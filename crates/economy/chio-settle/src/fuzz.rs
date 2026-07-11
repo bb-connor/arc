@@ -27,9 +27,10 @@
 //!    [`GovernedApprovalToken`] is minted with a fixed in-fuzzer keypair,
 //!    tamper bits from the input mutate the token / binding / expectations,
 //!    and the result is driven through [`crate::verify_governed_approval`]
-//!    (twice against one replay store, so the replay deny path runs every
-//!    iteration) and, when a witness is issued, through the EIP-3009 lane
-//!    wrapper [`crate::prepare_transfer_with_verified_approval`].
+//!    twice; each issued witness then drives the EIP-3009 lane wrapper
+//!    [`crate::prepare_transfer_with_verified_approval`] against ONE shared
+//!    replay store, so the issuance-level single-use deny path runs whenever
+//!    the fixture verifies.
 //!
 //! The keypairs are fixed via [`Keypair::from_seed`] with constant seeds,
 //! wrapped in [`OnceLock`] so they are materialised once per fuzzer process.
@@ -49,10 +50,10 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
-    parse_eip155_chain_id, parse_intent_settlement_binding, prepare_transfer_with_verified_approval,
-    verify_governed_approval, ApprovalBinding, Eip3009Domain, InMemoryApprovalReplayStore,
-    InMemoryEip3009NonceStore, TransferWithAuthorizationInput,
-    CHIO_SETTLEMENT_BINDING_CONTEXT_KEY,
+    parse_eip155_chain_id, parse_intent_settlement_binding,
+    prepare_transfer_with_verified_approval, verify_governed_approval, ApprovalBinding,
+    Eip3009Domain, InMemoryApprovalReplayStore, InMemoryEip3009NonceStore,
+    TransferWithAuthorizationInput, CHIO_SETTLEMENT_BINDING_CONTEXT_KEY,
 };
 
 /// Deterministic seed for the fixed approver keypair. Constant so the corpus
@@ -194,7 +195,9 @@ fn intent_committing_binding(binding: &ApprovalBinding) -> GovernedTransactionIn
     if let Some(capability_id) = binding.capability_id.as_ref() {
         commitment["capability_id"] = json!(capability_id);
     }
-    intent_with_context(Some(json!({ CHIO_SETTLEMENT_BINDING_CONTEXT_KEY: commitment })))
+    intent_with_context(Some(
+        json!({ CHIO_SETTLEMENT_BINDING_CONTEXT_KEY: commitment }),
+    ))
 }
 
 fn offset_clock(base: u64, offset: i64) -> u64 {
@@ -292,7 +295,10 @@ fn drive_witness_and_lane(case: &FuzzWitnessCase) {
     };
 
     let now = offset_clock(FUZZ_NOW, case.now_offset);
-    let replay_store = InMemoryApprovalReplayStore::new();
+    // Verification is read-only over the replay store, so the same token can
+    // be verified twice; each issued witness is driven through the lane
+    // below against ONE shared replay store, which exercises the
+    // issuance-level single-use deny path on the second issuance attempt.
     let first = verify_governed_approval(
         &token,
         &intent,
@@ -301,12 +307,7 @@ fn drive_witness_and_lane(case: &FuzzWitnessCase) {
         expected_request_id,
         binding.clone(),
         now,
-        &replay_store,
     );
-    // Second presentation against the same store: when the first issued a
-    // witness this is the single-use replay deny path; when it denied, the
-    // store is untouched and the same denial repeats. Either way it must not
-    // panic.
     let second = verify_governed_approval(
         &token,
         &intent,
@@ -315,11 +316,10 @@ fn drive_witness_and_lane(case: &FuzzWitnessCase) {
         expected_request_id,
         binding.clone(),
         now,
-        &replay_store,
     );
-    drop(second);
 
     let Ok(witness) = first else {
+        drop(second);
         return;
     };
 
@@ -349,13 +349,30 @@ fn drive_witness_and_lane(case: &FuzzWitnessCase) {
         nonce: format!("0x{:064x}", case.nonce_seed),
     };
     let nonce_store = InMemoryEip3009NonceStore::new();
+    let replay_store = InMemoryApprovalReplayStore::new();
     let _ = prepare_transfer_with_verified_approval(
-        domain,
-        authorization,
+        domain.clone(),
+        authorization.clone(),
         witness,
         now,
         &nonce_store,
+        &replay_store,
     );
+    if let Ok(second_witness) = second {
+        // Same approval, fresh nonce, shared replay store: covers the
+        // issuance-level replay denial (or a second issuance denial via the
+        // nonce path when the first attempt failed before consuming).
+        let mut second_authorization = authorization;
+        second_authorization.nonce = format!("0x{:064x}", case.nonce_seed.wrapping_add(1));
+        let _ = prepare_transfer_with_verified_approval(
+            domain,
+            second_authorization,
+            second_witness,
+            now,
+            &nonce_store,
+            &replay_store,
+        );
+    }
 }
 
 /// Drive arbitrary bytes through the settlement approval-witness trust

@@ -162,9 +162,7 @@ fn dispatch_binding() -> ApprovalBinding {
 /// COMMITS `binding`, mirroring production (the approver signs the intent that
 /// commits the concrete spend and the caller resolves the matching binding
 /// from it), so the per-lane mismatch tests still produce a witness whose
-/// binding disagrees only with the live DISPATCH, not with the intent. A fresh
-/// `InMemoryApprovalReplayStore` is allocated per call so each helper-produced
-/// witness is independent.
+/// binding disagrees only with the live DISPATCH, not with the intent.
 fn verified_for(binding: ApprovalBinding) -> VerifiedApproval {
     verified_for_with_token_expiry(binding, APPROVAL_NOW + 100)
 }
@@ -178,11 +176,24 @@ fn verified_for_with_token_expiry(
     binding: ApprovalBinding,
     token_expires_at: u64,
 ) -> VerifiedApproval {
+    verified_for_intent_with_token_expiry(binding, "intent-dispatch", token_expires_at)
+}
+
+/// Like [`verified_for_with_token_expiry`] but commits the binding into an
+/// intent with the given id. Distinct intent ids model DISTINCT approvals:
+/// the issuance-level replay key is `(request_id, intent_hash)`, so two
+/// spends sharing one replay store need distinct intents (or requests) for
+/// both to issue.
+fn verified_for_intent_with_token_expiry(
+    binding: ApprovalBinding,
+    intent_id: &str,
+    token_expires_at: u64,
+) -> VerifiedApproval {
     let approver = Keypair::generate();
     let subject = Keypair::generate();
     // Commit the very binding being verified so the intent-commitment check
     // passes; the lanes still assert the binding against the live dispatch.
-    let intent = intent_committing_binding("intent-dispatch", &binding);
+    let intent = intent_committing_binding(intent_id, &binding);
     let body = GovernedApprovalTokenBody {
         id: "approval-1".to_string(),
         approver: approver.public_key(),
@@ -194,7 +205,6 @@ fn verified_for_with_token_expiry(
         decision: GovernedApprovalDecision::Approved,
     };
     let token = GovernedApprovalToken::sign(body, &approver).test_unwrap();
-    let store = InMemoryApprovalReplayStore::new();
     verify_governed_approval(
         &token,
         &intent,
@@ -203,7 +213,6 @@ fn verified_for_with_token_expiry(
         APPROVAL_REQUEST_ID,
         binding,
         APPROVAL_NOW,
-        &store,
     )
     .test_unwrap()
 }
@@ -833,9 +842,9 @@ fn evaluates_paymaster_compatibility() {
 // -----------------------------------------------------------------
 
 /// Verify `token`/`intent` against the gate with the expected
-/// approver/subject/request defaulted from the same keypairs, a fresh
-/// replay store, and `APPROVAL_NOW`. Returns the gate result so callers
-/// can assert on success or the specific rejection.
+/// approver/subject/request defaulted from the same keypairs and
+/// `APPROVAL_NOW`. Returns the gate result so callers can assert on success
+/// or the specific rejection.
 fn verify_gate(
     token: &GovernedApprovalToken,
     intent: &GovernedTransactionIntent,
@@ -844,7 +853,6 @@ fn verify_gate(
     binding: ApprovalBinding,
     now: u64,
 ) -> Result<VerifiedApproval, SettlementError> {
-    let store = InMemoryApprovalReplayStore::new();
     verify_governed_approval(
         token,
         intent,
@@ -853,7 +861,6 @@ fn verify_gate(
         APPROVAL_REQUEST_ID,
         binding,
         now,
-        &store,
     )
 }
 
@@ -976,7 +983,6 @@ fn verify_governed_approval_rejects_an_unexpected_approver() {
     let token = signed_approval(&approver, &subject, &intent);
 
     let unexpected = Keypair::generate();
-    let store = InMemoryApprovalReplayStore::new();
     let error = verify_governed_approval(
         &token,
         &intent,
@@ -985,7 +991,6 @@ fn verify_governed_approval_rejects_an_unexpected_approver() {
         APPROVAL_REQUEST_ID,
         dispatch_binding(),
         APPROVAL_NOW,
-        &store,
     )
     .test_unwrap_err();
     assert!(
@@ -1038,7 +1043,6 @@ fn verify_governed_approval_rejects_a_wrong_subject() {
 
     // Verify with a DIFFERENT expected subject.
     let expected_subject = Keypair::generate();
-    let store = InMemoryApprovalReplayStore::new();
     let error = verify_governed_approval(
         &token,
         &intent,
@@ -1047,16 +1051,11 @@ fn verify_governed_approval_rejects_a_wrong_subject() {
         APPROVAL_REQUEST_ID,
         dispatch_binding(),
         APPROVAL_NOW,
-        &store,
     )
     .test_unwrap_err();
     assert!(
         error.to_string().contains("subject does not match"),
         "a token for a different subject must be rejected, got: {error}"
-    );
-    assert!(
-        store.is_empty().test_unwrap(),
-        "a subject-mismatch rejection must not burn the replay slot"
     );
 }
 
@@ -1071,7 +1070,6 @@ fn verify_governed_approval_rejects_a_wrong_request_id() {
     let intent = sample_intent("intent-wrong-request");
     let token = signed_approval(&approver, &subject, &intent);
 
-    let store = InMemoryApprovalReplayStore::new();
     let error = verify_governed_approval(
         &token,
         &intent,
@@ -1080,7 +1078,6 @@ fn verify_governed_approval_rejects_a_wrong_request_id() {
         "req-OTHER",
         dispatch_binding(),
         APPROVAL_NOW,
-        &store,
     )
     .test_unwrap_err();
     assert!(
@@ -1089,93 +1086,113 @@ fn verify_governed_approval_rejects_a_wrong_request_id() {
     );
 }
 
+/// Verify `token` over `intent` with matching expectations, returning the
+/// witness. Wrapper around [`verify_gate`] for the issuance-level replay
+/// tests, which re-verify the SAME token to model a second settlement
+/// attempt from the same approval.
+fn witness_for(
+    token: &GovernedApprovalToken,
+    intent: &GovernedTransactionIntent,
+    approver: &Keypair,
+    subject: &Keypair,
+) -> VerifiedApproval {
+    verify_gate(
+        token,
+        intent,
+        approver,
+        subject,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap()
+}
+
 #[test]
-fn verify_governed_approval_is_single_use_with_a_shared_store() {
-    // (2) Replay / single-use. The SAME approval verified twice against a
-    // SHARED replay store must be rejected on the second presentation,
-    // mirroring the kernel approval_replay_store. The first presentation
-    // succeeds; the second fails closed.
+fn issued_settlement_artifact_is_single_use_with_a_shared_store() {
+    // (2) Replay / single-use, consumed at ISSUANCE. The same approval can be
+    // verified twice (verification is read-only over the store), but the
+    // slot is recorded when a lane returns a settlement artifact: the first
+    // x402 issuance succeeds and the second attempt from the same approval
+    // against the same shared store fails closed.
     let approver = Keypair::generate();
     let subject = Keypair::generate();
     let intent = sample_intent("intent-replay");
     let token = signed_approval(&approver, &subject, &intent);
-
     let store = InMemoryApprovalReplayStore::new();
-    let first = verify_governed_approval(
-        &token,
-        &intent,
-        &approver.public_key(),
-        &subject.public_key(),
-        APPROVAL_REQUEST_ID,
-        dispatch_binding(),
+    let dispatch = sample_dispatch();
+
+    let first = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        witness_for(&token, &intent, &approver, &subject),
         APPROVAL_NOW,
         &store,
     );
-    assert!(
-        first.is_ok(),
-        "first presentation of a fresh approval must succeed"
-    );
+    assert!(first.is_ok(), "the first issuance must succeed: {first:?}");
+    assert_eq!(store.len().test_unwrap(), 1);
 
-    let replay = verify_governed_approval(
-        &token,
-        &intent,
-        &approver.public_key(),
-        &subject.public_key(),
-        APPROVAL_REQUEST_ID,
-        dispatch_binding(),
+    let replay = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        witness_for(&token, &intent, &approver, &subject),
         APPROVAL_NOW,
         &store,
     )
     .test_unwrap_err();
     assert!(
         replay.to_string().contains("already been consumed"),
-        "a second presentation of the same approval must be rejected, got: {replay}"
+        "a second issuance from the same approval must be rejected, got: {replay}"
     );
 }
 
 #[test]
-fn verify_governed_approval_does_not_burn_replay_slot_on_other_rejection() {
-    // The replay record happens LAST: a rejection on an earlier check
-    // (here a wrong approver) must not record the token, so a corrected
-    // presentation can still succeed against the same store.
-    let approver = Keypair::generate();
-    let subject = Keypair::generate();
-    let intent = sample_intent("intent-noslot");
-    let token = signed_approval(&approver, &subject, &intent);
+fn lane_rejection_does_not_burn_replay_slot() {
+    // The replay record happens at ISSUANCE: a witness that passes the gate
+    // but fails a LANE assertion (here a dispatch-identity mismatch) must
+    // not consume its slot, so a corrected pairing of the same approval can
+    // still settle against the same store.
     let store = InMemoryApprovalReplayStore::new();
-
-    let unexpected = Keypair::generate();
-    let _ = verify_governed_approval(
-        &token,
-        &intent,
-        &unexpected.public_key(),
-        &subject.public_key(),
-        APPROVAL_REQUEST_ID,
-        dispatch_binding(),
+    let other = sample_dispatch_with_other_dispatch_id();
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &other,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(dispatch_binding()),
         APPROVAL_NOW,
         &store,
     )
     .test_unwrap_err();
     assert!(
+        error.to_string().contains("dispatch mismatch"),
+        "got: {error}"
+    );
+    assert!(
         store.is_empty().test_unwrap(),
-        "an approver-mismatch rejection must not record a replay entry"
+        "a lane-level rejection must not record a replay entry"
     );
 
-    // The corrected presentation (right approver) now succeeds.
-    let ok = verify_governed_approval(
-        &token,
-        &intent,
-        &approver.public_key(),
-        &subject.public_key(),
-        APPROVAL_REQUEST_ID,
-        dispatch_binding(),
+    // The corrected pairing (right dispatch) still issues against the same
+    // store.
+    let ok = build_x402_payment_requirements_with_verified_approval(
+        &sample_dispatch(),
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(dispatch_binding()),
         APPROVAL_NOW,
         &store,
     );
-    assert!(
-        ok.is_ok(),
-        "a corrected presentation must still verify: {ok:?}"
-    );
+    assert!(ok.is_ok(), "a corrected pairing must still issue: {ok:?}");
+    assert_eq!(store.len().test_unwrap(), 1);
 }
 
 #[test]
@@ -1611,7 +1628,6 @@ fn verify_governed_approval_rejects_a_token_over_the_lifetime_cap() {
     };
     let token = GovernedApprovalToken::sign(body, &approver).test_unwrap();
 
-    let store = InMemoryApprovalReplayStore::new();
     let error = verify_governed_approval(
         &token,
         &intent,
@@ -1620,17 +1636,11 @@ fn verify_governed_approval_rejects_a_token_over_the_lifetime_cap() {
         APPROVAL_REQUEST_ID,
         dispatch_binding(),
         APPROVAL_NOW,
-        &store,
     )
     .test_unwrap_err();
     assert!(
         error.to_string().contains("lifetime") && error.to_string().contains("exceeds the maximum"),
         "a token whose lifetime exceeds the cap must be rejected, got: {error}"
-    );
-    // The over-long token must not have consumed its replay slot.
-    assert!(
-        store.is_empty().test_unwrap(),
-        "a lifetime-cap rejection must not burn the replay slot"
     );
 }
 
@@ -1653,7 +1663,6 @@ fn verify_governed_approval_accepts_a_token_at_the_lifetime_cap() {
     };
     let token = GovernedApprovalToken::sign(body, &approver).test_unwrap();
 
-    let store = InMemoryApprovalReplayStore::new();
     let verified = verify_governed_approval(
         &token,
         &intent,
@@ -1662,82 +1671,83 @@ fn verify_governed_approval_accepts_a_token_at_the_lifetime_cap() {
         APPROVAL_REQUEST_ID,
         dispatch_binding(),
         APPROVAL_NOW,
-        &store,
     )
     .test_unwrap();
     assert_eq!(verified.approval_id(), "approval-atcap");
 }
 
 #[test]
-fn shared_store_path_verifies_a_matching_token() {
-    // The only exported witness path now REQUIRES an explicit shared replay
-    // store (the per-call default store was removed because it could not
-    // enforce single-use across settlement requests). A matching token still
-    // verifies, and every binding check still runs.
+fn verification_does_not_consume_the_replay_slot() {
+    // Verification is a read-only proof over the token: re-verifying the
+    // same approval (for example after a crash between verification and
+    // settlement, or after a lane rejected the first witness) must succeed,
+    // and the later witness must still be able to issue. Only issuance
+    // consumes the slot.
     let approver = Keypair::generate();
     let subject = Keypair::generate();
     let intent = sample_intent("intent-shared-store");
     let token = signed_approval(&approver, &subject, &intent);
+
+    let first = witness_for(&token, &intent, &approver, &subject);
+    drop(first);
+    let second = witness_for(&token, &intent, &approver, &subject);
+
     let store = InMemoryApprovalReplayStore::new();
-    let verified = verify_governed_approval(
-        &token,
-        &intent,
-        &approver.public_key(),
-        &subject.public_key(),
-        APPROVAL_REQUEST_ID,
-        dispatch_binding(),
+    let issued = build_x402_payment_requirements_with_verified_approval(
+        &sample_dispatch(),
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        second,
         APPROVAL_NOW,
         &store,
-    )
-    .test_unwrap();
-    assert_eq!(verified.approval_id(), "approval-1");
+    );
+    assert!(
+        issued.is_ok(),
+        "a dropped witness must not block a later issuance: {issued:?}"
+    );
 }
 
 #[test]
-fn cross_call_replay_is_rejected_via_the_shared_store() {
-    // (1) Cross-call replay. The witness path no longer offers a per-call
-    // default store: callers MUST supply a shared store, so the SAME approval
-    // presented across two SEPARATE verification calls against that store is
-    // rejected on the second. Without a shared store (the removed default
-    // allocated a fresh per-call store) this second call would succeed and the
-    // approval would authorize a second settlement.
+fn same_approval_cannot_issue_on_two_lanes() {
+    // Cross-lane replay. The single-use unit is the issued settlement
+    // artifact, across ALL lanes sharing one store: after the x402 lane
+    // issues requirements for an approval, the Circle lane presented with a
+    // witness for the SAME approval must fail closed rather than prepare a
+    // second settlement of the same spend.
     let approver = Keypair::generate();
     let subject = Keypair::generate();
-    let intent = sample_intent("intent-cross-call");
+    let intent = sample_intent("intent-cross-lane");
     let token = signed_approval(&approver, &subject, &intent);
 
-    // A single durable store shared across both settlement requests.
+    // A single durable store shared across every lane.
     let shared_store = InMemoryApprovalReplayStore::new();
+    let dispatch = sample_dispatch();
 
-    let first = verify_governed_approval(
-        &token,
-        &intent,
-        &approver.public_key(),
-        &subject.public_key(),
-        APPROVAL_REQUEST_ID,
-        dispatch_binding(),
+    let x402 = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        witness_for(&token, &intent, &approver, &subject),
         APPROVAL_NOW,
         &shared_store,
     );
-    assert!(
-        first.is_ok(),
-        "the first settlement request must verify the approval"
-    );
+    assert!(x402.is_ok(), "the x402 issuance must succeed: {x402:?}");
 
-    let second = verify_governed_approval(
-        &token,
-        &intent,
-        &approver.public_key(),
-        &subject.public_key(),
-        APPROVAL_REQUEST_ID,
-        dispatch_binding(),
+    let circle = evaluate_circle_nanopayment_with_verified_approval(
+        &dispatch,
+        &sample_circle_policy(),
+        witness_for(&token, &intent, &approver, &subject),
         APPROVAL_NOW,
         &shared_store,
     )
     .test_unwrap_err();
     assert!(
-        second.to_string().contains("already been consumed"),
-        "the same approval presented to a second settlement request must be rejected, got: {second}"
+        circle.to_string().contains("already been consumed"),
+        "the same approval must not settle on a second lane, got: {circle}"
     );
 }
 
@@ -1754,10 +1764,12 @@ fn cross_call_replay_is_rejected_via_the_shared_store() {
 #[allow(clippy::type_complexity)]
 #[test]
 fn exported_lane_entry_points_require_a_verified_approval_witness() {
-    // The witness is taken BY VALUE on every lane (single-use), and every lane
-    // threads a lane-use clock (re-checks approval expiry at lane use). These
-    // fn-pointer types would fail to compile if a lane reverted to borrowing
-    // the witness or dropped its clock.
+    // The witness is taken BY VALUE on every lane (single-use), every lane
+    // threads a lane-use clock (re-checks approval expiry at lane use), and
+    // every lane threads the shared replay store it consumes the approval
+    // slot into at issuance. These fn-pointer types would fail to compile if
+    // a lane reverted to borrowing the witness, dropped its clock, or
+    // dropped the replay store.
     let _x402: fn(
         &Web3SettlementDispatchArtifact,
         &str,
@@ -1766,6 +1778,7 @@ fn exported_lane_entry_points_require_a_verified_approval_witness() {
         X402SettlementMode,
         VerifiedApproval,
         u64,
+        &dyn ApprovalReplayStore,
     ) -> Result<X402PaymentRequirements, SettlementError> =
         build_x402_payment_requirements_with_verified_approval;
     let _eip3009: fn(
@@ -1774,6 +1787,7 @@ fn exported_lane_entry_points_require_a_verified_approval_witness() {
         VerifiedApproval,
         u64,
         &dyn Eip3009NonceStore,
+        &dyn ApprovalReplayStore,
     ) -> Result<PreparedTransferWithAuthorization, SettlementError> =
         prepare_transfer_with_verified_approval;
     let _circle: fn(
@@ -1781,6 +1795,7 @@ fn exported_lane_entry_points_require_a_verified_approval_witness() {
         &CircleNanopaymentPolicy,
         VerifiedApproval,
         u64,
+        &dyn ApprovalReplayStore,
     ) -> Result<Option<PreparedCircleNanopayment>, SettlementError> =
         evaluate_circle_nanopayment_with_verified_approval;
 }
@@ -1804,6 +1819,7 @@ fn x402_with_verified_approval_authorizes_a_matching_dispatch() {
         X402SettlementMode::PrepaidAuthorization,
         approval,
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap();
 
@@ -1832,6 +1848,7 @@ fn x402_with_verified_approval_rejects_a_token_not_accepted() {
         X402SettlementMode::PrepaidAuthorization,
         verified_for(dispatch_binding()),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(error.to_string().contains("token mismatch"), "got: {error}");
@@ -1854,6 +1871,7 @@ fn x402_with_verified_approval_rejects_binding_mismatches() {
         X402SettlementMode::PrepaidAuthorization,
         verified_for(wrong_chain),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(error.to_string().contains("chain mismatch"), "got: {error}");
@@ -1870,6 +1888,7 @@ fn x402_with_verified_approval_rejects_binding_mismatches() {
         X402SettlementMode::PrepaidAuthorization,
         verified_for(wrong_payee),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(error.to_string().contains("payee mismatch"), "got: {error}");
@@ -1885,6 +1904,7 @@ fn x402_with_verified_approval_rejects_binding_mismatches() {
         X402SettlementMode::PrepaidAuthorization,
         verified_for(wrong_amount),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(
@@ -1928,6 +1948,7 @@ fn x402_with_verified_approval_accepts_a_base_usdc_dispatch_with_fiat_usd() {
         X402SettlementMode::PrepaidAuthorization,
         approval,
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap();
 
@@ -1964,6 +1985,7 @@ fn x402_with_verified_approval_rejects_a_non_bound_accepted_token() {
         X402SettlementMode::PrepaidAuthorization,
         verified_for(dispatch_binding_with_rail_token("USDC")),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(
@@ -1987,6 +2009,7 @@ fn x402_with_verified_approval_filters_a_non_bound_accepted_token() {
         X402SettlementMode::PrepaidAuthorization,
         verified_for(dispatch_binding_with_rail_token("USDC")),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap();
     assert_eq!(
@@ -2012,6 +2035,7 @@ fn x402_with_verified_approval_rejects_a_non_eip155_dispatch_chain() {
         X402SettlementMode::PrepaidAuthorization,
         verified_for(dispatch_binding()),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(
@@ -2024,25 +2048,28 @@ fn x402_with_verified_approval_rejects_a_non_eip155_dispatch_chain() {
 // C2: EIP-3009 lane binds against the verified approval.
 // -----------------------------------------------------------------
 
+/// The approval binding that matches `sample_authorization` on the EIP-3009
+/// lane (contract-pinned, no dispatch identity).
+fn eip3009_binding() -> ApprovalBinding {
+    ApprovalBinding {
+        chain_id: SAMPLE_CHAIN_ID,
+        payee_address: SAMPLE_PAYEE.to_string(),
+        amount_minor_units: SAMPLE_VALUE,
+        token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
+        token_contract: Some(SAMPLE_TOKEN_CONTRACT.to_string()),
+        settlement_currency: None,
+        dispatch_id: None,
+        capability_id: None,
+        approval_expires_at: SAMPLE_VALID_BEFORE,
+    }
+}
+
 /// A verified approval whose binding matches `sample_authorization`. The
 /// approval token expiry is set to the EIP-3009 sample window so the
 /// binding's `approval_expires_at == SAMPLE_VALID_BEFORE` stays within the
 /// token (the expiry clamp requires binding expiry <= token expiry).
 fn verified_for_eip3009_authorization() -> VerifiedApproval {
-    verified_for_with_token_expiry(
-        ApprovalBinding {
-            chain_id: SAMPLE_CHAIN_ID,
-            payee_address: SAMPLE_PAYEE.to_string(),
-            amount_minor_units: SAMPLE_VALUE,
-            token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
-            token_contract: Some(SAMPLE_TOKEN_CONTRACT.to_string()),
-            settlement_currency: None,
-            dispatch_id: None,
-            capability_id: None,
-            approval_expires_at: SAMPLE_VALID_BEFORE,
-        },
-        SAMPLE_VALID_BEFORE,
-    )
+    verified_for_with_token_expiry(eip3009_binding(), SAMPLE_VALID_BEFORE)
 }
 
 #[test]
@@ -2054,6 +2081,7 @@ fn eip3009_with_verified_approval_authorizes_a_matching_authorization() {
         verified_for_eip3009_authorization(),
         SAMPLE_NOW,
         &store,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap();
     assert!(prepared.authorization_digest.starts_with("0x"));
@@ -2086,6 +2114,7 @@ fn eip3009_with_verified_approval_rejects_a_payee_mismatch() {
         approval,
         SAMPLE_NOW,
         &store,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(error.to_string().contains("payee mismatch"), "got: {error}");
@@ -2106,6 +2135,7 @@ fn eip3009_with_verified_approval_rejects_an_expired_authorization() {
         verified_for_eip3009_authorization(),
         SAMPLE_VALID_BEFORE,
         &store,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(error.to_string().contains("expired"), "got: {error}");
@@ -2134,6 +2164,7 @@ fn circle_with_verified_approval_authorizes_a_matching_dispatch() {
         &sample_circle_policy(),
         verified_for(dispatch_binding()),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap()
     .test_unwrap();
@@ -2153,6 +2184,7 @@ fn circle_with_verified_approval_rejects_binding_mismatches() {
         &sample_circle_policy(),
         verified_for(wrong_chain),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(error.to_string().contains("chain mismatch"), "got: {error}");
@@ -2165,6 +2197,7 @@ fn circle_with_verified_approval_rejects_binding_mismatches() {
         &sample_circle_policy(),
         verified_for(wrong_payee),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(error.to_string().contains("payee mismatch"), "got: {error}");
@@ -2177,6 +2210,7 @@ fn circle_with_verified_approval_rejects_binding_mismatches() {
         &sample_circle_policy(),
         verified_for(wrong_amount),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(
@@ -2194,6 +2228,7 @@ fn circle_with_verified_approval_rejects_binding_mismatches() {
         &sample_circle_policy(),
         verified_for(wrong_token),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(error.to_string().contains("token mismatch"), "got: {error}");
@@ -2223,6 +2258,7 @@ fn x402_filters_extra_accepted_tokens_down_to_the_bound_token() {
         X402SettlementMode::PrepaidAuthorization,
         verified_for(dispatch_binding()),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap();
     assert_eq!(
@@ -2250,6 +2286,7 @@ fn x402_rejects_settlement_after_approval_expiry_at_lane_use() {
         X402SettlementMode::PrepaidAuthorization,
         approval,
         expiry,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(
@@ -2271,6 +2308,7 @@ fn circle_rejects_settlement_after_approval_expiry_at_lane_use() {
         &sample_circle_policy(),
         approval,
         expiry,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(
@@ -2292,6 +2330,7 @@ fn eip3009_rejects_settlement_after_approval_expiry_at_lane_use() {
         verified_for_eip3009_authorization(),
         SAMPLE_VALID_BEFORE,
         &store,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(
@@ -2310,10 +2349,13 @@ fn a_consumed_witness_cannot_authorize_a_second_transfer() {
     // so a single witness prepares exactly one transfer. The witness is moved
     // into the first call and `VerifiedApproval` is NOT `Clone`, so it cannot
     // be retained and reused with a fresh EIP-3009 nonce to forge a second
-    // transfer: a second spend must mint its OWN separately-verified witness.
-    // The compile-time fn-pointer test pins the by-value signature; here we
-    // show the first use succeeds and a second spend requires a fresh witness.
+    // transfer: a second spend must mint its OWN approval (distinct intent,
+    // hence a distinct replay key) and its own witness. The compile-time
+    // fn-pointer test pins the by-value signature; here both spends share ONE
+    // replay store to show a distinct approval still issues while the first
+    // approval's slot stays consumed.
     let store = InMemoryEip3009NonceStore::new();
+    let replay_store = InMemoryApprovalReplayStore::new();
 
     let approval = verified_for_eip3009_authorization();
     let first = prepare_transfer_with_verified_approval(
@@ -2322,6 +2364,7 @@ fn a_consumed_witness_cannot_authorize_a_second_transfer() {
         approval,
         SAMPLE_NOW,
         &store,
+        &replay_store,
     );
     assert!(
         first.is_ok(),
@@ -2330,20 +2373,31 @@ fn a_consumed_witness_cannot_authorize_a_second_transfer() {
 
     // `approval` was moved into the first call and cannot be referenced again
     // (it is not `Clone`), so a second transfer with a FRESH nonce must be
-    // authorized by a NEW witness rather than a reused one.
+    // authorized by a NEW approval over its own intent rather than a reused
+    // one.
     let mut second_authorization = sample_authorization();
     second_authorization.nonce =
         "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string();
     let second = prepare_transfer_with_verified_approval(
         sample_domain(),
         second_authorization,
-        verified_for_eip3009_authorization(),
+        verified_for_intent_with_token_expiry(
+            eip3009_binding(),
+            "intent-second-spend",
+            SAMPLE_VALID_BEFORE,
+        ),
         SAMPLE_NOW,
         &store,
+        &replay_store,
     );
     assert!(
         second.is_ok(),
-        "a second spend must be authorized by its OWN witness, not a reused one: {second:?}"
+        "a second spend must be authorized by its OWN approval and witness: {second:?}"
+    );
+    assert_eq!(
+        replay_store.len().test_unwrap(),
+        2,
+        "each issued transfer must consume its own approval slot"
     );
 }
 
@@ -2419,6 +2473,7 @@ fn x402_witness_with_fiat_max_amount_and_usdc_rail_is_accepted_and_still_clamps(
         X402SettlementMode::PrepaidAuthorization,
         approval,
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap();
     assert_eq!(
@@ -2510,6 +2565,7 @@ fn x402_rejects_a_witness_paired_with_a_different_dispatch_id() {
         X402SettlementMode::PrepaidAuthorization,
         verified_for(dispatch_binding()),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(
@@ -2529,6 +2585,7 @@ fn circle_rejects_a_witness_paired_with_a_different_dispatch_id() {
         &sample_circle_policy(),
         verified_for(dispatch_binding()),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(
@@ -2561,6 +2618,7 @@ fn x402_rejects_a_witness_paired_with_a_different_capability_id() {
         X402SettlementMode::PrepaidAuthorization,
         approval,
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(
@@ -2586,6 +2644,7 @@ fn x402_rejects_a_witness_with_no_bound_dispatch_identity() {
         X402SettlementMode::PrepaidAuthorization,
         verified_for(binding),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(
@@ -2613,6 +2672,7 @@ fn x402_rejects_a_contract_pinned_approval_on_the_symbol_only_lane() {
         X402SettlementMode::PrepaidAuthorization,
         verified_for(binding),
         APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
     )
     .test_unwrap_err();
     assert!(

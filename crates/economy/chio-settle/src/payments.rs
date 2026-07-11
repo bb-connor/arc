@@ -224,6 +224,16 @@ fn resolve_x402_capability_id(dispatch: &Web3SettlementDispatchArtifact) -> Stri
 /// after it lapses. The returned `accepted_tokens` are filtered down to the
 /// approval-bound token, so the requirements never advertise a token the
 /// approval did not authorize even if the caller passed extras.
+///
+/// The approval's single-use replay slot is consumed HERE, immediately
+/// before the requirements are returned: `(request_id, intent_hash)` is
+/// recorded into `replay_store`, so the first issued settlement artifact
+/// wins across every lane sharing the store and a lane-level rejection never
+/// burns the slot. A replayed approval fails closed.
+// Every parameter is an independent fail-closed input to the lane (dispatch
+// identity, facilitator/resource surface, token filter, mode, witness, lane
+// clock, shared replay store); merging any pair would weaken a check.
+#[allow(clippy::too_many_arguments)]
 pub fn build_x402_payment_requirements_with_verified_approval(
     dispatch: &Web3SettlementDispatchArtifact,
     facilitator_url: &str,
@@ -232,6 +242,7 @@ pub fn build_x402_payment_requirements_with_verified_approval(
     settlement_mode: X402SettlementMode,
     approval: VerifiedApproval,
     now_unix_seconds: u64,
+    replay_store: &dyn ApprovalReplayStore,
 ) -> Result<X402PaymentRequirements, SettlementError> {
     let binding = approval.binding();
 
@@ -341,13 +352,19 @@ pub fn build_x402_payment_requirements_with_verified_approval(
         )));
     }
 
-    build_x402_payment_requirements(
+    let requirements = build_x402_payment_requirements(
         dispatch,
         facilitator_url,
         resource,
         filtered_tokens,
         settlement_mode,
-    )
+    )?;
+
+    // Consume the single-use slot LAST: the artifact exists and every
+    // fail-closed check has passed, so a rejection anywhere above leaves the
+    // approval spendable by a corrected attempt.
+    consume_replay_slot_at_issuance(&approval, replay_store)?;
+    Ok(requirements)
 }
 
 fn validate_x402_field(label: &str, value: &str) -> Result<(), SettlementError> {
@@ -643,6 +660,12 @@ impl ApprovalBinding {
 /// It deliberately does NOT derive `Clone`: a single-use capability witness
 /// that could be duplicated would not be single-use, so a caller cannot keep a
 /// copy to reuse with a fresh EIP-3009 nonce after a lane has consumed it.
+///
+/// Holding a witness is NOT yet a consumed approval: the approval's
+/// `(request_id, governed_intent_hash)` replay slot is recorded only when a
+/// lane wrapper issues a settlement artifact, so a witness that is dropped,
+/// or rejected by a lane assertion, leaves the approval spendable by a
+/// corrected attempt. See [`verify_governed_approval`].
 #[derive(Debug)]
 pub struct VerifiedApproval {
     /// The intent hash the verified token committed to (== the recomputed
@@ -734,24 +757,24 @@ impl VerifiedApproval {
 ///    window bounded by the token.
 /// 10. **Lifetime cap.** `(token.expires_at - token.issued_at)` must not exceed
 ///     [`MAX_APPROVAL_TTL_SECS`] (mirroring the kernel cap), so a token cannot
-///     mint a witness that outlives the replay registry's eviction window. The
-///     cap is checked BEFORE the replay entry is recorded, so a rejected
-///     over-long token does not burn its replay slot.
-/// 11. **Single-use replay.** `(token.request_id, intent_hash)` is recorded in
-///     `replay_store` (mirroring the kernel `approval_replay_store`). A second
-///     presentation of the same approval is rejected before the witness is
-///     issued; the entry is recorded ONLY after every other check passes, so a
-///     rejected approval does not burn its replay slot.
+///     mint a witness that outlives the replay registry's eviction window.
+///
+/// # Single use is consumed at artifact issuance, not here
+///
+/// Verification is a read-only proof over the token: this gate never touches
+/// the [`ApprovalReplayStore`], so neither a gate-level rejection nor a
+/// verified-but-never-settled witness consumes the approval's single-use
+/// slot, and re-verifying the same token (for example after a crash between
+/// verification and settlement) still succeeds. The single-use unit is the
+/// ISSUED SETTLEMENT ARTIFACT: each exported lane wrapper records
+/// `(request_id, governed_intent_hash)` into its shared replay store
+/// immediately before returning a successful artifact, so the first issuance
+/// wins across every lane sharing the store.
 ///
 /// `binding` is the chain/payee/amount the caller resolved from `intent`.
 /// It is returned inside the [`VerifiedApproval`] for the lanes to assert
 /// against. The lanes' own assertions against the live dispatch are the
 /// second, independent economic check (see module trust-path docs).
-// The verifier genuinely needs the token, intent, expected
-// approver/subject/request, resolved binding, clock, and replay store; each is
-// an independent fail-closed input that cannot be merged without weakening one
-// of the C2 checks.
-#[allow(clippy::too_many_arguments)]
 pub fn verify_governed_approval(
     token: &GovernedApprovalToken,
     intent: &GovernedTransactionIntent,
@@ -760,7 +783,6 @@ pub fn verify_governed_approval(
     expected_request_id: &str,
     binding: ApprovalBinding,
     now_unix_seconds: u64,
-    replay_store: &dyn ApprovalReplayStore,
 ) -> Result<VerifiedApproval, SettlementError> {
     // (1) Signature over the canonical token body. `verify_signature`
     // returns Ok(false) for a well-formed-but-wrong signature and Err for a
@@ -881,8 +903,7 @@ pub fn verify_governed_approval(
     // with `expires_at` far past `issued_at` would mint a long-lived witness
     // that could outlive the single-use replay entry's eviction window. Mirror
     // the kernel cap (`MAX_APPROVAL_TTL_SECS`): reject any token whose
-    // `(expires_at - issued_at)` exceeds it BEFORE recording the replay entry,
-    // so a rejected over-long token never burns its replay slot. Fail closed.
+    // `(expires_at - issued_at)` exceeds it. Fail closed.
     let token_lifetime = token.expires_at.saturating_sub(token.issued_at);
     if token_lifetime > MAX_APPROVAL_TTL_SECS {
         return Err(SettlementError::Verification(format!(
@@ -891,30 +912,42 @@ pub fn verify_governed_approval(
         )));
     }
 
-    // (11) Single-use replay. Record AFTER every other check so a rejected
-    // approval does not burn its replay slot, but BEFORE issuing the witness
-    // so the first successful verification is the only one. Keyed on
-    // `(request_id, intent_hash)`, mirroring the kernel replay store. Retain
-    // until the token's own expiry.
-    match replay_store.record_if_fresh(
-        &token.request_id,
-        &token.governed_intent_hash,
-        token.expires_at,
-    )? {
-        ApprovalReplayOutcome::Fresh => {}
-        ApprovalReplayOutcome::Replayed => {
-            return Err(SettlementError::Verification(
-                "governed approval token has already been consumed (replay rejected)".to_string(),
-            ));
-        }
-    }
-
     Ok(VerifiedApproval {
         governed_intent_hash: token.governed_intent_hash.clone(),
         approval_id: token.id.clone(),
         request_id: token.request_id.clone(),
         binding,
     })
+}
+
+/// Consume the approval's single-use replay slot at settlement-artifact
+/// issuance.
+///
+/// Every exported lane wrapper calls this as its FINAL step: all lane
+/// assertions have passed and the settlement artifact already exists, so the
+/// only remaining outcome is returning it. Recording here (and nowhere
+/// earlier) makes the ISSUED ARTIFACT the single-use unit: the first
+/// issuance wins across every lane sharing `replay_store`, and neither a
+/// gate-level nor a lane-level rejection consumes the slot. Keyed on
+/// `(request_id, governed_intent_hash)`, mirroring the kernel
+/// `approval_replay_store`; retained until the approval expiry, which the
+/// gate clamps to the token expiry.
+fn consume_replay_slot_at_issuance(
+    approval: &VerifiedApproval,
+    replay_store: &dyn ApprovalReplayStore,
+) -> Result<(), SettlementError> {
+    match replay_store.record_if_fresh(
+        approval.request_id(),
+        approval.governed_intent_hash(),
+        approval.binding().approval_expires_at,
+    )? {
+        ApprovalReplayOutcome::Fresh => Ok(()),
+        ApprovalReplayOutcome::Replayed => Err(SettlementError::Verification(
+            "governed approval has already been consumed by an issued settlement artifact \
+             (replay rejected)"
+                .to_string(),
+        )),
+    }
 }
 
 /// Assert a caller-resolved [`ApprovalBinding`] matches the settlement
@@ -1599,12 +1632,23 @@ pub(crate) fn prepare_transfer_with_authorization(
 /// `approval_expires_at` is re-checked here before any digest is built, so an
 /// approval verified just before expiry and held cannot authorize a transfer
 /// prepared after it lapses.
+///
+/// The approval's single-use replay slot is consumed HERE, immediately
+/// before the prepared digest is returned: `(request_id, intent_hash)` is
+/// recorded into `replay_store`, so the first issued settlement artifact
+/// wins across every lane sharing the store and a lane-level rejection never
+/// burns the slot. Ordering note: the EIP-3009 nonce is recorded inside the
+/// inner preparation, so an authorization presented with an
+/// already-consumed approval leaves its own nonce consumed. That is
+/// fail-closed and only pins the replayed presentation's authorization; a
+/// legitimate new spend carries its own approval and its own nonce.
 pub fn prepare_transfer_with_verified_approval(
     domain: Eip3009Domain,
     authorization: TransferWithAuthorizationInput,
     approval: VerifiedApproval,
     now_unix_seconds: u64,
     nonce_store: &dyn Eip3009NonceStore,
+    replay_store: &dyn ApprovalReplayStore,
 ) -> Result<PreparedTransferWithAuthorization, SettlementError> {
     let binding = approval.binding();
     // Lane-use expiry: re-check the approval window against the lane-use clock
@@ -1614,13 +1658,19 @@ pub fn prepare_transfer_with_verified_approval(
     // re-check the approval window itself here so a held witness cannot prepare
     // a transfer after the approval has lapsed.
     binding.assert_not_expired_at("EIP-3009", now_unix_seconds)?;
-    prepare_transfer_with_authorization(
+    let prepared = prepare_transfer_with_authorization(
         domain,
         authorization,
         binding,
         now_unix_seconds,
         nonce_store,
-    )
+    )?;
+
+    // Consume the single-use slot LAST: the digest exists and every lane
+    // assertion has passed, so a rejection anywhere above leaves the
+    // approval spendable by a corrected attempt.
+    consume_replay_slot_at_issuance(&approval, replay_store)?;
+    Ok(prepared)
 }
 
 /// Evaluate a Circle nanopayment candidate straight off a dispatch with NO
@@ -1706,11 +1756,20 @@ pub(crate) fn evaluate_circle_nanopayment(
 /// is the lane-use clock: the approval's `approval_expires_at` is re-checked
 /// here, so a witness verified just before expiry and held cannot authorize a
 /// Circle payout prepared after it lapses.
+///
+/// The approval's single-use replay slot is consumed HERE, and only when a
+/// payout is actually prepared: `(request_id, intent_hash)` is recorded into
+/// `replay_store` immediately before returning `Ok(Some(_))`. The
+/// policy-driven `Ok(None)` "not a candidate" outcome issues no artifact and
+/// leaves the slot unconsumed, so the same approval can still settle on
+/// another lane; the first issued artifact wins across every lane sharing
+/// the store.
 pub fn evaluate_circle_nanopayment_with_verified_approval(
     dispatch: &Web3SettlementDispatchArtifact,
     policy: &CircleNanopaymentPolicy,
     approval: VerifiedApproval,
     now_unix_seconds: u64,
+    replay_store: &dyn ApprovalReplayStore,
 ) -> Result<Option<PreparedCircleNanopayment>, SettlementError> {
     let binding = approval.binding();
 
@@ -1764,7 +1823,14 @@ pub fn evaluate_circle_nanopayment_with_verified_approval(
     // fails closed.
     binding.assert_dispatch_id("Circle", &dispatch.dispatch_id)?;
 
-    evaluate_circle_nanopayment(dispatch, policy)
+    let prepared = evaluate_circle_nanopayment(dispatch, policy)?;
+    if prepared.is_some() {
+        // Consume the single-use slot only when a payout artifact is issued:
+        // the policy-driven None outcome settles nothing, so the approval
+        // stays spendable (on this lane or another).
+        consume_replay_slot_at_issuance(&approval, replay_store)?;
+    }
+    Ok(prepared)
 }
 
 pub fn prepare_paymaster_compatibility(

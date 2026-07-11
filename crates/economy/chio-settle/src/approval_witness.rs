@@ -7,9 +7,11 @@
 //! the replay bookkeeping and CAIP-2 chain parsing carry their own tests.
 //!
 //! The replay store mirrors the kernel's `approval_replay_store`
-//! (`chio-kernel::dpop::DpopNonceStore::check_and_insert`): an approval token
-//! is single-use, keyed on `(request_id, governed_intent_hash)`, so a second
-//! presentation of the same approval is rejected before any lane settles.
+//! (`chio-kernel::dpop::DpopNonceStore::check_and_insert`): an approval is
+//! single-use, keyed on `(request_id, governed_intent_hash)`. The lane
+//! wrappers consume the slot at settlement-artifact issuance, so the first
+//! issued artifact wins across every lane sharing the store and a second
+//! settlement attempt from the same approval is rejected.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -156,12 +158,15 @@ pub const DEFAULT_MAX_APPROVAL_REPLAY_ENTRIES: usize = 65_536;
 
 /// Single-use replay store for verified governed approvals.
 ///
-/// This is the trust-boundary surface the exported witness path consults
-/// BEFORE issuing a [`crate::payments::VerifiedApproval`]. It is keyed on the
-/// approval's `(request_id, governed_intent_hash)` pair, mirroring the kernel
+/// This is the trust-boundary surface the exported lane wrappers consult at
+/// settlement-artifact issuance, immediately before an artifact is returned
+/// (verification itself never touches it, so a
+/// [`crate::payments::VerifiedApproval`] that is rejected by a lane or never
+/// used leaves its slot unconsumed). It is keyed on the approval's
+/// `(request_id, governed_intent_hash)` pair, mirroring the kernel
 /// `approval_replay_store` so the settlement layer enforces the same
 /// single-use guarantee the kernel does on its own path: an approval token
-/// authorizes exactly one settlement.
+/// authorizes exactly one issued settlement artifact.
 ///
 /// Implementations are `Send + Sync` so callers can hold them behind an
 /// `Arc<dyn ApprovalReplayStore>` and share one across settlement workers.
@@ -175,9 +180,9 @@ pub trait ApprovalReplayStore: Send + Sync {
     /// Record `(request_id, intent_hash)` for replay detection.
     ///
     /// `retain_until_unix_seconds` is the time the entry stays GC-able until
-    /// (typically the approval token's `expires_at`). Atomicity: two
-    /// concurrent calls with the same key cannot both observe
-    /// [`ApprovalReplayOutcome::Fresh`].
+    /// (the approval expiry, which the witness gate clamps to the token
+    /// expiry). Atomicity: two concurrent calls with the same key cannot
+    /// both observe [`ApprovalReplayOutcome::Fresh`].
     fn record_if_fresh(
         &self,
         request_id: &str,
@@ -206,10 +211,12 @@ type ApprovalReplayMap = HashMap<(String, String), u64>;
 
 /// Process-local single-use approval replay store.
 ///
-/// Backed by `Mutex<ApprovalReplayMap>`. ON BY DEFAULT for the exported
-/// witness path and suitable for single-process deployments; durable
-/// deployments back the [`ApprovalReplayStore`] trait with the same SQLite
-/// seam the EIP-3009 nonce store uses.
+/// Backed by `Mutex<ApprovalReplayMap>`. Suitable for tests and
+/// single-process deployments ONLY: single-use holds just within one
+/// process. Durable multi-worker deployments back the
+/// [`ApprovalReplayStore`] trait with the SQLite implementation in
+/// `chio-store-sqlite::approval_replay_store` and share one database across
+/// every settlement worker.
 pub struct InMemoryApprovalReplayStore {
     inner: Mutex<ApprovalReplayMap>,
     max_entries: usize,
