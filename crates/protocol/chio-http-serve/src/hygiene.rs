@@ -14,7 +14,13 @@ use tower_http::timeout::TimeoutLayer;
 /// `TimeoutStopSec` at least this high plus a flush margin.
 pub const DEFAULT_DRAIN_TIMEOUT: Duration = Duration::from_secs(25);
 /// Per-request processing ceiling before the request is denied with 408.
-pub const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+///
+/// This stays strictly below [`DEFAULT_DRAIN_TIMEOUT`] so a request admitted just
+/// before a stop signal reaches its own 408 and completes cleanly within the
+/// drain window, rather than being severed mid-flight when the forced-drain timer
+/// force-closes the connection. A serve site that lengthens the request timeout
+/// must lengthen the drain to match.
+pub const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 /// Maximum concurrent in-flight requests before surplus load sheds with 503.
 pub const DEFAULT_MAX_CONCURRENT_REQUESTS: usize = 1024;
 /// Maximum simultaneously accepted TCP connections.

@@ -343,6 +343,112 @@ async fn accept_once(
     listener.accept().await
 }
 
+#[tokio::test]
+async fn capped_listener_still_serves_connect_info() {
+    // Capping connections changes the accepted IO type, which drops it out of
+    // axum's built-in `SocketAddr` connect-info. `CappedPeerAddr` restores the
+    // peer address, so a site keeps both the accept ceiling and per-connection
+    // context. A handler that echoes the peer address proves the binding resolves.
+    use axum::extract::ConnectInfo;
+    let router =
+        Router::new().route(
+            "/whoami",
+            get(
+                |ConnectInfo(peer): ConnectInfo<crate::CappedPeerAddr>| async move {
+                    peer.ip().to_string()
+                },
+            ),
+        );
+    let (listener, addr) = bind_ephemeral().await;
+    let capped = MaxConnListener::new(listener, 8);
+    let ctrl = ShutdownController::manual();
+    let server = axum::serve(
+        capped,
+        router.into_make_service_with_connect_info::<crate::CappedPeerAddr>(),
+    )
+    .with_graceful_shutdown(ctrl.signalled());
+    let serve = tokio::spawn(run_until_drained(
+        server,
+        ctrl.subscribe(),
+        Duration::from_secs(2),
+        async { Ok::<(), String>(()) },
+    ));
+
+    let (status, response) = http_request(addr, &get_request("/whoami")).await.unwrap();
+    assert_eq!(status, 200);
+    assert!(
+        response.contains("127.0.0.1"),
+        "the handler must observe the loopback peer address, got: {response}"
+    );
+
+    ctrl.trigger();
+    let _ = serve.await.unwrap();
+}
+
+#[test]
+fn default_request_timeout_stays_within_drain_window() {
+    // The forced-drain timer starts at the stop signal and force-closes at
+    // `DEFAULT_DRAIN_TIMEOUT`. A request admitted just before the signal must be
+    // able to reach its own 408 and complete cleanly first, so the per-request
+    // ceiling must be strictly below the drain window. If this ever inverts, a
+    // routine deploy severs requests that were still inside their allotted time.
+    assert!(
+        crate::DEFAULT_REQUEST_TIMEOUT < crate::DEFAULT_DRAIN_TIMEOUT,
+        "request timeout {:?} must stay below the drain window {:?}",
+        crate::DEFAULT_REQUEST_TIMEOUT,
+        crate::DEFAULT_DRAIN_TIMEOUT,
+    );
+}
+
+#[tokio::test]
+async fn slow_request_times_out_cleanly_inside_the_drain_window() {
+    // With the request timeout below the drain window, a request that outlives
+    // both is denied with 408 by the timeout layer and its connection completes,
+    // so the drain observes a clean shutdown rather than force-closing it. This is
+    // the behavioral guarantee the default ordering exists to provide.
+    let router = Router::new().route(
+        "/slow",
+        get(|| async {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            "unreachable"
+        }),
+    );
+    let config = ServeHygieneConfig {
+        request_timeout: Some(Duration::from_millis(100)),
+        drain_timeout: Duration::from_millis(600),
+        max_concurrent_requests: None,
+        max_connections: None,
+        max_body_bytes: None,
+    };
+    let router = apply_server_hygiene(router, &config);
+
+    let (listener, addr) = bind_ephemeral().await;
+    let ctrl = ShutdownController::manual();
+    let server = axum::serve(listener, router).with_graceful_shutdown(ctrl.signalled());
+    let serve = tokio::spawn(run_until_drained(
+        server,
+        ctrl.subscribe(),
+        config.drain_timeout,
+        async { Ok::<(), String>(()) },
+    ));
+
+    let request = tokio::spawn(async move { http_request(addr, &get_request("/slow")).await });
+    // Admit the request, then stop the server while it is still parked in the
+    // handler and inside its own request-timeout budget.
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    ctrl.trigger();
+
+    let (status, _) = request.await.unwrap().unwrap();
+    assert_eq!(status, 408, "the slow request should be denied with 408");
+
+    let outcome = serve.await.unwrap().unwrap();
+    assert_eq!(
+        outcome,
+        DrainOutcome::Clean,
+        "the request timeout must fire before the drain deadline force-closes"
+    );
+}
+
 #[test]
 fn hygiene_defaults_are_conservative() {
     let config = ServeHygieneConfig::default();

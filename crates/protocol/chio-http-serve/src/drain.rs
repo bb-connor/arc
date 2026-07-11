@@ -42,6 +42,16 @@ pub enum ServeError {
 /// server `drain_timeout` after boot. So the serve runs unbounded until either
 /// it ends on its own or the signal arrives; only then does the remaining
 /// in-flight drain get a deadline.
+///
+/// Flush-hook contract: on a clean drain the flush runs after every accepted
+/// connection has finished, so it has the store to itself. On a forced drain a
+/// connection outlived the deadline; axum serves each connection on a detached
+/// task that a bounded drain can neither join nor cancel, so `on_drained` can run
+/// while such a straggler is still finishing and MUST be safe against a concurrent
+/// writer. Sites keep this safe by making every acknowledged receipt durable
+/// synchronously in the handler (or via a commit actor that acks only after the
+/// write reaches the WAL), never in the flush hook, so a straggler can never cost
+/// an acknowledged receipt.
 pub async fn run_until_drained<S, D>(
     server: S,
     shutdown: watch::Receiver<bool>,
@@ -85,10 +95,12 @@ where
         }
     };
 
-    // On a forced drain the serve future still holds the stuck connection open.
-    // Drop it before the flush so no handler can still be writing a receipt when
-    // the flush runs. A clean outcome already ran the future to completion, so
-    // the drop is a no-op there.
+    // On a forced drain the serve future is still parked waiting on a connection
+    // that outlived the deadline. Drop it to release the accept loop and the
+    // listener before the flush. This does not guarantee the connection's handler
+    // has stopped: axum runs it on a detached task, so it may still be finishing
+    // (see the flush-hook contract above). A clean outcome already ran the future
+    // to completion, so the drop is a no-op there.
     if matches!(outcome, DrainOutcome::Forced) {
         drop(server);
     }

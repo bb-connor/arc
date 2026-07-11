@@ -1,10 +1,14 @@
 use std::io;
+use std::net::SocketAddr;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use axum::serve::Listener;
+use axum::extract::connect_info::Connected;
+use axum::serve::{IncomingStream, Listener};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::net::TcpListener;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 /// Wrap any [`axum::serve::Listener`] with a hard cap on concurrent
@@ -18,11 +22,13 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 /// unbounded-buffering new sockets. The permit semaphore is never closed, so a
 /// drain does not revoke the permits of connections that are still finishing.
 ///
-/// This wrapper changes the listener's IO type, which is incompatible with
-/// `into_make_service_with_connect_info::<SocketAddr>`: axum ties the connect-
-/// info binding to the concrete `TcpListener`, and coherence forbids extending
-/// it to a wrapper. A site that needs `ConnectInfo` therefore serves the raw
-/// listener and relies on the request concurrency limit for its accept ceiling.
+/// This wrapper changes the listener's accepted IO type, which moves it out of
+/// axum's built-in `Connected<_> for SocketAddr` impl (that impl is bound to the
+/// concrete `TcpListener`, and coherence forbids re-adding one for the foreign
+/// `SocketAddr`). A site that still needs the peer address serves
+/// `into_make_service_with_connect_info::<CappedPeerAddr>()` and reads
+/// `ConnectInfo<CappedPeerAddr>`, so it keeps both the accept cap and connect
+/// info.
 pub struct MaxConnListener<L> {
     inner: L,
     permits: Arc<Semaphore>,
@@ -72,6 +78,37 @@ where
 
     fn local_addr(&self) -> io::Result<Self::Addr> {
         self.inner.local_addr()
+    }
+}
+
+/// Peer socket address for a connection accepted through a
+/// [`MaxConnListener`] over a [`TcpListener`].
+///
+/// axum's built-in connect-info impl for [`SocketAddr`] is bound to the concrete
+/// `TcpListener`, so a capped site cannot ask for `ConnectInfo<SocketAddr>`
+/// directly (the cap wraps the listener). It asks for
+/// `ConnectInfo<CappedPeerAddr>` instead; this type derefs and displays as the
+/// wrapped `SocketAddr`, so per-IP logic reads unchanged.
+#[derive(Clone, Copy, Debug)]
+pub struct CappedPeerAddr(pub SocketAddr);
+
+impl Deref for CappedPeerAddr {
+    type Target = SocketAddr;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for CappedPeerAddr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Connected<IncomingStream<'_, MaxConnListener<TcpListener>>> for CappedPeerAddr {
+    fn connect_info(stream: IncomingStream<'_, MaxConnListener<TcpListener>>) -> Self {
+        Self(*stream.remote_addr())
     }
 }
 

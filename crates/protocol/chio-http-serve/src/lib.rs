@@ -44,7 +44,7 @@ pub use hygiene::{
     apply_server_hygiene, ServeHygieneConfig, DEFAULT_DRAIN_TIMEOUT,
     DEFAULT_MAX_CONCURRENT_REQUESTS, DEFAULT_MAX_CONNECTIONS, DEFAULT_REQUEST_TIMEOUT,
 };
-pub use listener::{MaxConnListener, PermittedIo};
+pub use listener::{CappedPeerAddr, MaxConnListener, PermittedIo};
 pub use signal::{shutdown_signal, ShutdownController};
 
 #[cfg(test)]
