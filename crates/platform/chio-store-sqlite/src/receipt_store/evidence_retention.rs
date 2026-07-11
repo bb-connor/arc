@@ -1290,7 +1290,20 @@ pub(super) fn retention_repair_on_writer(
     // the repair watermark; otherwise the insert fails on a missing table and
     // rolls the whole repair back, leaving the bricked store unrepaired.
     super::support::ensure_receipt_retention_watermark_table(&tx)?;
-    insert_receipt_retention_watermark(&tx, rounded_watermark, now, archive_path, None, now)?;
+    // A prior botched rotation may have already recorded a watermark at or above
+    // this repair boundary while leaving the orphaned claim-log rows behind. The
+    // ledger's monotonic-insert trigger rejects a non-increasing mark, so an
+    // unconditional re-insert at the covered boundary would abort and roll the
+    // whole repair back, leaving the store permanently unrepairable. The
+    // watermark already covers the boundary, so skip the redundant insert and let
+    // the deletion of the orphans stand.
+    let watermark_covers = matches!(
+        super::support::retention_watermark(&tx)?,
+        Some(current) if current >= rounded_watermark
+    );
+    if !watermark_covers {
+        insert_receipt_retention_watermark(&tx, rounded_watermark, now, archive_path, None, now)?;
+    }
     ensure_transparency_projection_guards(&tx)?;
     tx.commit()?;
 
