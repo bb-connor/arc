@@ -234,6 +234,7 @@ impl ChioKernel {
             emergency_stopped: AtomicBool::new(false),
             emergency_stopped_since: AtomicU64::new(0),
             emergency_stop_reason: ArcSwap::from_pointee(Option::<String>::None),
+            lock_poison: chio_supervisor::HealthFlag::new(true),
             memory_provenance: None,
             federation_peers: ArcSwap::from_pointee(HashMap::new()),
             capability_trust_roots: ArcSwap::from_pointee(HashMap::new()),
@@ -299,6 +300,31 @@ impl ChioKernel {
             )),
             Some(_) => Ok(()),
         }
+    }
+
+    /// Record that a trusted-computing-base lock was found poisoned. A poisoned
+    /// lock means a panic unwound while the lock was held, so the state it guards
+    /// may be half-mutated. Trip the persistent degraded flag so the pre-dispatch
+    /// gate fails subsequent evaluations closed rather than proceeding on the
+    /// recovered state.
+    pub(crate) fn record_tcb_lock_poison(&self, lock: &str) {
+        self.lock_poison.record_failure(
+            format!("{lock} lock poisoned by a prior panic"),
+            chio_supervisor::now_unix_ms(),
+            0,
+        );
+    }
+
+    /// Pre-dispatch gate: deny before dispatch once any TCB lock has been found
+    /// poisoned, so no evaluation proceeds on state a panicking thread may have
+    /// left half-mutated. Recovery is operator-visible only.
+    pub(crate) fn ensure_tcb_locks_healthy(&self) -> Result<(), KernelError> {
+        if self.lock_poison.is_serving_closed() {
+            return Err(KernelError::Internal(
+                "trusted state degraded: a TCB lock was poisoned by a prior panic".to_string(),
+            ));
+        }
+        Ok(())
     }
 
     pub(crate) fn ensure_receipt_persistence_ready(&self) -> Result<(), KernelError> {

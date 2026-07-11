@@ -264,6 +264,21 @@ impl ChioKernel {
                 extra_metadata.clone(),
             );
         }
+        if let Err(error) = self.ensure_tcb_locks_healthy() {
+            let msg = error.to_string();
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&msg),
+                "tcb lock poisoned pre-dispatch"
+            );
+            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
         if let Err(error) = self.ensure_receipt_persistence_ready() {
             let msg = error.to_string();
             warn!(
