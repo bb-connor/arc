@@ -63,3 +63,19 @@ time-deterministic (inject a fixed clock) as a follow-up; it is unrelated to M2 
 
 `chio/m2-build` is ready to merge / open a PR. The unblocked M2 surface ships once the six items in
 Section 3 close.
+
+## 5. Wire compatibility: `ungrounded` finality status (post-review note, 2026-07-10)
+
+The v1 verifier-report schema (`spec/schemas/chio-web3/v1/public-settlement-verifier-report.schema.json`)
+had the `ungrounded` value added to its closed finality-status enum in place. Two consequences:
+
+- Validators generated from the pre-addition v1 enum reject any report carrying `ungrounded`
+  (fail-closed direction, but strictly a breaking change for pinned external validators). If external
+  consumers pin this enum, bump the schema to v2 rather than relying on the in-place extension.
+- After the RPI-1 reconciliation with main, the shipped verifier hard-denies a bundle when no
+  independent chain head is supplied ("public settlement independent head missing"), so the
+  status-downgrade path that emits `ungrounded` is a structural second layer that no shipped
+  verify path currently reaches. Consumers keying off the status field are covered by the deny;
+  the only in-repo consumer that gates on the affirmative claim is the x402 signing path
+  (`x402_signing.rs`), which requires `finality_verified` to be PRESENT before attesting; the CLI
+  and proof-room callers surface the report without ever treating claim absence as success.
