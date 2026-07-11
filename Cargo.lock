@@ -3917,6 +3917,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core",
  "chrono",
+ "proptest",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
