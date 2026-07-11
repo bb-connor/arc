@@ -515,6 +515,24 @@ impl ChioKernel {
         // Spawn the retention maintenance worker only when retention is
         // configured; an unconfigured deployment gets no background thread.
         if let Some(config) = self.config.retention_config.clone() {
+            // Fail-closed: prefix retention can only archive receipts already
+            // covered by a kernel checkpoint (the archival watermark advances to
+            // checkpoint boundaries). With automatic checkpointing disabled
+            // (`checkpoint_batch_size == 0`) no background signer was installed
+            // above, so the checkpoint chain can never advance past 0 and the
+            // retention worker could never archive anything: the store would
+            // serve forever under a policy it can never honor, silently retaining
+            // every receipt. Reject the attach rather than run a retention policy
+            // that can never advance its watermark.
+            if self.checkpoint_batch_size == 0 {
+                return Err(KernelError::Internal(
+                    "KernelConfig.retention_config is set but automatic checkpointing is disabled \
+                     (checkpoint_batch_size == 0); prefix retention can only archive \
+                     checkpoint-covered receipts, so refusing to attach a store that could never \
+                     advance its retention watermark"
+                        .to_string(),
+                ));
+            }
             // Fail-closed: configured retention is a storage/compliance control.
             // A store whose rotate_receipts is the default unsupported stub would
             // attach and then only log "retention not supported" on every worker

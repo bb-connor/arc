@@ -83,6 +83,28 @@ fn attach_rejects_tenant_scoped_retention() {
     );
 }
 
+/// Prefix retention only ever archives receipts covered by a kernel checkpoint,
+/// so it depends on automatic checkpointing being enabled. Attaching a
+/// retention-configured store while `checkpoint_batch_size == 0` installs no
+/// background signer, so the checkpoint chain never advances past 0 and the
+/// retention worker could never archive anything: the store would silently
+/// retain every receipt forever. The attach must fail closed rather than serve
+/// under a retention policy that can never advance its watermark.
+#[test]
+fn attach_rejects_retention_when_checkpointing_disabled() {
+    let mut config = make_config();
+    config.checkpoint_batch_size = 0;
+    config.retention_config = Some(crate::RetentionConfig::default());
+    let mut kernel = make_kernel(config);
+    let error = kernel
+        .set_receipt_store(Box::new(RetentionCapableReceiptStore))
+        .expect_err("attach must reject retention when automatic checkpointing is disabled");
+    assert!(
+        matches!(&error, KernelError::Internal(message) if message.contains("automatic checkpointing is disabled")),
+        "unexpected error: {error:?}"
+    );
+}
+
 #[test]
 fn all_calls_produce_verified_receipts() {
     let mut kernel = make_kernel(make_config());
