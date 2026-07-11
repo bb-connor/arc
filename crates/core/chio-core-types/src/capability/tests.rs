@@ -5,6 +5,10 @@ use crate::error::{Error, Result};
 use crate::runtime_attestation::AttestationVerifierFamily;
 use crate::session::SessionAnchorReference;
 
+use super::aggregate_budget::{
+    AggregateBudgetRootBinding, AggregateBudgetRootBindingBody, AggregateBudgetRootCommitment,
+    AggregateInvocationBudget, AggregateInvocationScope, CHIO_AGGREGATE_BUDGET_ROOT_SCHEMA,
+};
 use super::attenuation::*;
 use super::caveat::GrantSubsetRelation;
 use super::crypto_floor::*;
@@ -52,6 +56,7 @@ fn capability_token_serde_roundtrip() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
 
@@ -81,6 +86,7 @@ fn capability_token_signature_verification() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
     assert!(token.verify_signature().unwrap());
@@ -101,6 +107,7 @@ fn legacy_body_signed_capability_token_still_verifies() -> Result<()> {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let (signature, _bytes) = kp.sign_canonical(&body)?;
     let token = CapabilityToken {
@@ -112,6 +119,7 @@ fn legacy_body_signed_capability_token_still_verifies() -> Result<()> {
         issued_at: body.issued_at,
         expires_at: body.expires_at,
         delegation_chain: body.delegation_chain,
+        aggregate_invocation_budget: None,
         algorithm: None,
         caveats: Vec::new(),
         scope_attenuations: None,
@@ -140,6 +148,7 @@ fn wrong_key_signature_fails() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let mut token = CapabilityToken::sign(body, &kp).unwrap();
     token.issuer = other_kp.public_key();
@@ -158,6 +167,7 @@ fn time_validation() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
 
@@ -376,6 +386,7 @@ fn attenuated_capability_schema_and_budget_fail_closed() {
         issued_at: 10,
         expires_at: 20,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -430,6 +441,7 @@ fn attenuated_capability_chain_binding_feature_disabled_fails_closed() {
         issued_at: 10,
         expires_at: 20,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -479,6 +491,7 @@ fn attenuated_capability_requires_attenuation_proof() -> Result<()> {
         issued_at: 10,
         expires_at: 20,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let mut token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -519,6 +532,7 @@ fn empty_child_scope_attenuation_proof_survives_serialization() -> Result<()> {
         issued_at: 10,
         expires_at: 20,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -603,6 +617,7 @@ fn chain_binding_disabled_does_not_reject_v1_tokens() {
             issued_at: 10,
             expires_at: 20,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &issuer,
     )
@@ -654,6 +669,7 @@ fn plain_delegated_token_without_attenuation_proof_verifies_and_skips_chain_bind
             issued_at: 100,
             expires_at: 200,
             delegation_chain: vec![parent_link],
+            aggregate_invocation_budget: None,
         },
         &issuer,
     )
@@ -709,6 +725,7 @@ fn requires_chain_binding_tracks_only_new_attenuation() {
             issued_at: 100,
             expires_at: 200,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &issuer,
     )
@@ -1733,6 +1750,7 @@ fn ed25519_capability_token_is_byte_identical_without_algorithm_field() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
     let json = serde_json::to_value(&token).unwrap();
@@ -1755,6 +1773,7 @@ fn capability_token_backend_signing_with_ed25519_verifies() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
     assert_eq!(
@@ -1780,6 +1799,7 @@ fn capability_token_p256_round_trip() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
     assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P256));
@@ -1806,6 +1826,7 @@ fn capability_token_p384_round_trip() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
     assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P384));
@@ -1825,6 +1846,7 @@ fn capability_token_p256_tampered_body_fails() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let mut token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
     token.id = "cap-tampered".to_string();
@@ -1869,6 +1891,7 @@ fn delegate_parent_token(
         issued_at,
         expires_at,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     CapabilityToken::sign(body, parent_kp).unwrap()
 }
@@ -2158,6 +2181,7 @@ fn bac573_capability_token(issued_at: u64, expires_at: u64) -> (Keypair, Capabil
         issued_at,
         expires_at,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
     (kp, token)
@@ -3131,4 +3155,323 @@ fn delegate_rejects_concrete_remove_operation_step_not_reflected_in_wildcard_chi
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
+}
+
+fn aggregate_invocation_wire_root_binding(
+    issuer: &Keypair,
+    subject: &PublicKey,
+    max_invocations: u32,
+) -> AggregateBudgetRootBinding {
+    AggregateBudgetRootBinding {
+        body: AggregateBudgetRootBindingBody {
+            schema: CHIO_AGGREGATE_BUDGET_ROOT_SCHEMA.to_string(),
+            root_capability_id: "cap-family-root".to_string(),
+            root_capability_hash: "11".repeat(32),
+            root_issuer: issuer.public_key(),
+            root_subject: subject.clone(),
+            max_invocations,
+            root_expires_at: 2_000,
+            root_scope_hash: "22".repeat(32),
+        },
+        algorithm: None,
+        signature: issuer.sign(b"aggregate-wire-shape"),
+    }
+}
+
+fn aggregate_invocation_wire_body(
+    issuer: &Keypair,
+    scope: ChioScope,
+    aggregate_invocation_budget: Option<AggregateInvocationBudget>,
+) -> CapabilityTokenBody {
+    CapabilityTokenBody {
+        id: "cap-aggregate-wire".to_string(),
+        issuer: issuer.public_key(),
+        subject: issuer.public_key(),
+        scope,
+        issued_at: 1_000,
+        expires_at: 2_000,
+        delegation_chain: vec![],
+        aggregate_invocation_budget,
+    }
+}
+
+fn aggregate_invocation_wire_unsigned_token(
+    issuer: &Keypair,
+    scope: ChioScope,
+    aggregate_invocation_budget: AggregateInvocationBudget,
+) -> CapabilityToken {
+    CapabilityToken {
+        schema: CHIO_CAPABILITY_SCHEMA.to_string(),
+        id: "cap-invalid-aggregate-wire".to_string(),
+        issuer: issuer.public_key(),
+        subject: issuer.public_key(),
+        scope,
+        issued_at: 1_000,
+        expires_at: 2_000,
+        delegation_chain: vec![],
+        aggregate_invocation_budget: Some(aggregate_invocation_budget),
+        algorithm: None,
+        caveats: vec![],
+        scope_attenuations: None,
+        attenuation_proof: None,
+        budget_share_bps: None,
+        signature: issuer.sign(b"structural-validation-only"),
+    }
+}
+
+#[test]
+fn aggregate_invocation_wire_absence_preserves_exact_prechange_bytes() {
+    let issuer =
+        Keypair::from_seed_hex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")
+            .expect("fixed RFC 8032 key");
+    let public_key = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+    let body = CapabilityTokenBody {
+        id: "cap-compat".to_string(),
+        issuer: issuer.public_key(),
+        subject: issuer.public_key(),
+        scope: ChioScope::default(),
+        issued_at: 1_000,
+        expires_at: 2_000,
+        delegation_chain: vec![],
+        aggregate_invocation_budget: None,
+    };
+    let expected_legacy = format!(
+        "{{\"expires_at\":2000,\"id\":\"cap-compat\",\"issued_at\":1000,\"issuer\":\"{public_key}\",\"scope\":{{}},\"subject\":\"{public_key}\"}}"
+    );
+    assert_eq!(
+        crate::canonical::canonical_json_bytes(&body).expect("canonical legacy body"),
+        expected_legacy.as_bytes()
+    );
+
+    let signing_body = CapabilityTokenSigningBody {
+        schema: CHIO_CAPABILITY_SCHEMA.to_string(),
+        body: body.clone(),
+        caveats: vec![],
+        scope_attenuations: None,
+        attenuation_proof: None,
+        budget_share_bps: None,
+    };
+    let expected_schema_aware = format!(
+        "{{\"expires_at\":2000,\"id\":\"cap-compat\",\"issued_at\":1000,\"issuer\":\"{public_key}\",\"schema\":\"chio.capability.v1\",\"scope\":{{}},\"subject\":\"{public_key}\"}}"
+    );
+    assert_eq!(
+        crate::canonical::canonical_json_bytes(&signing_body).expect("canonical schema-aware body"),
+        expected_schema_aware.as_bytes()
+    );
+
+    let body_json = serde_json::to_value(&body).expect("serialize body");
+    assert!(body_json.get("aggregate_invocation_budget").is_none());
+    let token = CapabilityToken::sign(body, &issuer).expect("sign token");
+    let token_json = serde_json::to_value(&token).expect("serialize token");
+    assert!(token_json.get("aggregate_invocation_budget").is_none());
+}
+
+#[test]
+fn aggregate_invocation_wire_zero_limit_round_trips() {
+    let issuer = Keypair::generate();
+    let budget = AggregateInvocationBudget {
+        scope: AggregateInvocationScope::Capability,
+        max_invocations: 0,
+        root_binding: None,
+    };
+    let body = aggregate_invocation_wire_body(&issuer, ChioScope::default(), Some(budget));
+    let token = CapabilityToken::sign(body, &issuer).expect("zero is a valid aggregate maximum");
+    let encoded = serde_json::to_vec(&token).expect("serialize token");
+    let decoded: CapabilityToken = serde_json::from_slice(&encoded).expect("deserialize token");
+    assert_eq!(
+        decoded
+            .aggregate_invocation_budget
+            .as_ref()
+            .expect("aggregate budget")
+            .max_invocations,
+        0
+    );
+    assert!(decoded.verify_signature().expect("verify signature"));
+}
+
+#[test]
+fn aggregate_invocation_wire_scope_values_are_exact() {
+    assert_eq!(
+        serde_json::to_string(&AggregateInvocationScope::Capability).expect("capability scope"),
+        "\"capability\""
+    );
+    assert_eq!(
+        serde_json::to_string(&AggregateInvocationScope::DelegationFamily)
+            .expect("delegation family scope"),
+        "\"delegation_family\""
+    );
+}
+
+#[test]
+fn aggregate_invocation_wire_nested_shapes_reject_unknown_fields() {
+    let issuer = Keypair::generate();
+    let subject = issuer.public_key();
+    let family = AggregateInvocationBudget {
+        scope: AggregateInvocationScope::DelegationFamily,
+        max_invocations: 3,
+        root_binding: Some(aggregate_invocation_wire_root_binding(&issuer, &subject, 3)),
+    };
+
+    let mut budget_json = serde_json::to_value(&family).expect("serialize budget");
+    budget_json
+        .as_object_mut()
+        .expect("budget object")
+        .insert("unknown".to_string(), serde_json::json!(true));
+    assert!(serde_json::from_value::<AggregateInvocationBudget>(budget_json).is_err());
+
+    let mut body_json = serde_json::to_value(&family.root_binding.as_ref().expect("binding").body)
+        .expect("serialize binding body");
+    body_json
+        .as_object_mut()
+        .expect("binding body object")
+        .insert("unknown".to_string(), serde_json::json!(true));
+    assert!(serde_json::from_value::<AggregateBudgetRootBindingBody>(body_json).is_err());
+
+    let mut binding_json =
+        serde_json::to_value(family.root_binding.expect("binding")).expect("serialize binding");
+    binding_json
+        .as_object_mut()
+        .expect("binding object")
+        .insert("unknown".to_string(), serde_json::json!(true));
+    assert!(serde_json::from_value::<AggregateBudgetRootBinding>(binding_json).is_err());
+
+    let commitment = AggregateBudgetRootCommitment {
+        root_capability_id: "cap-family-root".to_string(),
+        root_issuer: issuer.public_key(),
+        root_subject: subject,
+        root_scope_hash: "22".repeat(32),
+        root_issued_at: 1_000,
+        root_expires_at: 2_000,
+        aggregate_scope: AggregateInvocationScope::DelegationFamily,
+        max_invocations: 3,
+    };
+    let mut commitment_json = serde_json::to_value(commitment).expect("serialize commitment");
+    commitment_json
+        .as_object_mut()
+        .expect("commitment object")
+        .insert("unknown".to_string(), serde_json::json!(true));
+    assert!(serde_json::from_value::<AggregateBudgetRootCommitment>(commitment_json).is_err());
+}
+
+#[test]
+fn aggregate_invocation_wire_rejects_invalid_scope_and_root_combinations() {
+    let issuer = Keypair::generate();
+    let subject = issuer.public_key();
+    let binding = aggregate_invocation_wire_root_binding(&issuer, &subject, 3);
+
+    let capability_with_binding = AggregateInvocationBudget {
+        scope: AggregateInvocationScope::Capability,
+        max_invocations: 3,
+        root_binding: Some(binding.clone()),
+    };
+    assert!(capability_with_binding
+        .validate_for_scope(&ChioScope::default())
+        .is_err());
+    assert!(aggregate_invocation_wire_unsigned_token(
+        &issuer,
+        ChioScope::default(),
+        capability_with_binding,
+    )
+    .validate_schema()
+    .is_err());
+
+    let family_without_binding = AggregateInvocationBudget {
+        scope: AggregateInvocationScope::DelegationFamily,
+        max_invocations: 3,
+        root_binding: None,
+    };
+    assert!(family_without_binding
+        .validate_for_scope(&ChioScope::default())
+        .is_err());
+    assert!(aggregate_invocation_wire_unsigned_token(
+        &issuer,
+        ChioScope::default(),
+        family_without_binding,
+    )
+    .validate_schema()
+    .is_err());
+
+    let capability = AggregateInvocationBudget {
+        scope: AggregateInvocationScope::Capability,
+        max_invocations: 3,
+        root_binding: None,
+    };
+    for scope in [
+        ChioScope {
+            grants: vec![make_grant("server", "tool", vec![Operation::Delegate])],
+            ..ChioScope::default()
+        },
+        ChioScope {
+            resource_grants: vec![ResourceGrant {
+                uri_pattern: "resource://*".to_string(),
+                operations: vec![Operation::Delegate],
+            }],
+            ..ChioScope::default()
+        },
+        ChioScope {
+            prompt_grants: vec![PromptGrant {
+                prompt_name: "*".to_string(),
+                operations: vec![Operation::Delegate],
+            }],
+            ..ChioScope::default()
+        },
+    ] {
+        assert!(capability.validate_for_scope(&scope).is_err());
+        assert!(
+            aggregate_invocation_wire_unsigned_token(&issuer, scope, capability.clone())
+                .validate_schema()
+                .is_err()
+        );
+    }
+
+    let valid_family = AggregateInvocationBudget {
+        scope: AggregateInvocationScope::DelegationFamily,
+        max_invocations: 3,
+        root_binding: Some(binding),
+    };
+    assert!(valid_family
+        .validate_for_scope(&ChioScope::default())
+        .is_ok());
+}
+
+#[test]
+fn aggregate_invocation_wire_present_field_disables_plain_body_fallback() {
+    let issuer = Keypair::generate();
+    let body = aggregate_invocation_wire_body(
+        &issuer,
+        ChioScope::default(),
+        Some(AggregateInvocationBudget {
+            scope: AggregateInvocationScope::Capability,
+            max_invocations: 1,
+            root_binding: None,
+        }),
+    );
+    let (signature, _) = issuer
+        .sign_canonical(&body)
+        .expect("sign legacy plain body");
+    let token = CapabilityToken {
+        schema: CHIO_CAPABILITY_SCHEMA.to_string(),
+        id: body.id,
+        issuer: body.issuer,
+        subject: body.subject,
+        scope: body.scope,
+        issued_at: body.issued_at,
+        expires_at: body.expires_at,
+        delegation_chain: body.delegation_chain,
+        aggregate_invocation_budget: body.aggregate_invocation_budget,
+        algorithm: None,
+        caveats: vec![],
+        scope_attenuations: None,
+        attenuation_proof: None,
+        budget_share_bps: None,
+        signature,
+    };
+
+    assert!(!token.verify_signature().expect("ordinary verification"));
+    assert_eq!(
+        token
+            .verify_signature_with_floor(CapabilityCryptoFloor::AllowClassical)
+            .expect("floor verification"),
+        false
+    );
 }

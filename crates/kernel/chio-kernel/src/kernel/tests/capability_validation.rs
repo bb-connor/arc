@@ -10,6 +10,7 @@ fn kernel_rejects_classical_capability_under_pq_required_floor() {
             issued_at: 100,
             expires_at: 200,
             delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
         },
         &keypair,
     )
@@ -411,6 +412,7 @@ fn untrusted_issuer_denied() {
         issued_at: current_unix_timestamp(),
         expires_at: current_unix_timestamp() + 300,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let cap = CapabilityToken::sign(body, &rogue_kp).unwrap();
 
@@ -843,6 +845,7 @@ fn delegated_tool_call_exceeding_configured_max_depth_denies() {
             issued_at: current_unix_timestamp(),
             expires_at: current_unix_timestamp() + 300,
             delegation_chain: vec![root_to_parent.clone()],
+            aggregate_invocation_budget: None,
         },
         &kernel.config.keypair,
     )
@@ -919,6 +922,7 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
             issued_at: current_unix_timestamp(),
             expires_at: current_unix_timestamp() + 300,
             delegation_chain: vec![root_to_parent],
+            aggregate_invocation_budget: None,
         },
         &kernel.config.keypair,
     )

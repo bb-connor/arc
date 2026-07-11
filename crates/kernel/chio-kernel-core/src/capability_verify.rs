@@ -498,6 +498,7 @@ mod tests {
                 issued_at: 100,
                 expires_at: 200,
                 delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
             },
             &issuer,
         )
@@ -529,6 +530,7 @@ mod tests {
                 issued_at: 100,
                 expires_at: 200,
                 delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
             },
             &issuer,
         )
@@ -566,6 +568,7 @@ mod tests {
                     issued_at: 100,
                     expires_at: 200,
                     delegation_chain: Vec::new(),
+                    aggregate_invocation_budget: None,
                 },
                 caveats: Vec::new(),
                 scope_attenuations: Vec::new(),
@@ -728,6 +731,7 @@ mod tests {
                 issued_at: 100,
                 expires_at: 200,
                 delegation_chain: Vec::from([parent_link]),
+                aggregate_invocation_budget: None,
             },
             &issuer,
         )
@@ -796,6 +800,7 @@ mod tests {
                 issued_at: 100,
                 expires_at: 200,
                 delegation_chain: Vec::from([parent_link]),
+                aggregate_invocation_budget: None,
             },
             &issuer,
         )
@@ -861,6 +866,7 @@ mod tests {
                 issued_at: 100,
                 expires_at: 200,
                 delegation_chain: Vec::from([parent_link]),
+                aggregate_invocation_budget: None,
             },
             &issuer,
         )
@@ -926,6 +932,7 @@ mod tests {
                 issued_at: 100,
                 expires_at: 200,
                 delegation_chain: Vec::from([parent_link]),
+                aggregate_invocation_budget: None,
             },
             &issuer,
         )
@@ -1015,6 +1022,7 @@ mod tests {
                     issued_at: 100,
                     expires_at: 200,
                     delegation_chain: vec![parent_link],
+                    aggregate_invocation_budget: None,
                 },
                 caveats: Vec::new(),
                 scope_attenuations: Vec::new(),
@@ -1122,6 +1130,7 @@ mod tests {
                     issued_at: 100,
                     expires_at: 200,
                     delegation_chain: vec![first_link, second_link],
+                    aggregate_invocation_budget: None,
                 },
                 caveats: Vec::new(),
                 scope_attenuations: Vec::new(),
@@ -1196,6 +1205,7 @@ mod tests {
                     issued_at: 100,
                     expires_at: 200,
                     delegation_chain: Vec::from([parent_link]),
+                    aggregate_invocation_budget: None,
                 },
                 caveats: Vec::new(),
                 scope_attenuations: Vec::new(),

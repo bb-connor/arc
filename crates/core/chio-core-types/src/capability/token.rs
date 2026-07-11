@@ -14,6 +14,7 @@ use crate::signer_binding::{
     ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
 };
 
+use super::aggregate_budget::AggregateInvocationBudget;
 use super::attenuation::{
     scope_hash, validate_attenuation_proof, verify_attenuation_witness, Attenuation,
     AttenuationProof, DelegationLink, ScopeHash,
@@ -84,6 +85,10 @@ pub struct CapabilityToken {
     /// 10000 are rejected by validation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub budget_share_bps: Option<u16>,
+    /// Optional invocation maximum shared by this capability or its
+    /// delegation family.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_invocation_budget: Option<AggregateInvocationBudget>,
     /// Signature over canonical JSON of all fields above.
     pub signature: Signature,
 }
@@ -105,6 +110,8 @@ pub struct CapabilityTokenBody {
     pub expires_at: u64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub delegation_chain: Vec<DelegationLink>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_invocation_budget: Option<AggregateInvocationBudget>,
 }
 
 /// Schema-aware capability-token signing input used by newly-issued tokens.
@@ -149,6 +156,7 @@ impl CapabilityToken {
             issued_at: self.issued_at,
             expires_at: self.expires_at,
             delegation_chain: self.delegation_chain.clone(),
+            aggregate_invocation_budget: self.aggregate_invocation_budget.clone(),
         }
     }
 
@@ -172,6 +180,7 @@ impl CapabilityToken {
             && self.scope_attenuations.as_ref().is_none_or(Vec::is_empty)
             && self.attenuation_proof.is_none()
             && self.budget_share_bps.is_none()
+            && self.aggregate_invocation_budget.is_none()
     }
 
     /// Reject unknown schema IDs and budget amplification.
@@ -192,6 +201,9 @@ impl CapabilityToken {
         }
         if let Some(share) = self.budget_share_bps {
             validate_budget_share_bps(share)?;
+        }
+        if let Some(budget) = self.aggregate_invocation_budget.as_ref() {
+            budget.validate_for_scope(&self.scope)?;
         }
         if let Some(proof) = self.attenuation_proof.as_ref() {
             let child_hash = scope_hash(&self.scope)?;
@@ -337,6 +349,9 @@ impl CapabilityToken {
     /// default Ed25519 algorithm.
     pub fn sign(body: CapabilityTokenBody, keypair: &Keypair) -> Result<Self> {
         ensure_keypair_matches_embedded_key(&body.issuer, keypair, "capability token", "issuer")?;
+        if let Some(budget) = body.aggregate_invocation_budget.as_ref() {
+            budget.validate_for_scope(&body.scope)?;
+        }
         let signing_body = CapabilityTokenSigningBody {
             schema: CHIO_CAPABILITY_SCHEMA.to_string(),
             body: body.clone(),
@@ -360,6 +375,7 @@ impl CapabilityToken {
             scope_attenuations: None,
             attenuation_proof: None,
             budget_share_bps: None,
+            aggregate_invocation_budget: body.aggregate_invocation_budget,
             signature,
         })
     }
@@ -396,6 +412,9 @@ impl CapabilityToken {
         if let Some(share) = body.budget_share_bps {
             validate_budget_share_bps(share)?;
         }
+        if let Some(budget) = body.body.aggregate_invocation_budget.as_ref() {
+            budget.validate_for_scope(&body.body.scope)?;
+        }
         let signing_body = CapabilityTokenSigningBody {
             schema: CHIO_CAPABILITY_SCHEMA.to_string(),
             body: body.body.clone(),
@@ -419,6 +438,7 @@ impl CapabilityToken {
             scope_attenuations: Some(body.scope_attenuations),
             attenuation_proof: Some(body.attenuation_proof),
             budget_share_bps: body.budget_share_bps,
+            aggregate_invocation_budget: body.body.aggregate_invocation_budget,
             signature,
         })
     }
@@ -437,6 +457,9 @@ impl CapabilityToken {
         backend: &dyn SigningBackend,
     ) -> Result<Self> {
         ensure_backend_matches_embedded_key(&body.issuer, backend, "capability token", "issuer")?;
+        if let Some(budget) = body.aggregate_invocation_budget.as_ref() {
+            budget.validate_for_scope(&body.scope)?;
+        }
         let signing_body = CapabilityTokenSigningBody {
             schema: CHIO_CAPABILITY_SCHEMA.to_string(),
             body: body.clone(),
@@ -460,6 +483,7 @@ impl CapabilityToken {
             scope_attenuations: None,
             attenuation_proof: None,
             budget_share_bps: None,
+            aggregate_invocation_budget: body.aggregate_invocation_budget,
             signature,
         })
     }

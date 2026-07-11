@@ -23,6 +23,23 @@ pub struct ChioScope {
 }
 
 impl ChioScope {
+    /// Returns true when any tool, resource, or prompt grant authorizes
+    /// delegation.
+    #[must_use]
+    pub fn authorizes_delegation(&self) -> bool {
+        self.grants
+            .iter()
+            .any(|grant| grant.operations.contains(&Operation::Delegate))
+            || self
+                .resource_grants
+                .iter()
+                .any(|grant| grant.operations.contains(&Operation::Delegate))
+            || self
+                .prompt_grants
+                .iter()
+                .any(|grant| grant.operations.contains(&Operation::Delegate))
+    }
+
     /// Returns true if `self` is a subset of `other` -- that is, every grant
     /// in `self` is covered by some grant in `other`.
     #[must_use]

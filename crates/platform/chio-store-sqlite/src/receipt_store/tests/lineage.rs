@@ -223,6 +223,7 @@ fn receipt_lineage_verification_backfills_from_governed_call_chain_metadata() {
             issued_at: 1_000,
             expires_at: 9_000,
             delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
         },
         &issuer_kp,
     )

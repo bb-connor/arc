@@ -403,6 +403,7 @@ fn capability_with_id(id: &str, subject: &Keypair, issuer: &Keypair) -> Capabili
             issued_at: 100,
             expires_at: 100_000,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         issuer,
     )

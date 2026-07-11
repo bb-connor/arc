@@ -442,6 +442,7 @@ mod tests {
             issued_at,
             expires_at,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         };
         CapabilityToken::sign(body, issuer_kp).expect("sign failed")
     }

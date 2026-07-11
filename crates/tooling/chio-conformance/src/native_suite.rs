@@ -1142,6 +1142,7 @@ fn build_capability(
             issued_at: 1_700_000_000,
             expires_at: 1_800_000_000,
             delegation_chain,
+            aggregate_invocation_budget: None,
         },
         &authority_keypair(),
     )

@@ -377,6 +377,7 @@ mod tests {
             issued_at: 0,
             expires_at: u64::MAX,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         };
         CapabilityToken::sign(body, kp).expect("sign cap")
     }

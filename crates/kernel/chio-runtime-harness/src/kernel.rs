@@ -83,6 +83,7 @@ fn runtime_loopback_capability(
         issued_at,
         expires_at,
         delegation_chain: Vec::new(),
+        aggregate_invocation_budget: None,
     };
     chio_core::capability::token::CapabilityToken::sign(body, issuer).map_err(|error| {
         RuntimeLoopbackError::message(format!("Chio runtime loopback capability signing: {error}"))

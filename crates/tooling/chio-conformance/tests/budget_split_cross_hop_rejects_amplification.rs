@@ -74,6 +74,7 @@ fn sign_attenuated_with_chain(
         issued_at: 100,
         expires_at: 200,
         delegation_chain: chain,
+        aggregate_invocation_budget: None,
     };
     CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {

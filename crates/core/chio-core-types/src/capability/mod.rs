@@ -3,6 +3,7 @@
 //! Capability submodules are the public API. This root intentionally contains
 //! no flat re-export layer so callers import the domain they depend on.
 
+pub mod aggregate_budget;
 pub mod attenuation;
 pub mod caveat;
 pub mod crypto_floor;

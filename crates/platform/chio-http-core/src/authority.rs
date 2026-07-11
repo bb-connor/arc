@@ -706,6 +706,7 @@ impl HttpAuthority {
             issued_at,
             expires_at: issued_at.saturating_add(HTTP_AUTHORITY_TTL_SECS),
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         };
         CapabilityToken::sign(body, self.keypair.as_ref())
             .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))

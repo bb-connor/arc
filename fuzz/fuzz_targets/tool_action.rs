@@ -211,6 +211,7 @@ fn capability(issuer: &Keypair, subject: &Keypair, tool_name: &str) -> Capabilit
         issued_at: 0,
         expires_at: 60,
         delegation_chain: Vec::new(),
+        aggregate_invocation_budget: None,
     };
     match CapabilityToken::sign(body, issuer) {
         Ok(token) => token,

@@ -56,6 +56,7 @@ fn make_token_body(issuer_kp: &Keypair) -> CapabilityTokenBody {
         issued_at: 1_000_000,
         expires_at: 2_000_000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     }
 }
 

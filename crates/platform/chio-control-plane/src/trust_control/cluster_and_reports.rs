@@ -148,6 +148,7 @@ mod cluster_and_reports_tests {
                 issued_at: 1_000,
                 expires_at: 9_000,
                 delegation_chain: vec![],
+                aggregate_invocation_budget: None,
             },
             &issuer,
         )

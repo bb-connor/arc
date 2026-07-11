@@ -502,6 +502,7 @@ mod tests {
                 issued_at: 100,
                 expires_at: 200,
                 delegation_chain: vec![parent_link],
+                aggregate_invocation_budget: None,
             },
             issuer,
         ) {

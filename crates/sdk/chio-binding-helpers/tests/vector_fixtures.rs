@@ -806,6 +806,7 @@ fn base_capability_body(
         issued_at,
         expires_at,
         delegation_chain,
+        aggregate_invocation_budget: None,
     }
 }
 

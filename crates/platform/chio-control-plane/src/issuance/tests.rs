@@ -315,6 +315,7 @@ fn make_subject_capability(
         issued_at,
         expires_at: issued_at + 3_600,
         delegation_chain: Vec::new(),
+        aggregate_invocation_budget: None,
     };
     CapabilityToken::sign(body, issuer_kp).test_expect("sign capability")
 }

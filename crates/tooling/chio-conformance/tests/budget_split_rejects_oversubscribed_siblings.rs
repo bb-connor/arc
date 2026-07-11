@@ -70,6 +70,7 @@ fn build_child(
         issued_at: 100,
         expires_at: 200,
         delegation_chain,
+        aggregate_invocation_budget: None,
     };
     CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {

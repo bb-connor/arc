@@ -131,6 +131,7 @@ fn make_token(kp: &Keypair) -> CapabilityToken {
             issued_at: 1_710_000_000,
             expires_at: 1_710_000_600,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         kp,
     )
@@ -166,6 +167,7 @@ fn make_hybrid_token() -> CapabilityToken {
             issued_at: 1_710_000_000,
             expires_at: 1_710_000_600,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &backend,
     )

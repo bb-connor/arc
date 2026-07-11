@@ -27,6 +27,7 @@ fn signed_cap(kp: &Keypair, cap_id: &str, scope: ChioScope) -> CapabilityToken {
         issued_at: 0,
         expires_at: u64::MAX,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     match CapabilityToken::sign(body, kp) {
         Ok(token) => token,

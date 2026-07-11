@@ -65,6 +65,7 @@ fn test_shared_evidence_reporting_surfaces() {
             issued_at: 1_500,
             expires_at: 20_000,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &local_issuer_kp,
     )
@@ -78,6 +79,7 @@ fn test_shared_evidence_reporting_surfaces() {
             issued_at: 1_600,
             expires_at: 20_000,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &local_issuer_kp,
     )
@@ -374,6 +376,7 @@ fn test_behavioral_feed_export_surfaces() {
             issued_at: 1_000,
             expires_at: 10_000,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &issuer_kp,
     )
@@ -387,6 +390,7 @@ fn test_behavioral_feed_export_surfaces() {
             issued_at: 1_100,
             expires_at: 10_000,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &issuer_kp,
     )

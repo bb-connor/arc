@@ -66,6 +66,7 @@ impl CapabilityAuthority for LocalCapabilityAuthority {
             issued_at: now,
             expires_at: now.saturating_add(ttl_seconds),
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         };
 
         CapabilityToken::sign(body, &self.keypair)

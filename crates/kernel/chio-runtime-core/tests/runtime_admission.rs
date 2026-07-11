@@ -89,6 +89,7 @@ fn capability(capability_id: &str) -> Result<CapabilityToken, Box<dyn std::error
             issued_at: 1_800_000_000,
             expires_at: 1_800_003_600,
             delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
         },
         &issuer,
     )?)

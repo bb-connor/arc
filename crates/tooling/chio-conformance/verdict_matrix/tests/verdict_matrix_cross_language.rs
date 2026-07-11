@@ -244,6 +244,7 @@ fn make_browser_capability(
         issued_at: ISSUED_AT,
         expires_at: EXPIRES_AT,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     CapabilityToken::sign(body, issuer).map_err(|error| error.to_string())
 }

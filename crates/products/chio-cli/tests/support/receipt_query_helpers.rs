@@ -23,6 +23,7 @@ pub(crate) fn make_capability_token(
         issued_at: 1000,
         expires_at: 9999999999,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     CapabilityToken::sign(body, issuer_keypair).expect("sign capability token")
 }

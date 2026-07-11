@@ -78,6 +78,7 @@ async fn kernel_e2e_a2a_invocation_produces_allow_receipt() {
             issued_at: 100,
             expires_at: u64::MAX,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &issuer,
     )
@@ -458,6 +459,7 @@ async fn kernel_e2e_a2a_get_task_follow_up_produces_allow_receipt() {
             issued_at: 100,
             expires_at: u64::MAX,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &issuer,
     )

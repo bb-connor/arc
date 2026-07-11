@@ -70,6 +70,7 @@ fn unsigned_capability(ttl: u64) -> CapabilityToken {
         issued_at: 10,
         expires_at: 10 + ttl,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
         algorithm: None,
         caveats: vec![],
         scope_attenuations: None,

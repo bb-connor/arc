@@ -33,6 +33,7 @@ fn capability_body(issuer: &Keypair, subject: &Keypair) -> CapabilityTokenBody {
         issued_at: 1_710_000_000,
         expires_at: 1_710_003_600,
         delegation_chain: Vec::new(),
+        aggregate_invocation_budget: None,
     }
 }
 

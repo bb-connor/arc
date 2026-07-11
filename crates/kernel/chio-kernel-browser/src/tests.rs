@@ -111,6 +111,7 @@ fn make_capability_body(id: &str, subject: &Keypair, issuer: &Keypair) -> Capabi
         issued_at: ISSUED_AT,
         expires_at: EXPIRES_AT,
         delegation_chain: std::vec![],
+        aggregate_invocation_budget: None,
     }
 }
 

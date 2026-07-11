@@ -225,6 +225,7 @@ fn cost_attribution_report_aggregates_matching_corpus_and_limits_detail_rows() {
             issued_at: 1_000,
             expires_at: 9_000,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &issuer_kp,
     )
@@ -238,6 +239,7 @@ fn cost_attribution_report_aggregates_matching_corpus_and_limits_detail_rows() {
             issued_at: 1_100,
             expires_at: 9_000,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &issuer_kp,
     )
@@ -445,6 +447,7 @@ fn economic_receipt_projection_report_joins_signed_envelope_with_reconciliation_
             issued_at: 1_000,
             expires_at: 9_000,
             delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
         },
         &issuer_kp,
     )
@@ -1001,6 +1004,7 @@ fn compliance_report_counts_proof_and_lineage_coverage() {
             issued_at: 1_000,
             expires_at: 9_000,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &issuer_kp,
     )
@@ -1156,6 +1160,7 @@ fn receipt_store_authorization_context_report_does_not_mark_asserted_call_chain_
             issued_at: 1_000,
             expires_at: 9_000,
             delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
         },
         &issuer_kp,
     )

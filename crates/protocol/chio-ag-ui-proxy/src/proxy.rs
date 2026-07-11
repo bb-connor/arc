@@ -73,6 +73,7 @@ mod tests {
                 issued_at: 0,
                 expires_at: u64::MAX,
                 delegation_chain: vec![],
+                aggregate_invocation_budget: None,
             },
             &kp,
         )
@@ -108,6 +109,7 @@ mod tests {
                 issued_at: 0,
                 expires_at: u64::MAX,
                 delegation_chain: vec![],
+                aggregate_invocation_budget: None,
             },
             issuer,
         )
@@ -161,6 +163,7 @@ mod tests {
                 issued_at: 0,
                 expires_at: u64::MAX,
                 delegation_chain: vec![parent_link],
+                aggregate_invocation_budget: None,
             },
             issuer,
         )
@@ -219,6 +222,7 @@ mod tests {
                 issued_at: 0,
                 expires_at: u64::MAX,
                 delegation_chain: vec![parent_link],
+                aggregate_invocation_budget: None,
             },
             issuer,
         )
@@ -274,6 +278,7 @@ mod tests {
                 issued_at: 0,
                 expires_at: u64::MAX,
                 delegation_chain: vec![parent_link],
+                aggregate_invocation_budget: None,
             },
             issuer,
         )

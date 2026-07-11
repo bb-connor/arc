@@ -650,6 +650,7 @@ pub(crate) fn record_test_capability_snapshot(
             issued_at: 1_000,
             expires_at: 20_000,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         issuer,
     )
