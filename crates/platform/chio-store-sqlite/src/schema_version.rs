@@ -6,9 +6,15 @@
 //! binary understands or whose contents are not provably ours. The checks run
 //! on the open path only, so they add no cost to the append hot path.
 //!
-//! Fail-closed: a foreign or future database is refused before any write, so a
-//! rollback to an older binary or a mistargeted path is caught at open rather
-//! than after data has been commingled or a newer schema silently misread.
+//! The `application_id` is shared by every Chio store, so it proves a file is a
+//! Chio store but not which one. To keep a path mistargeted at a sibling store
+//! (opening a budget or authority database as a receipt store) from writing this
+//! store's tables into it, a populated database must also carry one of this
+//! store's anchor tables; otherwise it is refused as belonging to another store.
+//!
+//! Fail-closed: a foreign, misdirected, or future database is refused before any
+//! write, so a rollback to an older binary or a mistargeted path is caught at
+//! open rather than after data has been commingled or a newer schema misread.
 
 use rusqlite::Connection;
 
@@ -22,6 +28,10 @@ pub enum SchemaVersionError {
     Sqlite(#[from] rusqlite::Error),
     #[error("database application_id {found:#x} is not a Chio store (expected {expected:#x})")]
     ForeignDatabase { found: i32, expected: i32 },
+    #[error(
+        "database carries the Chio application_id but none of this store's tables ({expected_anchors:?}); refusing to open another store's database"
+    )]
+    MismatchedStore { expected_anchors: Vec<String> },
     #[error(
         "database schema version {found} is newer than this binary supports ({supported}); refusing to open"
     )]
@@ -38,6 +48,14 @@ pub enum SchemaVersionError {
 /// this store's `legacy_tables`); otherwise it is refused as
 /// [`SchemaVersionError::ForeignDatabase`] rather than commingling Chio tables
 /// into a foreign file.
+///
+/// A database already stamped with the shared Chio `application_id` proves it is
+/// a Chio store, but not that it is *this* store's. A populated stamped database
+/// must therefore also carry one of `legacy_tables`, or it is refused as
+/// [`SchemaVersionError::MismatchedStore`] so a path aimed at a sibling store's
+/// database (a budget or authority file) never gets this store's tables written
+/// into it. An empty stamped database (freshly stamped, tables not yet created)
+/// is always accepted.
 pub fn check_schema_version(
     conn: &Connection,
     supported_version: i32,
@@ -47,7 +65,7 @@ pub fn check_schema_version(
     let user_version: i32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
 
     if app_id == 0 && user_version == 0 {
-        if !zero_stamp_is_adoptable(conn, legacy_tables)? {
+        if !database_belongs_to_store(conn, legacy_tables)? {
             return Err(SchemaVersionError::ForeignDatabase {
                 found: app_id,
                 expected: CHIO_SQLITE_APPLICATION_ID,
@@ -64,6 +82,14 @@ pub fn check_schema_version(
             expected: CHIO_SQLITE_APPLICATION_ID,
         });
     }
+    if !database_belongs_to_store(conn, legacy_tables)? {
+        return Err(SchemaVersionError::MismatchedStore {
+            expected_anchors: legacy_tables
+                .iter()
+                .map(|table| table.to_string())
+                .collect(),
+        });
+    }
     if user_version > supported_version {
         return Err(SchemaVersionError::FutureSchema {
             found: user_version,
@@ -73,12 +99,13 @@ pub fn check_schema_version(
     Ok(user_version)
 }
 
-/// Whether a zero-stamped database may be adopted as a fresh or legacy Chio
-/// store. It is adoptable when it has no user tables (a freshly created file) or
-/// when it carries a known legacy table (a pre-stamping Chio store). This keeps
-/// an unrelated `0/0` SQLite file from being stamped and written into, without
-/// falsely rejecting a legacy Chio store on upgrade.
-fn zero_stamp_is_adoptable(
+/// Whether a database may be adopted as this store's. It qualifies when it has no
+/// user tables (a freshly created or freshly stamped file) or when it carries a
+/// known anchor table (a legacy pre-stamping store, or a reopened store of the
+/// same kind). This keeps an unrelated SQLite file from being written into and
+/// keeps a sibling Chio store's populated database from being mistaken for this
+/// one, without falsely rejecting an empty or same-kind database.
+fn database_belongs_to_store(
     conn: &Connection,
     legacy_tables: &[&str],
 ) -> Result<bool, SchemaVersionError> {
@@ -168,6 +195,40 @@ mod tests {
     }
 
     #[test]
+    fn stamped_database_of_a_different_store_kind_is_refused(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // A budget database carries the shared Chio application_id but none of
+        // the receipt store's anchor tables. Opening it as a receipt store must
+        // fail closed rather than write receipt tables into the budget file.
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(&format!(
+            "PRAGMA application_id = {CHIO_SQLITE_APPLICATION_ID};
+             CREATE TABLE capability_grant_budgets (id TEXT PRIMARY KEY);"
+        ))?;
+        let error = check_schema_version(&conn, SUPPORTED, &["chio_tool_receipts"]);
+        assert!(matches!(
+            error,
+            Err(SchemaVersionError::MismatchedStore { .. })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn stamped_database_carrying_a_store_anchor_is_accepted(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(&format!(
+            "PRAGMA application_id = {CHIO_SQLITE_APPLICATION_ID};
+             CREATE TABLE chio_tool_receipts (receipt_id TEXT PRIMARY KEY);"
+        ))?;
+        assert_eq!(
+            check_schema_version(&conn, SUPPORTED, &["chio_tool_receipts"])?,
+            0
+        );
+        Ok(())
+    }
+
+    #[test]
     fn future_schema_is_refused_without_mutation() -> Result<(), Box<dyn std::error::Error>> {
         let conn = Connection::open_in_memory()?;
         conn.execute_batch(&format!(
@@ -229,6 +290,30 @@ mod tests {
                 "{name} not stamped"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_store_adopts_a_file_already_holding_approval_tables(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // `chio api protect` opens the approval store first, then the receipt
+        // store, on one shared file. The receipt store must adopt the file the
+        // approval store stamped rather than reject it as a foreign store.
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("sidecar.db");
+        crate::SqliteApprovalStore::open(&path)?;
+        crate::SqliteReceiptStore::open(&path)?;
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_store_refuses_a_stamped_budget_database() -> Result<(), Box<dyn std::error::Error>> {
+        // A path mistargeted at a budget database must fail closed instead of
+        // writing receipt tables into another store's file.
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("budget.db");
+        crate::SqliteBudgetStore::open(&path)?;
+        assert!(crate::SqliteReceiptStore::open(&path).is_err());
         Ok(())
     }
 
