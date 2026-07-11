@@ -413,6 +413,39 @@ mod receipt_operator_tests {
         assert!(create_output.contains("checkpoint_range: 9..=12"));
     }
 
+    /// The retention watermark must be visible in the DEFAULT (non-JSON) health
+    /// and checkpoint-status output, not only in the JSON payload, so operators
+    /// on the plain CLI can see committed progress floored by an archived prefix.
+    #[test]
+    fn receipt_human_output_surfaces_retention_watermark() {
+        let health = chio_kernel::ReceiptStoreHealthReport {
+            healthy: true,
+            retention_watermark_entry_seq: Some(42),
+            ..chio_kernel::ReceiptStoreHealthReport::default()
+        };
+        assert!(
+            render_receipt_health_human(&health).contains("retention_watermark_entry_seq: 42"),
+            "health human output must surface the retention watermark"
+        );
+
+        let status = chio_kernel::ReceiptCheckpointStatusReport {
+            healthy: true,
+            retention_watermark_entry_seq: Some(42),
+            ..chio_kernel::ReceiptCheckpointStatusReport::default()
+        };
+        assert!(
+            render_receipt_checkpoint_status_human(&status)
+                .contains("retention_watermark_entry_seq: 42"),
+            "checkpoint status human output must surface the retention watermark"
+        );
+
+        // A never-archived store renders `none` rather than omitting the field.
+        let never = chio_kernel::ReceiptStoreHealthReport::default();
+        assert!(
+            render_receipt_health_human(&never).contains("retention_watermark_entry_seq: none")
+        );
+    }
+
     fn assert_remote_unsupported(result: Result<(), CliError>) {
         let error = match result {
             Ok(()) => panic!("remote receipt operator command should be deferred"),

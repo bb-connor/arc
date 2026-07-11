@@ -102,6 +102,10 @@ pub(crate) fn render_receipt_health_human(report: &chio_kernel::ReceiptStoreHeal
         "db_size_bytes: {}",
         optional_u64(report.db_size_bytes)
     ));
+    lines.push(format!(
+        "retention_watermark_entry_seq: {}",
+        optional_u64(report.retention_watermark_entry_seq)
+    ));
     if let Some(error) = report.checkpoint_error.as_deref() {
         lines.push(format!("checkpoint_error: {error}"));
     }
@@ -168,6 +172,10 @@ pub(crate) fn render_receipt_checkpoint_status_human(
     } else {
         lines.push("next_range: none".to_string());
     }
+    lines.push(format!(
+        "retention_watermark_entry_seq: {}",
+        optional_u64(report.retention_watermark_entry_seq)
+    ));
     if let Some(error) = report.checkpoint_error.as_deref() {
         lines.push(format!("checkpoint_error: {error}"));
     }
