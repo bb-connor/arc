@@ -1833,6 +1833,37 @@ pub fn evaluate_circle_nanopayment_with_verified_approval(
     Ok(prepared)
 }
 
+/// Evaluate whether the bounded ERC-4337 paymaster policy would sponsor gas
+/// for a user operation tied to `dispatch`.
+///
+/// # SECURITY: outside the governed-approval witness boundary
+///
+/// This surface evaluates a GAS SPONSORSHIP BUDGET only; it deliberately
+/// does NOT take a [`VerifiedApproval`] and is not a settlement lane:
+///
+/// - It moves no value and issues no broadcastable artifact. The returned
+///   [`PreparedPaymasterCompatibility`] is a policy verdict (`allowed` plus
+///   a rejection reason); the reimbursement it predicts is collected as an
+///   explicit settlement-side deduction on the value lanes, which ARE
+///   witness-gated.
+/// - The witness binding's fields do not map onto sponsorship. The signed
+///   [`ApprovalBinding::payee_address`] is the settlement payee, not the
+///   paymaster; the signed amount is the transfer amount, not a gas budget;
+///   the binding's token identifies the settled asset while gas is
+///   chain-native. Asserting sponsorship values against those signed fields
+///   would claim the approver authorized quantities they never signed, and
+///   an approval whose payee were re-pointed at the paymaster could no
+///   longer settle its actual spend.
+/// - Sponsorship is a SIBLING of a settlement, not an alternative
+///   settlement: consuming the approval's single-use replay slot here would
+///   deny the subsequent witness-gated settlement of the same approval.
+///
+/// The gas ceilings are enforced by [`Erc4337PaymasterPolicy`]
+/// (`max_sponsor_gas_limit`, `max_reimbursement_minor_units`, explicit
+/// settlement-side deduction), and an unsupported chain fails the
+/// evaluation. Executors MUST NOT treat `allowed: true` as spend
+/// authorization: every value movement for the sponsored operation still
+/// requires its own `*_with_verified_approval` lane call.
 pub fn prepare_paymaster_compatibility(
     dispatch: &Web3SettlementDispatchArtifact,
     policy: &Erc4337PaymasterPolicy,
