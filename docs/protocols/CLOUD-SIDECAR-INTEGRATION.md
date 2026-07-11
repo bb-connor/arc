@@ -68,9 +68,10 @@ spec:
   template:
     metadata:
       annotations:
-        # Keep at least 1 instance warm to avoid sidecar cold starts
+        # Keep 1 instance warm; pin to 1 because the receipt store is a
+        # single-writer SQLite database (see section 7)
         autoscaling.knative.dev/minScale: "1"
-        autoscaling.knative.dev/maxScale: "100"
+        autoscaling.knative.dev/maxScale: "1"
         # Container startup ordering
         run.googleapis.com/container-dependencies: '{"app":["chio-sidecar"]}'
     spec:
@@ -370,15 +371,16 @@ seed from flags:
 | `--upstream <url>` | Base URL of the protected upstream | Localhost within the task/service |
 | `--listen <addr>` | Bind address for the kernel ingress | Defaults to `127.0.0.1:9090`; the manifests bind `0.0.0.0:9090` |
 | `--spec <path>` | OpenAPI document the kernel derives its route and scope table from | The operator-provided spec, not the upstream |
-| `--receipt-store <path>` | Path to the durable SQLite audit log | Backed by the `chio_store_sqlite` backend; place it on a durable read-write volume |
+| `--receipt-store <path>` | Path to the durable SQLite audit log | Backed by the `chio_store_sqlite` backend; place it on a per-instance local disk with a single writer (see section 7) |
 | `--authority-seed-file <path>` | Path to the signing seed used to sign receipts | Delivered as a mounted secret file |
 
 The receipt store is a local SQLite database (the `chio_store_sqlite` backend).
-Point `--receipt-store` at a path on a durable volume so the audit log survives
-container restarts, revision recycles, and scale-to-zero. The reference
-manifests set only `CHIO_LOG_LEVEL` in the environment; the route table,
-receipts, and signing material are all supplied through the flags above and the
-mounted spec, seed, and receipt volumes.
+Point `--receipt-store` at a path on a per-instance disk with a single writer so
+the audit log survives container restarts and revision recycles (see section 7
+for the single-writer and local-disk requirements). The reference manifests set
+only `CHIO_LOG_LEVEL` in the environment; the route table, receipts, and signing
+material are all supplied through the flags above and the mounted spec, seed, and
+receipt volumes.
 
 ### 6.3 Health Check
 
@@ -398,23 +400,32 @@ GET /chio/health
 ## 7. Durable Receipt Store
 
 The sidecar writes its audit receipts to a local SQLite database (the
-`chio_store_sqlite` backend) at the path given by `--receipt-store`. There is a
-single on-disk format across platforms; durability is a property of the volume
-the database lives on, not of a platform-specific remote sink.
+`chio_store_sqlite` backend) at the path given by `--receipt-store`, in WAL mode.
+WAL coordinates readers and writers through a shared-memory index that only works
+when every connection is on the same host and a local (non-network) filesystem,
+so the store is a **single-writer, single-host database**:
 
-Place `--receipt-store` on a read-write volume backed by durable storage so the
-log survives container restarts, revision recycles, and scale-to-zero:
+- **Use a per-instance disk, not a shared network filesystem.** WAL is not safe
+  over Filestore/NFS, Amazon EFS, or Azure Files. If the mounted filesystem
+  cannot support WAL, the sidecar fails closed at startup rather than run without
+  durability, so a network-filesystem mount either refuses to boot or risks
+  corruption under concurrent access.
+- **Run exactly one writer per database.** Two instances writing the same file
+  corrupt it. The Cloud Run and Azure references pin to a single instance; the
+  ECS reference attaches a per-task block volume and expects `desiredCount: 1`.
 
-| Platform | Durable volume for `/var/lib/chio` |
-|----------|-------------------------------------|
-| GCP Cloud Run | Filestore (NFS) or a Cloud Storage FUSE volume |
-| AWS ECS | EFS access point |
-| Azure Container Apps | Azure Files share |
+| Platform | Per-instance receipt volume for `/var/lib/chio` |
+|----------|--------------------------------------------------|
+| GCP Cloud Run | Single instance (`maxScale: 1`); no per-instance persistent disk, so durability depends on the mounted Filestore share and horizontal scale needs a client-server store |
+| AWS ECS | A per-task Amazon EBS block volume attached at launch, with the service at `desiredCount: 1` |
+| Azure Container Apps | Single replica (`maxReplicas: 1`); no per-replica persistent disk, so durability depends on the mounted Azure Files share and horizontal scale needs a client-server store |
 
-Do not point `--receipt-store` at an ephemeral (emptyDir-tier) path: the audit
-log would be lost on every recycle, breaking receipt continuity. To move
-receipts onward (analytics, long-term retention), export from the SQLite store
-out of band rather than writing to a remote destination on the hot path.
+To scale horizontally, give each instance its own receipt database or front a
+client-server audit store; do not share one SQLite file across instances. Do not
+point `--receipt-store` at an ephemeral (emptyDir-tier) path: the audit log would
+be lost on every recycle, breaking receipt continuity. To move receipts onward
+(analytics, long-term retention), export from the SQLite store out of band rather
+than writing to a remote destination on the hot path.
 
 ## 8. Scale-to-Zero Considerations
 

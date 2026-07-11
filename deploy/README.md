@@ -30,8 +30,8 @@ Search and replace the following before applying:
 | `PROJECT_ID`, `REGION` | GCP project and region (Cloud Run) |
 | `FILESTORE_IP` | Filestore instance IP backing the durable Cloud Run receipt volume |
 | `ACCOUNT_ID` | AWS account ID (ECS) |
-| `EFS_FILESYSTEM_ID` | ECS EFS filesystem holding the read-only spec/seed shares and the durable receipt volume |
-| `EFS_SEED_ACCESS_POINT_ID`, `EFS_RECEIPTS_ACCESS_POINT_ID` | ECS EFS access points for the seed and receipt directories |
+| `EFS_FILESYSTEM_ID` | ECS EFS filesystem holding the read-only spec/seed shares |
+| `EFS_SEED_ACCESS_POINT_ID` | ECS EFS access point for the seed directory |
 | Key Vault / Secret Manager ARNs | Pre-created secret references |
 
 ## Required secrets
@@ -55,6 +55,28 @@ Non-secret configuration is passed as CLI flags to the sidecar subcommand
 
 The kernel policy is derived from the OpenAPI spec plus these flags; there is no
 separately mounted kernel or policy config file.
+
+## Durable receipt store
+
+`--receipt-store` opens a SQLite audit log in WAL mode. WAL coordinates readers
+and writers through a shared-memory index that only works when every connection
+is on the same host and a local (non-network) filesystem, so the store is a
+single-writer, single-host database:
+
+- Give the receipt database a **per-instance disk**, not a shared network
+  filesystem. WAL is not safe over Filestore/NFS, Amazon EFS, or Azure Files;
+  the sidecar fails closed at startup if the mounted filesystem cannot support
+  WAL rather than run without durability.
+- Run **exactly one writer** per database. The Cloud Run and Azure references
+  pin to a single instance, and the ECS reference attaches a per-task block
+  volume and expects `desiredCount: 1`. Two instances writing one receipt file
+  corrupt it.
+- To **scale horizontally**, give each instance its own receipt database or
+  front a client-server audit store; do not share one SQLite file across
+  instances. Cloud Run and Azure Container Apps have no per-instance persistent
+  disk, so durable receipts there require a per-instance disk platform (a
+  StatefulSet PVC, an ECS task with an attached block volume) or a client-server
+  store.
 
 ## Startup ordering
 

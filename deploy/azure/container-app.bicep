@@ -6,8 +6,9 @@
 //   Key Vault secrets must be created before deploy; the Container Apps
 //   environment's managed identity needs GET on those secrets.
 //   AzureFile-backed environment storages (specStorageName, receiptStorageName)
-//   must be registered on the managed environment before deploy; the receipt
-//   storage must be durable so the audit log survives revision recycles.
+//   must be registered on the managed environment before deploy. The receipt
+//   store is a single-writer SQLite database; this template runs one replica so
+//   only it opens the receipt share (see the maxReplicas and volume notes).
 //
 // Deploy:
 //   az deployment group create \
@@ -215,8 +216,17 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
           ]
         }
-        // Durable audit store. This share must be backed by durable Azure Files
-        // storage so the receipt log survives revision recycles; an emptyDir
+        // Durable audit store for a SINGLE writer. The receipt log is a SQLite
+        // database in WAL mode: WAL coordinates connections through a shared-memory
+        // index that requires every connection on the same host and a local
+        // filesystem, so it is not safe over a network filesystem (Azure Files)
+        // and two replicas writing the same file corrupt it. This app pins
+        // maxReplicas to 1 so exactly one replica opens the share; if the mounted
+        // filesystem cannot support WAL the sidecar refuses to start rather than
+        // run without durability. Container Apps has no per-replica persistent
+        // disk, so durability here depends on the Azure Files mount; horizontally
+        // scaled or multi-writer deployments belong on a platform with a
+        // per-instance disk or behind a client-server audit store. An emptyDir
         // volume is ephemeral and would break audit continuity.
         {
           name: 'chio-receipts'
@@ -224,19 +234,14 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           storageName: receiptStorageName
         }
       ]
+      // The receipt store is a single-writer SQLite database, so maxReplicas is
+      // pinned to 1: exactly one replica ever opens the receipt share. Fanning
+      // out to multiple replicas that share one receipt file would corrupt it.
+      // Scale horizontally with a per-instance disk or a client-server audit
+      // store instead of a shared SQLite file.
       scale: {
         minReplicas: 1
-        maxReplicas: 20
-        rules: [
-          {
-            name: 'http-scale'
-            http: {
-              metadata: {
-                concurrentRequests: '50'
-              }
-            }
-          }
-        ]
+        maxReplicas: 1
       }
     }
   }
