@@ -745,12 +745,16 @@ fn copy_archived_prefix(
 /// held stale bytes, and the delete would then leave the store with no faithful
 /// archived copy. Every archived table the delete touches is therefore verified
 /// by identity: the receipt tables (`chio_tool_receipts`, `chio_child_receipts`)
-/// on `seq` (the primary key the claim-log projection's `source_seq` points at,
-/// so a same-`receipt_id` archive row copied under a different `seq` cannot pass)
-/// and `raw_json`, and the claim-log projection, checkpoint rows, and
+/// keyed on `seq` (the primary key the claim-log projection's `source_seq`
+/// points at, so a same-`receipt_id` archive row copied under a different `seq`
+/// cannot pass) with a NULL-safe (`IS`) compare of every remaining column, and
+/// the claim-log projection, checkpoint rows, and
 /// settlement/metered/consumption reconciliations by a NULL-safe (`IS`)
 /// full-column compare of the live prefix rows against their archive
-/// counterparts (keyed on each table's primary key). Capability lineage is
+/// counterparts (keyed on each table's primary key). A partial compare that
+/// skipped the indexed/attribution columns (`subject_key`, `issuer_key`,
+/// `grant_index`, `tenant_id`, or the child session/request columns) would let a
+/// reused archive row misattribute retained evidence after the live row is gone. Capability lineage is
 /// verified the same way even though the delete leaves the live lineage rows in
 /// place: the archived receipts ARE deleted, so the archive becomes the only
 /// standalone-authoritative copy of their capability subject/issuer/grants, and
@@ -764,10 +768,14 @@ fn verify_co_archival_complete(
 ) -> Result<(), ReceiptStoreError> {
     let checks: [(&'static str, String, String); 8] = [
         (
-            // Present AND byte-identical: `archive_sql` counts only live prefix
-            // rows that have an archive row with the same `receipt_id` and
-            // identical `raw_json`, so a missing OR divergent archive row makes
-            // archived < live and aborts before the delete.
+            // Present AND every column identical: `archive_sql` counts only live
+            // prefix rows whose archive row matches on the `seq` primary key and
+            // NULL-safely (`IS`) on every remaining column, so a missing OR
+            // divergent archive row (including a differing indexed/attribution
+            // column such as `subject_key`, `issuer_key`, `grant_index`, or
+            // `tenant_id`, which archive reads filter on) makes archived < live
+            // and aborts before the delete. A `receipt_id`/`raw_json`-only check
+            // would keep a reused archive row that misattributes the receipt.
             "chio_tool_receipts",
             format!(
                 "SELECT COUNT(*) FROM main.chio_tool_receipts WHERE seq IN \
@@ -776,10 +784,22 @@ fn verify_co_archival_complete(
             format!(
                 "SELECT COUNT(*) FROM main.chio_tool_receipts m WHERE m.seq IN \
                  (SELECT source_seq FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt') \
-                 AND EXISTS (SELECT 1 FROM archive.chio_tool_receipts a WHERE a.seq = m.seq AND a.receipt_id = m.receipt_id AND a.raw_json = m.raw_json)"
+                 AND EXISTS (SELECT 1 FROM archive.chio_tool_receipts a WHERE a.seq = m.seq \
+                 AND a.receipt_id IS m.receipt_id AND a.timestamp IS m.timestamp \
+                 AND a.capability_id IS m.capability_id AND a.subject_key IS m.subject_key \
+                 AND a.issuer_key IS m.issuer_key AND a.grant_index IS m.grant_index \
+                 AND a.tool_server IS m.tool_server AND a.tool_name IS m.tool_name \
+                 AND a.decision_kind IS m.decision_kind AND a.policy_hash IS m.policy_hash \
+                 AND a.content_hash IS m.content_hash AND a.raw_json IS m.raw_json \
+                 AND a.tenant_id IS m.tenant_id)"
             ),
         ),
         (
+            // Same full-row identity for child receipts: a reused archive row
+            // matching only `seq`/`receipt_id`/`raw_json` but diverging on
+            // `session_id`, `parent_request_id`, `request_id`, or the outcome
+            // columns would misattribute retained child evidence once the live
+            // row is deleted.
             "chio_child_receipts",
             format!(
                 "SELECT COUNT(*) FROM main.chio_child_receipts WHERE seq IN \
@@ -788,7 +808,12 @@ fn verify_co_archival_complete(
             format!(
                 "SELECT COUNT(*) FROM main.chio_child_receipts m WHERE m.seq IN \
                  (SELECT source_seq FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'child_receipt') \
-                 AND EXISTS (SELECT 1 FROM archive.chio_child_receipts a WHERE a.seq = m.seq AND a.receipt_id = m.receipt_id AND a.raw_json = m.raw_json)"
+                 AND EXISTS (SELECT 1 FROM archive.chio_child_receipts a WHERE a.seq = m.seq \
+                 AND a.receipt_id IS m.receipt_id AND a.timestamp IS m.timestamp \
+                 AND a.session_id IS m.session_id AND a.parent_request_id IS m.parent_request_id \
+                 AND a.request_id IS m.request_id AND a.operation_kind IS m.operation_kind \
+                 AND a.terminal_state IS m.terminal_state AND a.policy_hash IS m.policy_hash \
+                 AND a.outcome_hash IS m.outcome_hash AND a.raw_json IS m.raw_json)"
             ),
         ),
         (

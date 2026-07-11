@@ -1074,6 +1074,107 @@ fn co_archival_rejects_reused_seq_archive() -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
+/// Co-archival identity must cover the FULL receipt row, not just
+/// `seq`/`receipt_id`/`raw_json`. Archive reads filter on the indexed/attribution
+/// columns (`subject_key`, `issuer_key`, `grant_index`, `tenant_id`), so a reused
+/// archive whose row matches those three columns but diverges on an attribution
+/// column would misattribute the retained receipt once the live row is deleted.
+/// Verification must FAIL fail-closed before any delete.
+#[test]
+fn co_archival_rejects_divergent_attribution_columns() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("co-archival-attribution");
+    let archive = unique_db_path("co-archival-attribution-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for i in 0..2u64 {
+        let receipt = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("attr-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(store.load_checkpoint_by_seq(1)?.is_some());
+
+    // Pre-seed the archive with a copy of the true seq-1 receipt that is byte
+    // identical on every column EXCEPT `subject_key`. Copying from the live DB
+    // (naming columns, not `SELECT *`) keeps seq/receipt_id/raw_json exactly
+    // equal to live; only the attribution column is then tampered. The rotation's
+    // INSERT OR IGNORE copy keeps this row on the seq primary-key conflict, so a
+    // seq/receipt_id/raw_json-only check would pass while the archived attribution
+    // silently diverges from the receipt being deleted.
+    {
+        let live_path = path.to_str().ok_or("db path invalid")?.replace('\'', "''");
+        let seed = rusqlite::Connection::open(&archive)?;
+        seed.execute_batch(&format!("ATTACH DATABASE '{live_path}' AS live;"))?;
+        seed.execute_batch(
+            "CREATE TABLE chio_tool_receipts (\
+                seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, timestamp INTEGER NOT NULL, \
+                capability_id TEXT NOT NULL, subject_key TEXT, issuer_key TEXT, grant_index INTEGER, \
+                tool_server TEXT NOT NULL, tool_name TEXT NOT NULL, decision_kind TEXT NOT NULL, \
+                policy_hash TEXT NOT NULL, content_hash TEXT NOT NULL, raw_json TEXT NOT NULL, tenant_id TEXT);",
+        )?;
+        seed.execute_batch(
+            "INSERT INTO chio_tool_receipts \
+             (seq, receipt_id, timestamp, capability_id, subject_key, issuer_key, grant_index, \
+              tool_server, tool_name, decision_kind, policy_hash, content_hash, raw_json, tenant_id) \
+             SELECT seq, receipt_id, timestamp, capability_id, subject_key, issuer_key, grant_index, \
+              tool_server, tool_name, decision_kind, policy_hash, content_hash, raw_json, tenant_id \
+             FROM live.chio_tool_receipts WHERE seq = 1;",
+        )?;
+        // Tamper ONLY the attribution: a value guaranteed to differ from the live
+        // subject_key whether that was NULL or a real key.
+        seed.execute(
+            "UPDATE chio_tool_receipts SET subject_key = 'tampered-attribution-' || COALESCE(subject_key, '') WHERE seq = 1",
+            [],
+        )?;
+        seed.execute_batch("DETACH DATABASE live;")?;
+    }
+
+    let result = store.archive_receipts_before(150, archive_path);
+    let message = result
+        .err()
+        .ok_or("expected RetentionArchiveIncomplete; rotation accepted a divergent-attribution archive")?
+        .to_string();
+    assert!(
+        message.contains("co-archival incomplete"),
+        "unexpected error: {message}"
+    );
+    assert!(
+        message.contains("chio_tool_receipts"),
+        "the attribution mismatch must fail the tool-receipt identity check: {message}"
+    );
+
+    // Fail-closed: the abort happened before any delete, so live rows are intact
+    // with their true attribution.
+    let live = store.reader_connection_for_test()?;
+    let live_tool: i64 = live.query_row("SELECT COUNT(*) FROM chio_tool_receipts", [], |row| {
+        row.get(0)
+    })?;
+    assert_eq!(
+        live_tool, 2,
+        "tool receipts intact when co-archival verify fails"
+    );
+    let live_log: i64 = live.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        live_log, 2,
+        "claim-log intact when co-archival verify fails"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// Retention repair must validate the archived copy by IDENTITY before deleting
 /// the orphaned live claim-log row, not merely by `receipt_id` presence. A reused
 /// or wrong archive that carries the receipt under a divergent `source_seq` (or
