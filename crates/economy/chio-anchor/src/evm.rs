@@ -1,921 +1,48 @@
-use std::collections::BTreeSet;
-use std::net::{IpAddr, Ipv6Addr};
-use std::str::FromStr;
+mod egress;
+mod hashing;
+mod preparation;
+mod publication;
+mod records;
+mod rpc;
+mod types;
+mod validation;
+mod verification;
 
-use alloy_primitives::{keccak256, Address, FixedBytes, B256, U256};
-use alloy_sol_types::SolCall;
-use chio_core::canonical::canonical_json_bytes;
-use chio_core::merkle::leaf_hash;
-use chio_core::web3::anchors::{
-    verify_anchor_inclusion_proof, AnchorInclusionProof, Web3ChainAnchorRecord,
+pub use egress::evm_anchor_devnet_rpc_egress_contract;
+#[cfg(test)]
+use egress::validate_rpc_egress_contract;
+#[cfg(test)]
+use hashing::hash_to_b256;
+pub use preparation::{prepare_delegate_registration, prepare_root_publication};
+pub use publication::{
+    confirm_root_publication, ensure_publication_ready, inspect_publication_guard,
 };
-use chio_core::web3::identity::{SignedWeb3IdentityBinding, Web3KeyBindingPurpose};
-use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
-use chio_kernel::checkpoint::KernelCheckpoint;
-use chio_web3_bindings::{ChioMerkleProof, IChioRootRegistry};
-use reqwest::Url;
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+pub use records::build_chain_anchor_record;
+pub use rpc::publish_root;
+pub use types::{
+    EvmAnchorTarget, EvmPublicationGuard, EvmPublicationReceipt, PreparedDelegateRegistration,
+    PreparedEvmRootPublication,
+};
+pub use validation::validate_publication_call_data_against_checkpoint;
+pub use verification::verify_inclusion_onchain;
 
 use crate::AnchorError;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct EvmAnchorTarget {
-    pub chain_id: String,
-    pub rpc_url: String,
-    pub contract_address: String,
-    pub operator_address: String,
-    pub publisher_address: String,
+#[cfg(test)]
+use chio_egress_contract::HttpEgressContract;
+
+pub(crate) use validation::parse_validated_evm_anchor_target;
+
+pub fn operator_key_hash(
+    binding: &chio_core::web3::identity::SignedWeb3IdentityBinding,
+) -> Result<alloy_primitives::B256, AnchorError> {
+    hashing::operator_key_hash(binding)
 }
 
-impl EvmAnchorTarget {
-    pub fn validate(&self) -> Result<(), AnchorError> {
-        parse_validated_evm_anchor_target(self).map(|_| ())
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct ValidatedEvmAnchorTarget {
-    pub(crate) operator: Address,
-    pub(crate) publisher: Address,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct PreparedEvmRootPublication {
-    pub chain_id: String,
-    pub rpc_url: String,
-    pub contract_address: String,
-    pub operator_address: String,
-    pub publisher_address: String,
-    pub checkpoint_seq: u64,
-    pub batch_start_seq: u64,
-    pub batch_end_seq: u64,
-    pub tree_size: u64,
-    pub merkle_root: chio_core::hashing::Hash,
-    pub operator_key_hash: String,
-    pub call_data: String,
-    pub requires_delegate_authorization: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct PreparedDelegateRegistration {
-    pub chain_id: String,
-    pub rpc_url: String,
-    pub contract_address: String,
-    pub operator_address: String,
-    pub delegate_address: String,
-    pub expires_at: u64,
-    pub call_data: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct EvmPublicationReceipt {
-    pub tx_hash: String,
-    pub block_number: u64,
-    pub block_hash: String,
-    pub published_at: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct EvmPublicationGuard {
-    pub chain_id: String,
-    pub operator_address: String,
-    pub publisher_address: String,
-    pub latest_checkpoint_seq: u64,
-    pub next_checkpoint_seq_min: u64,
-    pub publisher_authorized: bool,
-    pub requires_delegate_authorization: bool,
-}
-
-#[derive(Debug, Deserialize)]
-struct JsonRpcEnvelope {
-    #[serde(rename = "jsonrpc")]
-    _jsonrpc: String,
-    #[serde(rename = "id")]
-    _id: u64,
-    result: Option<Value>,
-    error: Option<JsonRpcError>,
-}
-
-#[derive(Debug, Deserialize)]
-struct JsonRpcError {
-    code: i64,
-    message: String,
-}
-
-pub fn operator_key_hash(binding: &SignedWeb3IdentityBinding) -> B256 {
-    keccak256(binding.certificate.chio_public_key.as_bytes())
-}
-
-pub fn operator_key_hash_hex(binding: &SignedWeb3IdentityBinding) -> String {
-    format!("0x{}", hex::encode(operator_key_hash(binding).as_slice()))
-}
-
-pub fn prepare_root_publication(
-    target: &EvmAnchorTarget,
-    checkpoint: &KernelCheckpoint,
-    binding: &SignedWeb3IdentityBinding,
-) -> Result<PreparedEvmRootPublication, AnchorError> {
-    let validated_target = parse_validated_evm_anchor_target(target)?;
-    if !binding
-        .certificate
-        .purpose
-        .contains(&Web3KeyBindingPurpose::Anchor)
-    {
-        return Err(AnchorError::InvalidBinding(
-            "binding certificate does not include anchor purpose".to_string(),
-        ));
-    }
-    if !binding
-        .certificate
-        .chain_scope
-        .iter()
-        .any(|chain| chain == &target.chain_id)
-    {
-        return Err(AnchorError::InvalidBinding(format!(
-            "binding certificate does not cover {}",
-            target.chain_id
-        )));
-    }
-    if binding.certificate.settlement_address != target.operator_address {
-        return Err(AnchorError::InvalidBinding(format!(
-            "binding settlement address {} does not match operator address {}",
-            binding.certificate.settlement_address, target.operator_address
-        )));
-    }
-    let call = IChioRootRegistry::publishRootCall {
-        operator: validated_target.operator,
-        merkleRoot: hash_to_b256(&checkpoint.body.merkle_root),
-        checkpointSeq: checkpoint.body.checkpoint_seq,
-        batchStartSeq: checkpoint.body.batch_start_seq,
-        batchEndSeq: checkpoint.body.batch_end_seq,
-        treeSize: checkpoint.body.tree_size as u64,
-        operatorKeyHash: operator_key_hash(binding),
-    };
-
-    Ok(PreparedEvmRootPublication {
-        chain_id: target.chain_id.clone(),
-        rpc_url: target.rpc_url.clone(),
-        contract_address: target.contract_address.clone(),
-        operator_address: target.operator_address.clone(),
-        publisher_address: target.publisher_address.clone(),
-        checkpoint_seq: checkpoint.body.checkpoint_seq,
-        batch_start_seq: checkpoint.body.batch_start_seq,
-        batch_end_seq: checkpoint.body.batch_end_seq,
-        tree_size: checkpoint.body.tree_size as u64,
-        merkle_root: checkpoint.body.merkle_root,
-        operator_key_hash: operator_key_hash_hex(binding),
-        call_data: format!("0x{}", hex::encode(call.abi_encode())),
-        requires_delegate_authorization: validated_target.publisher != validated_target.operator,
-    })
-}
-
-/// Bind a publication envelope EVM address to its expected trusted-target value.
-///
-/// Both sides are parsed to a canonical [`Address`] before comparison so a
-/// checksum-case difference is not a false mismatch, and an unparseable address on
-/// either side fails closed (the publication can never be confirmed against the
-/// trusted target). `field` names the envelope slot for the error message.
-fn bind_evm_address_to_target(
-    actual: &str,
-    expected: &str,
-    field: &str,
-) -> Result<(), AnchorError> {
-    let actual_address = Address::from_str(actual).map_err(|error| {
-        AnchorError::InvalidInput(format!(
-            "prepared publication {field} is not an EVM address: {error}"
-        ))
-    })?;
-    let expected_address = Address::from_str(expected).map_err(|error| {
-        AnchorError::InvalidInput(format!(
-            "expected anchor target {field} is not an EVM address: {error}"
-        ))
-    })?;
-    if actual_address != expected_address {
-        return Err(AnchorError::InvalidInput(format!(
-            "prepared publication {field} does not match the expected anchor target"
-        )));
-    }
-    Ok(())
-}
-
-/// Re-decode a prepared publication's broadcastable `call_data` and confirm it
-/// would publish EXACTLY the supplied checkpoint's root, sequence, range, and
-/// tree size under that checkpoint's own operator key, AND that it would broadcast
-/// to the expected, registered root-registry target (`expected_target`).
-///
-/// A [`PreparedEvmRootPublication`] carries both display scalar fields
-/// (`merkle_root`, `checkpoint_seq`, ...) AND the ABI-encoded `call_data` that an
-/// operator actually broadcasts. A consumer that trusts only the display scalars
-/// (or only the publication root) can be handed a publication whose `call_data`
-/// encodes a DIFFERENT root, sequence, range, or operator-key-hash, so the
-/// broadcast publishes something other than what was displayed. This re-decodes
-/// the broadcast payload and binds every field it would publish to the trusted,
-/// independently validated `checkpoint` (and re-checks the publication's own
-/// display scalars against that same checkpoint), failing closed on any
-/// disagreement. It performs no network IO and moves no value.
-///
-/// The transaction envelope (`chain_id`, `rpc_url` = the broadcast endpoint,
-/// `contract_address` = the `to` target, `operator_address`, `publisher_address`
-/// = the `from`) lives OUTSIDE the ABI `call_data` payload, so a call_data/root-
-/// consistent publication can still be tampered to broadcast to a DIFFERENT
-/// contract, chain, or RPC endpoint. `publish_root` (and `estimate_publication_gas`)
-/// use the mutable `publication.contract_address` as the broadcast target and post
-/// to the mutable `publication.rpc_url`, so a tampered target/endpoint would seal a
-/// publication that never reaches the intended root registry (or reaches a
-/// different chain via a different RPC). The expected envelope cannot be derived
-/// from the checkpoint (neither the registry address nor the RPC URL is committed
-/// in any signed artifact); it comes from the trusted, independently supplied
-/// `expected_target` (the registered anchor target/binding config). This binds the
-/// publication's envelope to that target, failing closed on a mismatch or an
-/// unparseable address.
-///
-/// # Errors
-///
-/// Returns [`AnchorError::InvalidInput`] when `call_data` is not a decodable
-/// `publishRoot` call, when any decoded broadcast field or displayed scalar
-/// disagrees with the checkpoint's root, sequence, range, tree size, operator
-/// address, or operator key hash, or when the publication's broadcast envelope
-/// (chain, RPC endpoint, target contract, operator, or publisher) disagrees with
-/// `expected_target` (or is not a parseable EVM address).
-pub fn validate_publication_call_data_against_checkpoint(
-    publication: &PreparedEvmRootPublication,
-    checkpoint: &KernelCheckpoint,
-    expected_target: &EvmAnchorTarget,
-) -> Result<(), AnchorError> {
-    let expected_tree_size = u64::try_from(checkpoint.body.tree_size)
-        .map_err(|_| AnchorError::InvalidInput("checkpoint tree_size overflows u64".to_string()))?;
-
-    // (a0) Bind the broadcast envelope to the trusted, registered target. These
-    // fields ride OUTSIDE the ABI `call_data` payload, so they cannot be bound to
-    // the checkpoint; they are bound here to the independently supplied
-    // `expected_target`. `publish_root` broadcasts to `publication.contract_address`
-    // (the `to`) from `publication.publisher_address` (the `from`) on
-    // `publication.chain_id`, AND posts that transaction to `publication.rpc_url`
-    // (the actual network endpoint, used by both gas estimation and the broadcast),
-    // so a tampered target/chain/rpc_url would seal a publication that never reaches
-    // the intended root registry (or reaches a different RPC endpoint/chain). Fail
-    // closed on any mismatch.
-    if publication.chain_id != expected_target.chain_id {
-        return Err(AnchorError::InvalidInput(
-            "prepared publication chain_id does not match the expected anchor target".to_string(),
-        ));
-    }
-    // The `rpc_url` is the broadcast/gas-estimation endpoint. It is not committed
-    // in any signed artifact and cannot be derived from the checkpoint, so a
-    // tampered `rpc_url` can redirect the publishRoot broadcast to a different RPC
-    // endpoint (and thus a different chain) while every other field still seals.
-    // Bind it to the trusted target by exact match: the prepared publication's
-    // `rpc_url` is cloned verbatim from the registered target in
-    // `prepare_root_publication`, so any divergence is tampering. Fail closed.
-    if publication.rpc_url != expected_target.rpc_url {
-        return Err(AnchorError::InvalidInput(
-            "prepared publication rpc_url does not match the expected anchor target".to_string(),
-        ));
-    }
-    bind_evm_address_to_target(
-        &publication.contract_address,
-        &expected_target.contract_address,
-        "contract_address (broadcast target)",
-    )?;
-    bind_evm_address_to_target(
-        &publication.operator_address,
-        &expected_target.operator_address,
-        "operator_address",
-    )?;
-    bind_evm_address_to_target(
-        &publication.publisher_address,
-        &expected_target.publisher_address,
-        "publisher_address (broadcast sender)",
-    )?;
-
-    // (a) The display scalars the panel surfaces must themselves match the
-    // checkpoint, so a tampered display field cannot ride a consistent call_data.
-    if publication.merkle_root != checkpoint.body.merkle_root {
-        return Err(AnchorError::InvalidInput(
-            "prepared publication merkle_root does not match the checkpoint".to_string(),
-        ));
-    }
-    if publication.checkpoint_seq != checkpoint.body.checkpoint_seq
-        || publication.batch_start_seq != checkpoint.body.batch_start_seq
-        || publication.batch_end_seq != checkpoint.body.batch_end_seq
-        || publication.tree_size != expected_tree_size
-    {
-        return Err(AnchorError::InvalidInput(
-            "prepared publication sequence/range/tree-size does not match the checkpoint"
-                .to_string(),
-        ));
-    }
-    let expected_operator_key_hash = keccak256(checkpoint.body.kernel_key.as_bytes());
-    let expected_operator_key_hash_hex =
-        format!("0x{}", hex::encode(expected_operator_key_hash.as_slice()));
-    if publication.operator_key_hash != expected_operator_key_hash_hex {
-        return Err(AnchorError::InvalidInput(
-            "prepared publication operator_key_hash does not match the checkpoint kernel key"
-                .to_string(),
-        ));
-    }
-
-    // (b) Decode the actual broadcast payload and bind every published field to
-    // the checkpoint (the trust anchor), not to the publication's display fields.
-    let hex_body = publication
-        .call_data
-        .strip_prefix("0x")
-        .unwrap_or(&publication.call_data);
-    let raw = hex::decode(hex_body).map_err(|error| {
-        AnchorError::InvalidInput(format!("publication call_data is not valid hex: {error}"))
-    })?;
-    let call = IChioRootRegistry::publishRootCall::abi_decode(&raw).map_err(|error| {
-        AnchorError::InvalidInput(format!(
-            "publication call_data is not a publishRoot call: {error}"
-        ))
-    })?;
-    if call.merkleRoot != hash_to_b256(&checkpoint.body.merkle_root) {
-        return Err(AnchorError::InvalidInput(
-            "publication call_data would publish a root that disagrees with the checkpoint"
-                .to_string(),
-        ));
-    }
-    if call.checkpointSeq != checkpoint.body.checkpoint_seq
-        || call.batchStartSeq != checkpoint.body.batch_start_seq
-        || call.batchEndSeq != checkpoint.body.batch_end_seq
-        || call.treeSize != expected_tree_size
-    {
-        return Err(AnchorError::InvalidInput(
-            "publication call_data would publish a sequence/range/tree-size that disagrees with the checkpoint"
-                .to_string(),
-        ));
-    }
-    if call.operatorKeyHash != expected_operator_key_hash {
-        return Err(AnchorError::InvalidInput(
-            "publication call_data operator key hash does not match the checkpoint kernel key"
-                .to_string(),
-        ));
-    }
-    let operator = Address::from_str(&publication.operator_address).map_err(|error| {
-        AnchorError::InvalidInput(format!(
-            "publication operator_address is not an EVM address: {error}"
-        ))
-    })?;
-    if call.operator != operator {
-        return Err(AnchorError::InvalidInput(
-            "publication call_data operator does not match the publication operator address"
-                .to_string(),
-        ));
-    }
-    Ok(())
-}
-
-pub fn prepare_delegate_registration(
-    target: &EvmAnchorTarget,
-    delegate_address: &str,
-    expires_at: u64,
-) -> Result<PreparedDelegateRegistration, AnchorError> {
-    parse_validated_evm_anchor_target(target)?;
-    if delegate_address.trim().is_empty() {
-        return Err(AnchorError::InvalidInput(
-            "delegate address is required".to_string(),
-        ));
-    }
-    if expires_at == 0 {
-        return Err(AnchorError::InvalidInput(
-            "delegate expiry must be non-zero".to_string(),
-        ));
-    }
-
-    let delegate = Address::from_str(delegate_address)
-        .map_err(|error| AnchorError::InvalidInput(error.to_string()))?;
-    let call = IChioRootRegistry::registerDelegateCall {
-        delegate,
-        expiresAt: expires_at,
-    };
-    Ok(PreparedDelegateRegistration {
-        chain_id: target.chain_id.clone(),
-        rpc_url: target.rpc_url.clone(),
-        contract_address: target.contract_address.clone(),
-        operator_address: target.operator_address.clone(),
-        delegate_address: delegate_address.to_string(),
-        expires_at,
-        call_data: format!("0x{}", hex::encode(call.abi_encode())),
-    })
-}
-
-pub async fn publish_root(
-    publication: &PreparedEvmRootPublication,
-    egress_contract: &HttpEgressContract,
+pub fn operator_key_hash_hex(
+    binding: &chio_core::web3::identity::SignedWeb3IdentityBinding,
 ) -> Result<String, AnchorError> {
-    let gas_limit = estimate_publication_gas(publication, egress_contract)
-        .await?
-        .saturating_mul(12)
-        .saturating_div(10)
-        .saturating_add(50_000);
-    let result = rpc_call(
-        &publication.rpc_url,
-        egress_contract,
-        "eth_sendTransaction",
-        json!([{
-            "from": publication.publisher_address,
-            "to": publication.contract_address,
-            "data": publication.call_data,
-            "gas": format!("0x{gas_limit:x}"),
-        }]),
-    )
-    .await?;
-
-    result
-        .as_str()
-        .map(ToString::to_string)
-        .ok_or_else(|| AnchorError::Rpc("eth_sendTransaction did not return a tx hash".to_string()))
-}
-
-async fn estimate_publication_gas(
-    publication: &PreparedEvmRootPublication,
-    egress_contract: &HttpEgressContract,
-) -> Result<u64, AnchorError> {
-    let result = rpc_call(
-        &publication.rpc_url,
-        egress_contract,
-        "eth_estimateGas",
-        json!([{
-            "from": publication.publisher_address,
-            "to": publication.contract_address,
-            "data": publication.call_data,
-        }]),
-    )
-    .await?;
-    parse_hex_u64(
-        result.as_str().ok_or_else(|| {
-            AnchorError::Rpc("eth_estimateGas did not return a string".to_string())
-        })?,
-    )
-}
-
-pub async fn confirm_root_publication(
-    target: &EvmAnchorTarget,
-    checkpoint: &KernelCheckpoint,
-    binding: &SignedWeb3IdentityBinding,
-    tx_hash: &str,
-    egress_contract: &HttpEgressContract,
-) -> Result<EvmPublicationReceipt, AnchorError> {
-    let validated_target = parse_validated_evm_anchor_target(target)?;
-    let receipt = rpc_call(
-        &target.rpc_url,
-        egress_contract,
-        "eth_getTransactionReceipt",
-        json!([tx_hash]),
-    )
-    .await?;
-    let block_number = parse_hex_u64(
-        receipt
-            .get("blockNumber")
-            .and_then(Value::as_str)
-            .ok_or_else(|| AnchorError::Rpc("receipt missing blockNumber".to_string()))?,
-    )?;
-    let block_hash = receipt
-        .get("blockHash")
-        .and_then(Value::as_str)
-        .ok_or_else(|| AnchorError::Rpc("receipt missing blockHash".to_string()))?
-        .to_string();
-    let status = receipt
-        .get("status")
-        .and_then(Value::as_str)
-        .ok_or_else(|| AnchorError::Rpc("receipt missing status".to_string()))?;
-    if status != "0x1" {
-        return Err(AnchorError::Rpc(format!(
-            "publication transaction {} failed with status {}",
-            tx_hash, status
-        )));
-    }
-
-    let get_root = IChioRootRegistry::getRootCall {
-        operator: validated_target.operator,
-        checkpointSeq: checkpoint.body.checkpoint_seq,
-    };
-    let root_result = rpc_call(
-        &target.rpc_url,
-        egress_contract,
-        "eth_call",
-        json!([
-            {
-                "to": target.contract_address,
-                "data": format!("0x{}", hex::encode(get_root.abi_encode()))
-            },
-            "latest"
-        ]),
-    )
-    .await?;
-    let entry_hex = root_result
-        .as_str()
-        .ok_or_else(|| AnchorError::Rpc("eth_call getRoot did not return data".to_string()))?;
-    let entry_bytes = hex::decode(entry_hex.trim_start_matches("0x"))
-        .map_err(|error| AnchorError::Rpc(error.to_string()))?;
-    let stored = IChioRootRegistry::getRootCall::abi_decode_returns(&entry_bytes)
-        .map_err(|error| AnchorError::Serialization(error.to_string()))?;
-    if stored.checkpointSeq != checkpoint.body.checkpoint_seq
-        || stored.batchStartSeq != checkpoint.body.batch_start_seq
-        || stored.batchEndSeq != checkpoint.body.batch_end_seq
-        || stored.treeSize != checkpoint.body.tree_size as u64
-        || stored.merkleRoot != hash_to_b256(&checkpoint.body.merkle_root)
-        || stored.operatorKeyHash != operator_key_hash(binding)
-    {
-        return Err(AnchorError::Verification(
-            "root registry entry does not match the checkpoint being confirmed".to_string(),
-        ));
-    }
-
-    Ok(EvmPublicationReceipt {
-        tx_hash: tx_hash.to_string(),
-        block_number,
-        block_hash,
-        published_at: stored.publishedAt,
-    })
-}
-
-pub async fn inspect_publication_guard(
-    target: &EvmAnchorTarget,
-    egress_contract: &HttpEgressContract,
-) -> Result<EvmPublicationGuard, AnchorError> {
-    let validated_target = parse_validated_evm_anchor_target(target)?;
-
-    let auth_call = IChioRootRegistry::isAuthorizedPublisherCall {
-        operator: validated_target.operator,
-        publisher: validated_target.publisher,
-    };
-    let auth_response = rpc_call(
-        &target.rpc_url,
-        egress_contract,
-        "eth_call",
-        json!([
-            {
-                "to": target.contract_address,
-                "data": format!("0x{}", hex::encode(auth_call.abi_encode()))
-            },
-            "latest"
-        ]),
-    )
-    .await?;
-    let auth_raw = auth_response.as_str().ok_or_else(|| {
-        AnchorError::Rpc("eth_call isAuthorizedPublisher did not return data".to_string())
-    })?;
-    let auth_bytes = hex::decode(auth_raw.trim_start_matches("0x"))
-        .map_err(|error| AnchorError::Rpc(error.to_string()))?;
-    let publisher_authorized =
-        IChioRootRegistry::isAuthorizedPublisherCall::abi_decode_returns(&auth_bytes)
-            .map_err(|error| AnchorError::Serialization(error.to_string()))?;
-
-    let seq_call = IChioRootRegistry::getLatestSeqCall {
-        operator: validated_target.operator,
-    };
-    let seq_response = rpc_call(
-        &target.rpc_url,
-        egress_contract,
-        "eth_call",
-        json!([
-            {
-                "to": target.contract_address,
-                "data": format!("0x{}", hex::encode(seq_call.abi_encode()))
-            },
-            "latest"
-        ]),
-    )
-    .await?;
-    let seq_raw = seq_response
-        .as_str()
-        .ok_or_else(|| AnchorError::Rpc("eth_call getLatestSeq did not return data".to_string()))?;
-    let seq_bytes = hex::decode(seq_raw.trim_start_matches("0x"))
-        .map_err(|error| AnchorError::Rpc(error.to_string()))?;
-    let latest_checkpoint_seq = IChioRootRegistry::getLatestSeqCall::abi_decode_returns(&seq_bytes)
-        .map_err(|error| AnchorError::Serialization(error.to_string()))?;
-
-    Ok(EvmPublicationGuard {
-        chain_id: target.chain_id.clone(),
-        operator_address: target.operator_address.clone(),
-        publisher_address: target.publisher_address.clone(),
-        latest_checkpoint_seq,
-        next_checkpoint_seq_min: latest_checkpoint_seq.saturating_add(1),
-        publisher_authorized,
-        requires_delegate_authorization: validated_target.publisher != validated_target.operator,
-    })
-}
-
-pub async fn ensure_publication_ready(
-    target: &EvmAnchorTarget,
-    checkpoint_seq: u64,
-    egress_contract: &HttpEgressContract,
-) -> Result<EvmPublicationGuard, AnchorError> {
-    let guard = inspect_publication_guard(target, egress_contract).await?;
-    if !guard.publisher_authorized {
-        return Err(AnchorError::Verification(format!(
-            "publisher {} is not authorized for operator {} on {}",
-            guard.publisher_address, guard.operator_address, guard.chain_id
-        )));
-    }
-    if checkpoint_seq < guard.next_checkpoint_seq_min {
-        return Err(AnchorError::Verification(format!(
-            "checkpoint sequence {} must be >= {} on {}",
-            checkpoint_seq, guard.next_checkpoint_seq_min, guard.chain_id
-        )));
-    }
-    Ok(guard)
-}
-
-pub async fn verify_inclusion_onchain(
-    target: &EvmAnchorTarget,
-    proof: &AnchorInclusionProof,
-    egress_contract: &HttpEgressContract,
-) -> Result<bool, AnchorError> {
-    let validated_target = parse_validated_evm_anchor_target(target)?;
-    verify_anchor_inclusion_proof(proof)
-        .map_err(|error| AnchorError::Verification(error.to_string()))?;
-    let operator = parse_nonzero_evm_address(
-        "proof binding settlement address",
-        &proof.key_binding_certificate.certificate.settlement_address,
-    )?;
-    if operator != validated_target.operator {
-        return Err(AnchorError::Verification(
-            "proof binding settlement address does not match anchor target operator".to_string(),
-        ));
-    }
-    let receipt_bytes = canonical_json_bytes(&proof.receipt.body())
-        .map_err(|error| AnchorError::Serialization(error.to_string()))?;
-    let leaf = leaf_hash(&receipt_bytes);
-    let evm_proof = ChioMerkleProof {
-        audit_path: proof
-            .receipt_inclusion
-            .proof
-            .audit_path
-            .iter()
-            .map(hash_to_b256)
-            .collect(),
-        leaf_index: U256::from(proof.receipt_inclusion.proof.leaf_index as u64),
-        tree_size: U256::from(proof.receipt_inclusion.proof.tree_size as u64),
-    };
-    let call = IChioRootRegistry::verifyInclusionDetailedCall {
-        proof: evm_proof.into(),
-        root: hash_to_b256(&proof.receipt_inclusion.merkle_root),
-        leafHash: hash_to_b256(&leaf),
-        operator,
-    };
-    let response = rpc_call(
-        &target.rpc_url,
-        egress_contract,
-        "eth_call",
-        json!([
-            {
-                "to": target.contract_address,
-                "data": format!("0x{}", hex::encode(call.abi_encode()))
-            },
-            "latest"
-        ]),
-    )
-    .await?;
-    let raw = response.as_str().ok_or_else(|| {
-        AnchorError::Rpc("eth_call verifyInclusionDetailed did not return data".to_string())
-    })?;
-    let bytes = hex::decode(raw.trim_start_matches("0x"))
-        .map_err(|error| AnchorError::Rpc(error.to_string()))?;
-    let verified = IChioRootRegistry::verifyInclusionDetailedCall::abi_decode_returns(&bytes)
-        .map_err(|error| AnchorError::Serialization(error.to_string()))?;
-    Ok(verified)
-}
-
-pub fn build_chain_anchor_record(
-    target: &EvmAnchorTarget,
-    checkpoint: &KernelCheckpoint,
-    confirmed: &EvmPublicationReceipt,
-) -> Web3ChainAnchorRecord {
-    Web3ChainAnchorRecord {
-        chain_id: target.chain_id.clone(),
-        contract_address: target.contract_address.clone(),
-        operator_address: target.operator_address.clone(),
-        tx_hash: confirmed.tx_hash.clone(),
-        block_number: confirmed.block_number,
-        block_hash: confirmed.block_hash.clone(),
-        anchored_merkle_root: checkpoint.body.merkle_root,
-        anchored_checkpoint_seq: checkpoint.body.checkpoint_seq,
-    }
-}
-
-async fn rpc_call(
-    rpc_url: &str,
-    egress_contract: &HttpEgressContract,
-    method: &str,
-    params: Value,
-) -> Result<Value, AnchorError> {
-    validate_rpc_egress_contract(rpc_url, egress_contract)?;
-    let client = client_builder_with_contract(egress_contract)
-        .build()
-        .map_err(|error| AnchorError::Rpc(format!("reqwest build: {error}")))?;
-    let request = client
-        .post(rpc_url)
-        .json(&json!({
-            "jsonrpc": "2.0",
-            "id": 1u64,
-            "method": method,
-            "params": params,
-        }))
-        .build()
-        .map_err(|error| AnchorError::Rpc(format!("reqwest build request: {error}")))?;
-    let response = send_with_contract(egress_contract, &client, request)
-        .await
-        .map_err(|error| {
-            AnchorError::Rpc(format!(
-                "HttpEgressContract rejects anchor EVM RPC dispatch: {error}"
-            ))
-        })?;
-    let envelope: JsonRpcEnvelope = response
-        .json()
-        .await
-        .map_err(|error| AnchorError::Rpc(error.to_string()))?;
-    if let Some(error) = envelope.error {
-        return Err(AnchorError::Rpc(format!(
-            "{} (code {})",
-            error.message, error.code
-        )));
-    }
-    envelope
-        .result
-        .ok_or_else(|| AnchorError::Rpc(format!("{} returned no result", method)))
-}
-
-pub fn evm_anchor_devnet_rpc_egress_contract(
-    rpc_url: &str,
-) -> Result<HttpEgressContract, AnchorError> {
-    devnet_rpc_egress_contract_for_url("chio-anchor-evm-devnet-rpc", rpc_url)
-}
-
-pub(crate) fn parse_validated_evm_anchor_target(
-    target: &EvmAnchorTarget,
-) -> Result<ValidatedEvmAnchorTarget, AnchorError> {
-    validate_evm_chain_id(&target.chain_id)?;
-    validate_evm_rpc_url(&target.rpc_url)?;
-    let _contract = parse_nonzero_evm_address("contract address", &target.contract_address)?;
-    let operator = parse_nonzero_evm_address("operator address", &target.operator_address)?;
-    let publisher = parse_nonzero_evm_address("publisher address", &target.publisher_address)?;
-    Ok(ValidatedEvmAnchorTarget {
-        operator,
-        publisher,
-    })
-}
-
-fn validate_evm_chain_id(chain_id: &str) -> Result<(), AnchorError> {
-    let suffix = chain_id.strip_prefix("eip155:").ok_or_else(|| {
-        AnchorError::InvalidInput(
-            "EVM anchor chain_id must use the eip155:<decimal-chain-id> format".to_string(),
-        )
-    })?;
-    if suffix.is_empty() || !suffix.bytes().all(|byte| byte.is_ascii_digit()) {
-        return Err(AnchorError::InvalidInput(
-            "EVM anchor chain_id must use a non-empty decimal eip155 chain id".to_string(),
-        ));
-    }
-    if suffix.len() > 1 && suffix.starts_with('0') {
-        return Err(AnchorError::InvalidInput(
-            "EVM anchor chain_id must be canonical and omit leading zeroes".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_evm_rpc_url(rpc_url: &str) -> Result<(), AnchorError> {
-    if rpc_url.trim() != rpc_url {
-        return Err(AnchorError::InvalidInput(
-            "anchor EVM RPC URL must not include surrounding whitespace".to_string(),
-        ));
-    }
-    let url = Url::parse(rpc_url).map_err(|error| {
-        AnchorError::InvalidInput(format!("invalid anchor EVM RPC URL: {error}"))
-    })?;
-    if !matches!(url.scheme(), "http" | "https") {
-        return Err(AnchorError::InvalidInput(
-            "anchor EVM RPC URL must use http or https".to_string(),
-        ));
-    }
-    if url.host_str().is_none() {
-        return Err(AnchorError::InvalidInput(
-            "anchor EVM RPC URL must include a host".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn parse_nonzero_evm_address(label: &str, address: &str) -> Result<Address, AnchorError> {
-    if address.trim() != address {
-        return Err(AnchorError::InvalidInput(format!(
-            "{label} must not include surrounding whitespace"
-        )));
-    }
-    let parsed = Address::from_str(address).map_err(|error| {
-        AnchorError::InvalidInput(format!("{label} is not a valid EVM address: {error}"))
-    })?;
-    if parsed == Address::from([0_u8; 20]) {
-        return Err(AnchorError::InvalidInput(format!(
-            "{label} must not be the zero address"
-        )));
-    }
-    Ok(parsed)
-}
-
-fn validate_rpc_egress_contract(
-    rpc_url: &str,
-    contract: &HttpEgressContract,
-) -> Result<(), AnchorError> {
-    contract
-        .validate_dispatchable_with_pinned_dns()
-        .map_err(|error| {
-            AnchorError::Rpc(format!(
-                "invalid anchor EVM RPC HttpEgressContract: {error}"
-            ))
-        })?;
-    // Validate scheme/authority and reject IP-literal loopback/link-local hosts
-    // here. Hostname address-class is enforced at connect time by the contract's
-    // pinned ContractDnsResolver (see client_builder_with_contract), so this does
-    // not resolve DNS itself: a config-time lookup would be redundant, fail
-    // offline, and be open to TOCTOU drift.
-    contract.enforce_url(rpc_url, 0).map_err(|error| {
-        AnchorError::Rpc(format!(
-            "anchor EVM RPC URL is not allowed by HttpEgressContract: {error}"
-        ))
-    })?;
-    Ok(())
-}
-
-fn devnet_rpc_egress_contract_for_url(
-    namespace: &str,
-    rpc_url: &str,
-) -> Result<HttpEgressContract, AnchorError> {
-    let url = Url::parse(rpc_url)
-        .map_err(|error| AnchorError::Rpc(format!("invalid anchor EVM RPC URL: {error}")))?;
-    let host = url
-        .host_str()
-        .ok_or_else(|| AnchorError::Rpc("anchor EVM RPC URL must include a host".to_string()))?;
-    if !rpc_host_is_loopback(host) {
-        return Err(AnchorError::InvalidInput(
-            "devnet anchor EVM RPC egress contract requires a loopback RPC URL".to_string(),
-        ));
-    }
-    let mut allowed_schemes = BTreeSet::new();
-    allowed_schemes.insert(url.scheme().to_ascii_lowercase());
-    let mut allowed_authority_set = BTreeSet::new();
-    allowed_authority_set.insert(normalized_rpc_authority(&url, host));
-    let contract = HttpEgressContract {
-        tenant_egress_namespace: namespace.to_string(),
-        allowed_schemes,
-        allowed_authority_set,
-        deny_loopback: false,
-        deny_link_local: true,
-        deny_ipv6_ula: true,
-        max_redirect_chain: 0,
-        max_response_bytes: 64 * 1024 * 1024,
-    };
-    contract
-        .validate_dispatchable_with_pinned_dns()
-        .map_err(|error| {
-            AnchorError::Rpc(format!(
-                "invalid anchor EVM RPC HttpEgressContract: {error}"
-            ))
-        })?;
-    contract.enforce_url_with_dns(rpc_url, 0).map_err(|error| {
-        AnchorError::Rpc(format!(
-            "anchor EVM RPC URL is not allowed by HttpEgressContract: {error}"
-        ))
-    })?;
-    Ok(contract)
-}
-
-fn normalized_rpc_authority(url: &Url, host: &str) -> String {
-    let host = if host.parse::<Ipv6Addr>().is_ok() {
-        format!("[{host}]")
-    } else {
-        host.trim_end_matches('.').to_ascii_lowercase()
-    };
-    match url.port() {
-        Some(port) => format!("{host}:{port}"),
-        None => host,
-    }
-}
-
-fn rpc_host_is_loopback(host: &str) -> bool {
-    matches!(
-        host.trim_end_matches('.').to_ascii_lowercase().as_str(),
-        "localhost" | "localhost.localdomain"
-    ) || host
-        .parse::<IpAddr>()
-        .is_ok_and(|address| address.is_loopback())
-}
-
-fn hash_to_b256(hash: &chio_core::hashing::Hash) -> B256 {
-    FixedBytes::from(*hash.as_bytes())
-}
-
-fn parse_hex_u64(value: &str) -> Result<u64, AnchorError> {
-    u64::from_str_radix(value.trim_start_matches("0x"), 16)
-        .map_err(|error| AnchorError::Rpc(error.to_string()))
+    hashing::operator_key_hash_hex(binding)
 }
 
 #[cfg(test)]
@@ -926,7 +53,9 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
+    use alloy_primitives::keccak256;
     use alloy_sol_types::SolCall;
+    use chio_core::crypto::PublicKey;
     use chio_core::web3::anchors::AnchorInclusionProof;
     use chio_core::web3::identity::{SignedWeb3IdentityBinding, Web3KeyBindingPurpose};
     use chio_kernel::checkpoint::KernelCheckpoint;
@@ -936,9 +65,9 @@ mod tests {
     use super::{
         build_chain_anchor_record, confirm_root_publication, ensure_publication_ready,
         evm_anchor_devnet_rpc_egress_contract, hash_to_b256, inspect_publication_guard,
-        operator_key_hash, prepare_delegate_registration, prepare_root_publication, publish_root,
-        validate_rpc_egress_contract, verify_inclusion_onchain, EvmAnchorTarget,
-        EvmPublicationReceipt, HttpEgressContract,
+        operator_key_hash, operator_key_hash_hex, prepare_delegate_registration,
+        prepare_root_publication, publish_root, validate_rpc_egress_contract,
+        verify_inclusion_onchain, EvmAnchorTarget, EvmPublicationReceipt, HttpEgressContract,
     };
 
     use chio_test_support::prelude::*;
@@ -1105,6 +234,86 @@ mod tests {
         format!("0x{}", hex::encode(data))
     }
 
+    const CONFIRM_TX_HASH: &str =
+        "0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddead";
+    const CONFIRM_BLOCK_HASH: &str =
+        "0xabababababababababababababababababababababababababababababababab";
+
+    fn successful_publication_receipt(
+        target: &EvmAnchorTarget,
+        checkpoint: &KernelCheckpoint,
+        binding: &SignedWeb3IdentityBinding,
+        tx_hash: &str,
+    ) -> Value {
+        json!({
+            "blockNumber": "0x2a",
+            "blockHash": CONFIRM_BLOCK_HASH,
+            "transactionHash": tx_hash,
+            "to": target.contract_address,
+            "status": "0x1",
+            "logs": [root_published_log(target, checkpoint, binding, tx_hash)],
+        })
+    }
+
+    fn root_published_log(
+        target: &EvmAnchorTarget,
+        checkpoint: &KernelCheckpoint,
+        binding: &SignedWeb3IdentityBinding,
+        tx_hash: &str,
+    ) -> Value {
+        let operator_key_hash = operator_key_hash(binding).test_expect("operator key hash");
+        let mut data = Vec::with_capacity(32 * 7);
+        data.extend_from_slice(hash_to_b256(&checkpoint.body.merkle_root).as_slice());
+        push_abi_u64(&mut data, checkpoint.body.batch_start_seq);
+        push_abi_u64(&mut data, checkpoint.body.batch_end_seq);
+        push_abi_u64(&mut data, checkpoint.body.tree_size as u64);
+        push_abi_u64(&mut data, 1_744_000_123_u64);
+        data.extend_from_slice(operator_key_hash.as_slice());
+        push_abi_u64(&mut data, 1);
+        json!({
+            "address": target.contract_address,
+            "topics": [
+                root_published_topic0(),
+                address_topic(&target.operator_address),
+                address_topic(&target.publisher_address),
+                u64_topic(checkpoint.body.checkpoint_seq),
+            ],
+            "data": format!("0x{}", hex::encode(data)),
+            "transactionHash": tx_hash,
+            "blockHash": CONFIRM_BLOCK_HASH,
+            "blockNumber": "0x2a",
+        })
+    }
+
+    fn push_abi_u64(data: &mut Vec<u8>, value: u64) {
+        data.extend_from_slice(&[0_u8; 24]);
+        data.extend_from_slice(&value.to_be_bytes());
+    }
+
+    fn root_published_topic0() -> String {
+        format!(
+            "0x{}",
+            hex::encode(
+                keccak256(
+                    "RootPublished(address,address,uint64,bytes32,uint64,uint64,uint64,uint64,bytes32,uint64)"
+                        .as_bytes()
+                )
+                .as_slice()
+            )
+        )
+    }
+
+    fn address_topic(address: &str) -> String {
+        let address_hex = address
+            .strip_prefix("0x")
+            .test_expect("test EVM address has 0x prefix");
+        format!("0x{}{}", "0".repeat(24), address_hex.to_ascii_lowercase())
+    }
+
+    fn u64_topic(value: u64) -> String {
+        format!("0x{value:064x}")
+    }
+
     fn read_http_request<R: Read>(stream: &mut R) -> String {
         let mut request = Vec::new();
         let mut chunk = [0_u8; 1024];
@@ -1226,6 +435,38 @@ mod tests {
         assert!(error
             .to_string()
             .contains("does not match operator address"));
+    }
+
+    #[test]
+    fn prepare_root_publication_accepts_operator_address_case_mismatch() {
+        let checkpoint = sample_checkpoint();
+        let mut target = sample_target("http://127.0.0.1:8545");
+        let mut binding = sample_binding();
+        target.operator_address = "0x735f1ba389d9d350501db8fbbb5b52477dcadda8".to_string();
+        binding.certificate.settlement_address =
+            "0x735F1Ba389D9D350501dB8FBbB5b52477DcaddA8".to_string();
+
+        let prepared = prepare_root_publication(&target, &checkpoint, &binding)
+            .test_expect("matching EVM operator addresses should prepare");
+
+        assert_eq!(prepared.operator_address, target.operator_address);
+    }
+
+    #[test]
+    fn prepare_root_publication_rejects_non_ed25519_operator_key() {
+        let checkpoint = sample_checkpoint();
+        let target = sample_target("http://127.0.0.1:8545");
+        let mut binding = sample_binding();
+        let mut encoded_point = [0u8; 65];
+        encoded_point[0] = 0x04;
+        binding.certificate.chio_public_key =
+            PublicKey::from_p256_sec1(&encoded_point).test_expect("P-256 key parses");
+
+        let error = prepare_root_publication(&target, &checkpoint, &binding)
+            .test_expect_err("non-Ed25519 operator key should fail");
+
+        assert!(matches!(error, crate::AnchorError::InvalidBinding(_)));
+        assert!(error.to_string().contains("Ed25519"));
     }
 
     #[test]
@@ -1543,15 +784,18 @@ mod tests {
                 batchEndSeq: checkpoint.body.batch_end_seq,
                 treeSize: checkpoint.body.tree_size as u64,
                 publishedAt: 1_744_000_123_u64,
-                operatorKeyHash: operator_key_hash(&binding),
+                operatorKeyHash: operator_key_hash(&binding).test_expect("operator key hash"),
+                operatorEpoch: 1,
             },
         ));
+        let target = sample_target("http://127.0.0.1:0");
         let Some(server) = MockJsonRpcServer::spawn(vec![
-            rpc_result(json!({
-                "blockNumber": "0x2a",
-                "blockHash": "0xabc",
-                "status": "0x1",
-            })),
+            rpc_result(successful_publication_receipt(
+                &target,
+                &checkpoint,
+                &binding,
+                CONFIRM_TX_HASH,
+            )),
             rpc_result(json!(stored)),
         ]) else {
             return;
@@ -1563,7 +807,7 @@ mod tests {
             &target,
             &checkpoint,
             &binding,
-            "0xdeadbeef",
+            CONFIRM_TX_HASH,
             &egress_contract,
         )
         .await
@@ -1572,18 +816,86 @@ mod tests {
         let requests = server.requests();
         server.join();
 
-        assert_eq!(receipt.tx_hash, "0xdeadbeef");
+        assert_eq!(receipt.tx_hash, CONFIRM_TX_HASH);
+        assert_eq!(receipt.block_hash, CONFIRM_BLOCK_HASH);
         assert_eq!(receipt.block_number, 42);
         assert_eq!(receipt.published_at, 1_744_000_123);
+        assert_eq!(
+            receipt.operator_key_hash,
+            format!(
+                "0x{}",
+                hex::encode(
+                    operator_key_hash(&binding)
+                        .test_expect("operator key hash")
+                        .as_slice()
+                )
+            )
+        );
         assert_eq!(requests[0]["method"], "eth_getTransactionReceipt");
         assert_eq!(requests[1]["method"], "eth_call");
+        assert_eq!(requests[1]["params"][1]["blockHash"], CONFIRM_BLOCK_HASH);
+        assert_eq!(requests[1]["params"][1]["requireCanonical"], true);
+    }
+
+    #[tokio::test]
+    async fn confirm_root_publication_retries_with_block_number_for_ganache_block_object_error() {
+        let checkpoint = sample_checkpoint();
+        let binding = sample_binding();
+        let stored = encode_hex(IChioRootRegistry::getRootCall::abi_encode_returns(
+            &IChioRootRegistry::RootEntry {
+                merkleRoot: hash_to_b256(&checkpoint.body.merkle_root),
+                checkpointSeq: checkpoint.body.checkpoint_seq,
+                batchStartSeq: checkpoint.body.batch_start_seq,
+                batchEndSeq: checkpoint.body.batch_end_seq,
+                treeSize: checkpoint.body.tree_size as u64,
+                publishedAt: 1_744_000_123_u64,
+                operatorKeyHash: operator_key_hash(&binding).test_expect("operator key hash"),
+                operatorEpoch: 1,
+            },
+        ));
+        let target = sample_target("http://127.0.0.1:0");
+        let Some(server) = MockJsonRpcServer::spawn(vec![
+            rpc_result(successful_publication_receipt(
+                &target,
+                &checkpoint,
+                &binding,
+                CONFIRM_TX_HASH,
+            )),
+            rpc_error(-32700, r#"Cannot wrap a "object" as a json-rpc type"#),
+            rpc_result(json!(stored)),
+        ]) else {
+            return;
+        };
+        let target = sample_target(server.base_url());
+        let egress_contract = sample_rpc_contract(server.base_url());
+
+        let receipt = confirm_root_publication(
+            &target,
+            &checkpoint,
+            &binding,
+            CONFIRM_TX_HASH,
+            &egress_contract,
+        )
+        .await
+        .test_expect("confirm publication through Ganache fallback");
+
+        let requests = server.requests();
+        server.join();
+
+        assert_eq!(receipt.tx_hash, CONFIRM_TX_HASH);
+        assert_eq!(requests.len(), 3);
+        assert_eq!(requests[1]["method"], "eth_call");
+        assert_eq!(requests[1]["params"][1]["blockHash"], CONFIRM_BLOCK_HASH);
+        assert_eq!(requests[1]["params"][1]["requireCanonical"], true);
+        assert_eq!(requests[2]["method"], "eth_call");
+        assert_eq!(requests[2]["params"][1], "0x2a");
     }
 
     #[tokio::test]
     async fn confirm_root_publication_rejects_failed_transaction_status() {
         let Some(server) = MockJsonRpcServer::spawn(vec![rpc_result(json!({
             "blockNumber": "0x2a",
-            "blockHash": "0xabc",
+            "blockHash": CONFIRM_BLOCK_HASH,
             "status": "0x0",
         }))]) else {
             return;
@@ -1597,7 +909,7 @@ mod tests {
             &target,
             &checkpoint,
             &binding,
-            "0xdeadbeef",
+            CONFIRM_TX_HASH,
             &egress_contract,
         )
         .await
@@ -1619,15 +931,18 @@ mod tests {
                 batchEndSeq: checkpoint.body.batch_end_seq,
                 treeSize: checkpoint.body.tree_size as u64 + 1,
                 publishedAt: 1_744_000_123_u64,
-                operatorKeyHash: operator_key_hash(&binding),
+                operatorKeyHash: operator_key_hash(&binding).test_expect("operator key hash"),
+                operatorEpoch: 1,
             },
         ));
+        let target = sample_target("http://127.0.0.1:0");
         let Some(server) = MockJsonRpcServer::spawn(vec![
-            rpc_result(json!({
-                "blockNumber": "0x2a",
-                "blockHash": "0xabc",
-                "status": "0x1",
-            })),
+            rpc_result(successful_publication_receipt(
+                &target,
+                &checkpoint,
+                &binding,
+                CONFIRM_TX_HASH,
+            )),
             rpc_result(json!(stored)),
         ]) else {
             return;
@@ -1639,7 +954,7 @@ mod tests {
             &target,
             &checkpoint,
             &binding,
-            "0xdeadbeef",
+            CONFIRM_TX_HASH,
             &egress_contract,
         )
         .await
@@ -1652,10 +967,110 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn confirm_root_publication_rejects_receipt_without_matching_event() {
+        let checkpoint = sample_checkpoint();
+        let binding = sample_binding();
+        let target = sample_target("http://127.0.0.1:0");
+        let Some(server) = MockJsonRpcServer::spawn(vec![rpc_result(json!({
+            "blockNumber": "0x2a",
+            "blockHash": CONFIRM_BLOCK_HASH,
+            "transactionHash": CONFIRM_TX_HASH,
+            "to": target.contract_address,
+            "status": "0x1",
+            "logs": [],
+        }))]) else {
+            return;
+        };
+        let target = sample_target(server.base_url());
+        let egress_contract = sample_rpc_contract(server.base_url());
+
+        let error = confirm_root_publication(
+            &target,
+            &checkpoint,
+            &binding,
+            CONFIRM_TX_HASH,
+            &egress_contract,
+        )
+        .await
+        .test_expect_err("receipt without event should fail");
+
+        let requests = server.requests();
+        server.join();
+        assert_eq!(requests.len(), 1);
+        assert!(error
+            .to_string()
+            .contains("missing matching RootPublished log"));
+    }
+
+    #[tokio::test]
+    async fn confirm_root_publication_rejects_short_receipt_block_hash() {
+        let checkpoint = sample_checkpoint();
+        let binding = sample_binding();
+        let target = sample_target("http://127.0.0.1:0");
+        let mut receipt =
+            successful_publication_receipt(&target, &checkpoint, &binding, CONFIRM_TX_HASH);
+        receipt["blockHash"] = json!("0xabc");
+        let Some(server) = MockJsonRpcServer::spawn(vec![rpc_result(receipt)]) else {
+            return;
+        };
+        let target = sample_target(server.base_url());
+        let egress_contract = sample_rpc_contract(server.base_url());
+
+        let error = confirm_root_publication(
+            &target,
+            &checkpoint,
+            &binding,
+            CONFIRM_TX_HASH,
+            &egress_contract,
+        )
+        .await
+        .test_expect_err("short block hash should fail");
+
+        let requests = server.requests();
+        server.join();
+        assert_eq!(requests.len(), 1);
+        assert!(error.to_string().contains("receipt blockHash"));
+    }
+
+    #[tokio::test]
+    async fn confirm_root_publication_rejects_log_block_hash_mismatch() {
+        let checkpoint = sample_checkpoint();
+        let binding = sample_binding();
+        let target = sample_target("http://127.0.0.1:0");
+        let mut receipt =
+            successful_publication_receipt(&target, &checkpoint, &binding, CONFIRM_TX_HASH);
+        receipt["logs"][0]["blockHash"] =
+            json!("0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd");
+        let Some(server) = MockJsonRpcServer::spawn(vec![rpc_result(receipt)]) else {
+            return;
+        };
+        let target = sample_target(server.base_url());
+        let egress_contract = sample_rpc_contract(server.base_url());
+
+        let error = confirm_root_publication(
+            &target,
+            &checkpoint,
+            &binding,
+            CONFIRM_TX_HASH,
+            &egress_contract,
+        )
+        .await
+        .test_expect_err("log block hash mismatch should fail");
+
+        let requests = server.requests();
+        server.join();
+        assert_eq!(requests.len(), 1);
+        assert!(error
+            .to_string()
+            .contains("missing matching RootPublished log"));
+    }
+
+    #[tokio::test]
     async fn inspect_publication_guard_decodes_authorization_and_sequence() {
+        let binding = sample_binding();
         let Some(server) = MockJsonRpcServer::spawn(vec![
             rpc_result(json!(encode_hex(
-                IChioRootRegistry::isAuthorizedPublisherCall::abi_encode_returns(&true)
+                IChioRootRegistry::isAuthorizedPublisherForKeyHashCall::abi_encode_returns(&true)
             ))),
             rpc_result(json!(encode_hex(
                 IChioRootRegistry::getLatestSeqCall::abi_encode_returns(&41_u64)
@@ -1666,12 +1081,16 @@ mod tests {
         let target = sample_delegate_target(server.base_url());
         let egress_contract = sample_rpc_contract(server.base_url());
 
-        let guard = inspect_publication_guard(&target, &egress_contract)
+        let guard = inspect_publication_guard(&target, &binding, &egress_contract)
             .await
             .test_expect("inspect guard");
 
         server.join();
         assert!(guard.publisher_authorized);
+        assert_eq!(
+            guard.operator_key_hash,
+            operator_key_hash_hex(&binding).test_expect("operator key hash")
+        );
         assert_eq!(guard.latest_checkpoint_seq, 41);
         assert_eq!(guard.next_checkpoint_seq_min, 42);
         assert!(guard.requires_delegate_authorization);
@@ -1679,9 +1098,11 @@ mod tests {
 
     #[tokio::test]
     async fn ensure_publication_ready_rejects_unauthorized_publisher() {
+        let checkpoint = sample_checkpoint();
+        let binding = sample_binding();
         let Some(server) = MockJsonRpcServer::spawn(vec![
             rpc_result(json!(encode_hex(
-                IChioRootRegistry::isAuthorizedPublisherCall::abi_encode_returns(&false)
+                IChioRootRegistry::isAuthorizedPublisherForKeyHashCall::abi_encode_returns(&false)
             ))),
             rpc_result(json!(encode_hex(
                 IChioRootRegistry::getLatestSeqCall::abi_encode_returns(&41_u64)
@@ -1692,7 +1113,7 @@ mod tests {
         let target = sample_delegate_target(server.base_url());
         let egress_contract = sample_rpc_contract(server.base_url());
 
-        let error = ensure_publication_ready(&target, 42, &egress_contract)
+        let error = ensure_publication_ready(&target, &checkpoint, &binding, &egress_contract)
             .await
             .test_expect_err("unauthorized publisher should fail");
 
@@ -1702,9 +1123,12 @@ mod tests {
 
     #[tokio::test]
     async fn ensure_publication_ready_rejects_checkpoint_regression() {
+        let mut checkpoint = sample_checkpoint();
+        checkpoint.body.checkpoint_seq = 41;
+        let binding = sample_binding();
         let Some(server) = MockJsonRpcServer::spawn(vec![
             rpc_result(json!(encode_hex(
-                IChioRootRegistry::isAuthorizedPublisherCall::abi_encode_returns(&true)
+                IChioRootRegistry::isAuthorizedPublisherForKeyHashCall::abi_encode_returns(&true)
             ))),
             rpc_result(json!(encode_hex(
                 IChioRootRegistry::getLatestSeqCall::abi_encode_returns(&41_u64)
@@ -1715,19 +1139,22 @@ mod tests {
         let target = sample_delegate_target(server.base_url());
         let egress_contract = sample_rpc_contract(server.base_url());
 
-        let error = ensure_publication_ready(&target, 41, &egress_contract)
+        let error = ensure_publication_ready(&target, &checkpoint, &binding, &egress_contract)
             .await
             .test_expect_err("checkpoint regression should fail");
 
         server.join();
-        assert!(error.to_string().contains("must be >="));
+        assert!(error.to_string().contains("must equal"));
     }
 
     #[tokio::test]
-    async fn ensure_publication_ready_accepts_next_checkpoint() {
+    async fn ensure_publication_ready_rejects_skipped_checkpoint_sequence() {
+        let mut checkpoint = sample_checkpoint();
+        checkpoint.body.checkpoint_seq = 44;
+        let binding = sample_binding();
         let Some(server) = MockJsonRpcServer::spawn(vec![
             rpc_result(json!(encode_hex(
-                IChioRootRegistry::isAuthorizedPublisherCall::abi_encode_returns(&true)
+                IChioRootRegistry::isAuthorizedPublisherForKeyHashCall::abi_encode_returns(&true)
             ))),
             rpc_result(json!(encode_hex(
                 IChioRootRegistry::getLatestSeqCall::abi_encode_returns(&41_u64)
@@ -1738,7 +1165,48 @@ mod tests {
         let target = sample_delegate_target(server.base_url());
         let egress_contract = sample_rpc_contract(server.base_url());
 
-        let guard = ensure_publication_ready(&target, 42, &egress_contract)
+        let error = ensure_publication_ready(&target, &checkpoint, &binding, &egress_contract)
+            .await
+            .test_expect_err("skipped checkpoint sequence should fail");
+
+        server.join();
+        assert!(error.to_string().contains("must equal"));
+    }
+
+    #[tokio::test]
+    async fn ensure_publication_ready_accepts_next_checkpoint() {
+        let mut checkpoint = sample_checkpoint();
+        checkpoint.body.checkpoint_seq = 42;
+        checkpoint.body.batch_start_seq = 10;
+        checkpoint.body.batch_end_seq = 20;
+        let binding = sample_binding();
+        let latest_root = IChioRootRegistry::RootEntry {
+            merkleRoot: hash_to_b256(&checkpoint.body.merkle_root),
+            checkpointSeq: checkpoint.body.checkpoint_seq - 1,
+            batchStartSeq: 1,
+            batchEndSeq: checkpoint.body.batch_start_seq - 1,
+            treeSize: checkpoint.body.tree_size as u64,
+            publishedAt: 1_744_000_123_u64,
+            operatorKeyHash: operator_key_hash(&binding).test_expect("operator key hash"),
+            operatorEpoch: 1,
+        };
+        let Some(server) = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!(encode_hex(
+                IChioRootRegistry::isAuthorizedPublisherForKeyHashCall::abi_encode_returns(&true)
+            ))),
+            rpc_result(json!(encode_hex(
+                IChioRootRegistry::getLatestSeqCall::abi_encode_returns(&41_u64)
+            ))),
+            rpc_result(json!(encode_hex(
+                IChioRootRegistry::getLatestRootCall::abi_encode_returns(&latest_root)
+            ))),
+        ]) else {
+            return;
+        };
+        let target = sample_delegate_target(server.base_url());
+        let egress_contract = sample_rpc_contract(server.base_url());
+
+        let guard = ensure_publication_ready(&target, &checkpoint, &binding, &egress_contract)
             .await
             .test_expect("checkpoint 42 should be accepted");
 
@@ -1747,9 +1215,50 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ensure_publication_ready_rejects_batch_gap_against_latest_root() {
+        let mut checkpoint = sample_checkpoint();
+        checkpoint.body.checkpoint_seq = 42;
+        checkpoint.body.batch_start_seq = 10;
+        checkpoint.body.batch_end_seq = 20;
+        let binding = sample_binding();
+        let latest_root = IChioRootRegistry::RootEntry {
+            merkleRoot: hash_to_b256(&checkpoint.body.merkle_root),
+            checkpointSeq: checkpoint.body.checkpoint_seq - 1,
+            batchStartSeq: 1,
+            batchEndSeq: checkpoint.body.batch_start_seq - 2,
+            treeSize: checkpoint.body.tree_size as u64,
+            publishedAt: 1_744_000_123_u64,
+            operatorKeyHash: operator_key_hash(&binding).test_expect("operator key hash"),
+            operatorEpoch: 1,
+        };
+        let Some(server) = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!(encode_hex(
+                IChioRootRegistry::isAuthorizedPublisherForKeyHashCall::abi_encode_returns(&true)
+            ))),
+            rpc_result(json!(encode_hex(
+                IChioRootRegistry::getLatestSeqCall::abi_encode_returns(&41_u64)
+            ))),
+            rpc_result(json!(encode_hex(
+                IChioRootRegistry::getLatestRootCall::abi_encode_returns(&latest_root)
+            ))),
+        ]) else {
+            return;
+        };
+        let target = sample_delegate_target(server.base_url());
+        let egress_contract = sample_rpc_contract(server.base_url());
+
+        let error = ensure_publication_ready(&target, &checkpoint, &binding, &egress_contract)
+            .await
+            .test_expect_err("batch gap should fail preflight");
+
+        server.join();
+        assert!(error.to_string().contains("batch_start_seq"));
+    }
+
+    #[tokio::test]
     async fn verify_inclusion_onchain_decodes_registry_verdict() {
         let Some(server) = MockJsonRpcServer::spawn(vec![rpc_result(json!(encode_hex(
-            IChioRootRegistry::verifyInclusionDetailedCall::abi_encode_returns(&true)
+            IChioRootRegistry::verifyInclusionDetailedForKeyHashCall::abi_encode_returns(&true)
         )))]) else {
             return;
         };
@@ -1767,6 +1276,20 @@ mod tests {
         assert!(verified);
         assert_eq!(requests.len(), 1);
         assert_eq!(requests[0]["method"], "eth_call");
+        let call_data = hex::decode(
+            requests[0]["params"][0]["data"]
+                .as_str()
+                .test_expect("eth_call data is string")
+                .trim_start_matches("0x"),
+        )
+        .test_expect("eth_call data decodes");
+        let decoded =
+            IChioRootRegistry::verifyInclusionDetailedForKeyHashCall::abi_decode(&call_data)
+                .test_expect("verifyInclusionDetailedForKeyHash call decodes");
+        assert_eq!(
+            decoded.operatorKeyHash,
+            operator_key_hash(&proof.key_binding_certificate).test_expect("operator key hash")
+        );
     }
 
     #[tokio::test]
@@ -1793,6 +1316,9 @@ mod tests {
             tx_hash: "0xdeadbeef".to_string(),
             block_number: 42,
             block_hash: "0xabc".to_string(),
+            operator_key_hash: "0x2222222222222222222222222222222222222222222222222222222222222222"
+                .to_string(),
+            operator_epoch: 1,
             published_at: 1_744_000_123,
         };
 
@@ -1803,6 +1329,9 @@ mod tests {
         assert_eq!(record.operator_address, target.operator_address);
         assert_eq!(record.tx_hash, confirmed.tx_hash);
         assert_eq!(record.block_number, confirmed.block_number);
+        assert_eq!(record.block_hash, confirmed.block_hash);
+        assert_eq!(record.operator_key_hash, confirmed.operator_key_hash);
+        assert_eq!(record.operator_epoch, confirmed.operator_epoch);
         assert_eq!(record.anchored_merkle_root, checkpoint.body.merkle_root);
     }
 }

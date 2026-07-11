@@ -29,10 +29,10 @@ Legend: DONE (committed + verified) | OPEN-LEGAL (blocked on counsel) | OPEN-FOU
 | M1-11 Pass CLI entrypoint | code | DONE | `7aeb4331d` chio pass issue/refresh/anchor, deterministic mint |
 | M1-12 E2e Gates 2 and 5 | evidence | DONE | `85ad3d0c4` issue->charge->rollover + dormant |
 | M1-13 Own-data DisclosureLineageBundle | code | DONE | `92d4cfbbd` C2 over the 3-key strip |
-| M1-14 Five-stream gift + Gate 4 | evidence | DONE | `4ffa5f2e3` byte-identical tiers + cross-tenant double-denial |
+| M1-14 Five-stream gift + Gate 4 | evidence | DONE | `4ffa5f2e3` byte-identical tiers + cross-tenant denial via the single shared `validate_reputation_import` gate, reached from both the eligibility and the verifier entrypoints (no parallel admission path) |
 | M1-15 Escrow-wire accept() | code | DONE | `9ba2a35a1` + review hardening `3d84864f9` (offer-token auth) |
 | M1-16 Pass eligibility + selection | code | DONE | `04d32117c` + review fix `45e8d7533` (saturation) |
-| M1-17 RR2-TM-01 authority keys | config | DONE | `26bf0ba9c` pinned key set + rotation |
+| M1-17 RR2-TM-01 authority keys | config | DONE | `26bf0ba9c` pinned key set + rotation seam. The registry is provenance, not a runtime lookup: the shipped verifier trusts policy-and-bundle intersection and the CLI trusts env/policy keys, so a rotation takes effect by regenerating those key sets from the active epoch and redeploying (no runtime epoch switch). |
 | M1-18 Order-passport replay | evidence | DONE | `dff290d86` escrow digest pinned, tamper-evident |
 | M1-19 PASS-NAMING copy-lint + free-tier copy | docs | DONE | `f11113ce5` no-future-value recital |
 | M1-20 Gate-6 anchor round-trip | evidence | DONE | `43b3c59f6` mock ChioRootRegistry publish + verify |
@@ -48,7 +48,7 @@ Legend: DONE (committed + verified) | OPEN-LEGAL (blocked on counsel) | OPEN-FOU
 - Gate 1 aggregate-pool-denies-fail-closed: SATISFIED (M1-10; 4th distinct-subject XCC denies cost_charged==0, committed==POOL).
 - Gate 2 re-mint-reset-closed: SATISFIED (M1-12; one-row accumulation, monthly roll, B7 rejection).
 - Gate 3 soulbinding-holds: SATISFIED (M0; holder-binding + non-Ed25519 rejection).
-- Gate 4 five-stream parity + own-data-never-tier-gated + cross-tenant denied: SATISFIED (M1-13/14).
+- Gate 4 five-stream parity + own-data-never-tier-gated + cross-tenant denied: SATISFIED (M1-13/14; one shared reputation-import gate serves both entrypoints, so there is no divergent path, not two independent guards).
 - Gate 5 dormant-stops-drawing: SATISFIED (M1-12; dormant denies, 5 baseline reads still serve).
 - Gate 6 anchoring round-trip read-only: SATISFIED (M1-20; mock publishRoot + verifyInclusionDetailed, no value transfer).
 - Gate 7 namespace-isolation + copy: SATISFIED (M1-9 code gap closed both directions; M1-19 copy). Sealed proof-room panel deferred to M2.

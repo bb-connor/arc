@@ -1,19 +1,37 @@
-use std::sync::atomic::{AtomicBool, AtomicU64};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use arc_swap::ArcSwap;
 use chio_appraisal::VerifiedRuntimeAttestationRecord;
 use chio_core::receipt::metadata::GuardEvidence;
-use chio_core_types::capability::token::FREETIER_GLOBAL_POOL_ID_PREFIX;
-use chio_log_redact::redacted;
 use dashmap::DashMap;
 
 use crate::budget_store::BudgetCommitMetadata;
 use crate::*;
 
 mod error;
+mod kernel_drop_guard;
+mod kernel_scopes;
+mod kernel_struct;
 
-pub use error::{KernelError, StructuredErrorReport};
+pub use error::{KernelError, OverloadResource, StructuredErrorReport};
+pub use kernel_struct::{
+    ChioKernel, FreeTierPoolConfig, HybridSigningConfig, KernelConfig, MemoryBudgetConfig,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS,
+};
+
+pub(crate) use kernel_drop_guard::{
+    dispatch_error_precedes_tool_side_effect, reserved_runtime_admission_ids,
+    PostAdmissionDropGuard, PostAdmissionReceiptContext,
+};
+pub(crate) use kernel_scopes::{
+    current_scoped_receipt_federation_admission, current_scoped_receipt_tenant_id,
+    extract_tenant_id_from_auth_context, scope_receipt_federation_admission,
+    scope_receipt_tenant_id, ReceiptFederationAdmission, ScopedKernelReceiptFederationAdmission,
+    ScopedKernelReceiptTenantId,
+};
+pub(crate) use kernel_struct::{
+    capability_crypto_floor, receipt_crypto_floor, FreeTierPoolHold, FREETIER_GLOBAL_GRANT_INDEX,
+};
 
 pub type AgentId = String;
 
@@ -98,271 +116,16 @@ struct KernelFederationTreatyDsseMetadata {
     treaty_binding_ref: chio_federation::bilateral_dsse::TreatyBindingRef,
 }
 
-// ---------------------------------------------------------------------------
-// Multi-tenant receipt isolation.
-//
-// The kernel must tag every receipt it signs with the tenant that the active
-// session belongs to. The natural place to derive that is the authenticated
-// session's `enterprise_identity.tenant_id`, but the existing response
-// builders accept only a `&ToolCallRequest` (no session handle) across ~40
-// call sites.  Rather than plumb a new parameter through every builder we
-// stash the resolved tenant_id in a thread-local scope for the duration of
-// one evaluate call; `build_and_sign_receipt` consults it when filling in the
-// receipt body.
-//
-// The scope is RAII: the guard resets the previous value on drop, which
-// keeps reentrant evaluations (e.g. a kernel that recursively evaluates a
-// sub-call inside the same thread) isolated.
-//
-// Tenant_id is NEVER extracted from the caller-provided `ToolCallRequest` --
-// allowing caller choice would defeat the isolation the store-level WHERE
-// clause enforces.
-thread_local! {
-    static RECEIPT_TENANT_ID_SCOPE: std::cell::RefCell<Option<String>> =
-        const { std::cell::RefCell::new(None) };
-    static RECEIPT_FEDERATION_ADMISSION_SCOPE:
-        std::cell::RefCell<Option<ReceiptFederationAdmission>> =
-        const { std::cell::RefCell::new(None) };
-}
-
-/// Guard returned by [`scope_receipt_tenant_id`]. Restores the previously
-/// active tenant scope when dropped.
-pub(crate) struct ScopedReceiptTenantId {
-    previous: Option<String>,
-}
-
-impl Drop for ScopedReceiptTenantId {
-    fn drop(&mut self) {
-        let previous = self.previous.take();
-        RECEIPT_TENANT_ID_SCOPE.with(|slot| {
-            *slot.borrow_mut() = previous;
-        });
-    }
-}
-
-/// Install `tenant_id` as the active scope for this thread until the
-/// returned guard is dropped. Passing `None` explicitly clears the scope
-/// (so a child evaluate that lacks a session cannot inherit a parent's
-/// tenant tag by accident).
-pub(crate) fn scope_receipt_tenant_id(tenant_id: Option<String>) -> ScopedReceiptTenantId {
-    let previous = RECEIPT_TENANT_ID_SCOPE.with(|slot| slot.replace(tenant_id));
-    ScopedReceiptTenantId { previous }
-}
-
-/// Read the tenant_id currently in scope on this thread.
-///
-/// Exposed to `build_and_sign_receipt` (in `responses.rs`) so the receipt
-/// body picks up the tag without rewiring every builder signature.
-pub(crate) fn current_scoped_receipt_tenant_id() -> Option<String> {
-    RECEIPT_TENANT_ID_SCOPE.with(|slot| slot.borrow().clone())
-}
-
-pub(crate) struct ScopedKernelReceiptTenantId {
-    request_id: String,
-    tenant_ids: Arc<DashMap<String, String>>,
-    previous: Option<String>,
-}
-
-impl Drop for ScopedKernelReceiptTenantId {
-    fn drop(&mut self) {
-        if let Some(previous) = self.previous.take() {
-            self.tenant_ids.insert(self.request_id.clone(), previous);
-        } else {
-            self.tenant_ids.remove(&self.request_id);
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ReceiptFederationAdmission {
-    pub remote_kernel_id: Option<String>,
-    pub peer: Option<chio_federation::trust_establishment::FederationPeer>,
-}
-
-/// Guard returned by [`scope_receipt_federation_admission`]. Restores the
-/// previously active admission snapshot when dropped.
-pub(crate) struct ScopedReceiptFederationAdmission {
-    previous: Option<ReceiptFederationAdmission>,
-}
-
-impl Drop for ScopedReceiptFederationAdmission {
-    fn drop(&mut self) {
-        let previous = self.previous.take();
-        RECEIPT_FEDERATION_ADMISSION_SCOPE.with(|slot| {
-            *slot.borrow_mut() = previous;
-        });
-    }
-}
-
-/// Install the receipt-version and peer-key decision made at admission time.
-/// Persistence and federation cosigning must use this snapshot rather than
-/// re-resolving freshness after the tool has already produced side effects.
-pub(crate) fn scope_receipt_federation_admission(
-    admission: Option<ReceiptFederationAdmission>,
-) -> ScopedReceiptFederationAdmission {
-    let previous = RECEIPT_FEDERATION_ADMISSION_SCOPE.with(|slot| slot.replace(admission));
-    ScopedReceiptFederationAdmission { previous }
-}
-
-pub(crate) fn current_scoped_receipt_federation_admission() -> Option<ReceiptFederationAdmission> {
-    RECEIPT_FEDERATION_ADMISSION_SCOPE.with(|slot| slot.borrow().clone())
-}
-
-pub(crate) struct ScopedKernelReceiptFederationAdmission {
-    request_id: String,
-    admissions: Arc<DashMap<String, ReceiptFederationAdmission>>,
-    previous: Option<ReceiptFederationAdmission>,
-}
-
-impl Drop for ScopedKernelReceiptFederationAdmission {
-    fn drop(&mut self) {
-        if let Some(previous) = self.previous.take() {
-            self.admissions.insert(self.request_id.clone(), previous);
-        } else {
-            self.admissions.remove(&self.request_id);
-        }
-    }
-}
-
-const POST_ADMISSION_DROP_REASON: &str = "tool evaluation future dropped after monetary admission";
-
-struct PostAdmissionReceiptContext {
-    extra_metadata: Option<serde_json::Value>,
-    pre_invocation_guard_evidence: Vec<GuardEvidence>,
-}
-
-struct PostAdmissionDropGuard<'a> {
-    kernel: &'a ChioKernel,
-    request: &'a ToolCallRequest,
-    cap: &'a CapabilityToken,
-    matched_grant_index: Option<usize>,
-    charge_result: Option<&'a BudgetChargeResult>,
-    payment_authorization: Option<&'a PaymentAuthorization>,
-    receipt_context: PostAdmissionReceiptContext,
-    armed: bool,
-}
-
-impl<'a> PostAdmissionDropGuard<'a> {
-    fn new(
-        kernel: &'a ChioKernel,
-        request: &'a ToolCallRequest,
-        cap: &'a CapabilityToken,
-        matched_grant_index: Option<usize>,
-        charge_result: Option<&'a BudgetChargeResult>,
-        payment_authorization: Option<&'a PaymentAuthorization>,
-        receipt_context: PostAdmissionReceiptContext,
-    ) -> Self {
-        Self {
-            kernel,
-            request,
-            cap,
-            matched_grant_index,
-            charge_result,
-            payment_authorization,
-            receipt_context,
-            armed: true,
-        }
-    }
-
-    fn disarm(&mut self) {
-        self.armed = false;
-    }
-}
-
-impl Drop for PostAdmissionDropGuard<'_> {
-    fn drop(&mut self) {
-        if !self.armed {
-            return;
-        }
-
-        let Some(charge) = self.charge_result else {
-            return;
-        };
-
-        let unwind = self.kernel.unwind_aborted_monetary_invocation(
-            self.request,
-            self.cap,
-            self.charge_result,
-            self.payment_authorization,
-        );
-        let extra_metadata = match &unwind {
-            Ok(Some(reverse)) => self.kernel.merge_budget_receipt_metadata(
-                self.receipt_context.extra_metadata.clone(),
-                self.kernel
-                    .budget_execution_receipt_metadata(charge, Some(("reversed", reverse))),
-            ),
-            Ok(None) => self.receipt_context.extra_metadata.clone(),
-            Err(error) => {
-                warn!(
-                    request_id = %self.request.request_id,
-                    reason = %redacted!(error),
-                    "failed to unwind dropped post-admission monetary invocation"
-                );
-                self.receipt_context.extra_metadata.clone()
-            }
-        };
-
-        let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
-            self.receipt_context.pre_invocation_guard_evidence.clone(),
-        );
-        if let Err(error) = self.kernel.build_cancelled_response_with_metadata(
-            self.request,
-            POST_ADMISSION_DROP_REASON,
-            current_unix_timestamp(),
-            self.matched_grant_index,
-            extra_metadata,
-        ) {
-            warn!(
-                request_id = %self.request.request_id,
-                reason = %redacted!(&error),
-                "failed to record cancellation receipt for dropped post-admission invocation"
-            );
-        }
-    }
-}
-
-fn dispatch_error_precedes_tool_side_effect(error: &KernelError) -> bool {
-    matches!(
-        error,
-        KernelError::ToolNotRegistered(_) | KernelError::UrlElicitationsRequired { .. }
-    )
-}
-
-/// Extract tenant_id from a session's authenticated auth context.
-///
-/// Preference order:
-///   1. OAuth bearer `enterprise_identity.tenant_id` (the richer SSO
-///      claim, preferred because IdP integrations that surface full
-///      EnterpriseIdentityContext use this path).
-///   2. OAuth bearer `federated_claims.tenant_id` (the minimal OIDC
-///      claim set; populated when the IdP only emits `tid`).
-///
-/// Anonymous sessions and static-bearer sessions return `None`.
-pub(crate) fn extract_tenant_id_from_auth_context(
-    auth_context: &SessionAuthContext,
-) -> Option<String> {
-    if let chio_core::session::SessionAuthMethod::OAuthBearer {
-        enterprise_identity,
-        federated_claims,
-        ..
-    } = &auth_context.method
-    {
-        if let Some(identity) = enterprise_identity.as_ref() {
-            if let Some(id) = identity.tenant_id.as_ref() {
-                return Some(id.clone());
-            }
-        }
-        if let Some(id) = federated_claims.tenant_id.as_ref() {
-            return Some(id.clone());
-        }
-    }
-    None
-}
-
 #[derive(Debug)]
 pub(crate) struct ReceiptContent {
     pub(crate) content_hash: String,
     pub(crate) metadata: Option<serde_json::Value>,
+    /// The exact byte preimage `content_hash` was computed over, carried so the
+    /// signing boundary can independently recompute the hash and refuse to sign
+    /// on mismatch (WYSIWYS). For value outputs this is the RFC 8785
+    /// canonical JSON; for streams the concatenated per-chunk digest preimage;
+    /// for the empty output the literal `null` canonicalization.
+    pub(crate) canonical_content: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -652,592 +415,126 @@ pub trait PromptProvider: Send + Sync {
     }
 }
 
-/// In-memory append-only log of signed receipts.
+/// Default capacity for a process-local receipt mirror when constructed without
+/// an explicit budget (tests / benches). The kernel construction path threads
+/// the configured `MemoryBudgetConfig::receipt_mirror_capacity` instead.
+const DEFAULT_RECEIPT_MIRROR_CAPACITY: usize = 4096;
+
+/// In-memory bounded ring of signed receipts. Process-local inspection mirror;
+/// a durable receipt store is authoritative for id lookups.
 ///
-/// This remains useful for process-local inspection even when a durable
-/// backend is configured.
-#[derive(Clone, Default)]
+/// `Clone` yields a read-only snapshot (used by the `receipt_log()` accessor).
+#[derive(Clone)]
 pub struct ReceiptLog {
-    receipts: Vec<ChioReceipt>,
+    ring: chio_bounded::Ring<ChioReceipt>,
 }
 
 impl ReceiptLog {
     pub fn new() -> Self {
-        Self::default()
+        Self::with_capacity(
+            DEFAULT_RECEIPT_MIRROR_CAPACITY,
+            chio_bounded::SizeGauge::new(),
+        )
+    }
+
+    pub fn with_capacity(capacity: usize, gauge: chio_bounded::SizeGauge) -> Self {
+        Self {
+            ring: chio_bounded::Ring::with_capacity(capacity, gauge),
+        }
     }
 
     pub fn append(&mut self, receipt: ChioReceipt) {
-        self.receipts.push(receipt);
+        // Evicted receipts are already durably persisted (the store write in
+        // record_chio_receipt precedes this mirror append) or ephemeral by
+        // policy, so dropping the evicted item is safe. Caveat: for an
+        // append-only/remote store that does NOT implement point lookups, this
+        // mirror is the only lookup source, so eviction here
+        // makes an older receipt unresolvable and parent-receipt call-chain
+        // validation fails closed. Such deployments must implement
+        // ReceiptStore::load_chio_receipt (see has_local_receipt_id).
+        let _evicted = self.ring.push(receipt);
     }
 
     pub fn len(&self) -> usize {
-        self.receipts.len()
+        self.ring.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.receipts.is_empty()
+        self.ring.is_empty()
     }
 
-    pub fn receipts(&self) -> &[ChioReceipt] {
-        &self.receipts
+    pub fn iter(&self) -> impl Iterator<Item = &ChioReceipt> {
+        self.ring.iter()
+    }
+
+    /// Cloned snapshot of the mirror (process-local inspection). Bounded by the
+    /// ring capacity.
+    pub fn receipts(&self) -> Vec<ChioReceipt> {
+        self.ring.iter().cloned().collect()
     }
 
     pub fn get(&self, index: usize) -> Option<&ChioReceipt> {
-        self.receipts.get(index)
+        self.ring.iter().nth(index)
     }
 }
 
-/// In-memory append-only log of signed child-request receipts.
-#[derive(Clone, Default)]
+impl Default for ReceiptLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// In-memory bounded ring of signed child-request receipts.
+#[derive(Clone)]
 pub struct ChildReceiptLog {
-    receipts: Vec<ChildRequestReceipt>,
+    ring: chio_bounded::Ring<ChildRequestReceipt>,
 }
 
 impl ChildReceiptLog {
     pub fn new() -> Self {
-        Self::default()
+        Self::with_capacity(
+            DEFAULT_RECEIPT_MIRROR_CAPACITY,
+            chio_bounded::SizeGauge::new(),
+        )
+    }
+
+    pub fn with_capacity(capacity: usize, gauge: chio_bounded::SizeGauge) -> Self {
+        Self {
+            ring: chio_bounded::Ring::with_capacity(capacity, gauge),
+        }
     }
 
     pub fn append(&mut self, receipt: ChildRequestReceipt) {
-        self.receipts.push(receipt);
+        let _evicted = self.ring.push(receipt);
     }
 
     pub fn len(&self) -> usize {
-        self.receipts.len()
+        self.ring.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.receipts.is_empty()
+        self.ring.is_empty()
     }
 
-    pub fn receipts(&self) -> &[ChildRequestReceipt] {
-        &self.receipts
+    pub fn iter(&self) -> impl Iterator<Item = &ChildRequestReceipt> {
+        self.ring.iter()
+    }
+
+    /// Cloned snapshot of the mirror (process-local inspection). Bounded by the
+    /// ring capacity.
+    pub fn receipts(&self) -> Vec<ChildRequestReceipt> {
+        self.ring.iter().cloned().collect()
     }
 
     pub fn get(&self, index: usize) -> Option<&ChildRequestReceipt> {
-        self.receipts.get(index)
+        self.ring.iter().nth(index)
     }
 }
 
-/// Configuration for the Chio Runtime Kernel.
-pub struct KernelConfig {
-    /// Ed25519 keypair for signing receipts and issuing capabilities.
-    pub keypair: Keypair,
-
-    /// Public keys of trusted Capability Authorities.
-    pub ca_public_keys: Vec<chio_core::PublicKey>,
-
-    /// Maximum allowed delegation depth.
-    pub max_delegation_depth: u32,
-
-    /// SHA-256 hash of the active policy (embedded in receipts).
-    pub policy_hash: String,
-
-    /// Whether nested sampling requests are allowed at all.
-    pub allow_sampling: bool,
-
-    /// Whether sampling requests may include tool-use affordances.
-    pub allow_sampling_tool_use: bool,
-
-    /// Whether nested elicitation requests are allowed.
-    pub allow_elicitation: bool,
-
-    /// Maximum total wall-clock duration permitted for one streamed tool result.
-    pub max_stream_duration_secs: u64,
-
-    /// Maximum total canonical payload size permitted for one streamed tool result.
-    pub max_stream_total_bytes: u64,
-
-    /// Whether durable receipts and kernel-signed checkpoints are mandatory
-    /// prerequisites for this deployment.
-    pub require_web3_evidence: bool,
-
-    /// Allow process-local receipt logs when no durable receipt store is
-    /// installed. This is for tests and local scaffolds only; protocol
-    /// deployments should leave it false so successful dispatch requires
-    /// durable receipt persistence before any tool side effect.
-    pub allow_ephemeral_receipt_log: bool,
-
-    /// Number of receipts between Merkle checkpoint snapshots. Default: 100.
-    ///
-    /// Set to 0 to disable automatic checkpointing for deployments that do not
-    /// require web3 evidence.
-    pub checkpoint_batch_size: u64,
-
-    /// Optional receipt retention configuration.
-    ///
-    /// When `None` (default), retention is disabled and receipts accumulate
-    /// indefinitely. When `Some(config)`, the kernel will archive receipts
-    /// that exceed the time or size threshold.
-    pub retention_config: Option<crate::receipt_store::RetentionConfig>,
-}
-
-// ---------------------------------------------------------------------------
-// Hybrid signing helper attached to the kernel
-// ---------------------------------------------------------------------------
-
-/// Boot-time configuration for the kernel-side hybrid signing path.
-///
-/// Mirrors the wire form of `chio_policy::CryptoFloor` (`allow_classical`,
-/// `allow_hybrid`, `pq_required`) and pairs the floor with the operator's
-/// 32-byte ML-DSA-65 keygen seed. Construct one of these from a parsed
-/// HushSpec policy plus the boot-loaded PQ seed and pass it to
-/// [`ChioKernel::with_hybrid_signing_backend`] with a verified self-quote
-/// port to obtain a `Box<dyn SigningBackend>` for hybrid receipt signing.
-///
-/// A separate input from [`KernelConfig`]: the hybrid fields are not folded
-/// into `KernelConfig`, so its wire form is unaffected.
-#[derive(Debug, Clone, Default)]
-pub struct HybridSigningConfig {
-    /// Minimum cryptographic posture enforced on receipts, capability
-    /// tokens, and compliance certificates. Default
-    /// [`KernelCryptoFloor::AllowClassical`].
-    pub crypto_floor: KernelCryptoFloor,
-
-    /// Optional 32-byte ML-DSA-65 keygen seed. Required when
-    /// `crypto_floor` is [`KernelCryptoFloor::AllowHybrid`] or
-    /// [`KernelCryptoFloor::PqRequired`]; ignored under
-    /// [`KernelCryptoFloor::AllowClassical`].
-    pub pq_signing_seed: Option<[u8; 32]>,
-}
-
-impl ChioKernel {
-    /// Construct the hybrid signing backend the kernel would use under
-    /// `hybrid`'s configured floor and PQ key material after the kernel
-    /// self-quote gate has run.
-    ///
-    /// Threads the kernel's classical Ed25519 keypair into a
-    /// [`chio_core::crypto::Ed25519Backend`] under
-    /// [`KernelCryptoFloor::AllowClassical`], or composes it with an
-    /// [`chio_core::crypto::MlDsa65Backend`] derived from `hybrid.pq_signing_seed`
-    /// into a [`chio_core::crypto::HybridBackend`] under
-    /// [`KernelCryptoFloor::AllowHybrid`] or [`KernelCryptoFloor::PqRequired`],
-    /// but only after [`crate::boot::load_kernel_signing_backend_after_self_quote`]
-    /// accepts `self_quote_bytes`.
-    ///
-    /// Receipt body construction continues to flow through the existing
-    /// inline path (`build_and_sign_receipt`); callers that opt in to
-    /// hybrid signing pass the returned backend through
-    /// [`crate::sign_receipt_body_with_backend`] before persistence.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::boot::KernelBootError::SelfQuoteRejected`] when the
-    /// self-quote verifier rejects a non-classical floor, or
-    /// [`crate::boot::KernelBootError::SigningBackend`] when the configured
-    /// floor needs a PQ key but `hybrid.pq_signing_seed` is `None`. Mirrors
-    /// the policy-level check in `chio_policy::CryptoFloor::validate_with_pq_key`
-    /// so the boot path catches the misconfiguration even when the policy crate
-    /// is bypassed.
-    pub fn with_hybrid_signing_backend(
-        &mut self,
-        hybrid: &HybridSigningConfig,
-        self_quote_bytes: &[u8],
-        verifier: &dyn crate::boot::KernelSelfQuoteVerifier,
-    ) -> Result<Box<dyn chio_core::crypto::SigningBackend>, crate::boot::KernelBootError> {
-        let backend = crate::boot::load_kernel_signing_backend_after_self_quote(
-            hybrid.crypto_floor,
-            self.config.keypair.clone(),
-            hybrid.pq_signing_seed.as_ref(),
-            self_quote_bytes,
-            verifier,
-        )?;
-        self.capability_crypto_floor = hybrid.crypto_floor;
-        Ok(backend)
+impl Default for ChildReceiptLog {
+    fn default() -> Self {
+        Self::new()
     }
-}
-
-fn capability_crypto_floor(
-    floor: KernelCryptoFloor,
-) -> chio_core::capability::crypto_floor::CapabilityCryptoFloor {
-    match floor {
-        KernelCryptoFloor::AllowClassical => {
-            chio_core::capability::crypto_floor::CapabilityCryptoFloor::AllowClassical
-        }
-        KernelCryptoFloor::AllowHybrid => {
-            chio_core::capability::crypto_floor::CapabilityCryptoFloor::AllowHybrid
-        }
-        KernelCryptoFloor::PqRequired => {
-            chio_core::capability::crypto_floor::CapabilityCryptoFloor::PqRequired
-        }
-    }
-}
-
-fn receipt_crypto_floor(
-    floor: KernelCryptoFloor,
-) -> chio_core::receipt::crypto_floor::ReceiptCryptoFloor {
-    match floor {
-        KernelCryptoFloor::AllowClassical => {
-            chio_core::receipt::crypto_floor::ReceiptCryptoFloor::AllowClassical
-        }
-        KernelCryptoFloor::AllowHybrid => {
-            chio_core::receipt::crypto_floor::ReceiptCryptoFloor::AllowHybrid
-        }
-        KernelCryptoFloor::PqRequired => {
-            chio_core::receipt::crypto_floor::ReceiptCryptoFloor::PqRequired
-        }
-    }
-}
-
-pub const DEFAULT_MAX_STREAM_DURATION_SECS: u64 = 300;
-pub const DEFAULT_MAX_STREAM_TOTAL_BYTES: u64 = 256 * 1024 * 1024;
-pub const DEFAULT_CHECKPOINT_BATCH_SIZE: u64 = 100;
-pub const DEFAULT_RETENTION_DAYS: u64 = 90;
-pub const DEFAULT_MAX_SIZE_BYTES: u64 = 10_737_418_240;
-
-/// Board-approved configuration for the Phase-0 free-tier compute pool (M0 Pass
-/// CONTROL 1). It bounds aggregate free-tier liability to a hard monthly ceiling
-/// so the gift degrades to "the pool shrinks", never "the treasury drains": when
-/// the aggregate term is exhausted the kernel denies fail-closed.
-///
-/// The config travels via the fallible [`ChioKernel::with_free_tier_pool`]
-/// builder rather than `KernelConfig`, so `ChioKernel::new` stays infallible and
-/// misconfiguration is rejected at install time.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FreeTierPoolConfig {
-    /// Hard monthly ceiling, in allotment units, on aggregate free-tier spend
-    /// across every Pass holder. Liability becomes `min(N x allotment, pool)`.
-    pub monthly_pool_units: u64,
-    /// The allotment unit. It MUST be the canonical Pass allotment unit
-    /// `pass_gating::PASS_ALLOTMENT_UNIT` ("XCC"): a 3-uppercase-letter private-use
-    /// code that carries no money leg and matches the unit Pass scopes are minted
-    /// with, so the aggregate co-debit actually fires for real Pass charges.
-    pub allotment_unit: String,
-    /// Audit-only reference to the board approval that funded this pool. It never
-    /// participates in any arithmetic; it only records provenance.
-    pub board_approval_ref: String,
-}
-
-impl FreeTierPoolConfig {
-    /// Validate the config fail-closed.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`KernelError::InvalidFreeTierPoolConfig`] when `monthly_pool_units`
-    /// is zero, `allotment_unit` is not the Pass allotment unit ("XCC"), or
-    /// `board_approval_ref` is empty.
-    pub fn validate(&self) -> Result<(), KernelError> {
-        if self.monthly_pool_units == 0 {
-            return Err(KernelError::InvalidFreeTierPoolConfig(
-                "monthly_pool_units must be non-zero".to_string(),
-            ));
-        }
-        let unit_ok = self.allotment_unit.len() == 3
-            && self.allotment_unit.bytes().all(|b| b.is_ascii_uppercase());
-        if !unit_ok {
-            return Err(KernelError::InvalidFreeTierPoolConfig(
-                "allotment_unit must be 3 uppercase ASCII letters".to_string(),
-            ));
-        }
-        // The pool unit MUST be the canonical Pass allotment unit. Pass scopes are
-        // minted with the fixed XCC unit (`pass_gating::PASS_ALLOTMENT_UNIT`), so a
-        // pool configured with any other (shape-valid) unit such as the pinned `USD`
-        // would never match a real Pass charge: the charge path takes the
-        // `currency != pool.allotment_unit` branch and authorizes WITHOUT the
-        // aggregate co-debit, silently disabling the monthly liability cap this config
-        // exists to enforce. Require an exact match, fail-closed.
-        if self.allotment_unit != crate::pass_gating::PASS_ALLOTMENT_UNIT {
-            return Err(KernelError::InvalidFreeTierPoolConfig(format!(
-                "allotment_unit must be the Pass allotment unit {}, got {}",
-                crate::pass_gating::PASS_ALLOTMENT_UNIT,
-                self.allotment_unit
-            )));
-        }
-        if self.board_approval_ref.is_empty() {
-            return Err(KernelError::InvalidFreeTierPoolConfig(
-                "board_approval_ref must be present".to_string(),
-            ));
-        }
-        Ok(())
-    }
-
-    /// Derive the aggregate pool budget-term id `"freetier:global:<YYYY-MM>"` from
-    /// a Pass capability's `issued_at` (which is pinned to the first second of its
-    /// active month, so the term is the same for every Pass in that month). The id
-    /// is what keys the single shared `(term, grant_index 0)` budget row.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`KernelError::InvalidFreeTierPoolConfig`] when `issued_at` is not a
-    /// representable unix timestamp.
-    pub fn window_ym_from_issued_at(issued_at: u64) -> Result<String, KernelError> {
-        let secs = i64::try_from(issued_at).map_err(|_| {
-            KernelError::InvalidFreeTierPoolConfig("issued_at out of range".to_string())
-        })?;
-        let dt = chrono::DateTime::from_timestamp(secs, 0).ok_or_else(|| {
-            KernelError::InvalidFreeTierPoolConfig("issued_at not representable".to_string())
-        })?;
-        // Build the term from the canonical shared prefix so the kernel's
-        // derivation and every fail-closed pool-exclusion filter agree on one
-        // namespace (no drifting literal).
-        Ok(format!(
-            "{FREETIER_GLOBAL_POOL_ID_PREFIX}{}",
-            dt.format("%Y-%m")
-        ))
-    }
-}
-
-#[cfg(test)]
-mod free_tier_pool_config_tests {
-    use super::FreeTierPoolConfig;
-
-    fn cfg() -> FreeTierPoolConfig {
-        FreeTierPoolConfig {
-            monthly_pool_units: 1_000_000,
-            allotment_unit: "XCC".to_string(),
-            board_approval_ref: "board-2026-06-001".to_string(),
-        }
-    }
-
-    #[test]
-    fn validate_accepts_well_formed_config() {
-        assert!(cfg().validate().is_ok());
-    }
-
-    #[test]
-    fn validate_rejects_zero_pool() {
-        let mut c = cfg();
-        c.monthly_pool_units = 0;
-        assert!(c.validate().is_err());
-    }
-
-    #[test]
-    fn validate_rejects_malformed_unit() {
-        for bad in ["xcc", "XC", "XCCX", "X1C", ""] {
-            let mut c = cfg();
-            c.allotment_unit = bad.to_string();
-            assert!(c.validate().is_err(), "unit `{bad}` must be rejected");
-        }
-    }
-
-    #[test]
-    fn validate_rejects_non_xcc_pool_unit() {
-        // PR957 codex P2: the pool unit must be the canonical Pass allotment unit
-        // (XCC). A shape-valid but pinned currency like USD would never match a real
-        // Pass charge, silently disabling the monthly liability cap, so it is rejected
-        // fail-closed even though it is three uppercase letters. Any other private-use
-        // code is likewise rejected: Pass scopes only ever mint XCC.
-        for non_xcc in ["USD", "ABC"] {
-            let mut c = cfg();
-            c.allotment_unit = non_xcc.to_string();
-            assert!(
-                c.validate().is_err(),
-                "a non-XCC pool unit `{non_xcc}` must be rejected"
-            );
-        }
-    }
-
-    #[test]
-    fn validate_rejects_empty_board_ref() {
-        let mut c = cfg();
-        c.board_approval_ref = String::new();
-        assert!(c.validate().is_err());
-    }
-
-    #[test]
-    fn window_term_id_is_month_scoped() {
-        assert_eq!(
-            FreeTierPoolConfig::window_ym_from_issued_at(0).unwrap(),
-            "freetier:global:1970-01"
-        );
-        let term = FreeTierPoolConfig::window_ym_from_issued_at(1_780_704_000).unwrap();
-        assert!(term.starts_with("freetier:global:2026-"), "got {term}");
-    }
-
-    #[test]
-    fn derived_pool_term_is_recognized_by_shared_predicate() {
-        // The kernel's term derivation and the canonical fail-closed predicate
-        // must never drift: every derived term is recognized as a pool id.
-        use chio_core_types::capability::token::{
-            is_freetier_global_pool_id, FREETIER_GLOBAL_POOL_ID_PREFIX,
-        };
-        let epoch = FreeTierPoolConfig::window_ym_from_issued_at(0).unwrap();
-        let live = FreeTierPoolConfig::window_ym_from_issued_at(1_780_704_000).unwrap();
-        assert!(is_freetier_global_pool_id(&epoch));
-        assert!(is_freetier_global_pool_id(&live));
-        assert!(epoch.starts_with(FREETIER_GLOBAL_POOL_ID_PREFIX));
-    }
-}
-
-/// Grant index of the single aggregate free-tier pool budget row. All free-tier
-/// charges in a month share `(freetier:global:<YYYY-MM>, 0)`.
-pub(crate) const FREETIER_GLOBAL_GRANT_INDEX: usize = 0;
-
-/// A hold taken against the aggregate free-tier pool alongside a per-Pass hold.
-/// Carried on [`BudgetChargeResult`] so the pool exposure is reversed and
-/// reconciled symmetrically with the per-Pass hold (no stale pool leak).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FreeTierPoolHold {
-    /// The `freetier:global:<YYYY-MM>` budget term this hold debits.
-    pub term_id: String,
-    /// Unique id of this pool hold, for symmetric reverse/reconcile.
-    pub hold_id: String,
-    /// Exposure units held against the pool (worst-case per-invocation cost).
-    pub units: u64,
-}
-
-impl ChioKernel {
-    /// Install the board-approved free-tier pool config. Fallible so misconfig is
-    /// rejected at install time while `ChioKernel::new` stays infallible.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`KernelError::InvalidFreeTierPoolConfig`] when the config fails
-    /// [`FreeTierPoolConfig::validate`].
-    pub fn with_free_tier_pool(mut self, config: FreeTierPoolConfig) -> Result<Self, KernelError> {
-        config.validate()?;
-        self.free_tier_pool = Some(config);
-        Ok(self)
-    }
-
-    pub(crate) fn free_tier_pool_config(&self) -> Option<&FreeTierPoolConfig> {
-        self.free_tier_pool.as_ref()
-    }
-}
-
-/// The Chio Runtime Kernel.
-///
-/// This is the central component of the Chio protocol. It validates capabilities,
-/// runs guards, dispatches tool calls, and signs receipts.
-///
-/// The kernel is designed to be the sole trusted mediator. It never exposes its
-/// signing key, address, or internal state to the agent.
-pub struct ChioKernel {
-    config: KernelConfig,
-    guards: Vec<Box<dyn Guard>>,
-    post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline,
-    budget_store: Arc<dyn BudgetStore>,
-    budget_store_lock: Mutex<()>,
-    /// Optional Phase-0 free-tier compute pool (M0 Pass CONTROL 1). When set,
-    /// every private-use (free-tier) per-Pass charge also debits one aggregate
-    /// `freetier:global:<YYYY-MM>` budget row, capping liability at
-    /// `min(N x allotment, pool)`. `None` keeps the kernel pool-free.
-    free_tier_pool: Option<FreeTierPoolConfig>,
-    revocation_store: Arc<dyn RevocationStore>,
-    capability_authority: Box<dyn CapabilityAuthority>,
-    tool_servers: HashMap<ServerId, Box<dyn ToolServerConnection>>,
-    resource_providers: Vec<Box<dyn ResourceProvider>>,
-    prompt_providers: Vec<Box<dyn PromptProvider>>,
-    sessions: DashMap<SessionId, Arc<Session>>,
-    receipt_log: Mutex<ReceiptLog>,
-    child_receipt_log: Mutex<ChildReceiptLog>,
-    receipt_store: Option<Arc<dyn ReceiptStore>>,
-    receipt_store_write_lock: Mutex<()>,
-    payment_adapter: Option<Box<dyn PaymentAdapter>>,
-    price_oracle: Option<Box<dyn PriceOracle>>,
-    runtime_admission_hook: Option<Arc<dyn RuntimeAdmissionHook>>,
-    attestation_trust_policy: Option<AttestationTrustPolicy>,
-    capability_crypto_floor: KernelCryptoFloor,
-    /// How many receipts per Merkle checkpoint batch. Default: 100.
-    checkpoint_batch_size: u64,
-    /// Monotonic counter for checkpoint_seq values.
-    checkpoint_seq_counter: AtomicU64,
-    /// seq of the last receipt included in the previous checkpoint batch.
-    last_checkpoint_seq: AtomicU64,
-    /// Nonce replay store for DPoP proof verification. Required when any grant has dpop_required.
-    dpop_nonce_store: Option<dpop::DpopNonceStore>,
-    /// Configuration for DPoP proof verification TTLs and clock skew.
-    dpop_config: Option<dpop::DpopConfig>,
-    /// Execution-nonce config (TTL, capacity, strict-mode flag).
-    /// When `None`, no nonce is minted on allow and strict verification is
-    /// disabled (legacy deployments keep working).
-    execution_nonce_config: Option<crate::execution_nonce::ExecutionNonceConfig>,
-    /// Replay-prevention store for execution nonces. Shared with
-    /// any tool server that delegates verification to the kernel. Boxed
-    /// trait object so SQLite-backed stores can be plugged in.
-    execution_nonce_store: Option<Box<dyn crate::execution_nonce::ExecutionNonceStore>>,
-    /// Replay store for governed approval tokens. Prevents a signed approval
-    /// from being consumed more than once. Uses the same LRU + TTL pattern as
-    /// DPoP nonce verification. Key: (request_id, governed_intent_hash).
-    approval_replay_store: Option<dpop::DpopNonceStore>,
-    /// Emergency kill switch. When `true`, every evaluate entry point returns
-    /// `Verdict::Deny` without performing capability validation or guard
-    /// evaluation. Flipped by `emergency_stop` / `emergency_resume`.
-    ///
-    /// Reads use `Ordering::SeqCst` even on the hot path. The emergency check
-    /// is a single atomic load per evaluate call (negligible cost relative to
-    /// the guard pipeline) and `SeqCst` is the safest default for a rarely
-    /// taken control path.
-    emergency_stopped: AtomicBool,
-    /// Unix timestamp (seconds) at which the kill switch was last engaged.
-    /// `0` means "never engaged" or "currently resumed". Written with
-    /// `SeqCst` before `emergency_stopped` is set to `true`, cleared to `0`
-    /// after `emergency_stopped` is set to `false`.
-    emergency_stopped_since: AtomicU64,
-    /// Operator-supplied reason for the most recent emergency stop. Set on
-    /// `emergency_stop`, cleared on `emergency_resume`. Stored behind
-    /// ArcSwap so health probes can read the current reason without blocking.
-    emergency_stop_reason: ArcSwap<Option<String>>,
-    /// Memory-provenance chain. When installed, every
-    /// governed `MemoryWrite` action appends an entry after the allow
-    /// receipt is signed, and every `MemoryRead` attaches the latest
-    /// entry (or an `Unverified` marker) to its receipt as
-    /// `memory_provenance` evidence metadata. `None` keeps the kernel
-    /// backward-compatible: memory-shaped tool calls behave exactly as
-    /// they do without a provenance chain installed.
-    memory_provenance: Option<Arc<dyn crate::memory_provenance::MemoryProvenanceStore>>,
-    /// Cross-kernel federation peer set. When a request
-    /// carries a `federated_origin_kernel_id` and that peer is pinned
-    /// here (fresh), the kernel invokes `federation_cosigner` after
-    /// locally signing the receipt to obtain the origin kernel's
-    /// co-signature. Absent in non-federated deployments.
-    federation_peers:
-        ArcSwap<HashMap<String, chio_federation::trust_establishment::FederationPeer>>,
-    /// `ArcSwap` so trust-root rotations can land without holding a
-    /// kernel mutex. Hex-keyed because `chio_core::PublicKey` does not
-    /// implement `Hash`.
-    capability_trust_roots: ArcSwap<HashMap<String, chio_core::capability::attenuation::ScopeHash>>,
-    /// Serializes read-modify-write updates to `capability_trust_roots`.
-    /// Snapshot reads remain lock-free through ArcSwap.
-    capability_trust_roots_write_lock: Mutex<()>,
-    /// Bilateral co-signer. Separate from the peer set so
-    /// runtime can install it independently -- for instance, a deployment
-    /// can declare peers while still using a mock cosigner in tests.
-    federation_cosigner: Option<Arc<dyn chio_federation::bilateral::BilateralCoSigningProtocol>>,
-    /// Locally-signed dual receipts, indexed by ChioReceipt.id.
-    /// Populated only when the post-sign hook fires successfully. Kept
-    /// in-memory; persistent storage plugs in via the federation-state
-    /// APIs already in chio-federation.
-    federation_dual_receipts: DashMap<String, chio_federation::bilateral::DualSignedReceipt>,
-    /// DSSE signature-slice envelopes, indexed by ChioReceipt.id.
-    /// These are emitted through the federation cosigner protocol rather than
-    /// by loading Org A private key material in the tool-host kernel.
-    federation_dsse_envelopes: DashMap<String, chio_federation::bilateral_dsse::DsseEnvelope>,
-    /// Request-keyed tenant scope for receipts. Async evaluate futures
-    /// can resume on a different worker after dispatch, so the scope is
-    /// stored in this map rather than a thread-local.
-    receipt_tenant_ids: Arc<DashMap<String, String>>,
-    /// Request-keyed copy of the receipt-version admission snapshot.
-    /// Async evaluate futures may resume on a different Tokio worker
-    /// after dispatch. This map keeps the admitted version and peer state
-    /// available until the evaluation future finishes.
-    receipt_federation_admissions: Arc<DashMap<String, ReceiptFederationAdmission>>,
-    /// Operator-declared kernel identifier used as the
-    /// `org_b_kernel_id` in bilateral co-signing. Defaults to the hex
-    /// encoding of the kernel's signing public key, but operators can
-    /// override it to a stable DNS name via `with_federation_peers`.
-    federation_local_kernel_id: ArcSwap<Option<String>>,
-    /// Mpsc-backed signing task handle. Owns a clone of `config.keypair` and
-    /// pulls signing requests from a bounded channel; producers `.await` on
-    /// backpressure rather than on a mutex. Spawned at [`ChioKernel::new`] and
-    /// joined by [`ChioKernel::shutdown`]. Wrapped in `Arc` so shared kernel
-    /// handles can pass the signing handle to in-flight evaluators without
-    /// cloning the whole kernel.
-    signing_task: std::sync::Arc<signing_task::SigningTaskHandle>,
-    /// Settlement observer slot. When `Some`, the kernel invokes the
-    /// hook against every finalized receipt that carries a non-zero
-    /// manifest price. Settlement runs strictly post-signing and never
-    /// blocks dispatch; failures are surfaced through the retry/dead-
-    /// letter machinery, not through this option.
-    settlement_observer: Option<std::sync::Arc<dyn chio_settle::SettlementHook>>,
-    /// Recursive-delegation oracle handle. When `Some`, the verifier consults this
-    /// arc-swap-backed snapshot on every delegated dispatch and denies
-    /// the capability if any link in the chain (or the leaf) is in the
-    /// revoked set. `None` falls back to the legacy per-row
-    /// `RevocationStore` lookup. Field always present so the struct
-    /// shape stays feature-flag agnostic.
-    revocation_view: Option<std::sync::Arc<chio_kernel_core::RevocationView>>,
-    budget_registry: Mutex<chio_kernel_core::InMemoryBudgetRegistry>,
 }
 
 #[derive(Clone, Copy)]
@@ -1266,6 +563,12 @@ pub(crate) struct BudgetChargeResult {
 }
 
 impl BudgetChargeResult {
+    /// The rail/store hold id for the monetary budget charge, so a cleanup
+    /// fault can name the stuck budget hold that needs manual recovery.
+    pub(crate) fn budget_hold_id(&self) -> &str {
+        &self.budget_hold_id
+    }
+
     fn reverse_event_id(&self) -> String {
         format!("{}:reverse", self.budget_hold_id)
     }
@@ -1731,6 +1034,11 @@ pub(crate) struct ReceiptParams<'a> {
     decision: Decision,
     action: ToolCallAction,
     content_hash: String,
+    /// Byte preimage `content_hash` was computed over. The signing boundary
+    /// recomputes `sha256_hex(canonical_content)` and refuses to sign when it
+    /// disagrees with `content_hash` (WYSIWYS). Always sourced from
+    /// the matching [`ReceiptContent::canonical_content`].
+    canonical_content: Vec<u8>,
     metadata: Option<serde_json::Value>,
     timestamp: u64,
     /// Strength of kernel mediation for this evaluation. Defaults to
@@ -1778,7 +1086,6 @@ pub(crate) mod delegation;
 mod construction;
 // Tool-call and plan evaluation path, including the long-form evaluation
 // cores.
-#[path = "evaluation.rs"]
 mod evaluation;
 // Capability and budget validation.
 #[path = "validation.rs"]
@@ -1791,8 +1098,6 @@ mod governed_validation;
 mod dispatch;
 #[path = "evaluator.rs"]
 pub mod evaluator;
-#[path = "responses.rs"]
-#[allow(dead_code)]
 mod responses;
 #[path = "session_ops.rs"]
 mod session_ops;

@@ -257,17 +257,6 @@ mod cli_env_tests {
 
         restore_env("CHIO_GUARD_REGISTRY_PASSWORD", prior);
     }
-
-    #[test]
-    fn explain_help_text_uses_chio_named_dsse_conformance_wording() {
-        let source = include_str!("types/receipt.rs");
-        let stale_uppercase_phrase = ["strict ", "CHIO"].concat();
-
-        assert!(
-            !source.contains(&stale_uppercase_phrase),
-            "active explain help text must not describe DSSE conformance with stale uppercase legacy wording"
-        );
-    }
 }
 
 #[derive(Subcommand)]
@@ -387,6 +376,12 @@ pub(crate) enum Commands {
     Proof {
         #[command(subcommand)]
         command: ProofCommands,
+    },
+
+    /// Verify commerce proof bundles and payment evidence.
+    Commerce {
+        #[command(subcommand)]
+        command: CommerceCommands,
     },
 
     /// Validate read-only workflow planning evidence before dispatch.

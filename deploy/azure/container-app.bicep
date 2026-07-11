@@ -14,9 +14,9 @@
 //
 // Startup ordering: the Chio sidecar declares a startupProbe on :9090/chio/health;
 // the app container declares a startupProbe on :8080/healthz that depends on
-// the sidecar URL being reachable. The sidecar fails closed if
-// CHIO_KERNEL_CONFIG_PATH cannot be loaded, causing the revision to be marked
-// unhealthy and recycled.
+// the sidecar URL being reachable. The sidecar fails closed if it cannot start
+// serving that health endpoint, causing the revision to be marked unhealthy and
+// recycled.
 
 @description('Azure region for the container app.')
 param location string = resourceGroup().location
@@ -42,12 +42,6 @@ param chioCapabilityAuthoritySecretUri string
 @description('User-assigned managed identity resource ID with Key Vault read access.')
 param userAssignedIdentityId string
 
-@description('Policy source URI (blob, file, or remote).')
-param chioPolicySource string = 'https://chioconfig.blob.core.windows.net/config/policy.yaml'
-
-@description('Receipt sink destination.')
-param chioReceiptSink string = 'cosmosdb://chio-receipts'
-
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
@@ -61,6 +55,11 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     managedEnvironmentId: managedEnvironmentId
     configuration: {
       activeRevisionsMode: 'Single'
+      // Prometheus scrape target: the chio-sidecar serves an admin-gated GET
+      // /metrics carrying the kernel/edge/alert-pack families on targetPort 9090.
+      // Azure Container Apps has no native Prometheus scrape annotation, so the
+      // collector sidecar / Managed Prometheus is configured to scrape
+      // http://<app>:9090/metrics.
       ingress: {
         external: true
         targetPort: 9090
@@ -93,10 +92,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'CHIO_SIDECAR_URL'
               value: 'http://localhost:9090'
-            }
-            {
-              name: 'CHIO_SIDECAR_HEALTH_URL'
-              value: 'http://localhost:9090/chio/health'
             }
           ]
           probes: [
@@ -142,26 +137,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             memory: '0.5Gi'
           }
           env: [
-            {
-              name: 'CHIO_LISTEN_ADDR'
-              value: '0.0.0.0:9090'
-            }
-            {
-              name: 'CHIO_HEALTH_PATH'
-              value: '/chio/health'
-            }
-            {
-              name: 'CHIO_KERNEL_CONFIG_PATH'
-              value: '/etc/chio/kernel.yaml'
-            }
-            {
-              name: 'CHIO_POLICY_SOURCE'
-              value: chioPolicySource
-            }
-            {
-              name: 'CHIO_RECEIPT_SINK'
-              value: chioReceiptSink
-            }
             {
               name: 'CHIO_LOG_LEVEL'
               value: 'info'

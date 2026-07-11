@@ -7,8 +7,11 @@
 //! [`BlockingToolEvaluator`] remains for compatibility surfaces that
 //! intentionally enter the synchronous bridge.
 //!
-//! The synchronous bridge path is not cancellation-safe for futures dropped
-//! after budget admission or tool dispatch; that gap is a known open item.
+//! Futures dropped after budget admission are handled by the post-admission
+//! drop guard (RFC-0002): a cancellation receipt is recorded whenever
+//! dispatch was in flight and runtime-admission reservations get an explicit
+//! fail-closed disposition. Hard process death mid-dispatch remains the
+//! charter of the dispatch-intent journal (RFC-0003).
 
 use crate::kernel::ChioKernel;
 use crate::{
@@ -87,19 +90,25 @@ pub trait ToolEvaluator: Send + Sync {
 
     /// Sign the receipt for the (allow or deny) outcome of a tool call.
     ///
-    /// Accepts a fully-constructed [`ChioReceiptBody`] and returns the signed
+    /// Accepts a fully-constructed [`ChioReceiptBody`] plus the exact byte
+    /// preimage its `content_hash` was derived from, and returns the signed
     /// [`ChioReceipt`]. The default body routes through
     /// `kernel.sign_receipt_via_channel` (the mpsc-backed signing task);
     /// producers wait on bounded backpressure, never on a receipt-log mutex.
     /// The signed receipt is byte-identical to the inline
-    /// `build_and_sign_receipt` path because both delegate to
-    /// `chio_kernel_core::sign_receipt`.
+    /// `build_and_sign_receipt` path, and equally fail-closed: both delegate to
+    /// `chio_kernel_core::sign_receipt_with_handle`, which recomputes
+    /// `content_hash` over `canonical_content` and refuses to sign on mismatch
+    /// (WYSIWYS).
     async fn sign_receipt(
         &self,
         kernel: &ChioKernel,
         body: ChioReceiptBody,
+        canonical_content: Vec<u8>,
     ) -> Result<ChioReceipt, KernelError> {
-        kernel.sign_receipt_via_channel(body).await
+        kernel
+            .sign_receipt_via_channel(body, canonical_content)
+            .await
     }
 }
 

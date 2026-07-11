@@ -12,6 +12,15 @@
 //! rotated out in a later epoch is no longer trusted. Every step is fail-closed:
 //! an empty registry, an empty epoch key set, a duplicate or non-ascending epoch,
 //! and an unknown active epoch are all rejected rather than defaulted.
+//!
+//! Wiring boundary: this resolver is the provenance seam, not a runtime lookup.
+//! The shipped verifier (`verify_trust_market_context`) resolves trust from the
+//! intersection of the verifier policy and the presented bundle, and the CLI
+//! resolves its trusted keys from env/policy configuration; neither consults
+//! this registry at verify time. A rotation therefore takes effect only when
+//! deployments regenerate their policy / env key sets from the registry's
+//! active epoch and redeploy. Operational rotation is that regeneration step;
+//! there is no runtime epoch switch.
 
 use std::error::Error;
 use std::fmt;

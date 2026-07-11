@@ -14,11 +14,11 @@ use wasm_bindgen::prelude::*;
 
 use crate::pure::{
     decode_seed_hex, decode_trusted_issuers, evaluate_pure, hex_encode_lower,
-    parse_authority_input, sign_receipt_pure, verify_capability_pure, verify_receipt_pure,
+    parse_authority_input, sign_receipt_pure, sign_receipt_relaying_trusted_body_pure,
+    verify_capability_pure, verify_receipt_pure,
 };
 use crate::wire::{
     BindingError, EvaluateRequestJson, SignReceiptRequestJson, VerifyCapabilityRequestJson,
-    VerifyReceiptResultJson,
 };
 use crate::{BrowserClock, WebCryptoRng};
 
@@ -59,17 +59,44 @@ pub fn evaluate(request_json: &str) -> Result<JsValue, JsValue> {
     encode_result(&verdict)
 }
 
-/// Sign a receipt body.
+/// Sign a receipt body (PUBLIC WYSIWYS signer; fail-closed).
 ///
 /// The `signing_seed_hex` parameter carries a 32-byte Ed25519 seed
 /// as lowercase hex (optionally `0x`-prefixed). Callers that want
 /// the browser to mint a fresh seed per receipt should call
 /// [`mint_signing_seed_hex`] first and pass the result in here.
+///
+/// WYSIWYS: the JSON body MUST include the `canonical_content`
+/// preimage so the signer recomputes `content_hash` inside the trust boundary
+/// and refuses on mismatch. A body without `canonical_content` is refused; it
+/// does NOT silently relay a trusted body. Callers that only forward an
+/// upstream-minted body through the relay seam must call
+/// [`sign_receipt_relaying_trusted_body`].
 #[wasm_bindgen]
 pub fn sign_receipt(body_json: &str, signing_seed_hex: &str) -> Result<JsValue, JsValue> {
     let input: SignReceiptRequestJson = parse_json("sign_receipt body", body_json)?;
     let seed = decode_seed_hex(signing_seed_hex).map_err(|err| to_js_error(&err))?;
     let receipt = sign_receipt_pure(input, &seed).map_err(|err| to_js_error(&err))?;
+    encode_result(&receipt)
+}
+
+/// Relay-sign an already-minted, upstream-trusted receipt body.
+///
+/// This is NOT the default public signer. It trusts the caller-supplied
+/// `content_hash` and does not recompute it, so it must only be used to forward
+/// a body an upstream trusted producer already minted (where the WYSIWYS
+/// recompute already ran). Content-bearing callers that construct receipts at
+/// the boundary MUST use [`sign_receipt`] instead so the recompute gate runs.
+#[wasm_bindgen]
+pub fn sign_receipt_relaying_trusted_body(
+    body_json: &str,
+    signing_seed_hex: &str,
+) -> Result<JsValue, JsValue> {
+    let input: SignReceiptRequestJson =
+        parse_json("sign_receipt_relaying_trusted_body body", body_json)?;
+    let seed = decode_seed_hex(signing_seed_hex).map_err(|err| to_js_error(&err))?;
+    let receipt =
+        sign_receipt_relaying_trusted_body_pure(input, &seed).map_err(|err| to_js_error(&err))?;
     encode_result(&receipt)
 }
 
@@ -87,7 +114,7 @@ pub fn verify_capability(token_json: &str, authority_pub_hex: &str) -> Result<Js
         token,
         trusted_issuers_hex,
         clock_override_unix_secs: None,
-        peer_capabilities: Some(CapabilityNegotiation::v1_default()),
+        peer_capabilities: Some(CapabilityNegotiation::t1_default()),
         capability_trust_roots: BTreeMap::new(),
         parent_budget_snapshots: Vec::new(),
     };

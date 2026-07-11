@@ -7,6 +7,7 @@ members = [
     "crates/core/chio-errors",
     "crates/core/chio-adversarial-suite",
     "crates/core/chio-arena",
+    "crates/core/chio-bounded",
     #
     # Kernel variants
     "crates/kernel/chio-kernel",
@@ -82,6 +83,7 @@ members = [
     "crates/trust/chio-did",
     "crates/trust/chio-disclosure-lineage",
     "crates/trust/chio-federation",
+    "crates/trust/chio-federation-transport-iroh",
     "crates/trust/chio-governance",
     "crates/trust/chio-attest-buyer-core",
     "crates/trust/chio-federation-authority",
@@ -285,7 +287,6 @@ miette = { version = "7.6.0", features = ["fancy"] }
 chrono = "0.4"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 fips204 = { version = "0.4.6", default-features = false, features = ["ml-dsa-65"] }
-dcap-rs = "0.1.0"
 sev = { version = "7.1.0", default-features = false, features = ["snp", "crypto_nossl"] }
 coset = { version = "0.4.2", default-features = false }
 x509-parser = "0.16"
@@ -330,9 +331,7 @@ tower-lsp = "0.20.0"
 lsp-types = "0.95.1"
 notify = "6.1.1"
 opentelemetry-semantic-conventions = { version = "=0.29.0", default-features = false, features = ["semconv_experimental"] }
-# Lineage DAG (petgraph) and marketplace CSV exports (csv).
-petgraph = "0.6"
-csv = "1"
+zeroize = "1.8"
 # Workspace metric registry. Surfaced through workspace.dependencies so edge
 # crates plus chio-wasm-guards consume the registry by
 # `chio-metrics-spec = { workspace = true }` rather than each carrying its own
@@ -364,6 +363,7 @@ chio-attest-verify = { path = "crates/trust/chio-attest-verify" }
 chio-autonomy = { path = "crates/economy/chio-autonomy" }
 chio-bedrock-converse-adapter = { path = "crates/protocol/chio-bedrock-converse-adapter" }
 chio-binding-helpers = { path = "crates/sdk/chio-binding-helpers" }
+chio-bounded = { path = "crates/core/chio-bounded" }
 chio-cohere-tools-adapter = { path = "crates/protocol/chio-cohere-tools-adapter" }
 chio-config = { path = "crates/platform/chio-config" }
 chio-conformance = { path = "crates/tooling/chio-conformance" }
@@ -391,6 +391,7 @@ chio-eval-receipt = { path = "crates/sdk/chio-eval-receipt" }
 chio-external-guards = { path = "crates/guards/chio-external-guards" }
 chio-federation = { path = "crates/trust/chio-federation" }
 chio-federation-authority = { path = "crates/trust/chio-federation-authority" }
+chio-federation-transport-iroh = { path = "crates/trust/chio-federation-transport-iroh" }
 chio-gemini-tools-adapter = { path = "crates/protocol/chio-gemini-tools-adapter" }
 chio-governance = { path = "crates/trust/chio-governance" }
 chio-groq-tools-adapter = { path = "crates/protocol/chio-groq-tools-adapter" }

@@ -41,8 +41,9 @@
 use chio_web3::capability::scope::{Operation, ToolGrant};
 use chio_web3::crypto::PublicKey;
 use chio_web3::settlement_proof::{
-    verify_public_settlement_proof, PublicSettlementProofBundle, PublicSettlementVerifierReport,
-    PublicSettlementVerifierTrust, ToolCallAuthorization,
+    verify_public_settlement_proof, PublicSettlementIndependentChainHead,
+    PublicSettlementProofBundle, PublicSettlementRuntimeCodehashTrust,
+    PublicSettlementVerifierReport, PublicSettlementVerifierTrust, ToolCallAuthorization,
 };
 
 /// A real, fully-verified public x402 settlement proof bundle: payment settled
@@ -95,7 +96,21 @@ fn trust_for(bundle: &PublicSettlementProofBundle) -> PublicSettlementVerifierTr
         .clone()
         .expect("oracle conversion evidence carries a signing key");
 
+    let bundle_signer = PublicKey::from_hex(
+        &bundle
+            .bundle_signature
+            .as_ref()
+            .expect("verified fixture bundle carries its signature envelope")
+            .signer_key,
+    )
+    .expect("bundle signer key parses");
+    let provenance = bundle
+        .deployment_provenance
+        .clone()
+        .expect("verified fixture bundle carries deployment provenance");
+
     PublicSettlementVerifierTrust {
+        trusted_bundle_signer_keys: vec![bundle_signer],
         trusted_capital_signer_keys: vec![capital_signer],
         trusted_anchor_kernel_keys: vec![anchor_kernel],
         trusted_beneficiary_identity_keys: vec![beneficiary_identity],
@@ -104,7 +119,30 @@ fn trust_for(bundle: &PublicSettlementProofBundle) -> PublicSettlementVerifierTr
         mainnet_blocked: false,
         minimum_confirmations: None,
         expected_trust_market_context: None,
-        independent_chain_head: None,
+        // The offline-finality fixture's matching independent head: finality
+        // grounds on a head the verifier observes, never the producer-supplied
+        // snapshot depth.
+        independent_chain_head: Some(PublicSettlementIndependentChainHead {
+            chain_id: bundle.chain_id.clone(),
+            observed_block_number: 12_345_678,
+            observed_block_hash:
+                "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                    .to_string(),
+            latest_block_number: 12_345_701,
+        }),
+        trusted_dispute_event_blocks: Vec::new(),
+        trusted_release_event_blocks: Vec::new(),
+        trusted_release_event_logs: Vec::new(),
+        trusted_refund_event_logs: Vec::new(),
+        verifier_now_unix_seconds: Some(1_743_293_560),
+        trusted_runtime_codehashes: Some(PublicSettlementRuntimeCodehashTrust {
+            contract_package_id: provenance.contract_package_id,
+            reviewed_manifest_hash: provenance.reviewed_manifest_hash,
+            root_registry_runtime_codehash: provenance.root_registry_runtime_codehash,
+            identity_registry_runtime_codehash: provenance.identity_registry_runtime_codehash,
+            escrow_runtime_codehash: provenance.escrow_runtime_codehash,
+            bond_vault_runtime_codehash: provenance.bond_vault_runtime_codehash,
+        }),
     }
 }
 
