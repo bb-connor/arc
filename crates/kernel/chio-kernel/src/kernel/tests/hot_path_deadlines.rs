@@ -233,3 +233,79 @@ async fn wedged_writer_watchdog_denies_before_side_effect(
     );
     Ok(())
 }
+
+/// A wedged store that also counts capability-snapshot writes, to prove the
+/// snapshot path denies before entering the (unbounded) writer-backed write.
+struct SnapshotCountingWedgedStore {
+    snapshot_writes: Arc<AtomicU64>,
+}
+
+impl ReceiptStore for SnapshotCountingWedgedStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+    fn record_capability_snapshot(
+        &self,
+        _token: &CapabilityToken,
+        _parent_capability_id: Option<&str>,
+    ) -> Result<(), ReceiptStoreError> {
+        self.snapshot_writes.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+    fn writer_liveness(&self, _stall_threshold: std::time::Duration) -> ReceiptWriterLiveness {
+        ReceiptWriterLiveness::Wedged
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn wedged_writer_denies_before_evaluation_capability_snapshot(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // The observed-capability snapshot in the evaluation hot path is a
+    // writer-backed write with an unbounded wait. A wedged writer must be denied
+    // before that write is entered, not after it has already hung the request.
+    let invocations = Arc::new(AtomicU64::new(0));
+    let snapshot_writes = Arc::new(AtomicU64::new(0));
+    let mut kernel = make_kernel(make_config());
+    kernel.set_receipt_store(Box::new(SnapshotCountingWedgedStore {
+        snapshot_writes: Arc::clone(&snapshot_writes),
+    }))?;
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-snapshot",
+        vec!["noop"],
+        Arc::clone(&invocations),
+    )));
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-snapshot", "noop")]),
+        300,
+    );
+    // Publish the wedged verdict only now, so the snapshot that capability
+    // issuance above records is not what this test measures.
+    kernel.refresh_receipt_writer_liveness_for_test();
+    let snapshots_before_dispatch = snapshot_writes.load(Ordering::SeqCst);
+    let request = make_request("req-snapshot", &cap, "noop", "srv-snapshot");
+    let kernel = Arc::new(kernel);
+
+    let response = kernel.evaluate_tool_call(&request).await?;
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        snapshot_writes.load(Ordering::SeqCst),
+        snapshots_before_dispatch,
+        "evaluation must deny before entering the capability snapshot write"
+    );
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        0,
+        "no tool side effect may occur while the writer is wedged"
+    );
+    Ok(())
+}

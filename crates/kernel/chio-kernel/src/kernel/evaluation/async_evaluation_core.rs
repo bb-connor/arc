@@ -235,6 +235,26 @@ impl ChioKernel {
             );
         }
 
+        // Bound the hot path before the writer-backed capability snapshot below:
+        // that snapshot commits through the receipt writer with an unbounded
+        // wait, so a wedged, saturated, or dead writer must be denied here rather
+        // than allowed to hang the request inside the write.
+        if let Err(error) = self.ensure_receipt_persistence_ready() {
+            let msg = error.to_string();
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&msg),
+                "receipt persistence unavailable pre-dispatch"
+            );
+            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+
         if let Err(error) = self.record_observed_capability_snapshot(cap) {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "failed to persist capability lineage");
@@ -255,21 +275,6 @@ impl ChioKernel {
                 request_id = %request.request_id,
                 reason = %redacted!(&msg),
                 "federated receipt persistence unavailable pre-dispatch"
-            );
-            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
-                request,
-                &msg,
-                now,
-                None,
-                extra_metadata.clone(),
-            );
-        }
-        if let Err(error) = self.ensure_receipt_persistence_ready() {
-            let msg = error.to_string();
-            warn!(
-                request_id = %request.request_id,
-                reason = %redacted!(&msg),
-                "receipt persistence unavailable pre-dispatch"
             );
             return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
                 request,
