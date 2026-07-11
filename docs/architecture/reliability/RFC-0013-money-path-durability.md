@@ -857,9 +857,9 @@ adopter persist and restore counters instead of silently losing them.
 
 ## Migration and compatibility
 
-- Backward compatible: every new table and enum value is additive; older binaries
-  ignore the tables and treat unknown mutation kinds/dispositions as opaque. Newer
-  binaries create the tables on open.
+- New tables and enum values are additive; older binaries ignore the tables and
+  treat unknown mutation kinds/dispositions as opaque. The unshipped dead-letter
+  body is a deliberate pre-release replacement, not a compatibility promise.
 - There are no historical journal, attempt, or nonce rows. Existing holds lack a
   trustworthy `request_id` and terminal recovery proof, so they are never
   auto-expired merely because they predate the migration. They appear in the
