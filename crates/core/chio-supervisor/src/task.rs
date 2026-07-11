@@ -1,0 +1,177 @@
+//! Supervised tokio task: retains the join handle, records each iteration's
+//! outcome, restarts with capped backoff, and trips the health flag on a panic, a
+//! failed iteration, or an exhausted restart budget.
+
+use crate::config::{backoff_delay, SupervisedOutcome, SupervisorConfig};
+use crate::health::HealthFlag;
+use crate::time::now_unix_ms;
+use std::future::Future;
+use tokio::task::JoinHandle;
+
+/// A supervised tokio task that owns its join handle and a [`HealthFlag`]. Retaining
+/// the handle is the fix for the historical pattern of spawning a long-lived loop and
+/// dropping the handle, which made the task's death invisible.
+pub struct SupervisedTask {
+    handle: JoinHandle<()>,
+    health: HealthFlag,
+}
+
+impl SupervisedTask {
+    /// Spawn a supervised task whose `iteration` is invoked in a loop. Each iteration
+    /// runs in its own child task so a panic across an `.await` surfaces as a failure
+    /// to this supervisor rather than silently finishing the loop. A panicked or
+    /// failed iteration is recorded and restarted with capped backoff.
+    pub fn spawn<F, Fut>(config: SupervisorConfig, iteration: F) -> Self
+    where
+        F: FnMut() -> Fut + Send + 'static,
+        Fut: Future<Output = SupervisedOutcome> + Send + 'static,
+    {
+        let health = HealthFlag::new(config.tcb_critical);
+        let handle = supervise_task(config, health.clone(), iteration);
+        Self { handle, health }
+    }
+
+    /// A cloneable handle to this task's health.
+    #[must_use]
+    pub fn health(&self) -> HealthFlag {
+        self.health.clone()
+    }
+
+    /// Whether the supervisor loop itself has finished (terminal `Failed`, runtime
+    /// shutdown, or a clean `Shutdown` outcome). A secondary backstop for surfaces
+    /// that want to trip a flag when the whole supervisor exits.
+    #[must_use]
+    pub fn is_finished(&self) -> bool {
+        self.handle.is_finished()
+    }
+
+    /// Abort the supervisor loop. Used during process shutdown.
+    pub fn abort(&self) {
+        self.handle.abort();
+    }
+}
+
+/// Supervise `iteration` in a loop and return the retained [`JoinHandle`]. Each
+/// iteration runs inside a child task so that a panic - which can occur across an
+/// `.await` point where `catch_unwind` cannot cleanly capture it - surfaces as a
+/// `JoinError` and is classified as a restart-worthy failure. Where the runtime is
+/// configured to abort on panic, the process aborts loudly instead and the
+/// orchestrator restarts it: the same fail-loud outcome as the synchronous worker.
+pub fn supervise_task<F, Fut>(
+    config: SupervisorConfig,
+    health: HealthFlag,
+    mut iteration: F,
+) -> JoinHandle<()>
+where
+    F: FnMut() -> Fut + Send + 'static,
+    Fut: Future<Output = SupervisedOutcome> + Send + 'static,
+{
+    tokio::spawn(async move {
+        loop {
+            let outcome = match tokio::spawn(iteration()).await {
+                Ok(outcome) => outcome,
+                Err(join_error) if join_error.is_panic() => SupervisedOutcome::Restart,
+                Err(_cancelled) => return,
+            };
+            match outcome {
+                SupervisedOutcome::Shutdown => return,
+                SupervisedOutcome::Continue => continue,
+                SupervisedOutcome::Restart => {
+                    let now = now_unix_ms();
+                    let count = health.record_failure(
+                        format!("{} iteration panicked or failed", config.name),
+                        now,
+                        config.trip_after,
+                    );
+                    if count >= config.max_restarts {
+                        health.escalate_failed(now);
+                        return;
+                    }
+                    tokio::time::sleep(backoff_delay(&config, count)).await;
+                }
+            }
+        }
+    })
+}
+
+#[cfg(all(test, not(loom)))]
+mod tests {
+    use super::*;
+    use crate::HealthLevel;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    fn fast_config(name: &'static str, tcb: bool, max_restarts: u32) -> SupervisorConfig {
+        SupervisorConfig {
+            name,
+            tcb_critical: tcb,
+            trip_after: 2,
+            max_restarts,
+            base_backoff: Duration::from_millis(1),
+            max_backoff: Duration::from_millis(2),
+        }
+    }
+
+    #[tokio::test]
+    async fn continue_iterations_keep_the_flag_healthy() {
+        let ticks = Arc::new(AtomicU32::new(0));
+        let worker_ticks = Arc::clone(&ticks);
+        let task = SupervisedTask::spawn(fast_config("healthy", false, 5), move || {
+            let worker_ticks = Arc::clone(&worker_ticks);
+            async move {
+                let seen = worker_ticks.fetch_add(1, Ordering::SeqCst);
+                if seen >= 3 {
+                    SupervisedOutcome::Shutdown
+                } else {
+                    SupervisedOutcome::Continue
+                }
+            }
+        });
+        let health = task.health();
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while !task.is_finished() {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .unwrap_or(());
+        assert_eq!(health.level(), HealthLevel::Healthy);
+        assert!(ticks.load(Ordering::SeqCst) >= 3);
+    }
+
+    #[tokio::test]
+    async fn panicking_iteration_is_recorded_and_escalates() {
+        let task = SupervisedTask::spawn(fast_config("panic", true, 3), || async {
+            panic!("iteration blew up");
+        });
+        let health = task.health();
+        tokio::time::timeout(Duration::from_secs(3), async {
+            while health.level() != HealthLevel::Failed {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+        })
+        .await
+        .unwrap_or(());
+        assert_eq!(health.level(), HealthLevel::Failed);
+        assert!(health.is_serving_closed());
+        assert!(task.is_finished());
+    }
+
+    #[tokio::test]
+    async fn failing_iteration_trips_to_degraded() {
+        let task = SupervisedTask::spawn(fast_config("fail", false, 100), || async {
+            SupervisedOutcome::Restart
+        });
+        let health = task.health();
+        tokio::time::timeout(Duration::from_secs(3), async {
+            while health.level() == HealthLevel::Healthy {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+        })
+        .await
+        .unwrap_or(());
+        assert_eq!(health.level(), HealthLevel::Degraded);
+        task.abort();
+    }
+}
