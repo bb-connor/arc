@@ -982,13 +982,30 @@ pub(super) fn retention_repair_on_writer(
     let escaped = archive_path.replace('\'', "''");
     connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
     let assert_result = (|| -> Result<u64, ReceiptStoreError> {
-        for (_, receipt_id) in &extras {
-            let present: i64 = connection.query_row(
-                "SELECT COUNT(*) FROM archive.claim_receipt_log_entries WHERE receipt_id = ?1",
-                params![receipt_id],
+        for (entry_seq, _) in &extras {
+            // Identity, not mere presence: the orphaned live claim-log row is the
+            // last faithful evidence for its receipt, and deleting it is only safe
+            // if the archive holds a BYTE-IDENTICAL copy. A reused or wrong archive
+            // that merely reuses the `receipt_id` under a divergent `entry_seq`,
+            // `source_seq`, `receipt_kind`, or `raw_json` would pass a count-only
+            // probe yet leave no faithful archived copy behind the delete, so
+            // compare the whole row (keyed on the verbatim-copied `entry_seq`).
+            let faithful: i64 = connection.query_row(
+                "SELECT COUNT(*) FROM main.claim_receipt_log_entries m \
+                 WHERE m.entry_seq = ?1 \
+                   AND EXISTS (SELECT 1 FROM archive.claim_receipt_log_entries a \
+                     WHERE a.entry_seq = m.entry_seq \
+                       AND a.receipt_id IS m.receipt_id AND a.receipt_kind IS m.receipt_kind \
+                       AND a.source_seq IS m.source_seq AND a.timestamp IS m.timestamp \
+                       AND a.capability_id IS m.capability_id AND a.session_id IS m.session_id \
+                       AND a.parent_request_id IS m.parent_request_id AND a.request_id IS m.request_id \
+                       AND a.subject_key IS m.subject_key AND a.issuer_key IS m.issuer_key \
+                       AND a.tool_server IS m.tool_server AND a.tool_name IS m.tool_name \
+                       AND a.raw_json IS m.raw_json)",
+                params![entry_seq],
                 |row| row.get(0),
             )?;
-            if present == 0 {
+            if faithful == 0 {
                 return Err(ReceiptStoreError::RetentionArchiveIncomplete {
                     table: "claim_receipt_log_entries",
                     live: 1,

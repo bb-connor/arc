@@ -868,6 +868,91 @@ fn co_archival_rejects_reused_seq_archive() -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
+/// Retention repair must validate the archived copy by IDENTITY before deleting
+/// the orphaned live claim-log row, not merely by `receipt_id` presence. A reused
+/// or wrong archive that carries the receipt under a divergent `source_seq` (or
+/// any other column) would otherwise pass, and deleting the live row would leave
+/// no faithful archived evidence behind.
+#[test]
+fn repair_rejects_divergent_archive_identity() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("repair-divergent-archive");
+    let archive = unique_db_path("repair-divergent-archive-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+        for i in 0..4u64 {
+            let r = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("dv-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store.append_chio_receipt_returning_seq(&r)?;
+        }
+        store.flush_receipt_writes()?;
+        // Fabricate the bricked state, but co-archive a DIVERGENT projection: same
+        // receipt_id and entry_seq, wrong source_seq. Then delete the source rows
+        // for [1,2], leaving orphaned claim-log rows.
+        store.writer_handle().run_write({
+            let archive_path = archive_path.to_string();
+            move |connection| {
+                let escaped = archive_path.replace('\'', "''");
+                connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
+                connection.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries \
+                       (entry_seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, receipt_kind TEXT NOT NULL, \
+                        source_seq INTEGER NOT NULL, timestamp INTEGER NOT NULL, capability_id TEXT, session_id TEXT, \
+                        parent_request_id TEXT, request_id TEXT, subject_key TEXT, issuer_key TEXT, tool_server TEXT, \
+                        tool_name TEXT, raw_json TEXT NOT NULL); \
+                     INSERT OR IGNORE INTO archive.claim_receipt_log_entries \
+                       (entry_seq, receipt_id, receipt_kind, source_seq, timestamp, capability_id, session_id, \
+                        parent_request_id, request_id, subject_key, issuer_key, tool_server, tool_name, raw_json) \
+                       SELECT entry_seq, receipt_id, receipt_kind, source_seq + 500, timestamp, capability_id, session_id, \
+                        parent_request_id, request_id, subject_key, issuer_key, tool_server, tool_name, raw_json \
+                       FROM main.claim_receipt_log_entries WHERE entry_seq <= 2; \
+                     DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
+                     DELETE FROM main.chio_tool_receipts WHERE seq <= 2; \
+                     CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
+                       BEFORE DELETE ON chio_tool_receipts \
+                       BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END;",
+                )?;
+                connection.execute_batch("DETACH DATABASE archive")?;
+                Ok(())
+            }
+        })?;
+    }
+
+    let store = SqliteReceiptStore::open_existing(&path)?;
+    let result = store.retention_repair(archive_path);
+    let message = result
+        .err()
+        .ok_or("expected RetentionArchiveIncomplete; repair trusted a divergent archive")?
+        .to_string();
+    assert!(
+        message.contains("co-archival incomplete"),
+        "unexpected error: {message}"
+    );
+
+    // Fail-closed: the orphaned rows survive, so no faithful evidence was lost.
+    let live = store.reader_connection_for_test()?;
+    let orphans: i64 = live.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq <= 2",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        orphans, 2,
+        "orphaned claim-log rows must survive a rejected repair"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// Primary correctness proof: a state-machine proptest that drives random
 /// interleaved sequences of tool/child appends (non-monotonic
 /// timestamps within an aged band, to exercise the MAX(timestamp)-over-prefix
