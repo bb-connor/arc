@@ -625,10 +625,9 @@ in `docs/superpowers/plans/2026-07-10-ws1-first-light-phase1.md`. The same
 transitions. `RetryPolicy` is validated at installation and at the store
 boundary, all time arithmetic is checked in milliseconds, and a dead letter is
 terminal until an explicit operator action. A byte-identical terminal replay may
-compare reconstructed v2 canonical bytes after the live attempt was removed, but
-performs no mutation; any difference is a conflict. Legacy v1 dead letters remain
-available through a versioned read shape and are never rewritten or synthesized
-as v2. Unknown schema tags fail closed.
+compare reconstructed canonical bytes after the live attempt was removed, but
+performs no mutation; any difference is a conflict. Obsolete unbounded bodies
+and unknown schema tags fail closed.
 
 Every unresolved registered-observer outcome, including failed cleanup or
 persistence, emits one bounded warning and increments the shared
@@ -847,7 +846,7 @@ adopter persist and restore counters instead of silently losing them.
   EXISTS`). The existing `settle_dead_letters`, `iou_envelope`, and
   `settlement_reconciliations` tables are now populated by production code
   (F68/F69), not only tests.
-- `PaymentJournalRecord`, `DeadLetterRecord` (existing, schema `chio.settle.dead-letter.v2`),
+- `PaymentJournalRecord`, `DeadLetterRecord` (existing, schema `chio.settle.dead-letter.v1`),
   and any reconciliation report serialize as RFC 8785 canonical JSON, consistent with
   the canonical-JSON `parameter_hash` and dead-letter row bytes already in use.
 - `BudgetDenyReason` gains a `CurrencyMismatch` variant. It is config-as-data JSON
@@ -865,9 +864,8 @@ adopter persist and restore counters instead of silently losing them.
   trustworthy `request_id` and terminal recovery proof, so they are never
   auto-expired merely because they predate the migration. They appear in the
   review command and require an explicit reconciled resolution.
-- Existing `chio.settle.dead-letter.v1` rows remain readable through the SQLite
-  store's versioned compatibility API. New writes are exact v2 only, and migration
-  never rewrites legacy canonical bytes.
+- The bounded `chio.settle.dead-letter.v1` shape is the sole pre-release
+  dead-letter contract. Rows that do not match it fail closed.
 - Staged rollout. The payment journal is the money-path specialization of RFC-0003's
   `DispatchIntentJournalMode`; enable it with the `Monetary` class first (highest
   consequence), gated behind the same config. The F68 routing consumer ships enabled

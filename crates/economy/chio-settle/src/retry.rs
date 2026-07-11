@@ -23,7 +23,7 @@ use crate::hook::{SettlementFailureClass, SettlementFailureReason, SettlementSki
 use crate::outcome_store::SettlementRoutingInput;
 
 /// Schema string emitted on the wire for [`DeadLetterRecord`] frames.
-pub const SETTLE_DEAD_LETTER_SCHEMA: &str = "chio.settle.dead-letter.v2";
+pub const SETTLE_DEAD_LETTER_SCHEMA: &str = "chio.settle.dead-letter.v1";
 
 fn deserialize_dead_letter_schema<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
@@ -226,7 +226,7 @@ pub fn classify_attempt(
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DeadLetterRecord {
-    /// Schema tag (`chio.settle.dead-letter.v2`).
+    /// Schema tag (`chio.settle.dead-letter.v1`).
     #[serde(deserialize_with = "deserialize_dead_letter_schema")]
     pub schema: String,
     /// `id` of the originating receipt.
@@ -283,7 +283,7 @@ mod tests {
 
     #[test]
     fn schema_is_stable() {
-        assert_eq!(SETTLE_DEAD_LETTER_SCHEMA, "chio.settle.dead-letter.v2");
+        assert_eq!(SETTLE_DEAD_LETTER_SCHEMA, "chio.settle.dead-letter.v1");
     }
 
     #[test]

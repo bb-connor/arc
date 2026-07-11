@@ -16,15 +16,11 @@
 //! receipt-store database that already holds other tables.
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_settle::{DeadLetterRecord, SETTLE_DEAD_LETTER_SCHEMA};
+use chio_settle::DeadLetterRecord;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, OptionalExtension};
-use serde::{Deserialize, Deserializer};
 use thiserror::Error;
-
-/// Schema tag used by dead-letter rows written before bounded failure reasons.
-pub const LEGACY_SETTLE_DEAD_LETTER_SCHEMA: &str = "chio.settle.dead-letter.v1";
 
 /// SQL migration applied by [`SqliteDeadLetterStore::open_with_pool`]
 /// to create the `settle_dead_letters` table.
@@ -69,65 +65,6 @@ fn dead_letter_row_error(error: rusqlite::Error) -> DeadLetterStoreError {
     }
 }
 
-fn deserialize_legacy_schema<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let schema = String::deserialize(deserializer)?;
-    if schema == LEGACY_SETTLE_DEAD_LETTER_SCHEMA {
-        Ok(schema)
-    } else {
-        Err(serde::de::Error::custom(
-            "unsupported settlement dead-letter schema",
-        ))
-    }
-}
-
-/// Exact wire shape persisted by the legacy v1 dead-letter writer.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct LegacyDeadLetterRecordV1 {
-    /// Exact v1 schema tag.
-    #[serde(deserialize_with = "deserialize_legacy_schema")]
-    pub schema: String,
-    /// Originating receipt id.
-    pub receipt_id: String,
-    /// Receipt finalization timestamp.
-    pub finalized_at: u64,
-    /// Number of settlement attempts.
-    pub attempts: u32,
-    /// Unbounded legacy terminal reason.
-    pub reason: String,
-    /// Optional unbounded legacy pipeline error.
-    #[serde(default)]
-    pub pipeline_error: Option<String>,
-}
-
-/// Schema-preserving dead-letter value returned by SQLite reads.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum VersionedDeadLetterRecord {
-    /// Legacy row with unbounded diagnostic strings.
-    V1(LegacyDeadLetterRecordV1),
-    /// Current row with a bounded failure reason.
-    V2(DeadLetterRecord),
-}
-
-impl VersionedDeadLetterRecord {
-    /// Return the receipt id without erasing the stored schema version.
-    #[must_use]
-    pub fn receipt_id(&self) -> &str {
-        match self {
-            Self::V1(record) => record.receipt_id.as_str(),
-            Self::V2(record) => record.receipt_id.as_str(),
-        }
-    }
-}
-
-#[derive(Deserialize)]
-struct DeadLetterSchemaTag {
-    schema: String,
-}
-
 struct StoredDeadLetterRow {
     receipt_id: String,
     finalized_at: i64,
@@ -145,25 +82,7 @@ pub struct SqliteDeadLetterStore {
     writer: Option<crate::receipt_store::WriterHandle>,
 }
 
-fn decode_dead_letter(canonical: &str) -> Result<VersionedDeadLetterRecord, DeadLetterStoreError> {
-    let tag: DeadLetterSchemaTag = serde_json::from_str(canonical)
-        .map_err(|err| DeadLetterStoreError::InvalidRecord(err.to_string()))?;
-    match tag.schema.as_str() {
-        LEGACY_SETTLE_DEAD_LETTER_SCHEMA => serde_json::from_str(canonical)
-            .map(VersionedDeadLetterRecord::V1)
-            .map_err(|err| DeadLetterStoreError::InvalidRecord(err.to_string())),
-        SETTLE_DEAD_LETTER_SCHEMA => serde_json::from_str(canonical)
-            .map(VersionedDeadLetterRecord::V2)
-            .map_err(|err| DeadLetterStoreError::InvalidRecord(err.to_string())),
-        _ => Err(DeadLetterStoreError::InvalidRecord(
-            "unsupported settlement dead-letter schema".to_string(),
-        )),
-    }
-}
-
-fn encode_v2_dead_letter(
-    record: &DeadLetterRecord,
-) -> Result<(i64, Vec<u8>), DeadLetterStoreError> {
+fn encode_dead_letter(record: &DeadLetterRecord) -> Result<(i64, Vec<u8>), DeadLetterStoreError> {
     if !record.has_supported_schema() {
         return Err(DeadLetterStoreError::InvalidRecord(
             "unsupported programmatic settlement dead-letter schema".to_string(),
@@ -205,7 +124,7 @@ fn read_stored_dead_letter_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Stor
 
 fn decode_stored_dead_letter(
     row: StoredDeadLetterRow,
-) -> Result<VersionedDeadLetterRecord, DeadLetterStoreError> {
+) -> Result<DeadLetterRecord, DeadLetterStoreError> {
     let finalized_at: u64 =
         row.finalized_at
             .try_into()
@@ -222,25 +141,15 @@ fn decode_stored_dead_letter(
                 "persisted attempts is outside the u32 range".to_string(),
             )
         })?;
-    let record = decode_dead_letter(&row.canonical)?;
-    let columns_match = match &record {
-        VersionedDeadLetterRecord::V1(record) => {
-            record.receipt_id == row.receipt_id
-                && record.finalized_at == finalized_at
-                && record.attempts == attempts
-                && record.reason == row.reason
-                && record.pipeline_error == row.pipeline_error
-        }
-        VersionedDeadLetterRecord::V2(record) => {
-            let (_, canonical) = encode_v2_dead_letter(record)?;
-            record.receipt_id == row.receipt_id
-                && record.finalized_at == finalized_at
-                && record.attempts == attempts
-                && record.reason.code().as_str() == row.reason
-                && row.pipeline_error.is_none()
-                && canonical.as_slice() == row.canonical.as_bytes()
-        }
-    };
+    let record: DeadLetterRecord = serde_json::from_str(&row.canonical)
+        .map_err(|err| DeadLetterStoreError::InvalidRecord(err.to_string()))?;
+    let (_, canonical) = encode_dead_letter(&record)?;
+    let columns_match = record.receipt_id == row.receipt_id
+        && record.finalized_at == finalized_at
+        && record.attempts == attempts
+        && record.reason.code().as_str() == row.reason
+        && row.pipeline_error.is_none()
+        && canonical.as_slice() == row.canonical.as_bytes();
     if columns_match {
         Ok(record)
     } else {
@@ -273,7 +182,7 @@ pub(crate) fn insert_dead_letter_on_connection(
     connection: &rusqlite::Connection,
     record: &DeadLetterRecord,
 ) -> Result<bool, DeadLetterStoreError> {
-    let (finalized_at, canonical) = encode_v2_dead_letter(record)?;
+    let (finalized_at, canonical) = encode_dead_letter(record)?;
     let canonical = std::str::from_utf8(&canonical)
         .map_err(|err| DeadLetterStoreError::InvalidRecord(err.to_string()))?;
     let inserted = connection
@@ -321,11 +230,11 @@ pub(crate) fn insert_dead_letter_on_connection(
     }
 }
 
-/// Read and decode one schema-preserving dead-letter row.
+/// Read and decode one dead-letter row.
 pub(crate) fn read_dead_letter_on_connection(
     connection: &rusqlite::Connection,
     receipt_id: &str,
-) -> Result<Option<VersionedDeadLetterRecord>, DeadLetterStoreError> {
+) -> Result<Option<DeadLetterRecord>, DeadLetterStoreError> {
     select_dead_letter_row(connection, receipt_id)?
         .map(decode_stored_dead_letter)
         .transpose()
@@ -463,10 +372,7 @@ impl SqliteDeadLetterStore {
     }
 
     /// Look up a single dead-letter record by `receipt_id`.
-    pub fn get(
-        &self,
-        receipt_id: &str,
-    ) -> Result<Option<VersionedDeadLetterRecord>, DeadLetterStoreError> {
+    pub fn get(&self, receipt_id: &str) -> Result<Option<DeadLetterRecord>, DeadLetterStoreError> {
         let connection = self
             .pool
             .get()
@@ -476,7 +382,7 @@ impl SqliteDeadLetterStore {
 
     /// List all dead-letter records sorted by finalization time then
     /// receipt id (matching the deterministic settlement ordering).
-    pub fn list(&self) -> Result<Vec<VersionedDeadLetterRecord>, DeadLetterStoreError> {
+    pub fn list(&self) -> Result<Vec<DeadLetterRecord>, DeadLetterStoreError> {
         let connection = self
             .pool
             .get()
@@ -535,7 +441,7 @@ mod tests {
 
     use chio_test_support::prelude::*;
 
-    const LEGACY_V1_FIXTURE: &str = r#"{"schema":"chio.settle.dead-letter.v1","receipt_id":"legacy-1","finalized_at":17,"attempts":2,"reason":"rpc unavailable","pipeline_error":"settlement pipeline error: rpc unavailable"}"#;
+    const UNBOUNDED_V1_FIXTURE: &str = r#"{"schema":"chio.settle.dead-letter.v1","receipt_id":"old-1","finalized_at":17,"attempts":2,"reason":"rpc unavailable","pipeline_error":"settlement pipeline error: rpc unavailable"}"#;
 
     fn pool() -> Pool<SqliteConnectionManager> {
         let manager = SqliteConnectionManager::memory();
@@ -570,11 +476,11 @@ mod tests {
             .get("rcpt-1")
             .test_expect("get ok")
             .test_expect("row present");
-        assert_eq!(loaded, VersionedDeadLetterRecord::V2(record));
+        assert_eq!(loaded, record);
     }
 
     #[test]
-    fn insert_writes_rfc_8785_bytes_and_bounded_legacy_columns() {
+    fn insert_writes_rfc_8785_bytes_and_bounded_columns() {
         let pool = pool();
         let store = SqliteDeadLetterStore::open_with_pool(pool.clone()).test_expect("store opens");
         let record = sample_record("rcpt-canonical", 4);
@@ -597,7 +503,7 @@ mod tests {
     }
 
     #[test]
-    fn insert_rejects_a_programmatic_non_v2_schema() {
+    fn insert_rejects_an_unsupported_schema() {
         let store = SqliteDeadLetterStore::open_with_pool(pool()).test_expect("store opens");
         let mut record = sample_record("rcpt-schema", 1);
         record.schema = "chio.settle.dead-letter.v99".to_string();
@@ -695,7 +601,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_v1_fixture_decodes_without_rewriting_its_bytes() {
+    fn unbounded_v1_body_fails_closed() {
         let pool = pool();
         let store = SqliteDeadLetterStore::open_with_pool(pool.clone()).test_expect("store opens");
         let connection = pool.get().test_expect("connection opens");
@@ -705,48 +611,21 @@ mod tests {
                  (receipt_id, finalized_at, attempts, reason, pipeline_error, canonical_json) \
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 params![
-                    "legacy-1",
+                    "old-1",
                     17_i64,
                     2_i64,
                     "rpc unavailable",
                     "settlement pipeline error: rpc unavailable",
-                    LEGACY_V1_FIXTURE,
+                    UNBOUNDED_V1_FIXTURE,
                 ],
             )
-            .test_expect("legacy row inserts");
+            .test_expect("old row inserts");
         drop(connection);
 
-        let loaded = store
-            .get("legacy-1")
-            .test_expect("legacy row decodes")
-            .test_expect("legacy row exists");
-        assert_eq!(
-            loaded,
-            VersionedDeadLetterRecord::V1(LegacyDeadLetterRecordV1 {
-                schema: LEGACY_SETTLE_DEAD_LETTER_SCHEMA.to_string(),
-                receipt_id: "legacy-1".to_string(),
-                finalized_at: 17,
-                attempts: 2,
-                reason: "rpc unavailable".to_string(),
-                pipeline_error: Some("settlement pipeline error: rpc unavailable".to_string()),
-            })
-        );
-
-        let mut v2 = sample_record("legacy-1", 2);
-        v2.finalized_at = 17;
         assert!(matches!(
-            store.insert(&v2),
-            Err(DeadLetterStoreError::Conflict(_))
+            store.get("old-1"),
+            Err(DeadLetterStoreError::InvalidRecord(_))
         ));
-        let connection = pool.get().test_expect("connection reopens");
-        let unchanged: String = connection
-            .query_row(
-                "SELECT canonical_json FROM settle_dead_letters WHERE receipt_id = ?1",
-                params!["legacy-1"],
-                |row| row.get(0),
-            )
-            .test_expect("legacy bytes load");
-        assert_eq!(unchanged, LEGACY_V1_FIXTURE);
     }
 
     #[test]
@@ -778,10 +657,10 @@ mod tests {
     }
 
     #[test]
-    fn noncanonical_v2_body_fails_closed_on_read() {
+    fn noncanonical_body_fails_closed_on_read() {
         let pool = pool();
         let store = SqliteDeadLetterStore::open_with_pool(pool.clone()).test_expect("store opens");
-        let record = sample_record("noncanonical-v2", 1);
+        let record = sample_record("noncanonical", 1);
         let noncanonical = serde_json::to_string(&record).test_expect("record serializes");
         assert_ne!(
             noncanonical.as_bytes(),
@@ -827,7 +706,7 @@ mod tests {
         assert_eq!(
             listed
                 .iter()
-                .map(VersionedDeadLetterRecord::receipt_id)
+                .map(|record| record.receipt_id.as_str())
                 .collect::<Vec<_>>(),
             vec!["rcpt-a", "rcpt-b", "rcpt-c"]
         );

@@ -25,7 +25,7 @@ use crate::SettlementError;
 pub const SETTLEMENT_OBSERVATION_SCHEMA: &str = "chio.settle.observation.v1";
 
 /// Schema string emitted on the wire for [`SettlementOutcome`] frames.
-pub const SETTLEMENT_OUTCOME_SCHEMA: &str = "chio.settle.outcome.v2";
+pub const SETTLEMENT_OUTCOME_SCHEMA: &str = "chio.settle.outcome.v1";
 
 fn deserialize_schema<'de, D>(
     deserializer: D,
@@ -310,7 +310,7 @@ pub enum SettlementOutcome {
     /// id lets operators correlate the kernel-side observation with
     /// the downstream settlement record.
     Accepted {
-        /// Schema tag (`chio.settle.outcome.v2`).
+        /// Schema tag (`chio.settle.outcome.v1`).
         #[serde(deserialize_with = "deserialize_outcome_schema")]
         schema: String,
         /// Stable transcript identifier produced by the ops pipeline.
@@ -318,7 +318,7 @@ pub enum SettlementOutcome {
     },
     /// The receipt requires no settlement work.
     Skipped {
-        /// Schema tag (`chio.settle.outcome.v2`).
+        /// Schema tag (`chio.settle.outcome.v1`).
         #[serde(deserialize_with = "deserialize_outcome_schema")]
         schema: String,
         /// Closed reason for skipping settlement.
@@ -326,7 +326,7 @@ pub enum SettlementOutcome {
     },
     /// The hook rejected the observation with a recoverable failure.
     Retryable {
-        /// Schema tag (`chio.settle.outcome.v2`).
+        /// Schema tag (`chio.settle.outcome.v1`).
         #[serde(deserialize_with = "deserialize_outcome_schema")]
         schema: String,
         /// Bounded failure reason carried across retries.
@@ -334,7 +334,7 @@ pub enum SettlementOutcome {
     },
     /// The hook rejected the observation permanently.
     Permanent {
-        /// Schema tag (`chio.settle.outcome.v2`).
+        /// Schema tag (`chio.settle.outcome.v1`).
         #[serde(deserialize_with = "deserialize_outcome_schema")]
         schema: String,
         /// Bounded failure reason carried into the dead letter.
@@ -574,7 +574,7 @@ mod tests {
 
     #[test]
     fn outcome_schema_is_stable() {
-        assert_eq!(SETTLEMENT_OUTCOME_SCHEMA, "chio.settle.outcome.v2");
+        assert_eq!(SETTLEMENT_OUTCOME_SCHEMA, "chio.settle.outcome.v1");
     }
 
     #[test]

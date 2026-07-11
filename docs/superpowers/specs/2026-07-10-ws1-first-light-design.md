@@ -222,9 +222,9 @@ constructs a deliberately isolated kernel.
   implementation),
   the F72 currency-mismatch deny, the F73 nonce store, and the F74 snapshot seam.
   These follow RFC-0013's normative invariants; the illustrative F68
-  read-then-upsert sequence is tightened into one atomic transaction. Legacy v1
-  dead letters remain exact, read-only compatibility records; new writes are
-  canonical v2 and unknown schema tags fail closed. The receipt store advertises
+  read-then-upsert sequence is tightened into one atomic transaction. The
+  bounded dead-letter v1 body is the sole pre-release shape; obsolete unbounded
+  bodies and unknown schema tags fail closed. The receipt store advertises
   the atomic projection only when its live SQLite schema and complete trigger set
   match the reference manifest, and verifies the inserted attempt-zero row before
   committing a new receipt.

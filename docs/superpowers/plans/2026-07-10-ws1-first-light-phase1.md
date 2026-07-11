@@ -221,9 +221,9 @@ a permanent `SettlementFailureReason`. Preserve the original detail only long
 enough to compute its digest and pass it through the repository redaction
 boundary for bounded logs; never persist or label the raw string.
 
-These changes alter the public observer-status wire shape. Bump
-`SETTLEMENT_OBSERVER_STATUS_SCHEMA` to `chio.settle.observer-status.v2`; do not
-emit the typed status under the v1 tag.
+These changes define the pre-release observer-status v1 wire shape. Keep
+`SETTLEMENT_OBSERVER_STATUS_SCHEMA` at `chio.settle.observer-status.v1`; no
+released compatibility contract requires a speculative v2 tag.
 
 Map `SettlementHookError::InvalidObservation` and
 `SettlementHookError::Permanent` to `Permanent`, and
@@ -389,7 +389,7 @@ The interface contract requires:
   accepted or skipped input cannot clear it; a byte-identical terminal input is
   idempotent; a different terminal record is a conflict. Exact terminal replay
   is the only path that may inspect terminal state without a live attempt row: it
-  reconstructs the canonical v2 record from the persisted claim values and
+  reconstructs the canonical record from the persisted claim values and
   supplied typed outcome, compares bytes, and performs no mutation.
 - A backend error or process crash before claim leaves attempt zero due. A crash
   after claim, including after the hook returns but before the outcome CAS,
@@ -500,11 +500,10 @@ An attempt-zero row has `work_kind = 'pending_observation'`, `attempts = 0`,
 `work_kind = 'retry_scheduled'` and a bounded reason pair. Checked conversions
 reject negative or out-of-range persisted integers.
 
-Keep the `settle_dead_letters` primary key, but introduce the versioned bounded
+Keep the `settle_dead_letters` primary key, but define one bounded v1
 dead-letter body that stores only `reason_code` and the 32-byte detail digest.
-Legacy v1 rows remain readable through a store-local versioned read enum and are
-never rewritten or synthesized as v2; new writes accept only exact v2 and use RFC
-8785 canonical JSON. Unknown schema tags fail closed. Add database guards
+New writes accept only that exact v1 shape and use RFC 8785 canonical JSON.
+Unknown or obsolete bodies fail closed. Add database guards
 preventing an attempt insert while the same receipt is dead-lettered and
 preventing an independent dead-letter insert while an attempt exists. The atomic
 transition deletes the attempt before inserting the terminal row inside one
@@ -532,7 +531,7 @@ projection capability. Within one transaction:
    claim values.
 3. For claimed completion, read terminal state first only to support an exact
    idempotent terminal replay after the attempt row was removed. Reconstruct the
-   expected v2 bytes from the claim and outcome; exact equality returns the
+   expected canonical bytes from the claim and outcome; exact equality returns the
    existing terminal result without mutation, and every other case is
    `Conflict`.
 4. When no terminal row exists, verify the complete claim and its unexpired
@@ -566,8 +565,7 @@ Add tests using the existing `chio_test_support::prelude::*` conventions:
 - Attempt-zero seeding is atomic with a new receipt append; byte-identical receipt
   replay never resurrects completed work, and a forced failure leaves neither
   receipt nor attempt row.
-- A legacy v1 dead letter remains readable through the versioned API without any
-  byte rewrite; unknown schema tags fail closed.
+- An obsolete unbounded v1 body and unknown schema tags fail closed.
 - Claiming writes a unique token and increments the version; a concurrent or
   stale claim cannot commit an outcome.
 - Crashes before the hook, after the hook but before outcome CAS, and after a
