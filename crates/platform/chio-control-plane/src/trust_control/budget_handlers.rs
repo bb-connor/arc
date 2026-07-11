@@ -149,8 +149,7 @@ fn generated_budget_event_id() -> String {
 /// precise; the authority-MAX fallback remains only as a defensive path (row not
 /// found) and can only OVER-target the seq (wait longer), never under-target it,
 /// so the witness still never over-counts (fail-closed). A single-node write (no
-/// authority) carries a placeholder token and the quorum wait short-circuits when
-/// unclustered.
+/// authority) carries an unclustered token, and the quorum wait short-circuits.
 fn budget_write_token(
     store: &SqliteBudgetStore,
     authority: Option<&BudgetEventAuthority>,

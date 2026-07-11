@@ -144,7 +144,7 @@ pub fn guard_metrics_endpoint(path: &str) -> Option<MetricsEndpointResponse> {
 /// families (whose sole producers are chio-wasm-guards and the OTLP ingress,
 /// which cannot be depended on by the kernel), the signing-queue block family,
 /// the settlement unresolved family, and receipt watchdog gauges. Every sample
-/// comes from its shared runtime family rather than a hardcoded placeholder.
+/// comes from its shared runtime family rather than a fixed zero.
 #[must_use]
 pub fn render_guard_metrics_prometheus() -> String {
     let mut output = String::new();

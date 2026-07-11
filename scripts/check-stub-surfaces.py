@@ -236,7 +236,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "2026-12-31",
     ),
     "supply-chain/config.toml": allow(
-        "cargo-vet exemption names the upstream bollard-stubs crate",
+        "cargo-vet exemption table headers contain immutable upstream package names",
         "2026-12-31",
     ),
 }
@@ -434,7 +434,8 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
         r'"schema": \{ "pattern": "\\\\.stub\$" \}',
     ),
     "supply-chain/config.toml": (
-        r"\[\[exemptions\.bollard-stubs\]\]",
+        r"^\[\[exemptions\.bollard-stubs\]\]$",
+        r"^\[\[exemptions\.proc-macro-hack\]\]$",
     ),
 }
 

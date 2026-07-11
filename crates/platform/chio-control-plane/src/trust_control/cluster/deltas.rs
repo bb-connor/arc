@@ -1196,7 +1196,7 @@ fn budget_write_quorum_commit_view_locked(
     // the write's term with a different leader would mint a lease_id for an
     // authority that never wrote the event. The write
     // token already carries origin_id; fall back to the consensus leader only for
-    // a placeholder (unclustered) token that has no origin.
+    // an unclustered token that has no origin.
     let authority_id = if write.origin_id.is_empty() {
         consensus
             .leader_url
