@@ -956,13 +956,7 @@ mod tests {
             uri_pattern: "chio://receipts/*".to_string(),
             operations: vec![Operation::Read],
         });
-        let token = signed_token(
-            id.clone(),
-            &subject,
-            inflated,
-            window.since,
-            window.until,
-        );
+        let token = signed_token(id.clone(), &subject, inflated, window.since, window.until);
         assert!(matches!(
             assert_pass_capability_id_deterministic(&token),
             Err(KernelError::PassScopeInflation(_))
