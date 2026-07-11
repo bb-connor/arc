@@ -1121,6 +1121,52 @@ fn read_only_health_ok_on_pre_retention_schema() -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
+/// A watermark that merely MATCHES a checkpoint boundary is not proof of
+/// archival. If the covered rows are still live (a raw INSERT at a real
+/// boundary), verification must NOT skip their Merkle rebuild; corruption below
+/// the forged boundary must still be caught fail-closed.
+#[test]
+fn boundary_matching_watermark_over_live_prefix_does_not_skip_verification(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::receipt_store::support::{
+        insert_receipt_retention_watermark, verify_checkpoint_chain_integrity,
+    };
+
+    let path = unique_db_path("boundary-live-watermark");
+    let store = SqliteReceiptStore::open(&path)?;
+    let keypair = super::support::receipt_test_keypair();
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    // Two checkpoints cover [1,2] and [3,4]; NOTHING is archived.
+    for i in 0..4u64 {
+        let receipt =
+            super::support::sample_receipt_with_keypair(&format!("bm-{i}"), i + 1, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(store.load_checkpoint_by_seq(2)?.is_some());
+
+    // Forge W = 2: a REAL checkpoint boundary (checkpoint 1's batch_end), but the
+    // covered rows [1,2] are never deleted. Then tamper a still-live row in that
+    // range. A boundary-only exemption would skip the [1,2] rebuild and pass.
+    store.writer_handle().run_write(|connection| {
+        insert_receipt_retention_watermark(connection, 2, 100, "phantom-archive.sqlite3", None, 1)?;
+        connection.execute_batch(
+            "DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_update; \
+             UPDATE claim_receipt_log_entries SET raw_json = '{\"tampered\":true}' WHERE entry_seq = 1;",
+        )?;
+        Ok(())
+    })?;
+
+    let connection = store.reader_connection_for_test()?;
+    assert!(
+        verify_checkpoint_chain_integrity(&connection).is_err(),
+        "a boundary-matching watermark over a live prefix must not skip verification"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 /// Primary correctness proof: a state-machine proptest that drives random
 /// interleaved sequences of tool/child appends (non-monotonic
 /// timestamps within an aged band, to exercise the MAX(timestamp)-over-prefix

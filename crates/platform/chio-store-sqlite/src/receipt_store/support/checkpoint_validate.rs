@@ -346,6 +346,55 @@ pub(crate) fn verify_latest_checkpoint_integrity(
     verify_checkpoint_chain_integrity(connection).map(|_| ())
 }
 
+/// The archival watermark that may be TRUSTED to skip the live Merkle rebuild
+/// for every checkpoint whose `batch_end_seq <= W`, or 0 when no exemption is
+/// safe. The watermark ledger's DB triggers enforce monotonicity ONLY, not that
+/// the covered rows were ever archived, so two independent facts must hold
+/// before the exemption applies:
+///
+/// 1. `W` matches a persisted checkpoint's `batch_end_seq`. The archival path
+///    only ever advances `W` to a checkpoint boundary (`compute_archival_watermark`)
+///    and `kernel_checkpoints` is immutable and signature-verified, so a genuine
+///    `W` always lands on a boundary. A forged `W` past the latest real
+///    checkpoint would otherwise skip the rebuild for never-archived live ranges.
+///
+/// 2. No live claim-log row survives at or below `W`. A matching boundary is not
+///    proof of archival: a raw INSERT of `W` at a real boundary while the covered
+///    rows stay live would satisfy (1) yet skip the Merkle rebuild for corrupted
+///    still-present rows. The archival delete removes the entire covered claim-log
+///    prefix atomically with the watermark insert, so a truly archived `W` leaves
+///    no live row `entry_seq <= W`; any survivor means the prefix was never
+///    archived.
+///
+/// Fail-closed: either condition failing yields 0 (full verification). Bounded to
+/// two indexed existence probes, never an O(log length) scan.
+pub(crate) fn trusted_retention_watermark(
+    connection: &Connection,
+) -> Result<u64, ReceiptStoreError> {
+    let raw = retention_watermark(connection)?.unwrap_or(0);
+    if raw == 0 {
+        return Ok(0);
+    }
+    let raw_i64 = sqlite_i64(raw, "retention watermark")?;
+    let boundary_matches: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM kernel_checkpoints WHERE batch_end_seq = ?1)",
+        params![raw_i64],
+        |row| row.get(0),
+    )?;
+    if !boundary_matches {
+        return Ok(0);
+    }
+    let live_prefix_present: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM claim_receipt_log_entries WHERE entry_seq <= ?1)",
+        params![raw_i64],
+        |row| row.get(0),
+    )?;
+    if live_prefix_present {
+        return Ok(0);
+    }
+    Ok(raw)
+}
+
 pub(crate) fn verify_checkpoint_chain_integrity(
     connection: &Connection,
 ) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
@@ -355,25 +404,7 @@ pub(crate) fn verify_checkpoint_chain_integrity(
     let mut expected_witness_ids = BTreeSet::new();
     let mut expected_publication_ids = BTreeSet::new();
 
-    // SECURITY: the watermark ledger's DB triggers enforce monotonicity only,
-    // not that W is a genuine archived-checkpoint boundary. The archival path
-    // only ever advances W to some checkpoint's batch_end_seq
-    // (`compute_archival_watermark`), and kernel_checkpoints is immutable and
-    // signature-verified in the loop below, so a real W always matches a
-    // persisted checkpoint boundary. A forged, strictly-larger W written past
-    // the latest real checkpoint would otherwise skip the live Merkle rebuild
-    // for never-archived live ranges. Trust W as a skip-verification exemption
-    // only when it matches a persisted checkpoint's batch_end_seq; otherwise
-    // fall back to full verification (effective watermark 0, fail-closed).
-    // Bounded to the already-loaded checkpoint rows (O(number of checkpoints),
-    // never O(log length)).
-    let raw_watermark = retention_watermark(connection)?.unwrap_or(0);
-    let watermark =
-        if raw_watermark != 0 && rows.iter().any(|row| row.batch_end_seq == raw_watermark) {
-            raw_watermark
-        } else {
-            0
-        };
+    let watermark = trusted_retention_watermark(connection)?;
     for row in rows {
         let checkpoint = parse_persisted_checkpoint_row(row.clone())?; // signature + column consistency
                                                                        // Checkpoints fully covered by a persisted archival watermark have
