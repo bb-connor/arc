@@ -1167,6 +1167,57 @@ fn boundary_matching_watermark_over_live_prefix_does_not_skip_verification(
     Ok(())
 }
 
+/// A writer whose verified head is behind a checkpoint another handle archived
+/// must still catch up across the boundary. The incremental catch-up path must
+/// honor the same archival-watermark exemption as the full chain walk; otherwise
+/// it rebuilds the deleted prefix from the live claim log and fails.
+#[test]
+fn catch_up_honors_archival_watermark_exemption() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::receipt_store::support::insert_receipt_retention_watermark;
+
+    let path = unique_db_path("catch-up-watermark");
+    let store = SqliteReceiptStore::open(&path)?;
+    let keypair = super::support::receipt_test_keypair();
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    // Checkpoints cover [1,2] and [3,4].
+    for i in 0..4u64 {
+        let receipt =
+            super::support::sample_receipt_with_keypair(&format!("cu-{i}"), i + 1, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(store.load_checkpoint_by_seq(2)?.is_some());
+
+    // Archive checkpoint 1's range [1,2]: record the watermark and delete the
+    // covered claim-log rows, the post-archival state a stale head must adopt.
+    store.writer_handle().run_write(|connection| {
+        insert_receipt_retention_watermark(connection, 2, 100, "archive.sqlite3", None, 1)?;
+        connection.execute_batch(
+            "DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete; \
+             DELETE FROM claim_receipt_log_entries WHERE entry_seq <= 2; \
+             CREATE TRIGGER IF NOT EXISTS claim_receipt_log_entries_reject_delete \
+               BEFORE DELETE ON claim_receipt_log_entries \
+               BEGIN SELECT RAISE(ABORT, 'claim_receipt_log_entries is append-only'); END;",
+        )?;
+        Ok(())
+    })?;
+
+    // A fresh (behind) verified head catching up from seq 0 to seq 2 must process
+    // checkpoint 1, whose range [1,2] was archived. Without the exemption the
+    // rebuild from the emptied prefix fails; with it the head advances cleanly.
+    let connection = store.reader_connection_for_test()?;
+    let mut head = crate::receipt_store::VerifiedHead::default();
+    crate::receipt_store::catch_up_verified_head_to(&connection, &mut head, 2)?;
+    assert_eq!(
+        head.checkpoint_seq(),
+        2,
+        "the head must catch up across the archived boundary"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 /// Primary correctness proof: a state-machine proptest that drives random
 /// interleaved sequences of tool/child appends (non-monotonic
 /// timestamps within an aged band, to exercise the MAX(timestamp)-over-prefix

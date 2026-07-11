@@ -1605,6 +1605,14 @@ fn catch_up_verified_head_to(
     latest_seq: u64,
 ) -> Result<(), ReceiptStoreError> {
     let mut cursor = head.checkpoint_seq();
+    // A checkpoint fully covered by a trusted archival watermark has had its
+    // claim-log rows co-archived and deleted, so its Merkle range is served from
+    // the archive exactly as the full chain walk exempts it. Without this the
+    // incremental catch-up path would rebuild the deleted prefix from the live
+    // claim log and fail: a stale writer that had not yet adopted a checkpoint
+    // another handle archived could never catch up across the boundary, and its
+    // next append would poison the head. Computed once for the caught-up span.
+    let watermark = trusted_retention_watermark(connection)?;
     while cursor < latest_seq {
         let next_seq = cursor.saturating_add(1);
         let Some(row) = load_persisted_checkpoint_row(connection, next_seq)? else {
@@ -1620,7 +1628,9 @@ fn catch_up_verified_head_to(
             }
             None => validate_checkpoint_base(&checkpoint)?,
         }
-        validate_checkpoint_against_claim_log(connection, &checkpoint)?;
+        if checkpoint.body.batch_end_seq > watermark {
+            validate_checkpoint_against_claim_log(connection, &checkpoint)?;
+        }
         // Projection validation before adoption: the
         // catch-up path verified signature + predecessor + claim-log range but
         // not the transparency projection rows that full
