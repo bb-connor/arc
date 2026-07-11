@@ -7,6 +7,39 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 pub struct SqliteRevocationStore {
     connection: Mutex<Connection>,
+    /// Whether the backing database lives only in process memory and so loses
+    /// every revocation on restart. Computed from the open path, not assumed
+    /// durable: an in-memory SQLite database must not satisfy the durability
+    /// gate the way a real filesystem path does.
+    ephemeral: bool,
+}
+
+/// Whether a SQLite path opens a database that lives only in memory for the life
+/// of the process. rusqlite enables URI filenames, so the bare `:memory:`
+/// sentinel, `file::memory:`, and any `file:...?mode=memory` URI all open a
+/// non-durable database that loses every revocation on restart.
+fn path_opens_in_memory(path: &Path) -> bool {
+    let Some(value) = path.to_str() else {
+        return false;
+    };
+    if value.eq_ignore_ascii_case(":memory:") {
+        return true;
+    }
+    let Some(rest) = value.strip_prefix("file:") else {
+        return false;
+    };
+    let (name, query) = match rest.split_once('?') {
+        Some((name, query)) => (name, Some(query)),
+        None => (rest, None),
+    };
+    if name.eq_ignore_ascii_case(":memory:") {
+        return true;
+    }
+    query.is_some_and(|query| {
+        query
+            .split('&')
+            .any(|param| param.eq_ignore_ascii_case("mode=memory"))
+    })
 }
 
 /// Revocation-store schema revision. Bump on every schema-affecting change.
@@ -18,8 +51,13 @@ const REVOCATION_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["revoked_capabilities"]
 impl SqliteRevocationStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, RevocationStoreError> {
         let path = path.as_ref();
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+        let ephemeral = path_opens_in_memory(path);
+        if !ephemeral {
+            if let Some(parent) = path.parent() {
+                if !parent.as_os_str().is_empty() {
+                    fs::create_dir_all(parent)?;
+                }
+            }
         }
 
         let connection = Connection::open(path)?;
@@ -49,6 +87,7 @@ impl SqliteRevocationStore {
 
         Ok(Self {
             connection: Mutex::new(connection),
+            ephemeral,
         })
     }
 
@@ -173,7 +212,7 @@ impl RevocationStore for SqliteRevocationStore {
     }
 
     fn is_ephemeral(&self) -> bool {
-        false
+        self.ephemeral
     }
 }
 
@@ -228,6 +267,28 @@ mod tests {
         );
         let _ = fs::remove_file(&path);
         Ok(())
+    }
+
+    #[test]
+    fn file_backed_revocation_store_reports_durable() {
+        let path = unique_db_path("chio-rev-durable");
+        let store = SqliteRevocationStore::open(&path).unwrap();
+        assert!(
+            !store.is_ephemeral(),
+            "a filesystem-backed revocation store is durable"
+        );
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn in_memory_revocation_store_reports_ephemeral() {
+        for path in [":memory:", "file::memory:", "file:rev?mode=memory"] {
+            let store = SqliteRevocationStore::open(path).unwrap();
+            assert!(
+                store.is_ephemeral(),
+                "in-memory revocation store {path} must report ephemeral so the durability gate refuses it"
+            );
+        }
     }
 
     #[test]
