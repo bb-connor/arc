@@ -3487,6 +3487,111 @@ fn connector_url_elicitation_retains_invocation_nested_flow(
     Ok(())
 }
 
+fn assert_monetary_url_elicitation_release_projection(
+    nested: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let request_id = if nested {
+        "req-monetary-url-release-nested"
+    } else {
+        "req-monetary-url-release-top"
+    };
+    let mut kernel = make_kernel(make_monetary_config());
+    let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
+        "cost-srv",
+        vec!["compute"],
+        std::sync::Arc::clone(&stream_attempts),
+    )));
+    let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
+    let releases = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(
+        ReleaseTrackingRuntimeAdmissionHook {
+            calls: std::sync::Arc::clone(&admission_calls),
+            releases: std::sync::Arc::clone(&releases),
+            expected_request_id: request_id,
+            admission_id: "adm-monetary-url-release",
+            lease_id: "lease-monetary-url-release",
+            continuation_id: None,
+        },
+    ));
+
+    let agent_kp = make_keypair();
+    let mut grant = make_monetary_grant("cost-srv", "compute", 100, 1_000, "USD");
+    grant.max_invocations = Some(1);
+    let cap = make_capability(&kernel, &agent_kp, make_scope(vec![grant]), 300);
+    let request = make_request_with_arguments(
+        request_id,
+        &cap,
+        "compute",
+        "cost-srv",
+        serde_json::json!({}),
+    );
+
+    let result = if nested {
+        let session_id =
+            kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;
+        kernel.activate_session(&session_id)?;
+        let context =
+            make_operation_context(&session_id, request_id, &agent_kp.public_key().to_hex());
+        kernel.begin_session_request(&context, OperationKind::ToolCall, true)?;
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
+        runtime.block_on(async {
+            let mut client = NoopNestedFlowClient;
+            kernel
+                .evaluate_tool_call_with_nested_flow_client_async(
+                    &context,
+                    &request,
+                    &mut client,
+                    None,
+                )
+                .await
+        })
+    } else {
+        kernel.evaluate_tool_call_blocking(&request)
+    };
+
+    assert!(matches!(
+        result,
+        Err(KernelError::UrlElicitationsRequired { .. })
+    ));
+    assert_eq!(stream_attempts.load(Ordering::SeqCst), 1);
+    assert_eq!(admission_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(releases.load(Ordering::SeqCst), 0);
+    let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert_eq!(usage.total_cost_exposed, 0);
+
+    let receipt_log = kernel.receipt_log();
+    assert_eq!(receipt_log.len(), 1);
+    let receipt = receipt_log.get(0).unwrap();
+    assert!(receipt.is_incomplete());
+    let metadata = receipt.metadata.as_ref().unwrap();
+    assert_eq!(
+        metadata["chio_runtime"]["reservations_retained_fail_closed"],
+        true
+    );
+    let terminal = &metadata["budget_authority"]["terminal"];
+    assert_eq!(terminal["disposition"], "released");
+    assert!(terminal["event_id"]
+        .as_str()
+        .is_some_and(|event_id| event_id.ends_with(":release")));
+    Ok(())
+}
+
+#[test]
+fn monetary_url_elicitation_success_projects_release_top_level(
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert_monetary_url_elicitation_release_projection(false)
+}
+
+#[test]
+fn monetary_url_elicitation_success_projects_release_nested(
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert_monetary_url_elicitation_release_projection(true)
+}
+
 /// Sibling-sum delegation fixture whose child capabilities target a tool server
 /// that returns `UrlElicitationsRequired` before any side effect. Parent share
 /// is 5000 bps and each child claims 4000 bps, so child_a alone fits but
@@ -3561,14 +3666,8 @@ fn make_sibling_sum_url_fixture(prefix: &str) -> SiblingSumInvocationFixture {
 }
 
 #[test]
-fn url_elicitation_idempotent_readmit_preserves_sibling_budget(
+fn url_elicitation_retained_evaluation_holder_blocks_sibling_top_level(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Refcount: admit_capability_budget takes a holder lease per evaluation. An
-    // earlier evaluation holds child_a's edge (lease 1). A second overlapping
-    // evaluation that hits UrlElicitationsRequired takes a second lease and releases
-    // only that one on cleanup (holders 2 -> 1); it must NOT free child_a's edge
-    // while the earlier holder remains, or the oversubscribing sibling child_b would
-    // admit while child_a is still valid.
     let SiblingSumInvocationFixture {
         kernel,
         child_a,
@@ -3578,15 +3677,11 @@ fn url_elicitation_idempotent_readmit_preserves_sibling_budget(
         ..
     } = make_sibling_sum_url_fixture("chio-runtime-url-idempotent-readmit");
 
-    // Earlier evaluation holds child_a's edge (lease 1) for the duration.
     let first = kernel
         .admit_capability_budget(&child_a)
         .map_err(std::io::Error::other)?;
     assert!(first, "the first admission must acquire child_a's lease");
 
-    // Second overlapping evaluation on the SAME child_a hits
-    // UrlElicitationsRequired; its internal admit takes (and its cleanup drops)
-    // a second lease, leaving the earlier holder's share intact.
     let request = make_request_with_arguments(
         "req-url-idempotent-readmit-async",
         &child_a,
@@ -3600,23 +3695,20 @@ fn url_elicitation_idempotent_readmit_preserves_sibling_budget(
         "the delegated child must reach dispatch and surface UrlElicitationsRequired: {result:?}"
     );
 
-    // child_a's edge is still held by the earlier evaluation, so the
-    // oversubscribing sibling child_b (4000 + 4000 > 5000 parent share) must
-    // still be DENIED.
+    kernel
+        .release_admitted_capability_budget(&child_a)
+        .map_err(std::io::Error::other)?;
     let readmit_b = kernel.admit_capability_budget(&child_b);
     assert!(
         readmit_b.is_err(),
-        "the second evaluation's cleanup must drop only its own lease, leaving child_a held so child_b stays oversubscribed: {readmit_b:?}"
+        "after releasing the explicit first holder, the connector-error evaluation's retained holder must still block child_b: {readmit_b:?}"
     );
     Ok(())
 }
 
 #[test]
-fn url_elicitation_idempotent_readmit_preserves_sibling_budget_nested_flow(
+fn url_elicitation_retained_evaluation_holder_blocks_sibling_nested_flow(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Nested-flow mirror of the async idempotent-readmit test: the nested arm's
-    // UrlElicitationsRequired cleanup must also drop only its own holder lease,
-    // leaving the earlier holder's sibling reservation intact.
     let SiblingSumInvocationFixture {
         kernel,
         child_a,
@@ -3661,10 +3753,13 @@ fn url_elicitation_idempotent_readmit_preserves_sibling_budget_nested_flow(
         "the nested delegated child must surface UrlElicitationsRequired: {result:?}"
     );
 
+    kernel
+        .release_admitted_capability_budget(&child_a)
+        .map_err(std::io::Error::other)?;
     let readmit_b = kernel.admit_capability_budget(&child_b);
     assert!(
         readmit_b.is_err(),
-        "the nested second evaluation's cleanup must drop only its own lease, leaving child_a held: {readmit_b:?}"
+        "after releasing the explicit first holder, the nested connector-error evaluation's retained holder must still block child_b: {readmit_b:?}"
     );
     Ok(())
 }
@@ -3823,7 +3918,7 @@ fn url_elicitation_retains_runtime_reservations_and_invocation_nested_flow(
 }
 
 /// Assert that a failed post-dispatch budget or payment release recorded a
-/// signed cancellation receipt naming the cleanup step and stuck hold.
+/// signed incomplete receipt naming the cleanup step and stuck hold.
 fn assert_url_elicitation_budget_cleanup_fault_recorded(
     kernel: &ChioKernel,
     step: &str,
@@ -3831,14 +3926,18 @@ fn assert_url_elicitation_budget_cleanup_fault_recorded(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let receipt_log = kernel.receipt_log();
     let found = receipt_log.receipts().iter().any(|receipt| {
-        receipt.is_cancelled()
+        receipt.is_incomplete()
             && receipt.metadata.as_ref().is_some_and(|metadata| {
                 metadata["chio_runtime"]["post_dispatch_cleanup_failed"] == true
+                    && metadata["budget_authority"]["terminal"].is_null()
                     && metadata["chio_runtime"]["post_dispatch_cleanup_faults"]
                         .as_array()
                         .is_some_and(|faults| {
                             faults.iter().any(|fault| {
                                 fault["step"] == step
+                                    && fault["attempted_release_event_id"]
+                                        .as_str()
+                                        .is_some_and(|event_id| event_id.ends_with(":release"))
                                     && fault["hold_ids"].as_array().is_some_and(|ids| {
                                         ids.iter().any(|id| id == hold_id)
                                     })
@@ -4024,7 +4123,7 @@ impl PaymentAdapter for FailingReleasePaymentAdapter {
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
         Err(PaymentError::RailError(
-            "injected payment release failure".to_string(),
+            "injected payment release failure sk_live_abcdefghijklmnopqrstuvwx".to_string(),
         ))
     }
 
@@ -4063,7 +4162,7 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_async(
         300,
     );
     let request = make_request_with_arguments(
-        "req-url-elicitation-monetary-reversal-failure-async",
+        "req-url-elicitation-monetary-release-failure-async",
         &cap,
         "compute",
         "cost-srv",
@@ -4083,7 +4182,7 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_async(
     // The stuck payment authorization id must land in the fault hold_ids.
     assert_url_elicitation_budget_cleanup_fault_recorded(
         &kernel,
-        "url_elicitation_post_dispatch_budget_release",
+        "payment_release",
         "auth_failing_release",
     )?;
     Ok(())
@@ -4092,7 +4191,7 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_async(
 #[test]
 fn url_elicitation_monetary_release_failure_records_hold_ids_nested_flow(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Nested-flow mirror of the async monetary-reversal-failure test: the
+    // Nested-flow mirror of the async monetary-release-failure test: the
     // nested arm must ALSO name the stuck payment authorization id in the fault.
     let mut kernel = make_kernel(make_monetary_config());
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
@@ -4114,12 +4213,12 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_nested_flow(
     kernel.activate_session(&session_id)?;
     let context = make_operation_context(
         &session_id,
-        "req-url-elicitation-monetary-reversal-failure-nested",
+        "req-url-elicitation-monetary-release-failure-nested",
         &agent_kp.public_key().to_hex(),
     );
     kernel.begin_session_request(&context, OperationKind::ToolCall, true)?;
     let request = make_request_with_arguments(
-        "req-url-elicitation-monetary-reversal-failure-nested",
+        "req-url-elicitation-monetary-release-failure-nested",
         &cap,
         "compute",
         "cost-srv",
@@ -4146,7 +4245,7 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_nested_flow(
     );
     assert_url_elicitation_budget_cleanup_fault_recorded(
         &kernel,
-        "url_elicitation_post_dispatch_budget_release",
+        "payment_release",
         "auth_failing_release",
     )?;
     Ok(())

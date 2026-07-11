@@ -17,6 +17,109 @@ struct PendingMonetaryServer {
     started: std::sync::Arc<tokio::sync::Notify>,
 }
 
+struct FailingReleaseBudgetStore {
+    inner: InMemoryBudgetStore,
+}
+
+impl FailingReleaseBudgetStore {
+    fn new() -> Self {
+        Self {
+            inner: InMemoryBudgetStore::new(),
+        }
+    }
+}
+
+impl BudgetStore for FailingReleaseBudgetStore {
+    fn try_increment(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.inner
+            .try_increment(capability_id, grant_index, max_invocations)
+    }
+
+    fn try_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.inner.try_charge_cost(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+        )
+    }
+
+    fn reverse_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner
+            .reverse_charge_cost(capability_id, grant_index, cost_units)
+    }
+
+    fn reduce_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner
+            .reduce_charge_cost(capability_id, grant_index, cost_units)
+    }
+
+    fn settle_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        exposed_cost_units: u64,
+        realized_cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.settle_charge_cost(
+            capability_id,
+            grant_index,
+            exposed_cost_units,
+            realized_cost_units,
+        )
+    }
+
+    fn release_budget_hold(
+        &self,
+        _request: crate::budget_store::BudgetReleaseHoldRequest,
+    ) -> Result<crate::budget_store::BudgetReleaseHoldDecision, BudgetStoreError> {
+        Err(BudgetStoreError::Invariant(
+            "injected budget release failure sk_live_abcdefghijklmnopqrstuvwx".to_string(),
+        ))
+    }
+
+    fn list_usages(
+        &self,
+        limit: usize,
+        capability_id: Option<&str>,
+    ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
+        self.inner.list_usages(limit, capability_id)
+    }
+
+    fn get_usage(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
+        self.inner.get_usage(capability_id, grant_index)
+    }
+}
+
 struct StaticPriceOracle {
     rates: std::collections::BTreeMap<(String, String), Result<ExchangeRate, PriceOracleError>>,
 }
@@ -1190,6 +1293,97 @@ async fn dropping_async_evaluate_after_monetary_admission_unwinds_budget_payment
     assert!(terminal["event_id"]
         .as_str()
         .is_some_and(|event_id| event_id.ends_with(":release")));
+}
+
+#[derive(Clone, Copy)]
+enum DropCleanupFailureSource {
+    Payment,
+    BudgetStore,
+}
+
+async fn assert_post_dispatch_drop_cleanup_fault(source: DropCleanupFailureSource) {
+    let started = std::sync::Arc::new(tokio::sync::Notify::new());
+    let mut kernel = make_kernel(make_monetary_config());
+    match source {
+        DropCleanupFailureSource::Payment => {
+            kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter));
+        }
+        DropCleanupFailureSource::BudgetStore => {
+            kernel.set_budget_store_handle(std::sync::Arc::new(
+                FailingReleaseBudgetStore::new(),
+            ));
+        }
+    }
+    kernel.register_tool_server(Box::new(PendingMonetaryServer {
+        id: "cost-srv".to_string(),
+        started: std::sync::Arc::clone(&started),
+    }));
+
+    let agent_kp = Keypair::generate();
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let request = make_request(
+        "req-post-dispatch-drop-cleanup-fault",
+        &cap,
+        "compute",
+        "cost-srv",
+    );
+
+    let kernel = std::sync::Arc::new(kernel);
+    let eval = {
+        let kernel = std::sync::Arc::clone(&kernel);
+        tokio::spawn(async move { kernel.evaluate_tool_call(&request).await })
+    };
+    tokio::time::timeout(Duration::from_secs(1), started.notified())
+        .await
+        .expect("pending monetary tool should be entered before abort");
+    eval.abort();
+    assert!(eval.await.unwrap_err().is_cancelled());
+
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert_eq!(usage.total_cost_exposed, 100);
+    let receipt_log = kernel.receipt_log();
+    assert_eq!(receipt_log.len(), 1);
+    let receipt = receipt_log.get(0).unwrap();
+    assert!(receipt.is_cancelled());
+    let metadata = receipt.metadata.as_ref().unwrap();
+    assert!(metadata["budget_authority"]["terminal"].is_null());
+    assert_eq!(
+        metadata["chio_runtime"]["post_dispatch_cleanup_failed"],
+        true
+    );
+    let fault = &metadata["chio_runtime"]["post_dispatch_cleanup_faults"][0];
+    let expected_step = match source {
+        DropCleanupFailureSource::Payment => "payment_release",
+        DropCleanupFailureSource::BudgetStore => "budget_hold_release",
+    };
+    assert_eq!(fault["step"], expected_step);
+    let reason = fault["reason"].as_str().unwrap();
+    assert!(reason.contains("[REDACTED-API-KEY]"));
+    assert!(!reason.contains("sk_live_"));
+    assert!(fault["attempted_release_event_id"]
+        .as_str()
+        .is_some_and(|event_id| event_id.ends_with(":release")));
+    let hold_ids = fault["hold_ids"].as_array().unwrap();
+    assert!(hold_ids.iter().any(|id| id == &cap.id));
+    let budget_hold_id = metadata["budget_authority"]["hold_id"].as_str().unwrap();
+    assert!(hold_ids.iter().any(|id| id == budget_hold_id));
+    if matches!(source, DropCleanupFailureSource::Payment) {
+        assert!(hold_ids.iter().any(|id| id == "auth_failing_release"));
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn post_dispatch_drop_payment_cleanup_failure_is_signed() {
+    assert_post_dispatch_drop_cleanup_fault(DropCleanupFailureSource::Payment).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn post_dispatch_drop_budget_cleanup_failure_is_signed() {
+    assert_post_dispatch_drop_cleanup_fault(DropCleanupFailureSource::BudgetStore).await;
 }
 
 fn make_dpop_grant(server: &str, tool: &str) -> ToolGrant {

@@ -144,28 +144,21 @@ impl<'a> PostAdmissionDropGuard<'a> {
         let Some(charge) = self.budget_mutation.charge_result() else {
             return base;
         };
-        let release = self.kernel.release_post_dispatch_monetary_invocation(
+        let cleanup = self.kernel.release_post_dispatch_monetary_invocation(
             self.request,
             self.cap,
             self.budget_mutation.charge_result(),
             self.payment_authorization,
         );
-        match &release {
-            Ok(Some(released)) => self.kernel.merge_budget_receipt_metadata(
-                base,
-                self.kernel
-                    .budget_execution_receipt_metadata(charge, Some(("released", released))),
-            ),
-            Ok(None) => base,
-            Err(error) => {
-                warn!(
-                    request_id = %self.request.request_id,
-                    reason = %redacted!(error),
-                    "failed to unwind dropped post-admission monetary invocation"
-                );
-                base
-            }
+        if let Err(failure) = &cleanup {
+            warn!(
+                request_id = %self.request.request_id,
+                reason = %failure.reason(),
+                "failed to release dropped post-admission monetary invocation"
+            );
         }
+        self.kernel
+            .post_dispatch_cleanup_receipt_metadata(base, Some(charge), &cleanup)
     }
 
     /// Fully unwind a future dropped BEFORE tool-server dispatch. No side

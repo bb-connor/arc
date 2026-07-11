@@ -645,51 +645,25 @@ impl ChioKernel {
                 // invocation usage and fail-closed runtime/delegation leases,
                 // while releasing only payment and monetary exposure. Preserve
                 // the UrlElicitationsRequired return shape for edge handling.
-                match self.release_post_dispatch_monetary_invocation(
+                let cleanup = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
                     budget_mutation.charge_result(),
                     payment_authorization.as_ref(),
-                ) {
-                    Ok(released) => {
-                        let metadata = match (budget_mutation.charge_result(), released.as_ref()) {
-                            (Some(charge), Some(release)) => self.merge_budget_receipt_metadata(
-                                runtime_admission_metadata.clone(),
-                                self.budget_execution_receipt_metadata(
-                                    charge,
-                                    Some(("released", release)),
-                                ),
-                            ),
-                            _ => runtime_admission_metadata.clone(),
-                        };
-                        self.record_url_elicitation_post_dispatch_receipt(
-                            request,
-                            &error.to_string(),
-                            now,
-                            matched_grant_index,
-                            metadata,
-                            &pre_invocation_guard_evidence,
-                        );
-                    }
-                    Err(release_error) => {
-                        let mut hold_ids = vec![cap.id.clone()];
-                        if let Some(payment_authorization) = payment_authorization.as_ref() {
-                            hold_ids.push(payment_authorization.authorization_id.clone());
-                        }
-                        if let Some(charge) = budget_mutation.charge_result() {
-                            hold_ids.push(charge.budget_hold_id().to_string());
-                        }
-                        self.record_url_elicitation_budget_cleanup_fault(
-                            request,
-                            matched_grant_index,
-                            "url_elicitation_post_dispatch_budget_release",
-                            &redacted!(&release_error).to_string(),
-                            hold_ids,
-                            runtime_admission_metadata.clone(),
-                            &pre_invocation_guard_evidence,
-                        );
-                    }
-                }
+                );
+                let metadata = self.post_dispatch_cleanup_receipt_metadata(
+                    runtime_admission_metadata.clone(),
+                    budget_mutation.charge_result(),
+                    &cleanup,
+                );
+                self.record_url_elicitation_post_dispatch_receipt(
+                    request,
+                    &error.to_string(),
+                    now,
+                    matched_grant_index,
+                    metadata,
+                    &pre_invocation_guard_evidence,
+                );
                 warn!(
                     request_id = %request.request_id,
                     reason = %redacted!(&error),
@@ -698,12 +672,17 @@ impl ChioKernel {
                 return Err(error);
             }
             Err(KernelError::RequestCancelled { request_id, reason }) => {
-                let released = self.release_post_dispatch_monetary_invocation(
+                let cleanup = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
                     budget_mutation.charge_result(),
                     payment_authorization.as_ref(),
-                )?;
+                );
+                let cleanup_metadata = self.post_dispatch_cleanup_receipt_metadata(
+                    runtime_admission_metadata.clone(),
+                    budget_mutation.charge_result(),
+                    &cleanup,
+                );
                 if request_id == parent_context.request_id {
                     self.with_session_mut(&parent_context.session_id, |session| {
                         session.request_cancellation(&parent_context.request_id)?;
@@ -724,29 +703,24 @@ impl ChioKernel {
                             now,
                             Some(matched_grant_index),
                             self.mark_runtime_admission_reservations_retained_fail_closed(
-                                match (budget_mutation.charge_result(), released.as_ref()) {
-                                    (Some(charge), Some(release)) => self
-                                        .merge_budget_receipt_metadata(
-                                            runtime_admission_metadata.clone(),
-                                            self.budget_execution_receipt_metadata(
-                                                charge,
-                                                Some(("released", release)),
-                                            ),
-                                        ),
-                                    _ => runtime_admission_metadata.clone(),
-                                },
+                                cleanup_metadata.clone(),
                             ),
                         )
                     },
                 );
             }
             Err(KernelError::RequestIncomplete(reason)) => {
-                let released = self.release_post_dispatch_monetary_invocation(
+                let cleanup = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
                     budget_mutation.charge_result(),
                     payment_authorization.as_ref(),
-                )?;
+                );
+                let cleanup_metadata = self.post_dispatch_cleanup_receipt_metadata(
+                    runtime_admission_metadata.clone(),
+                    budget_mutation.charge_result(),
+                    &cleanup,
+                );
                 warn!(
                     request_id = %request.request_id,
                     reason = %redacted!(&reason),
@@ -762,17 +736,7 @@ impl ChioKernel {
                             now,
                             Some(matched_grant_index),
                             self.mark_runtime_admission_reservations_retained_fail_closed(
-                                match (budget_mutation.charge_result(), released.as_ref()) {
-                                    (Some(charge), Some(release)) => self
-                                        .merge_budget_receipt_metadata(
-                                            runtime_admission_metadata.clone(),
-                                            self.budget_execution_receipt_metadata(
-                                                charge,
-                                                Some(("released", release)),
-                                            ),
-                                        ),
-                                    _ => runtime_admission_metadata.clone(),
-                                },
+                                cleanup_metadata.clone(),
                             ),
                         )
                     },
@@ -784,30 +748,23 @@ impl ChioKernel {
                 // A tool side effect may have executed: retain the runtime
                 // admission reservations and invocation usage (fail-closed),
                 // while releasing payment and monetary exposure.
-                let released = self.release_post_dispatch_monetary_invocation(
+                let cleanup = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
                     budget_mutation.charge_result(),
                     payment_authorization.as_ref(),
-                )?;
+                );
+                let cleanup_metadata = self.post_dispatch_cleanup_receipt_metadata(
+                    runtime_admission_metadata.clone(),
+                    budget_mutation.charge_result(),
+                    &cleanup,
+                );
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
-                        let deny_metadata =
-                            match (budget_mutation.charge_result(), released.as_ref()) {
-                                (Some(charge), Some(release)) => self
-                                    .merge_budget_receipt_metadata(
-                                        runtime_admission_metadata.clone(),
-                                        self.budget_execution_receipt_metadata(
-                                            charge,
-                                            Some(("released", release)),
-                                        ),
-                                    ),
-                                _ => runtime_admission_metadata.clone(),
-                            };
                         let deny_metadata = self
                             .mark_runtime_admission_reservations_retained_fail_closed(
-                                deny_metadata,
+                                cleanup_metadata.clone(),
                             );
                         self.build_deny_response_with_metadata(
                             request,

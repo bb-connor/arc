@@ -210,17 +210,36 @@ impl ChioKernel {
         cap: &CapabilityToken,
         charge_result: Option<&BudgetChargeResult>,
         payment_authorization: Option<&PaymentAuthorization>,
-    ) -> Result<Option<BudgetReleaseHoldDecision>, KernelError> {
+    ) -> Result<Option<BudgetReleaseHoldDecision>, PostDispatchCleanupFailure> {
         let Some(charge) = charge_result else {
             return Ok(None);
         };
 
+        let failure = |step: &'static str, reason: String| {
+            let mut hold_ids = vec![cap.id.clone(), charge.budget_hold_id.clone()];
+            if let Some(authorization) = payment_authorization {
+                hold_ids.push(authorization.authorization_id.clone());
+            }
+            PostDispatchCleanupFailure {
+                step,
+                reason,
+                attempted_release_event_id: charge.release_event_id(),
+                hold_ids,
+            }
+        };
+
         if let Some(authorization) = payment_authorization {
             let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
-                KernelError::Internal(
+                failure(
+                    "payment_adapter_lookup",
                     "payment authorization present without configured adapter".to_string(),
                 )
             })?;
+            let payment_step = if authorization.settled {
+                "payment_refund"
+            } else {
+                "payment_release"
+            };
             let release_result = if authorization.settled {
                 adapter.refund(
                     &authorization.authorization_id,
@@ -232,13 +251,48 @@ impl ChioKernel {
                 adapter.release(&authorization.authorization_id, &request.request_id)
             };
             if let Err(error) = release_result {
-                return Err(KernelError::Internal(format!(
-                    "failed to release payment after dispatched tool invocation: {error}"
-                )));
+                return Err(failure(payment_step, redacted!(&error).to_string()));
             }
         }
 
-        Ok(Some(self.release_budget_charge(&cap.id, charge)?))
+        self.release_budget_charge(&cap.id, charge)
+            .map(Some)
+            .map_err(|error| failure("budget_hold_release", redacted!(&error).to_string()))
+    }
+
+    pub(crate) fn post_dispatch_cleanup_receipt_metadata(
+        &self,
+        base: Option<serde_json::Value>,
+        charge: Option<&BudgetChargeResult>,
+        cleanup: &Result<Option<BudgetReleaseHoldDecision>, PostDispatchCleanupFailure>,
+    ) -> Option<serde_json::Value> {
+        match (charge, cleanup) {
+            (Some(charge), Ok(Some(released))) => self.merge_budget_receipt_metadata(
+                base,
+                self.budget_execution_receipt_metadata(charge, Some(("released", released))),
+            ),
+            (Some(charge), Err(failure)) => {
+                let authorized = self.merge_budget_receipt_metadata(
+                    base,
+                    self.budget_execution_receipt_metadata(charge, None),
+                );
+                merge_metadata_objects(
+                    authorized,
+                    Some(serde_json::json!({
+                        "chio_runtime": {
+                            "post_dispatch_cleanup_failed": true,
+                            "post_dispatch_cleanup_faults": [{
+                                "step": failure.step,
+                                "reason": failure.reason,
+                                "attempted_release_event_id": failure.attempted_release_event_id,
+                                "hold_ids": failure.hold_ids,
+                            }],
+                        }
+                    })),
+                )
+            }
+            _ => base,
+        }
     }
 
     pub(crate) fn record_observed_capability_snapshot(

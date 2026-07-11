@@ -1451,6 +1451,228 @@ fn monetary_generic_connector_error_releases_exposure_nested() {
     );
 }
 
+#[derive(Clone, Copy)]
+enum CleanupFailureSource {
+    Payment,
+    BudgetStore,
+}
+
+#[derive(Clone, Copy)]
+enum CleanupFailureTerminal {
+    Cancelled,
+    Incomplete,
+    Denied,
+}
+
+fn assert_post_dispatch_cleanup_failure_projection(
+    server: Box<dyn ToolServerConnection>,
+    server_entries: std::sync::Arc<AtomicU64>,
+    request_id: &str,
+    nested: bool,
+    source: CleanupFailureSource,
+    terminal: CleanupFailureTerminal,
+) {
+    let mut kernel = make_kernel(make_monetary_config());
+    match source {
+        CleanupFailureSource::Payment => {
+            kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter));
+        }
+        CleanupFailureSource::BudgetStore => {
+            kernel.set_budget_store_handle(std::sync::Arc::new(
+                FailingReleaseBudgetStore::new(),
+            ));
+        }
+    }
+    kernel.register_tool_server(server);
+
+    let subject_kp = Keypair::generate();
+    let mut grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+    grant.max_invocations = Some(1);
+    let cap = kernel
+        .issue_capability(&subject_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let request = make_request(request_id, &cap, "compute", "cost-srv");
+
+    let response = if nested {
+        let session_id = kernel
+            .open_session(subject_kp.public_key().to_hex(), vec![cap.clone()])
+            .unwrap();
+        kernel.activate_session(&session_id).unwrap();
+        let context = make_operation_context(
+            &session_id,
+            request_id,
+            &subject_kp.public_key().to_hex(),
+        );
+        kernel
+            .begin_session_request(&context, OperationKind::ToolCall, true)
+            .unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime
+            .block_on(async {
+                let mut client = NoopNestedFlowClient;
+                kernel
+                    .evaluate_tool_call_with_nested_flow_client_async(
+                        &context,
+                        &request,
+                        &mut client,
+                        None,
+                    )
+                    .await
+            })
+            .expect("cleanup failure must preserve the connector terminal response")
+    } else {
+        kernel
+            .evaluate_tool_call_blocking(&request)
+            .expect("cleanup failure must preserve the connector terminal response")
+    };
+
+    assert_eq!(server_entries.load(Ordering::SeqCst), 1);
+    match terminal {
+        CleanupFailureTerminal::Cancelled => assert!(response.receipt.is_cancelled()),
+        CleanupFailureTerminal::Incomplete => assert!(response.receipt.is_incomplete()),
+        CleanupFailureTerminal::Denied => assert!(response.receipt.is_denied()),
+    }
+
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert_eq!(usage.total_cost_exposed, 100);
+
+    let metadata = response.receipt.metadata.as_ref().unwrap();
+    assert!(metadata["budget_authority"]["terminal"].is_null());
+    assert_eq!(
+        metadata["chio_runtime"]["post_dispatch_cleanup_failed"],
+        true
+    );
+    let faults = metadata["chio_runtime"]["post_dispatch_cleanup_faults"]
+        .as_array()
+        .unwrap();
+    assert_eq!(faults.len(), 1);
+    let fault = &faults[0];
+    let expected_step = match source {
+        CleanupFailureSource::Payment => "payment_release",
+        CleanupFailureSource::BudgetStore => "budget_hold_release",
+    };
+    assert_eq!(fault["step"], expected_step);
+    let reason = fault["reason"].as_str().unwrap();
+    assert!(reason.contains("[REDACTED-API-KEY]"));
+    assert!(!reason.contains("sk_live_"));
+    assert!(fault["attempted_release_event_id"]
+        .as_str()
+        .is_some_and(|event_id| event_id.ends_with(":release")));
+    let hold_ids = fault["hold_ids"].as_array().unwrap();
+    assert!(hold_ids.iter().any(|id| id == &cap.id));
+    let budget_hold_id = metadata["budget_authority"]["hold_id"].as_str().unwrap();
+    assert!(hold_ids.iter().any(|id| id == budget_hold_id));
+    if matches!(source, CleanupFailureSource::Payment) {
+        assert!(hold_ids.iter().any(|id| id == "auth_failing_release"));
+    }
+}
+
+#[test]
+fn post_dispatch_cleanup_fault_preserves_cancelled_top_level() {
+    let entries = std::sync::Arc::new(AtomicU64::new(0));
+    assert_post_dispatch_cleanup_failure_projection(
+        Box::new(CancellationAfterSideEffectServer::new(
+            "cost-srv",
+            vec!["compute"],
+            std::sync::Arc::clone(&entries),
+        )),
+        entries,
+        "req-cleanup-fault-cancelled-top",
+        false,
+        CleanupFailureSource::Payment,
+        CleanupFailureTerminal::Cancelled,
+    );
+}
+
+#[test]
+fn post_dispatch_cleanup_fault_preserves_incomplete_top_level() {
+    let entries = std::sync::Arc::new(AtomicU64::new(0));
+    assert_post_dispatch_cleanup_failure_projection(
+        Box::new(IncompleteAfterSideEffectServer::new(
+            "cost-srv",
+            vec!["compute"],
+            std::sync::Arc::clone(&entries),
+        )),
+        entries,
+        "req-cleanup-fault-incomplete-top",
+        false,
+        CleanupFailureSource::BudgetStore,
+        CleanupFailureTerminal::Incomplete,
+    );
+}
+
+#[test]
+fn post_dispatch_cleanup_fault_preserves_denied_top_level() {
+    let entries = std::sync::Arc::new(AtomicU64::new(0));
+    assert_post_dispatch_cleanup_failure_projection(
+        Box::new(FailingAfterSideEffectServer::new(
+            "cost-srv",
+            vec!["compute"],
+            std::sync::Arc::clone(&entries),
+        )),
+        entries,
+        "req-cleanup-fault-denied-top",
+        false,
+        CleanupFailureSource::Payment,
+        CleanupFailureTerminal::Denied,
+    );
+}
+
+#[test]
+fn post_dispatch_cleanup_fault_preserves_cancelled_nested() {
+    let entries = std::sync::Arc::new(AtomicU64::new(0));
+    assert_post_dispatch_cleanup_failure_projection(
+        Box::new(CancellationAfterSideEffectServer::new(
+            "cost-srv",
+            vec!["compute"],
+            std::sync::Arc::clone(&entries),
+        )),
+        entries,
+        "req-cleanup-fault-cancelled-nested",
+        true,
+        CleanupFailureSource::BudgetStore,
+        CleanupFailureTerminal::Cancelled,
+    );
+}
+
+#[test]
+fn post_dispatch_cleanup_fault_preserves_incomplete_nested() {
+    let entries = std::sync::Arc::new(AtomicU64::new(0));
+    assert_post_dispatch_cleanup_failure_projection(
+        Box::new(IncompleteAfterSideEffectServer::new(
+            "cost-srv",
+            vec!["compute"],
+            std::sync::Arc::clone(&entries),
+        )),
+        entries,
+        "req-cleanup-fault-incomplete-nested",
+        true,
+        CleanupFailureSource::Payment,
+        CleanupFailureTerminal::Incomplete,
+    );
+}
+
+#[test]
+fn post_dispatch_cleanup_fault_preserves_denied_nested() {
+    let entries = std::sync::Arc::new(AtomicU64::new(0));
+    assert_post_dispatch_cleanup_failure_projection(
+        Box::new(FailingAfterSideEffectServer::new(
+            "cost-srv",
+            vec!["compute"],
+            std::sync::Arc::clone(&entries),
+        )),
+        entries,
+        "req-cleanup-fault-denied-nested",
+        true,
+        CleanupFailureSource::BudgetStore,
+        CleanupFailureTerminal::Denied,
+    );
+}
+
 #[test]
 fn monetary_full_pipeline_three_invocations_third_denied() {
     // max_total_cost=250, max_cost_per_invocation=100.

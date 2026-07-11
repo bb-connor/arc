@@ -553,13 +553,20 @@ pub(crate) struct BudgetChargeResult {
     authorize_metadata: BudgetCommitMetadata,
 }
 
-impl BudgetChargeResult {
-    /// The rail/store hold id for the monetary budget charge, so a cleanup
-    /// fault can name the stuck budget hold that needs manual recovery.
-    pub(crate) fn budget_hold_id(&self) -> &str {
-        &self.budget_hold_id
-    }
+pub(crate) struct PostDispatchCleanupFailure {
+    step: &'static str,
+    reason: String,
+    attempted_release_event_id: String,
+    hold_ids: Vec<String>,
+}
 
+impl PostDispatchCleanupFailure {
+    pub(crate) fn reason(&self) -> &str {
+        &self.reason
+    }
+}
+
+impl BudgetChargeResult {
     fn reverse_event_id(&self) -> String {
         format!("{}:reverse", self.budget_hold_id)
     }

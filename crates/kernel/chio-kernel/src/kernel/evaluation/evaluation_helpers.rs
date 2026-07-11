@@ -1,10 +1,5 @@
 use super::*;
 
-/// Reason recorded on the signed fault receipt when post-dispatch monetary
-/// cleanup fails while preserving an externally visible URL-elicitation error.
-const URL_ELICITATION_BUDGET_CLEANUP_FAULT_REASON: &str =
-    "budget cleanup failed after URL-elicitation connector dispatch";
-
 pub(super) struct PreDispatchCleanupDeny<'a> {
     pub(super) request: &'a ToolCallRequest,
     pub(super) reason: &'a str,
@@ -58,57 +53,6 @@ impl ChioKernel {
                 reason = %redacted!(&error),
                 audit_fault = "url_elicitation_terminal_receipt_unrecorded",
                 "failed to record URL-elicitation post-dispatch receipt"
-            );
-        }
-    }
-
-    /// Record a signed fault receipt when post-dispatch monetary release fails.
-    /// The caller still returns `Err(UrlElicitationsRequired)`, preserving the
-    /// edge response while making the stuck payment or budget hold auditable.
-    // The fault receipt legitimately needs the request, grant, failing step,
-    // reason, stuck hold ids, admission metadata, and guard evidence to locate
-    // the stuck reservation; grouping them into a params struct would only
-    // rename the same inputs.
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn record_url_elicitation_budget_cleanup_fault(
-        &self,
-        request: &ToolCallRequest,
-        matched_grant_index: usize,
-        step: &'static str,
-        reason: &str,
-        hold_ids: Vec<String>,
-        metadata: Option<serde_json::Value>,
-        pre_invocation_guard_evidence: &[chio_core::receipt::metadata::GuardEvidence],
-    ) {
-        let fault_metadata = merge_metadata_objects(
-            metadata,
-            Some(serde_json::json!({
-                "chio_runtime": {
-                    "post_dispatch_cleanup_failed": true,
-                    "post_dispatch_cleanup_faults": [{
-                        "step": step,
-                        "reason": reason,
-                        "hold_ids": hold_ids,
-                    }],
-                }
-            })),
-        );
-        let fault_metadata =
-            self.mark_runtime_admission_reservations_retained_fail_closed(fault_metadata);
-        let _guard_evidence_scope =
-            scope_pre_invocation_guard_evidence(pre_invocation_guard_evidence.to_vec());
-        if let Err(error) = self.build_cancelled_response_with_metadata(
-            request,
-            URL_ELICITATION_BUDGET_CLEANUP_FAULT_REASON,
-            current_unix_timestamp(),
-            Some(matched_grant_index),
-            fault_metadata,
-        ) {
-            warn!(
-                request_id = %request.request_id,
-                reason = %redacted!(&error),
-                audit_fault = "url_elicitation_budget_cleanup_fault_unrecorded",
-                "failed to record URL-elicitation budget cleanup fault receipt"
             );
         }
     }
