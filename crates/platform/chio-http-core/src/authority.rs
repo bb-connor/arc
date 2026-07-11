@@ -376,17 +376,57 @@ impl HttpAuthority {
         )
     }
 
+    /// Fail-closed constructor with a caller-provided approval store. Like
+    /// [`HttpAuthority::new`], no receipt or revocation store is attached and both
+    /// ephemeral opt-ins stay off, so a mediated side-effect call denies with a
+    /// durable-persistence error until durable stores are wired through
+    /// [`HttpAuthority::builder`]. Reach for
+    /// [`HttpAuthority::new_ephemeral_with_approval_store_and_trusted_issuers`]
+    /// when in-memory receipts and revocations are intended.
     #[must_use]
     pub fn new_with_approval_store(
         keypair: Keypair,
         policy_hash: String,
         approval_store: Arc<dyn ApprovalStore>,
     ) -> Self {
-        Self::assemble(keypair, policy_hash, approval_store, Vec::new(), true, true)
+        Self::assemble(
+            keypair,
+            policy_hash,
+            approval_store,
+            Vec::new(),
+            false,
+            false,
+        )
     }
 
+    /// Fail-closed constructor with a caller-provided approval store and trusted
+    /// issuers. Side-effect calls deny until durable stores are attached; see
+    /// [`HttpAuthority::new_with_approval_store`].
     #[must_use]
     pub fn new_with_approval_store_and_trusted_issuers(
+        keypair: Keypair,
+        policy_hash: String,
+        approval_store: Arc<dyn ApprovalStore>,
+        trusted_capability_issuers: Vec<PublicKey>,
+    ) -> Self {
+        Self::assemble(
+            keypair,
+            policy_hash,
+            approval_store,
+            trusted_capability_issuers,
+            false,
+            false,
+        )
+    }
+
+    /// Explicitly ephemeral constructor with a caller-provided approval store and
+    /// trusted issuers: the embedded kernel keeps its receipt log and revocation
+    /// state in memory, and both are lost on restart. Ephemerality is opted into
+    /// through the constructor name (unlike the fail-closed
+    /// [`HttpAuthority::new_with_approval_store_and_trusted_issuers`]) for local
+    /// scaffolds and tests that intend it.
+    #[must_use]
+    pub fn new_ephemeral_with_approval_store_and_trusted_issuers(
         keypair: Keypair,
         policy_hash: String,
         approval_store: Arc<dyn ApprovalStore>,

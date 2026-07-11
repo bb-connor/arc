@@ -95,7 +95,7 @@ fn authority_with_issuer() -> (HttpAuthority, Keypair) {
 }
 
 fn authority_with_trusted_issuer(trusted_issuer: PublicKey) -> HttpAuthority {
-    HttpAuthority::new_with_approval_store_and_trusted_issuers(
+    HttpAuthority::new_ephemeral_with_approval_store_and_trusted_issuers(
         Keypair::generate(),
         "policy-hash".to_string(),
         Arc::new(InMemoryApprovalStore::new()),
@@ -395,6 +395,82 @@ fn valid_capability_allows_deny_by_default() {
     assert_eq!(result.receipt.session_id.as_deref(), Some("session-1"));
     assert!(
         metadata_string(result.receipt.metadata.as_ref(), CHIO_KERNEL_RECEIPT_ID_KEY).is_some()
+    );
+}
+
+#[test]
+fn approval_store_constructor_fails_closed_without_durable_stores() {
+    // Passing a caller-provided approval store must not silently opt the embedded
+    // kernel out of durable persistence: with no receipt or revocation store
+    // attached, a mediated side effect fails closed instead of running on
+    // in-memory audit state. The same request is allowed only when ephemerality
+    // is opted into explicitly.
+    let query = HashMap::new();
+    let issuer = Keypair::generate();
+    let capability = signed_capability_token_json(&issuer, "cap-durable-gate");
+
+    let fail_closed = HttpAuthority::new_with_approval_store_and_trusted_issuers(
+        issuer.clone(),
+        "policy-hash".to_string(),
+        Arc::new(InMemoryApprovalStore::new()),
+        Vec::new(),
+    );
+    let error = fail_closed
+        .evaluate(HttpAuthorityInput {
+            request_id: "req-fail-closed".to_string(),
+            method: HttpMethod::Patch,
+            route_pattern: "/pets/{petId}".to_string(),
+            path: "/pets/42",
+            query: &query,
+            caller: caller(),
+            body_hash: Some("def".to_string()),
+            body_length: 3,
+            session_id: Some("session-1".to_string()),
+            capability_id_hint: None,
+            presented_capability: Some(&capability),
+            requested_tool_server: None,
+            requested_tool_name: None,
+            requested_arguments: None,
+            model_metadata: None,
+            execution_nonce: None,
+            policy: HttpAuthorityPolicy::DenyByDefault,
+        })
+        .test_unwrap_err();
+    assert!(
+        error.to_string().contains("durable receipt persistence"),
+        "fail-closed constructor must refuse a side effect for missing durable persistence, got {error}"
+    );
+
+    let ephemeral = HttpAuthority::new_ephemeral_with_approval_store_and_trusted_issuers(
+        issuer.clone(),
+        "policy-hash".to_string(),
+        Arc::new(InMemoryApprovalStore::new()),
+        Vec::new(),
+    );
+    let allowed = ephemeral
+        .evaluate(HttpAuthorityInput {
+            request_id: "req-ephemeral".to_string(),
+            method: HttpMethod::Patch,
+            route_pattern: "/pets/{petId}".to_string(),
+            path: "/pets/42",
+            query: &query,
+            caller: caller(),
+            body_hash: Some("def".to_string()),
+            body_length: 3,
+            session_id: Some("session-1".to_string()),
+            capability_id_hint: None,
+            presented_capability: Some(&capability),
+            requested_tool_server: None,
+            requested_tool_name: None,
+            requested_arguments: None,
+            model_metadata: None,
+            execution_nonce: None,
+            policy: HttpAuthorityPolicy::DenyByDefault,
+        })
+        .test_unwrap();
+    assert!(
+        allowed.verdict.is_allowed(),
+        "explicit ephemeral constructor still allows the same request"
     );
 }
 

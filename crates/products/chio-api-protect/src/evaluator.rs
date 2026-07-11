@@ -57,7 +57,7 @@ impl RequestEvaluator {
     ) -> Self {
         Self {
             routes,
-            authority: HttpAuthority::new_with_approval_store_and_trusted_issuers(
+            authority: HttpAuthority::new_ephemeral_with_approval_store_and_trusted_issuers(
                 keypair,
                 policy_hash,
                 Arc::new(chio_kernel::InMemoryApprovalStore::new()),
@@ -92,7 +92,7 @@ impl RequestEvaluator {
     ) -> Self {
         Self {
             routes,
-            authority: HttpAuthority::new_with_approval_store_and_trusted_issuers(
+            authority: HttpAuthority::new_ephemeral_with_approval_store_and_trusted_issuers(
                 keypair,
                 policy_hash,
                 approval_store,
