@@ -35,6 +35,7 @@ pub mod custody;
 pub mod dpop;
 pub mod evidence_export;
 pub mod execution_nonce;
+pub mod federation_artifact_store;
 pub mod memory_provenance;
 pub mod observability;
 pub mod operator_report;
@@ -346,9 +347,9 @@ pub use memory_provenance::{
     MEMORY_PROVENANCE_ENTRY_SCHEMA, MEMORY_PROVENANCE_GENESIS_PREV_HASH,
 };
 pub use observability::metrics::{
-    guard_metrics_endpoint, render_guard_metrics_prometheus, GuardMetricFamily,
-    MetricsEndpointResponse, PrometheusMetricKind, GUARD_METRICS_PATH, GUARD_METRIC_FAMILIES,
-    METRIC_CHIO_OTEL_INGRESS_DROP_TOTAL, METRIC_CHIO_OTEL_SINK_DROP_TOTAL,
+    guard_metrics_endpoint, record_receipt_health_gauges, render_guard_metrics_prometheus,
+    GuardMetricFamily, MetricsEndpointResponse, PrometheusMetricKind, GUARD_METRICS_PATH,
+    GUARD_METRIC_FAMILIES, METRIC_CHIO_OTEL_INGRESS_DROP_TOTAL, METRIC_CHIO_OTEL_SINK_DROP_TOTAL,
     PROMETHEUS_TEXT_CONTENT_TYPE,
 };
 pub use operator_report::{behavioral_anomaly_score, BehavioralAnomalyScore, EmaBaselineState};
@@ -440,11 +441,11 @@ pub(crate) use kernel::{current_unix_timestamp, MatchingGrant, ReceiptContent};
 
 pub use kernel::{
     AgentId, CapabilityId, ChildReceiptLog, ChioKernel, Guard, GuardContext, GuardDecision,
-    HybridSigningConfig, KernelConfig, KernelError, PromptProvider, ReceiptLog, ResourceProvider,
-    RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook, ServerId,
-    StructuredErrorReport, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS,
-    EMERGENCY_STOP_DENY_REASON,
+    HybridSigningConfig, KernelConfig, KernelError, MemoryBudgetConfig, OverloadResource,
+    PromptProvider, ReceiptLog, ResourceProvider, RuntimeAdmissionContext,
+    RuntimeAdmissionDecision, RuntimeAdmissionHook, ServerId, StructuredErrorReport,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS, EMERGENCY_STOP_DENY_REASON,
 };
 
 pub use kernel::evaluator::ToolEvaluator;

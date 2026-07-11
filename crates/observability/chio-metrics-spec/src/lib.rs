@@ -6,6 +6,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod runtime;
+
 /// Prometheus metric family kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MetricKind {
@@ -128,8 +130,11 @@ pub const CHIO_FEDERATION_TRANSPORT_ADMISSION_TOTAL: &str =
     "chio_federation_transport_admission_total";
 pub const CHIO_FEDERATION_TRANSPORT_CATCHUP_EPOCH_GAP_TOTAL: &str =
     "chio_federation_transport_catchup_epoch_gap_total";
+pub const CHIO_FEDERATION_TRANSPORT_DIRECTORY_RELOAD_TOTAL: &str =
+    "chio_federation_transport_directory_reload_total";
 pub const CHIO_FEDERATION_TRANSPORT_LANE_TOTAL: &str = "chio_federation_transport_lane_total";
 pub const CHIO_FEDERATION_TRANSPORT_OUTBOX_TOTAL: &str = "chio_federation_transport_outbox_total";
+pub const CHIO_FEDERATION_TRANSPORT_ROUTER_ALIVE: &str = "chio_federation_transport_router_alive";
 pub const CHIO_FEDERATION_TRANSPORT_VERIFY_FAILURES_TOTAL: &str =
     "chio_federation_transport_verify_failures_total";
 pub const CHIO_GUARD_DENY_TOTAL: &str = "chio_guard_deny_total";
@@ -169,6 +174,9 @@ pub const CHIO_PHEROMONE_RECEIVER_DEPOSITS_TOTAL: &str = "chio_pheromone_receive
 pub const CHIO_PHEROMONE_RECEIVER_LATENCY_SECONDS: &str = "chio_pheromone_receiver_latency_seconds";
 pub const CHIO_PHEROMONE_RECEIVER_REJECTIONS_TOTAL: &str =
     "chio_pheromone_receiver_rejections_total";
+pub const CHIO_RECEIPT_SECONDS_SINCE_LAST_CHECKPOINT: &str =
+    "chio_receipt_seconds_since_last_checkpoint";
+pub const CHIO_RECEIPT_UNCHECKPOINTED_SEQ_RANGE: &str = "chio_receipt_uncheckpointed_seq_range";
 pub const CHIO_RECEIPT_WRITE_TOTAL: &str = "chio_receipt_write_total";
 pub const CHIO_RECEIPT_WRITE_LATENCY_SECONDS: &str = "chio_receipt_write_latency_seconds";
 pub const CHIO_SIDECAR_REQUESTS_TOTAL: &str = "chio_sidecar_requests_total";
@@ -285,6 +293,12 @@ pub const REGISTRY: &[MetricDescriptor] = &[
         labels = ["source"]
     ),
     describe!(
+        name = CHIO_FEDERATION_TRANSPORT_DIRECTORY_RELOAD_TOTAL,
+        help = "Total iroh federation-transport directory reload outcomes.",
+        kind = Counter,
+        labels = ["outcome"]
+    ),
+    describe!(
         name = CHIO_FEDERATION_TRANSPORT_LANE_TOTAL,
         help = "Total iroh federation-transport per-lane accept outcomes.",
         kind = Counter,
@@ -295,6 +309,12 @@ pub const REGISTRY: &[MetricDescriptor] = &[
         help = "Total iroh federation-transport pheromone outbox drain outcomes.",
         kind = Counter,
         labels = ["outcome"]
+    ),
+    describe!(
+        name = CHIO_FEDERATION_TRANSPORT_ROUTER_ALIVE,
+        help = "Iroh federation-transport router liveness (1 alive, 0 the router died).",
+        kind = Gauge,
+        labels = []
     ),
     describe!(
         name = CHIO_FEDERATION_TRANSPORT_VERIFY_FAILURES_TOTAL,
@@ -492,6 +512,18 @@ pub const REGISTRY: &[MetricDescriptor] = &[
         labels = []
     ),
     describe!(
+        name = CHIO_RECEIPT_SECONDS_SINCE_LAST_CHECKPOINT,
+        help = "Seconds since the receipt-store checkpoint last advanced while data was pending on the local store.",
+        kind = Gauge,
+        labels = []
+    ),
+    describe!(
+        name = CHIO_RECEIPT_UNCHECKPOINTED_SEQ_RANGE,
+        help = "Uncheckpointed receipt entry_seq range (end - start) on the local store.",
+        kind = Gauge,
+        labels = []
+    ),
+    describe!(
         name = CHIO_RECEIPT_WRITE_LATENCY_SECONDS,
         help = "Receipt write latency at the local store boundary in seconds.",
         kind = Histogram,
@@ -512,9 +544,9 @@ pub const REGISTRY: &[MetricDescriptor] = &[
     ),
     describe!(
         name = CHIO_SIGNING_QUEUE_BLOCK_TOTAL,
-        help = "Total receipt signing requests blocked by bounded queue capacity.",
+        help = "Total receipt signing requests blocked by bounded queue capacity or byte budget.",
         kind = Counter,
-        labels = []
+        labels = ["reason"]
     ),
     describe!(
         name = CHIO_SOC_EXPORT_LAG_SECONDS,

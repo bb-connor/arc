@@ -2638,6 +2638,7 @@ dependencies = [
  "chio-core-types",
  "chio-http-core",
  "chio-kernel",
+ "chio-metrics-spec",
  "chio-openapi",
  "chio-store-sqlite",
  "chio-test-support",
@@ -2826,6 +2827,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-bounded"
+version = "0.1.0"
+dependencies = [
+ "loom",
+ "proptest",
+]
+
+[[package]]
 name = "chio-cli"
 version = "0.1.0"
 dependencies = [
@@ -2862,8 +2871,10 @@ dependencies = [
  "chio-kernel",
  "chio-lineage",
  "chio-listing",
+ "chio-log-redact",
  "chio-mcp-adapter",
  "chio-mcp-remote",
+ "chio-metrics-spec",
  "chio-open-market",
  "chio-pheromone",
  "chio-pheromone-relay",
@@ -3055,6 +3066,7 @@ dependencies = [
  "chio-kernel",
  "chio-link",
  "chio-mcp-adapter",
+ "chio-metrics-spec",
  "chio-policy",
  "chio-reputation",
  "chio-risk-comptroller",
@@ -3428,6 +3440,8 @@ dependencies = [
 name = "chio-federation-transport-iroh"
 version = "0.1.0"
 dependencies = [
+ "arc-swap",
+ "async-trait",
  "blake3",
  "bytes",
  "chio-core-types",
@@ -3435,11 +3449,14 @@ dependencies = [
  "chio-metrics-spec",
  "chio-pheromone",
  "chio-pheromone-relay",
+ "chio-pheromone-runtime",
  "chio-revocation-oracle",
  "iroh",
  "iroh-blobs",
  "iroh-gossip",
+ "loom",
  "n0-future",
+ "proptest",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3602,6 +3619,8 @@ dependencies = [
 name = "chio-http-session"
 version = "0.1.0"
 dependencies = [
+ "chio-bounded",
+ "chio-kernel",
  "hex",
  "serde",
  "serde_json",
@@ -3617,6 +3636,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chio-appraisal",
+ "chio-bounded",
  "chio-core",
  "chio-core-types",
  "chio-credit",
@@ -3637,6 +3657,7 @@ dependencies = [
  "dashmap 6.1.0",
  "dhat",
  "futures",
+ "libc",
  "loom",
  "lru 0.16.3",
  "opentelemetry-semantic-conventions",
@@ -3847,6 +3868,7 @@ dependencies = [
  "chio-egress-contract",
  "chio-kernel",
  "chio-mcp-adapter",
+ "chio-metrics-spec",
  "chio-siem",
  "chio-store-sqlite",
  "p256 0.13.2",
@@ -4000,7 +4022,9 @@ version = "0.1.0"
 dependencies = [
  "chio-core",
  "chio-kernel",
+ "chio-metrics-spec",
  "loom",
+ "proptest",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -4339,10 +4363,12 @@ dependencies = [
  "chio-kernel",
  "chio-log-redact",
  "chio-test-support",
+ "proptest",
  "reqwest 0.13.2",
  "rusqlite",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
@@ -4383,6 +4409,8 @@ dependencies = [
  "chio-settle",
  "chio-test-support",
  "criterion",
+ "loom",
+ "proptest",
  "r2d2",
  "r2d2_sqlite",
  "rusqlite",
@@ -4482,6 +4510,7 @@ dependencies = [
  "chio-core-types",
  "chio-http-core",
  "chio-kernel",
+ "chio-metrics-spec",
  "chrono",
  "hex",
  "http 1.4.0",
@@ -4556,6 +4585,7 @@ dependencies = [
  "chio-core",
  "chio-guards",
  "chio-kernel",
+ "chio-metrics-spec",
  "chio-siem",
  "chio-store-sqlite",
  "chio-wall-core",
