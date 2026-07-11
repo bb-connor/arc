@@ -522,3 +522,70 @@ async fn phase_dispatch_honors_the_configured_dispatch_budget(
     }
     Ok(())
 }
+
+/// A guard that records the thread it ran on, to observe whether the pipeline
+/// offloaded it onto a blocking thread or ran it inline on the async worker.
+struct ThreadRecordingGuard {
+    label: String,
+    thread: Arc<std::sync::Mutex<Option<std::thread::ThreadId>>>,
+}
+
+impl Guard for ThreadRecordingGuard {
+    fn name(&self) -> &str {
+        &self.label
+    }
+    fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
+        *self.thread.lock().expect("record guard thread") = Some(std::thread::current().id());
+        Ok(GuardDecision {
+            verdict: Verdict::Allow,
+            evidence: Vec::new(),
+        })
+    }
+}
+
+#[test]
+fn always_offload_moves_guards_off_the_async_worker_without_a_timer(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // `always_offload_guards` asks to move blocking guards onto spawn_blocking so
+    // they cannot pin the async worker. That offload needs no time driver, only
+    // the (absent) timeout wrapping does, so it must still take effect in a
+    // timerless runtime rather than silently degrading to inline.
+    let mut config = make_config();
+    config.deadlines.always_offload_guards = true;
+    let mut kernel = make_kernel(config);
+    let guard_thread = Arc::new(std::sync::Mutex::new(None));
+    kernel.add_guard(Box::new(ThreadRecordingGuard {
+        label: "recording".to_string(),
+        thread: Arc::clone(&guard_thread),
+    }));
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-offload", "noop")]),
+        300,
+    );
+    let request = make_request("req-offload", &cap, "noop", "srv-offload");
+    let scope = make_scope(vec![make_grant("srv-offload", "noop")]);
+
+    // A current-thread runtime built without a time driver: dispatch timeouts
+    // would panic, so the pipeline must degrade the timeout, not the offload.
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+    runtime.block_on(async {
+        assert!(
+            !super::dispatch::dispatch_timer_available(),
+            "the test runtime must be timerless"
+        );
+        let worker = std::thread::current().id();
+        let outcome = kernel
+            .run_guards_within_budget(&request, &scope, None, None)
+            .await;
+        assert!(outcome.is_ok(), "the recording guard allows");
+        let guard = guard_thread.lock().expect("read guard thread").expect("guard ran");
+        assert_ne!(
+            guard, worker,
+            "always_offload must move the guard off the async worker even without a timer"
+        );
+    });
+    Ok(())
+}

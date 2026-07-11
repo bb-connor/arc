@@ -498,11 +498,15 @@ impl ChioKernel {
     ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
         let has_per_guard = !self.config.deadlines.per_guard_budget_ms.is_empty();
         let pipeline_budget = self.config.deadlines.guard_pipeline_budget();
-        let want_offload = pipeline_budget.is_some()
-            || has_per_guard
-            || self.config.deadlines.always_offload_guards;
+        // A pipeline or per-guard budget is only enforceable with a Tokio time
+        // driver: the timeout wrapper panics without one, so those degrade to
+        // inline. Offload itself needs no timer, so `always_offload_guards` still
+        // moves a blocking guard onto `spawn_blocking` even in a timerless
+        // runtime; only the (absent) timeout is skipped.
+        let needs_timer = pipeline_budget.is_some() || has_per_guard;
+        let want_offload = needs_timer || self.config.deadlines.always_offload_guards;
 
-        if !want_offload || !dispatch_timer_available() {
+        if !want_offload || (needs_timer && !dispatch_timer_available()) {
             return self.run_guards(
                 request,
                 scope,
