@@ -755,9 +755,9 @@ not relabel a new failure as pre-existing without that proof.
 ### 5.3 Documentation and claim checks
 
 ```bash
-rg -n "_settlement_status|as_secs\(\)|signing_keypair|record_chio_receipt_for_test" \
+rg -n "let _settlement_status|Duration::as_secs\(\)|signing_keypair|record_chio_receipt_for_test" \
   docs/superpowers/plans/2026-07-10-ws1-first-light-phase1.md
-rg -n "configure_settlement|configure_payment_rail|configure_price_oracle" \
+rg -n "configure_\\*|configure_settlement|configure_payment_rail|configure_price_oracle" \
   docs/superpowers/plans/2026-07-10-ws1-first-light-phase1.md
 rg -n $'\u2014' \
   crates/economy/chio-metering \
@@ -768,10 +768,10 @@ rg -n $'\u2014' \
 
 Expected:
 
-- The first search finds only the explicit ban in this plan, never an
-  implementation instruction.
-- The second search finds only the no-op-installer prohibition, never a Phase
-  1 task.
+- The first search finds only explicit prohibitions and the search command,
+  never an implementation instruction.
+- The second search finds only the no-op-installer prohibition and the search
+  command, never a Phase 1 task.
 - The em-dash search returns no matches in changed content.
 
 ## Phase 1 Exit Criteria
