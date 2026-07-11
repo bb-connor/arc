@@ -399,11 +399,20 @@ impl ChioKernel {
         }
         let poll =
             std::time::Duration::from_millis(self.config.deadlines.receipt_writer_poll_ms.max(1));
-        let kernel = std::sync::Arc::clone(self);
+        // Hold a weak reference between ticks. The kernel owns this task's join
+        // handle, so a strong reference here would form a cycle (kernel -> handle
+        // -> task -> kernel) that keeps the kernel and its receipt store alive
+        // forever when the last external Arc is dropped without calling
+        // shutdown(). Upgrade only to take a sample, then release before awaiting
+        // the next tick, and exit once the kernel is gone.
+        let kernel = std::sync::Arc::downgrade(self);
         let handle = tokio::spawn(async move {
             let mut ticker = tokio::time::interval(poll);
             loop {
                 ticker.tick().await;
+                let Some(kernel) = kernel.upgrade() else {
+                    return;
+                };
                 let verdict = kernel.sample_receipt_writer_liveness();
                 kernel.receipt_writer_watchdog.publish(verdict);
             }

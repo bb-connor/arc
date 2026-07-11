@@ -610,3 +610,29 @@ fn watchdog_does_not_start_without_a_timer() -> Result<(), Box<dyn std::error::E
     });
     Ok(())
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn watchdog_does_not_keep_the_kernel_alive() {
+    // The kernel owns the watchdog task's join handle. If the task held a strong
+    // reference back to the kernel, dropping the last external Arc without
+    // calling shutdown() would leave the kernel (and its receipt store) alive
+    // forever. The task must hold only a weak reference between ticks so the
+    // kernel drops when its last external owner does.
+    let mut config = make_config();
+    // A long poll so the task takes its first (immediate) sample and then parks,
+    // holding only the weak reference while this test drops the kernel.
+    config.deadlines.receipt_writer_poll_ms = 60_000;
+    let kernel = Arc::new(make_kernel(config));
+    let weak = Arc::downgrade(&kernel);
+    kernel.spawn_receipt_writer_watchdog();
+
+    // Let the watchdog run its immediate first tick and park on the next.
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    drop(kernel);
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    assert!(
+        weak.upgrade().is_none(),
+        "the watchdog task must not keep the kernel alive after its last external Arc is dropped"
+    );
+}
