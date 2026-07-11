@@ -627,7 +627,7 @@ mod tests {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod do_not_weaken {
-    //! DO-NOT-WEAKEN regression suite (M1-7).
+    //! DO-NOT-WEAKEN regression suite.
     //!
     //! Premium currency codes must remain ISO 4217-style: exactly three
     //! ASCII-uppercase letters. A CHIO-flavoured code such as

@@ -57,7 +57,7 @@ if ! grep -Fq "pass_passport_naming_overload" "$lint"; then
   exit 1
 fi
 
-# Negative: the bad string must be flagged by the new pattern.
+# Negative: the bad string must be flagged.
 if CHIO_PROOF_ROOM_RELEASE_TRUTH="$truth" \
   CHIO_PROOF_ROOM_BUNDLE_RELEASE_TRUTH="$bundle_truth" \
   CHIO_PROOF_ROOM_RELEASE_DOCS="$work/pass-naming-fail.md" \

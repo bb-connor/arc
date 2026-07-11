@@ -37,11 +37,11 @@ pub const CHIO_PASS_CAPABILITY_ID_DOMAIN: &str = "chio.pass.capability.id.v1";
 pub const CHIO_PASS_CAPABILITY_ID_PREFIX: &str = "chiopass:";
 
 /// Namespace prefix of the aggregate free-tier pool budget-term id
-/// `freetier:global:<window_ym>` (CONTROL 1). The std kernel derives each
-/// per-month term by appending the `"%Y-%m"` window to this prefix (see
-/// `FreeTierPoolConfig::window_ym_from_issued_at`), so this constant is the
-/// single source of truth for the pool namespace and the only string callers
-/// should match against.
+/// `freetier:global:<window_ym>` (the free-tier pool ceiling). The std kernel
+/// derives each per-month term by appending the `"%Y-%m"` window to this
+/// prefix (see `FreeTierPoolConfig::window_ym_from_issued_at`), so this
+/// constant is the single source of truth for the pool namespace and the only
+/// string callers should match against.
 ///
 /// The pool is a Sybil-ceiling accounting term, never capital. Every id under
 /// this prefix (the current window and any retained prior-month window) MUST be

@@ -1,6 +1,6 @@
 //! Custodial offer-safety escrow wired into the commerce-order spine.
 //!
-//! M1-15 binds the M0 single-ledger custodial escrow to the shipped
+//! This module binds the single-ledger custodial escrow to the shipped
 //! commerce-order state machine. [`accept`] performs the single-ledger atomic
 //! two-leg swap (lock leg) against a verified offer/reservation pair, emits the
 //! [`CommerceSettlementPacket`] as a signed body, and pins the resulting escrow
@@ -32,13 +32,14 @@
 //!   `buyer_subject` / `merchant_subject`, never caller-supplied, so custody can
 //!   never be redirected to a third account while the settlement packet names
 //!   the order merchant.
-//! - Seam A: the freetier:global Sybil-ceiling pool ledger and the escrow
-//!   ledger are hard-isolated. No escrow leg, in either direction, may name a
+//! - Pool isolation: the freetier:global Sybil-ceiling pool ledger and the
+//!   escrow ledger are hard-isolated. No escrow leg, in either direction, may name a
 //!   `freetier:global:<window>` row (see [`is_freetier_global_pool_id`]).
 //!
-//! At M1 the on-chain value leg never moves: [`accept`] returns a PREPARE-ONLY
-//! [`EscrowBroadcastIntent`]. The on-chain value move is M2 and reuses the
-//! chio-settle prepare path (`prepare_web3_escrow_dispatch`).
+//! In the tokenless launch phase the on-chain value leg never moves: [`accept`]
+//! returns a PREPARE-ONLY [`EscrowBroadcastIntent`]. The on-chain value move is
+//! deferred to a later phase and reuses the chio-settle prepare path
+//! (`prepare_web3_escrow_dispatch`).
 
 use std::collections::BTreeMap;
 
@@ -63,7 +64,7 @@ const RECONCILE_SETTLEMENT_TRANSITION: &str = "reconcile_settlement";
 
 /// The single custody account every escrow leg flows through. It is a fixed,
 /// non-pool account id so the escrow ledger can never share a row with the
-/// freetier:global pool (Seam A).
+/// freetier:global pool.
 const ESCROW_CUSTODY_ACCOUNT: &str = "chio:commerce:escrow:custody";
 
 /// Canonical commerce-order states, mirroring the strings the shipped event-log
@@ -199,7 +200,7 @@ pub struct CommerceEscrowLedger {
 impl CommerceEscrowLedger {
     /// Build the locked ledger: the single lock leg debits the depositor and
     /// credits the custody account. Fails closed if any account is a
-    /// freetier:global pool row (Seam A) or if conservation does not hold.
+    /// freetier:global pool row or if conservation does not hold.
     fn lock(
         order_id: String,
         currency: String,
@@ -368,8 +369,8 @@ impl CommerceEscrowLedger {
     }
 }
 
-/// Seam A: the custodial escrow ledger and the freetier:global Sybil-ceiling
-/// pool ledger are hard-isolated. No escrow leg, in either direction, may name
+/// Pool isolation: the custodial escrow ledger and the freetier:global
+/// Sybil-ceiling pool ledger are hard-isolated. No escrow leg, in either direction, may name
 /// a `freetier:global:<window>` row, so the escrow can never co-debit or
 /// co-credit the aggregate pool.
 fn ensure_pool_escrow_isolation(account_id: &str) -> Result<(), CommerceOrderError> {
@@ -443,8 +444,9 @@ impl CommerceSettlementDispatch {
     }
 }
 
-/// PREPARE-ONLY broadcast intent. At M1 no value moves on-chain; the on-chain
-/// value move is M2 and reuses the chio-settle prepare path.
+/// PREPARE-ONLY broadcast intent. In the tokenless launch phase no value moves
+/// on-chain; the on-chain value move is deferred to a later phase and reuses
+/// the chio-settle prepare path.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct EscrowBroadcastIntent {
@@ -692,11 +694,11 @@ pub struct CommerceEscrowRelease {
 /// - the locked offer liability does not equal the signed quote amount;
 /// - the acceptor is not the offer subject;
 /// - the order context's current state is not a settlement-assembly state;
-/// - any escrow account is a freetier:global pool row (Seam A).
+/// - any escrow account is a freetier:global pool row.
 ///
 /// On success it performs the single-ledger atomic two-leg swap (lock leg),
 /// emits the [`CommerceSettlementPacket`] signed body, derives a PREPARE-ONLY
-/// broadcast intent (no value moves on-chain at M1), and returns the order
+/// broadcast intent (no value moves on-chain at launch), and returns the order
 /// context advanced to `settlement_packet_assembled` with the escrow digest
 /// pinned.
 ///
@@ -714,7 +716,7 @@ pub fn accept(
 ) -> Result<CommerceEscrowAcceptance, CommerceOrderError> {
     request.order_context.validate_shape()?;
 
-    // Finding 3: recompute and compare the canonical quote digest BEFORE building
+    // Recompute and compare the canonical quote digest BEFORE building
     // the ledger or locking custody. `validate_shape` only proves `quote_sha256` is
     // a well-formed 64-hex string, NOT that it matches the canonical quote fields.
     // Without this gate an arbitrary same-shape `quote_sha256` passes accept, locks
@@ -739,7 +741,7 @@ pub fn accept(
         )));
     }
 
-    // ESCROW-1: authenticate the offered capability token BEFORE deriving any
+    // Authenticate the offered capability token BEFORE deriving any
     // custodial liability from it. `subject` and `issuer` are attacker-settable
     // public fields, so the acceptor==subject guard below is hollow until the
     // token itself is proven authentic. This mirrors the open-market accept
@@ -798,11 +800,11 @@ pub fn accept(
         ));
     }
 
-    // ESCROW-2: the reservation is a SIGNED witness, never a bare amount. Verify
+    // The reservation is a SIGNED witness, never a bare amount. Verify
     // it against the pinned settlement reservation authority and bind it to this
     // order id and the exact offer token BEFORE any collateral is trusted. A
     // fabricated amount cannot satisfy this; only an authority-signed witness
-    // minted for THIS order/offer can. Compose with the ESCROW-1 offer-token
+    // minted for THIS order/offer can. Compose with the offer-token
     // authentication above.
     let reservation = VerifiedCommerceReservation::from_signed(
         request.reservation,
@@ -826,7 +828,7 @@ pub fn accept(
                 .to_string(),
         ));
     }
-    // C1: the amount locked in custody is the offer collateral cap
+    // The amount locked in custody is the offer collateral cap
     // (`liability.units`), but the settlement packet and the release leg are
     // settled against the signed quote (`quote_amount_minor`). When the cap
     // differs from the quote the custody hold and the settled amount disagree,
@@ -844,7 +846,7 @@ pub fn accept(
         ));
     }
 
-    // ESCROW-3: bind the custodial accounts to the actual order parties. The
+    // Bind the custodial accounts to the actual order parties. The
     // depositor (buyer) and beneficiary (merchant) accounts are NOT
     // caller-supplied; they are derived from the order context's verified
     // `buyer_subject` / `merchant_subject`. A caller can therefore never redirect
@@ -854,7 +856,7 @@ pub fn accept(
     let beneficiary_account = request.order_context.merchant_subject.clone();
 
     // Single-ledger custodial escrow: the lock leg debits the depositor (buyer)
-    // and credits the custody account. Seam A is enforced inside `lock`.
+    // and credits the custody account. Pool isolation is enforced inside `lock`.
     let ledger = CommerceEscrowLedger::lock(
         request.order_context.order_id.clone(),
         liability.currency.clone(),
@@ -1013,7 +1015,7 @@ pub fn release(
     // advanced context is the order state the dispatch/observe steps produced; it
     // MUST name the same order and carry the same pinned (locked) escrow digest,
     // so an observation reconciled for a DIFFERENT order/escrow cannot drain this
-    // custody (REL-2).
+    // custody.
     advanced_context.validate_shape()?;
     if advanced_context.order_id != acceptance.updated_context.order_id {
         return Err(CommerceOrderError::SettlementFailed(
@@ -1064,7 +1066,7 @@ pub fn release(
         ));
     }
 
-    // REL-3: bind the observed execution to THIS order's reconciliation artifact,
+    // Bind the observed execution to THIS order's reconciliation artifact,
     // not merely its amount/currency. Amount+currency alone cannot tell two
     // same-value payments apart, so a Matched execution belonging to a DIFFERENT
     // payment could otherwise drain this order's custody. The reconciliation ref
@@ -1348,7 +1350,7 @@ mod tests {
         context
     }
 
-    /// Pin the canonical quote digest into a test context. Finding 3: `accept`
+    /// Pin the canonical quote digest into a test context. `accept`
     /// recomputes the canonical quote digest and denies a context whose pinned
     /// `quote_sha256` does not match the canonical quote fields, so every test
     /// context must carry the REAL digest (not the HEX64 placeholder), and any test
@@ -1463,7 +1465,7 @@ mod tests {
         assert_eq!(acceptance.ledger.legs[0].kind, CommerceEscrowLegKind::Lock);
         assert_eq!(acceptance.ledger.legs[0].from_account, "buyer:alice");
         assert_eq!(acceptance.ledger.legs[0].to_account, ESCROW_CUSTODY_ACCOUNT);
-        // PREPARE-ONLY: no value moves on-chain at M1.
+        // PREPARE-ONLY: no value moves on-chain at launch.
         assert!(acceptance.broadcast.prepare_only);
         assert!(!acceptance.broadcast.value_moved_on_chain);
         assert_eq!(acceptance.next_state, OrderState::SettlementPacketAssembled);
@@ -1624,7 +1626,7 @@ mod tests {
         );
     }
 
-    // Finding 2 / REL-3: a Matched observation whose external reference does not
+    // A Matched observation whose external reference does not
     // match the order's (signed) reconciliation ref is denied before custody is
     // drained, even when its amount and currency match the locked ledger exactly.
     // This stops a same-value execution from a DIFFERENT payment from draining
@@ -1719,7 +1721,7 @@ mod tests {
         let mut credit_context = order_context("fulfillment_attested");
         credit_context.merchant_subject = pool_id.to_string();
         // merchant_subject is a quote-binding field; re-pin so the quote-digest gate
-        // passes and the accept reaches the Seam A isolation check (the actual SUT).
+        // passes and the accept reaches the pool-isolation check (the actual SUT).
         pin_quote_digest(&mut credit_context);
         let reservation = signed_reservation(&credit_context, &token, 4200, "USD", &res_auth);
         let credit_error = accept(accept_request(
@@ -1738,7 +1740,7 @@ mod tests {
         ));
     }
 
-    // ESCROW-3: the locked ledger's depositor/beneficiary are bound to the order
+    // The locked ledger's depositor/beneficiary are bound to the order
     // parties (buyer_subject / merchant_subject), never caller-supplied, so
     // custody can never be redirected to a third account while the settlement
     // packet still names the order merchant.
@@ -1847,7 +1849,7 @@ mod tests {
         }
     }
 
-    // ESCROW-1: a forged/unsigned offer token is denied before any custodial
+    // A forged/unsigned offer token is denied before any custodial
     // liability is derived from it.
     #[test]
     fn accept_fails_closed_on_forged_offer_token() {
@@ -1881,7 +1883,7 @@ mod tests {
         ));
     }
 
-    // ESCROW-1: an offer token issued by the acceptor to itself (issuer ==
+    // An offer token issued by the acceptor to itself (issuer ==
     // subject) carries no real counterparty and is denied.
     #[test]
     fn accept_fails_closed_on_self_issued_offer_token() {
@@ -1911,7 +1913,7 @@ mod tests {
         ));
     }
 
-    // ESCROW-1: an offer token outside its validity window is denied in both
+    // An offer token outside its validity window is denied in both
     // directions (not-yet-valid and expired).
     #[test]
     fn accept_fails_closed_on_offer_token_outside_validity_window() {
@@ -1959,7 +1961,7 @@ mod tests {
         ));
     }
 
-    // C1: the locked offer collateral cap must equal the signed quote amount.
+    // The locked offer collateral cap must equal the signed quote amount.
     #[test]
     fn accept_fails_closed_when_liability_cap_differs_from_quote() {
         let issuer = keypair(1);
@@ -2264,7 +2266,7 @@ mod tests {
             ));
         }
 
-        // Finding 7: a non-RFC3339 issued_at is rejected here, before `accept`
+        // A non-RFC3339 issued_at is rejected here, before `accept`
         // signs the packet, so the accept and the later verifier agree.
         let mut bad_timestamp = dispatch();
         bad_timestamp.issued_at = "2026-06-25 00:00:00".to_string();
@@ -2278,7 +2280,7 @@ mod tests {
         ));
     }
 
-    /// Finding 7: `accept` parses the settlement `issued_at` as RFC3339 BEFORE it
+    /// `accept` parses the settlement `issued_at` as RFC3339 BEFORE it
     /// signs the packet and locks custody, so a malformed timestamp (which the
     /// standard `validate_settlement_packet` verifier would later reject) can never
     /// lock custody or pin a context digest for an unverifiable settlement artifact.
@@ -2311,7 +2313,7 @@ mod tests {
         ));
     }
 
-    /// Finding 4: a release whose acceptance pairs THIS order's locked
+    /// A release whose acceptance pairs THIS order's locked
     /// ledger/context with a validly-signed settlement packet from a DIFFERENT
     /// order is denied. The accepted packet's canonical digest no longer matches
     /// the accepted context's pinned `settlement_packet_sha256`, so order B's
@@ -2395,7 +2397,7 @@ mod tests {
         assert_eq!(acceptance_a.ledger.status, CommerceEscrowStatus::Locked);
     }
 
-    // ESCROW-2: a tampered (unverifiable) reservation witness is denied; a bare
+    // A tampered (unverifiable) reservation witness is denied; a bare
     // fabricated amount can never lock custody.
     #[test]
     fn accept_fails_closed_on_unsigned_reservation_witness() {
@@ -2427,7 +2429,7 @@ mod tests {
         ));
     }
 
-    // ESCROW-2: a reservation witnessed for a DIFFERENT order cannot lock this
+    // A reservation witnessed for a DIFFERENT order cannot lock this
     // order's custody, even when signed by the expected authority.
     #[test]
     fn accept_fails_closed_on_reservation_bound_to_wrong_order() {
@@ -2461,7 +2463,7 @@ mod tests {
         ));
     }
 
-    // Finding 1 / ESCROW-2: a reservation signed by a CALLER-CHOSEN key that is
+    // A reservation signed by a CALLER-CHOSEN key that is
     // not a member of the pinned trusted reservation-authority set is denied. The
     // expected signer is sourced from the pinned set, NEVER echoed from the
     // receipt, so a holder cannot self-sign a witness and name their own key as
@@ -2523,7 +2525,7 @@ mod tests {
         ));
     }
 
-    // Finding 1 / ESCROW-2: an empty pinned trusted reservation-authority set
+    // An empty pinned trusted reservation-authority set
     // fails closed; with no trusted authority pinned, no witness can lock custody.
     #[test]
     fn accept_fails_closed_on_empty_trusted_reservation_authorities() {
@@ -2553,7 +2555,7 @@ mod tests {
         ));
     }
 
-    /// 765: the emitted settlement packet is bound to the advanced context's
+    /// The emitted settlement packet is bound to the advanced context's
     /// `settlement_packet_sha256`, which is pinned to the canonical digest of the
     /// signed packet body (not the inbound placeholder), so the accepted
     /// (context, packet) pair is internally consistent and verifiable.
@@ -2591,7 +2593,7 @@ mod tests {
         assert_ne!(acceptance.updated_context.settlement_packet_sha256, HEX64);
     }
 
-    /// 377: the accept-time settlement dispatch status is restricted to the
+    /// The accept-time settlement dispatch status is restricted to the
     /// dispatched/assembled state; a packet claiming a final `reconciled` or
     /// `settled` status while the escrow is merely locked is denied.
     #[test]
@@ -2624,7 +2626,7 @@ mod tests {
         }
     }
 
-    /// 816: release derives the spine prior state from the ADVANCED order
+    /// Release derives the spine prior state from the ADVANCED order
     /// context, never a caller-supplied argument. A release driven immediately
     /// after accept (the context still at `settlement_packet_assembled`) is
     /// denied even with a Matched observation, so the dispatched/observed steps
@@ -2674,7 +2676,7 @@ mod tests {
         assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
     }
 
-    /// REL-2: a Matched observation cannot be replayed across orders or escrows.
+    /// A Matched observation cannot be replayed across orders or escrows.
     /// A release whose advanced context names a DIFFERENT order, or carries a
     /// DIFFERENT pinned escrow digest, is denied before custody is drained.
     #[test]
@@ -2744,7 +2746,7 @@ mod tests {
         assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
     }
 
-    /// 801: a forged locked acceptance (its fields are public) cannot produce a
+    /// A forged locked acceptance (its fields are public) cannot produce a
     /// released ledger. Release re-derives the escrow digest from the ledger and
     /// re-verifies the settlement-packet signature, denying a tampered digest or
     /// an unsigned/forged packet.
@@ -2815,7 +2817,7 @@ mod tests {
         assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
     }
 
-    /// Batch 6 / Finding 1: a forged acceptance whose LEDGER is locked for a
+    /// A forged acceptance whose LEDGER is locked for a
     /// DIFFERENT order or beneficiary (but the same value) than the accepted ORDER
     /// CONTEXT is denied. The escrow-digest binding alone proves only that the
     /// context pins THIS ledger's digest; without binding the ledger's order id and
@@ -2943,7 +2945,7 @@ mod tests {
         assert_eq!(acceptance.ledger.status, CommerceEscrowStatus::Locked);
     }
 
-    /// Finding 1: a net-balanced ledger whose lock leg is funded by a DIFFERENT
+    /// A net-balanced ledger whose lock leg is funded by a DIFFERENT
     /// account than the declared depositor is denied. Conservation alone (net flow
     /// zero, custody holds the full amount) would accept it; binding the leg KINDS,
     /// ENDPOINTS, and AMOUNTS to the declared depositor/custody/beneficiary catches
@@ -3015,7 +3017,7 @@ mod tests {
         ));
     }
 
-    /// Finding 3: `accept` recomputes the canonical quote digest and denies a
+    /// `accept` recomputes the canonical quote digest and denies a
     /// context whose pinned `quote_sha256` does not match the canonical quote fields
     /// BEFORE it builds the ledger or locks custody, so an unverifiable quote (which
     /// `verify_commerce_order` would later reject) can never lock custody or sign a

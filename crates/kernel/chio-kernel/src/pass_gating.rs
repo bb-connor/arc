@@ -1,4 +1,4 @@
-//! Chio Pass data-stream access gating (M0 T5).
+//! Chio Pass data-stream access gating.
 //!
 //! The Chio Pass mints a permanent tier_0 baseline RIGHT: free Read/Subscribe
 //! over three aggregate trust feeds plus the holder's OWN receipts and OWN
@@ -23,8 +23,8 @@
 //!
 //! GIFT-BOUNDARY POSTURE (own receipts / own lineage). The read grants this
 //! module mints are the SCOPE boundary. They are NOT the disclosed-artifact
-//! boundary for the holder's own data. Per the fail-closed authority rule the
-//! disclosure binding (alignment C2) WINS over the spec-8.3 3-key strip: the
+//! boundary for the holder's own data. The disclosure binding is authoritative
+//! (a bare metadata strip is never sufficient for the own streams): the
 //! own-receipts/own-lineage gift (streams `3..=4`) MUST be emitted as a verified
 //! [`DisclosureLineageBundle`], routed ONLY through
 //! [`chio_disclosure_lineage::verify_disclosure_lineage_bundle`]. That artifact
@@ -41,8 +41,8 @@
 //! selection steps only, never the emitted artifact. [`project_pass_stream_view`]
 //! is likewise an INTERNAL whitelist-by-removal redaction step used ONLY for the
 //! three aggregate streams; it is deliberately weaker than the disclosure layer
-//! mandates and a raw-stream or 3-key-strip emission for the two own streams now
-//! fails fail-closed.
+//! mandates, and a raw-stream or metadata-strip emission for the two own streams
+//! fails closed.
 //!
 //! Naming note: `ChioPassStream` here is the gated data stream, distinct from the
 //! `ChioPass` soulbound credential in `chio-credentials`.
@@ -64,10 +64,10 @@ use crate::request_matching::{
     capability_matches_resource_request, capability_matches_resource_subscription,
 };
 
-/// Tool-server id the metered XCC compute grant pins (Section 2.7).
+/// Tool-server id the metered XCC compute grant pins.
 pub const PASS_COMPUTE_SERVER_ID: &str = "chio.pass.compute";
 
-/// Private-use allotment unit the metered grant denominates (Section 2.3). It is
+/// Private-use allotment unit the metered grant denominates. It is
 /// intentionally never priced, so it carries no money leg.
 pub const PASS_ALLOTMENT_UNIT: &str = "XCC";
 
@@ -78,7 +78,7 @@ pub const PASS_COST_METADATA_SCHEMA: &str = "chio.cost-metadata.v1";
 
 /// Custom cost-dimension name the free-tier XCC allotment debit is recorded under
 /// on served receipts. This MUST stay byte-identical to
-/// `chio_credentials::CHIO_PASS_ALLOTMENT_COST_NAME` so the CONTROL 3 genuine-use
+/// `chio_credentials::CHIO_PASS_ALLOTMENT_COST_NAME` so the genuine-use
 /// scan (which reads `metadata["cost"].dimensions[].name`) recognizes a real
 /// metered Pass debit. The kernel cannot depend on `chio-credentials`, so the two
 /// literals are kept in lockstep.
@@ -86,7 +86,7 @@ pub const PASS_ALLOTMENT_COST_NAME: &str = "chio.pass.allotment.v1";
 
 /// Stamp the free-tier XCC allotment debit onto a served receipt's `metadata`.
 ///
-/// CONTROL 3 binding: the genuine-use scan recognizes a real metered Pass debit by
+/// Genuine-use binding: the scan recognizes a real metered Pass debit by
 /// a `metadata["cost"].dimensions[]` entry whose `name == PASS_ALLOTMENT_COST_NAME`
 /// and `value > 0`. A normal Pass invocation does not inject a custom `cost` block,
 /// so without this the kernel-charged XCC debit would scan as non-genuine and the
@@ -275,7 +275,7 @@ pub fn uri_is_pass_denied(uri: &str) -> bool {
 }
 
 /// Validates that the single metered tool grant is the canonical XCC compute
-/// allotment (Section 2.7): `server_id == chio.pass.compute`, `tool_name == "*"`,
+/// allotment: `server_id == chio.pass.compute`, `tool_name == "*"`,
 /// `operations == [Invoke]`, a positive-unit XCC `max_cost_per_invocation`, and
 /// an XCC `max_total_cost`.
 fn validate_metered_grant(grant: &ToolGrant) -> Result<(), KernelError> {
@@ -419,7 +419,7 @@ fn pass_attestation_window(issued_at: u64) -> Result<AttestationWindowId, Kernel
     })
 }
 
-/// Kernel admission assertion (B7, M0 T6): a Pass-shaped capability MUST carry the
+/// Kernel admission assertion: a Pass-shaped capability MUST carry the
 /// deterministic, window-scoped `chiopass:<hash>` id.
 ///
 /// A capability is Pass-shaped when EITHER its id carries the
@@ -521,7 +521,7 @@ pub fn pass_receipt_read_context(subject_tenant: &str) -> Result<ReceiptReadCont
 /// only (see the module-level gift-boundary posture). It removes every key in
 /// [`PASS_REDACTED_METADATA_KEYS`] from `metadata` and stamps
 /// `redaction: "summary"`. It never mutates or re-signs the stored artifact, and
-/// the CONTROL 3 genuine-use scan reads the STORED receipt directly, so stripping
+/// the genuine-use scan reads the STORED receipt directly, so stripping
 /// `"cost"` from the served view does not affect that scan.
 ///
 /// # Errors
@@ -609,7 +609,7 @@ pub enum PassStreamSelection<'a> {
     OwnDataBundle(&'a DisclosureLineageBundle),
 }
 
-/// Per-stream emission dispatcher (M1-13). Routes the two OWN streams through the
+/// Per-stream emission dispatcher. Routes the two OWN streams through the
 /// verified [`DisclosureLineageBundle`] boundary and the three aggregate streams
 /// through the redacted view. Fail-closed: an OWN stream fed a raw/3-key-strip
 /// body is denied, and an aggregate stream fed a bundle is denied.
@@ -1198,7 +1198,7 @@ mod tests {
 
     #[test]
     fn admission_rejects_uuid_id_bearing_the_xcc_metered_grant() {
-        // B7: a non-canonical (UUIDv7) mint site stamped an XCC Pass scope. The
+        // A non-canonical (UUIDv7) mint site stamped an XCC Pass scope. The
         // missing chiopass: prefix is rejected at admission, closing the three
         // other mint sites (chio-kernel/chio-store-sqlite/chio-http-core).
         let subject = Keypair::generate();
@@ -1238,7 +1238,7 @@ mod tests {
 
     #[test]
     fn allotment_cost_name_matches_credential_layer_literal() {
-        // PR957 codex P1: the kernel-stamped dimension name MUST stay byte-identical
+        // The kernel-stamped dimension name MUST stay byte-identical
         // to the credential-layer constant the genuine-use scan keys on.
         assert_eq!(PASS_ALLOTMENT_COST_NAME, "chio.pass.allotment.v1");
         assert_eq!(PASS_COST_METADATA_SCHEMA, "chio.cost-metadata.v1");
@@ -1246,7 +1246,7 @@ mod tests {
 
     #[test]
     fn stamp_allotment_dimension_creates_cost_block_when_absent() {
-        // PR957 codex P1: a normal Pass invocation carries no custom `cost` block;
+        // A normal Pass invocation carries no custom `cost` block;
         // the stamp must create one so the genuine-use scan recognizes the debit.
         let stamped = stamp_pass_allotment_cost_dimension(None, 7);
         let dimensions = stamped
@@ -1339,7 +1339,7 @@ mod tests {
         assert!(assert_pass_capability_id_deterministic(&token).is_ok());
     }
 
-    // -- M1-13: own-data gift as a verified DisclosureLineageBundle ------------
+    // -- Own-data gift as a verified DisclosureLineageBundle -------------------
 
     use chio_core_types::sha256_hex;
     use chio_disclosure_lineage::{
@@ -1856,7 +1856,7 @@ mod tests {
         ));
     }
 
-    // -- M1-14: five-stream day-zero gift parity + Gate 4 hardening -------------
+    // -- Five-stream day-zero gift parity + cross-tenant hardening --------------
 
     #[test]
     fn day_zero_tier0_gifts_all_five_streams_at_pinned_indices() {

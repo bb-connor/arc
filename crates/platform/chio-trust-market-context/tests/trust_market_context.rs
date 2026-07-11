@@ -1975,7 +1975,7 @@ fn trust_market_rejects_untrusted_risk_sanction_jurisdiction_receipt() {
 }
 
 // ---------------------------------------------------------------------------
-// RR2-TM-01 market-authority registry resolver (M1-17)
+// RR2-TM-01 market-authority registry resolver
 //
 // The pinned RR2-TM-01 registry is the provenance for both the Pass
 // `accepted_kernel_keys` and the commerce-proof market-authority trust roots.
@@ -2286,7 +2286,7 @@ fn trust_market_rejects_tampered_provider_assertion_digest() {
 }
 
 // ---------------------------------------------------------------------------
-// Pass portable-reputation eligibility + trust-tier reconciliation (M1-16)
+// Pass portable-reputation eligibility + trust-tier reconciliation
 //
 // Pass eligibility is bound to the SAME provider-admission substrate the
 // marketplace verifies: it routes through validate_reputation_import (no parallel

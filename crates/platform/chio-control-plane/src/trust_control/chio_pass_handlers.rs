@@ -146,17 +146,17 @@ impl ChioPassConfig {
         }
     }
 
-    /// The single board-approved M1 launch defaults (task M1-1).
+    /// The single board-approved launch defaults.
     ///
-    /// Returns ONE fail-closed [`ChioPassConfig`] pinned to the M1 launch numbers.
-    /// Unlike [`Self::m0_placeholder`] (kept intact for the existing T9/T10 wiring
-    /// tests), the board-approved governance numbers are pinned HERE; the only
-    /// caller-supplied input is `accepted_kernel_keys`, because the trusted-kernel
-    /// allowlist is sourced from the trust-market market-authority registry
-    /// RR2-TM-01 and its membership rotates per rotation epoch, so it is loaded from
-    /// that registry at install time, never hard-coded into this binary. The
-    /// returned surface still loads fail-closed: [`Self::validate`] rejects it when
-    /// the supplied `accepted_kernel_keys` is empty.
+    /// Returns ONE fail-closed [`ChioPassConfig`] pinned to the launch numbers.
+    /// Unlike [`Self::m0_placeholder`], the board-approved governance numbers are
+    /// pinned HERE; the only caller-supplied input is `accepted_kernel_keys`,
+    /// because the trusted-kernel allowlist is sourced from the trust-market
+    /// market-authority registry and its membership rotates per rotation epoch,
+    /// so it is loaded from that registry at install time, never hard-coded into
+    /// this binary. The returned surface still loads fail-closed:
+    /// [`Self::validate`] rejects it when the supplied `accepted_kernel_keys` is
+    /// empty.
     ///
     /// Pinned launch defaults:
     /// - tier -> units 1000 / 1000 / 2500 / 5000 (unverified / attested / verified /
@@ -164,21 +164,21 @@ impl ChioPassConfig {
     ///   unconditional; the tier scales allotment SIZE only, never existence.
     /// - allotment unit XCC ([`CHIO_PASS_ALLOTMENT_UNIT`]); the per-invocation XCC
     ///   cost is the committed positive floor, so the metered grant's
-    ///   `max_cost_per_invocation.units > 0` always holds and the CONTROL 1 pool
+    ///   `max_cost_per_invocation.units > 0` always holds and the free-tier pool
     ///   co-debit bounds spend (it can never request zero units).
     /// - `window_token_capacity` / `active_population_cap`: anti-farm throttle
-    ///   placeholders (Section 6.1).
+    ///   placeholders.
     /// - `min_genuine_use_receipts`: the committed spec floor.
     #[must_use]
-    pub fn m1_launch_default(accepted_kernel_keys: Vec<PublicKey>) -> Self {
+    pub fn launch_default(accepted_kernel_keys: Vec<PublicKey>) -> Self {
         // BOARD-PENDING: replace with the ratified launch governance reference once
         // the board vote lands. This audit-only ref records provenance and never
         // enters any arithmetic; it is non-empty so `validate` accepts the surface.
         let board_approval_ref = "board-approval-pending/chio-pass-M1-launch".to_string();
         // BOARD-PENDING: monthly aggregate free-tier POOL ceiling, in XCC. Documented
         // launch default = active_population_cap (100_000) x the attested tier floor
-        // (1_000 XCC). CONTROL 1 makes liability min(N x allotment, pool), so the
-        // gift degrades to "the pool shrinks", never "the treasury drains".
+        // (1_000 XCC). The pool ceiling makes liability min(N x allotment, pool), so
+        // the gift degrades to "the pool shrinks", never "the treasury drains".
         let monthly_pool_units: u64 = 100_000_000;
         Self {
             free_tier_pool: FreeTierPoolConfig {
@@ -187,7 +187,7 @@ impl ChioPassConfig {
                 board_approval_ref: board_approval_ref.clone(),
             },
             // tier -> units 1000 / 1000 / 2500 / 5000 (unverified/attested/verified/
-            // premier): the committed M1 launch allotment table.
+            // premier): the committed launch allotment table.
             tier_allotment_table: TierAllotmentTable::default(),
             window_token_capacity: 10_000,  // placeholder
             active_population_cap: 100_000, // placeholder
@@ -198,8 +198,8 @@ impl ChioPassConfig {
             min_genuine_use_receipts: MIN_GENUINE_USE_RECEIPTS,
             board_approval_ref,
             // Non-empty by contract: the launch trusted-kernel-key allowlist is
-            // sourced from the trust-market market-authority registry RR2-TM-01 and
-            // rotates per rotation epoch. `validate` rejects an empty set fail-closed
+            // sourced from the trust-market market-authority registry and rotates
+            // per rotation epoch. `validate` rejects an empty set fail-closed
             // (an empty allowlist would silently force every identity dormant).
             accepted_kernel_keys,
         }
@@ -944,25 +944,25 @@ mod tests {
         (did, key_hex, window, capability_id)
     }
 
-    // ---- M1-12 launch evidence: e2e Pass issue -> mint -> charge -> read ->
-    //      rollover + dormant (spec Section 8.3 launch Gates 2 and 5). ----
+    // ---- Launch evidence: e2e Pass issue -> mint -> charge -> read ->
+    //      rollover + dormant. ----
     //
     // The metered XCC grant is charged through the PUBLIC
     // `evaluate_tool_call_blocking` pipeline. That is the only public charge
     // surface (the lower-level `check_and_increment_budget` is crate-private to
     // chio-kernel), and it is the faithful "REAL kernel charge": the call runs
-    // the full admission path (the B7 deterministic-id gate at
+    // the full admission path (the deterministic-id gate at
     // `assert_pass_capability_id_deterministic`), the per-Pass `(cap.id, 0)`
-    // budget row, AND the CONTROL-1 `freetier:global:<YYYY-MM>` pool co-debit.
+    // budget row, AND the aggregate `freetier:global:<YYYY-MM>` pool co-debit.
     // The deterministic `chiopass:<hash>` id minted by `LocalCapabilityAuthority`
-    // is what lets the Pass clear B7 (a naive XCC-bearing capability is rejected
-    // at admission). Budget rows are read back through the installed `BudgetStore`
-    // handle. The attestation window is derived from the real wall clock (see
-    // `current_window`), so the minted Pass is always time-valid at the wall
-    // clock the pipeline reads, whatever month the suite runs in.
+    // is what lets the Pass clear that gate (a naive XCC-bearing capability is
+    // rejected at admission). Budget rows are read back through the installed
+    // `BudgetStore` handle. The attestation window is derived from the real wall
+    // clock (see `current_window`), so the minted Pass is always time-valid at
+    // the wall clock the pipeline reads, whatever month the suite runs in.
 
     /// Build a kernel wired exactly as the Pass free-tier path needs it: the
-    /// CONTROL-1 pool installed, a caller-held `BudgetStore` handle (so the test
+    /// aggregate free-tier pool installed, a caller-held `BudgetStore` handle (so the test
     /// can read `(cap.id, 0)` and `freetier:global:*` rows back), and a
     /// `chio.pass.compute` tool server so an admitted metered charge dispatches
     /// and commits. `ca_public_keys` pins the trusted capability issuers so the
@@ -976,7 +976,7 @@ mod tests {
             keypair: Keypair::generate(),
             ca_public_keys,
             max_delegation_depth: 5,
-            policy_hash: "m1-12-e2e-policy".to_string(),
+            policy_hash: "pass-e2e-policy".to_string(),
             allow_sampling: false,
             allow_sampling_tool_use: false,
             allow_elicitation: false,
@@ -991,13 +991,13 @@ mod tests {
         let pool = FreeTierPoolConfig {
             monthly_pool_units: pool_units,
             allotment_unit: CHIO_PASS_ALLOTMENT_UNIT.to_string(),
-            board_approval_ref: "board-2026-06-m1-12".to_string(),
+            board_approval_ref: "board-2026-06-pass-e2e".to_string(),
         };
         let mut kernel = ChioKernel::new(config)
             .with_free_tier_pool(pool)
             .expect("install free-tier pool");
         kernel.set_budget_store_handle(budget_store.clone());
-        let service = NativeChioServiceBuilder::new(PASS_COMPUTE_SERVER_ID, "m1-12-pass-compute")
+        let service = NativeChioServiceBuilder::new(PASS_COMPUTE_SERVER_ID, "pass-e2e-compute")
             .tool(
                 NativeTool::new("run", "metered pass compute", serde_json::json!({})),
                 |arguments| Ok(serde_json::json!({ "echo": arguments })),
@@ -1065,7 +1065,7 @@ mod tests {
 
     #[test]
     #[allow(clippy::too_many_lines)]
-    fn e2e_pass_issue_charge_rollover_dormant_gates_2_and_5() {
+    fn e2e_pass_issue_charge_rollover_dormant() {
         let issuer = Keypair::generate();
         let authority_key = Keypair::generate();
         let authority_pub = authority_key.public_key();
@@ -1074,14 +1074,15 @@ mod tests {
         // any non-empty allowlist keeps the orchestrator config fail-closed valid.
         let config = config_with_keys(vec![Keypair::generate().public_key()]);
 
-        // A dedicated trusted signer for the B7 negative token below, so its
-        // pipeline denial is attributable to the B7 gate, not an untrusted issuer.
-        let b7_signer = Keypair::generate();
+        // A dedicated trusted signer for the non-deterministic-id negative token
+        // below, so its pipeline denial is attributable to the deterministic-id
+        // gate, not an untrusted issuer.
+        let nondet_signer = Keypair::generate();
         let (kernel, store) =
-            wired_pass_kernel(vec![authority_pub, b7_signer.public_key()], 1_000_000);
+            wired_pass_kernel(vec![authority_pub, nondet_signer.public_key()], 1_000_000);
 
         // ================================================================
-        // GATE 2 (re-mint-reset-closed): a deterministic id maps to ONE row.
+        // Re-mint-reset-closed: a deterministic id maps to ONE row.
         // ================================================================
         let subject = Keypair::generate();
         let (did, _key_hex, window, expected_cap_id) = subject_context(&subject);
@@ -1089,7 +1090,7 @@ mod tests {
         let current_pool_term =
             FreeTierPoolConfig::window_ym_from_issued_at(window.since).expect("current pool term");
 
-        // (2a) Two Passes minted for the SAME subject+window are byte-identical.
+        // (1a) Two Passes minted for the SAME subject+window are byte-identical.
         let pass_a = issue_chio_pass_command(
             &config,
             &authority,
@@ -1119,10 +1120,10 @@ mod tests {
             "a re-mint in the same window yields a byte-identical capability id"
         );
 
-        // (2b) Charge BOTH through the real kernel; they land on ONE per-Pass row.
+        // (1b) Charge BOTH through the real kernel; they land on ONE per-Pass row.
         let resp_a = kernel
             .evaluate_tool_call_blocking(&pass_tool_request(
-                "g2-a",
+                "remint-a",
                 &pass_a.capability,
                 &subject.public_key(),
             ))
@@ -1136,7 +1137,7 @@ mod tests {
         assert_eq!(committed_units_in(&store, &expected_cap_id), 1);
         let resp_b = kernel
             .evaluate_tool_call_blocking(&pass_tool_request(
-                "g2-b",
+                "remint-b",
                 &pass_b.capability,
                 &subject.public_key(),
             ))
@@ -1162,7 +1163,7 @@ mod tests {
             "both charges co-debit the SAME freetier:global pool row for the window"
         );
 
-        // (2c) Past `until` the old token is denied; the next window is a FRESH row.
+        // (1c) Past `until` the old token is denied; the next window is a FRESH row.
         assert!(
             pass_a.capability.validate_time(minted_at).is_ok(),
             "the token is valid inside its window"
@@ -1206,47 +1207,47 @@ mod tests {
             "the next window opens a FRESH freetier:global pool row (the monthly reset is a clean slate)"
         );
 
-        // (2d) B7: a non-deterministic (UUIDv7-style) id carrying the XCC metered
+        // (1d) A non-deterministic (UUIDv7-style) id carrying the XCC metered
         //      grant is rejected at admission.
-        let b7_subject = Keypair::generate();
+        let nondet_subject = Keypair::generate();
         let xcc_scope = build_pass_scope(&pass_a.pass, &did).expect("xcc metered scope");
         let nondeterministic = CapabilityToken::sign(
             CapabilityTokenBody {
                 id: "cap-018f9b2c-7e3a-7c91-a0b2-uuidv7nonpassid".to_string(),
-                issuer: b7_signer.public_key(),
-                subject: b7_subject.public_key(),
+                issuer: nondet_signer.public_key(),
+                subject: nondet_subject.public_key(),
                 scope: xcc_scope,
                 issued_at: window.since,
                 expires_at: window.until,
                 delegation_chain: vec![],
             },
-            &b7_signer,
+            &nondet_signer,
         )
         .expect("sign non-deterministic Pass-shaped token");
         assert!(
             assert_pass_capability_id_deterministic(&nondeterministic).is_err(),
-            "B7: a UUIDv7-id token carrying the XCC metered grant must be rejected"
+            "a UUIDv7-id token carrying the XCC metered grant must be rejected"
         );
-        let b7_resp = kernel
+        let nondet_resp = kernel
             .evaluate_tool_call_blocking(&pass_tool_request(
-                "g2-b7",
+                "nondet-id",
                 &nondeterministic,
-                &b7_subject.public_key(),
+                &nondet_subject.public_key(),
             ))
-            .expect("B7 admission evaluation");
+            .expect("non-deterministic-id admission evaluation");
         assert_eq!(
-            b7_resp.verdict,
+            nondet_resp.verdict,
             Verdict::Deny,
-            "B7 denies the non-deterministic Pass-shaped capability at admission"
+            "the deterministic-id gate denies the non-deterministic Pass-shaped capability at admission"
         );
         assert_eq!(
-            receipt_cost_charged(&b7_resp.receipt),
+            receipt_cost_charged(&nondet_resp.receipt),
             0,
-            "a B7-denied call charges nothing"
+            "a denied non-deterministic call charges nothing"
         );
 
         // ================================================================
-        // GATE 5 (dormant-stops-drawing): a 0-ceiling metered draw denies
+        // Dormant-stops-drawing: a 0-ceiling metered draw denies
         // fail-closed, but the five gifted streams stay readable.
         // ================================================================
         let dormant_subject = Keypair::generate();
@@ -1261,7 +1262,7 @@ mod tests {
             "contiguous prior -> current rollover"
         );
         let empty_store = {
-            let path = unique_db_path("m1-12-dormant");
+            let path = unique_db_path("pass-e2e-dormant");
             SqliteReceiptStore::open(&path).expect("open empty receipt store")
         };
         let refresh = refresh_chio_pass_window(
@@ -1295,10 +1296,10 @@ mod tests {
             "the dormant metered grant carries a 0 ceiling"
         );
 
-        // (5a) The metered draw denies fail-closed: BudgetExhausted -> cost_charged == 0.
+        // (2a) The metered draw denies fail-closed: BudgetExhausted -> cost_charged == 0.
         let dormant_resp = kernel
             .evaluate_tool_call_blocking(&pass_tool_request(
-                "g5-draw",
+                "dormant-draw",
                 &dormant.capability,
                 &dormant_subject.public_key(),
             ))
@@ -1324,7 +1325,7 @@ mod tests {
             "nothing stuck to the dormant Pass row (the per-Pass hold was reversed)"
         );
 
-        // (5b) Every one of the five gifted streams STILL authorizes a read for the
+        // (2b) Every one of the five gifted streams STILL authorizes a read for the
         //      SAME dormant token: dormant stops the metered draw, never the gift.
         let gifted_uris = pass_baseline_read_uris(&dormant_did).expect("baseline read uris");
         assert_eq!(
@@ -1638,14 +1639,14 @@ mod tests {
     }
 
     #[test]
-    fn m1_launch_default_validates_and_rejects_empty_keys() {
-        // The single board-approved M1 launch surface validates fail-closed when the
-        // registry RR2-TM-01 trusted-kernel key set is non-empty.
+    fn launch_default_validates_and_rejects_empty_keys() {
+        // The single board-approved launch surface validates fail-closed when the
+        // market-authority-registry trusted-kernel key set is non-empty.
         let key = Keypair::generate().public_key();
-        let config = ChioPassConfig::m1_launch_default(vec![key]);
+        let config = ChioPassConfig::launch_default(vec![key]);
         config
             .validate()
-            .expect("m1 launch default validates fail-closed");
+            .expect("launch default validates fail-closed");
 
         // Pinned launch defaults: tier -> units 1000 / 1000 / 2500 / 5000 in XCC.
         assert_eq!(config.tier_allotment_table.unverified, 1000);
@@ -1988,7 +1989,7 @@ mod tests {
         );
     }
 
-    // -- M1-20: mock ChioRootRegistry publishRoot + verifyInclusionDetailed ----
+    // -- Mock ChioRootRegistry publishRoot + verifyInclusionDetailed -----------
     //
     // A value-free, in-memory mirror of the on-chain `ChioRootRegistry`
     // (contracts/src/ChioRootRegistry.sol). It reproduces exactly the two calls
@@ -2345,7 +2346,7 @@ mod tests {
         );
     }
 
-    // -- M1-14: Gate 4 cross-tenant + byte-identity hardening ------------------
+    // -- Cross-tenant denial + byte-identity hardening -------------------------
 
     /// Issue a first-window Pass for `subject` at `tier`, returning the full
     /// issuance (the soulbound Pass plus its minted window-scoped capability).

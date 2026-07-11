@@ -938,7 +938,7 @@ include!("credit/capital_and_execution.rs");
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod do_not_weaken {
-    //! DO-NOT-WEAKEN regression suite (M1-7).
+    //! DO-NOT-WEAKEN regression suite.
     //!
     //! Three credit invariants are frozen here:
     //!
