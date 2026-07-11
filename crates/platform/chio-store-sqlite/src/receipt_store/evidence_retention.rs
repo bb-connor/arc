@@ -536,6 +536,84 @@ fn ensure_archive_file_exists(archive_path: &str) -> Result<(), ReceiptStoreErro
     Ok(())
 }
 
+/// Reject an archive target that could destroy the only copy of the evidence a
+/// rotation is about to delete.
+///
+/// `ATTACH DATABASE` accepts non-durable and aliasing targets that silently
+/// break the co-archive-then-delete contract:
+///
+/// - An in-memory or temporary target (`:memory:`, an empty path, or a
+///   `mode=memory` URI) is destroyed on `DETACH`, so co-archiving into it and
+///   then deleting the live prefix leaves no copy of the archived rows behind a
+///   recorded watermark.
+/// - A target that aliases the live database (the same path, or a hard link to
+///   it) makes SQLite attach the live file itself as `archive`, so the
+///   co-archival identity checks compare the table to itself and pass trivially,
+///   then the delete removes the only copy while still recording a watermark.
+///
+/// Fail closed on both before the ATTACH so a rotation never records a watermark
+/// it cannot back with durable, independent evidence.
+fn ensure_durable_distinct_archive_path(
+    connection: &rusqlite::Connection,
+    archive_path: &str,
+) -> Result<(), ReceiptStoreError> {
+    let trimmed = archive_path.trim();
+    let lowered = trimmed.to_ascii_lowercase();
+    if trimmed.is_empty() || lowered == ":memory:" || lowered.contains("mode=memory") {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "retention archive path {archive_path:?} is not a durable database file; refusing to \
+             co-archive evidence into a target destroyed on detach"
+        )));
+    }
+    // The live main database's backing file. Empty for an in-memory/temporary
+    // main store, which cannot alias a file archive, so the alias check is
+    // skipped in that case (the durable-target check above still applies).
+    let main_file: String = connection
+        .query_row(
+            "SELECT file FROM pragma_database_list WHERE name = 'main'",
+            [],
+            |row| row.get::<_, Option<String>>(0),
+        )
+        .optional()?
+        .flatten()
+        .unwrap_or_default();
+    if !main_file.is_empty() && archive_path_aliases_live(&main_file, trimmed) {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "retention archive path {archive_path:?} aliases the live database; refusing to archive \
+             a store into itself"
+        )));
+    }
+    Ok(())
+}
+
+/// True when `archive_path` names the same on-disk file as the live database:
+/// an identical path string, the same file after resolving symlinks and
+/// `.`/`..`, or (on Unix) the same device+inode as a hard link.
+fn archive_path_aliases_live(main_file: &str, archive_path: &str) -> bool {
+    if main_file == archive_path {
+        return true;
+    }
+    let resolved = |path: &str| std::fs::canonicalize(std::path::Path::new(path)).ok();
+    if let (Some(main), Some(archive)) = (resolved(main_file), resolved(archive_path)) {
+        if main == archive {
+            return true;
+        }
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if let (Ok(main), Ok(archive)) = (
+            std::fs::metadata(main_file),
+            std::fs::metadata(archive_path),
+        ) {
+            if main.dev() == archive.dev() && main.ino() == archive.ino() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// Entry point run on the single writer connection by the `Rotate` command.
 pub(super) fn rotate_on_writer_connection(
     connection: &mut rusqlite::Connection,
@@ -581,6 +659,7 @@ fn archive_range(
     }
     let w = sqlite_i64(watermark, "archival watermark")?;
 
+    ensure_durable_distinct_archive_path(connection, archive_path)?;
     ensure_archive_file_exists(archive_path)?;
     let escaped_path = archive_path.replace('\'', "''");
     connection.execute_batch(&format!("ATTACH DATABASE '{escaped_path}' AS archive"))?;
@@ -1087,6 +1166,7 @@ pub(super) fn retention_repair_on_writer(
     // 2. Assert every extra id is present in the archive, and its range is
     //    checkpoint-covered. Refuse otherwise (never delete a non-archived row,
     //    never touch the uncheckpointed suffix).
+    ensure_durable_distinct_archive_path(connection, archive_path)?;
     ensure_archive_file_exists(archive_path)?;
     let escaped = archive_path.replace('\'', "''");
     connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;

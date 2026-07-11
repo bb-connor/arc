@@ -912,6 +912,78 @@ fn first_rotation_creates_archive_on_open_existing_store() -> Result<(), Box<dyn
     Ok(())
 }
 
+/// Rotation co-archives evidence and then deletes the live prefix, so it must
+/// refuse a non-durable or self-aliasing archive target. An in-memory database
+/// is destroyed on DETACH, and a path that aliases the live database makes
+/// SQLite attach the live file itself; either way the delete would remove the
+/// only copy of the archived evidence while still recording a watermark. The
+/// rotation must fail closed and delete nothing.
+#[test]
+fn rotation_rejects_non_durable_or_aliasing_archive_path() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("nondurable-archive");
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for i in 0..4u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("nd-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    store.flush_receipt_writes()?;
+
+    // An in-memory archive target is destroyed on DETACH: the rotation must
+    // reject it before archiving-and-deleting the live prefix.
+    let memory_error = store
+        .archive_receipts_before(150, ":memory:")
+        .err()
+        .ok_or("rotation into an in-memory archive must fail closed")?;
+    assert!(
+        matches!(memory_error, ReceiptStoreError::Conflict(_)),
+        "expected a fail-closed Conflict over a non-durable archive, got {memory_error:?}"
+    );
+
+    // An archive path that aliases the live database is rejected the same way:
+    // attaching the live file as `archive` would let the delete destroy the only
+    // copy.
+    let live_path = path.to_str().ok_or("db path invalid")?;
+    let alias_error = store
+        .archive_receipts_before(150, live_path)
+        .err()
+        .ok_or("rotation into a self-aliasing archive must fail closed")?;
+    assert!(
+        matches!(alias_error, ReceiptStoreError::Conflict(_)),
+        "expected a fail-closed Conflict over a self-aliasing archive, got {alias_error:?}"
+    );
+
+    // Fail-closed: no evidence was deleted; the live prefix is intact.
+    let live = store.reader_connection_for_test()?;
+    let live_tool: i64 = live.query_row("SELECT COUNT(*) FROM chio_tool_receipts", [], |row| {
+        row.get(0)
+    })?;
+    assert_eq!(
+        live_tool, 4,
+        "no receipts may be deleted on a rejected archive target"
+    );
+    let live_log: i64 = live.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        live_log, 4,
+        "no claim-log rows may be deleted on a rejected archive target"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 /// A rotation is an in-flight writer, so `dispatch_rotate` increments
 /// `writer.inflight` before sending the Rotate
 /// command and the actor's Rotate arm must decrement it on dequeue. Without the
