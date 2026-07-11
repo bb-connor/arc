@@ -597,6 +597,80 @@ fn child_only_evidence_ages_out_under_time_trigger() -> Result<(), Box<dyn std::
     Ok(())
 }
 
+/// The time and size triggers are independent: a store over its size limit must
+/// still rotate even when the age cutoff would archive nothing. A checkpoint ages
+/// out only when its ENTIRE prefix is older than the cutoff, so a still-fresh
+/// receipt at the head of the prefix blocks the age cutoff for every batch.
+/// Resolving that no-op age cutoff and returning before the size check would
+/// leave an oversized store oversized forever; the size cutoff must apply on the
+/// same pass.
+#[test]
+fn size_trigger_applies_when_time_cutoff_is_a_noop() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("retention-size-fallthrough");
+    let archive = unique_db_path("retention-size-fallthrough-archive");
+    let keypair = super::support::receipt_test_keypair();
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    // entry_seq -> timestamp. Entry 1 is still inside the 10-day window, so it
+    // blocks the age cutoff for the whole prefix; entry 2 is well aged, so the
+    // time trigger still fires. Entry 4 is brand new, so the median+1 size cutoff
+    // frees only the first checkpoint batch [1,2], not [3,4].
+    let timestamps = [
+        now.saturating_sub(500_000),
+        now.saturating_sub(2_000_000),
+        now.saturating_sub(100_000),
+        now,
+    ];
+    for (i, ts) in timestamps.iter().enumerate() {
+        let receipt = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("fallthrough-{i}"),
+            (i + 1) as u64,
+            *ts,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(
+        store.load_checkpoint_by_seq(2)?.is_some(),
+        "both checkpoint batches must be persisted before rotation"
+    );
+
+    // Time trigger fires (entry 2 is well past the 10-day window) but its cutoff
+    // archives nothing (entry 1 is still fresh at the head of the prefix). The
+    // store is over the size limit, so the size cutoff must free the first aged
+    // checkpoint batch on the same pass.
+    let config = RetentionConfig {
+        retention_days: 10,
+        max_size_bytes: 1,
+        archive_path: archive.to_str().ok_or("archive path invalid")?.to_string(),
+        ..RetentionConfig::default()
+    };
+    let archived = store.rotate_if_needed(&config)?;
+    assert_eq!(
+        archived, 2,
+        "the size cutoff must free the first checkpoint batch even though the age cutoff is a no-op"
+    );
+
+    let after = store.reader_connection_for_test()?;
+    let live_tool: i64 = after.query_row("SELECT COUNT(*) FROM chio_tool_receipts", [], |row| {
+        row.get(0)
+    })?;
+    assert_eq!(
+        live_tool, 2,
+        "the aged first batch was archived and deleted; the fresh batch stayed live"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// A rotation is an in-flight writer, so `dispatch_rotate` increments
 /// `writer.inflight` before sending the Rotate
 /// command and the actor's Rotate arm must decrement it on dequeue. Without the

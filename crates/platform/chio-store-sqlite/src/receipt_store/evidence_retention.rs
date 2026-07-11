@@ -452,9 +452,19 @@ fn resolve_rotation_cutoff(
         [],
         |row| row.get::<_, Option<i64>>(0),
     )?;
+    // Both triggers are evaluated and the rotation uses whichever cutoff frees
+    // more (the max). The time cutoff alone can archive nothing, for example when
+    // a still-fresh receipt sits early in the checkpointed prefix, because
+    // `compute_archival_watermark` requires a checkpoint's ENTIRE covered prefix
+    // to be older than the cutoff. Returning that cutoff before the size check
+    // would let an oversized store stay oversized indefinitely even while the
+    // size trigger is exceeded, since the maintenance worker would keep applying
+    // a no-op time cutoff. Taking the max lets the size-relief cutoff apply
+    // whenever the store is over its limit, independent of the time trigger.
+    let mut cutoff: Option<u64> = None;
     if let Some(oldest_ts) = oldest {
         if (oldest_ts.max(0) as u64) < time_cutoff {
-            return Ok(Some(time_cutoff));
+            cutoff = Some(time_cutoff);
         }
     }
     // Size trigger: measured against live_db_size_bytes (freelist-adjusted),
@@ -479,10 +489,11 @@ fn resolve_rotation_cutoff(
             // `max_size_bytes`. Advance the cutoff one second past the median so
             // receipts at the median become eligible and a checkpointed prefix
             // can actually age out.
-            return Ok(Some((median_ts.max(0) as u64).saturating_add(1)));
+            let size_cutoff = (median_ts.max(0) as u64).saturating_add(1);
+            cutoff = Some(cutoff.map_or(size_cutoff, |current| current.max(size_cutoff)));
         }
     }
-    Ok(None)
+    Ok(cutoff)
 }
 
 /// Live logical size backing `SqliteReceiptStore::live_db_size_bytes`:
