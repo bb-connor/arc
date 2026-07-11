@@ -50,6 +50,7 @@ chio-mcp-edge = { path = "../crates/protocol/chio-mcp-edge", features = ["fuzz"]
 chio-openapi-mcp-bridge = { path = "../crates/protocol/chio-openapi-mcp-bridge", features = ["fuzz"] }
 chio-policy = { path = "../crates/guards/chio-policy" }
 chio-revocation-oracle = { path = "../crates/trust/chio-revocation-oracle" }
+chio-settle = { path = "../crates/economy/chio-settle", features = ["fuzz"] }
 chio-wasm-guards = { path = "../crates/guards/chio-wasm-guards", features = ["fuzz"] }
 libfuzzer-sys = "0.4"
 # `derive` feature lets per-target structs use `#[derive(Arbitrary)]`.
@@ -141,6 +142,13 @@ bench = false
 [[bin]]
 name = "receipt_log_replay"
 path = "fuzz_targets/receipt_log_replay.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "settlement_approval_witness"
+path = "fuzz_targets/settlement_approval_witness.rs"
 test = false
 doc = false
 bench = false

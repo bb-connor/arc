@@ -1070,7 +1070,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "tracing",
  "ureq",
  "url",
  "webpki-roots 0.26.11",
@@ -1115,7 +1114,6 @@ dependencies = [
  "hex",
  "opentimestamps",
  "p256",
- "pem",
  "reqwest 0.13.3",
  "serde",
  "serde_json",
@@ -1152,7 +1150,6 @@ dependencies = [
  "tokio",
  "toml 0.8.23",
  "tough",
- "tracing",
  "url",
  "x509-cert",
 ]
@@ -1167,6 +1164,13 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-bounded"
+version = "0.1.0"
+dependencies = [
+ "loom",
 ]
 
 [[package]]
@@ -1197,9 +1201,6 @@ dependencies = [
  "chio-web3",
  "ed25519-dalek",
  "hex",
- "percent-encoding",
- "rand_core 0.6.4",
- "ryu",
  "serde",
  "serde_json",
  "sha2",
@@ -1262,9 +1263,11 @@ dependencies = [
  "chio-core-types",
  "chio-kernel",
  "chio-manifest",
+ "futures",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tokio",
 ]
 
 [[package]]
@@ -1279,6 +1282,7 @@ dependencies = [
  "der",
  "hex",
  "jsonwebtoken",
+ "rusqlite",
  "serde",
  "serde_json",
  "sha2",
@@ -1401,6 +1405,7 @@ dependencies = [
  "chio-openapi-mcp-bridge",
  "chio-policy",
  "chio-revocation-oracle",
+ "chio-settle",
  "chio-underwriting",
  "chio-wasm-guards",
  "libfuzzer-sys",
@@ -1415,7 +1420,6 @@ dependencies = [
  "chio-core-types",
  "chio-listing",
  "serde",
- "serde_json",
  "thiserror 1.0.69",
 ]
 
@@ -1426,7 +1430,6 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chio-core",
- "chio-core-types",
  "chio-http-session",
  "chio-kernel",
  "glob",
@@ -1439,7 +1442,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
- "zeroize",
 ]
 
 [[package]]
@@ -1453,14 +1455,11 @@ dependencies = [
  "chio-kernel",
  "chio-metrics-spec",
  "chrono",
- "ed25519-dalek",
  "hex",
- "rand_core 0.6.4",
  "serde",
  "serde_json",
  "sha2",
  "thiserror 1.0.69",
- "url",
  "uuid",
 ]
 
@@ -1468,6 +1467,8 @@ dependencies = [
 name = "chio-http-session"
 version = "0.1.0"
 dependencies = [
+ "chio-bounded",
+ "chio-kernel",
  "hex",
  "serde",
  "serde_json",
@@ -1483,19 +1484,16 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chio-appraisal",
+ "chio-bounded",
  "chio-core",
  "chio-core-types",
  "chio-credit",
  "chio-custody-hw",
  "chio-federation",
- "chio-governance",
  "chio-kernel-core",
  "chio-link",
- "chio-listing",
  "chio-log-redact",
- "chio-market",
  "chio-metrics-spec",
- "chio-open-market",
  "chio-settle",
  "chio-tool-call-fabric",
  "chio-underwriting",
@@ -1503,6 +1501,7 @@ dependencies = [
  "chrono",
  "dashmap",
  "futures",
+ "libc",
  "lru",
  "rand 0.8.6",
  "regex",
@@ -1532,7 +1531,6 @@ name = "chio-lineage"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
- "petgraph 0.6.5",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -1557,8 +1555,6 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "serde",
- "serde_json",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1590,7 +1586,6 @@ dependencies = [
  "chio-credit",
  "chio-underwriting",
  "serde",
- "serde_json",
  "thiserror 1.0.69",
 ]
 
@@ -1607,7 +1602,6 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
  "tokio",
  "tracing",
  "url",
@@ -1624,7 +1618,6 @@ dependencies = [
  "chio-edge-metrics",
  "chio-kernel",
  "chio-manifest",
- "chio-metrics-spec",
  "chrono",
  "serde",
  "serde_json",
@@ -1656,7 +1649,6 @@ dependencies = [
  "chio-governance",
  "chio-listing",
  "serde",
- "serde_json",
  "thiserror 1.0.69",
 ]
 
@@ -1741,7 +1733,6 @@ dependencies = [
  "chio-core-types",
  "rs_merkle",
  "serde",
- "serde_json",
  "sha2",
  "thiserror 1.0.69",
 ]
@@ -1787,8 +1778,6 @@ dependencies = [
  "chio-appraisal",
  "chio-core-types",
  "serde",
- "serde_json",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1821,6 +1810,7 @@ dependencies = [
 name = "chio-web3"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives",
  "chio-core-types",
  "chio-credit",
  "serde",
@@ -3036,6 +3026,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "generator"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3b854b0e584ead1a33f18b2fcad7cf7be18b3875c78816b753639aa501513ae"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "libc",
+ "log",
+ "rustversion",
+ "windows-link",
+ "windows-result",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4062,6 +4067,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
+name = "loom"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "419e0dc8046cb947daa77eb95ae174acfbddb7673b4151f56d1eed8e93fbfaca"
+dependencies = [
+ "cfg-if",
+ "generator",
+ "scoped-tls",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "lru"
 version = "0.16.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4094,6 +4112,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "matchers"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1525a2a28c7f4fa0fc98bb91ae755d1e2d1505079e05539e35bc876b5d65ae9"
+dependencies = [
+ "regex-automata",
 ]
 
 [[package]]
@@ -5813,6 +5840,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "scoped-tls"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1cf6437eb19a8f4a6cc0f7dca544973b0b78843adbfeb3683d1a94a0024a294"
+
+[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6986,10 +7019,14 @@ version = "0.3.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb7f578e5945fb242538965c2d0b04418d38ec25c79d160cd279bf0731c8d319"
 dependencies = [
+ "matchers",
  "nu-ansi-term",
+ "once_cell",
+ "regex-automata",
  "sharded-slab",
  "smallvec",
  "thread_local",
+ "tracing",
  "tracing-core",
  "tracing-log",
 ]

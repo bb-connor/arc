@@ -13,6 +13,10 @@ name = "chio_settle"
 
 [features]
 default = ["web3"]
+# Enables `chio_settle::fuzz`, the libFuzzer entry-point module. Off by
+# default; turned on only by the `chio-fuzz` standalone workspace. Implies
+# `web3` because the whole crate body is gated on it.
+fuzz = ["web3"]
 web3 = [
     "dep:alloy-primitives",
     "dep:alloy-sol-types",

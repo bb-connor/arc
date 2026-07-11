@@ -13,6 +13,8 @@ mod automation;
 mod ccip;
 mod config;
 mod evm;
+#[cfg(feature = "fuzz")]
+pub mod fuzz;
 mod hook;
 mod observe;
 mod ops;

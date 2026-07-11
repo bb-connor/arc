@@ -132,6 +132,7 @@ jobs:
           - chio_yaml_parse
           - openapi_ingest
           - receipt_log_replay
+          - settlement_approval_witness
           - eval_receipt_bundle
           - fuzz_policy_parse_compile
           - fuzz_sql_parser
