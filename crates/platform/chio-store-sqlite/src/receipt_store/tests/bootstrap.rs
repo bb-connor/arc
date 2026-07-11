@@ -132,6 +132,47 @@ fn sqlite_receipt_store_stamps_application_id_and_refuses_future_database() {
 }
 
 #[test]
+fn open_refuses_foreign_database_without_switching_it_to_wal() {
+    let path = unique_db_path("chio-receipts-foreign-no-wal");
+
+    // A pre-existing, unrelated SQLite database on the target path, in the
+    // default rollback-journal mode.
+    {
+        let foreign = rusqlite::Connection::open(&path).test_unwrap();
+        foreign
+            .execute_batch("CREATE TABLE someone_elses_table (id TEXT PRIMARY KEY);")
+            .test_unwrap();
+        let journal_mode: String = foreign
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+            .test_unwrap();
+        assert!(
+            !journal_mode.eq_ignore_ascii_case("wal"),
+            "precondition: the foreign database is not in WAL mode"
+        );
+    }
+
+    // Opening it as a receipt store must fail closed as foreign.
+    let error = SqliteReceiptStore::open(&path).test_unwrap_err();
+    assert!(
+        error.to_string().contains("not a Chio store"),
+        "unexpected error: {error}"
+    );
+
+    // The refused foreign database must be left untouched: the durability
+    // pragmas must not have rewritten its header into WAL mode.
+    let reopened = rusqlite::Connection::open(&path).test_unwrap();
+    let journal_mode: String = reopened
+        .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+        .test_unwrap();
+    assert!(
+        !journal_mode.eq_ignore_ascii_case("wal"),
+        "a refused foreign database must not be switched to WAL, got {journal_mode}"
+    );
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn flush_receipt_writes_reports_prior_committed_entries() {
     let path = unique_db_path("chio-receipts-flush");
     let store = SqliteReceiptStore::open(&path).test_unwrap();

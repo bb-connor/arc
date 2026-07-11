@@ -136,13 +136,16 @@ impl SqliteReceiptStore {
         };
         if !create_if_missing {
             require_existing_receipt_schema(path, &connection)?;
-            configure_sqlite_connection(&mut connection)?;
+            // Validate provenance before configuring pragmas: a foreign or
+            // future database must be refused before any write touches its
+            // header, so a mistargeted path is never mutated into WAL mode.
             crate::check_schema_version(
                 &connection,
                 RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
                 RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
             )
             .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+            configure_sqlite_connection(&mut connection)?;
             super::support::ensure_transparency_projection_guards(&connection)?;
             drop(connection);
 
@@ -170,13 +173,16 @@ impl SqliteReceiptStore {
             });
         }
 
-        configure_sqlite_connection(&mut connection)?;
+        // Validate provenance before configuring pragmas: an existing file that
+        // is a foreign database must be refused before any write touches its
+        // header, so a mistargeted path is never mutated into WAL mode.
         crate::check_schema_version(
             &connection,
             RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
             RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
         )
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        configure_sqlite_connection(&mut connection)?;
         connection.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS chio_tool_receipts (
