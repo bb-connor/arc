@@ -289,6 +289,35 @@ impl SqliteBudgetStore {
             .map_err(Into::into)
     }
 
+    /// Ids of holds still `open` that were stamped as delegated
+    /// reserve-for-caller reservations: marked reserved (a non-NULL
+    /// `reserved_until`) with a delegation depth of at least one. Such a hold
+    /// keeps its delegated child's sibling-sum share admitted against the parent
+    /// for as long as it stays open, so a freshly built mediation kernel drains
+    /// exactly these holds before resuming delegated admission after a restart. A
+    /// depth-zero or unstamped reserved hold carries no such share and is
+    /// excluded, as is any non-open hold. Errors fail-closed rather than reporting
+    /// a partial set, so the kernel aborts admission on a store read error.
+    pub(super) fn list_open_delegated_reserved_holds(
+        &self,
+    ) -> Result<Vec<String>, BudgetStoreError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
+        let mut statement = connection.prepare(
+            "SELECT hold_id FROM budget_authorization_holds \
+             WHERE disposition = 'open' AND reserved_until IS NOT NULL \
+               AND reserved_delegation_depth IS NOT NULL AND reserved_delegation_depth >= 1",
+        )?;
+        let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+        let mut ids = Vec::new();
+        for row in rows {
+            ids.push(row?);
+        }
+        Ok(ids)
+    }
+
     /// Rows still `open`:
     /// `(hold_id, capability_id, grant_index, remaining_exposure_units, authority)`.
     /// A hold with inconsistent authority lease columns is rejected fail-closed.
@@ -750,5 +779,80 @@ mod tests {
                 .unwrap(),
             0
         );
+    }
+
+    #[test]
+    fn list_open_delegated_reserved_hold_ids_enumerates_only_open_delegated_reserved() {
+        use chio_kernel::budget_store::BudgetReconcileHoldRequest;
+
+        let store = open_temp_store();
+
+        // (a) Open delegated reserve-for-caller hold: reserved with delegation
+        // depth one, so its child's sibling-sum share stays admitted against the
+        // parent until it closes. The restart gate must drain exactly this hold.
+        authorize(&store, "hold-a-delegated", "cap-a");
+        store
+            .mark_hold_reserved_until(
+                "hold-a-delegated",
+                4_242,
+                "USD",
+                None,
+                &ReservedHoldEnvelope {
+                    budget_total: None,
+                    delegation_depth: 1,
+                    root_budget_holder: "root-a".to_string(),
+                },
+            )
+            .unwrap();
+
+        // (b) Open reserved hold at delegation depth zero: reserved but not
+        // delegated, so it holds no sibling-sum share and must be excluded.
+        authorize(&store, "hold-b-nondelegated", "cap-b");
+        store
+            .mark_hold_reserved_until(
+                "hold-b-nondelegated",
+                4_242,
+                "USD",
+                None,
+                &ReservedHoldEnvelope {
+                    budget_total: None,
+                    delegation_depth: 0,
+                    root_budget_holder: "root-b".to_string(),
+                },
+            )
+            .unwrap();
+
+        // (c) Delegated hold that has since closed: reconciled, so no longer open
+        // and no longer holds a share, and must be excluded.
+        authorize(&store, "hold-c-closed", "cap-c");
+        store
+            .mark_hold_reserved_until(
+                "hold-c-closed",
+                4_242,
+                "USD",
+                None,
+                &ReservedHoldEnvelope {
+                    budget_total: None,
+                    delegation_depth: 1,
+                    root_budget_holder: "root-c".to_string(),
+                },
+            )
+            .unwrap();
+        store
+            .reconcile_budget_hold(BudgetReconcileHoldRequest {
+                capability_id: "cap-c".to_string(),
+                grant_index: 0,
+                exposed_cost_units: 100,
+                realized_spend_units: 40,
+                hold_id: Some("hold-c-closed".to_string()),
+                event_id: Some("hold-c-closed:reconcile".to_string()),
+                authority: None,
+            })
+            .unwrap();
+
+        // Some(..) switches the kernel onto the precise restart gate; the set
+        // enumerates only the open delegated reserved hold.
+        let ids = store.list_open_delegated_reserved_hold_ids().unwrap();
+        assert_eq!(ids, Some(vec!["hold-a-delegated".to_string()]));
     }
 }

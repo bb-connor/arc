@@ -1141,6 +1141,17 @@ impl BudgetStore for SqliteBudgetStore {
         Ok(self.list_open_holds()?.len())
     }
 
+    fn list_open_delegated_reserved_hold_ids(
+        &self,
+    ) -> Result<Option<Vec<String>>, BudgetStoreError> {
+        // SQLite persists the delegation depth on each reserved hold, so it can
+        // enumerate the open delegated reservations precisely. Returning Some(..)
+        // switches the mediation kernel onto the precise restart gate that drains
+        // only the affected delegated admission, rather than the coarse gate that
+        // denies all mediation until every open hold closes.
+        Ok(Some(self.list_open_delegated_reserved_holds()?))
+    }
+
     fn get_budget_hold(
         &self,
         hold_id: &str,
