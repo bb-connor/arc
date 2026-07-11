@@ -138,8 +138,14 @@ struct ReceiptCommitWriterHealth {
     inflight: AtomicU64,
     last_commit_unix_ms: AtomicU64,
     /// Wall-clock (unix-ms) of the first accepted append, set once (0 = unset).
-    /// Anchors the wedged-writer stall clock before the first commit lands.
+    /// Retained for operator display of when this writer first did work.
     first_accept_unix_ms: AtomicU64,
+    /// Wall-clock (unix-ms) at which the CURRENT unserviced backlog began, i.e.
+    /// the enqueue that took `inflight` from 0 to 1 (0 = no backlog yet). The
+    /// wedged-writer stall clock anchors here so a writer that was merely idle
+    /// (an old last commit) is not judged wedged the instant fresh work arrives;
+    /// it re-stamps on each new backlog and a growing backlog keeps its start.
+    backlog_started_unix_ms: AtomicU64,
     last_error: Mutex<Option<String>>,
     // Verified-head snapshot, written only by the actor thread; read by
     // flush_report / receipt_store_health / kernel counters.
@@ -150,17 +156,34 @@ struct ReceiptCommitWriterHealth {
 }
 
 impl ReceiptCommitWriterHealth {
-    /// Record the wall-clock time of the first accepted append, exactly once.
-    /// Later accepts leave it untouched so it stays anchored to the oldest
-    /// pre-first-commit work, which is the reference the stall clock needs to
-    /// catch a writer that wedges before it ever commits.
-    fn note_first_accept(&self) {
-        let _ = self.first_accept_unix_ms.compare_exchange(
-            0,
-            current_unix_ms(),
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        );
+    /// Record accept-time liveness anchors. `first_accept_unix_ms` is set once,
+    /// for operator display. `backlog_started_unix_ms` is (re)stamped whenever an
+    /// enqueue takes `inflight` from 0 to 1 (`previous_inflight == 0`), marking
+    /// the start of the current unserviced backlog. A backlog that only grows
+    /// keeps its original start; the next backlog after the writer fully drains
+    /// resets it. The stall clock reads this so a writer that wedges before its
+    /// first commit is still caught, while a writer resuming after an idle period
+    /// is measured from the fresh work rather than a stale last commit.
+    fn note_accept(&self, previous_inflight: u64) {
+        let now = current_unix_ms();
+        let _ =
+            self.first_accept_unix_ms
+                .compare_exchange(0, now, Ordering::SeqCst, Ordering::SeqCst);
+        if previous_inflight == 0 {
+            self.backlog_started_unix_ms.store(now, Ordering::SeqCst);
+        }
+    }
+
+    /// Record that the commit actor has disconnected so the liveness classifier
+    /// reports the writer `Dead`. The classifier keys the dead verdict on the
+    /// "unavailable" marker in `last_error`, so an actor observed gone at enqueue
+    /// time must set it: otherwise the next liveness sample can still read
+    /// `Healthy` and admit a tool side effect whose receipt can never be
+    /// persisted.
+    fn note_writer_unavailable(&self) {
+        if let Ok(mut last_error) = self.last_error.lock() {
+            *last_error = Some("sqlite receipt commit actor is unavailable".to_string());
+        }
     }
 
     fn store_head_snapshot(&self, head: &VerifiedHead) {
@@ -267,11 +290,11 @@ impl ReceiptCommitActor {
         // The worker decrements unconditionally on dequeue, so the pre-send
         // increment pairs correctly. Any failure of `try_send` undoes the
         // speculative increment before returning.
-        self.health.inflight.fetch_add(1, Ordering::SeqCst);
+        let previous_inflight = self.health.inflight.fetch_add(1, Ordering::SeqCst);
         match self.sender.try_send(command) {
             Ok(()) => {
                 self.health.accepted_total.fetch_add(1, Ordering::SeqCst);
-                self.health.note_first_accept();
+                self.health.note_accept(previous_inflight);
             }
             Err(mpsc::TrySendError::Full(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
@@ -280,6 +303,7 @@ impl ReceiptCommitActor {
             }
             Err(mpsc::TrySendError::Disconnected(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.note_writer_unavailable();
                 return Err(receipt_actor_unavailable_error());
             }
         }
@@ -288,6 +312,7 @@ impl ReceiptCommitActor {
             Err(_) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
                 self.health.failed_total.fetch_add(1, Ordering::SeqCst);
+                self.health.note_writer_unavailable();
                 Err(receipt_actor_unavailable_error())
             }
         }
@@ -317,11 +342,11 @@ impl ReceiptCommitActor {
             ensure_lineage,
             response,
         }));
-        self.health.inflight.fetch_add(1, Ordering::SeqCst);
+        let previous_inflight = self.health.inflight.fetch_add(1, Ordering::SeqCst);
         match self.sender.try_send(command) {
             Ok(()) => {
                 self.health.accepted_total.fetch_add(1, Ordering::SeqCst);
-                self.health.note_first_accept();
+                self.health.note_accept(previous_inflight);
             }
             Err(mpsc::TrySendError::Full(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
@@ -330,6 +355,7 @@ impl ReceiptCommitActor {
             }
             Err(mpsc::TrySendError::Disconnected(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.note_writer_unavailable();
                 return Err(receipt_actor_unavailable_error());
             }
         }
@@ -383,10 +409,21 @@ impl ReceiptCommitActor {
                 return Err(receipt_actor_saturated_error());
             }
             Err(mpsc::TrySendError::Disconnected(_)) => {
+                self.health.note_writer_unavailable();
                 return Err(receipt_actor_unavailable_error());
             }
         }
         receive(result)
+    }
+
+    /// Wall-clock (unix-ms) at which the current unserviced backlog began, or
+    /// `None` when no backlog has started. The liveness classifier anchors its
+    /// stall clock here so idle-then-fresh work is not mistaken for a wedge.
+    fn backlog_started_unix_ms(&self) -> Option<u64> {
+        match self.health.backlog_started_unix_ms.load(Ordering::SeqCst) {
+            0 => None,
+            value => Some(value),
+        }
     }
 
     fn writer_counters(&self) -> ReceiptWriterCounters {
@@ -612,7 +649,7 @@ impl WriterHandle {
         // `ReceiptCommitActor::append` (see the comment at the `inflight`
         // increment in `append`). The actor decrements unconditionally on
         // dequeue; any send failure undoes the speculative increment.
-        self.health.inflight.fetch_add(1, Ordering::SeqCst);
+        let previous_inflight = self.health.inflight.fetch_add(1, Ordering::SeqCst);
         match self.sender.try_send(ReceiptCommitCommand::Write {
             job: boxed,
             appends_receipts,
@@ -628,7 +665,7 @@ impl WriterHandle {
                 // O(1), fail-closed unchanged (a Full/Disconnected send still
                 // returns before counting).
                 self.health.accepted_total.fetch_add(1, Ordering::SeqCst);
-                self.health.note_first_accept();
+                self.health.note_accept(previous_inflight);
             }
             Err(mpsc::TrySendError::Full(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
@@ -637,6 +674,7 @@ impl WriterHandle {
             }
             Err(mpsc::TrySendError::Disconnected(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.note_writer_unavailable();
                 return Err(receipt_actor_unavailable_error());
             }
         }
@@ -1401,13 +1439,14 @@ fn atomic_saturating_sub(value: &AtomicU64, amount: u64) {
 /// - `Dead`: the actor channel has disconnected (its last error reports the
 ///   writer unavailable). Nothing can drain, so admission must stop.
 /// - `Wedged`: work is still queued or running (`inflight > 0`, or more appends
-///   were accepted than have completed) and no commit has landed within
-///   `stall_threshold_ms`. The stall clock is anchored to the last commit, or,
-///   before any commit exists, to the first-ever accept, so a writer that
-///   wedges before its first commit is caught rather than reported healthy
-///   forever. A timed-out append leaves `inflight` elevated without advancing
-///   `failed_total` past `accepted_total`, which is exactly the `inflight`
-///   signal this reads.
+///   were accepted than have completed) and no progress has been made within
+///   `stall_threshold_ms`. The stall clock is anchored to the more recent of the
+///   last commit and the start of the current backlog, so a writer that wedges
+///   before its first commit is caught, while a writer resuming after an idle
+///   period (an old last commit but freshly enqueued work) is measured from that
+///   fresh work rather than judged wedged the instant it accepts. A timed-out
+///   append leaves `inflight` elevated without advancing `failed_total` past
+///   `accepted_total`, which is exactly the `inflight` signal this reads.
 /// - `Saturated`: the commit queue is full right now (`inflight` has reached the
 ///   channel capacity), so the next append would be rejected. Deny admission
 ///   rather than run a side effect whose receipt cannot be enqueued.
@@ -1416,6 +1455,7 @@ fn classify_writer_liveness(
     counters: &ReceiptWriterCounters,
     stall_threshold_ms: u64,
     channel_capacity: u64,
+    backlog_started_unix_ms: Option<u64>,
     now_unix_ms: u64,
 ) -> chio_kernel::ReceiptWriterLiveness {
     use chio_kernel::ReceiptWriterLiveness as Liveness;
@@ -1446,9 +1486,15 @@ fn classify_writer_liveness(
             > counters
                 .committed_total
                 .saturating_add(counters.failed_total);
+    // Anchor to the more recent of the last commit and the current backlog
+    // start. Using the last commit alone marks a writer wedged after any idle
+    // period (its last commit is naturally old); using the backlog start alone
+    // would ignore progress a busy writer is still making.
     let progress_reference = counters
         .last_commit_unix_ms
-        .or(counters.first_accept_unix_ms);
+        .into_iter()
+        .chain(backlog_started_unix_ms)
+        .max();
     let stalled = match progress_reference {
         Some(reference) => now_unix_ms.saturating_sub(reference) >= stall_threshold_ms,
         None => false,
@@ -1481,11 +1527,10 @@ mod writer_liveness_classifier_tests {
             accepted_total: 1,
             failed_total: 1,
             inflight: 1,
-            first_accept_unix_ms: Some(NOW - 20_000),
             ..ReceiptWriterCounters::default()
         };
         assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, NOW),
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, Some(NOW - 20_000), NOW),
             Liveness::Wedged
         );
     }
@@ -1503,12 +1548,11 @@ mod writer_liveness_classifier_tests {
             failed_total: 1,
             inflight: 1,
             last_commit_unix_ms: None,
-            first_accept_unix_ms: Some(NOW - 6_000),
             last_error: Some("sqlite receipt commit append timed out".to_string()),
             ..ReceiptWriterCounters::default()
         };
         assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, NOW),
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, Some(NOW - 6_000), NOW),
             Liveness::Wedged
         );
     }
@@ -1516,16 +1560,15 @@ mod writer_liveness_classifier_tests {
     #[test]
     fn never_committed_backlog_reports_wedged() {
         // Wedged before the first commit: `last_commit_unix_ms` is `None`, so the
-        // stall clock must fall back to the first-accept timestamp.
+        // stall clock must fall back to the current backlog start.
         let counters = ReceiptWriterCounters {
             accepted_total: 1,
             inflight: 1,
             last_commit_unix_ms: None,
-            first_accept_unix_ms: Some(NOW - 20_000),
             ..ReceiptWriterCounters::default()
         };
         assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, NOW),
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, Some(NOW - 20_000), NOW),
             Liveness::Wedged
         );
     }
@@ -1543,11 +1586,11 @@ mod writer_liveness_classifier_tests {
             ..ReceiptWriterCounters::default()
         };
         assert_eq!(
-            classify_writer_liveness(&counters, 500, CAPACITY, NOW),
+            classify_writer_liveness(&counters, 500, CAPACITY, None, NOW),
             Liveness::Wedged
         );
         assert_eq!(
-            classify_writer_liveness(&counters, 10_000, CAPACITY, NOW),
+            classify_writer_liveness(&counters, 10_000, CAPACITY, None, NOW),
             Liveness::Healthy
         );
     }
@@ -1565,10 +1608,38 @@ mod writer_liveness_classifier_tests {
             ..ReceiptWriterCounters::default()
         };
         assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, NOW),
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, None, NOW),
             Liveness::Saturated
         );
         assert!(!Liveness::Saturated.healthy());
+    }
+
+    #[test]
+    fn idle_writer_with_fresh_backlog_is_not_wedged() {
+        // After a long idle period the last commit is naturally old, but a newly
+        // enqueued write has only just started. The stall clock must anchor to the
+        // fresh backlog start, not the stale last commit, or the writer is marked
+        // wedged and admission denied the instant it accepts work after a quiet
+        // period.
+        let counters = ReceiptWriterCounters {
+            accepted_total: 6,
+            committed_total: 5,
+            inflight: 1,
+            last_commit_unix_ms: Some(NOW - 60_000),
+            ..ReceiptWriterCounters::default()
+        };
+        assert_eq!(
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, Some(NOW - 100), NOW),
+            Liveness::Healthy,
+            "fresh work after idle must not be judged wedged by the stale last commit"
+        );
+        // The same stale commit WITH a backlog that has itself gone unserviced
+        // past the threshold is a genuine wedge.
+        assert_eq!(
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, Some(NOW - 20_000), NOW),
+            Liveness::Wedged,
+            "a backlog stalled past the threshold must still report wedged"
+        );
     }
 
     #[test]
@@ -1578,7 +1649,7 @@ mod writer_liveness_classifier_tests {
             ..ReceiptWriterCounters::default()
         };
         assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, NOW),
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, None, NOW),
             Liveness::Dead
         );
     }
@@ -1590,11 +1661,10 @@ mod writer_liveness_classifier_tests {
             committed_total: 10,
             inflight: 0,
             last_commit_unix_ms: Some(NOW - 50),
-            first_accept_unix_ms: Some(NOW - 5_000),
             ..ReceiptWriterCounters::default()
         };
         assert_eq!(
-            classify_writer_liveness(&counters, STALL_MS, CAPACITY, NOW),
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, None, NOW),
             Liveness::Healthy
         );
     }
@@ -2448,6 +2518,7 @@ impl SqliteReceiptStore {
             &self.receipt_commit_actor.writer_counters(),
             u64::try_from(stall_threshold.as_millis()).unwrap_or(u64::MAX),
             RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY as u64,
+            self.receipt_commit_actor.backlog_started_unix_ms(),
             current_unix_ms(),
         )
     }
@@ -3365,6 +3436,84 @@ mod receipt_commit_actor_tests {
     }
 
     #[test]
+    fn enqueue_on_a_disconnected_actor_records_writer_dead(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // The commit actor has exited, so its receiver is gone and `try_send`
+        // fails Disconnected before any response channel exists. That enqueue
+        // path must record the writer death, or the next liveness sample keeps
+        // reporting the writer Healthy and admits a tool side effect whose
+        // receipt can never be persisted.
+        let (sender, receiver) = receipt_commit_channel();
+        drop(receiver);
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        let actor = ReceiptCommitActor { sender, health };
+
+        let error = actor.append_with_timeout(
+            actor_test_receipt()?,
+            "{}".to_string(),
+            false,
+            Duration::from_millis(250),
+        );
+        assert!(error
+            .err()
+            .ok_or("expected writer-unavailable error")?
+            .to_string()
+            .contains("unavailable"));
+
+        let counters = actor.writer_counters();
+        assert!(
+            counters
+                .last_error
+                .as_deref()
+                .is_some_and(|error| error.contains("unavailable")),
+            "the disconnected enqueue must record the writer death"
+        );
+        assert_eq!(
+            classify_writer_liveness(
+                &counters,
+                10_000,
+                RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY as u64,
+                None,
+                1_000_000,
+            ),
+            chio_kernel::ReceiptWriterLiveness::Dead,
+            "a disconnected writer must classify as Dead so admission stops"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn note_accept_restamps_backlog_start_only_on_a_fresh_backlog() {
+        let health = ReceiptCommitWriterHealth::default();
+
+        // 0 -> 1 begins a backlog and stamps a real start time.
+        health.note_accept(0);
+        assert_ne!(
+            health.backlog_started_unix_ms.load(Ordering::SeqCst),
+            0,
+            "the first enqueue of a backlog must stamp its start"
+        );
+
+        // 1 -> 2 grows an ongoing backlog and must NOT move its start.
+        health.backlog_started_unix_ms.store(1, Ordering::SeqCst);
+        health.note_accept(1);
+        assert_eq!(
+            health.backlog_started_unix_ms.load(Ordering::SeqCst),
+            1,
+            "a growing backlog must keep its original start"
+        );
+
+        // 0 -> 1 after the writer drained begins a NEW backlog and restamps.
+        health.backlog_started_unix_ms.store(1, Ordering::SeqCst);
+        health.note_accept(0);
+        assert_ne!(
+            health.backlog_started_unix_ms.load(Ordering::SeqCst),
+            1,
+            "a fresh backlog after draining must restamp the start"
+        );
+    }
+
+    #[test]
     fn run_write_receipt_with_timeout_fails_closed_when_writer_never_drains(
     ) -> Result<(), Box<dyn std::error::Error>> {
         // Child receipts persist through `run_write_receipt`. Its bounded variant
@@ -3481,6 +3630,7 @@ mod receipt_commit_actor_tests {
                 &counters,
                 10_000,
                 RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY as u64,
+                None,
                 current_unix_ms(),
             ),
             chio_kernel::ReceiptWriterLiveness::Dead
