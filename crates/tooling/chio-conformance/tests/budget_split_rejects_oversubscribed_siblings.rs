@@ -60,6 +60,7 @@ fn build_child(
         parent_scope_hash: scope_hash(parent_scope).unwrap(),
         child_scope_hash: scope_hash(child_scope).unwrap(),
         normalized_subset_proof: witness,
+        aggregate_family_preservation: None,
     };
     let _ = parent_id;
     let body = CapabilityTokenBody {
@@ -109,6 +110,7 @@ fn parent_at_5000_bps_cannot_mint_two_children_at_4000_bps_each() {
             attenuations: vec![],
             timestamp: 100,
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+            aggregate_family_preservation: None,
         };
         let link = DelegationLink::sign(body, &parent_kp).expect("delegation link signs");
         vec![link]
@@ -132,6 +134,7 @@ fn parent_at_5000_bps_cannot_mint_two_children_at_4000_bps_each() {
                 attenuations: vec![],
                 timestamp: 100,
                 scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+                aggregate_family_preservation: None,
             };
             vec![DelegationLink::sign(body, &parent_kp).expect("link a")]
         },

@@ -335,6 +335,7 @@ proptest! {
                 attenuations: Vec::new(),
                 timestamp: i as u64,
                 scope_hash: None,
+                aggregate_family_preservation: None,
             };
             let link = match DelegationLink::sign(body, &keypairs[i]) {
                 Ok(link) => link,
@@ -477,6 +478,7 @@ proptest! {
                 attenuations: Vec::new(),
                 timestamp: i as u64,
                 scope_hash: None,
+                aggregate_family_preservation: None,
             };
             let link = match DelegationLink::sign(body, &keypairs[i]) {
                 Ok(link) => link,

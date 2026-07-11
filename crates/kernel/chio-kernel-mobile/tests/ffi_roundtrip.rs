@@ -81,6 +81,7 @@ fn make_delegated_capability(
             attenuations: vec![],
             timestamp: ISSUED_AT,
             scope_hash: None,
+            aggregate_family_preservation: None,
         },
         issuer,
     )

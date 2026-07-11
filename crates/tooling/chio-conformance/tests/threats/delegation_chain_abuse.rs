@@ -82,6 +82,7 @@ fn signed_delegated_cap(
             attenuations: Vec::new(),
             timestamp: issued_at,
             scope_hash: None,
+            aggregate_family_preservation: None,
         },
         issuer,
     ) {

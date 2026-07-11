@@ -39,6 +39,7 @@ fn make_delegated_capability(
             attenuations: std::vec![],
             timestamp: ISSUED_AT,
             scope_hash: Some(parent_scope_hash.clone()),
+            aggregate_family_preservation: None,
         },
         issuer,
     )
@@ -47,6 +48,7 @@ fn make_delegated_capability(
         parent_scope_hash,
         child_scope_hash: scope_hash(&body.scope).unwrap(),
         normalized_subset_proof: compute_attenuation_witness(&body.scope, &body.scope).unwrap(),
+        aggregate_family_preservation: None,
     };
     let mut body = body;
     body.delegation_chain = std::vec![parent_link];
@@ -122,6 +124,7 @@ fn make_v2_capability(subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
         child_scope_hash: scope_hash(&body.scope).expect("child scope hash"),
         normalized_subset_proof: compute_attenuation_witness(&body.scope, &body.scope)
             .expect("attenuation witness"),
+        aggregate_family_preservation: None,
     };
     CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {

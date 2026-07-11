@@ -784,6 +784,7 @@ fn signed_delegation_link(
             attenuations: vec![],
             timestamp,
             scope_hash: None,
+            aggregate_family_preservation: None,
         },
         delegator,
     )

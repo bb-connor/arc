@@ -1,5 +1,6 @@
 //! Aggregate invocation budget wire types, issuance, and authority verification.
 
+use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
@@ -125,6 +126,14 @@ pub struct AggregateBudgetRootBinding {
     pub signature: Signature,
 }
 
+/// Signed projection proving preservation of aggregate family authority.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AggregateFamilyPreservationEvidence {
+    pub root_binding_digest: String,
+    pub max_invocations: u32,
+}
+
 impl AggregateBudgetRootCommitment {
     /// Canonical RFC 8785 bytes of the schema-free root commitment.
     pub fn canonical_bytes(&self) -> Result<Vec<u8>> {
@@ -160,6 +169,45 @@ impl AggregateBudgetRootBinding {
     }
 }
 
+impl AggregateFamilyPreservationEvidence {
+    /// Validate this projection against authenticated family authority.
+    pub fn validate_against_verified_root(&self, root: &VerifiedAggregateFamilyRoot) -> Result<()> {
+        validate_preservation_values(self, root.root_binding_digest(), root.max_invocations())
+    }
+
+    pub(crate) fn validate_against_budget(&self, budget: &AggregateInvocationBudget) -> Result<()> {
+        let binding = budget
+            .root_binding
+            .as_ref()
+            .ok_or_else(|| Error::AttenuationViolation {
+                reason: "delegation-family aggregate budget is missing its root binding"
+                    .to_string(),
+            })?;
+        let digest = binding.preservation_digest()?;
+        validate_preservation_values(self, &digest, budget.max_invocations)
+    }
+}
+
+fn validate_preservation_values(
+    evidence: &AggregateFamilyPreservationEvidence,
+    root_binding_digest: &str,
+    max_invocations: u32,
+) -> Result<()> {
+    if evidence.root_binding_digest != root_binding_digest {
+        return Err(Error::AttenuationViolation {
+            reason: "aggregate family preservation digest does not match the root binding"
+                .to_string(),
+        });
+    }
+    if evidence.max_invocations != max_invocations {
+        return Err(Error::AttenuationViolation {
+            reason: "aggregate family preservation maximum does not match the immutable maximum"
+                .to_string(),
+        });
+    }
+    Ok(())
+}
+
 /// Authenticated projection of a direct aggregate delegation-family root.
 ///
 /// The non-exhaustive shape prevents external callers from constructing a
@@ -167,41 +215,35 @@ impl AggregateBudgetRootBinding {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct VerifiedAggregateFamilyRoot {
-    root_capability_id: String,
-    root_issuer: PublicKey,
-    root_subject: PublicKey,
-    root_scope_hash: ScopeHash,
     root_issued_at: u64,
-    root_expires_at: u64,
-    max_invocations: u32,
     root_binding_digest: String,
     family_owner: String,
-    root_binding: AggregateBudgetRootBinding,
+    root_binding: Box<AggregateBudgetRootBinding>,
 }
 
 impl VerifiedAggregateFamilyRoot {
     /// Authenticated root capability identifier.
     #[must_use]
     pub fn root_capability_id(&self) -> &str {
-        &self.root_capability_id
+        &self.root_binding.body.root_capability_id
     }
 
     /// Authenticated root issuing authority.
     #[must_use]
     pub fn root_issuer(&self) -> &PublicKey {
-        &self.root_issuer
+        &self.root_binding.body.root_issuer
     }
 
     /// Authenticated root subject.
     #[must_use]
     pub fn root_subject(&self) -> &PublicKey {
-        &self.root_subject
+        &self.root_binding.body.root_subject
     }
 
     /// Authenticated canonical scope hash.
     #[must_use]
     pub fn root_scope_hash(&self) -> &str {
-        &self.root_scope_hash
+        &self.root_binding.body.root_scope_hash
     }
 
     /// Authenticated root issuance timestamp.
@@ -213,13 +255,13 @@ impl VerifiedAggregateFamilyRoot {
     /// Authenticated root expiry timestamp.
     #[must_use]
     pub fn root_expires_at(&self) -> u64 {
-        self.root_expires_at
+        self.root_binding.body.root_expires_at
     }
 
     /// Immutable authenticated family invocation maximum.
     #[must_use]
     pub fn max_invocations(&self) -> u32 {
-        self.max_invocations
+        self.root_binding.body.max_invocations
     }
 
     /// Digest of the complete authenticated binding envelope.
@@ -237,7 +279,16 @@ impl VerifiedAggregateFamilyRoot {
     /// Complete authenticated root binding envelope.
     #[must_use]
     pub fn root_binding(&self) -> &AggregateBudgetRootBinding {
-        &self.root_binding
+        self.root_binding.as_ref()
+    }
+
+    /// Signed attenuation projection for this authenticated family root.
+    #[must_use]
+    pub fn preservation_evidence(&self) -> AggregateFamilyPreservationEvidence {
+        AggregateFamilyPreservationEvidence {
+            root_binding_digest: self.root_binding_digest.clone(),
+            max_invocations: self.max_invocations(),
+        }
     }
 }
 
@@ -451,6 +502,15 @@ impl VerifiedAggregateInvocationAuthority {
         match self {
             Self::Capability(_) => None,
             Self::DelegationFamily(root) => Some(root),
+        }
+    }
+
+    /// Signed attenuation projection when this authority belongs to a family.
+    #[must_use]
+    pub fn preservation_evidence(&self) -> Option<AggregateFamilyPreservationEvidence> {
+        match self {
+            Self::Capability(_) => None,
+            Self::DelegationFamily(root) => Some(root.preservation_evidence()),
         }
     }
 }
@@ -704,16 +764,10 @@ pub fn verify_direct_aggregate_family_root(
     let root_binding_digest = binding.preservation_digest()?;
     let family_owner = binding.body.unverified_family_owner()?;
     Ok(VerifiedAggregateFamilyRoot {
-        root_capability_id: token.id.clone(),
-        root_issuer: token.issuer.clone(),
-        root_subject: token.subject.clone(),
-        root_scope_hash,
         root_issued_at: token.issued_at,
-        root_expires_at: token.expires_at,
-        max_invocations: budget.max_invocations,
         root_binding_digest,
         family_owner,
-        root_binding: binding.clone(),
+        root_binding: Box::new(binding.clone()),
     })
 }
 
@@ -778,6 +832,7 @@ pub fn verify_aggregate_invocation_authority(
     match resolved {
         AggregateFamilyRootResolution::LegacyUnbound(root) => {
             ensure_resolved_record_matches_lookup(root.root_capability_id(), lookup_root_id)?;
+            reject_spurious_family_preservation(token)?;
             let authority = match token.aggregate_invocation_budget.as_ref() {
                 None => None,
                 Some(budget) if budget.scope == AggregateInvocationScope::Capability => {
@@ -836,6 +891,7 @@ pub fn verify_aggregate_invocation_authority(
                 }
                 .into());
             }
+            validate_family_preservation(token, &root)?;
             verify_resolved_root_lineage(
                 token,
                 first_link,
@@ -858,19 +914,63 @@ fn verify_direct_aggregate_authority(
     AggregateInvocationAuthorityError,
 > {
     let Some(budget) = token.aggregate_invocation_budget.as_ref() else {
+        reject_spurious_family_preservation(token)?;
         return Ok(None);
     };
     match budget.scope {
         AggregateInvocationScope::Capability => {
+            reject_spurious_family_preservation(token)?;
             Ok(Some(capability_aggregate_authority(token, budget)))
         }
         AggregateInvocationScope::DelegationFamily => {
             let root = verify_direct_aggregate_family_root(token, trusted_issuers)?;
+            validate_family_preservation(token, &root)?;
             Ok(Some(
                 VerifiedAggregateInvocationAuthority::DelegationFamily(root),
             ))
         }
     }
+}
+
+fn validate_family_preservation(
+    token: &CapabilityToken,
+    root: &VerifiedAggregateFamilyRoot,
+) -> Result<()> {
+    if let Some(proof) = token.attenuation_proof.as_ref() {
+        let evidence = proof
+            .aggregate_family_preservation
+            .as_ref()
+            .ok_or_else(|| Error::AttenuationViolation {
+                reason: "attenuated delegation-family capability must preserve aggregate family evidence"
+                    .to_string(),
+            })?;
+        evidence.validate_against_verified_root(root)?;
+    }
+    for link in &token.delegation_chain {
+        if let Some(evidence) = link.aggregate_family_preservation.as_ref() {
+            evidence.validate_against_verified_root(root)?;
+        }
+    }
+    Ok(())
+}
+
+fn reject_spurious_family_preservation(token: &CapabilityToken) -> Result<()> {
+    let proof_has_evidence = token
+        .attenuation_proof
+        .as_ref()
+        .and_then(|proof| proof.aggregate_family_preservation.as_ref())
+        .is_some();
+    let link_has_evidence = token
+        .delegation_chain
+        .iter()
+        .any(|link| link.aggregate_family_preservation.is_some());
+    if proof_has_evidence || link_has_evidence {
+        return Err(Error::AttenuationViolation {
+            reason: "aggregate family preservation evidence requires a delegation-family budget"
+                .to_string(),
+        });
+    }
+    Ok(())
 }
 
 fn capability_aggregate_authority(
@@ -1467,6 +1567,7 @@ mod tests {
                     attenuations: vec![],
                     timestamp: 900,
                     scope_hash: None,
+                    aggregate_family_preservation: None,
                 },
                 &issuer,
             )
@@ -1520,6 +1621,7 @@ mod tests {
                     attenuations: vec![],
                     timestamp: 900,
                     scope_hash: None,
+                    aggregate_family_preservation: None,
                 },
                 &issuer,
             )

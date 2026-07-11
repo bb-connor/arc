@@ -117,6 +117,7 @@ fn direct_attenuated_token(
         parent_scope_hash: scope_hash(&scope).unwrap(),
         child_scope_hash: scope_hash(&scope).unwrap(),
         normalized_subset_proof: witness,
+        aggregate_family_preservation: None,
     };
     CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -205,6 +206,7 @@ fn kernel_hot_path_rejects_inflated_parent_scope() {
         parent_scope_hash: scope_hash(&scope_bigger).unwrap(),
         child_scope_hash: scope_hash(&scope_child).unwrap(),
         normalized_subset_proof: witness,
+        aggregate_family_preservation: None,
     };
 
     let body = CapabilityTokenBody {
@@ -279,6 +281,7 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
             attenuations: vec![],
             timestamp: 100,
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+            aggregate_family_preservation: None,
         };
         vec![DelegationLink::sign(body, &issuer).expect("delegation link signs")]
     };
@@ -289,6 +292,7 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
             parent_scope_hash: scope_hash(&parent_scope).unwrap(),
             child_scope_hash: scope_hash(&child_scope).unwrap(),
             normalized_subset_proof: witness,
+            aggregate_family_preservation: None,
         };
         let body = CapabilityTokenBody {
             id: id.to_string(),
@@ -380,6 +384,7 @@ fn delegated_child_without_pre_registered_parent_fails_closed() {
             attenuations: vec![],
             timestamp: 100,
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+            aggregate_family_preservation: None,
         };
         vec![DelegationLink::sign(body, &issuer).expect("delegation link signs")]
     };
@@ -389,6 +394,7 @@ fn delegated_child_without_pre_registered_parent_fails_closed() {
         parent_scope_hash: scope_hash(&parent_scope).unwrap(),
         child_scope_hash: scope_hash(&child_scope).unwrap(),
         normalized_subset_proof: witness,
+        aggregate_family_preservation: None,
     };
     let body = CapabilityTokenBody {
         id: "cap-child-autoreg".to_string(),
@@ -467,6 +473,7 @@ fn unregistered_parent_rejects_first_sibling_fail_closed() {
             attenuations: vec![],
             timestamp: 100,
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+            aggregate_family_preservation: None,
         };
         vec![DelegationLink::sign(body, &issuer).expect("delegation link signs")]
     };
@@ -477,6 +484,7 @@ fn unregistered_parent_rejects_first_sibling_fail_closed() {
             parent_scope_hash: scope_hash(&parent_scope).unwrap(),
             child_scope_hash: scope_hash(&child_scope).unwrap(),
             normalized_subset_proof: witness,
+            aggregate_family_preservation: None,
         };
         let body = CapabilityTokenBody {
             id: id.to_string(),
@@ -548,6 +556,7 @@ fn chain_binding_disabled_rejects_attenuated_token() {
         parent_scope_hash: scope_hash(&scope).unwrap(),
         child_scope_hash: scope_hash(&scope).unwrap(),
         normalized_subset_proof: witness,
+        aggregate_family_preservation: None,
     };
     let body = CapabilityTokenBody {
         id: "cap-attenuated-chain-binding-disabled".to_string(),

@@ -124,6 +124,7 @@ fn build_validation_fixture() -> (
             attenuations: Vec::new(),
             timestamp: 1_710_000_000,
             scope_hash: None,
+            aggregate_family_preservation: None,
         },
         &root,
     )
@@ -136,6 +137,7 @@ fn build_validation_fixture() -> (
             attenuations: Vec::new(),
             timestamp: 1_710_000_060,
             scope_hash: None,
+            aggregate_family_preservation: None,
         },
         &delegate_one,
     )

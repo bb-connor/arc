@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
@@ -110,8 +111,14 @@ fn family_root_scope() -> ChioScope {
 
 #[derive(Clone)]
 enum ResolverOutcome {
-    Resolved(AggregateFamilyRootResolution),
+    Resolved(Box<AggregateFamilyRootResolution>),
     Error(AggregateFamilyRootResolutionError),
+}
+
+impl ResolverOutcome {
+    fn resolved(resolution: AggregateFamilyRootResolution) -> Self {
+        Self::Resolved(Box::new(resolution))
+    }
 }
 
 struct CountingResolver {
@@ -132,7 +139,7 @@ impl CountingResolver {
     fn family(fixture: &FamilyFixture) -> Self {
         Self::new(
             &fixture.root_token.id,
-            ResolverOutcome::Resolved(AggregateFamilyRootResolution::FamilyBound(
+            ResolverOutcome::resolved(AggregateFamilyRootResolution::FamilyBound(
                 fixture.verified_root.clone(),
             )),
         )
@@ -141,7 +148,7 @@ impl CountingResolver {
     fn legacy(fixture: &FamilyFixture) -> Self {
         Self::new(
             &fixture.root_token.id,
-            ResolverOutcome::Resolved(AggregateFamilyRootResolution::LegacyUnbound(
+            ResolverOutcome::resolved(AggregateFamilyRootResolution::LegacyUnbound(
                 fixture.legacy_record(),
             )),
         )
@@ -161,7 +168,7 @@ impl AggregateFamilyRootResolver for CountingResolver {
         self.calls.set(self.calls.get() + 1);
         assert_eq!(root_capability_id, self.expected_root_id);
         match &self.outcome {
-            ResolverOutcome::Resolved(root) => Ok(root.clone()),
+            ResolverOutcome::Resolved(root) => Ok(root.as_ref().clone()),
             ResolverOutcome::Error(error) => Err(error.clone()),
         }
     }
@@ -202,6 +209,7 @@ fn signed_link(
             attenuations: Vec::new(),
             timestamp,
             scope_hash,
+            aggregate_family_preservation: None,
         },
         signer,
     )
@@ -747,7 +755,7 @@ fn delegation_family_first_link_id_mismatch_is_corrupt_resolution() {
     );
     let resolver = CountingResolver::new(
         wrong_id,
-        ResolverOutcome::Resolved(AggregateFamilyRootResolution::FamilyBound(
+        ResolverOutcome::resolved(AggregateFamilyRootResolution::FamilyBound(
             fixture.verified_root.clone(),
         )),
     );
@@ -872,7 +880,7 @@ fn delegation_family_resolver_root_record_id_mismatch_is_corrupt() {
     let leaf = fixture.one_hop_descendant("record-key-leaf");
     let resolver = CountingResolver::new(
         &fixture.root_token.id,
-        ResolverOutcome::Resolved(AggregateFamilyRootResolution::FamilyBound(
+        ResolverOutcome::resolved(AggregateFamilyRootResolution::FamilyBound(
             wrong_record.verified_root,
         )),
     );

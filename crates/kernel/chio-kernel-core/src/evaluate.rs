@@ -482,6 +482,7 @@ mod tests {
                 attenuations: vec![],
                 timestamp: 100,
                 scope_hash: None,
+                aggregate_family_preservation: None,
             },
             issuer,
         ) {

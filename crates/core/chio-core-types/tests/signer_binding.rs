@@ -270,6 +270,7 @@ fn delegation_link_sign_rejects_embedded_delegator_mismatch() {
         attenuations: Vec::new(),
         timestamp: 1_710_000_000,
         scope_hash: None,
+        aggregate_family_preservation: None,
     };
 
     assert!(DelegationLink::sign(body, &actual_signer).is_err());

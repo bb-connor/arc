@@ -12,7 +12,7 @@ use crate::error::{Error, Result};
 use crate::schema_binding::ensure_schema_matches;
 use crate::signer_binding::ensure_keypair_matches_embedded_key;
 
-use super::aggregate_budget::AggregateInvocationBudget;
+use super::aggregate_budget::{AggregateInvocationBudget, AggregateInvocationScope};
 use super::attenuation::{
     scope_hash, validate_attenuation_proof, verify_attenuation_witness, Attenuation,
     AttenuationProof, DelegationLink, ScopeHash,
@@ -37,6 +37,29 @@ fn is_none_or_empty<T>(value: &Option<Vec<T>>) -> bool {
 
 fn is_none_or_empty_attenuation_proof(value: &Option<AttenuationProof>) -> bool {
     value.is_none()
+}
+
+fn validate_aggregate_family_preservation(
+    proof: &AttenuationProof,
+    budget: Option<&AggregateInvocationBudget>,
+) -> Result<()> {
+    match budget {
+        Some(budget) if budget.scope == AggregateInvocationScope::DelegationFamily => {
+            let evidence = proof
+                .aggregate_family_preservation
+                .as_ref()
+                .ok_or_else(|| Error::AttenuationViolation {
+                    reason: "attenuated delegation-family capability must preserve aggregate family evidence"
+                        .to_string(),
+                })?;
+            evidence.validate_against_budget(budget)
+        }
+        _ if proof.aggregate_family_preservation.is_some() => Err(Error::AttenuationViolation {
+            reason: "aggregate family preservation evidence requires a delegation-family budget"
+                .to_string(),
+        }),
+        _ => Ok(()),
+    }
 }
 
 /// A Chio capability token. Scoped, time-bounded, cryptographically signed.
@@ -204,6 +227,10 @@ impl CapabilityToken {
             budget.validate_for_scope(&self.scope)?;
         }
         if let Some(proof) = self.attenuation_proof.as_ref() {
+            validate_aggregate_family_preservation(
+                proof,
+                self.aggregate_invocation_budget.as_ref(),
+            )?;
             let child_hash = scope_hash(&self.scope)?;
             if proof.child_scope_hash != child_hash {
                 return Err(Error::AttenuationViolation {
@@ -396,6 +423,10 @@ impl CapabilityToken {
                         .to_string(),
             });
         }
+        validate_aggregate_family_preservation(
+            &body.attenuation_proof,
+            body.body.aggregate_invocation_budget.as_ref(),
+        )?;
         let child_hash = scope_hash(&body.body.scope)?;
         if body.attenuation_proof.child_scope_hash != child_hash {
             return Err(Error::AttenuationViolation {

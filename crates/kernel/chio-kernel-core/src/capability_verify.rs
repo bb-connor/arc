@@ -641,6 +641,7 @@ mod tests {
             child_scope_hash: scope_hash(&scope).expect("child scope hash"),
             normalized_subset_proof: compute_attenuation_witness(&scope, &scope)
                 .expect("attenuation witness"),
+            aggregate_family_preservation: None,
         };
         CapabilityToken::sign_attenuated(
             CapabilityTokenAttenuationBody {
@@ -797,6 +798,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: Some(scope_hash(&ChioScope::default()).expect("scope hash")),
+                aggregate_family_preservation: None,
             },
             &final_delegator,
         )
@@ -878,6 +880,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: Some(root_hash.clone()),
+                aggregate_family_preservation: None,
             },
             &root_delegator,
         )
@@ -890,6 +893,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 101,
                 scope_hash: Some(root_hash.clone()),
+                aggregate_family_preservation: None,
             },
             &final_delegator,
         )
@@ -934,6 +938,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: None,
+                aggregate_family_preservation: None,
             },
             &final_delegator,
         )
@@ -996,6 +1001,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: None,
+                aggregate_family_preservation: None,
             },
             &issuer,
         )
@@ -1065,6 +1071,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: None,
+                aggregate_family_preservation: None,
             },
             &issuer,
         )
@@ -1130,6 +1137,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: None,
+                aggregate_family_preservation: None,
             },
             &issuer,
         )
@@ -1196,6 +1204,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: None,
+                aggregate_family_preservation: None,
             },
             &issuer,
         )
@@ -1277,6 +1286,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: Some(inflated_hash.clone()),
+                aggregate_family_preservation: None,
             },
             &issuer,
         )
@@ -1289,6 +1299,7 @@ mod tests {
                 &authorized_scope,
             )
             .expect("attenuation witness"),
+            aggregate_family_preservation: None,
         };
         let token = CapabilityToken::sign_attenuated(
             CapabilityTokenAttenuationBody {
@@ -1373,6 +1384,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: Some(trust_root_hash.clone()),
+                aggregate_family_preservation: None,
             },
             &issuer,
         )
@@ -1385,6 +1397,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 101,
                 scope_hash: Some(intermediate_hash.clone()),
+                aggregate_family_preservation: None,
             },
             &intermediate,
         )
@@ -1397,6 +1410,7 @@ mod tests {
                 &authorized_scope,
             )
             .expect("attenuation witness"),
+            aggregate_family_preservation: None,
         };
         let token = CapabilityToken::sign_attenuated(
             CapabilityTokenAttenuationBody {
@@ -1462,6 +1476,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: None,
+                aggregate_family_preservation: None,
             },
             &issuer,
         )
@@ -1472,6 +1487,7 @@ mod tests {
             child_scope_hash: scope_hash(&scope).expect("child scope hash"),
             normalized_subset_proof: compute_attenuation_witness(&scope, &scope)
                 .expect("attenuation witness"),
+            aggregate_family_preservation: None,
         };
         let token = CapabilityToken::sign_attenuated(
             CapabilityTokenAttenuationBody {

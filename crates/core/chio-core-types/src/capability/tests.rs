@@ -445,6 +445,7 @@ fn attenuated_capability_schema_and_budget_fail_closed() {
         parent_scope_hash: scope_hash(&parent).unwrap(),
         child_scope_hash: scope_hash(&child).unwrap(),
         normalized_subset_proof: witness,
+        aggregate_family_preservation: None,
     };
     let body = CapabilityTokenBody {
         id: "cap-attenuated".to_string(),
@@ -500,6 +501,7 @@ fn attenuated_capability_chain_binding_feature_disabled_fails_closed() {
         parent_scope_hash: scope_hash(&scope).unwrap(),
         child_scope_hash: scope_hash(&scope).unwrap(),
         normalized_subset_proof: compute_attenuation_witness(&scope, &scope).unwrap(),
+        aggregate_family_preservation: None,
     };
     let body = CapabilityTokenBody {
         id: "cap-attenuated-disabled-chain-binding".to_string(),
@@ -550,6 +552,7 @@ fn attenuated_capability_requires_attenuation_proof() -> Result<()> {
         parent_scope_hash: scope_hash(&parent)?,
         child_scope_hash: scope_hash(&child)?,
         normalized_subset_proof: compute_attenuation_witness(&parent, &child)?,
+        aggregate_family_preservation: None,
     };
     let body = CapabilityTokenBody {
         id: "cap-attenuated".to_string(),
@@ -591,6 +594,7 @@ fn empty_child_scope_attenuation_proof_survives_serialization() -> Result<()> {
         parent_scope_hash: scope_hash(&parent)?,
         child_scope_hash: scope_hash(&child)?,
         normalized_subset_proof: compute_attenuation_witness(&parent, &child)?,
+        aggregate_family_preservation: None,
     };
     let body = CapabilityTokenBody {
         id: "cap-empty-child".to_string(),
@@ -723,6 +727,7 @@ fn plain_delegated_token_without_attenuation_proof_verifies_and_skips_chain_bind
             attenuations: vec![],
             timestamp: 100,
             scope_hash: None,
+            aggregate_family_preservation: None,
         },
         &issuer,
     )
@@ -808,6 +813,7 @@ fn requires_chain_binding_tracks_only_new_attenuation() {
             attenuations: vec![],
             timestamp: 100,
             scope_hash: None,
+            aggregate_family_preservation: None,
         },
         &issuer,
     )
@@ -845,6 +851,7 @@ fn make_signed_link(
         attenuations: vec![],
         timestamp,
         scope_hash: None,
+        aggregate_family_preservation: None,
     };
     DelegationLink::sign(body, delegator_kp).unwrap()
 }
@@ -2781,6 +2788,7 @@ fn delegate_enforces_parent_relative_budget_share() {
                 child_scope_hash: scope_hash(&plain.scope).unwrap(),
                 normalized_subset_proof: compute_attenuation_witness(&plain.scope, &plain.scope)
                     .unwrap(),
+                aggregate_family_preservation: None,
             },
             budget_share_bps: Some(3_000),
         },
@@ -2858,6 +2866,7 @@ fn delegate_requires_child_share_under_attenuated_parent() {
                 child_scope_hash: scope_hash(&plain.scope).unwrap(),
                 normalized_subset_proof: compute_attenuation_witness(&plain.scope, &plain.scope)
                     .unwrap(),
+                aggregate_family_preservation: None,
             },
             budget_share_bps: Some(3_000),
         },
@@ -2977,6 +2986,7 @@ fn attenuated_share_parent(
                 child_scope_hash: scope_hash(&plain.scope).unwrap(),
                 normalized_subset_proof: compute_attenuation_witness(&plain.scope, &plain.scope)
                     .unwrap(),
+                aggregate_family_preservation: None,
             },
             budget_share_bps: Some(budget_share_bps),
         },
@@ -3598,10 +3608,7 @@ fn aggregate_invocation_wire_present_field_disables_plain_body_fallback() {
     };
 
     assert!(!token.verify_signature().expect("ordinary verification"));
-    assert_eq!(
-        token
-            .verify_signature_with_floor(CapabilityCryptoFloor::AllowClassical)
-            .expect("floor verification"),
-        false
-    );
+    assert!(!token
+        .verify_signature_with_floor(CapabilityCryptoFloor::AllowClassical)
+        .expect("floor verification"));
 }

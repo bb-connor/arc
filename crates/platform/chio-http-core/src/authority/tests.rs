@@ -65,6 +65,7 @@ fn signed_direct_v2_capability_token_json(issuer: &Keypair, id: &str) -> String 
                 parent_scope_hash: parent_hash,
                 child_scope_hash: child_hash,
                 normalized_subset_proof: witness,
+                aggregate_family_preservation: None,
             },
             budget_share_bps: None,
         },

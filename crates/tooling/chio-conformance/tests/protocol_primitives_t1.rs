@@ -55,6 +55,7 @@ fn capability_unknown_schema_rejected() {
                 })
                 .unwrap(),
                 normalized_subset_proof: witness,
+                aggregate_family_preservation: None,
             },
             budget_share_bps: Some(10_000),
         },
@@ -102,6 +103,7 @@ fn forged_attenuation_proof_rejected() {
                 })
                 .unwrap(),
                 normalized_subset_proof: witness,
+                aggregate_family_preservation: None,
             },
             budget_share_bps: None,
         },

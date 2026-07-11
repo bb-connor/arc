@@ -37,8 +37,11 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 use crate::canonical::CanonicalBytes;
+use crate::capability::aggregate_budget::{
+    AggregateFamilyPreservationEvidence, VerifiedAggregateFamilyRoot,
+};
 use crate::capability::attenuation::{Attenuation, DelegationLink};
-use crate::error::Result;
+use crate::error::{Error, Result};
 
 /// Structured attenuation applied during a `delegate` mint.
 ///
@@ -140,6 +143,29 @@ impl DelegationReceipt {
     /// hash the receipt deterministically.
     pub fn canonical_bytes(&self) -> Result<CanonicalBytes> {
         CanonicalBytes::new(self)
+    }
+
+    /// Borrow aggregate family evidence covered by the fresh link signature.
+    #[must_use]
+    pub fn aggregate_family_preservation(&self) -> Option<&AggregateFamilyPreservationEvidence> {
+        self.link.aggregate_family_preservation.as_ref()
+    }
+
+    /// Authenticate and validate the receipt's aggregate family projection.
+    pub fn verify_aggregate_family_preservation(
+        &self,
+        verified_root: &VerifiedAggregateFamilyRoot,
+    ) -> Result<()> {
+        if !self.link.verify_signature()? {
+            return Err(Error::SignatureVerificationFailed);
+        }
+        let evidence =
+            self.aggregate_family_preservation()
+                .ok_or_else(|| Error::AttenuationViolation {
+                    reason: "delegation receipt is missing aggregate family preservation evidence"
+                        .into(),
+                })?;
+        evidence.validate_against_verified_root(verified_root)
     }
 
     /// Reconstruct the complete delegation chain represented by this

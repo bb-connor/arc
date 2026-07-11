@@ -131,6 +131,7 @@ mod tests {
                 attenuations: vec![],
                 timestamp: 0,
                 scope_hash: None,
+                aggregate_family_preservation: None,
             },
             issuer,
         )
@@ -186,6 +187,7 @@ mod tests {
                 attenuations: vec![],
                 timestamp: 0,
                 scope_hash: None,
+                aggregate_family_preservation: None,
             },
             issuer,
         )
@@ -245,6 +247,7 @@ mod tests {
                 attenuations: vec![],
                 timestamp: 0,
                 scope_hash: None,
+                aggregate_family_preservation: None,
             },
             issuer,
         )

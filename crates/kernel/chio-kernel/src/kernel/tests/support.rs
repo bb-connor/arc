@@ -1004,6 +1004,7 @@ fn make_direct_attenuated_capability(
                 parent_scope_hash: parent_hash,
                 child_scope_hash: child_hash,
                 normalized_subset_proof: witness,
+                aggregate_family_preservation: None,
             },
             budget_share_bps: None,
         },
@@ -1166,6 +1167,7 @@ fn make_chain_bound_delegation_link(
             attenuations: vec![],
             timestamp,
             scope_hash: Some(scope_hash(authorized_scope).unwrap()),
+            aggregate_family_preservation: None,
         },
         delegator_kp,
     )
@@ -1185,6 +1187,7 @@ fn make_chain_bound_capability(
         parent_scope_hash: scope_hash(proof_parent_scope).unwrap(),
         child_scope_hash: scope_hash(&scope).unwrap(),
         normalized_subset_proof: compute_attenuation_witness(proof_parent_scope, &scope).unwrap(),
+        aggregate_family_preservation: None,
     };
     // Keep the delegated child strictly inside its parent's lifetime. The parent
     // helpers issue a 300s window; capture the clock once and use a shorter child
@@ -1249,6 +1252,7 @@ fn make_v2_delegated_child(input: V2DelegatedChildInput<'_>) -> CapabilityToken 
             &input.child_scope,
         )
         .unwrap(),
+        aggregate_family_preservation: None,
     };
     let link = DelegationLink::sign(
         DelegationLinkBody {
@@ -1258,6 +1262,7 @@ fn make_v2_delegated_child(input: V2DelegatedChildInput<'_>) -> CapabilityToken 
             attenuations: vec![],
             timestamp: current_unix_timestamp(),
             scope_hash: Some(parent_scope_hash),
+            aggregate_family_preservation: None,
         },
         input.parent_kp,
     )
