@@ -1040,6 +1040,49 @@ fn repair_refuses_partial_checkpoint_batch() -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
+/// A store whose entire checkpointed history was archived has legitimately empty
+/// source tables AND an empty projection. The next writable `open()` must NOT
+/// brick it on the empty-projection backfill guard just because a checkpoint or
+/// watermark exists; there is nothing to regenerate.
+#[test]
+fn fully_archived_store_reopens_writable() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("fully-archived-reopen");
+    let archive = unique_db_path("fully-archived-reopen-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+        for i in 0..4u64 {
+            let r = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("fr-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store.append_chio_receipt_returning_seq(&r)?;
+        }
+        store.flush_receipt_writes()?;
+        let archived = store.archive_receipts_before(150, archive_path)?;
+        assert_eq!(archived, 4, "the whole history archives");
+    }
+
+    // Reopen writable: the empty expected + empty existing case must be accepted.
+    let reopened = SqliteReceiptStore::open(&path)?;
+    assert!(reopened.receipt_store_health()?.healthy);
+    // And the store is still appendable after the full-prefix rotation.
+    let fresh =
+        super::support::sample_receipt_with_keypair_and_timestamp("fr-fresh", 9, 900, &keypair);
+    reopened.append_chio_receipt_returning_seq(&fresh)?;
+    reopened.flush_receipt_writes()?;
+    assert!(reopened.receipt_store_health()?.healthy);
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// Primary correctness proof: a state-machine proptest that drives random
 /// interleaved sequences of tool/child appends (non-monotonic
 /// timestamps within an aged band, to exercise the MAX(timestamp)-over-prefix

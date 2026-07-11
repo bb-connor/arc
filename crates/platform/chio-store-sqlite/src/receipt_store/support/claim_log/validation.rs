@@ -63,6 +63,18 @@ pub(crate) fn validate_or_backfill_claim_receipt_log_entries(
                 "claim receipt log projection is missing for persisted receipt rows".to_string(),
             ));
         }
+        // A fully archived store legitimately has BOTH empty source tables and
+        // an empty projection: retention co-archived and deleted the entire
+        // checkpointed prefix. There is nothing to regenerate, so the empty
+        // expected + empty existing state is consistent and reopenable even
+        // though a checkpoint or watermark exists. Returning here keeps a valid
+        // full-prefix rotation followed by a restart from bricking the store on
+        // the next writable open; the checkpointed-range refusal below is only
+        // for the case where SOURCE rows survived and their entry_seq ordering
+        // would have to be guessed against committed checkpoint boundaries.
+        if expected.is_empty() {
+            return Ok(());
+        }
         // Fail-closed: only regenerate a never-checkpointed, never-archived
         // projection. Once a checkpoint has committed a batch_end_seq boundary
         // or an archival watermark exists, re-deriving entry_seq from surviving
