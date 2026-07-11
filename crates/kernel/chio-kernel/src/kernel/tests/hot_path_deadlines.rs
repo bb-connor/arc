@@ -161,6 +161,48 @@ async fn per_guard_budget_bounds_single_guard_not_pipeline(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn pipeline_budget_bounds_the_per_guard_loop(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // With per-guard budgets configured, the whole guard loop must still honor
+    // the pipeline budget. A single guard whose own budget is generous but whose
+    // work exceeds the pipeline budget must trip the pipeline deadline rather
+    // than running to completion.
+    let mut config = make_config();
+    config.deadlines.guard_pipeline_budget_ms = 300;
+    // A generous per-guard override forces the per-guard offloaded path yet never
+    // fires on its own, so only the pipeline deadline can stop the slow guard.
+    config
+        .deadlines
+        .per_guard_budget_ms
+        .insert("slow".to_string(), 5_000);
+    let mut kernel = make_kernel(config);
+    kernel.add_guard(Box::new(SleepingGuard {
+        label: "slow".to_string(),
+    }));
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-pipeline", vec!["noop"])));
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-pipeline", "noop")]),
+        300,
+    );
+    let request = make_request("req-pipeline", &cap, "noop", "srv-pipeline");
+    let kernel = Arc::new(kernel);
+
+    let start = std::time::Instant::now();
+    let response = kernel.evaluate_tool_call(&request).await?;
+    let elapsed = start.elapsed();
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(
+        elapsed < Duration::from_secs(1),
+        "the pipeline deadline must fire near 300ms, well before the 2s guard sleep, took {elapsed:?}"
+    );
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn dispatch_budget_expiry_runs_full_unwind_and_emits_cancelled_receipt(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let invocations = Arc::new(AtomicU64::new(0));

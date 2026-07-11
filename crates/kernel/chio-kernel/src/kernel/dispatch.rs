@@ -546,7 +546,25 @@ impl ChioKernel {
         });
 
         if has_per_guard {
-            return self.run_guards_per_guard_offloaded(&owned).await;
+            // Per-guard budgets bound each guard individually, but the whole
+            // loop must still honor the pipeline budget: without an outer
+            // deadline a chain of guards, each within its own budget, can run
+            // far past the configured pipeline wall-clock limit. Keep the
+            // pipeline deadline around the loop so total guard time stays bounded.
+            let per_guard = self.run_guards_per_guard_offloaded(&owned);
+            return match pipeline_budget {
+                Some(budget) => match tokio::time::timeout(budget, per_guard).await {
+                    Ok(result) => result,
+                    Err(_elapsed) => Err(GuardRunError::new(
+                        KernelError::HotPathDeadlineExceeded {
+                            stage: HotPathStage::GuardPipeline,
+                            budget_ms: budget_ms_saturating(budget),
+                        },
+                        Vec::new(),
+                    )),
+                },
+                None => per_guard.await,
+            };
         }
 
         let guards = Arc::clone(&self.guards);
