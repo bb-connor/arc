@@ -2222,10 +2222,15 @@ impl SqliteReceiptStore {
         }
         let (writer_level, writer_restart_total) =
             self.receipt_commit_actor.writer_health_summary();
-        // A dead or degraded writer can never read green even when the last completed
-        // batch left no `last_error`: the supervised flag is the source of truth for
-        // writer liveness, and `last_error` only reflects the last batch attempt.
+        // A writer that cannot be trusted to persist can never read green. This is
+        // the same predicate the pre-dispatch gate denies on, so readiness and the
+        // gate never disagree: it covers a dead or degraded supervised thread AND a
+        // poisoned verified head, where the thread is still Healthy and no batch
+        // recorded a `last_error` yet every append is already rejected (the window
+        // right after opening a store, before the head has been seeded). Neither
+        // the thread level nor `last_error` alone can see the poisoned head.
         let healthy = status.healthy
+            && !self.receipt_commit_actor.writer_serving_closed()
             && self
                 .receipt_commit_actor
                 .writer_counters()

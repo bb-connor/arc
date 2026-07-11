@@ -508,6 +508,56 @@ fn poisoned_head_reports_writer_serving_closed() -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
+/// A poisoned verified head must read the whole STORE as unhealthy, not only
+/// close the pre-dispatch gate. Right after a store opens, the supervised writer
+/// thread is still Healthy and no batch has recorded a `last_error`, yet every
+/// append is already rejected until the head is seeded. If store health ignored
+/// the poisoned head it would report green to readiness and the watchdog during
+/// the exact window in which the gate denies every tool call, so the two
+/// surfaces must agree.
+#[test]
+fn poisoned_head_reads_store_unhealthy() -> Result<(), Box<dyn std::error::Error>> {
+    let (path, store, keypair) = open_seeded_store("chio-head-poison-health", 3)?;
+    store.create_next_receipt_checkpoint(3, &keypair)?;
+
+    // Baseline: a seeded, verified head with no write error reads green on both
+    // surfaces.
+    let baseline = store.receipt_store_health()?;
+    assert!(
+        baseline.healthy,
+        "a verified head with no write error must read healthy"
+    );
+    assert!(!store.writer_serving_closed());
+
+    // Poison the head directly: the supervised writer thread stays alive and no
+    // batch error is recorded, so `last_error` is empty and the thread level is
+    // still Healthy. This is the fresh-open window where the summary counters
+    // look green but the writer cannot persist a single receipt.
+    store.receipt_commit_actor.health.set_head_poisoned(true);
+
+    assert!(
+        store.writer_serving_closed(),
+        "a poisoned head must fail the pre-dispatch gate closed"
+    );
+    let report = store.receipt_store_health()?;
+    assert!(
+        report.writer.last_error.is_none(),
+        "the poison window records no per-batch last_error"
+    );
+    assert_eq!(
+        report.writer_level,
+        HealthLevel::Healthy,
+        "the supervised writer thread is still alive"
+    );
+    assert!(
+        !report.healthy,
+        "a store whose verified head is poisoned must read unhealthy so readiness and the pre-dispatch gate agree"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
 /// `reseed_verified_head()` success clears `last_error` and replaces the head,
 /// and must ALSO clear the actor loop's separate `pending_flush_error` (set by
 /// an earlier poisoned append). Otherwise a subsequent STANDALONE
