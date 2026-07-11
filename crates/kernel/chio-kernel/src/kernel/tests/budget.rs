@@ -93,10 +93,12 @@ fn aggregate_invocation_enforcement_disabled_denies_before_hosted_dispatch() {
     )));
 
     let subject_kp = make_keypair();
+    let mut grant = make_grant("srv-a", "read_file");
+    grant.max_invocations = Some(1);
     let ordinary = make_capability(
         &kernel,
         &subject_kp,
-        make_scope(vec![make_grant("srv-a", "read_file")]),
+        make_scope(vec![grant]),
         300,
     );
     let mut body = ordinary.body();
@@ -125,6 +127,14 @@ fn aggregate_invocation_enforcement_disabled_denies_before_hosted_dispatch() {
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(response.reason.as_deref().is_some_and(|reason| reason
         .contains("aggregate invocation budget enforcement is disabled")));
+    assert!(
+        kernel
+            .budget_store
+            .get_usage(&aggregate.id, 0)
+            .expect("query budget usage")
+            .is_none(),
+        "aggregate rollout denial must precede ordinary budget mutation"
+    );
 }
 
 #[test]

@@ -558,6 +558,25 @@ mod tests {
             .expect_err("full verification must deny unenforced aggregate budgets");
             assert_aggregate_enforcement_disabled(full_error);
         }
+
+        let mut tampered = aggregate_budget_token(&issuer, 0);
+        tampered.id.push_str("-tampered");
+        let portable_error = verify_capability(&tampered, &[issuer.public_key()], &clock)
+            .expect_err("signature authentication must precede aggregate rollout denial");
+        assert_eq!(portable_error, CapabilityError::InvalidSignature);
+
+        let mut budgets = NoopBudgetRegistry;
+        let full_error = verify_capability_full(
+            &tampered,
+            &[issuer.public_key()],
+            &clock,
+            CapabilityCryptoFloor::AllowClassical,
+            &peer,
+            &trust_roots,
+            &mut budgets,
+        )
+        .expect_err("full verification must authenticate before aggregate rollout denial");
+        assert_eq!(full_error, CapabilityError::InvalidSignature);
     }
 
     #[test]
