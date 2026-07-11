@@ -736,7 +736,9 @@ fn copy_archived_prefix(
 /// held stale bytes, and the delete would then leave the store with no faithful
 /// archived copy. Every archived table the delete touches is therefore verified
 /// by identity: the receipt tables (`chio_tool_receipts`, `chio_child_receipts`)
-/// on `raw_json`, and the claim-log projection, checkpoint rows, and
+/// on `seq` (the primary key the claim-log projection's `source_seq` points at,
+/// so a same-`receipt_id` archive row copied under a different `seq` cannot pass)
+/// and `raw_json`, and the claim-log projection, checkpoint rows, and
 /// settlement/metered/consumption reconciliations by a NULL-safe (`IS`)
 /// full-column compare of the live prefix rows against their archive
 /// counterparts (keyed on each table's primary key). The compare is bounded to
@@ -761,7 +763,7 @@ fn verify_co_archival_complete(
             format!(
                 "SELECT COUNT(*) FROM main.chio_tool_receipts m WHERE m.seq IN \
                  (SELECT source_seq FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt') \
-                 AND EXISTS (SELECT 1 FROM archive.chio_tool_receipts a WHERE a.receipt_id = m.receipt_id AND a.raw_json = m.raw_json)"
+                 AND EXISTS (SELECT 1 FROM archive.chio_tool_receipts a WHERE a.seq = m.seq AND a.receipt_id = m.receipt_id AND a.raw_json = m.raw_json)"
             ),
         ),
         (
@@ -773,7 +775,7 @@ fn verify_co_archival_complete(
             format!(
                 "SELECT COUNT(*) FROM main.chio_child_receipts m WHERE m.seq IN \
                  (SELECT source_seq FROM main.claim_receipt_log_entries WHERE entry_seq <= {w} AND receipt_kind = 'child_receipt') \
-                 AND EXISTS (SELECT 1 FROM archive.chio_child_receipts a WHERE a.receipt_id = m.receipt_id AND a.raw_json = m.raw_json)"
+                 AND EXISTS (SELECT 1 FROM archive.chio_child_receipts a WHERE a.seq = m.seq AND a.receipt_id = m.receipt_id AND a.raw_json = m.raw_json)"
             ),
         ),
         (

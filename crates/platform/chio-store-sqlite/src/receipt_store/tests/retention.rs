@@ -774,6 +774,100 @@ fn bricked_store_repair_restores_append() -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
+/// Co-archival identity must pin the receipt-table primary key `seq`, not just
+/// `receipt_id` + `raw_json`. The projection's `source_seq` (copied verbatim)
+/// points at that `seq`, so an archive that already holds the same receipt under
+/// a DIFFERENT `seq` (the idempotent copy keeps it on the `receipt_id` UNIQUE
+/// conflict) would leave the archived projection pointing at the wrong source
+/// row. Verification must FAIL fail-closed before any delete.
+#[test]
+fn co_archival_rejects_reused_seq_archive() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("co-archival-reused-seq");
+    let archive = unique_db_path("co-archival-reused-seq-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for i in 0..2u64 {
+        let receipt = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("reused-seq-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(store.load_checkpoint_by_seq(1)?.is_some());
+
+    // Read the true bytes of the first receipt (seq 1), then pre-seed the archive
+    // with that receipt under a DIVERGENT primary-key `seq`. The rotation's
+    // INSERT OR IGNORE copy keeps this row on the receipt_id UNIQUE conflict, so
+    // a receipt_id+raw_json-only check would pass while source_seq points nowhere.
+    let (receipt_id, raw_json): (String, String) = {
+        let live = store.reader_connection_for_test()?;
+        live.query_row(
+            "SELECT receipt_id, raw_json FROM chio_tool_receipts WHERE seq = 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?
+    };
+    {
+        let seed = rusqlite::Connection::open(&archive)?;
+        seed.execute_batch(
+            "CREATE TABLE chio_tool_receipts (\
+                seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, timestamp INTEGER NOT NULL, \
+                capability_id TEXT NOT NULL, subject_key TEXT, issuer_key TEXT, grant_index INTEGER, \
+                tool_server TEXT NOT NULL, tool_name TEXT NOT NULL, decision_kind TEXT NOT NULL, \
+                policy_hash TEXT NOT NULL, content_hash TEXT NOT NULL, raw_json TEXT NOT NULL, tenant_id TEXT);",
+        )?;
+        seed.execute(
+            "INSERT INTO chio_tool_receipts \
+             (seq, receipt_id, timestamp, capability_id, tool_server, tool_name, decision_kind, policy_hash, content_hash, raw_json) \
+             VALUES (9001, ?1, 100, 'cap', 'srv', 'tool', 'allow', 'ph', 'ch', ?2)",
+            rusqlite::params![receipt_id, raw_json],
+        )?;
+    }
+
+    let result = store.archive_receipts_before(150, archive_path);
+    let message = result
+        .err()
+        .ok_or("expected RetentionArchiveIncomplete; rotation accepted a reused-seq archive")?
+        .to_string();
+    assert!(
+        message.contains("co-archival incomplete"),
+        "unexpected error: {message}"
+    );
+    assert!(
+        message.contains("chio_tool_receipts"),
+        "the seq mismatch must fail the tool-receipt identity check: {message}"
+    );
+
+    // Fail-closed: the abort happened before any delete, so live rows are intact.
+    let live = store.reader_connection_for_test()?;
+    let live_tool: i64 = live.query_row("SELECT COUNT(*) FROM chio_tool_receipts", [], |row| {
+        row.get(0)
+    })?;
+    assert_eq!(
+        live_tool, 2,
+        "tool receipts intact when co-archival verify fails"
+    );
+    let live_log: i64 = live.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        live_log, 2,
+        "claim-log intact when co-archival verify fails"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// Primary correctness proof: a state-machine proptest that drives random
 /// interleaved sequences of tool/child appends (non-monotonic
 /// timestamps within an aged band, to exercise the MAX(timestamp)-over-prefix
