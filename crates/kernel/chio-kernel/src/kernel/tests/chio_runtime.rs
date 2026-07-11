@@ -1907,6 +1907,7 @@ fn make_fabricated_drop_charge() -> BudgetChargeResult {
             budget_commit_index: None,
             event_id: None,
         },
+        free_tier_pool_hold: None,
     }
 }
 

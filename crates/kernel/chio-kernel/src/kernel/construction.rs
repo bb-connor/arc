@@ -102,6 +102,12 @@ impl ChioKernel {
         self.with_session(session_id, f)
     }
 
+    /// Run `f` with exclusive access to the budget store. The `budget_store_lock`
+    /// serializes check-then-increment sequences (including the free-tier pool
+    /// co-debit) against OTHER CALLS ON THIS KERNEL INSTANCE only: with the
+    /// default in-memory store the `freetier:global` ceiling is therefore
+    /// per-process. A multi-replica deployment must install one shared,
+    /// transactionally-atomic budget store for the ceiling to be fleet-global.
     pub(crate) fn with_budget_store<R>(
         &self,
         f: impl FnOnce(&dyn BudgetStore) -> Result<R, KernelError>,
@@ -192,6 +198,7 @@ impl ChioKernel {
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
             budget_store: Arc::new(InMemoryBudgetStore::new()),
             budget_store_lock: Mutex::new(()),
+            free_tier_pool: None,
             revocation_store: Arc::new(InMemoryRevocationStore::new()),
             capability_authority: Box::new(LocalCapabilityAuthority::new(authority_keypair)),
             tool_servers: HashMap::new(),

@@ -1,0 +1,1690 @@
+// Chio Pass: a soulbound (non-transferable, non-redeemable) verifiable
+// credential keyed to a single attested `did:chio`.
+//
+// NAMING (B-review): `ChioPass` is the soulbound free-tier credential and is
+// DISTINCT from the existing `AgentPassport` / `PassportLifecycleRecord` bundle
+// (the reputation-passport family). A `ChioPass` is a reputation credential, not
+// an `AgentPassport` and not a transaction passport; do not conflate `ChioPass`
+// with `ChioPassport`. The credential envelope (context/type/proof) mirrors
+// `ReputationCredential` byte-for-byte so the same Ed25519 canonical-JSON
+// (RFC 8785) signing and verification path applies.
+//
+// This module owns the credential FORMAT plus issuance, verification, and
+// revocation. The kernel data-stream gating, aggregate pool admission, anti-farm
+// distribution, and the refresh-on-genuine-use receipt scan live in their own
+// crates and are out of scope here.
+
+/// VC `type` member identifying a Chio Pass credential.
+pub const CHIO_PASS_TYPE: &str = "ChioPass";
+
+/// Schema identifier for the Chio Pass credential family (a VC family, not a
+/// signed-artifact-registry member, mirroring `chio.agent-passport.v1`).
+pub const CHIO_PASS_SCHEMA: &str = "chio.pass.v1";
+
+/// Allotment unit. `XCC` is a 3-uppercase-letter ISO-4217 private-use code that
+/// is intentionally NOT priced by `chio-link::minor_units_for_currency`, so the
+/// free-tier allotment never acquires a money leg.
+pub const CHIO_PASS_ALLOTMENT_UNIT: &str = "XCC";
+
+/// Metering `CostDimension::Custom` name written into served receipts so the
+/// allotment debit stays off `total_monetary_cost` (summed only from `ApiCost`)
+/// and the genuine-use scan can recognize it.
+pub const CHIO_PASS_ALLOTMENT_COST_NAME: &str = "chio.pass.allotment.v1";
+
+/// Per-invocation XCC cost (default placeholder). A separate small positive
+/// constant so `max_cost_per_invocation.units > 0` always holds and the pool
+/// co-debit can never request zero units. Board-approved governance config may override
+/// this; the floor is "> 0", not this exact value.
+pub const CHIO_PASS_PER_INVOCATION_UNITS: u64 = 1;
+
+/// Tier -> allotment-units table. GOVERNANCE-PINNED config (not a
+/// `const`), loaded fail-closed. The invariant every code path honors: the floor
+/// applies unconditionally (a tier_0 newcomer gets a positive allotment); the
+/// tier scales SIZE only, never existence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TierAllotmentTable {
+    pub unverified: u64,
+    pub attested: u64,
+    pub verified: u64,
+    pub premier: u64,
+}
+
+impl Default for TierAllotmentTable {
+    /// Default placeholder pending board sign-off; surfaced as governance
+    /// config under `ChioPassConfig`, not a wire constant.
+    fn default() -> Self {
+        Self {
+            unverified: 1000,
+            attested: 1000,
+            verified: 2500,
+            premier: 5000,
+        }
+    }
+}
+
+/// The single tier-size lookup. Pinned `#[must_use]` so the result is never
+/// silently dropped at a sizing site.
+#[must_use]
+pub fn allotment_units_for_tier(tier: TrustTier, table: &TierAllotmentTable) -> u64 {
+    match tier {
+        TrustTier::Unverified => table.unverified,
+        TrustTier::Attested => table.attested,
+        TrustTier::Verified => table.verified,
+        TrustTier::Premier => table.premier,
+    }
+}
+
+/// The five tier_0 baseline read URIs: three aggregate trust feeds
+/// plus the holder's OWN receipts and OWN lineage. The own-tenant patterns carry
+/// the canonical `did:chio` with the MANDATORY `/` delimiter before the trailing
+/// `*` so tenant `did:chioabcd` cannot prefix-match `did:chioabcde...`.
+///
+/// This is the SINGLE credential-layer builder both issuance and
+/// [`validate_chio_pass_entitlements`] call against the canonical subject DID, so
+/// `read_scopes` is bound to the canonical identity (closing the scope-binding
+/// gap). The kernel data-stream gating builds the matching `ResourceGrant`
+/// set against the same URI strings.
+///
+/// # Errors
+///
+/// Fails closed if `subject_did` is not a canonical `did:chio` identifier.
+pub fn pass_baseline_read_uris(subject_did: &str) -> Result<Vec<String>, CredentialError> {
+    let canonical = DidChio::from_str(subject_did)?.to_string();
+    Ok(vec![
+        "chio://trust/reputation/tier/*".to_string(),
+        "chio://marketplace/listings*".to_string(),
+        "chio://trust/pheromone/concentration/*".to_string(),
+        format!("chio://receipts/tenant/{canonical}/*"),
+        format!("chio://lineage/tenant/{canonical}/*"),
+    ])
+}
+
+/// The metered XCC allotment a Pass grants for one attestation window.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChioPassAllotmentGrant {
+    /// MUST equal [`CHIO_PASS_ALLOTMENT_UNIT`] (`"XCC"`).
+    pub unit: String,
+    /// Allotment SIZE for this window (tier-sized; `0` == withheld dormant).
+    pub window_units: u64,
+    /// Per-invocation XCC cost. MUST be `> 0` so the pool co-debit bounds spend.
+    pub per_invocation_units: u64,
+    /// MUST equal `window.until - window.since`.
+    pub refill_cadence_secs: u64,
+    /// Whether the next window's refresh is gated on genuine-use evidence.
+    pub requires_genuine_use_refresh: bool,
+}
+
+/// The entitlements a Pass binds to its subject for one window.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChioPassEntitlements {
+    /// Governs allotment SIZE/refill only, never the baseline read right.
+    pub tier: TrustTier,
+    /// MUST equal `pass_baseline_read_uris(credential_subject.id)`.
+    pub read_scopes: Vec<String>,
+    pub allotment: ChioPassAllotmentGrant,
+    /// Canonical shared attestation window.
+    pub window: AttestationWindowId,
+}
+
+/// Issuer-attested evidence captured at snapshot time.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChioPassEvidence {
+    pub attested_tier: TrustTier,
+    /// Reuses the existing `AttestationWindow`; `since` MUST be `Some(window.since)`.
+    pub snapshot_window: AttestationWindow,
+    /// Embedded output of the genuine-use scan.
+    pub genuine_use_observed: bool,
+}
+
+/// The credential subject: a soulbound `did:chio` and its entitlements.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChioPassSubject {
+    pub id: String,
+    pub entitlements: ChioPassEntitlements,
+}
+
+/// The unsigned Chio Pass body (the canonical-JSON signing input). The flatten
+/// target carries no `deny_unknown_fields`, matching `UnsignedReputationCredential`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct UnsignedChioPass {
+    #[serde(rename = "@context")]
+    pub context: Vec<String>,
+    #[serde(rename = "type")]
+    pub credential_type: Vec<String>,
+    pub schema: String,
+    pub issuer: String,
+    pub issuance_date: String,
+    pub expiration_date: String,
+    pub credential_subject: ChioPassSubject,
+    pub evidence: ChioPassEvidence,
+}
+
+/// The signed Chio Pass credential.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ChioPass {
+    #[serde(flatten)]
+    pub unsigned: UnsignedChioPass,
+    pub proof: CredentialProof,
+}
+
+/// Build the entitlements + evidence snapshot for one window. Canonicalizes
+/// `subject_did` FIRST, then derives the baseline read scopes and the allotment
+/// size from the canonical DID and the governance table.
+///
+/// REFRESH-ON-GENUINE-USE (the sizing half, not the receipt scan): the allotment
+/// is tier-sized on the first window or when genuine use was observed, otherwise
+/// withheld at `0`. The baseline read scopes persist regardless.
+///
+/// # Errors
+///
+/// Fails closed on a malformed subject DID or a degenerate window.
+pub fn snapshot_chio_pass_entitlements(
+    subject_did: &str,
+    attested_tier: TrustTier,
+    window: &AttestationWindowId,
+    is_first_window: bool,
+    genuine_use_observed: bool,
+    table: &TierAllotmentTable,
+) -> Result<(ChioPassEntitlements, ChioPassEvidence), CredentialError> {
+    window
+        .validate()
+        .map_err(|error| CredentialError::InvalidChioPassWindow(error.to_string()))?;
+    let canonical = DidChio::from_str(subject_did)?.to_string();
+    let read_scopes = pass_baseline_read_uris(&canonical)?;
+    let refill_cadence_secs = window.until.checked_sub(window.since).ok_or_else(|| {
+        CredentialError::InvalidChioPassWindow("until must be greater than since".to_string())
+    })?;
+    let observed = is_first_window || genuine_use_observed;
+    let window_units = if observed {
+        allotment_units_for_tier(attested_tier, table)
+    } else {
+        0
+    };
+    let entitlements = ChioPassEntitlements {
+        tier: attested_tier,
+        read_scopes,
+        allotment: ChioPassAllotmentGrant {
+            unit: CHIO_PASS_ALLOTMENT_UNIT.to_string(),
+            window_units,
+            per_invocation_units: CHIO_PASS_PER_INVOCATION_UNITS,
+            refill_cadence_secs,
+            requires_genuine_use_refresh: true,
+        },
+        window: window.clone(),
+    };
+    let evidence = ChioPassEvidence {
+        attested_tier,
+        snapshot_window: AttestationWindow {
+            since: Some(window.since),
+            until: window.until,
+        },
+        genuine_use_observed: observed,
+    };
+    Ok((entitlements, evidence))
+}
+
+/// Validate the entitlements + evidence against the canonical subject and the
+/// governance table, fail-closed.
+///
+/// Both `evidence` and `table` are threaded through even though only the
+/// refresh rule reads them: the refresh check recomputes the tier-sized
+/// allotment from `evidence.genuine_use_observed`, so the issuer-independent
+/// recomputation is actually verifiable.
+pub fn validate_chio_pass_entitlements(
+    entitlements: &ChioPassEntitlements,
+    evidence: &ChioPassEvidence,
+    issuance: u64,
+    expiration: u64,
+    subject_did: &str,
+    table: &TierAllotmentTable,
+) -> Result<(), CredentialError> {
+    let allotment = &entitlements.allotment;
+    if allotment.unit != CHIO_PASS_ALLOTMENT_UNIT {
+        return Err(CredentialError::InvalidChioPassAllotmentGrant(format!(
+            "allotment unit must be {CHIO_PASS_ALLOTMENT_UNIT}, got {}",
+            allotment.unit
+        )));
+    }
+    if allotment.per_invocation_units == 0 {
+        return Err(CredentialError::InvalidChioPassAllotmentGrant(
+            "per_invocation_units must be greater than zero".to_string(),
+        ));
+    }
+
+    let window = &entitlements.window;
+    if window.window_ym.is_empty() {
+        return Err(CredentialError::InvalidChioPassWindow(
+            "window_ym must not be empty".to_string(),
+        ));
+    }
+    if window.since != issuance {
+        return Err(CredentialError::InvalidChioPassWindow(
+            "window.since must equal the issuance timestamp".to_string(),
+        ));
+    }
+    if window.until != expiration {
+        return Err(CredentialError::InvalidChioPassWindow(
+            "window.until must equal the expiration timestamp".to_string(),
+        ));
+    }
+    if window.since >= window.until {
+        return Err(CredentialError::InvalidChioPassWindow(
+            "window.since must be strictly before window.until".to_string(),
+        ));
+    }
+    let expected_cadence = window.until.checked_sub(window.since).ok_or_else(|| {
+        CredentialError::InvalidChioPassWindow("until must be greater than since".to_string())
+    })?;
+    if allotment.refill_cadence_secs != expected_cadence {
+        return Err(CredentialError::InvalidChioPassAllotmentGrant(
+            "refill_cadence_secs must equal window.until - window.since".to_string(),
+        ));
+    }
+
+    let expected_scopes = pass_baseline_read_uris(subject_did)?;
+    if entitlements.read_scopes != expected_scopes {
+        return Err(CredentialError::InvalidChioPassAllotmentGrant(
+            "read_scopes must equal the canonical baseline read URIs for the subject".to_string(),
+        ));
+    }
+
+    // Bind the embedded attestation evidence to the entitlement it justifies. The
+    // allotment SIZE is recomputed from `entitlements.tier`, so an issuer or
+    // control-plane bug that signs evidence for a lower tier or a different window
+    // than the entitlement grants must be rejected fail-closed: otherwise the
+    // verified credential would carry attestation evidence that cannot justify it.
+    if evidence.attested_tier != entitlements.tier {
+        return Err(CredentialError::InvalidChioPassAllotmentGrant(
+            "evidence.attested_tier must equal entitlements.tier".to_string(),
+        ));
+    }
+    if evidence.snapshot_window.since != Some(window.since)
+        || evidence.snapshot_window.until != window.until
+    {
+        return Err(CredentialError::InvalidChioPassAllotmentGrant(
+            "evidence.snapshot_window must equal the entitlement window".to_string(),
+        ));
+    }
+
+    // The allotment SIZE is a strict biconditional of `genuine_use_observed`: a
+    // tier-sized ceiling iff genuine use was observed, otherwise exactly `0`.
+    // Recomputing the tier size in BOTH directions closes the gap where
+    // `genuine_use_observed == true` but `window_units == 0` (a zero-ceiling Pass
+    // that would deny the holder's first charged invocation and break the
+    // first-window / genuine-use floor) as well as the reverse (`window_units > 0`
+    // without observed use).
+    let expected_units = allotment_units_for_tier(entitlements.tier, table);
+    if evidence.genuine_use_observed {
+        if allotment.window_units != expected_units {
+            return Err(CredentialError::InvalidChioPassAllotmentGrant(
+                "genuine_use_observed requires window_units to equal the tier-sized allotment"
+                    .to_string(),
+            ));
+        }
+    } else if allotment.window_units != 0 {
+        return Err(CredentialError::InvalidChioPassAllotmentGrant(
+            "a non-zero window_units requires genuine_use_observed".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Issue a soulbound Chio Pass. Mirrors
+/// `issue_reputation_credential_with_enterprise_identity`: the subject is
+/// canonicalized via `DidChio::from_str`, the entitlements are validated
+/// fail-closed, and the body is signed with Ed25519 over canonical JSON.
+///
+/// NOTE: `table` is threaded for the issuer-independent refresh check (see
+/// [`validate_chio_pass_entitlements`]).
+///
+/// # Errors
+///
+/// Returns [`CredentialError::InvalidChioPassValidityWindow`] when
+/// `issued_at > valid_until`, propagates DID / validation failures, and surfaces
+/// any signing error.
+pub fn issue_chio_pass(
+    issuer_keypair: &Keypair,
+    subject_did: &str,
+    entitlements: ChioPassEntitlements,
+    evidence: ChioPassEvidence,
+    issued_at: u64,
+    valid_until: u64,
+    table: &TierAllotmentTable,
+) -> Result<ChioPass, CredentialError> {
+    if issued_at > valid_until {
+        return Err(CredentialError::InvalidChioPassValidityWindow);
+    }
+    let issuer = DidChio::from_public_key(issuer_keypair.public_key())?;
+    let subject = DidChio::from_str(subject_did)?.to_string();
+    validate_chio_pass_entitlements(
+        &entitlements,
+        &evidence,
+        issued_at,
+        valid_until,
+        &subject,
+        table,
+    )?;
+
+    let unsigned = UnsignedChioPass {
+        context: vec![
+            VC_CONTEXT_V1.to_string(),
+            CHIO_CREDENTIAL_CONTEXT_V1.to_string(),
+        ],
+        credential_type: vec![VC_TYPE.to_string(), CHIO_PASS_TYPE.to_string()],
+        schema: CHIO_PASS_SCHEMA.to_string(),
+        issuer: issuer.to_string(),
+        issuance_date: rfc3339_from_unix(issued_at)?,
+        expiration_date: rfc3339_from_unix(valid_until)?,
+        credential_subject: ChioPassSubject {
+            id: subject,
+            entitlements,
+        },
+        evidence,
+    };
+
+    let (signature, _) = issuer_keypair.sign_canonical(&unsigned)?;
+    Ok(ChioPass {
+        unsigned,
+        proof: CredentialProof {
+            proof_type: PROOF_TYPE.to_string(),
+            created: rfc3339_from_unix(issued_at)?,
+            proof_purpose: PROOF_PURPOSE.to_string(),
+            verification_method: issuer.verification_method_id(),
+            proof_value: signature.to_hex(),
+        },
+    })
+}
+
+/// Verify a Chio Pass: schema, proof envelope, issuer binding, validity window,
+/// half-open expiry, entitlement integrity, and the Ed25519 signature.
+///
+/// Expiry is HALF-OPEN to match the capability token's `validate_time` (B11):
+/// `now >= expiration` is expired because `until` is the start of the next
+/// window. Signature verification runs last over `canonical_json_bytes(&unsigned)`.
+///
+/// # Errors
+///
+/// Returns the specific [`CredentialError`] for the first failing check.
+pub fn verify_chio_pass(
+    pass: &ChioPass,
+    now: u64,
+    table: &TierAllotmentTable,
+) -> Result<(), CredentialError> {
+    if pass.unsigned.schema != CHIO_PASS_SCHEMA {
+        return Err(CredentialError::InvalidChioPassSchema);
+    }
+    if pass.proof.proof_type != PROOF_TYPE {
+        return Err(CredentialError::InvalidProofType);
+    }
+    if pass.proof.proof_purpose != PROOF_PURPOSE {
+        return Err(CredentialError::InvalidProofPurpose);
+    }
+    let issuer = DidChio::from_str(&pass.unsigned.issuer)?;
+    if pass.proof.verification_method != issuer.verification_method_id() {
+        return Err(CredentialError::IssuerVerificationMethodMismatch);
+    }
+
+    let issuance = unix_from_rfc3339(&pass.unsigned.issuance_date)?;
+    let expiration = unix_from_rfc3339(&pass.unsigned.expiration_date)?;
+    if issuance > expiration {
+        return Err(CredentialError::InvalidChioPassValidityWindow);
+    }
+    if now >= expiration {
+        return Err(CredentialError::ChioPassExpired);
+    }
+
+    validate_chio_pass_entitlements(
+        &pass.unsigned.credential_subject.entitlements,
+        &pass.unsigned.evidence,
+        issuance,
+        expiration,
+        &pass.unsigned.credential_subject.id,
+        table,
+    )?;
+
+    let signature = Signature::from_hex(&pass.proof.proof_value)?;
+    let verified = issuer
+        .public_key()
+        .verify(&canonical_json_bytes(&pass.unsigned)?, &signature);
+    if !verified {
+        return Err(CredentialError::InvalidCredentialSignature);
+    }
+    Ok(())
+}
+
+/// Enforce soulbinding: the presenting holder key MUST derive
+/// `credential_subject.id`. A non-Ed25519 holder key is rejected by
+/// `DidChio::from_public_key`.
+///
+/// # Errors
+///
+/// Returns [`CredentialError::PresentationHolderMismatch`] when the derived DID
+/// does not match the subject.
+pub fn verify_chio_pass_holder_binding(
+    pass: &ChioPass,
+    holder_public_key: PublicKey,
+) -> Result<(), CredentialError> {
+    let holder_did = DidChio::from_public_key(holder_public_key)?.to_string();
+    if holder_did != pass.unsigned.credential_subject.id {
+        return Err(CredentialError::PresentationHolderMismatch);
+    }
+    Ok(())
+}
+
+/// The anchor leaf / lifecycle key: `sha256_hex(canonical_json_bytes(pass))` over
+/// the FULL signed Pass (mirrors `passport_artifact_id`).
+///
+/// # Errors
+///
+/// Propagates canonical-JSON serialization failures.
+pub fn chio_pass_artifact_id(pass: &ChioPass) -> Result<String, CredentialError> {
+    Ok(sha256_hex(&canonical_json_bytes(pass)?))
+}
+
+/// Build the revocation lifecycle record for a Pass. Rejects `revoked_at == 0`
+/// up front, then constructs a `Revoked` [`PassportLifecycleRecord`] keyed by the
+/// Pass artifact id and runs `record.validate()`. The caller emits the
+/// `PassportRevocationEvent` via `record.to_revocation_event()`.
+///
+/// # Errors
+///
+/// Returns [`CredentialError::InvalidPassportLifecycle`] when `revoked_at == 0`
+/// or the assembled record fails its own validation, and propagates artifact-id /
+/// timestamp errors.
+pub fn revoke_chio_pass_record(
+    pass: &ChioPass,
+    revoked_at: u64,
+    revoked_reason: String,
+) -> Result<PassportLifecycleRecord, CredentialError> {
+    if revoked_at == 0 {
+        return Err(CredentialError::InvalidPassportLifecycle(
+            "chio pass revocation requires a non-zero revoked_at".to_string(),
+        ));
+    }
+    let passport_id = chio_pass_artifact_id(pass)?;
+    let published_at = unix_from_rfc3339(&pass.unsigned.issuance_date)?;
+    let record = PassportLifecycleRecord {
+        passport_id,
+        subject: pass.unsigned.credential_subject.id.clone(),
+        issuers: vec![pass.unsigned.issuer.clone()],
+        issuer_count: 1,
+        published_at,
+        updated_at: revoked_at,
+        status: PassportLifecycleState::Revoked,
+        superseded_by: None,
+        revoked_at: Some(revoked_at),
+        revoked_reason: Some(revoked_reason),
+        distribution: PassportStatusDistribution::default(),
+        valid_until: pass.unsigned.expiration_date.clone(),
+    };
+    record.validate()?;
+    Ok(record)
+}
+
+/// UTC calendar-month window containing `now`. Uses `DateTime::from_timestamp`
+/// (no `TimeZone`-trait read of a wall clock). Fails closed on an out-of-range
+/// timestamp or month overflow.
+///
+/// # Errors
+///
+/// Returns [`CredentialError::InvalidUnixTimestamp`] on any range failure.
+pub fn attestation_window_containing(now: u64) -> Result<AttestationWindowId, CredentialError> {
+    let secs = i64::try_from(now).map_err(|_| CredentialError::InvalidUnixTimestamp(now))?;
+    let dt = DateTime::from_timestamp(secs, 0).ok_or(CredentialError::InvalidUnixTimestamp(now))?;
+    let month_start_naive = dt
+        .date_naive()
+        .with_day(1)
+        .and_then(|d| d.and_hms_opt(0, 0, 0))
+        .ok_or(CredentialError::InvalidUnixTimestamp(now))?;
+    let month_start = Utc.from_utc_datetime(&month_start_naive);
+    let next_month = month_start
+        .checked_add_months(Months::new(1))
+        .ok_or(CredentialError::InvalidUnixTimestamp(now))?;
+    let since =
+        u64::try_from(month_start.timestamp()).map_err(|_| CredentialError::InvalidUnixTimestamp(now))?;
+    let until =
+        u64::try_from(next_month.timestamp()).map_err(|_| CredentialError::InvalidUnixTimestamp(now))?;
+    Ok(AttestationWindowId {
+        window_ym: month_start.format("%Y-%m").to_string(),
+        since,
+        until,
+    })
+}
+
+/// Admission-boundary defense-in-depth: recompute the expected window-scoped id
+/// from the token's OWN subject and its `issued_at`-aligned window, and reject any
+/// mismatch. Robust to mint skew because it recomputes the window from
+/// `token.issued_at` (pinned `== window.since`).
+///
+/// # Errors
+///
+/// Returns [`CredentialError::InvalidChioPassCapabilityBinding`] when the subject
+/// key is not Ed25519, the expiry is not pinned to the window boundary, or the id
+/// is not the canonical window-scoped id.
+pub fn verify_window_scoped_capability_id(token: &CapabilityToken) -> Result<(), CredentialError> {
+    let subject_did = DidChio::from_public_key(token.subject.clone())
+        .map_err(|error| CredentialError::InvalidChioPassCapabilityBinding(error.to_string()))?
+        .to_string();
+    let window = attestation_window_containing(token.issued_at)?;
+    if token.expires_at != window.until {
+        return Err(CredentialError::InvalidChioPassCapabilityBinding(
+            "Pass expiry is not pinned to its attestation-window boundary".to_string(),
+        ));
+    }
+    let expected = window_scoped_capability_id(&subject_did, &window)
+        .map_err(|error| CredentialError::InvalidChioPassCapabilityBinding(error.to_string()))?;
+    if token.id != expected {
+        return Err(CredentialError::InvalidChioPassCapabilityBinding(
+            "Pass capability id is not the canonical window-scoped id".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Refresh-on-genuine-use
+//
+// The PURE half of the refresh control: a per-receipt genuine-use predicate
+// plus the next-window refresh decision. It does NOT touch the kernel hot path
+// (the kernel keeps charging the deterministic id against a fixed ceiling); it
+// only decides WHETHER the next window's `window_units` is tier-sized or 0. The
+// storage-backed scan loop and the rollover orchestrator (`count_genuine_use`,
+// `refresh_chio_pass_window`) live in the control plane and are out of
+// scope here.
+// ---------------------------------------------------------------------------
+
+/// Minimum number of qualifying genuine-use receipts in a window required to
+/// refresh the next window's allotment at tier size. Launch placeholder; the
+/// board-approved `ChioPassConfig` may raise the floor. The floor is
+/// `>= MIN_GENUINE_USE_RECEIPTS`, not this exact value.
+pub const MIN_GENUINE_USE_RECEIPTS: u32 = 1;
+
+/// Whether `receipt` debited the XCC free-tier allotment, detected by reading the
+/// EXISTING metering `CostMetadata` Custom dimension under
+/// `metadata["cost"].dimensions[]` with `name == CHIO_PASS_ALLOTMENT_COST_NAME`
+/// and `value > 0`. This deliberately reads the shipped cost
+/// dimension via `serde_json` (no `chio-metering` dependency, no invented
+/// `metadata.metering.allotment_debit` block) and NEVER panics: absent or
+/// malformed metadata yields `false` (fail-closed - an unrecognized receipt does
+/// not count as genuine use).
+#[must_use]
+fn receipt_debited_pass_allotment(receipt: &ChioReceipt) -> bool {
+    let Some(metadata) = receipt.metadata.as_ref() else {
+        return false;
+    };
+    let Some(dimensions) = metadata
+        .get("cost")
+        .and_then(|cost| cost.get("dimensions"))
+        .and_then(serde_json::Value::as_array)
+    else {
+        return false;
+    };
+    dimensions.iter().any(|dimension| {
+        let name_matches = dimension.get("name").and_then(serde_json::Value::as_str)
+            == Some(CHIO_PASS_ALLOTMENT_COST_NAME);
+        let value_positive = dimension
+            .get("value")
+            .and_then(serde_json::Value::as_u64)
+            .is_some_and(|value| value > 0);
+        name_matches && value_positive
+    })
+}
+
+/// The genuine-use predicate. Returns `Ok(true)` only when
+/// ALL six conditions hold for `receipt`, `Ok(false)` when any condition fails,
+/// and `Err(ChioPassGenuineUseScanFailed)` only when the signature verification
+/// itself faults (a canonicalization/crypto error, distinct from a well-formed
+/// receipt whose signature simply does not verify, which is `Ok(false)`).
+///
+/// The six conditions, in order:
+/// 1. `capability_id == pass_capability_id` (the same deterministic Pass id).
+/// 2. `decision == Some(Decision::Allow)` (Deny/Cancelled/Incomplete never count).
+/// 3. `receipt_kind == ReceiptKind::MediatedDecision` AND
+///    `trust_level == TrustLevel::Mediated` (advisory/trace activity never counts).
+/// 4. `window.since <= timestamp < window.until` (signed u64 bounds, no wall clock).
+/// 5. the receipt DEBITED the XCC allotment ([`receipt_debited_pass_allotment`]);
+///    pure free-read activity never counts.
+/// 6. `verify_signature()? == true` AND `receipt.kernel_key` is in the pinned
+///    `accepted_kernel_keys` allowlist.
+///
+/// SECURITY (point 6, do NOT weaken): `verify_signature` only proves the receipt
+/// is internally self-consistent against its OWN `kernel_key`. The predicate ALSO
+/// requires `receipt.kernel_key` to be a member of the pinned
+/// `accepted_kernel_keys` allowlist, which is what upgrades "internally
+/// consistent" to "a TRUSTED kernel signed it" (a self-signed receipt under an
+/// attacker-chosen key passes `verify_signature` but fails membership). The
+/// PROVENANCE of that allowlist - who pins and rotates it - is the orchestrator's
+/// job; this pure predicate only takes the
+/// pinned slice and checks membership fail-closed, inventing no provenance.
+///
+/// # Errors
+///
+/// Returns [`CredentialError::ChioPassGenuineUseScanFailed`] when
+/// `ChioReceipt::verify_signature` returns an error.
+pub fn is_genuine_use_receipt(
+    receipt: &ChioReceipt,
+    pass_capability_id: &str,
+    window: &AttestationWindowId,
+    accepted_kernel_keys: &[PublicKey],
+) -> Result<bool, CredentialError> {
+    if receipt.capability_id != pass_capability_id {
+        return Ok(false);
+    }
+    if !matches!(receipt.decision, Some(Decision::Allow)) {
+        return Ok(false);
+    }
+    if receipt.receipt_kind != ReceiptKind::MediatedDecision
+        || receipt.trust_level != TrustLevel::Mediated
+    {
+        return Ok(false);
+    }
+    if receipt.timestamp < window.since || receipt.timestamp >= window.until {
+        return Ok(false);
+    }
+    if !receipt_debited_pass_allotment(receipt) {
+        return Ok(false);
+    }
+    if !accepted_kernel_keys
+        .iter()
+        .any(|key| key == &receipt.kernel_key)
+    {
+        return Ok(false);
+    }
+    match receipt.verify_signature() {
+        Ok(verified) => Ok(verified),
+        Err(error) => Err(CredentialError::ChioPassGenuineUseScanFailed(
+            error.to_string(),
+        )),
+    }
+}
+
+/// The refresh disposition for the next attestation window. This is
+/// an AUDIT label, never the authority: the kernel ceiling is. It only records
+/// whether the next window's `window_units` is tier-sized or `0`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ChioPassRefreshOutcome {
+    /// Re-attested AND genuine use observed: mint the next Pass at tier size.
+    Granted,
+    /// Re-attested but no genuine use: mint the next Pass with `window_units == 0`
+    /// (baseline reads persist; the first metered charge denies fail-closed).
+    WithheldDormant,
+    /// No fresh re-attestation: no new Pass is minted; the old token lapses at
+    /// expiry.
+    DeniedNoReattestation,
+}
+
+/// Serializable audit record of one refresh decision. Canonical
+/// JSON (camelCase) for audit/anchoring; it RECORDS the decision but is NOT the
+/// authority (the kernel ceiling is). `next_allotment_units` is the size the next
+/// window's Pass is minted with: the tier size on `Granted`, `0` otherwise.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChioPassRefreshDecision {
+    /// Canonical `did:chio` of the soulbound subject.
+    pub subject: String,
+    /// The window whose genuine use was scanned.
+    pub prior_window: AttestationWindowId,
+    /// The contiguous next window being refreshed into.
+    pub next_window: AttestationWindowId,
+    /// The prior window's deterministic capability id.
+    pub prior_capability_id: String,
+    /// The next window's deterministic capability id.
+    pub next_capability_id: String,
+    /// Count of qualifying genuine-use receipts observed in `prior_window`.
+    pub genuine_use_count: u32,
+    /// Whether fresh re-attestation was verified at rollover.
+    pub reattested: bool,
+    /// Attested coarse tier (governs the granted allotment SIZE only).
+    pub tier: TrustTier,
+    /// The refresh disposition.
+    pub outcome: ChioPassRefreshOutcome,
+    /// The `window_units` the next Pass is minted with (`0` unless `Granted`).
+    pub next_allotment_units: u64,
+}
+
+/// Decide the next window's allotment refresh (pure half).
+///
+/// REFRESH MAPPING (fail-closed, re-attestation gates first):
+/// - not re-attested -> `DeniedNoReattestation`, `next_allotment_units = 0` (the
+///   caller mints NO new Pass; the old token lapses at expiry).
+/// - re-attested AND `genuine_use_count >= MIN_GENUINE_USE_RECEIPTS` -> `Granted`,
+///   `next_allotment_units = allotment_units_for_tier(tier, table)`.
+/// - re-attested but no genuine use -> `WithheldDormant`,
+///   `next_allotment_units = 0` (the caller mints a Pass whose baseline reads
+///   persist but whose first metered charge denies fail-closed).
+///
+/// The returned [`ChioPassRefreshDecision`] is a serializable audit record, not
+/// the authority. This function does NOT mint anything; the control-plane
+/// orchestrator maps the outcome onto issuance.
+///
+/// # Errors
+///
+/// Returns [`CredentialError::InvalidChioPassRefreshWindow`] when `next_window`
+/// is not exactly the single calendar month immediately following `prior_window`
+/// (the canonical [`attestation_window_containing`] of `prior_window.until`), so a
+/// contiguous-but-multi-month window is rejected.
+#[allow(clippy::too_many_arguments)]
+pub fn chio_pass_refresh_decision(
+    subject: &DidChio,
+    prior_window: &AttestationWindowId,
+    next_window: &AttestationWindowId,
+    prior_capability_id: String,
+    next_capability_id: String,
+    genuine_use_count: u32,
+    reattested: bool,
+    tier: TrustTier,
+    table: &TierAllotmentTable,
+) -> Result<ChioPassRefreshDecision, CredentialError> {
+    // Monthly rollover: the next window must be the SINGLE calendar month
+    // immediately following the prior window, not merely a contiguous (and
+    // possibly multi-month) interval. Recompute the canonical month window that
+    // contains `prior_window.until` and require an exact match, so a caller cannot
+    // pass a contiguous but extended window that mints the next Pass and capability
+    // with an `expires_at` past the intended monthly reset.
+    let expected_next = attestation_window_containing(prior_window.until)
+        .map_err(|_| CredentialError::InvalidChioPassRefreshWindow)?;
+    if next_window != &expected_next {
+        return Err(CredentialError::InvalidChioPassRefreshWindow);
+    }
+    let (next_allotment_units, outcome) = if !reattested {
+        (0, ChioPassRefreshOutcome::DeniedNoReattestation)
+    } else if genuine_use_count >= MIN_GENUINE_USE_RECEIPTS {
+        (
+            allotment_units_for_tier(tier, table),
+            ChioPassRefreshOutcome::Granted,
+        )
+    } else {
+        (0, ChioPassRefreshOutcome::WithheldDormant)
+    };
+    Ok(ChioPassRefreshDecision {
+        subject: subject.to_string(),
+        prior_window: prior_window.clone(),
+        next_window: next_window.clone(),
+        prior_capability_id,
+        next_capability_id,
+        genuine_use_count,
+        reattested,
+        tier,
+        outcome,
+        next_allotment_units,
+    })
+}
+
+#[cfg(test)]
+mod chio_pass_tests {
+    use super::*;
+    use chio_core::capability::scope::ChioScope;
+    use chio_core::capability::token::CapabilityTokenBody;
+    use chio_core::Keypair;
+
+    // 2026-06-15T12:00:00Z, comfortably inside the June 2026 window.
+    const MID_JUNE_2026: u64 = 1_781_524_800;
+    // 2026-06-01T00:00:00Z and 2026-07-01T00:00:00Z.
+    const JUNE_SINCE: u64 = 1_780_272_000;
+    const JULY_SINCE: u64 = 1_782_864_000;
+
+    fn june_window() -> AttestationWindowId {
+        attestation_window_containing(MID_JUNE_2026).expect("window")
+    }
+
+    fn issued_pass(
+        issuer: &Keypair,
+        subject: &Keypair,
+        window: &AttestationWindowId,
+        table: &TierAllotmentTable,
+    ) -> ChioPass {
+        let subject_did = DidChio::from_public_key(subject.public_key())
+            .expect("ed25519")
+            .to_string();
+        let (entitlements, evidence) = snapshot_chio_pass_entitlements(
+            &subject_did,
+            TrustTier::Attested,
+            window,
+            true,
+            true,
+            table,
+        )
+        .expect("snapshot");
+        issue_chio_pass(
+            issuer,
+            &subject_did,
+            entitlements,
+            evidence,
+            window.since,
+            window.until,
+            table,
+        )
+        .expect("issue")
+    }
+
+    #[test]
+    fn attestation_window_containing_produces_june_window() {
+        let window = june_window();
+        assert_eq!(window.window_ym, "2026-06");
+        assert_eq!(window.since, JUNE_SINCE);
+        assert_eq!(window.until, JULY_SINCE);
+        assert!(window.since <= MID_JUNE_2026 && MID_JUNE_2026 < window.until);
+    }
+
+    #[test]
+    fn attestation_window_handles_december_and_leap_february() {
+        // 2024-12-15 -> Dec window rolling into 2025-01.
+        let december = attestation_window_containing(1_734_220_800).expect("december");
+        assert_eq!(december.window_ym, "2024-12");
+        assert_eq!(december.since, 1_733_011_200); // 2024-12-01T00:00:00Z
+        assert_eq!(december.until, 1_735_689_600); // 2025-01-01T00:00:00Z
+        // 2024-02-15 -> leap February rolling into 2024-03.
+        let february = attestation_window_containing(1_708_000_000).expect("february");
+        assert_eq!(february.window_ym, "2024-02");
+        assert_eq!(february.since, 1_706_745_600); // 2024-02-01T00:00:00Z
+        assert_eq!(february.until, 1_709_251_200); // 2024-03-01T00:00:00Z
+    }
+
+    #[test]
+    fn issue_then_verify_round_trips_and_is_canonical_stable() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let table = TierAllotmentTable::default();
+        let window = june_window();
+        let pass = issued_pass(&issuer, &subject, &window, &table);
+
+        assert!(verify_chio_pass(&pass, MID_JUNE_2026, &table).is_ok());
+
+        // Identical issuance is byte-stable under RFC 8785 canonicalization.
+        let second = issued_pass(&issuer, &subject, &window, &table);
+        let first_bytes = canonical_json_bytes(&pass.unsigned).expect("canonical");
+        let second_bytes = canonical_json_bytes(&second.unsigned).expect("canonical");
+        assert_eq!(first_bytes, second_bytes);
+
+        // Soulbinding: subject key matches, others do not.
+        assert!(verify_chio_pass_holder_binding(&pass, subject.public_key()).is_ok());
+        let stranger = Keypair::generate();
+        assert!(matches!(
+            verify_chio_pass_holder_binding(&pass, stranger.public_key()),
+            Err(CredentialError::PresentationHolderMismatch)
+        ));
+    }
+
+    #[test]
+    fn verify_rejects_wrong_schema_and_tamper() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let table = TierAllotmentTable::default();
+        let window = june_window();
+        let pass = issued_pass(&issuer, &subject, &window, &table);
+
+        let mut wrong_schema = pass.clone();
+        wrong_schema.unsigned.schema = "chio.pass.wrong".to_string();
+        assert!(matches!(
+            verify_chio_pass(&wrong_schema, MID_JUNE_2026, &table),
+            Err(CredentialError::InvalidChioPassSchema)
+        ));
+
+        // Tamper the signed body without re-signing -> signature fails.
+        let mut tampered = pass.clone();
+        tampered
+            .unsigned
+            .credential_subject
+            .entitlements
+            .allotment
+            .window_units = allotment_units_for_tier(TrustTier::Attested, &table) + 1;
+        assert!(verify_chio_pass(&tampered, MID_JUNE_2026, &table).is_err());
+    }
+
+    #[test]
+    fn verify_expiry_is_half_open() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let table = TierAllotmentTable::default();
+        let window = june_window();
+        let pass = issued_pass(&issuer, &subject, &window, &table);
+
+        assert!(verify_chio_pass(&pass, window.until - 1, &table).is_ok());
+        assert!(matches!(
+            verify_chio_pass(&pass, window.until, &table),
+            Err(CredentialError::ChioPassExpired)
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_non_xcc_unit_and_zero_per_invocation() {
+        let subject = Keypair::generate();
+        let subject_did = DidChio::from_public_key(subject.public_key())
+            .expect("ed25519")
+            .to_string();
+        let table = TierAllotmentTable::default();
+        let window = june_window();
+        let (entitlements, evidence) = snapshot_chio_pass_entitlements(
+            &subject_did,
+            TrustTier::Attested,
+            &window,
+            true,
+            true,
+            &table,
+        )
+        .expect("snapshot");
+
+        let mut bad_unit = entitlements.clone();
+        bad_unit.allotment.unit = "USD".to_string();
+        assert!(matches!(
+            validate_chio_pass_entitlements(
+                &bad_unit,
+                &evidence,
+                window.since,
+                window.until,
+                &subject_did,
+                &table
+            ),
+            Err(CredentialError::InvalidChioPassAllotmentGrant(_))
+        ));
+
+        let mut zero_per_invocation = entitlements;
+        zero_per_invocation.allotment.per_invocation_units = 0;
+        assert!(matches!(
+            validate_chio_pass_entitlements(
+                &zero_per_invocation,
+                &evidence,
+                window.since,
+                window.until,
+                &subject_did,
+                &table
+            ),
+            Err(CredentialError::InvalidChioPassAllotmentGrant(_))
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_read_scope_mismatch() {
+        let subject = Keypair::generate();
+        let subject_did = DidChio::from_public_key(subject.public_key())
+            .expect("ed25519")
+            .to_string();
+        let table = TierAllotmentTable::default();
+        let window = june_window();
+        let (mut entitlements, evidence) = snapshot_chio_pass_entitlements(
+            &subject_did,
+            TrustTier::Attested,
+            &window,
+            true,
+            true,
+            &table,
+        )
+        .expect("snapshot");
+        entitlements
+            .read_scopes
+            .push("chio://market/financials/*".to_string());
+        assert!(matches!(
+            validate_chio_pass_entitlements(
+                &entitlements,
+                &evidence,
+                window.since,
+                window.until,
+                &subject_did,
+                &table
+            ),
+            Err(CredentialError::InvalidChioPassAllotmentGrant(_))
+        ));
+    }
+
+    #[test]
+    fn validate_refresh_is_issuer_independently_checkable() {
+        let subject = Keypair::generate();
+        let subject_did = DidChio::from_public_key(subject.public_key())
+            .expect("ed25519")
+            .to_string();
+        let table = TierAllotmentTable::default();
+        let window = june_window();
+        let (entitlements, _evidence) = snapshot_chio_pass_entitlements(
+            &subject_did,
+            TrustTier::Attested,
+            &window,
+            true,
+            true,
+            &table,
+        )
+        .expect("snapshot");
+
+        // window_units > 0 but genuine_use_observed == false is rejected.
+        let lying_evidence = ChioPassEvidence {
+            attested_tier: TrustTier::Attested,
+            snapshot_window: AttestationWindow {
+                since: Some(window.since),
+                until: window.until,
+            },
+            genuine_use_observed: false,
+        };
+        assert!(matches!(
+            validate_chio_pass_entitlements(
+                &entitlements,
+                &lying_evidence,
+                window.since,
+                window.until,
+                &subject_did,
+                &table
+            ),
+            Err(CredentialError::InvalidChioPassAllotmentGrant(_))
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_observed_pass_with_zero_window_units() {
+        // genuine_use_observed == true but window_units == 0 must
+        // be rejected. Such a Pass would verify but deny the holder's first charged
+        // invocation, breaking the first-window / genuine-use floor.
+        let subject = Keypair::generate();
+        let subject_did = DidChio::from_public_key(subject.public_key())
+            .expect("ed25519")
+            .to_string();
+        let table = TierAllotmentTable::default();
+        let window = june_window();
+        let (mut entitlements, evidence) = snapshot_chio_pass_entitlements(
+            &subject_did,
+            TrustTier::Attested,
+            &window,
+            true,
+            true,
+            &table,
+        )
+        .expect("snapshot");
+        assert!(evidence.genuine_use_observed);
+        assert!(entitlements.allotment.window_units > 0);
+        // Zero the ceiling while leaving genuine_use_observed == true.
+        entitlements.allotment.window_units = 0;
+        assert!(matches!(
+            validate_chio_pass_entitlements(
+                &entitlements,
+                &evidence,
+                window.since,
+                window.until,
+                &subject_did,
+                &table
+            ),
+            Err(CredentialError::InvalidChioPassAllotmentGrant(_))
+        ));
+    }
+
+    #[test]
+    fn validate_binds_evidence_tier_and_window_to_entitlement() {
+        // evidence.attested_tier and evidence.snapshot_window must
+        // be bound to the entitlement they justify.
+        let subject = Keypair::generate();
+        let subject_did = DidChio::from_public_key(subject.public_key())
+            .expect("ed25519")
+            .to_string();
+        let table = TierAllotmentTable::default();
+        let window = june_window();
+        let (entitlements, evidence) = snapshot_chio_pass_entitlements(
+            &subject_did,
+            TrustTier::Verified,
+            &window,
+            true,
+            true,
+            &table,
+        )
+        .expect("snapshot");
+
+        // Evidence attesting a lower tier than the entitlement grants is rejected.
+        let mut lower_tier_evidence = evidence.clone();
+        lower_tier_evidence.attested_tier = TrustTier::Unverified;
+        assert!(matches!(
+            validate_chio_pass_entitlements(
+                &entitlements,
+                &lower_tier_evidence,
+                window.since,
+                window.until,
+                &subject_did,
+                &table
+            ),
+            Err(CredentialError::InvalidChioPassAllotmentGrant(_))
+        ));
+
+        // Evidence whose snapshot window does not match the entitlement window is
+        // rejected.
+        let mut wrong_window_evidence = evidence;
+        wrong_window_evidence.snapshot_window = AttestationWindow {
+            since: Some(window.since + 1),
+            until: window.until,
+        };
+        assert!(matches!(
+            validate_chio_pass_entitlements(
+                &entitlements,
+                &wrong_window_evidence,
+                window.since,
+                window.until,
+                &subject_did,
+                &table
+            ),
+            Err(CredentialError::InvalidChioPassAllotmentGrant(_))
+        ));
+    }
+
+    #[test]
+    fn tier_governs_size_not_existence() {
+        let table = TierAllotmentTable::default();
+        assert!(allotment_units_for_tier(TrustTier::Unverified, &table) > 0);
+    }
+
+    #[test]
+    fn verify_window_scoped_capability_id_accepts_and_rejects() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let subject_did = DidChio::from_public_key(subject.public_key())
+            .expect("ed25519")
+            .to_string();
+        let window = june_window();
+        let id = window_scoped_capability_id(&subject_did, &window).expect("id");
+        let body = CapabilityTokenBody {
+            id,
+            issuer: issuer.public_key(),
+            subject: subject.public_key(),
+            scope: ChioScope::default(),
+            issued_at: window.since,
+            expires_at: window.until,
+            delegation_chain: vec![],
+        };
+        let token = CapabilityToken::sign(body, &issuer).expect("sign");
+        assert!(verify_window_scoped_capability_id(&token).is_ok());
+
+        let mut wrong_id = token.clone();
+        wrong_id.id = "chiopass:0000".to_string();
+        assert!(matches!(
+            verify_window_scoped_capability_id(&wrong_id),
+            Err(CredentialError::InvalidChioPassCapabilityBinding(_))
+        ));
+
+        let mut wrong_expiry = token;
+        wrong_expiry.expires_at = window.until + 1;
+        assert!(matches!(
+            verify_window_scoped_capability_id(&wrong_expiry),
+            Err(CredentialError::InvalidChioPassCapabilityBinding(_))
+        ));
+    }
+
+    #[test]
+    fn revoke_builds_validatable_record_and_rejects_zero() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let table = TierAllotmentTable::default();
+        let window = june_window();
+        let pass = issued_pass(&issuer, &subject, &window, &table);
+
+        let record =
+            revoke_chio_pass_record(&pass, window.since + 10, "compromise".to_string()).expect("revoke");
+        assert_eq!(record.status, PassportLifecycleState::Revoked);
+        assert_eq!(
+            record.passport_id,
+            chio_pass_artifact_id(&pass).expect("artifact id")
+        );
+        record.validate().expect("record valid");
+        let event = record.to_revocation_event().expect("event");
+        let event = event.expect("revocation event present");
+        assert_eq!(event.passport_id, record.passport_id);
+
+        assert!(matches!(
+            revoke_chio_pass_record(&pass, 0, "compromise".to_string()),
+            Err(CredentialError::InvalidPassportLifecycle(_))
+        ));
+    }
+}
+
+#[cfg(test)]
+mod chio_pass_refresh_tests {
+    use super::*;
+    use chio_core::receipt::body::ChioReceiptBody;
+    use chio_core::receipt::decision::ToolCallAction;
+    use chio_core::receipt::kinds::{BoundaryClass, RedactionMode, ToolOrigin};
+    use chio_core::Keypair;
+
+    // 2026-06-15T12:00:00Z, comfortably inside the June 2026 window.
+    const MID_JUNE_2026: u64 = 1_781_524_800;
+    const PASS_CAP_ID: &str = "chiopass:genuine-use-test";
+
+    fn june_window() -> AttestationWindowId {
+        attestation_window_containing(MID_JUNE_2026).expect("june window")
+    }
+
+    /// A `metadata["cost"].dimensions[]` envelope carrying the XCC allotment
+    /// Custom dimension the genuine-use scan looks for.
+    fn allotment_metadata(value: u64) -> serde_json::Value {
+        serde_json::json!({
+            "cost": {
+                "schema": "chio.cost-metadata.v1",
+                "dimensions": [
+                    {
+                        "dimension": "custom",
+                        "name": CHIO_PASS_ALLOTMENT_COST_NAME,
+                        "value": value,
+                        "unit": CHIO_PASS_ALLOTMENT_UNIT,
+                    }
+                ]
+            }
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn signed_receipt(
+        kernel: &Keypair,
+        capability_id: &str,
+        timestamp: u64,
+        decision: Option<Decision>,
+        receipt_kind: ReceiptKind,
+        trust_level: TrustLevel,
+        boundary_class: BoundaryClass,
+        metadata: Option<serde_json::Value>,
+    ) -> ChioReceipt {
+        let body = ChioReceiptBody {
+            id: "genuine-use-seed".to_string(),
+            timestamp,
+            capability_id: capability_id.to_string(),
+            tool_server: "chio.pass.compute".to_string(),
+            tool_name: "*".to_string(),
+            action: ToolCallAction::from_parameters(serde_json::json!({ "op": "compute" }))
+                .expect("action"),
+            decision,
+            receipt_kind,
+            boundary_class,
+            observation_outcome: None,
+            tool_origin: ToolOrigin::CallerExecuted,
+            redaction_mode: RedactionMode::None,
+            actor_chain: Vec::new(),
+            content_hash: sha256_hex(b"genuine-use"),
+            policy_hash: "policy-hash".to_string(),
+            evidence: Vec::new(),
+            metadata,
+            trust_level,
+            tenant_id: None,
+            kernel_key: kernel.public_key(),
+            bbs_projection_version: None,
+        };
+        ChioReceipt::sign(body, kernel).expect("sign receipt")
+    }
+
+    /// A fully valid genuine-use receipt: Allow + MediatedDecision + Mediated +
+    /// in-window + XCC allotment debit, signed by `kernel`.
+    fn genuine_use_receipt(kernel: &Keypair, window: &AttestationWindowId) -> ChioReceipt {
+        signed_receipt(
+            kernel,
+            PASS_CAP_ID,
+            window.since + 100,
+            Some(Decision::Allow),
+            ReceiptKind::MediatedDecision,
+            TrustLevel::Mediated,
+            BoundaryClass::Prevent,
+            Some(allotment_metadata(5)),
+        )
+    }
+
+    #[test]
+    fn genuine_use_receipt_passes_every_condition() {
+        let kernel = Keypair::generate();
+        let window = june_window();
+        let receipt = genuine_use_receipt(&kernel, &window);
+        let allow = [kernel.public_key()];
+        // Sanity: the fixture really does verify.
+        assert!(receipt.verify_signature().expect("verify"));
+        assert!(
+            is_genuine_use_receipt(&receipt, PASS_CAP_ID, &window, &allow).expect("scan"),
+            "a genuine-use receipt must return Ok(true)"
+        );
+    }
+
+    #[test]
+    fn condition_1_wrong_capability_id_returns_false() {
+        let kernel = Keypair::generate();
+        let window = june_window();
+        let receipt = genuine_use_receipt(&kernel, &window);
+        let allow = [kernel.public_key()];
+        assert!(
+            !is_genuine_use_receipt(&receipt, "chiopass:some-other-id", &window, &allow)
+                .expect("scan")
+        );
+    }
+
+    #[test]
+    fn condition_2_non_allow_decision_returns_false() {
+        let kernel = Keypair::generate();
+        let window = june_window();
+        let allow = [kernel.public_key()];
+        let denied = signed_receipt(
+            &kernel,
+            PASS_CAP_ID,
+            window.since + 100,
+            Some(Decision::Deny {
+                reason: "budget exhausted".to_string(),
+                guard: "kernel".to_string(),
+            }),
+            ReceiptKind::MediatedDecision,
+            TrustLevel::Mediated,
+            BoundaryClass::Prevent,
+            Some(allotment_metadata(5)),
+        );
+        assert!(!is_genuine_use_receipt(&denied, PASS_CAP_ID, &window, &allow).expect("scan"));
+    }
+
+    #[test]
+    fn condition_3_wrong_kind_or_trust_level_returns_false() {
+        let kernel = Keypair::generate();
+        let window = june_window();
+        let allow = [kernel.public_key()];
+
+        // A non-Mediated trust level fails condition 3 (checked before the
+        // signature, so the post-sign mutation that invalidates the signature is
+        // irrelevant: the scan returns Ok(false), never Err).
+        let mut wrong_trust = genuine_use_receipt(&kernel, &window);
+        wrong_trust.trust_level = TrustLevel::Advisory;
+        assert!(!is_genuine_use_receipt(&wrong_trust, PASS_CAP_ID, &window, &allow).expect("scan"));
+
+        let mut wrong_kind = genuine_use_receipt(&kernel, &window);
+        wrong_kind.receipt_kind = ReceiptKind::AdvisoryEvaluation;
+        assert!(!is_genuine_use_receipt(&wrong_kind, PASS_CAP_ID, &window, &allow).expect("scan"));
+    }
+
+    #[test]
+    fn condition_4_out_of_window_timestamp_returns_false() {
+        let kernel = Keypair::generate();
+        let window = june_window();
+        let allow = [kernel.public_key()];
+
+        // The window is half-open [since, until): a timestamp exactly at `until`
+        // is OUT of the window.
+        let at_until = signed_receipt(
+            &kernel,
+            PASS_CAP_ID,
+            window.until,
+            Some(Decision::Allow),
+            ReceiptKind::MediatedDecision,
+            TrustLevel::Mediated,
+            BoundaryClass::Prevent,
+            Some(allotment_metadata(5)),
+        );
+        assert!(!is_genuine_use_receipt(&at_until, PASS_CAP_ID, &window, &allow).expect("scan"));
+
+        let before_since = signed_receipt(
+            &kernel,
+            PASS_CAP_ID,
+            window.since - 1,
+            Some(Decision::Allow),
+            ReceiptKind::MediatedDecision,
+            TrustLevel::Mediated,
+            BoundaryClass::Prevent,
+            Some(allotment_metadata(5)),
+        );
+        assert!(
+            !is_genuine_use_receipt(&before_since, PASS_CAP_ID, &window, &allow).expect("scan")
+        );
+    }
+
+    #[test]
+    fn condition_5_no_xcc_allotment_debit_returns_false() {
+        let kernel = Keypair::generate();
+        let window = june_window();
+        let allow = [kernel.public_key()];
+
+        // No metadata at all.
+        let no_metadata = signed_receipt(
+            &kernel,
+            PASS_CAP_ID,
+            window.since + 100,
+            Some(Decision::Allow),
+            ReceiptKind::MediatedDecision,
+            TrustLevel::Mediated,
+            BoundaryClass::Prevent,
+            None,
+        );
+        assert!(!is_genuine_use_receipt(&no_metadata, PASS_CAP_ID, &window, &allow).expect("scan"));
+
+        // A zero-value allotment dimension does not count (value > 0 required).
+        let zero_value = signed_receipt(
+            &kernel,
+            PASS_CAP_ID,
+            window.since + 100,
+            Some(Decision::Allow),
+            ReceiptKind::MediatedDecision,
+            TrustLevel::Mediated,
+            BoundaryClass::Prevent,
+            Some(allotment_metadata(0)),
+        );
+        assert!(!is_genuine_use_receipt(&zero_value, PASS_CAP_ID, &window, &allow).expect("scan"));
+
+        // A cost dimension under a different name does not count.
+        let other_dimension = signed_receipt(
+            &kernel,
+            PASS_CAP_ID,
+            window.since + 100,
+            Some(Decision::Allow),
+            ReceiptKind::MediatedDecision,
+            TrustLevel::Mediated,
+            BoundaryClass::Prevent,
+            Some(serde_json::json!({
+                "cost": { "dimensions": [
+                    { "dimension": "custom", "name": "other.metric.v1", "value": 9, "unit": "XCC" }
+                ] }
+            })),
+        );
+        assert!(
+            !is_genuine_use_receipt(&other_dimension, PASS_CAP_ID, &window, &allow).expect("scan")
+        );
+    }
+
+    #[test]
+    fn condition_6_kernel_key_not_in_allowlist_returns_false() {
+        let kernel = Keypair::generate();
+        let window = june_window();
+        let receipt = genuine_use_receipt(&kernel, &window);
+
+        // A different kernel key is not accepted, even though the receipt's own
+        // signature verifies against its own kernel_key.
+        let stranger = Keypair::generate();
+        assert!(!is_genuine_use_receipt(
+            &receipt,
+            PASS_CAP_ID,
+            &window,
+            &[stranger.public_key()]
+        )
+        .expect("scan"));
+
+        // An empty allowlist denies fail-closed.
+        assert!(!is_genuine_use_receipt(&receipt, PASS_CAP_ID, &window, &[]).expect("scan"));
+    }
+
+    #[test]
+    fn tampered_signature_returns_false_not_err() {
+        let kernel = Keypair::generate();
+        let window = june_window();
+        let allow = [kernel.public_key()];
+
+        // Tamper a signed-but-unchecked field (content_hash) so the receipt id no
+        // longer matches: verify_signature returns Ok(false), so the scan returns
+        // Ok(false) rather than Err.
+        let mut tampered = genuine_use_receipt(&kernel, &window);
+        tampered.content_hash = sha256_hex(b"tampered-content");
+        assert!(!tampered.verify_signature().expect("verify"));
+        assert!(!is_genuine_use_receipt(&tampered, PASS_CAP_ID, &window, &allow).expect("scan"));
+    }
+
+    fn refresh_windows() -> (DidChio, AttestationWindowId, AttestationWindowId) {
+        let subject = Keypair::generate();
+        let did = DidChio::from_public_key(subject.public_key()).expect("did");
+        let prior = june_window();
+        // The contiguous monthly successor (July begins exactly at prior.until).
+        let next = attestation_window_containing(prior.until + 100).expect("next window");
+        (did, prior, next)
+    }
+
+    #[test]
+    fn refresh_grants_tier_size_when_reattested_and_used() {
+        let (did, prior, next) = refresh_windows();
+        let table = TierAllotmentTable::default();
+        let decision = chio_pass_refresh_decision(
+            &did,
+            &prior,
+            &next,
+            "chiopass:prior".to_string(),
+            "chiopass:next".to_string(),
+            MIN_GENUINE_USE_RECEIPTS,
+            true,
+            TrustTier::Verified,
+            &table,
+        )
+        .expect("decision");
+        assert_eq!(decision.outcome, ChioPassRefreshOutcome::Granted);
+        assert_eq!(
+            decision.next_allotment_units,
+            allotment_units_for_tier(TrustTier::Verified, &table)
+        );
+        assert!(decision.next_allotment_units > 0);
+    }
+
+    #[test]
+    fn refresh_withholds_when_reattested_but_dormant() {
+        let (did, prior, next) = refresh_windows();
+        let table = TierAllotmentTable::default();
+        let decision = chio_pass_refresh_decision(
+            &did,
+            &prior,
+            &next,
+            "chiopass:prior".to_string(),
+            "chiopass:next".to_string(),
+            0,
+            true,
+            TrustTier::Verified,
+            &table,
+        )
+        .expect("decision");
+        assert_eq!(decision.outcome, ChioPassRefreshOutcome::WithheldDormant);
+        assert_eq!(decision.next_allotment_units, 0);
+    }
+
+    #[test]
+    fn refresh_denies_without_reattestation_even_with_use() {
+        let (did, prior, next) = refresh_windows();
+        let table = TierAllotmentTable::default();
+        // Genuine use present, but no fresh re-attestation: no new Pass is minted.
+        let decision = chio_pass_refresh_decision(
+            &did,
+            &prior,
+            &next,
+            "chiopass:prior".to_string(),
+            "chiopass:next".to_string(),
+            10,
+            false,
+            TrustTier::Premier,
+            &table,
+        )
+        .expect("decision");
+        assert_eq!(decision.outcome, ChioPassRefreshOutcome::DeniedNoReattestation);
+        assert_eq!(decision.next_allotment_units, 0);
+    }
+
+    #[test]
+    fn refresh_rejects_non_contiguous_window() {
+        let (did, prior, next) = refresh_windows();
+        let table = TierAllotmentTable::default();
+
+        // next.since does not meet prior.until.
+        let gapped = AttestationWindowId {
+            window_ym: next.window_ym.clone(),
+            since: prior.until + 1,
+            until: next.until,
+        };
+        assert!(matches!(
+            chio_pass_refresh_decision(
+                &did,
+                &prior,
+                &gapped,
+                "p".to_string(),
+                "n".to_string(),
+                MIN_GENUINE_USE_RECEIPTS,
+                true,
+                TrustTier::Verified,
+                &table,
+            ),
+            Err(CredentialError::InvalidChioPassRefreshWindow)
+        ));
+
+        // next does not extend strictly beyond prior (until <= prior.until).
+        let empty = AttestationWindowId {
+            window_ym: prior.window_ym.clone(),
+            since: prior.until,
+            until: prior.until,
+        };
+        assert!(matches!(
+            chio_pass_refresh_decision(
+                &did,
+                &prior,
+                &empty,
+                "p".to_string(),
+                "n".to_string(),
+                MIN_GENUINE_USE_RECEIPTS,
+                true,
+                TrustTier::Verified,
+                &table,
+            ),
+            Err(CredentialError::InvalidChioPassRefreshWindow)
+        ));
+    }
+
+    #[test]
+    fn refresh_rejects_contiguous_multi_month_window() {
+        // A next window that is contiguous (starts exactly at
+        // prior.until and extends beyond it) but spans MORE than the single next
+        // calendar month must be rejected, so the refresh cannot stretch
+        // `expires_at` past the monthly reset.
+        let (did, prior, _next) = refresh_windows();
+        let table = TierAllotmentTable::default();
+        let july = attestation_window_containing(prior.until).expect("july window");
+        let august = attestation_window_containing(july.until).expect("august window");
+        let multi_month = AttestationWindowId {
+            window_ym: july.window_ym.clone(),
+            since: july.since, // contiguous: equals prior.until
+            until: august.until, // but spans July AND August
+        };
+        // Sanity: this passes the old contiguity-only predicate.
+        assert_eq!(multi_month.since, prior.until);
+        assert!(multi_month.until > prior.until);
+        assert!(matches!(
+            chio_pass_refresh_decision(
+                &did,
+                &prior,
+                &multi_month,
+                "p".to_string(),
+                "n".to_string(),
+                MIN_GENUINE_USE_RECEIPTS,
+                true,
+                TrustTier::Verified,
+                &table,
+            ),
+            Err(CredentialError::InvalidChioPassRefreshWindow)
+        ));
+    }
+
+    #[test]
+    fn refresh_decision_is_canonical_json_round_trippable() {
+        let (did, prior, next) = refresh_windows();
+        let table = TierAllotmentTable::default();
+        let decision = chio_pass_refresh_decision(
+            &did,
+            &prior,
+            &next,
+            "chiopass:prior".to_string(),
+            "chiopass:next".to_string(),
+            MIN_GENUINE_USE_RECEIPTS,
+            true,
+            TrustTier::Attested,
+            &table,
+        )
+        .expect("decision");
+        let bytes = canonical_json_bytes(&decision).expect("canonical");
+        let decoded: ChioPassRefreshDecision =
+            serde_json::from_slice(&bytes).expect("round trip");
+        assert_eq!(decoded, decision);
+    }
+}

@@ -48,6 +48,7 @@ pub const CHIO_FFI_ERROR_INVALID_OUTPUT_SCHEMA: i32 = 25;
 pub const CHIO_FFI_ERROR_INVALID_MANIFEST_FIELD: i32 = 26;
 pub const CHIO_FFI_ERROR_INVALID_REQUIRED_PERMISSION: i32 = 27;
 pub const CHIO_FFI_ERROR_DUPLICATE_REQUIRED_PERMISSION: i32 = 28;
+pub const CHIO_FFI_ERROR_INVALID_ATTESTATION_WINDOW: i32 = 29;
 pub const CHIO_FFI_ERROR_INTERNAL: i32 = 255;
 
 #[repr(C)]
@@ -149,6 +150,7 @@ fn ffi_error_code_from_helper_code(code: ErrorCode) -> i32 {
         ErrorCode::DuplicateRequiredPermission => CHIO_FFI_ERROR_DUPLICATE_REQUIRED_PERMISSION,
         ErrorCode::UnsupportedSchema => CHIO_FFI_ERROR_UNSUPPORTED_SCHEMA,
         ErrorCode::ManifestVerificationFailed => CHIO_FFI_ERROR_MANIFEST_VERIFICATION_FAILED,
+        ErrorCode::InvalidAttestationWindow => CHIO_FFI_ERROR_INVALID_ATTESTATION_WINDOW,
     }
 }
 

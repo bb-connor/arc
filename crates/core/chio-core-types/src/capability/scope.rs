@@ -162,7 +162,7 @@ impl ToolGrant {
 }
 
 /// Authorization for reading or subscribing to a resource.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceGrant {
     /// URI pattern identifying which resources are in scope.
     pub uri_pattern: String,

@@ -35,6 +35,156 @@ fn budget_exhaustion() {
 }
 
 #[test]
+fn free_tier_pool_leaves_non_pass_private_unit_on_normal_path() {
+    // With the free-tier pool installed, a capability budgeted in a
+    // custom private-use unit ("ABC", which is NOT the pool allotment unit) must
+    // stay on the normal budget path and be allowed, not denied. Only a genuine
+    // Pass XCC charge routes through the aggregate pool.
+    let pool = FreeTierPoolConfig {
+        monthly_pool_units: 1_000_000,
+        allotment_unit: "XCC".to_string(),
+        board_approval_ref: "board-approval-test".to_string(),
+    };
+    let mut kernel = make_kernel(make_monetary_config())
+        .with_free_tier_pool(pool)
+        .unwrap();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
+
+    let agent_kp = make_keypair();
+    let grant = make_monetary_grant("cost-srv", "compute", 5, 100, "ABC");
+    let cap = make_capability(&kernel, &agent_kp, make_scope(vec![grant]), 300);
+
+    let resp = kernel
+        .evaluate_tool_call_blocking(&make_request_with_arguments(
+            "abc-private-1",
+            &cap,
+            "compute",
+            "cost-srv",
+            serde_json::json!({}),
+        ))
+        .unwrap();
+    assert_eq!(
+        resp.verdict,
+        Verdict::Allow,
+        "a non-Pass private-use unit must not be denied merely because the Pass pool is configured"
+    );
+}
+
+#[test]
+fn free_tier_pass_charge_stamps_allotment_cost_dimension_on_receipt() {
+    // A genuine Pass (free-tier XCC) charge must stamp the
+    // `chio.pass.allotment.v1` cost dimension on the served receipt so the
+    // genuine-use scan recognizes the metered debit even though the tool injects no
+    // custom cost block.
+    use chio_core::capability::scope::{MonetaryAmount, Operation};
+    use chio_core::capability::token::{window_scoped_capability_id, AttestationWindowId};
+    use chrono::{DateTime, Datelike, Months, TimeZone, Utc};
+
+    // Current calendar-month window, computed dynamically so the test is not a
+    // wall-clock time bomb.
+    let now = current_unix_timestamp();
+    let dt = DateTime::from_timestamp(now as i64, 0).expect("representable timestamp");
+    let month_start_naive = dt
+        .date_naive()
+        .with_day(1)
+        .and_then(|day| day.and_hms_opt(0, 0, 0))
+        .expect("month start");
+    let month_start = Utc.from_utc_datetime(&month_start_naive);
+    let next_month = month_start
+        .checked_add_months(Months::new(1))
+        .expect("next month");
+    let window = AttestationWindowId {
+        window_ym: month_start.format("%Y-%m").to_string(),
+        since: month_start.timestamp() as u64,
+        until: next_month.timestamp() as u64,
+    };
+
+    let pool = FreeTierPoolConfig {
+        monthly_pool_units: 1_000_000,
+        allotment_unit: "XCC".to_string(),
+        board_approval_ref: "board-approval-test".to_string(),
+    };
+    let mut kernel = make_kernel(make_monetary_config())
+        .with_free_tier_pool(pool)
+        .unwrap();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("chio.pass.compute")));
+
+    let subject = make_keypair();
+    let subject_did = format!("did:chio:{}", subject.public_key().to_hex());
+    let metered = ToolGrant {
+        server_id: "chio.pass.compute".to_string(),
+        tool_name: "*".to_string(),
+        operations: vec![Operation::Invoke],
+        constraints: vec![],
+        max_invocations: None,
+        max_cost_per_invocation: Some(MonetaryAmount {
+            units: 1,
+            currency: "XCC".to_string(),
+        }),
+        max_total_cost: Some(MonetaryAmount {
+            units: 1000,
+            currency: "XCC".to_string(),
+        }),
+        dpop_required: None,
+    };
+    let scope = ChioScope {
+        grants: vec![metered],
+        resource_grants: crate::pass_gating::pass_baseline_resource_grants(&subject_did)
+            .expect("baseline resource grants"),
+        prompt_grants: vec![],
+    };
+    let id = window_scoped_capability_id(&subject_did, &window).expect("window-scoped id");
+    let cap = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id,
+            issuer: kernel.config.keypair.public_key(),
+            subject: subject.public_key(),
+            scope,
+            issued_at: window.since,
+            expires_at: window.until,
+            delegation_chain: vec![],
+        },
+        &kernel.config.keypair,
+    )
+    .expect("sign pass capability");
+
+    let resp = kernel
+        .evaluate_tool_call_blocking(&make_request_with_arguments(
+            "pass-charge-1",
+            &cap,
+            "compute",
+            "chio.pass.compute",
+            serde_json::json!({}),
+        ))
+        .unwrap();
+    assert_eq!(
+        resp.verdict,
+        Verdict::Allow,
+        "a genuine free-tier Pass charge should be allowed"
+    );
+
+    let log = kernel.receipt_log();
+    let receipt = log.get(0).expect("a tool-call receipt");
+    let metadata = receipt.metadata.as_ref().expect("receipt metadata");
+    let dimensions = metadata
+        .get("cost")
+        .and_then(|cost| cost.get("dimensions"))
+        .and_then(serde_json::Value::as_array)
+        .expect("metadata.cost.dimensions array");
+    assert!(
+        dimensions.iter().any(|dim| {
+            dim.get("name").and_then(serde_json::Value::as_str)
+                == Some("chio.pass.allotment.v1")
+                && dim
+                    .get("value")
+                    .and_then(serde_json::Value::as_u64)
+                    .is_some_and(|value| value > 0)
+        }),
+        "free-tier Pass receipt must carry the chio.pass.allotment.v1 cost dimension with value > 0"
+    );
+}
+
+#[test]
 fn budgets_are_tracked_per_matching_grant() {
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new(

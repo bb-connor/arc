@@ -28,6 +28,96 @@ use super::validation::validate_budget_share_bps;
 /// attenuation and delegation-binding fields are folded into this v1 shape.
 pub const CHIO_CAPABILITY_SCHEMA: &str = "chio.capability.v1";
 
+/// Domain-separation tag hashed into a Pass capability id so its digest cannot
+/// collide with any other sha256 use in the protocol.
+pub const CHIO_PASS_CAPABILITY_ID_DOMAIN: &str = "chio.pass.capability.id.v1";
+
+/// Namespace prefix on a Pass-minted capability id, keeping it distinct from
+/// UUIDv7 token ids and from the `freetier:global:<window_ym>` pool key.
+pub const CHIO_PASS_CAPABILITY_ID_PREFIX: &str = "chiopass:";
+
+/// Window identifier shared by the std kernel and the credential layer without
+/// pulling a chrono or DID dependency into this `no_std + alloc` crate.
+///
+/// The interval is half-open `[since, until)`. A Pass-minted capability token
+/// binds `token.issued_at == since` and `token.expires_at == until`, and
+/// `window_ym` is the single term shared with the
+/// `freetier:global:<window_ym>` aggregate pool key.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AttestationWindowId {
+    /// UTC calendar-month label formatted "%Y-%m" (for example "2026-06").
+    pub window_ym: String,
+    /// 00:00:00Z on the first of the month (unix seconds). Equals `issued_at`.
+    pub since: u64,
+    /// 00:00:00Z on the first of the NEXT month (unix seconds). Equals
+    /// `expires_at`.
+    pub until: u64,
+}
+
+impl AttestationWindowId {
+    /// Fail closed on a malformed window: an empty month label or a window
+    /// that is not strictly forward (`until <= since`) is rejected so a Pass
+    /// capability id can never be derived from a degenerate window.
+    pub fn validate(&self) -> Result<()> {
+        if self.window_ym.is_empty() {
+            return Err(Error::InvalidAttestationWindow {
+                reason: "window_ym must not be empty".to_string(),
+            });
+        }
+        if self.until <= self.since {
+            return Err(Error::InvalidAttestationWindow {
+                reason: "until must be strictly greater than since".to_string(),
+            });
+        }
+        Ok(())
+    }
+}
+
+/// Canonicalization input for [`window_scoped_capability_id`]. RFC 8785 sorts
+/// keys, so the digest is independent of this struct's field declaration order.
+#[derive(Debug, Clone, Serialize)]
+struct WindowScopedCapabilityIdInput<'a> {
+    domain: &'a str,
+    subject_did: &'a str,
+    window_ym: &'a str,
+}
+
+/// Derive the deterministic, window-scoped Pass capability id:
+/// `"chiopass:" + sha256_hex(canonical_json_bytes({domain, subjectDid, windowYm}))`.
+///
+/// This is the ONE id formula. The credential layer and the kernel authority
+/// path both call this function, so a Pass re-presented within the same month
+/// always maps to the same `(capability_id, grant_index = 0)` budget row and
+/// re-minting cannot reset the free-tier counter. `grant_index` is pinned to
+/// `0` by the caller.
+///
+/// The id binds only `(domain, subjectDid, windowYm)`: it deliberately does not
+/// commit to scope or tier (a tier change reuses the same row), and under the
+/// single issuing authority it carries no issuer column. `subject_did` must be
+/// the canonical `did:chio` string (`DidChio::as_str()`), never a raw
+/// caller-supplied value, so the row is stable across re-presentations.
+///
+/// # Errors
+///
+/// Fails closed via [`AttestationWindowId::validate`] on a malformed window,
+/// and propagates any canonical-JSON serialization error.
+pub fn window_scoped_capability_id(
+    subject_did: &str,
+    window: &AttestationWindowId,
+) -> Result<String> {
+    window.validate()?;
+    let input = WindowScopedCapabilityIdInput {
+        domain: CHIO_PASS_CAPABILITY_ID_DOMAIN,
+        subject_did,
+        window_ym: window.window_ym.as_str(),
+    };
+    let bytes = crate::canonical::canonical_json_bytes(&input)?;
+    Ok(format!(
+        "{CHIO_PASS_CAPABILITY_ID_PREFIX}{}",
+        crate::hashing::sha256_hex(&bytes)
+    ))
+}
+
 fn default_capability_schema() -> String {
     CHIO_CAPABILITY_SCHEMA.to_string()
 }
@@ -658,5 +748,72 @@ impl CapabilityToken {
             });
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod m0_pass_capability_id_tests {
+    use super::*;
+
+    fn window() -> AttestationWindowId {
+        AttestationWindowId {
+            window_ym: "2026-06".to_string(),
+            since: 1_780_704_000,
+            until: 1_783_296_000,
+        }
+    }
+
+    #[test]
+    fn capability_id_is_deterministic_and_prefixed() {
+        let w = window();
+        let a = window_scoped_capability_id("did:chio:alice", &w).unwrap();
+        let b = window_scoped_capability_id("did:chio:alice", &w).unwrap();
+        assert_eq!(a, b, "same subject and window must yield the same id");
+        assert!(a.starts_with(CHIO_PASS_CAPABILITY_ID_PREFIX));
+    }
+
+    #[test]
+    fn capability_id_separates_subject_and_window() {
+        let june = window();
+        let mut july = window();
+        july.window_ym = "2026-07".to_string();
+        let alice_june = window_scoped_capability_id("did:chio:alice", &june).unwrap();
+        let bob_june = window_scoped_capability_id("did:chio:bob", &june).unwrap();
+        let alice_july = window_scoped_capability_id("did:chio:alice", &july).unwrap();
+        assert_ne!(
+            alice_june, bob_june,
+            "different subjects must not share a row"
+        );
+        assert_ne!(
+            alice_june, alice_july,
+            "different months must not share a row"
+        );
+    }
+
+    #[test]
+    fn window_validate_rejects_empty_label() {
+        let w = AttestationWindowId {
+            window_ym: String::new(),
+            since: 1,
+            until: 2,
+        };
+        assert!(matches!(
+            w.validate(),
+            Err(Error::InvalidAttestationWindow { .. })
+        ));
+        assert!(window_scoped_capability_id("did:chio:alice", &w).is_err());
+    }
+
+    #[test]
+    fn window_validate_rejects_non_forward_interval() {
+        let w = AttestationWindowId {
+            window_ym: "2026-06".to_string(),
+            since: 10,
+            until: 10,
+        };
+        assert!(matches!(
+            w.validate(),
+            Err(Error::InvalidAttestationWindow { .. })
+        ));
     }
 }

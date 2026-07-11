@@ -1,0 +1,1136 @@
+//! Chio Pass data-stream access gating.
+//!
+//! The Chio Pass mints a permanent tier_0 baseline RIGHT: free Read/Subscribe
+//! over three aggregate trust feeds plus the holder's OWN receipts and OWN
+//! lineage. This module is the kernel-side gate for that right. It builds the
+//! Pass-minted [`ResourceGrant`] set for the five gifted streams, enforces the
+//! own-tenant baseline binding, and applies the deny-list that keeps raw
+//! pheromone deposits and financial market surfaces out of scope.
+//!
+//! The five gifted streams (pinned indices `0..=4`, no `TrustTier` predicate, so
+//! a tier_0 newcomer and a Premier holder get byte-identical decisions):
+//!
+//! | idx | uri_pattern                                  | kind                              |
+//! |-----|----------------------------------------------|-----------------------------------|
+//! | 0   | `chio://trust/reputation/tier/*`             | aggregate (coarse tier label)     |
+//! | 1   | `chio://marketplace/listings*`               | aggregate (advertised prices)     |
+//! | 2   | `chio://trust/pheromone/concentration/*`     | aggregate (collapsed origin)      |
+//! | 3   | `chio://receipts/tenant/<subject_tenant>/*`  | OWN (tenant-bound baseline right) |
+//! | 4   | `chio://lineage/tenant/<subject_tenant>/*`   | OWN (tenant-bound baseline right) |
+//!
+//! Own patterns use the MANDATORY `/` delimiter before the trailing `*` so a
+//! tenant `did:chioabcd` cannot prefix-match `did:chioabcde...`.
+//!
+//! GIFT-BOUNDARY POSTURE (own receipts / own lineage). The read grants this
+//! module mints are the SCOPE boundary. They are NOT the disclosed-artifact
+//! boundary for the holder's own data. Per the disclosure binding, the
+//! own-receipts/own-lineage gift MUST be served through the shipped
+//! disclosure-lineage export
+//! (`chio-disclosure-lineage::verify_disclosure_lineage_bundle`): a pinned-key
+//! signed lineage subgraph bound to a transaction-passport ref, a verifier
+//! privacy profile, a mandatory leakage ledger (required even when empty), and
+//! hashed identifiers. [`project_pass_stream_view`] in this module is only an
+//! INTERNAL whitelist-by-removal redaction step; it is deliberately weaker than
+//! that disclosure layer mandates and is never the gift boundary on its own. The
+//! orchestrator that wires the disclosure-lineage bundle lives outside this
+//! module.
+//!
+//! Naming note: `ChioPassStream` here is the gated data stream, distinct from the
+//! `ChioPass` soulbound credential in `chio-credentials`.
+
+use chio_core_types::capability::scope::{ChioScope, Operation, ResourceGrant, ToolGrant};
+use chio_core_types::capability::token::{
+    window_scoped_capability_id, AttestationWindowId, CapabilityToken,
+    CHIO_PASS_CAPABILITY_ID_PREFIX,
+};
+use chio_core_types::crypto::SigningAlgorithm;
+
+use crate::kernel::KernelError;
+use crate::receipt_query::ReceiptReadContext;
+use crate::request_matching::{
+    capability_matches_resource_request, capability_matches_resource_subscription,
+};
+
+/// Tool-server id the metered XCC compute grant pins.
+pub const PASS_COMPUTE_SERVER_ID: &str = "chio.pass.compute";
+
+/// Private-use allotment unit the metered grant denominates. It is
+/// intentionally never priced, so it carries no money leg.
+pub const PASS_ALLOTMENT_UNIT: &str = "XCC";
+
+/// Metering cost-metadata schema id stamped on free-tier receipts. Mirrors
+/// `chio_metering::cost::COST_METADATA_SCHEMA`; the kernel must not depend on the
+/// metering crate, so the literal is reproduced here (and cross-checked by tests).
+pub const PASS_COST_METADATA_SCHEMA: &str = "chio.cost-metadata.v1";
+
+/// Custom cost-dimension name the free-tier XCC allotment debit is recorded under
+/// on served receipts. This MUST stay byte-identical to
+/// `chio_credentials::CHIO_PASS_ALLOTMENT_COST_NAME` so the genuine-use
+/// scan (which reads `metadata["cost"].dimensions[].name`) recognizes a real
+/// metered Pass debit. The kernel cannot depend on `chio-credentials`, so the two
+/// literals are kept in lockstep.
+pub const PASS_ALLOTMENT_COST_NAME: &str = "chio.pass.allotment.v1";
+
+/// Stamp the free-tier XCC allotment debit onto a served receipt's `metadata`.
+///
+/// Genuine-use binding: the scan recognizes a real metered Pass debit by
+/// a `metadata["cost"].dimensions[]` entry whose `name == PASS_ALLOTMENT_COST_NAME`
+/// and `value > 0`. A normal Pass invocation does not inject a custom `cost` block,
+/// so without this the kernel-charged XCC debit would scan as non-genuine and the
+/// refresh would withhold the next allotment despite actual usage. The allotment
+/// dimension is APPENDED to an existing `cost.dimensions` array when present (never
+/// clobbering tool-provided dimensions) and otherwise the `cost` block is created.
+///
+/// Fail-closed: a non-object `metadata`, or a `cost`/`dimensions` of the wrong JSON
+/// shape, is replaced so the metadata still carries the allotment dimension; the
+/// genuine-use signal is never silently dropped.
+#[must_use]
+pub fn stamp_pass_allotment_cost_dimension(
+    metadata: Option<serde_json::Value>,
+    allotment_units: u64,
+) -> serde_json::Value {
+    let dimension = serde_json::json!({
+        "dimension": "custom",
+        "name": PASS_ALLOTMENT_COST_NAME,
+        "value": allotment_units,
+        "unit": PASS_ALLOTMENT_UNIT,
+    });
+    let mut root = match metadata {
+        Some(serde_json::Value::Object(map)) => map,
+        _ => serde_json::Map::new(),
+    };
+    let cost = root.entry("cost".to_string()).or_insert_with(
+        || serde_json::json!({ "schema": PASS_COST_METADATA_SCHEMA, "dimensions": [] }),
+    );
+    if let Some(cost_obj) = cost.as_object_mut() {
+        cost_obj
+            .entry("schema".to_string())
+            .or_insert_with(|| serde_json::Value::String(PASS_COST_METADATA_SCHEMA.to_string()));
+        let dimensions = cost_obj
+            .entry("dimensions".to_string())
+            .or_insert_with(|| serde_json::Value::Array(Vec::new()));
+        if let Some(array) = dimensions.as_array_mut() {
+            array.push(dimension);
+        } else {
+            *dimensions = serde_json::Value::Array(vec![dimension]);
+        }
+    } else {
+        *cost = serde_json::json!({
+            "schema": PASS_COST_METADATA_SCHEMA,
+            "dimensions": [dimension],
+        });
+    }
+    serde_json::Value::Object(root)
+}
+
+/// Deny-listed raw pheromone deposit surface (origin-identifying); only the
+/// collapsed aggregate `concentration` feed is gifted.
+pub const PASS_DENY_PHEROMONE_DEPOSITS: &str = "chio://trust/pheromone/deposits";
+
+/// Deny-listed financial market surface. Note the trailing `/`: it does NOT
+/// collide with the gifted `chio://marketplace/listings*` aggregate stream.
+pub const PASS_DENY_MARKET_FINANCIAL: &str = "chio://market/";
+
+/// Economic envelope keys removed from every served free-read VIEW
+/// (whitelist-by-removal, fail-closed). Stripping `"financial"` alone was
+/// fail-open because `metadata["budget_authority"]` and `metadata["cost"]` carry
+/// cost data too.
+pub const PASS_REDACTED_METADATA_KEYS: [&str; 3] = ["financial", "budget_authority", "cost"];
+
+/// One of the five gifted data streams (pinned indices `0..=4`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChioPassStream {
+    /// idx 0: aggregate coarse reputation tier feed.
+    ReputationTier,
+    /// idx 1: aggregate listing/pricing discovery.
+    MarketplaceListings,
+    /// idx 2: aggregate pheromone concentration (collapsed origin counts).
+    PheromoneConcentration,
+    /// idx 3: the holder's OWN receipts (tenant-bound baseline right).
+    OwnReceipts,
+    /// idx 4: the holder's OWN lineage (tenant-bound baseline right).
+    OwnLineage,
+}
+
+impl ChioPassStream {
+    /// The five streams in their pinned `0..=4` order.
+    pub const ALL: [ChioPassStream; 5] = [
+        ChioPassStream::ReputationTier,
+        ChioPassStream::MarketplaceListings,
+        ChioPassStream::PheromoneConcentration,
+        ChioPassStream::OwnReceipts,
+        ChioPassStream::OwnLineage,
+    ];
+
+    /// True for the two tenant-bound OWN streams (receipts, lineage).
+    #[must_use]
+    pub fn is_own_tenant(self) -> bool {
+        matches!(
+            self,
+            ChioPassStream::OwnReceipts | ChioPassStream::OwnLineage
+        )
+    }
+}
+
+/// Validates a subject tenant string for use in an own-stream URI. Fail-closed:
+/// rejects an empty tenant, a wildcard, or a path delimiter, any of which would
+/// widen the own-tenant binding past a single identity.
+fn validated_tenant(tenant: &str) -> Result<&str, KernelError> {
+    let trimmed = tenant.trim();
+    if trimmed.is_empty() || trimmed.contains('*') || trimmed.contains('/') {
+        return Err(KernelError::PassTenantBindingInvalid(tenant.to_string()));
+    }
+    Ok(trimmed)
+}
+
+/// Returns the canonical URI pattern for a single gifted stream.
+///
+/// The own streams bind `subject_tenant` (validated fail-closed); the three
+/// aggregate streams ignore it.
+///
+/// # Errors
+///
+/// Returns [`KernelError::PassTenantBindingInvalid`] when an own stream is asked
+/// for and `subject_tenant` is empty, wildcarded, or path-delimited.
+pub fn pass_stream_uri(
+    stream: ChioPassStream,
+    subject_tenant: &str,
+) -> Result<String, KernelError> {
+    Ok(match stream {
+        ChioPassStream::ReputationTier => "chio://trust/reputation/tier/*".to_string(),
+        ChioPassStream::MarketplaceListings => "chio://marketplace/listings*".to_string(),
+        ChioPassStream::PheromoneConcentration => {
+            "chio://trust/pheromone/concentration/*".to_string()
+        }
+        ChioPassStream::OwnReceipts => {
+            let tenant = validated_tenant(subject_tenant)?;
+            format!("chio://receipts/tenant/{tenant}/*")
+        }
+        ChioPassStream::OwnLineage => {
+            let tenant = validated_tenant(subject_tenant)?;
+            format!("chio://lineage/tenant/{tenant}/*")
+        }
+    })
+}
+
+/// The five canonical baseline read URI strings, in pinned `0..=4` order.
+///
+/// This MUST stay byte-identical to the credential-layer builder
+/// `chio_credentials::pass_baseline_read_uris(subject_did)` so a minted Pass
+/// scope and the credential `read_scopes` bind the same identity. The two crates
+/// cannot share one function (the credential crate does not depend on the kernel),
+/// so the literals are kept in lockstep and cross-checked by tests on both sides.
+/// Callers pass the canonical `did:chio` (which carries no `/`), matching the
+/// issuance `tenant_id` used verbatim in the SQL `r.tenant_id = ?` own-stream
+/// guard.
+///
+/// # Errors
+///
+/// Returns [`KernelError::PassTenantBindingInvalid`] when `subject_tenant` is
+/// empty, wildcarded, or path-delimited.
+pub fn pass_baseline_read_uris(subject_tenant: &str) -> Result<Vec<String>, KernelError> {
+    ChioPassStream::ALL
+        .iter()
+        .map(|stream| pass_stream_uri(*stream, subject_tenant))
+        .collect()
+}
+
+/// The five Pass-minted [`ResourceGrant`]s, each `operations: [Read, Subscribe]`,
+/// at pinned indices `0..=4`. These carry no `max_*` limits and never open budget
+/// rows.
+///
+/// # Errors
+///
+/// Propagates [`pass_baseline_read_uris`] failures.
+pub fn pass_baseline_resource_grants(
+    subject_tenant: &str,
+) -> Result<Vec<ResourceGrant>, KernelError> {
+    Ok(pass_baseline_read_uris(subject_tenant)?
+        .into_iter()
+        .map(|uri_pattern| ResourceGrant {
+            uri_pattern,
+            operations: vec![Operation::Read, Operation::Subscribe],
+        })
+        .collect())
+}
+
+/// True if `uri` reaches a deny-listed surface (raw pheromone deposits or any
+/// financial market surface). Prefix-based and fail-closed.
+#[must_use]
+pub fn uri_is_pass_denied(uri: &str) -> bool {
+    uri.starts_with(PASS_DENY_PHEROMONE_DEPOSITS) || uri.starts_with(PASS_DENY_MARKET_FINANCIAL)
+}
+
+/// Validates that the single metered tool grant is the canonical XCC compute
+/// allotment: `server_id == chio.pass.compute`, `tool_name == "*"`,
+/// `operations == [Invoke]`, a positive-unit XCC `max_cost_per_invocation`, and
+/// an XCC `max_total_cost`.
+fn validate_metered_grant(grant: &ToolGrant) -> Result<(), KernelError> {
+    if grant.server_id != PASS_COMPUTE_SERVER_ID {
+        return Err(KernelError::PassScopeInflation(format!(
+            "metered grant server_id must be {PASS_COMPUTE_SERVER_ID}"
+        )));
+    }
+    if grant.tool_name != "*" {
+        return Err(KernelError::PassScopeInflation(
+            "metered grant tool_name must be \"*\"".to_string(),
+        ));
+    }
+    if grant.operations != [Operation::Invoke] {
+        return Err(KernelError::PassScopeInflation(
+            "metered grant operations must be exactly [Invoke]".to_string(),
+        ));
+    }
+    match &grant.max_cost_per_invocation {
+        Some(amount) if amount.currency == PASS_ALLOTMENT_UNIT && amount.units > 0 => {}
+        _ => {
+            return Err(KernelError::PassScopeInflation(
+                "metered grant max_cost_per_invocation must be a positive XCC amount".to_string(),
+            ));
+        }
+    }
+    match &grant.max_total_cost {
+        Some(amount) if amount.currency == PASS_ALLOTMENT_UNIT => {}
+        _ => {
+            return Err(KernelError::PassScopeInflation(
+                "metered grant max_total_cost must be Some XCC amount".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Scope-inflation backstop (fail-closed, covers ALL grant kinds).
+///
+/// A valid Pass scope carries EXACTLY one metered XCC tool grant, ZERO prompt
+/// grants, and the five canonical baseline resource grants (exact count, order,
+/// pattern, and operations). Anything else is rejected. The exact-equality check
+/// on the resource grants both pins ordering and guarantees no deny-listed
+/// surface slipped in.
+///
+/// # Errors
+///
+/// Returns [`KernelError::PassScopeInflation`] on any tool/prompt inflation or any
+/// deviation from the canonical baseline, and propagates tenant-binding failures.
+pub fn validate_pass_scope_is_baseline(
+    scope: &ChioScope,
+    subject_tenant: &str,
+) -> Result<(), KernelError> {
+    if scope.grants.len() != 1 {
+        return Err(KernelError::PassScopeInflation(
+            "expected exactly one metered grant".to_string(),
+        ));
+    }
+    if !scope.prompt_grants.is_empty() {
+        return Err(KernelError::PassScopeInflation(
+            "prompt grants are not permitted".to_string(),
+        ));
+    }
+    let metered = scope.grants.first().ok_or_else(|| {
+        KernelError::PassScopeInflation("expected exactly one metered grant".to_string())
+    })?;
+    validate_metered_grant(metered)?;
+
+    let baseline = pass_baseline_resource_grants(subject_tenant)?;
+    if scope.resource_grants != baseline {
+        return Err(KernelError::PassScopeInflation(
+            "resource grants are not the canonical baseline".to_string(),
+        ));
+    }
+    for grant in &scope.resource_grants {
+        if uri_is_pass_denied(&grant.uri_pattern) {
+            return Err(KernelError::PassScopeInflation(grant.uri_pattern.clone()));
+        }
+    }
+    Ok(())
+}
+
+/// Build the [`KernelError::PassCapabilityIdNotDeterministic`] denial.
+fn pass_id_not_deterministic(reason: &str) -> KernelError {
+    KernelError::PassCapabilityIdNotDeterministic(reason.to_string())
+}
+
+/// True if any tool grant in `scope` is denominated in the private-use Pass
+/// allotment unit ([`PASS_ALLOTMENT_UNIT`], `"XCC"`). This is the scope-shaped
+/// Pass signal: a token carrying the XCC metered grant is a free-tier Pass even
+/// when a non-canonical mint site stamped it with a UUIDv7 id.
+fn scope_carries_xcc_metered_grant(scope: &ChioScope) -> bool {
+    scope.grants.iter().any(|grant| {
+        grant
+            .max_cost_per_invocation
+            .as_ref()
+            .is_some_and(|amount| amount.currency == PASS_ALLOTMENT_UNIT)
+            || grant
+                .max_total_cost
+                .as_ref()
+                .is_some_and(|amount| amount.currency == PASS_ALLOTMENT_UNIT)
+    })
+}
+
+/// The UTC calendar-month attestation window containing `issued_at`.
+///
+/// This mirrors `chio_credentials::attestation_window_containing` byte-for-byte
+/// (same `window_ym`, `since`, and `until`) so the kernel admission assertion and
+/// the credential-layer `verify_window_scoped_capability_id` recompute the same
+/// id. The kernel must NOT depend on `chio-credentials`, so the derivation is
+/// reproduced here against the same `chrono` primitives instead of being shared.
+///
+/// # Errors
+///
+/// Returns [`KernelError::PassCapabilityIdNotDeterministic`], fail-closed, on an
+/// out-of-range timestamp or a month overflow.
+fn pass_attestation_window(issued_at: u64) -> Result<AttestationWindowId, KernelError> {
+    use chrono::{DateTime, Datelike, Months, TimeZone, Utc};
+
+    let secs = i64::try_from(issued_at)
+        .map_err(|_| pass_id_not_deterministic("issued_at is out of range"))?;
+    let dt = DateTime::from_timestamp(secs, 0)
+        .ok_or_else(|| pass_id_not_deterministic("issued_at is not a representable timestamp"))?;
+    let month_start_naive = dt
+        .date_naive()
+        .with_day(1)
+        .and_then(|day| day.and_hms_opt(0, 0, 0))
+        .ok_or_else(|| pass_id_not_deterministic("attestation month start is not representable"))?;
+    let month_start = Utc.from_utc_datetime(&month_start_naive);
+    let next_month = month_start
+        .checked_add_months(Months::new(1))
+        .ok_or_else(|| pass_id_not_deterministic("attestation month overflowed"))?;
+    let since = u64::try_from(month_start.timestamp())
+        .map_err(|_| pass_id_not_deterministic("window since is out of range"))?;
+    let until = u64::try_from(next_month.timestamp())
+        .map_err(|_| pass_id_not_deterministic("window until is out of range"))?;
+    Ok(AttestationWindowId {
+        window_ym: month_start.format("%Y-%m").to_string(),
+        since,
+        until,
+    })
+}
+
+/// Kernel admission assertion: a Pass-shaped capability MUST carry the
+/// deterministic, window-scoped `chiopass:<hash>` id.
+///
+/// A capability is Pass-shaped when EITHER its id carries the
+/// [`CHIO_PASS_CAPABILITY_ID_PREFIX`] OR its scope carries the XCC metered grant
+/// (the free-tier compute allotment). For any Pass-shaped capability this asserts,
+/// fail-closed, that:
+///
+/// 1. the id carries the `chiopass:` prefix (so a token whose scope is Pass-shaped
+///    but whose id is a UUIDv7 is rejected, closing the three other UUIDv7 mint
+///    sites at `chio-kernel`, `chio-store-sqlite`, and `chio-http-core`);
+/// 2. the subject is an ed25519 `did:chio` key (the only key the canonical id
+///    derives from);
+/// 3. `issued_at`/`expires_at` are pinned to the attestation-window boundaries
+///    derived from `issued_at`; and
+/// 4. the id equals the canonical [`window_scoped_capability_id`] recomputed from
+///    the token's OWN subject DID and that window.
+///
+/// This closes the loophole where another mint site could stamp a non-canonical id
+/// on a Pass-shaped capability and so open a fresh `(capability_id, 0)` budget row
+/// that resets the free-tier counter. The recompute mirrors the credential-layer
+/// `chio_credentials::verify_window_scoped_capability_id`; because the kernel
+/// cannot depend on `chio-credentials`, it derives the canonical `did:chio` as
+/// `did:chio:<subject hex>` (identical to `DidChio::from_public_key(..).to_string()`)
+/// and the window from `issued_at`, against the same shared
+/// [`window_scoped_capability_id`] formula, so both layers agree byte-for-byte.
+/// A capability that is NOT Pass-shaped is admitted unchanged.
+///
+/// # Errors
+///
+/// Returns [`KernelError::PassCapabilityIdNotDeterministic`] on any mismatch.
+pub fn assert_pass_capability_id_deterministic(cap: &CapabilityToken) -> Result<(), KernelError> {
+    let id_is_pass_shaped = cap.id.starts_with(CHIO_PASS_CAPABILITY_ID_PREFIX);
+    let scope_is_pass_shaped = scope_carries_xcc_metered_grant(&cap.scope);
+    if !id_is_pass_shaped && !scope_is_pass_shaped {
+        // Not a Pass capability: existing admission behavior is unchanged.
+        return Ok(());
+    }
+
+    if !id_is_pass_shaped {
+        return Err(pass_id_not_deterministic(
+            "a capability carrying the XCC metered grant must use the deterministic chiopass: id",
+        ));
+    }
+
+    if cap.subject.algorithm() != SigningAlgorithm::Ed25519 {
+        return Err(pass_id_not_deterministic(
+            "Pass capability subject must be an ed25519 did:chio key",
+        ));
+    }
+    let subject_did = format!("did:chio:{}", cap.subject.to_hex());
+
+    let window = pass_attestation_window(cap.issued_at)?;
+    if cap.issued_at != window.since {
+        return Err(pass_id_not_deterministic(
+            "Pass issued_at is not pinned to its attestation-window start",
+        ));
+    }
+    if cap.expires_at != window.until {
+        return Err(pass_id_not_deterministic(
+            "Pass expires_at is not pinned to its attestation-window boundary",
+        ));
+    }
+
+    let expected = window_scoped_capability_id(&subject_did, &window)
+        .map_err(|error| KernelError::PassCapabilityIdNotDeterministic(error.to_string()))?;
+    if cap.id != expected {
+        return Err(pass_id_not_deterministic(
+            "Pass capability id is not the canonical window-scoped id",
+        ));
+    }
+
+    // Admission-side mirror of the mint-choke scope check: a Pass admitted here
+    // must still carry EXACTLY the canonical baseline scope (one metered XCC
+    // grant, the five baseline resource grants, no prompt grants). The mint choke
+    // is the primary defense; re-running the predicate at admission means a Pass
+    // signed by any other trusted-authority path, or narrowed via delegation,
+    // cannot smuggle an inflated (or attenuated, hence non-canonical) scope past
+    // the id equality above. Soulbound Passes have no legitimate delegated or
+    // reshaped form, so any deviation denies fail-closed.
+    validate_pass_scope_is_baseline(&cap.scope, &subject_did)?;
+    Ok(())
+}
+
+/// The tenant-scoped receipt read context for the OWN-receipts stream. This is
+/// the independent second denial behind the URI binding: tenant-scoped with
+/// `include_null_tenant = false`, so untenanted rows stay hidden and the store's
+/// no-widening guard constrains the read to `r.tenant_id = <subject_tenant>`.
+///
+/// # Errors
+///
+/// Returns [`KernelError::PassTenantBindingInvalid`] when `subject_tenant` is
+/// empty, wildcarded, or path-delimited.
+pub fn pass_receipt_read_context(subject_tenant: &str) -> Result<ReceiptReadContext, KernelError> {
+    let tenant = validated_tenant(subject_tenant)?;
+    Ok(ReceiptReadContext::authenticated_tenant(tenant))
+}
+
+/// Projects a redacted COPY of a served free-read VIEW. INTERNAL redaction step
+/// only (see the module-level gift-boundary posture). It removes every key in
+/// [`PASS_REDACTED_METADATA_KEYS`] from `metadata` and stamps
+/// `redaction: "summary"`. It never mutates or re-signs the stored artifact, and
+/// the genuine-use scan reads the STORED receipt directly, so stripping
+/// `"cost"` from the served view does not affect that scan.
+///
+/// # Errors
+///
+/// Fail-closed: a body that is not a JSON object, or a `metadata` that is neither
+/// an object nor null, returns [`KernelError::PassRedactionFailed`] so the row is
+/// denied rather than served with cost data leaked.
+pub fn project_pass_stream_view(
+    receipt_body: &serde_json::Value,
+) -> Result<serde_json::Value, KernelError> {
+    let serde_json::Value::Object(map) = receipt_body else {
+        return Err(KernelError::PassRedactionFailed(
+            "receipt body is not a JSON object".to_string(),
+        ));
+    };
+    let mut redacted = map.clone();
+    match redacted.get_mut("metadata") {
+        Some(serde_json::Value::Object(metadata)) => {
+            for key in PASS_REDACTED_METADATA_KEYS {
+                metadata.remove(key);
+            }
+        }
+        Some(serde_json::Value::Null) | None => {}
+        Some(_) => {
+            return Err(KernelError::PassRedactionFailed(
+                "receipt metadata is neither an object nor null".to_string(),
+            ));
+        }
+    }
+    redacted.insert(
+        "redaction".to_string(),
+        serde_json::Value::String("summary".to_string()),
+    );
+    Ok(serde_json::Value::Object(redacted))
+}
+
+/// Serving gate for a Read against a gifted stream. Deny-list FIRST, then defer
+/// to the unchanged resource matcher. No `TrustTier` branch exists, so the
+/// decision is identical for a tier_0 newcomer and a Premier holder.
+///
+/// # Errors
+///
+/// Propagates resource-matcher failures.
+pub fn pass_authorizes_read(cap: &CapabilityToken, uri: &str) -> Result<bool, KernelError> {
+    if uri_is_pass_denied(uri) {
+        return Ok(false);
+    }
+    capability_matches_resource_request(cap, uri)
+}
+
+/// Serving gate for a Subscribe against a gifted stream. Deny-list FIRST, then
+/// defer to the unchanged subscription matcher.
+///
+/// # Errors
+///
+/// Propagates subscription-matcher failures.
+pub fn pass_authorizes_subscription(cap: &CapabilityToken, uri: &str) -> Result<bool, KernelError> {
+    if uri_is_pass_denied(uri) {
+        return Ok(false);
+    }
+    capability_matches_resource_subscription(cap, uri)
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use chio_core_types::capability::scope::{MonetaryAmount, PromptGrant};
+    use chio_core_types::capability::token::CapabilityTokenBody;
+    use chio_core_types::crypto::Keypair;
+
+    const TENANT: &str = "did:chioabcd";
+
+    fn xcc_metered_grant() -> ToolGrant {
+        ToolGrant {
+            server_id: PASS_COMPUTE_SERVER_ID.to_string(),
+            tool_name: "*".to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: Vec::new(),
+            max_invocations: None,
+            max_cost_per_invocation: Some(MonetaryAmount {
+                units: 1,
+                currency: PASS_ALLOTMENT_UNIT.to_string(),
+            }),
+            max_total_cost: Some(MonetaryAmount {
+                units: 1000,
+                currency: PASS_ALLOTMENT_UNIT.to_string(),
+            }),
+            dpop_required: None,
+        }
+    }
+
+    fn baseline_scope(tenant: &str) -> ChioScope {
+        ChioScope {
+            grants: vec![xcc_metered_grant()],
+            resource_grants: pass_baseline_resource_grants(tenant).expect("baseline grants"),
+            prompt_grants: Vec::new(),
+        }
+    }
+
+    fn pass_capability(scope: ChioScope) -> CapabilityToken {
+        let issuer = Keypair::generate();
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "chiopass:test".to_string(),
+                issuer: issuer.public_key(),
+                subject: issuer.public_key(),
+                scope,
+                issued_at: 1,
+                expires_at: u64::MAX,
+                delegation_chain: Vec::new(),
+            },
+            &issuer,
+        )
+        .expect("sign capability")
+    }
+
+    #[test]
+    fn baseline_read_uris_match_canonical_literals() {
+        let uris = pass_baseline_read_uris(TENANT).expect("uris");
+        assert_eq!(
+            uris,
+            vec![
+                "chio://trust/reputation/tier/*".to_string(),
+                "chio://marketplace/listings*".to_string(),
+                "chio://trust/pheromone/concentration/*".to_string(),
+                format!("chio://receipts/tenant/{TENANT}/*"),
+                format!("chio://lineage/tenant/{TENANT}/*"),
+            ],
+            "kernel baseline URIs must stay byte-identical to the credential-layer builder",
+        );
+    }
+
+    #[test]
+    fn baseline_resource_grants_are_five_read_subscribe_grants_in_order() {
+        let grants = pass_baseline_resource_grants(TENANT).expect("grants");
+        assert_eq!(grants.len(), 5);
+        for (index, stream) in ChioPassStream::ALL.iter().enumerate() {
+            let expected_uri = pass_stream_uri(*stream, TENANT).expect("uri");
+            assert_eq!(grants[index].uri_pattern, expected_uri);
+            assert_eq!(
+                grants[index].operations,
+                vec![Operation::Read, Operation::Subscribe],
+                "every gifted stream is Read/Subscribe only",
+            );
+        }
+    }
+
+    #[test]
+    fn own_streams_reject_invalid_tenant_fail_closed() {
+        for bad in ["", "*", "did/chio", "did:chio*"] {
+            assert!(matches!(
+                pass_stream_uri(ChioPassStream::OwnReceipts, bad),
+                Err(KernelError::PassTenantBindingInvalid(_))
+            ));
+            assert!(matches!(
+                pass_baseline_read_uris(bad),
+                Err(KernelError::PassTenantBindingInvalid(_))
+            ));
+            assert!(matches!(
+                pass_receipt_read_context(bad),
+                Err(KernelError::PassTenantBindingInvalid(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn own_tenant_uri_uses_mandatory_delimiter_blocking_prefix_collision() {
+        // A shorter tenant must not prefix-match a longer sibling tenant.
+        let short = pass_stream_uri(ChioPassStream::OwnReceipts, "did:chioabcd").expect("uri");
+        let long = "chio://receipts/tenant/did:chioabcde/extra";
+        assert!(
+            !long.starts_with(short.trim_end_matches('*')),
+            "the mandatory `/` before `*` must block did:chioabcd matching did:chioabcde",
+        );
+    }
+
+    #[test]
+    fn deny_list_covers_raw_deposits_and_market_financial() {
+        assert!(uri_is_pass_denied("chio://trust/pheromone/deposits"));
+        assert!(uri_is_pass_denied(
+            "chio://trust/pheromone/deposits/origin/abc"
+        ));
+        assert!(uri_is_pass_denied("chio://market/financials/spot"));
+    }
+
+    #[test]
+    fn deny_list_does_not_collide_with_gifted_marketplace_listings() {
+        // The gifted aggregate listing stream must NOT be deny-listed by the
+        // chio://market/ financial prefix (marketplace != market/).
+        assert!(!uri_is_pass_denied("chio://marketplace/listings"));
+        assert!(!uri_is_pass_denied("chio://marketplace/listings/abc"));
+        assert!(!uri_is_pass_denied(
+            "chio://trust/pheromone/concentration/x"
+        ));
+    }
+
+    #[test]
+    fn baseline_scope_validates() {
+        validate_pass_scope_is_baseline(&baseline_scope(TENANT), TENANT).expect("baseline valid");
+    }
+
+    #[test]
+    fn scope_rejects_extra_tool_grant() {
+        let mut scope = baseline_scope(TENANT);
+        scope.grants.push(xcc_metered_grant());
+        assert!(matches!(
+            validate_pass_scope_is_baseline(&scope, TENANT),
+            Err(KernelError::PassScopeInflation(_))
+        ));
+    }
+
+    #[test]
+    fn scope_rejects_prompt_grant_inflation() {
+        let mut scope = baseline_scope(TENANT);
+        scope.prompt_grants.push(PromptGrant {
+            prompt_name: "*".to_string(),
+            operations: vec![Operation::Get],
+        });
+        assert!(matches!(
+            validate_pass_scope_is_baseline(&scope, TENANT),
+            Err(KernelError::PassScopeInflation(_))
+        ));
+    }
+
+    #[test]
+    fn scope_rejects_non_xcc_metered_grant() {
+        let mut scope = baseline_scope(TENANT);
+        scope.grants[0].max_cost_per_invocation = Some(MonetaryAmount {
+            units: 1,
+            currency: "USD".to_string(),
+        });
+        assert!(matches!(
+            validate_pass_scope_is_baseline(&scope, TENANT),
+            Err(KernelError::PassScopeInflation(_))
+        ));
+    }
+
+    #[test]
+    fn scope_rejects_zero_per_invocation_cost() {
+        let mut scope = baseline_scope(TENANT);
+        scope.grants[0].max_cost_per_invocation = Some(MonetaryAmount {
+            units: 0,
+            currency: PASS_ALLOTMENT_UNIT.to_string(),
+        });
+        assert!(matches!(
+            validate_pass_scope_is_baseline(&scope, TENANT),
+            Err(KernelError::PassScopeInflation(_))
+        ));
+    }
+
+    #[test]
+    fn scope_rejects_resource_grant_reordering() {
+        let mut scope = baseline_scope(TENANT);
+        scope.resource_grants.reverse();
+        assert!(matches!(
+            validate_pass_scope_is_baseline(&scope, TENANT),
+            Err(KernelError::PassScopeInflation(_))
+        ));
+    }
+
+    #[test]
+    fn scope_rejects_widened_resource_operations() {
+        let mut scope = baseline_scope(TENANT);
+        scope.resource_grants[0].operations.push(Operation::Invoke);
+        assert!(matches!(
+            validate_pass_scope_is_baseline(&scope, TENANT),
+            Err(KernelError::PassScopeInflation(_))
+        ));
+    }
+
+    #[test]
+    fn serving_gate_authorizes_each_gifted_stream_and_denies_out_of_scope() {
+        let cap = pass_capability(baseline_scope(TENANT));
+        for stream in ChioPassStream::ALL {
+            // Pick a concrete URI inside each gifted pattern.
+            let uri = match stream {
+                ChioPassStream::ReputationTier => "chio://trust/reputation/tier/coarse".to_string(),
+                ChioPassStream::MarketplaceListings => {
+                    "chio://marketplace/listings/abc".to_string()
+                }
+                ChioPassStream::PheromoneConcentration => {
+                    "chio://trust/pheromone/concentration/ns".to_string()
+                }
+                ChioPassStream::OwnReceipts => format!("chio://receipts/tenant/{TENANT}/r1"),
+                ChioPassStream::OwnLineage => format!("chio://lineage/tenant/{TENANT}/n1"),
+            };
+            assert!(pass_authorizes_read(&cap, &uri).expect("read"));
+            assert!(pass_authorizes_subscription(&cap, &uri).expect("subscribe"));
+        }
+        // A sibling tenant's receipts are out of scope.
+        assert!(
+            !pass_authorizes_read(&cap, "chio://receipts/tenant/did:chioabcde/r1")
+                .expect("read other tenant")
+        );
+    }
+
+    #[test]
+    fn serving_gate_deny_list_wins_even_if_a_grant_matched() {
+        // Even a cap whose scope nominally pattern-matches a deny-listed URI is
+        // denied because the deny-list runs first.
+        let scope = ChioScope {
+            grants: vec![xcc_metered_grant()],
+            resource_grants: vec![ResourceGrant {
+                uri_pattern: "chio://market/*".to_string(),
+                operations: vec![Operation::Read, Operation::Subscribe],
+            }],
+            prompt_grants: Vec::new(),
+        };
+        let cap = pass_capability(scope);
+        assert!(!pass_authorizes_read(&cap, "chio://market/financials/spot").expect("read"));
+        assert!(
+            !pass_authorizes_subscription(&cap, "chio://market/financials/spot")
+                .expect("subscribe")
+        );
+    }
+
+    #[test]
+    fn redaction_strips_all_economic_envelope_keys_and_stamps_summary() {
+        let body = serde_json::json!({
+            "capability_id": "chiopass:test",
+            "metadata": {
+                "financial": { "cost_charged": 42 },
+                "budget_authority": { "authority": "x" },
+                "cost": { "dimensions": [] },
+                "trust_level": "mediated"
+            }
+        });
+        let view = project_pass_stream_view(&body).expect("redacted view");
+        let metadata = view
+            .get("metadata")
+            .and_then(|m| m.as_object())
+            .expect("metadata object");
+        assert!(!metadata.contains_key("financial"));
+        assert!(!metadata.contains_key("budget_authority"));
+        assert!(!metadata.contains_key("cost"));
+        assert_eq!(
+            metadata.get("trust_level").and_then(|v| v.as_str()),
+            Some("mediated")
+        );
+        assert_eq!(
+            view.get("redaction").and_then(|v| v.as_str()),
+            Some("summary")
+        );
+    }
+
+    #[test]
+    fn redaction_allows_null_or_absent_metadata() {
+        let null_meta = serde_json::json!({ "metadata": null });
+        let view = project_pass_stream_view(&null_meta).expect("null metadata ok");
+        assert_eq!(
+            view.get("redaction").and_then(|v| v.as_str()),
+            Some("summary")
+        );
+
+        let no_meta = serde_json::json!({ "capability_id": "chiopass:test" });
+        let view = project_pass_stream_view(&no_meta).expect("absent metadata ok");
+        assert_eq!(
+            view.get("redaction").and_then(|v| v.as_str()),
+            Some("summary")
+        );
+    }
+
+    #[test]
+    fn redaction_fails_closed_on_non_object_body_or_bad_metadata() {
+        assert!(matches!(
+            project_pass_stream_view(&serde_json::json!("not an object")),
+            Err(KernelError::PassRedactionFailed(_))
+        ));
+        assert!(matches!(
+            project_pass_stream_view(&serde_json::json!({ "metadata": ["not", "an", "object"] })),
+            Err(KernelError::PassRedactionFailed(_))
+        ));
+    }
+
+    #[test]
+    fn receipt_read_context_is_tenant_scoped_without_null_tenant() {
+        let ctx = pass_receipt_read_context(TENANT).expect("ctx");
+        assert!(!ctx.include_null_tenant);
+    }
+
+    // 2026-06-01T00:00:00Z and 2026-07-01T00:00:00Z (real UTC month boundaries),
+    // matching the credential-layer window so the recomputed id agrees.
+    const JUNE_SINCE: u64 = 1_780_272_000;
+    const JULY_SINCE: u64 = 1_782_864_000;
+
+    fn june_window() -> AttestationWindowId {
+        AttestationWindowId {
+            window_ym: "2026-06".to_string(),
+            since: JUNE_SINCE,
+            until: JULY_SINCE,
+        }
+    }
+
+    fn signed_token(
+        id: String,
+        subject: &Keypair,
+        scope: ChioScope,
+        issued_at: u64,
+        expires_at: u64,
+    ) -> CapabilityToken {
+        let issuer = Keypair::generate();
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id,
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope,
+                issued_at,
+                expires_at,
+                delegation_chain: Vec::new(),
+            },
+            &issuer,
+        )
+        .expect("sign capability")
+    }
+
+    #[test]
+    fn admission_accepts_canonical_window_scoped_pass_id() {
+        let subject = Keypair::generate();
+        let subject_did = format!("did:chio:{}", subject.public_key().to_hex());
+        let window = june_window();
+        let id = window_scoped_capability_id(&subject_did, &window).expect("id");
+        // The mint choke builds the baseline against the subject DID itself, so a
+        // mint-shaped fixture must bind its own-data URIs to the same DID.
+        let token = signed_token(
+            id,
+            &subject,
+            baseline_scope(&subject_did),
+            window.since,
+            window.until,
+        );
+        assert!(assert_pass_capability_id_deterministic(&token).is_ok());
+    }
+
+    #[test]
+    fn admission_rejects_pass_scope_that_is_not_the_canonical_baseline() {
+        let subject = Keypair::generate();
+        let subject_did = format!("did:chio:{}", subject.public_key().to_hex());
+        let window = june_window();
+        let id = window_scoped_capability_id(&subject_did, &window).expect("id");
+
+        // Inflated: one resource grant beyond the canonical baseline.
+        let mut inflated = baseline_scope(&subject_did);
+        inflated.resource_grants.push(ResourceGrant {
+            uri_pattern: "chio://receipts/*".to_string(),
+            operations: vec![Operation::Read],
+        });
+        let token = signed_token(id.clone(), &subject, inflated, window.since, window.until);
+        assert!(matches!(
+            assert_pass_capability_id_deterministic(&token),
+            Err(KernelError::PassScopeInflation(_))
+        ));
+
+        // Attenuated: one baseline resource grant removed. A narrowed Pass is
+        // still non-canonical and denies (soulbound Passes have no reshaped form).
+        let mut attenuated = baseline_scope(&subject_did);
+        attenuated.resource_grants.pop();
+        let token = signed_token(id, &subject, attenuated, window.since, window.until);
+        assert!(matches!(
+            assert_pass_capability_id_deterministic(&token),
+            Err(KernelError::PassScopeInflation(_))
+        ));
+    }
+
+    #[test]
+    fn admission_rejects_chiopass_id_that_is_not_canonical() {
+        let subject = Keypair::generate();
+        let window = june_window();
+        let token = signed_token(
+            "chiopass:0000".to_string(),
+            &subject,
+            baseline_scope(TENANT),
+            window.since,
+            window.until,
+        );
+        assert!(matches!(
+            assert_pass_capability_id_deterministic(&token),
+            Err(KernelError::PassCapabilityIdNotDeterministic(_))
+        ));
+    }
+
+    #[test]
+    fn admission_rejects_uuid_id_bearing_the_xcc_metered_grant() {
+        // A non-canonical (UUIDv7) mint site stamped an XCC Pass scope. The
+        // missing chiopass: prefix is rejected at admission, closing the three
+        // other mint sites (chio-kernel/chio-store-sqlite/chio-http-core).
+        let subject = Keypair::generate();
+        let window = june_window();
+        let token = signed_token(
+            "cap-018f-7a3c-uuidv7".to_string(),
+            &subject,
+            baseline_scope(TENANT),
+            window.since,
+            window.until,
+        );
+        assert!(matches!(
+            assert_pass_capability_id_deterministic(&token),
+            Err(KernelError::PassCapabilityIdNotDeterministic(_))
+        ));
+    }
+
+    #[test]
+    fn admission_rejects_window_boundary_drift() {
+        let subject = Keypair::generate();
+        let subject_did = format!("did:chio:{}", subject.public_key().to_hex());
+        let window = june_window();
+        let id = window_scoped_capability_id(&subject_did, &window).expect("id");
+        // expires_at is not pinned to the attestation-window boundary.
+        let token = signed_token(
+            id,
+            &subject,
+            baseline_scope(TENANT),
+            window.since,
+            window.until + 1,
+        );
+        assert!(matches!(
+            assert_pass_capability_id_deterministic(&token),
+            Err(KernelError::PassCapabilityIdNotDeterministic(_))
+        ));
+    }
+
+    #[test]
+    fn allotment_cost_name_matches_credential_layer_literal() {
+        // The kernel-stamped dimension name MUST stay byte-identical
+        // to the credential-layer constant the genuine-use scan keys on.
+        assert_eq!(PASS_ALLOTMENT_COST_NAME, "chio.pass.allotment.v1");
+        assert_eq!(PASS_COST_METADATA_SCHEMA, "chio.cost-metadata.v1");
+    }
+
+    #[test]
+    fn stamp_allotment_dimension_creates_cost_block_when_absent() {
+        // A normal Pass invocation carries no custom `cost` block;
+        // the stamp must create one so the genuine-use scan recognizes the debit.
+        let stamped = stamp_pass_allotment_cost_dimension(None, 7);
+        let dimensions = stamped
+            .get("cost")
+            .and_then(|cost| cost.get("dimensions"))
+            .and_then(serde_json::Value::as_array)
+            .expect("cost.dimensions array");
+        assert_eq!(dimensions.len(), 1);
+        let dim = &dimensions[0];
+        assert_eq!(
+            dim.get("name").and_then(serde_json::Value::as_str),
+            Some(PASS_ALLOTMENT_COST_NAME)
+        );
+        assert_eq!(
+            dim.get("value").and_then(serde_json::Value::as_u64),
+            Some(7)
+        );
+        assert_eq!(
+            dim.get("unit").and_then(serde_json::Value::as_str),
+            Some(PASS_ALLOTMENT_UNIT)
+        );
+        assert_eq!(
+            dim.get("dimension").and_then(serde_json::Value::as_str),
+            Some("custom")
+        );
+    }
+
+    #[test]
+    fn stamp_allotment_dimension_appends_without_clobbering_existing() {
+        // An existing financial block and a pre-existing cost dimension must both
+        // survive: the allotment dimension is appended, not overwritten.
+        let existing = serde_json::json!({
+            "financial": { "cost_charged": 0, "currency": "XCC" },
+            "cost": {
+                "schema": PASS_COST_METADATA_SCHEMA,
+                "dimensions": [
+                    { "dimension": "custom", "name": "other.metric.v1", "value": 3, "unit": "x" }
+                ]
+            }
+        });
+        let stamped = stamp_pass_allotment_cost_dimension(Some(existing), 5);
+        assert!(stamped.get("financial").is_some(), "financial preserved");
+        let dimensions = stamped
+            .get("cost")
+            .and_then(|cost| cost.get("dimensions"))
+            .and_then(serde_json::Value::as_array)
+            .expect("cost.dimensions array");
+        assert_eq!(
+            dimensions.len(),
+            2,
+            "existing dimension preserved, allotment appended"
+        );
+        assert!(dimensions.iter().any(|dim| {
+            dim.get("name").and_then(serde_json::Value::as_str) == Some("other.metric.v1")
+        }));
+        assert!(dimensions.iter().any(|dim| {
+            dim.get("name").and_then(serde_json::Value::as_str) == Some(PASS_ALLOTMENT_COST_NAME)
+                && dim.get("value").and_then(serde_json::Value::as_u64) == Some(5)
+        }));
+    }
+
+    #[test]
+    fn admission_leaves_non_pass_capability_unaffected() {
+        // A USD tool grant under a UUIDv7 id: Pass-shaped by neither id nor scope.
+        let subject = Keypair::generate();
+        let usd_scope = ChioScope {
+            grants: vec![ToolGrant {
+                server_id: "svc".to_string(),
+                tool_name: "*".to_string(),
+                operations: vec![Operation::Invoke],
+                constraints: Vec::new(),
+                max_invocations: None,
+                max_cost_per_invocation: Some(MonetaryAmount {
+                    units: 1,
+                    currency: "USD".to_string(),
+                }),
+                max_total_cost: None,
+                dpop_required: None,
+            }],
+            resource_grants: Vec::new(),
+            prompt_grants: Vec::new(),
+        };
+        let token = signed_token(
+            "cap-018f-7a3c-uuidv7".to_string(),
+            &subject,
+            usd_scope,
+            100,
+            200,
+        );
+        assert!(assert_pass_capability_id_deterministic(&token).is_ok());
+    }
+}

@@ -14,7 +14,7 @@ mod kernel_struct;
 
 pub use error::{KernelError, OverloadResource, StructuredErrorReport};
 pub use kernel_struct::{
-    ChioKernel, HybridSigningConfig, KernelConfig, MemoryBudgetConfig,
+    ChioKernel, FreeTierPoolConfig, HybridSigningConfig, KernelConfig, MemoryBudgetConfig,
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS,
 };
@@ -29,7 +29,9 @@ pub(crate) use kernel_scopes::{
     scope_receipt_tenant_id, ReceiptFederationAdmission, ScopedKernelReceiptFederationAdmission,
     ScopedKernelReceiptTenantId,
 };
-pub(crate) use kernel_struct::{capability_crypto_floor, receipt_crypto_floor};
+pub(crate) use kernel_struct::{
+    capability_crypto_floor, receipt_crypto_floor, FreeTierPoolHold, FREETIER_GLOBAL_GRANT_INDEX,
+};
 
 pub type AgentId = String;
 
@@ -554,6 +556,10 @@ pub(crate) struct BudgetChargeResult {
     new_committed_cost_units: u64,
     budget_hold_id: String,
     authorize_metadata: BudgetCommitMetadata,
+    /// Set when this was a free-tier charge that also debited the aggregate pool.
+    /// Reversed and reconciled symmetrically with the per-Pass hold. Boxed to keep
+    /// the common (non-free-tier) `BudgetChargeResult` small.
+    free_tier_pool_hold: Option<Box<FreeTierPoolHold>>,
 }
 
 impl BudgetChargeResult {

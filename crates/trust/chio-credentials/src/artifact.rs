@@ -176,6 +176,33 @@ pub enum CredentialError {
 
     #[error("invalid portable reputation contract: {0}")]
     InvalidPortableReputation(String),
+
+    #[error("chio pass schema must be {CHIO_PASS_SCHEMA}")]
+    InvalidChioPassSchema,
+
+    #[error("chio pass has expired")]
+    ChioPassExpired,
+
+    #[error("chio pass issuance date must be before or equal to expiration date")]
+    InvalidChioPassValidityWindow,
+
+    #[error("invalid chio pass allotment grant: {0}")]
+    InvalidChioPassAllotmentGrant(String),
+
+    #[error("invalid chio pass attestation window: {0}")]
+    InvalidChioPassWindow(String),
+
+    #[error("invalid chio pass capability binding: {0}")]
+    InvalidChioPassCapabilityBinding(String),
+
+    #[error("chio pass genuine-use receipt scan failed: {0}")]
+    ChioPassGenuineUseScanFailed(String),
+
+    #[error("chio pass refresh requires fresh re-attestation")]
+    ChioPassReattestationMissing,
+
+    #[error("invalid chio pass refresh window")]
+    InvalidChioPassRefreshWindow,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

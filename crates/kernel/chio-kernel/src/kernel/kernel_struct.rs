@@ -287,6 +287,11 @@ pub struct ChioKernel {
     pub(super) post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline,
     pub(super) budget_store: Arc<dyn BudgetStore>,
     pub(super) budget_store_lock: Mutex<()>,
+    /// Optional free-tier compute pool ceiling. When set,
+    /// every private-use (free-tier) per-Pass charge also debits one aggregate
+    /// `freetier:global:<YYYY-MM>` budget row, capping liability at
+    /// `min(N x allotment, pool)`. `None` keeps the kernel pool-free.
+    pub(super) free_tier_pool: Option<FreeTierPoolConfig>,
     pub(super) revocation_store: Arc<dyn RevocationStore>,
     pub(super) capability_authority: Box<dyn CapabilityAuthority>,
     pub(super) tool_servers: HashMap<ServerId, Box<dyn ToolServerConnection>>,
@@ -486,5 +491,200 @@ impl ChioKernel {
         )?;
         self.capability_crypto_floor = hybrid.crypto_floor;
         Ok(backend)
+    }
+}
+
+/// Board-approved configuration for the free-tier compute pool. It bounds
+/// aggregate free-tier liability to a hard monthly ceiling
+/// so the gift degrades to "the pool shrinks", never "the treasury drains": when
+/// the aggregate term is exhausted the kernel denies fail-closed.
+///
+/// The config travels via the fallible [`ChioKernel::with_free_tier_pool`]
+/// builder rather than `KernelConfig`, so `ChioKernel::new` stays infallible and
+/// misconfiguration is rejected at install time.
+///
+/// Ceiling scope: the ceiling is enforced against the kernel's budget store, so
+/// it is exactly as global as that store. The default in-memory store bounds one
+/// process; a horizontally-scaled fleet must share one transactionally-atomic
+/// budget store or each replica keeps its own `freetier:global` row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FreeTierPoolConfig {
+    /// Hard monthly ceiling, in allotment units, on aggregate free-tier spend
+    /// across every Pass holder. Liability becomes `min(N x allotment, pool)`.
+    pub monthly_pool_units: u64,
+    /// The allotment unit. It MUST be the canonical Pass allotment unit
+    /// `pass_gating::PASS_ALLOTMENT_UNIT` ("XCC"): a 3-uppercase-letter private-use
+    /// code that carries no money leg and matches the unit Pass scopes are minted
+    /// with, so the aggregate co-debit actually fires for real Pass charges.
+    pub allotment_unit: String,
+    /// Audit-only reference to the board approval that funded this pool. It never
+    /// participates in any arithmetic; it only records provenance.
+    pub board_approval_ref: String,
+}
+
+impl FreeTierPoolConfig {
+    /// Validate the config fail-closed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`KernelError::InvalidFreeTierPoolConfig`] when `monthly_pool_units`
+    /// is zero, `allotment_unit` is not the Pass allotment unit ("XCC"), or
+    /// `board_approval_ref` is empty.
+    pub fn validate(&self) -> Result<(), KernelError> {
+        if self.monthly_pool_units == 0 {
+            return Err(KernelError::InvalidFreeTierPoolConfig(
+                "monthly_pool_units must be non-zero".to_string(),
+            ));
+        }
+        let unit_ok = self.allotment_unit.len() == 3
+            && self.allotment_unit.bytes().all(|b| b.is_ascii_uppercase());
+        if !unit_ok {
+            return Err(KernelError::InvalidFreeTierPoolConfig(
+                "allotment_unit must be 3 uppercase ASCII letters".to_string(),
+            ));
+        }
+        // The pool unit MUST be the canonical Pass allotment unit. Pass scopes are
+        // minted with the fixed XCC unit (`pass_gating::PASS_ALLOTMENT_UNIT`), so a
+        // pool configured with any other (shape-valid) unit such as the pinned `USD`
+        // would never match a real Pass charge: the charge path takes the
+        // `currency != pool.allotment_unit` branch and authorizes WITHOUT the
+        // aggregate co-debit, silently disabling the monthly liability cap this config
+        // exists to enforce. Require an exact match, fail-closed.
+        if self.allotment_unit != crate::pass_gating::PASS_ALLOTMENT_UNIT {
+            return Err(KernelError::InvalidFreeTierPoolConfig(format!(
+                "allotment_unit must be the Pass allotment unit {}, got {}",
+                crate::pass_gating::PASS_ALLOTMENT_UNIT,
+                self.allotment_unit
+            )));
+        }
+        if self.board_approval_ref.is_empty() {
+            return Err(KernelError::InvalidFreeTierPoolConfig(
+                "board_approval_ref must be present".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Derive the aggregate pool budget-term id `"freetier:global:<YYYY-MM>"` from
+    /// a Pass capability's `issued_at` (which is pinned to the first second of its
+    /// active month, so the term is the same for every Pass in that month). The id
+    /// is what keys the single shared `(term, grant_index 0)` budget row.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`KernelError::InvalidFreeTierPoolConfig`] when `issued_at` is not a
+    /// representable unix timestamp.
+    pub fn window_ym_from_issued_at(issued_at: u64) -> Result<String, KernelError> {
+        let secs = i64::try_from(issued_at).map_err(|_| {
+            KernelError::InvalidFreeTierPoolConfig("issued_at out of range".to_string())
+        })?;
+        let dt = chrono::DateTime::from_timestamp(secs, 0).ok_or_else(|| {
+            KernelError::InvalidFreeTierPoolConfig("issued_at not representable".to_string())
+        })?;
+        Ok(format!("freetier:global:{}", dt.format("%Y-%m")))
+    }
+}
+
+#[cfg(test)]
+mod free_tier_pool_config_tests {
+    use super::FreeTierPoolConfig;
+
+    fn cfg() -> FreeTierPoolConfig {
+        FreeTierPoolConfig {
+            monthly_pool_units: 1_000_000,
+            allotment_unit: "XCC".to_string(),
+            board_approval_ref: "board-2026-06-001".to_string(),
+        }
+    }
+
+    #[test]
+    fn validate_accepts_well_formed_config() {
+        assert!(cfg().validate().is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_zero_pool() {
+        let mut c = cfg();
+        c.monthly_pool_units = 0;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_malformed_unit() {
+        for bad in ["xcc", "XC", "XCCX", "X1C", ""] {
+            let mut c = cfg();
+            c.allotment_unit = bad.to_string();
+            assert!(c.validate().is_err(), "unit `{bad}` must be rejected");
+        }
+    }
+
+    #[test]
+    fn validate_rejects_non_xcc_pool_unit() {
+        // The pool unit must be the canonical Pass allotment unit
+        // (XCC). A shape-valid but pinned currency like USD would never match a real
+        // Pass charge, silently disabling the monthly liability cap, so it is rejected
+        // fail-closed even though it is three uppercase letters. Any other private-use
+        // code is likewise rejected: Pass scopes only ever mint XCC.
+        for non_xcc in ["USD", "ABC"] {
+            let mut c = cfg();
+            c.allotment_unit = non_xcc.to_string();
+            assert!(
+                c.validate().is_err(),
+                "a non-XCC pool unit `{non_xcc}` must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_rejects_empty_board_ref() {
+        let mut c = cfg();
+        c.board_approval_ref = String::new();
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn window_term_id_is_month_scoped() {
+        assert_eq!(
+            FreeTierPoolConfig::window_ym_from_issued_at(0).unwrap(),
+            "freetier:global:1970-01"
+        );
+        let term = FreeTierPoolConfig::window_ym_from_issued_at(1_780_704_000).unwrap();
+        assert!(term.starts_with("freetier:global:2026-"), "got {term}");
+    }
+}
+
+/// Grant index of the single aggregate free-tier pool budget row. All free-tier
+/// charges in a month share `(freetier:global:<YYYY-MM>, 0)`.
+pub(crate) const FREETIER_GLOBAL_GRANT_INDEX: usize = 0;
+
+/// A hold taken against the aggregate free-tier pool alongside a per-Pass hold.
+/// Carried on `BudgetChargeResult` so the pool exposure is reversed and
+/// reconciled symmetrically with the per-Pass hold (no stale pool leak).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FreeTierPoolHold {
+    /// The `freetier:global:<YYYY-MM>` budget term this hold debits.
+    pub term_id: String,
+    /// Unique id of this pool hold, for symmetric reverse/reconcile.
+    pub hold_id: String,
+    /// Exposure units held against the pool (worst-case per-invocation cost).
+    pub units: u64,
+}
+
+impl ChioKernel {
+    /// Install the board-approved free-tier pool config. Fallible so misconfig is
+    /// rejected at install time while `ChioKernel::new` stays infallible.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`KernelError::InvalidFreeTierPoolConfig`] when the config fails
+    /// [`FreeTierPoolConfig::validate`].
+    pub fn with_free_tier_pool(mut self, config: FreeTierPoolConfig) -> Result<Self, KernelError> {
+        config.validate()?;
+        self.free_tier_pool = Some(config);
+        Ok(self)
+    }
+
+    pub(crate) fn free_tier_pool_config(&self) -> Option<&FreeTierPoolConfig> {
+        self.free_tier_pool.as_ref()
     }
 }

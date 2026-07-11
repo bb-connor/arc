@@ -16,6 +16,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
 
+use chio_core::capability::token::{
+    window_scoped_capability_id, AttestationWindowId, CapabilityToken,
+};
+use chio_core::receipt::body::ChioReceipt;
+use chio_core::receipt::decision::Decision;
+use chio_core::receipt::kinds::{ReceiptKind, TrustLevel};
 use chio_core::{
     canonical_json_bytes,
     session::{ChioIdentityAssertion, EnterpriseFederationMethod, EnterpriseIdentityContext},
@@ -28,7 +34,7 @@ use chio_reputation::{
     IncidentCorrelationMetrics, LeastPrivilegeMetrics, LocalReputationScorecard, MetricValue,
     ReliabilityMetrics, ResourceStewardshipMetrics, SpecializationMetrics,
 };
-use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Months, SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
 const VC_CONTEXT_V1: &str = "https://www.w3.org/2018/credentials/v1";
@@ -88,4 +94,6 @@ include!("oid4vci.rs");
 include!("oid4vp.rs");
 include!("discovery.rs");
 include!("portable_reputation.rs");
+include!("chio_pass.rs");
+include!("chio_pass_antifarm.rs");
 include!("tests.rs");

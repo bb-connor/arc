@@ -40,6 +40,7 @@ pub mod memory_provenance;
 pub mod observability;
 pub mod operator_report;
 pub mod otel;
+pub mod pass_gating;
 pub mod payment;
 pub mod post_invocation;
 #[allow(deprecated)]
@@ -133,9 +134,10 @@ pub use capability_lineage::{
 };
 pub use checkpoint::{
     build_checkpoint, build_checkpoint_with_previous, build_inclusion_proof,
-    checkpoint_body_sha256, is_supported_checkpoint_schema, verify_checkpoint_continuity,
-    verify_checkpoint_signature, CheckpointError, KernelCheckpoint, KernelCheckpointBody,
-    ReceiptInclusionProof, CHECKPOINT_SCHEMA,
+    checkpoint_body_sha256, is_supported_checkpoint_schema, validate_checkpoint,
+    validate_checkpoint_predecessor, verify_checkpoint_continuity, verify_checkpoint_signature,
+    CheckpointError, KernelCheckpoint, KernelCheckpointBody, ReceiptInclusionProof,
+    CHECKPOINT_SCHEMA,
 };
 pub use chio_core::credit::{
     ensure_capital_execution_custodian_authority, ensure_capital_execution_owner_authority,
@@ -440,9 +442,9 @@ mod kernel;
 pub(crate) use kernel::{current_unix_timestamp, MatchingGrant, ReceiptContent};
 
 pub use kernel::{
-    AgentId, CapabilityId, ChildReceiptLog, ChioKernel, Guard, GuardContext, GuardDecision,
-    HybridSigningConfig, KernelConfig, KernelError, MemoryBudgetConfig, OverloadResource,
-    PromptProvider, ReceiptLog, ResourceProvider, RuntimeAdmissionContext,
+    AgentId, CapabilityId, ChildReceiptLog, ChioKernel, FreeTierPoolConfig, Guard, GuardContext,
+    GuardDecision, HybridSigningConfig, KernelConfig, KernelError, MemoryBudgetConfig,
+    OverloadResource, PromptProvider, ReceiptLog, ResourceProvider, RuntimeAdmissionContext,
     RuntimeAdmissionDecision, RuntimeAdmissionHook, ServerId, StructuredErrorReport,
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS, EMERGENCY_STOP_DENY_REASON,
