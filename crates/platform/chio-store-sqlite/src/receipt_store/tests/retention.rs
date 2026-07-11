@@ -95,43 +95,59 @@ fn backfill_refuses_regeneration_over_checkpointed_range() -> Result<(), Box<dyn
     Ok(())
 }
 
-#[test]
-fn checkpoint_chain_watermark_exemption() -> Result<(), Box<dyn std::error::Error>> {
-    use crate::receipt_store::support::{
-        insert_receipt_retention_watermark, verify_checkpoint_chain_integrity,
-    };
-
-    let path = unique_db_path("chain-exemption");
-    let store = SqliteReceiptStore::open(&path)?;
-    let keypair = super::support::receipt_test_keypair();
-    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
-    // Two checkpoints cover [1,2] and [3,4]; leave 5..6 uncheckpointed.
-    for i in 0..6u64 {
-        let receipt =
-            super::support::sample_receipt_with_keypair(&format!("ce-{i}"), i + 1, &keypair);
+/// Append two aged receipts (timestamp 100) checkpointed as [1,2] and four
+/// fresh receipts (timestamp 500) checkpointed as [3,4] with 5..6 left
+/// uncheckpointed, then genuinely archive the aged range so a real archive holds
+/// the co-archived `[1, 2]` prefix and the live rows are deleted with the
+/// watermark set to 2.
+fn store_with_archived_first_checkpoint(
+    path: &std::path::Path,
+    archive_path: &str,
+    keypair: &chio_core::crypto::Keypair,
+) -> Result<SqliteReceiptStore, Box<dyn std::error::Error>> {
+    let store = SqliteReceiptStore::open(path)?;
+    store.enable_background_checkpoints(super::support::signer(keypair, 2))?;
+    for i in 0..2u64 {
+        let receipt = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("ce-aged-{i}"),
+            i + 1,
+            100,
+            keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    for i in 2..6u64 {
+        let receipt = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("ce-fresh-{i}"),
+            i + 1,
+            500,
+            keypair,
+        );
         store.append_chio_receipt_returning_seq(&receipt)?;
     }
     store.flush_receipt_writes()?;
     assert!(store.load_checkpoint_by_seq(2)?.is_some());
 
-    // Simulate archival of the first checkpoint's range [1,2]: record the
-    // watermark and drop the covered claim-log rows, fabricating the
-    // post-archival state to prove the exemption in isolation.
-    store.writer_handle().run_write(|connection| {
-        insert_receipt_retention_watermark(connection, 2, 100, "archive.sqlite3", None, 1)?;
-        connection.execute_batch(
-            "DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete; \
-             DELETE FROM claim_receipt_log_entries WHERE entry_seq <= 2; \
-             CREATE TRIGGER IF NOT EXISTS claim_receipt_log_entries_reject_delete \
-               BEFORE DELETE ON claim_receipt_log_entries \
-               BEGIN SELECT RAISE(ABORT, 'claim_receipt_log_entries is append-only'); END;",
-        )?;
-        Ok(())
-    })?;
+    // Archive only the aged first checkpoint's range [1,2]: the rows move to a
+    // real archive, the live prefix is deleted, and the ledger records W=2.
+    let archived = store.archive_receipts_before(150, archive_path)?;
+    assert_eq!(archived, 2, "only the aged [1,2] batch archives");
+    Ok(store)
+}
+
+#[test]
+fn checkpoint_chain_watermark_exemption() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::receipt_store::support::verify_checkpoint_chain_integrity;
+
+    let path = unique_db_path("chain-exemption");
+    let archive = unique_db_path("chain-exemption-archive");
+    let archive_path = archive.to_str().ok_or("archive path is not valid utf-8")?;
+    let keypair = super::support::receipt_test_keypair();
+    let store = store_with_archived_first_checkpoint(&path, archive_path, &keypair)?;
 
     // With the exemption the chain still verifies: checkpoint 1 (batch_end_seq
-    // <= W = 2) skips the live Merkle rebuild; checkpoint 2 (batch_end_seq 4 >
-    // W) is rebuilt as before.
+    // <= W = 2) skips the live Merkle rebuild and trusts the co-archived range;
+    // checkpoint 2 (batch_end_seq 4 > W) is rebuilt as before.
     let connection = store.reader_connection_for_test()?;
     verify_checkpoint_chain_integrity(&connection)?;
 
@@ -148,6 +164,43 @@ fn checkpoint_chain_watermark_exemption() -> Result<(), Box<dyn std::error::Erro
     assert!(
         verify_checkpoint_chain_integrity(&connection).is_err(),
         "tamper above the watermark must still fail the chain"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
+/// The watermark exemption must be backed by the archived evidence, not merely
+/// by a matching checkpoint boundary and an absent live prefix. After a genuine
+/// rotation the watermark is trusted, but once the archive that vouches for the
+/// deleted prefix is gone the exemption is withdrawn fail-closed even though the
+/// ledger and boundary are unchanged (the state an out-of-band prefix delete
+/// plus a planted watermark would leave behind).
+#[test]
+fn watermark_trust_requires_backing_archive() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::receipt_store::support::trusted_retention_watermark;
+
+    let path = unique_db_path("watermark-backing");
+    let archive = unique_db_path("watermark-backing-archive");
+    let archive_path = archive.to_str().ok_or("archive path is not valid utf-8")?;
+    let keypair = super::support::receipt_test_keypair();
+    let store = store_with_archived_first_checkpoint(&path, archive_path, &keypair)?;
+
+    // Archive present and covering [1,2]: the watermark is trusted.
+    let connection = store.reader_connection_for_test()?;
+    assert_eq!(trusted_retention_watermark(&connection)?, 2);
+    drop(connection);
+
+    // Remove the archive that backs the deleted prefix. The ledger row, the
+    // matching checkpoint boundary, and the absent live prefix are all still in
+    // place, but there is no longer any archived evidence to trust.
+    std::fs::remove_file(&archive)?;
+    let connection = store.reader_connection_for_test()?;
+    assert_eq!(
+        trusted_retention_watermark(&connection)?,
+        0,
+        "a watermark with no backing archive must not be trusted"
     );
 
     let _ = std::fs::remove_file(&path);
@@ -1961,8 +2014,16 @@ fn repair_is_idempotent_when_watermark_already_covers_boundary(
                        BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END;",
                 )?;
                 connection.execute_batch("DETACH DATABASE archive")?;
+                // The ledger must name the real archive the botched rotation
+                // co-archived [1,2] into, so the reopen's watermark check finds
+                // the backing evidence.
                 crate::receipt_store::support::insert_receipt_retention_watermark(
-                    connection, 2, 100, "archive", None, 1,
+                    connection,
+                    2,
+                    100,
+                    &archive_path,
+                    None,
+                    1,
                 )?;
                 Ok(())
             }
@@ -2224,38 +2285,18 @@ fn boundary_matching_watermark_over_live_prefix_does_not_skip_verification(
 /// it rebuilds the deleted prefix from the live claim log and fails.
 #[test]
 fn catch_up_honors_archival_watermark_exemption() -> Result<(), Box<dyn std::error::Error>> {
-    use crate::receipt_store::support::insert_receipt_retention_watermark;
-
     let path = unique_db_path("catch-up-watermark");
-    let store = SqliteReceiptStore::open(&path)?;
+    let archive = unique_db_path("catch-up-watermark-archive");
+    let archive_path = archive.to_str().ok_or("archive path is not valid utf-8")?;
     let keypair = super::support::receipt_test_keypair();
-    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
-    // Checkpoints cover [1,2] and [3,4].
-    for i in 0..4u64 {
-        let receipt =
-            super::support::sample_receipt_with_keypair(&format!("cu-{i}"), i + 1, &keypair);
-        store.append_chio_receipt_returning_seq(&receipt)?;
-    }
-    store.flush_receipt_writes()?;
-    assert!(store.load_checkpoint_by_seq(2)?.is_some());
-
-    // Archive checkpoint 1's range [1,2]: record the watermark and delete the
-    // covered claim-log rows, the post-archival state a stale head must adopt.
-    store.writer_handle().run_write(|connection| {
-        insert_receipt_retention_watermark(connection, 2, 100, "archive.sqlite3", None, 1)?;
-        connection.execute_batch(
-            "DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete; \
-             DELETE FROM claim_receipt_log_entries WHERE entry_seq <= 2; \
-             CREATE TRIGGER IF NOT EXISTS claim_receipt_log_entries_reject_delete \
-               BEFORE DELETE ON claim_receipt_log_entries \
-               BEGIN SELECT RAISE(ABORT, 'claim_receipt_log_entries is append-only'); END;",
-        )?;
-        Ok(())
-    })?;
+    // Checkpoints cover [1,2] and [3,4]; the aged [1,2] range is genuinely
+    // archived (real archive, watermark W=2, live prefix deleted).
+    let store = store_with_archived_first_checkpoint(&path, archive_path, &keypair)?;
 
     // A fresh (behind) verified head catching up from seq 0 to seq 2 must process
     // checkpoint 1, whose range [1,2] was archived. Without the exemption the
-    // rebuild from the emptied prefix fails; with it the head advances cleanly.
+    // rebuild from the emptied prefix fails; with it (backed by the real archive)
+    // the head advances cleanly.
     let connection = store.reader_connection_for_test()?;
     let mut head = crate::receipt_store::VerifiedHead::default();
     crate::receipt_store::catch_up_verified_head_to(&connection, &mut head, 2)?;
@@ -2266,6 +2307,7 @@ fn catch_up_honors_archival_watermark_exemption() -> Result<(), Box<dyn std::err
     );
 
     let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
     Ok(())
 }
 

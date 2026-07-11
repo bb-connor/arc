@@ -349,7 +349,7 @@ pub(crate) fn verify_latest_checkpoint_integrity(
 /// The archival watermark that may be TRUSTED to skip the live Merkle rebuild
 /// for every checkpoint whose `batch_end_seq <= W`, or 0 when no exemption is
 /// safe. The watermark ledger's DB triggers enforce monotonicity ONLY, not that
-/// the covered rows were ever archived, so two independent facts must hold
+/// the covered rows were ever archived, so three independent facts must hold
 /// before the exemption applies:
 ///
 /// 1. `W` matches a persisted checkpoint's `batch_end_seq`. The archival path
@@ -366,8 +366,20 @@ pub(crate) fn verify_latest_checkpoint_integrity(
 ///    no live row `entry_seq <= W`; any survivor means the prefix was never
 ///    archived.
 ///
-/// Fail-closed: either condition failing yields 0 (full verification). Bounded to
-/// two indexed existence probes, never an O(log length) scan.
+/// 3. The archive named in the ledger actually holds the `[1, W]` claim-log
+///    prefix. Conditions (1) and (2) are equally satisfied by a genuine rotation
+///    and by an out-of-band delete of the live prefix followed by a planted
+///    watermark: both land on a boundary and leave no live prefix row. Only the
+///    genuine rotation co-archives the deleted rows first. Skipping the rebuild
+///    trusts that those rows survive in the archive, so opening the archive and
+///    confirming it covers the prefix ties the exemption to the evidence rather
+///    than to the mere absence of live rows. A missing, unreadable, or short
+///    archive is not proof of archival and withdraws the exemption.
+///
+/// Fail-closed: any condition failing yields 0 (full verification, which then
+/// rejects a truly unarchived prefix because its live rows are gone). Bounded to
+/// two indexed existence probes plus one archive open and indexed count, never an
+/// O(log length) scan.
 pub(crate) fn trusted_retention_watermark(
     connection: &Connection,
 ) -> Result<u64, ReceiptStoreError> {
@@ -392,7 +404,47 @@ pub(crate) fn trusted_retention_watermark(
     if live_prefix_present {
         return Ok(0);
     }
+    if !archived_prefix_is_backed(connection, raw_i64)? {
+        return Ok(0);
+    }
     Ok(raw)
+}
+
+/// True only when the archive named by the current watermark ledger row holds
+/// the entire claim-log prefix through `watermark`. Opens the archive read-only
+/// on its own connection (never ATTACHing onto the caller's) and counts the
+/// co-archived claim-log rows at or below the watermark. `entry_seq` is a
+/// contiguous `1..=W` prefix (AUTOINCREMENT, the base checkpoint starts at 1 and
+/// batches tile without gaps) that co-archival copies verbatim, so a faithful
+/// archive holds exactly `watermark` such rows. Any missing, unreadable, or
+/// short archive returns false so the caller falls back to full verification
+/// (fail-closed).
+fn archived_prefix_is_backed(
+    connection: &Connection,
+    watermark: i64,
+) -> Result<bool, ReceiptStoreError> {
+    let archive_path: Option<String> = connection
+        .query_row(
+            "SELECT archive_path FROM receipt_retention_watermark \
+             ORDER BY archived_through_entry_seq DESC, rotated_at DESC LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(archive_path) = archive_path else {
+        return Ok(false);
+    };
+    let flags =
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX;
+    let Ok(archive) = rusqlite::Connection::open_with_flags(&archive_path, flags) else {
+        return Ok(false);
+    };
+    let covered = archive.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq <= ?1",
+        params![watermark],
+        |row| row.get::<_, i64>(0),
+    );
+    Ok(matches!(covered, Ok(count) if count >= watermark))
 }
 
 pub(crate) fn verify_checkpoint_chain_integrity(
