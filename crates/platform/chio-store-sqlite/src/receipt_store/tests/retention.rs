@@ -953,6 +953,93 @@ fn repair_rejects_divergent_archive_identity() -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
+/// Retention repair rounds the watermark up to a checkpoint boundary. When the
+/// orphaned rows cover only PART of that batch, the rows above them may still
+/// have live source receipts; stamping the watermark there would mark them
+/// archived and skip their Merkle rebuild forever. Repair must refuse a partial
+/// batch fail-closed.
+#[test]
+fn repair_refuses_partial_checkpoint_batch() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("repair-partial-batch");
+    let archive = unique_db_path("repair-partial-batch-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    {
+        // One checkpoint covers the whole batch [1,4] (max_batch 4).
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 4))?;
+        for i in 0..4u64 {
+            let r = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("pb-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store.append_chio_receipt_returning_seq(&r)?;
+        }
+        store.flush_receipt_writes()?;
+        assert!(store.load_checkpoint_by_seq(1)?.is_some());
+        assert!(
+            store.load_checkpoint_by_seq(2)?.is_none(),
+            "one batch [1,4]"
+        );
+        // Orphan ONLY rows 1..=2 (co-archive faithfully, delete their source
+        // rows), leaving rows 3..=4 with live source receipts inside the same
+        // checkpoint batch.
+        store.writer_handle().run_write({
+            let archive_path = archive_path.to_string();
+            move |connection| {
+                let escaped = archive_path.replace('\'', "''");
+                connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
+                connection.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries \
+                       (entry_seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, receipt_kind TEXT NOT NULL, \
+                        source_seq INTEGER NOT NULL, timestamp INTEGER NOT NULL, capability_id TEXT, session_id TEXT, \
+                        parent_request_id TEXT, request_id TEXT, subject_key TEXT, issuer_key TEXT, tool_server TEXT, \
+                        tool_name TEXT, raw_json TEXT NOT NULL); \
+                     INSERT OR IGNORE INTO archive.claim_receipt_log_entries \
+                       SELECT * FROM main.claim_receipt_log_entries WHERE entry_seq <= 2; \
+                     DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
+                     DELETE FROM main.chio_tool_receipts WHERE seq <= 2; \
+                     CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
+                       BEFORE DELETE ON chio_tool_receipts \
+                       BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END;",
+                )?;
+                connection.execute_batch("DETACH DATABASE archive")?;
+                Ok(())
+            }
+        })?;
+    }
+
+    let store = SqliteReceiptStore::open_existing(&path)?;
+    let result = store.retention_repair(archive_path);
+    let message = result
+        .err()
+        .ok_or("expected a partial-batch refusal; repair watermarked live rows")?
+        .to_string();
+    assert!(
+        message.contains("partially archived batch"),
+        "unexpected error: {message}"
+    );
+
+    // Fail-closed: no watermark was recorded and the orphans survive.
+    let live = store.reader_connection_for_test()?;
+    let orphans: i64 = live.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq <= 2",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        orphans, 2,
+        "orphaned claim-log rows must survive the refusal"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// Primary correctness proof: a state-machine proptest that drives random
 /// interleaved sequences of tool/child appends (non-monotonic
 /// timestamps within an aged band, to exercise the MAX(timestamp)-over-prefix

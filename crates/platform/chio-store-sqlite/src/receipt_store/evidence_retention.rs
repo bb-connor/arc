@@ -1026,6 +1026,29 @@ pub(super) fn retention_repair_on_writer(
                     .to_string(),
             )
         })?;
+        // The rounded watermark is a checkpoint boundary at or above the largest
+        // orphan. If the orphans cover only PART of that batch, rows between the
+        // largest orphan and the boundary may still have LIVE source receipts;
+        // stamping the watermark there would mark them archived and permanently
+        // skip their Merkle rebuild. Refuse a partial batch: every claim-log row
+        // up to the boundary must itself be an orphan (absent from both source
+        // tables), so after the delete the whole covered prefix is genuinely
+        // gone and the watermark never covers a live row.
+        let live_in_prefix: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM claim_receipt_log_entries e \
+             WHERE e.entry_seq <= ?1 \
+               AND (EXISTS (SELECT 1 FROM chio_tool_receipts t WHERE t.receipt_id = e.receipt_id) \
+                    OR EXISTS (SELECT 1 FROM chio_child_receipts c WHERE c.receipt_id = e.receipt_id))",
+            params![rounded],
+            |row| row.get(0),
+        )?;
+        if live_in_prefix > 0 {
+            return Err(ReceiptStoreError::Conflict(
+                "retention repair: the checkpoint batch covering the orphaned rows still has \
+                 live source receipts; refusing to watermark a partially archived batch"
+                    .to_string(),
+            ));
+        }
         sqlite_u64(rounded, "repair rounded watermark")
     })();
     let detach = connection.execute_batch("DETACH DATABASE archive");
