@@ -528,6 +528,75 @@ fn size_rotation_archives_when_median_timestamp_is_shared() -> Result<(), Box<dy
     Ok(())
 }
 
+/// Retention triggers must age out CHILD-receipt evidence too. The threshold
+/// resolver reads the claim receipt log, which projects both tool and child
+/// receipts, not chio_tool_receipts alone; otherwise a store whose evidence is
+/// child-only sees an empty tool table and never crosses the time trigger, so
+/// aged child receipts would be retained forever even though the rotation path
+/// co-archives child rows once a cutoff is chosen.
+#[test]
+fn child_only_evidence_ages_out_under_time_trigger() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("retention-child-only");
+    let archive = unique_db_path("retention-child-only-archive");
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    // Two aged child receipts and NO tool receipts. Their claim-log entries form
+    // a checkpointed batch far past any retention window.
+    for i in 0..2u64 {
+        let child = super::support::sample_child_receipt_with_keypair_and_timestamp(
+            &format!("aged-child-{i}"),
+            100,
+            &keypair,
+        );
+        store.append_child_receipt_record(&child)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(
+        store.load_checkpoint_by_seq(1)?.is_some(),
+        "the child-only prefix must be checkpointed before it can be archived"
+    );
+
+    let before = store.reader_connection_for_test()?;
+    let tool_rows: i64 =
+        before.query_row("SELECT COUNT(*) FROM chio_tool_receipts", [], |row| {
+            row.get(0)
+        })?;
+    assert_eq!(tool_rows, 0, "the store holds child receipts only");
+    let child_rows: i64 =
+        before.query_row("SELECT COUNT(*) FROM chio_child_receipts", [], |row| {
+            row.get(0)
+        })?;
+    assert_eq!(child_rows, 2, "two child receipts are live before rotation");
+
+    // Time-driven rotation: the timestamp-100 receipts are far past a one-day
+    // window; the size branch is disabled.
+    let config = RetentionConfig {
+        retention_days: 1,
+        max_size_bytes: u64::MAX,
+        archive_path: archive.to_str().ok_or("archive path invalid")?.to_string(),
+        ..RetentionConfig::default()
+    };
+    store.rotate_if_needed(&config)?;
+
+    // The aged child prefix aged out. rotate_if_needed reports tool rows archived
+    // (zero here), so assert directly on the live child rows.
+    let after = store.reader_connection_for_test()?;
+    let live_child: i64 =
+        after.query_row("SELECT COUNT(*) FROM chio_child_receipts", [], |row| {
+            row.get(0)
+        })?;
+    assert_eq!(
+        live_child, 0,
+        "aged child-only evidence must age out under the time trigger"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// A rotation is an in-flight writer, so `dispatch_rotate` increments
 /// `writer.inflight` before sending the Rotate
 /// command and the actor's Rotate arm must decrement it on dequeue. Without the

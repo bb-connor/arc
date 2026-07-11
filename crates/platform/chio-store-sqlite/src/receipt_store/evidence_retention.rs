@@ -442,10 +442,16 @@ fn resolve_rotation_cutoff(
         .map(|d| d.as_secs())
         .unwrap_or(0);
     let time_cutoff = now.saturating_sub(config.retention_days.saturating_mul(86_400));
-    let oldest: Option<i64> =
-        connection.query_row("SELECT MIN(timestamp) FROM chio_tool_receipts", [], |row| {
-            row.get::<_, Option<i64>>(0)
-        })?;
+    // Trigger thresholds are measured over the claim receipt log, which projects
+    // BOTH tool and child receipts. Reading only chio_tool_receipts would leave a
+    // store whose aged (or oldest-checkpointed) evidence is child-only stuck below
+    // every trigger, even though the rotation/delete path co-archives child rows
+    // once a cutoff is chosen.
+    let oldest: Option<i64> = connection.query_row(
+        "SELECT MIN(timestamp) FROM claim_receipt_log_entries",
+        [],
+        |row| row.get::<_, Option<i64>>(0),
+    )?;
     if let Some(oldest_ts) = oldest {
         if (oldest_ts.max(0) as u64) < time_cutoff {
             return Ok(Some(time_cutoff));
@@ -457,8 +463,8 @@ fn resolve_rotation_cutoff(
     if size > config.max_size_bytes {
         let median: Option<i64> = connection
             .query_row(
-                "SELECT timestamp FROM chio_tool_receipts ORDER BY timestamp \
-                 LIMIT 1 OFFSET (SELECT COUNT(*) FROM chio_tool_receipts) / 2",
+                "SELECT timestamp FROM claim_receipt_log_entries ORDER BY timestamp \
+                 LIMIT 1 OFFSET (SELECT COUNT(*) FROM claim_receipt_log_entries) / 2",
                 [],
                 |row| row.get(0),
             )
