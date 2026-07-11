@@ -480,6 +480,15 @@ impl WriterHandle {
             Err(mpsc::RecvTimeoutError::Disconnected) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
                 self.health.failed_total.fetch_add(1, Ordering::SeqCst);
+                // Record the writer death so the next liveness sample reports the
+                // writer Dead. The classifier keys the Dead verdict on the
+                // "unavailable" marker, so without setting it a disconnected
+                // writer with `inflight` compensated and `failed_total` matching
+                // `accepted_total` would sample as Healthy and admit a tool side
+                // effect before receipt persistence fails.
+                if let Ok(mut last_error) = self.health.last_error.lock() {
+                    *last_error = Some("sqlite receipt commit actor is unavailable".to_string());
+                }
                 Err(receipt_actor_unavailable_error())
             }
         }
@@ -508,6 +517,11 @@ impl WriterHandle {
                 // underflowing.
                 atomic_saturating_sub(&self.health.inflight, 1);
                 self.health.failed_total.fetch_add(1, Ordering::SeqCst);
+                // Record the writer death so the next liveness sample reports the
+                // writer Dead rather than Healthy (see the bounded-write arm).
+                if let Ok(mut last_error) = self.health.last_error.lock() {
+                    *last_error = Some("sqlite receipt commit actor is unavailable".to_string());
+                }
                 Err(receipt_actor_unavailable_error())
             }
         }
@@ -3353,6 +3367,59 @@ mod receipt_commit_actor_tests {
         // must leave inflight elevated (the honest wedged-writer signal).
         assert_eq!(health.inflight.load(Ordering::SeqCst), inflight_before + 1);
         assert!(health.failed_total.load(Ordering::SeqCst) >= 1);
+        Ok(())
+    }
+
+    #[test]
+    fn disconnected_bounded_write_records_writer_death_for_liveness(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // The commit actor accepts a bounded child-receipt write, then dies
+        // without responding, disconnecting the caller's response channel. The
+        // write must record the writer death so the next pre-dispatch liveness
+        // sample reports the writer Dead and denies admission, instead of
+        // sampling Healthy once inflight is compensated and failed_total matches
+        // accepted_total.
+        let (sender, receiver) = receipt_commit_channel();
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        let handle = WriterHandle {
+            sender,
+            health: Arc::clone(&health),
+        };
+        // Actor thread: take the one queued command and drop it (die mid-flight),
+        // which drops the deferred responder and disconnects the caller.
+        let actor = std::thread::spawn(move || {
+            if let Ok(command) = receiver.recv() {
+                drop(command);
+            }
+            drop(receiver);
+        });
+
+        let error =
+            handle.run_write_receipt_with_timeout(|_connection| Ok(()), Duration::from_secs(5));
+        actor.join().map_err(|_| "actor thread panicked")?;
+        assert!(error.is_err(), "a disconnected writer must fail closed");
+
+        let counters = ReceiptCommitActor {
+            sender: receipt_commit_channel().0,
+            health: Arc::clone(&health),
+        }
+        .writer_counters();
+        assert!(
+            counters
+                .last_error
+                .as_deref()
+                .is_some_and(|reason| reason.contains("unavailable")),
+            "writer death must be recorded for the liveness probe"
+        );
+        assert_eq!(
+            classify_writer_liveness(
+                &counters,
+                10_000,
+                RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY as u64,
+                current_unix_ms(),
+            ),
+            chio_kernel::ReceiptWriterLiveness::Dead
+        );
         Ok(())
     }
 
