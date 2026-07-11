@@ -1050,6 +1050,18 @@ impl InMemoryBudgetStoreInner {
         Ok(())
     }
 
+    fn request_id_has_reserved_hold(&self, request_id: &str) -> bool {
+        // A mediated hold id is `budget-hold:{request_id}:{capability}:{grant}`.
+        // Matching the `budget-hold:{request_id}:` prefix reports the request_id
+        // taken no matter which capability opened the hold; the trailing colon
+        // keeps a request_id that is only a textual prefix of another from
+        // matching.
+        let prefix = format!("budget-hold:{request_id}:");
+        self.holds
+            .keys()
+            .any(|hold_id| hold_id.starts_with(&prefix))
+    }
+
     fn list_open_delegated_reserved_hold_ids(&self) -> Vec<String> {
         // A delegated reserve-for-caller hold is open, was marked reserved
         // (reserved_until is set), and carries a delegation depth of at least
@@ -1580,6 +1592,15 @@ impl BudgetStore for InMemoryBudgetStore {
     ) -> Result<Option<Vec<String>>, BudgetStoreError> {
         Ok(Some(
             self.lock_inner()?.list_open_delegated_reserved_hold_ids(),
+        ))
+    }
+
+    fn request_id_has_reserved_hold(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<bool>, BudgetStoreError> {
+        Ok(Some(
+            self.lock_inner()?.request_id_has_reserved_hold(request_id),
         ))
     }
 }

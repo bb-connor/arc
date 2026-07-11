@@ -387,15 +387,12 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
     // Durable reuse guard that survives a restart, which the in-memory window
     // below cannot: after a restart the window is empty, but a reservation opened
-    // before it persists as a budget hold. The kernel derives the hold id from
-    // (request_id, capability id, matched grant index), so reconstruct each
-    // candidate and reject fail-closed (409) when the hold-capable store already
-    // carries ANY hold under this request_id, open or closed. An open hold means a
-    // reused id would collapse into an idempotent authorize that mints a second
-    // nonce against one reservation without reserving more budget; a closed
-    // (settled or reaped) hold means the kernel would reject the duplicate hold id
-    // on creation and turn an otherwise valid later authorization into a 500
-    // instead of the documented bounded-reuse 409.
+    // before it persists as a budget hold. Rejecting the reuse fail-closed (409)
+    // is load-bearing because a reused id would either collapse into an idempotent
+    // authorize that mints a second nonce against one reservation without
+    // reserving more budget, or (for a closed, settled-or-reaped hold) make the
+    // kernel reject the duplicate hold id on creation and turn an otherwise valid
+    // later authorization into a 500 instead of the documented bounded-reuse 409.
     let Some(budget_store) = state.budget_store.as_ref() else {
         return internal_json_error_response(
             "chio_mediation_requires_local_budget_store",
@@ -410,28 +407,58 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     if parsed.capability.scope.grants.len() > MAX_MEDIATED_SCOPE_GRANTS {
         return sidecar_bad_request("capability scope carries too many grants").into_response();
     }
-    for grant_index in 0..parsed.capability.scope.grants.len() {
-        let hold_id = format!(
-            "budget-hold:{}:{}:{}",
-            request_id, parsed.capability.id, grant_index
-        );
-        match budget_store.get_budget_hold(&hold_id) {
-            Ok(Some(_)) => {
-                return (
-                    StatusCode::CONFLICT,
-                    axum::Json(serde_json::json!({
-                        "error": "chio_request_id_reused",
-                        "message":
-                            "request_id already backs a reservation; choose a fresh request_id",
-                    })),
-                )
-                    .into_response();
+    // Prefer the capability-agnostic durable probe. The kernel derives each hold
+    // id from (request_id, capability id, grant index), so the per-grant exact-id
+    // lookup below only sees a reuse under the SAME capability: a caller that
+    // replays this request_id under a DIFFERENT capability token would miss the
+    // existing `budget-hold:{request_id}:{other_cap}:..` row and win a second
+    // reservation once a restart cleared the in-memory window. When the store can
+    // enumerate holds by the `budget-hold:{request_id}:` prefix it rejects the
+    // reuse regardless of which capability opened the hold; when it cannot
+    // (`Ok(None)`), fall back to the per-grant exact-id probe.
+    match budget_store.request_id_has_reserved_hold(&request_id) {
+        Ok(Some(true)) => {
+            return (
+                StatusCode::CONFLICT,
+                axum::Json(serde_json::json!({
+                    "error": "chio_request_id_reused",
+                    "message": "request_id already backs a reservation; choose a fresh request_id",
+                })),
+            )
+                .into_response();
+        }
+        Ok(Some(false)) => {}
+        Ok(None) => {
+            for grant_index in 0..parsed.capability.scope.grants.len() {
+                let hold_id = format!(
+                    "budget-hold:{}:{}:{}",
+                    request_id, parsed.capability.id, grant_index
+                );
+                match budget_store.get_budget_hold(&hold_id) {
+                    Ok(Some(_)) => {
+                        return (
+                            StatusCode::CONFLICT,
+                            axum::Json(serde_json::json!({
+                                "error": "chio_request_id_reused",
+                                "message": "request_id already backs a reservation; choose a fresh request_id",
+                            })),
+                        )
+                            .into_response();
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        warn!("durable hold lookup failed: {error}");
+                        return internal_json_error_response(
+                            "chio_mediation_failed",
+                            &error.to_string(),
+                        );
+                    }
+                }
             }
-            Ok(None) => {}
-            Err(error) => {
-                warn!("durable hold lookup failed: {error}");
-                return internal_json_error_response("chio_mediation_failed", &error.to_string());
-            }
+        }
+        Err(error) => {
+            warn!("durable hold lookup failed: {error}");
+            return internal_json_error_response("chio_mediation_failed", &error.to_string());
         }
     }
     // Fail-closed over-subscription guard: the kernel derives the durable budget
@@ -1244,6 +1271,67 @@ mod tests {
             100,
             "the pre-execution hold must remain reserved (open), not reversed"
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_durable_reuse_guard_rejects_reused_request_id_across_capabilities() {
+        let signer = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
+        let cap_a =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+        let cap_b =
+            issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+        assert_ne!(
+            cap_a.id, cap_b.id,
+            "the two capabilities must carry distinct ids"
+        );
+
+        // First reservation under capability A binds request_id R to a durable
+        // hold whose id embeds A.
+        let state_before = mediated_test_state(signer.clone(), Arc::clone(&budget), Vec::new());
+        let body_a = serde_json::json!({
+            "capability": cap_a,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "request_id": "shared-request-id",
+            "parameters": { "invoice": "inv-1" }
+        });
+        let (status_a, json_a) = post_evaluate(Arc::clone(&state_before), &body_a).await;
+        assert_eq!(status_a, StatusCode::OK, "{json_a}");
+        assert_eq!(json_a["status"], "authorized");
+
+        // Simulate a restart: a fresh sidecar state (empty minted-request-id
+        // window and approval replay cache) over the SAME durable budget store, so
+        // only the durable prefix guard can catch a reused request_id.
+        let state_after = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+
+        // Replaying the SAME request_id under a DIFFERENT capability is rejected by
+        // the durable prefix guard, even though no `budget-hold:R:{capB}:..` row
+        // exists for capability B.
+        let body_b = serde_json::json!({
+            "capability": cap_b,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "request_id": "shared-request-id",
+            "parameters": { "invoice": "inv-2" }
+        });
+        let (status_b, json_b) = post_evaluate(Arc::clone(&state_after), &body_b).await;
+        assert_eq!(status_b, StatusCode::CONFLICT, "{json_b}");
+        assert_eq!(json_b["error"], "chio_request_id_reused");
+
+        // A fresh request_id under capability B still proceeds.
+        let body_fresh = serde_json::json!({
+            "capability": cap_b,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "request_id": "fresh-request-id",
+            "parameters": { "invoice": "inv-3" }
+        });
+        let (status_fresh, json_fresh) = post_evaluate(Arc::clone(&state_after), &body_fresh).await;
+        assert_eq!(status_fresh, StatusCode::OK, "{json_fresh}");
+        assert_eq!(json_fresh["status"], "authorized");
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

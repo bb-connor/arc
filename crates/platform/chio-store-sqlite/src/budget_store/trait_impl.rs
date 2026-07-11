@@ -1152,6 +1152,17 @@ impl BudgetStore for SqliteBudgetStore {
         Ok(Some(self.list_open_delegated_reserved_holds()?))
     }
 
+    fn request_id_has_reserved_hold(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<bool>, BudgetStoreError> {
+        // SQLite persists every hold under its full id, so it can answer the
+        // durable prefix probe precisely; Some(..) switches the mediation gate
+        // onto the capability-agnostic reuse check instead of the per-capability
+        // exact-id fallback.
+        Ok(Some(self.hold_exists_for_request_id(request_id)?))
+    }
+
     fn get_budget_hold(
         &self,
         hold_id: &str,

@@ -798,6 +798,31 @@ pub trait BudgetStore: Send + Sync {
         Ok(None)
     }
 
+    /// Whether any authorization hold id begins with the durable
+    /// `budget-hold:{request_id}:` prefix, regardless of the capability id and
+    /// grant index encoded after it.
+    ///
+    /// The mediated pre-execution gate derives each hold id from
+    /// (request_id, capability id, grant index), so a caller that replays one
+    /// request_id under a DIFFERENT capability token would slip past a
+    /// per-capability exact-id probe (its `budget-hold:{request_id}:{other_cap}:..`
+    /// row never matches) and win a second reservation after a restart cleared
+    /// the in-memory reuse window. Matching the prefix rejects the replay no
+    /// matter which capability presented it.
+    ///
+    /// `Ok(Some(true))` = at least one hold id begins with the prefix;
+    /// `Ok(Some(false))` = none does; `Ok(None)` marks a store that cannot
+    /// enumerate holds by prefix, so the caller falls back to the per-capability
+    /// exact probe. The default is `Ok(None)` so a store that does not persist
+    /// hold state is treated as unable to enumerate rather than as having none.
+    fn request_id_has_reserved_hold(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<bool>, BudgetStoreError> {
+        let _ = request_id;
+        Ok(None)
+    }
+
     /// Project a single hold by id, or `None` when it is unknown. Stores that
     /// do not persist hold state return `Ok(None)` (the default). Used by the
     /// reconcile-by-nonce entry point to resolve the exact reserved hold a
@@ -1160,5 +1185,47 @@ mod tests {
         assert_eq!(events[0].allowed, Some(false));
         assert_eq!(events[0].authority.as_ref(), Some(&authority));
         assert!(store.get_usage("cap-budget-deny", 0).unwrap().is_none());
+    }
+
+    #[test]
+    fn request_id_reserved_hold_enumerated_by_prefix_across_capabilities() {
+        let store = InMemoryBudgetStore::new();
+        // A reservation opened under capability A binds request_id R to a hold
+        // whose id embeds A. The reuse guard must report R as taken regardless of
+        // which capability opened it.
+        let decision = store
+            .authorize_budget_hold(BudgetAuthorizeHoldRequest {
+                capability_id: "cap-a".to_string(),
+                grant_index: 0,
+                max_invocations: Some(4),
+                requested_exposure_units: 100,
+                max_cost_per_invocation: Some(100),
+                max_total_cost_units: Some(1_000),
+                hold_id: Some("budget-hold:req-shared:cap-a:0".to_string()),
+                event_id: Some("budget-hold:req-shared:cap-a:0:authorize".to_string()),
+                authority: None,
+            })
+            .unwrap();
+        assert!(matches!(
+            decision,
+            BudgetAuthorizeHoldDecision::Authorized(_)
+        ));
+
+        // The request_id that backs the hold is reported taken.
+        assert_eq!(
+            store.request_id_has_reserved_hold("req-shared").unwrap(),
+            Some(true)
+        );
+        // A different request_id has no hold.
+        assert_eq!(
+            store.request_id_has_reserved_hold("req-other").unwrap(),
+            Some(false)
+        );
+        // The trailing colon delimits the prefix, so a request_id that is only a
+        // textual prefix of the reserved one does not spuriously match.
+        assert_eq!(
+            store.request_id_has_reserved_hold("req").unwrap(),
+            Some(false)
+        );
     }
 }

@@ -318,6 +318,36 @@ impl SqliteBudgetStore {
         Ok(ids)
     }
 
+    /// Whether any hold id begins with `budget-hold:{request_id}:`, regardless of
+    /// disposition or the capability id and grant index encoded after it. The
+    /// mediated pre-execution gate derives each hold id from
+    /// (request_id, capability id, grant index), so a replay of one request_id
+    /// under a different capability token must still be seen as taken. `request_id`
+    /// is caller-supplied, so its LIKE metacharacters (`%`, `_`, and the escape
+    /// char) are escaped and the pattern is bound with an explicit ESCAPE clause,
+    /// so a request_id containing `%` or `_` can neither widen nor narrow the match
+    /// onto another caller's reservation.
+    pub(super) fn hold_exists_for_request_id(
+        &self,
+        request_id: &str,
+    ) -> Result<bool, BudgetStoreError> {
+        let prefix = format!("budget-hold:{request_id}:");
+        let pattern = Self::sqlite_like_prefix_pattern(&prefix);
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| BudgetStoreError::Invariant("budget store mutex poisoned".to_string()))?;
+        Ok(connection
+            .query_row(
+                "SELECT 1 FROM budget_authorization_holds \
+                 WHERE hold_id LIKE ?1 ESCAPE '\\' LIMIT 1",
+                params![pattern],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some())
+    }
+
     /// Rows still `open`:
     /// `(hold_id, capability_id, grant_index, remaining_exposure_units, authority)`.
     /// A hold with inconsistent authority lease columns is rejected fail-closed.
@@ -559,6 +589,39 @@ mod tests {
         assert!(store
             .mark_hold_reserved_until("nope", 100, "USD", None, &ReservedHoldEnvelope::default())
             .is_err());
+    }
+
+    #[test]
+    fn request_id_has_reserved_hold_matches_by_prefix_and_escapes_like_metacharacters() {
+        let store = open_temp_store();
+        // A reservation under capability A binds request_id `axc` to a hold whose
+        // id embeds A. The reuse guard must report `axc` taken regardless of the
+        // capability that opened it.
+        authorize(&store, "budget-hold:axc:cap-a:0", "cap-a");
+
+        assert_eq!(
+            store.request_id_has_reserved_hold("axc").unwrap(),
+            Some(true),
+            "the request_id that backs the hold is reported taken"
+        );
+        assert_eq!(
+            store.request_id_has_reserved_hold("other").unwrap(),
+            Some(false),
+            "a request_id with no hold is reported free"
+        );
+        // request_id is caller-supplied, so LIKE metacharacters in it must be
+        // escaped: `_` (any single char) and `%` (any run) must not widen the
+        // prefix onto the different stored request_id `axc`.
+        assert_eq!(
+            store.request_id_has_reserved_hold("a_c").unwrap(),
+            Some(false),
+            "an underscore in request_id must not match a different stored id"
+        );
+        assert_eq!(
+            store.request_id_has_reserved_hold("a%c").unwrap(),
+            Some(false),
+            "a percent in request_id must not match a different stored id"
+        );
     }
 
     #[test]
