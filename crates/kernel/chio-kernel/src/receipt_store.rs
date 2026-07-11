@@ -487,6 +487,16 @@ pub trait ReceiptStore: Send + Sync {
         Ok(false)
     }
 
+    /// Whether this store actually implements retention rotation
+    /// (`rotate_receipts`). Default `false`: the default `rotate_receipts` is a
+    /// fail-closed stub, so a kernel configured with `retention_config` uses
+    /// this to refuse attaching a store that cannot rotate, rather than serving
+    /// traffic under a retention policy whose background worker would only log
+    /// "not supported" on every interval and never archive.
+    fn supports_retention(&self) -> bool {
+        false
+    }
+
     /// Archive receipts that have aged out under `config` (day/size
     /// threshold, or an explicit cutoff). Returns the number of archived
     /// tool-receipt rows. Default: unsupported (fail-closed) for stores that

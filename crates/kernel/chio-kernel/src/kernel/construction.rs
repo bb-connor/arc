@@ -515,6 +515,19 @@ impl ChioKernel {
         // Spawn the retention maintenance worker only when retention is
         // configured; an unconfigured deployment gets no background thread.
         if let Some(config) = self.config.retention_config.clone() {
+            // Fail-closed: configured retention is a storage/compliance control.
+            // A store whose rotate_receipts is the default unsupported stub would
+            // attach and then only log "retention not supported" on every worker
+            // interval, silently never archiving. Reject the attach rather than
+            // serve traffic under a retention policy the store cannot honor.
+            if !receipt_store.supports_retention() {
+                return Err(KernelError::Internal(
+                    "receipt store does not support retention but KernelConfig.retention_config \
+                     is set; refusing to attach a store that cannot honor the configured \
+                     retention policy"
+                        .to_string(),
+                ));
+            }
             self.retention_maintenance =
                 Some(crate::receipt_store::RetentionMaintenanceHandle::spawn(
                     Arc::clone(&receipt_store),

@@ -41,6 +41,25 @@ fn kernel_persists_tool_receipts_to_sqlite_store() {
     let _ = std::fs::remove_file(path);
 }
 
+/// Configured retention is a storage/compliance control. Attaching a store
+/// that cannot rotate (the default `rotate_receipts` stub) while
+/// `retention_config` is set must fail closed: otherwise the kernel would serve
+/// traffic while the background worker only logs "not supported" every interval
+/// and never archives anything.
+#[test]
+fn attach_rejects_configured_retention_on_unsupported_store() {
+    let mut config = make_config();
+    config.retention_config = Some(crate::RetentionConfig::default());
+    let mut kernel = make_kernel(config);
+    let error = kernel
+        .set_receipt_store(Box::new(AppendOnlyReceiptStore))
+        .expect_err("attach must reject a retention-configured store that cannot rotate");
+    assert!(
+        matches!(&error, KernelError::Internal(message) if message.contains("does not support retention")),
+        "unexpected error: {error:?}"
+    );
+}
+
 #[test]
 fn all_calls_produce_verified_receipts() {
     let mut kernel = make_kernel(make_config());
