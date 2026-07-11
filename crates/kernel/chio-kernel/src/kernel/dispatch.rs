@@ -180,19 +180,31 @@ impl ChioKernel {
                     "payment authorization present without configured adapter".to_string(),
                 )
             })?;
-            // A settled hold is refunded at the captured amount; an unsettled hold
-            // is released so the payer's prepaid funds are not left frozen at the
-            // facilitator. A settled no-ceiling MustPrepay (charge_result == None)
-            // was captured at authorize time, so releasing it would leave the payer
-            // CHARGED for a tool that never completed: refund the prepaid quote
-            // instead. Only genuinely unsettled holds are released.
+            // A settled hold is refunded the amount that actually funded it; an
+            // unsettled hold is released so the payer's prepaid funds are not left
+            // frozen at the facilitator. The refund amount mirrors the authorize
+            // precedence: a MustPrepay intent funded its authorization from the
+            // quoted cost whenever a quote is present, even alongside a provisional
+            // monetary budget hold, so the refund must return that quote. Refunding
+            // the smaller provisional-hold amount would leave the payer CHARGED for
+            // the difference on a tool that never completed. Only a settled charge
+            // with no MustPrepay quote refunds the charged amount; only genuinely
+            // unsettled holds are released.
             let unwind_result = match (charge_result, authorization.settled) {
-                (Some(charge), true) => adapter.refund(
-                    &authorization.authorization_id,
-                    charge.cost_charged,
-                    &charge.currency,
-                    &request.request_id,
-                ),
+                (Some(charge), true) => match Self::mustprepay_quoted_amount(request) {
+                    Some((amount_units, currency)) => adapter.refund(
+                        &authorization.authorization_id,
+                        amount_units,
+                        &currency,
+                        &request.request_id,
+                    ),
+                    None => adapter.refund(
+                        &authorization.authorization_id,
+                        charge.cost_charged,
+                        &charge.currency,
+                        &request.request_id,
+                    ),
+                },
                 (None, true) => match Self::mustprepay_quoted_amount(request) {
                     Some((amount_units, currency)) => adapter.refund(
                         &authorization.authorization_id,

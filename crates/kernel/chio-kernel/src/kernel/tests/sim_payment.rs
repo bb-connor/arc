@@ -1240,10 +1240,16 @@ fn reconcile_stamps_mustprepay_prepayment_rail_reference() {
 
 // Records the amount and currency presented to authorize so a test can assert
 // which figure funds the prepayment. Holds unsettled so the caller settles it.
+// Also records the amount, currency, and call counts of refund/release so an
+// abort-unwind test can assert which figure is returned to the payer.
 #[derive(Debug, Clone, Default)]
 struct AmountRecordingPaymentAdapter {
     authorized_amount: std::sync::Arc<std::sync::atomic::AtomicU64>,
     authorized_currency: std::sync::Arc<std::sync::Mutex<String>>,
+    refunded_amount: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    refunded_currency: std::sync::Arc<std::sync::Mutex<String>>,
+    refund_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    release_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl PaymentAdapter for AmountRecordingPaymentAdapter {
@@ -1280,6 +1286,8 @@ impl PaymentAdapter for AmountRecordingPaymentAdapter {
         authorization_id: &str,
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
+        self.release_calls
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(PaymentResult {
             transaction_id: authorization_id.to_string(),
             settlement_status: RailSettlementStatus::Released,
@@ -1290,16 +1298,233 @@ impl PaymentAdapter for AmountRecordingPaymentAdapter {
     fn refund(
         &self,
         transaction_id: &str,
-        _amount_units: u64,
-        _currency: &str,
+        amount_units: u64,
+        currency: &str,
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
+        self.refunded_amount
+            .store(amount_units, std::sync::atomic::Ordering::SeqCst);
+        *self.refunded_currency.lock().unwrap() = currency.to_string();
+        self.refund_calls
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(PaymentResult {
             transaction_id: transaction_id.to_string(),
             settlement_status: RailSettlementStatus::Refunded,
             metadata: serde_json::json!({ "adapter": "amount-recording" }),
         })
     }
+}
+
+// Authorize a real, open budget hold matching a fabricated provisional charge
+// (see `make_provisional_charge`) so the abort-unwind's `reverse_budget_charge`
+// is a clean, receipt-free reversal rather than a fault over a missing hold.
+fn authorize_provisional_hold(
+    kernel: &ChioKernel,
+    capability_id: &str,
+    exposure_units: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    kernel
+        .with_budget_store(|store| {
+            let decision =
+                store.authorize_budget_hold(crate::budget_store::BudgetAuthorizeHoldRequest {
+                    capability_id: capability_id.to_string(),
+                    grant_index: 0,
+                    max_invocations: None,
+                    requested_exposure_units: exposure_units,
+                    max_cost_per_invocation: Some(1_000),
+                    max_total_cost_units: Some(10_000),
+                    hold_id: Some("hold-provisional".to_string()),
+                    event_id: Some("hold-provisional:authorize".to_string()),
+                    authority: None,
+                })?;
+            assert!(
+                matches!(
+                    decision,
+                    crate::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)
+                ),
+                "provisional hold must authorize"
+            );
+            Ok(())
+        })
+        .map_err(|error| -> Box<dyn std::error::Error> {
+            format!("authorize provisional hold: {error}").into()
+        })?;
+    Ok(())
+}
+
+// A settled MustPrepay authorization that funded the tool from the prepaid quote
+// (100) while a smaller provisional budget hold (10, cross-currency) accompanied
+// it. When the invocation aborts, the payer must be refunded the quote amount it
+// actually prepaid, in the quote's currency, not the provisional hold's smaller
+// figure. Refunding the hold amount would leave the payer charged the difference
+// for a tool that never completed.
+#[test]
+fn aborted_settled_mustprepay_charge_refunds_the_quoted_amount(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut kernel = make_kernel(make_monetary_config());
+    let adapter = AmountRecordingPaymentAdapter::default();
+    let refunded_amount = adapter.refunded_amount.clone();
+    let refunded_currency = adapter.refunded_currency.clone();
+    let refund_calls = adapter.refund_calls.clone();
+    kernel.set_payment_adapter(Box::new(adapter));
+
+    let agent_kp = Keypair::generate();
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 10, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    authorize_provisional_hold(&kernel, &cap.id, 10)?;
+
+    let intent = make_mustprepay_intent("intent-abort-refund", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-abort-refund", &cap, &agent_kp, intent, &kernel);
+
+    // Provisional per-invocation hold of 10 in a different currency accompanies
+    // the 100 USD quote that actually funded the authorization.
+    let charge = make_provisional_charge(10, "EUR");
+    let authorization = PaymentAuthorization {
+        authorization_id: "auth-settled-abort".to_string(),
+        settled: true,
+        metadata: serde_json::json!({ "adapter": "amount-recording" }),
+    };
+
+    kernel.unwind_aborted_monetary_invocation(
+        &request,
+        &cap,
+        Some(&charge),
+        Some(&authorization),
+    )?;
+
+    assert_eq!(
+        refund_calls.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "a settled MustPrepay abort must refund exactly once"
+    );
+    assert_eq!(
+        refunded_amount.load(std::sync::atomic::Ordering::SeqCst),
+        100,
+        "the refund must return the prepaid quote (100), not the provisional hold (10)"
+    );
+    assert_eq!(
+        refunded_currency.lock().unwrap().as_str(),
+        "USD",
+        "the refund must be in the quote's currency, not the provisional charge's"
+    );
+    Ok(())
+}
+
+// A settled NON-MustPrepay metered charge has no prepaid quote, so an abort must
+// refund the charged amount in the charge's currency. The quote-first refund
+// precedence must not disturb the plain metered path.
+#[test]
+fn aborted_settled_non_mustprepay_charge_refunds_the_charged_amount(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut kernel = make_kernel(make_monetary_config());
+    let adapter = AmountRecordingPaymentAdapter::default();
+    let refunded_amount = adapter.refunded_amount.clone();
+    let refunded_currency = adapter.refunded_currency.clone();
+    let refund_calls = adapter.refund_calls.clone();
+    kernel.set_payment_adapter(Box::new(adapter));
+
+    let agent_kp = Keypair::generate();
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 10, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    authorize_provisional_hold(&kernel, &cap.id, 10)?;
+
+    // No governed intent means no MustPrepay quote: the charge alone was funded.
+    let request = ToolCallRequest {
+        request_id: "req-abort-metered-refund".to_string(),
+        capability: cap.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    };
+    let charge = make_provisional_charge(10, "USD");
+    let authorization = PaymentAuthorization {
+        authorization_id: "auth-settled-metered".to_string(),
+        settled: true,
+        metadata: serde_json::json!({ "adapter": "amount-recording" }),
+    };
+
+    kernel.unwind_aborted_monetary_invocation(
+        &request,
+        &cap,
+        Some(&charge),
+        Some(&authorization),
+    )?;
+
+    assert_eq!(
+        refund_calls.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "a settled metered abort must refund exactly once"
+    );
+    assert_eq!(
+        refunded_amount.load(std::sync::atomic::Ordering::SeqCst),
+        10,
+        "a non-MustPrepay charge must refund the charged amount"
+    );
+    assert_eq!(
+        refunded_currency.lock().unwrap().as_str(),
+        "USD",
+        "a non-MustPrepay charge must refund in the charge's currency"
+    );
+    Ok(())
+}
+
+// An UNSETTLED authorization was never captured, so an abort must release the
+// hold, not refund it, whether or not a MustPrepay quote is present.
+#[test]
+fn aborted_unsettled_mustprepay_charge_releases_not_refunds(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut kernel = make_kernel(make_monetary_config());
+    let adapter = AmountRecordingPaymentAdapter::default();
+    let refund_calls = adapter.refund_calls.clone();
+    let release_calls = adapter.release_calls.clone();
+    kernel.set_payment_adapter(Box::new(adapter));
+
+    let agent_kp = Keypair::generate();
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 10, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    authorize_provisional_hold(&kernel, &cap.id, 10)?;
+
+    let intent =
+        make_mustprepay_intent("intent-abort-release", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-abort-release", &cap, &agent_kp, intent, &kernel);
+    let charge = make_provisional_charge(10, "USD");
+    let authorization = PaymentAuthorization {
+        authorization_id: "auth-unsettled-abort".to_string(),
+        settled: false,
+        metadata: serde_json::json!({ "adapter": "amount-recording" }),
+    };
+
+    kernel.unwind_aborted_monetary_invocation(
+        &request,
+        &cap,
+        Some(&charge),
+        Some(&authorization),
+    )?;
+
+    assert_eq!(
+        release_calls.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "an unsettled authorization must be released"
+    );
+    assert_eq!(
+        refund_calls.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "an unsettled authorization must not be refunded"
+    );
+    Ok(())
 }
 
 // A fabricated provisional monetary budget hold used to drive
