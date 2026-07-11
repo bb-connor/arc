@@ -36,7 +36,7 @@ fn budget_exhaustion() {
 
 #[test]
 fn free_tier_pool_leaves_non_pass_private_unit_on_normal_path() {
-    // PR957 codex P2: with the free-tier pool installed, a capability budgeted in a
+    // With the free-tier pool installed, a capability budgeted in a
     // custom private-use unit ("ABC", which is NOT the pool allotment unit) must
     // stay on the normal budget path and be allowed, not denied. Only a genuine
     // Pass XCC charge routes through the aggregate pool.
@@ -72,8 +72,8 @@ fn free_tier_pool_leaves_non_pass_private_unit_on_normal_path() {
 
 #[test]
 fn free_tier_pass_charge_stamps_allotment_cost_dimension_on_receipt() {
-    // PR957 codex P1: a genuine Pass (free-tier XCC) charge must stamp the
-    // `chio.pass.allotment.v1` cost dimension on the served receipt so the CONTROL 3
+    // A genuine Pass (free-tier XCC) charge must stamp the
+    // `chio.pass.allotment.v1` cost dimension on the served receipt so the
     // genuine-use scan recognizes the metered debit even though the tool injects no
     // custom cost block.
     use chio_core::capability::scope::{MonetaryAmount, Operation};

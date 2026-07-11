@@ -10,9 +10,9 @@
 // (RFC 8785) signing and verification path applies.
 //
 // This module owns the credential FORMAT plus issuance, verification, and
-// revocation (M0 task T4). The kernel data-stream gating (T5), aggregate pool
-// admission (kernel), anti-farm distribution (T7), and the refresh-on-genuine-use
-// receipt scan (T8) live in their own tasks/crates and are out of scope here.
+// revocation. The kernel data-stream gating, aggregate pool admission, anti-farm
+// distribution, and the refresh-on-genuine-use receipt scan live in their own
+// crates and are out of scope here.
 
 /// VC `type` member identifying a Chio Pass credential.
 pub const CHIO_PASS_TYPE: &str = "ChioPass";
@@ -28,16 +28,16 @@ pub const CHIO_PASS_ALLOTMENT_UNIT: &str = "XCC";
 
 /// Metering `CostDimension::Custom` name written into served receipts so the
 /// allotment debit stays off `total_monetary_cost` (summed only from `ApiCost`)
-/// and the CONTROL 3 genuine-use scan can recognize it.
+/// and the genuine-use scan can recognize it.
 pub const CHIO_PASS_ALLOTMENT_COST_NAME: &str = "chio.pass.allotment.v1";
 
-/// Per-invocation XCC cost (M0 default placeholder). A separate small positive
+/// Per-invocation XCC cost (default placeholder). A separate small positive
 /// constant so `max_cost_per_invocation.units > 0` always holds and the pool
-/// co-debit can never request zero units. Governance config (T9) may override
+/// co-debit can never request zero units. Board-approved governance config may override
 /// this; the floor is "> 0", not this exact value.
 pub const CHIO_PASS_PER_INVOCATION_UNITS: u64 = 1;
 
-/// Tier -> allotment-units table (Section 2.5). GOVERNANCE-PINNED config (not a
+/// Tier -> allotment-units table. GOVERNANCE-PINNED config (not a
 /// `const`), loaded fail-closed. The invariant every code path honors: the floor
 /// applies unconditionally (a tier_0 newcomer gets a positive allotment); the
 /// tier scales SIZE only, never existence.
@@ -51,8 +51,8 @@ pub struct TierAllotmentTable {
 }
 
 impl Default for TierAllotmentTable {
-    /// M0 default placeholder (Section 2.5). Needs board sign-off; surfaced as
-    /// governance config under `ChioPassConfig` (T9), not a wire constant.
+    /// Default placeholder pending board sign-off; surfaced as governance
+    /// config under `ChioPassConfig`, not a wire constant.
     fn default() -> Self {
         Self {
             unverified: 1000,
@@ -75,7 +75,7 @@ pub fn allotment_units_for_tier(tier: TrustTier, table: &TierAllotmentTable) -> 
     }
 }
 
-/// The five tier_0 baseline read URIs (Section 5.1): three aggregate trust feeds
+/// The five tier_0 baseline read URIs: three aggregate trust feeds
 /// plus the holder's OWN receipts and OWN lineage. The own-tenant patterns carry
 /// the canonical `did:chio` with the MANDATORY `/` delimiter before the trailing
 /// `*` so tenant `did:chioabcd` cannot prefix-match `did:chioabcde...`.
@@ -83,7 +83,7 @@ pub fn allotment_units_for_tier(tier: TrustTier, table: &TierAllotmentTable) -> 
 /// This is the SINGLE credential-layer builder both issuance and
 /// [`validate_chio_pass_entitlements`] call against the canonical subject DID, so
 /// `read_scopes` is bound to the canonical identity (closing the scope-binding
-/// gap). The kernel data-stream gating (T5) builds the matching `ResourceGrant`
+/// gap). The kernel data-stream gating builds the matching `ResourceGrant`
 /// set against the same URI strings.
 ///
 /// # Errors
@@ -125,7 +125,7 @@ pub struct ChioPassEntitlements {
     /// MUST equal `pass_baseline_read_uris(credential_subject.id)`.
     pub read_scopes: Vec<String>,
     pub allotment: ChioPassAllotmentGrant,
-    /// Canonical shared window (Section 2.1).
+    /// Canonical shared attestation window.
     pub window: AttestationWindowId,
 }
 
@@ -136,7 +136,7 @@ pub struct ChioPassEvidence {
     pub attested_tier: TrustTier,
     /// Reuses the existing `AttestationWindow`; `since` MUST be `Some(window.since)`.
     pub snapshot_window: AttestationWindow,
-    /// Embedded output of the CONTROL 3 genuine-use scan.
+    /// Embedded output of the genuine-use scan.
     pub genuine_use_observed: bool,
 }
 
@@ -233,11 +233,10 @@ pub fn snapshot_chio_pass_entitlements(
 /// Validate the entitlements + evidence against the canonical subject and the
 /// governance table, fail-closed.
 ///
-/// NOTE (resolved spec inconsistency): Section 3.3 writes the parameter list
-/// without `evidence` and the verify entry point without `table`, yet the
-/// refresh-verifiable rule (#5) reads `evidence.genuine_use_observed` and
-/// recomputes the tier-sized allotment. Both inputs are therefore threaded so the
-/// issuer-independent recomputation is actually verifiable.
+/// Both `evidence` and `table` are threaded through even though only the
+/// refresh rule reads them: the refresh check recomputes the tier-sized
+/// allotment from `evidence.genuine_use_observed`, so the issuer-independent
+/// recomputation is actually verifiable.
 pub fn validate_chio_pass_entitlements(
     entitlements: &ChioPassEntitlements,
     evidence: &ChioPassEvidence,
@@ -590,28 +589,27 @@ pub fn verify_window_scoped_capability_id(token: &CapabilityToken) -> Result<(),
 }
 
 // ---------------------------------------------------------------------------
-// CONTROL 3 - Refresh-on-genuine-use (M0 task T8, Section 4.3)
+// Refresh-on-genuine-use
 //
-// The PURE half of CONTROL 3: a per-receipt genuine-use predicate plus the
-// next-window refresh decision. CONTROL 3 does NOT touch the kernel hot path
+// The PURE half of the refresh control: a per-receipt genuine-use predicate
+// plus the next-window refresh decision. It does NOT touch the kernel hot path
 // (the kernel keeps charging the deterministic id against a fixed ceiling); it
 // only decides WHETHER the next window's `window_units` is tier-sized or 0. The
 // storage-backed scan loop and the rollover orchestrator (`count_genuine_use`,
-// `refresh_chio_pass_window`) live in the control plane (T9) and are out of
+// `refresh_chio_pass_window`) live in the control plane and are out of
 // scope here.
 // ---------------------------------------------------------------------------
 
 /// Minimum number of qualifying genuine-use receipts in a window required to
-/// refresh the next window's allotment at tier size (Section 2.6). M0
-/// placeholder; the board-approved `ChioPassConfig` (T9) may raise the floor
-/// (Open Question 5). The floor is `>= MIN_GENUINE_USE_RECEIPTS`, not this exact
-/// value.
+/// refresh the next window's allotment at tier size. Launch placeholder; the
+/// board-approved `ChioPassConfig` may raise the floor. The floor is
+/// `>= MIN_GENUINE_USE_RECEIPTS`, not this exact value.
 pub const MIN_GENUINE_USE_RECEIPTS: u32 = 1;
 
 /// Whether `receipt` debited the XCC free-tier allotment, detected by reading the
 /// EXISTING metering `CostMetadata` Custom dimension under
 /// `metadata["cost"].dimensions[]` with `name == CHIO_PASS_ALLOTMENT_COST_NAME`
-/// and `value > 0` (Section 4.3). This deliberately reads the shipped cost
+/// and `value > 0`. This deliberately reads the shipped cost
 /// dimension via `serde_json` (no `chio-metering` dependency, no invented
 /// `metadata.metering.allotment_debit` block) and NEVER panics: absent or
 /// malformed metadata yields `false` (fail-closed - an unrecognized receipt does
@@ -639,7 +637,7 @@ fn receipt_debited_pass_allotment(receipt: &ChioReceipt) -> bool {
     })
 }
 
-/// CONTROL 3 genuine-use predicate (Section 4.3). Returns `Ok(true)` only when
+/// The genuine-use predicate. Returns `Ok(true)` only when
 /// ALL six conditions hold for `receipt`, `Ok(false)` when any condition fails,
 /// and `Err(ChioPassGenuineUseScanFailed)` only when the signature verification
 /// itself faults (a canonicalization/crypto error, distinct from a well-formed
@@ -663,7 +661,7 @@ fn receipt_debited_pass_allotment(receipt: &ChioReceipt) -> bool {
 /// consistent" to "a TRUSTED kernel signed it" (a self-signed receipt under an
 /// attacker-chosen key passes `verify_signature` but fails membership). The
 /// PROVENANCE of that allowlist - who pins and rotates it - is the orchestrator's
-/// job (T9) and the spec's Open Question 3; this pure predicate only takes the
+/// job; this pure predicate only takes the
 /// pinned slice and checks membership fail-closed, inventing no provenance.
 ///
 /// # Errors
@@ -707,7 +705,7 @@ pub fn is_genuine_use_receipt(
     }
 }
 
-/// The refresh disposition for the next attestation window (Section 4.3). This is
+/// The refresh disposition for the next attestation window. This is
 /// an AUDIT label, never the authority: the kernel ceiling is. It only records
 /// whether the next window's `window_units` is tier-sized or `0`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -723,7 +721,7 @@ pub enum ChioPassRefreshOutcome {
     DeniedNoReattestation,
 }
 
-/// Serializable audit record of one refresh decision (Section 4.3). Canonical
+/// Serializable audit record of one refresh decision. Canonical
 /// JSON (camelCase) for audit/anchoring; it RECORDS the decision but is NOT the
 /// authority (the kernel ceiling is). `next_allotment_units` is the size the next
 /// window's Pass is minted with: the tier size on `Granted`, `0` otherwise.
@@ -752,7 +750,7 @@ pub struct ChioPassRefreshDecision {
     pub next_allotment_units: u64,
 }
 
-/// Decide the next window's allotment refresh (CONTROL 3 pure half, Section 4.3).
+/// Decide the next window's allotment refresh (pure half).
 ///
 /// REFRESH MAPPING (fail-closed, re-attestation gates first):
 /// - not re-attested -> `DeniedNoReattestation`, `next_allotment_units = 0` (the
@@ -764,8 +762,8 @@ pub struct ChioPassRefreshDecision {
 ///   persist but whose first metered charge denies fail-closed).
 ///
 /// The returned [`ChioPassRefreshDecision`] is a serializable audit record, not
-/// the authority. This function does NOT mint anything; the orchestrator (T9)
-/// maps the outcome onto issuance.
+/// the authority. This function does NOT mint anything; the control-plane
+/// orchestrator maps the outcome onto issuance.
 ///
 /// # Errors
 ///
@@ -1078,7 +1076,7 @@ mod chio_pass_tests {
 
     #[test]
     fn validate_rejects_observed_pass_with_zero_window_units() {
-        // PR957 codex P2: genuine_use_observed == true but window_units == 0 must
+        // genuine_use_observed == true but window_units == 0 must
         // be rejected. Such a Pass would verify but deny the holder's first charged
         // invocation, breaking the first-window / genuine-use floor.
         let subject = Keypair::generate();
@@ -1115,7 +1113,7 @@ mod chio_pass_tests {
 
     #[test]
     fn validate_binds_evidence_tier_and_window_to_entitlement() {
-        // PR957 codex P2: evidence.attested_tier and evidence.snapshot_window must
+        // evidence.attested_tier and evidence.snapshot_window must
         // be bound to the entitlement they justify.
         let subject = Keypair::generate();
         let subject_did = DidChio::from_public_key(subject.public_key())
@@ -1636,7 +1634,7 @@ mod chio_pass_refresh_tests {
 
     #[test]
     fn refresh_rejects_contiguous_multi_month_window() {
-        // PR957 codex P2: a next window that is contiguous (starts exactly at
+        // A next window that is contiguous (starts exactly at
         // prior.until and extends beyond it) but spans MORE than the single next
         // calendar month must be rejected, so the refresh cannot stretch
         // `expires_at` past the monthly reset.

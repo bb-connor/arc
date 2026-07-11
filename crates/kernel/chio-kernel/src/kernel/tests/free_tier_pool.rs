@@ -1,6 +1,6 @@
-// Section 8.2 kernel free-tier pool suite + Gate 1 exhaustion evidence (M1-10).
+// Kernel free-tier pool suite.
 //
-// These tests exercise the CONTROL-1 per-Pass + aggregate-pool co-debit in
+// These tests exercise the per-Pass + aggregate-pool co-debit in
 // `check_and_increment_budget` (validation.rs) and its symmetric reversal in
 // `reverse_budget_charge`. They prove the free-tier gift bounds aggregate
 // liability to a hard monthly ceiling and degrades to read-only (fail-closed)
@@ -8,13 +8,14 @@
 //
 // The mechanism is tested directly at the budget-charge boundary (the unit under
 // test) rather than through `evaluate_tool_call_blocking`: a naive XCC-bearing
-// capability is rejected at admission by the B7 deterministic-id gate, so driving
-// the full pipeline would require minting canonical window-scoped Passes and
-// exercise unrelated surface. `KernelError::BudgetExhausted` is exactly the
-// pre-execution deny signal the evaluation pipeline renders as `Verdict::Deny`
-// with `cost_charged == 0` (evaluation.rs builds the monetary deny receipt from
-// this error), so the Gate-1 assertions below are the faithful kernel-level form
-// of the spec's "the 4th is Verdict::Deny".
+// capability is rejected at admission by the deterministic window-scoped
+// capability-id gate, so driving the full pipeline would require minting
+// canonical window-scoped Passes and exercise unrelated surface.
+// `KernelError::BudgetExhausted` is exactly the pre-execution deny signal the
+// evaluation pipeline renders as `Verdict::Deny` with `cost_charged == 0`
+// (evaluation.rs builds the monetary deny receipt from this error), so the
+// pool-exhaustion assertions below are the faithful kernel-level form of the
+// spec's "the 4th is Verdict::Deny".
 
 const FT_SERVER: &str = "chio.pass.compute";
 const FT_TOOL: &str = "compute";
@@ -123,9 +124,9 @@ fn expect_denied(
     }
 }
 
-// 1. Pool-disabled additive no-op: with no pool installed the existing monetary
-//    path is byte-identical to before the mechanism (Allow then exhaustion Deny)
-//    and NO freetier:global row is ever written.
+// 1. Pool-disabled additive no-op: with no pool installed the monetary path is
+//    unchanged (Allow then exhaustion Deny) and NO freetier:global row is ever
+//    written.
 #[test]
 fn pool_disabled_is_additive_noop_and_writes_no_freetier_row() {
     let kernel = no_pool_kernel();
@@ -231,13 +232,13 @@ fn zero_cost_freetier_charge_denies_and_cannot_bypass_meter() {
     );
 }
 
-// 4. B5: with NO pool installed a free-tier (XCC) charge denies fail-closed AND
+// 4. With NO pool installed a free-tier (XCC) charge denies fail-closed AND
 //    the per-Pass hold is reversed (no stranded exposure).
 #[test]
-fn b5_freetier_pool_none_denies_xcc_and_reverses_per_pass_hold() {
+fn freetier_pool_none_denies_xcc_and_reverses_per_pass_hold() {
     let kernel = no_pool_kernel();
     let cap = make_freetier_cap(
-        "cap-b5",
+        "cap-no-pool",
         WINDOW_JUNE_ISSUED_AT,
         make_grant_in(50, 1_000, FT_UNIT),
     );
@@ -245,7 +246,7 @@ fn b5_freetier_pool_none_denies_xcc_and_reverses_per_pass_hold() {
     let committed_before = committed_units(&kernel, &cap.id);
 
     let err = expect_denied(
-        kernel.check_and_increment_budget("req-b5", &cap, &grants),
+        kernel.check_and_increment_budget("req-no-pool", &cap, &grants),
         "XCC with no pool installed must deny",
     );
     assert!(matches!(err, KernelError::BudgetExhausted(_)));
@@ -401,14 +402,14 @@ fn cancelling_a_charge_reverses_both_per_pass_and_pool_holds() {
     );
 }
 
-// 8. GATE 1 (headline evidence): a board-approved pool of exactly three
+// 8. The pool-exhaustion proof: a board-approved pool of exactly three
 //    allotments. Four DISTINCT-subject Passes in the SAME window each draw one
 //    XCC allotment. The first three are admitted; the fourth is denied
 //    fail-closed with nothing charged, the pool sits at EXACTLY its ceiling, and
 //    the denied Pass keeps a zero committed balance. Generosity-insolvency
 //    degrades the gift to read-only; the treasury never overspends.
 #[test]
-fn gate_1_pool_exhaustion_fails_closed_treasury_never_overspends() {
+fn pool_exhaustion_fails_closed_treasury_never_overspends() {
     const ALLOT: u64 = 100;
     const POOL: u64 = 3 * ALLOT;
     let kernel = pool_kernel(POOL);
@@ -417,13 +418,13 @@ fn gate_1_pool_exhaustion_fails_closed_treasury_never_overspends() {
 
     for i in 0..3 {
         let cap = make_freetier_cap(
-            &format!("cap-gate1-{i}"),
+            &format!("cap-exhaust-{i}"),
             WINDOW_JUNE_ISSUED_AT,
             make_grant_in(ALLOT, ALLOT, FT_UNIT),
         );
         let grants = one_grant(&cap);
         let (_idx, mutation) = kernel
-            .check_and_increment_budget(&format!("req-gate1-{i}"), &cap, &grants)
+            .check_and_increment_budget(&format!("req-exhaust-{i}"), &cap, &grants)
             .unwrap_or_else(|e| panic!("pass {i} must be admitted, got {e}"));
         match &mutation {
             PreExecutionBudgetMutation::Charge(charge) => {
@@ -452,7 +453,7 @@ fn gate_1_pool_exhaustion_fails_closed_treasury_never_overspends() {
 
     // The fourth distinct Pass: the gift is insolvent for this window.
     let cap4 = make_freetier_cap(
-        "cap-gate1-3",
+        "cap-exhaust-3",
         WINDOW_JUNE_ISSUED_AT,
         make_grant_in(ALLOT, ALLOT, FT_UNIT),
     );
@@ -460,7 +461,7 @@ fn gate_1_pool_exhaustion_fails_closed_treasury_never_overspends() {
     let committed_before = committed_units(&kernel, &cap4.id);
 
     let err = expect_denied(
-        kernel.check_and_increment_budget("req-gate1-3", &cap4, &grants4),
+        kernel.check_and_increment_budget("req-exhaust-3", &cap4, &grants4),
         "the fourth Pass must be denied (Verdict::Deny at the pipeline)",
     );
     // BudgetExhausted is the pre-execution deny the pipeline renders as
@@ -496,8 +497,8 @@ fn gate_1_pool_exhaustion_fails_closed_treasury_never_overspends() {
 }
 
 #[test]
-fn gate_1_pipeline_renders_pool_exhaustion_as_verdict_deny() {
-    // Full-pipeline form of the Gate-1 ceiling proof: three canonical Passes
+fn pipeline_renders_pool_exhaustion_as_verdict_deny() {
+    // Full-pipeline form of the pool-exhaustion ceiling proof: three canonical Passes
     // fill the pool through evaluate_tool_call_blocking, then the fourth
     // distinct holder's charge renders as Verdict::Deny with the pool row
     // unchanged at the ceiling and nothing stuck to the denied Pass.
@@ -584,7 +585,7 @@ fn gate_1_pipeline_renders_pool_exhaustion_as_verdict_deny() {
         let (_subject, cap) = mint_pass(&kernel, &format!("holder-{i}"));
         let resp = kernel
             .evaluate_tool_call_blocking(&make_request_with_arguments(
-                &format!("pipeline-gate1-{i}"),
+                &format!("pipeline-exhaust-{i}"),
                 &cap,
                 "compute",
                 FT_SERVER,
@@ -608,7 +609,7 @@ fn gate_1_pipeline_renders_pool_exhaustion_as_verdict_deny() {
     let (_subject4, cap4) = mint_pass(&kernel, "holder-3");
     let resp = kernel
         .evaluate_tool_call_blocking(&make_request_with_arguments(
-            "pipeline-gate1-3",
+            "pipeline-exhaust-3",
             &cap4,
             "compute",
             FT_SERVER,
@@ -635,11 +636,10 @@ fn gate_1_pipeline_renders_pool_exhaustion_as_verdict_deny() {
 }
 
 // ---------------------------------------------------------------------------
-// Code-review C1 + PR957 codex P2: post-execution pool reconciliation (worst-
-// case hold down to realized cost) and the no-pool admission boundary that keeps
-// unrelated custom private-unit budgets on the normal path while still failing
-// closed for genuine XCC Pass charges. (Helpers here are independent of the
-// M1-10 suite above; folded in during the m0 -> m1 flow-up merge.)
+// Post-execution pool reconciliation (worst-case hold down to realized cost)
+// and the no-pool admission boundary that keeps unrelated custom private-unit
+// budgets on the normal path while still failing closed for genuine XCC Pass
+// charges.
 /// The current UTC calendar-month attestation window, computed dynamically so
 /// these tests are not wall-clock time bombs.
 fn current_month_window() -> chio_core::capability::token::AttestationWindowId {
@@ -719,9 +719,9 @@ fn make_free_tier_pass_cap(
 
 #[test]
 fn free_tier_pool_reconciles_pass_charge_to_realized_cost_and_frees_room() {
-    // code-review C1: a free-tier XCC Pass charged with max_cost_per_invocation = N
-    // but realizing a lower cost M < N must reconcile the aggregate pool co-debit DOWN
-    // to M (freeing N - M), so committed_units(term) == M and a second Pass can consume
+    // A free-tier XCC Pass charged with max_cost_per_invocation = N but realizing
+    // a lower cost M < N must reconcile the aggregate pool co-debit DOWN to M
+    // (freeing N - M), so committed_units(term) == M and a second Pass can consume
     // the freed room. The pool (150) is deliberately smaller than 2*N (200): without
     // the reconcile the second Pass's worst-case hold would exhaust the pool and deny,
     // so an Allow on the second charge proves the room was actually freed.
@@ -810,11 +810,11 @@ fn free_tier_pool_reconciles_pass_charge_to_realized_cost_and_frees_room() {
 
 #[test]
 fn non_pass_private_unit_allowed_when_no_pool_configured() {
-    // PR957 codex P2: with NO free-tier pool installed, a capability budgeted in a
-    // custom private-use unit ("ABC", which is not the Pass XCC allotment unit) must
-    // stay on the normal budget path and be allowed. Before the fix the no-pool branch
-    // reversed and denied EVERY unpinned three-letter unit, breaking unrelated
-    // private-unit budgets merely because the Pass pool was absent.
+    // With NO free-tier pool installed, a capability budgeted in a custom
+    // private-use unit ("ABC", which is not the Pass XCC allotment unit) must
+    // stay on the normal budget path and be allowed. Denying every unpinned
+    // three-letter unit merely because the Pass pool is absent would break
+    // unrelated private-unit budgets.
     let mut kernel = make_kernel(make_monetary_config());
     kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
 
@@ -840,7 +840,7 @@ fn non_pass_private_unit_allowed_when_no_pool_configured() {
 
 #[test]
 fn genuine_pass_xcc_denied_when_no_pool_configured() {
-    // PR957 codex P2 (DO-NOT-WEAKEN guard): the no-pool fix above must NOT widen the
+    // DO-NOT-WEAKEN guard: the no-pool allowance above must NOT widen the
     // XCC-must-co-debit invariant. A genuine Pass XCC charge cannot co-debit an absent
     // aggregate ceiling, so with NO pool configured it MUST still fail closed.
     let mut kernel = make_kernel(make_monetary_config());

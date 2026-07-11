@@ -37,11 +37,11 @@ pub const CHIO_PASS_CAPABILITY_ID_DOMAIN: &str = "chio.pass.capability.id.v1";
 pub const CHIO_PASS_CAPABILITY_ID_PREFIX: &str = "chiopass:";
 
 /// Namespace prefix of the aggregate free-tier pool budget-term id
-/// `freetier:global:<window_ym>` (CONTROL 1). The std kernel derives each
-/// per-month term by appending the `"%Y-%m"` window to this prefix (see
-/// `FreeTierPoolConfig::window_ym_from_issued_at`), so this constant is the
-/// single source of truth for the pool namespace and the only string callers
-/// should match against.
+/// `freetier:global:<window_ym>` (the free-tier pool ceiling). The std kernel
+/// derives each per-month term by appending the `"%Y-%m"` window to this
+/// prefix (see `FreeTierPoolConfig::window_ym_from_issued_at`), so this
+/// constant is the single source of truth for the pool namespace and the only
+/// string callers should match against.
 ///
 /// The pool is a Sybil-ceiling accounting term, never capital. Every id under
 /// this prefix (the current window and any retained prior-month window) MUST be
@@ -66,7 +66,7 @@ pub fn is_freetier_global_pool_id(capability_id: &str) -> bool {
 /// The interval is half-open `[since, until)`. A Pass-minted capability token
 /// binds `token.issued_at == since` and `token.expires_at == until`, and
 /// `window_ym` is the single term shared with the
-/// `freetier:global:<window_ym>` aggregate pool key (CONTROL 1).
+/// `freetier:global:<window_ym>` aggregate pool key.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AttestationWindowId {
     /// UTC calendar-month label formatted "%Y-%m" (for example "2026-06").
@@ -116,7 +116,7 @@ struct WindowScopedCapabilityIdInput<'a> {
 /// `0` by the caller.
 ///
 /// The id binds only `(domain, subjectDid, windowYm)`: it deliberately does not
-/// commit to scope or tier (a tier change reuses the same row), and under M0's
+/// commit to scope or tier (a tier change reuses the same row), and under the
 /// single issuing authority it carries no issuer column. `subject_did` must be
 /// the canonical `did:chio` string (`DidChio::as_str()`), never a raw
 /// caller-supplied value, so the row is stable across re-presentations.

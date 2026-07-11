@@ -1,11 +1,11 @@
 //! `chio pass` subcommand: the operable CLI entrypoint for the board-approved
-//! Chio Pass control-plane orchestrator (task M1-11).
+//! Chio Pass control-plane orchestrator.
 //!
 //! The Chio Pass is a soulbound, PORTABLE REPUTATION CREDENTIAL (never a
 //! passport): it gifts one attested `did:chio` a metered free-tier allotment plus
 //! the baseline gifted-stream reads. This module is the thin CLI shell that loads
 //! the single board-approved governance surface
-//! ([`ChioPassConfig::m1_launch_default`]) and drives the three already-built
+//! ([`ChioPassConfig::launch_default`]) and drives the three already-built
 //! control-plane entrypoints end to end:
 //!
 //! - [`pass_issue`] mints the first-window credential and its deterministic
@@ -140,7 +140,7 @@ struct PassDistributionCounters {
 ///
 /// A fresh oracle yields `(0, 0)`, admitting the bootstrap issuance under cap; as
 /// issuances accumulate the SAME store enforces both caps without changing the
-/// entrypoint contract. CONTROL 1's aggregate pool ceiling remains the hard
+/// entrypoint contract. The aggregate free-tier pool ceiling remains the hard
 /// liability bound regardless.
 ///
 /// Fail-closed: a store IO fault propagates as `Err`, so no Pass is minted.
@@ -213,9 +213,9 @@ fn pass_issue(
     let accepted_kernel_keys =
         resolve_accepted_kernel_keys(accepted_kernel_keys_hex)?;
 
-    // The single board-approved M1 launch governance surface (validated
+    // The single board-approved launch governance surface (validated
     // fail-closed inside the entrypoint).
-    let config = ChioPassConfig::m1_launch_default(accepted_kernel_keys);
+    let config = ChioPassConfig::launch_default(accepted_kernel_keys);
     let authority = LocalCapabilityAuthority::new(authority_keypair.clone());
 
     let oracle = SqliteRevocationStore::open(revocation_db_path)?;
@@ -404,8 +404,9 @@ const REFRESH_ROLLOVER_GRACE_SECS: u64 = 86_400;
 /// boundary: at the rollover instant AND just after it (e.g. 2026-07-01T00:00:01Z)
 /// `now` already lands in the NEW window, so deriving the prior window from `now`
 /// would scan the brand-new (empty) window and mint a month too far ahead (scan
-/// July, mint August instead of scan June, mint July). The round-2 fix only handled
-/// the exact instant `now == since`; a run one second later still mis-derived.
+/// July, mint August instead of scan June, mint July). Handling only the exact
+/// rollover instant `now == since` is not enough: a run one second later still
+/// mis-derives.
 ///
 /// The expiring window is therefore pinned EXPLICITLY by `prior_window_at` (a unix
 /// instant INSIDE the expiring Pass's window) whenever it is supplied; the minted
@@ -472,8 +473,8 @@ fn refresh_windows(
 /// Persist a renewed/dormant next-window issuance into the anti-farm roster
 /// through the SAME atomic count/check/insert cap transaction `issue` uses, so a
 /// refresh cannot fill the next window past the distribution or population caps
-/// before any first-window `issue` denies (the round-2 refresh persisted via plain
-/// `record_pass_issuance`, bypassing the caps). The deterministic next-window
+/// before any first-window `issue` denies (persisting via plain
+/// `record_pass_issuance` would bypass the caps). The deterministic next-window
 /// `chiopass:<hash>` id is the roster key, so re-refreshing the SAME subject/window
 /// is an idempotent re-record admitted even at the cap (it adds no population).
 /// Fail-closed: a cap-full denial returns Err so the in-memory mint is discarded
@@ -539,7 +540,7 @@ fn pass_refresh(
     let authority_keypair = load_or_create_authority_keypair(&seed_path)?;
     let accepted_kernel_keys =
         resolve_accepted_kernel_keys(accepted_kernel_keys_hex)?;
-    let config = ChioPassConfig::m1_launch_default(accepted_kernel_keys);
+    let config = ChioPassConfig::launch_default(accepted_kernel_keys);
     let authority = LocalCapabilityAuthority::new(authority_keypair.clone());
 
     // Derive the re-attestation verdict from a verified presentation proof, never
@@ -642,7 +643,7 @@ fn write_refresh_artifacts(
 /// entitlement-shape check that binds `window.since == issuance` denies it anyway.)
 fn verify_anchored_pass_shape(pass: &ChioPass) -> Result<(), CliError> {
     // The launch entitlement-shape table the credential was minted against
-    // (`ChioPassConfig::m1_launch_default` pins `TierAllotmentTable::default()`).
+    // (`ChioPassConfig::launch_default` pins `TierAllotmentTable::default()`).
     let table = TierAllotmentTable::default();
     let issuance_instant = pass.unsigned.credential_subject.entitlements.window.since;
     verify_chio_pass(pass, issuance_instant, &table)
@@ -1244,7 +1245,7 @@ mod tests {
         assert_eq!(counters_a.active_population, 0);
 
         // A DISTINCT subject minted in the SAME window observes the persisted
-        // first issuance: the counters are no longer hard-coded 0.
+        // first issuance in its counters.
         let subject_b = Keypair::generate().public_key().to_hex();
         let (_second, counters_b) = pass_issue(
             &subject_b,
@@ -1296,7 +1297,7 @@ mod tests {
         // A tiny per-window cap so a SINGLE issuance fills the window; the population
         // cap stays large so the WINDOW cap is the binding gate.
         let kernel_key = Keypair::generate().public_key();
-        let mut config = ChioPassConfig::m1_launch_default(vec![kernel_key]);
+        let mut config = ChioPassConfig::launch_default(vec![kernel_key]);
         config.window_token_capacity = 1;
 
         let window_ym = attestation_window_containing(MID_JUNE_2026)
@@ -1497,7 +1498,7 @@ mod tests {
         }
     }
 
-    /// 311 + Finding 5: only actually-revoked lifecycle records whose `passport_id`
+    /// Only actually-revoked lifecycle records whose `passport_id`
     /// is PROVEN by the paired original signed Pass may be anchored as revoked
     /// digests. A genuine record verifies; a stale Active export, a hand-written
     /// record with a fabricated `passport_id`, and an unpaired record are all denied.
@@ -1543,7 +1544,7 @@ mod tests {
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].status, PassportLifecycleState::Revoked);
 
-        // Finding 5: a hand-written record with a FABRICATED passport_id, paired
+        // A hand-written record with a FABRICATED passport_id, paired
         // with the genuine Pass, is rejected: no genuine signed Pass recomputes to
         // it, so the revoked leaf is unprovable.
         let mut fabricated = genuine_record.clone();
@@ -1584,7 +1585,7 @@ mod tests {
         ));
     }
 
-    /// 325: a supplied previous checkpoint must belong to THIS operator and carry
+    /// A supplied previous checkpoint must belong to THIS operator and carry
     /// a verifying signature before it chains the per-operator sequence.
     #[test]
     fn validate_previous_checkpoint_binds_to_operator() {
@@ -1641,7 +1642,7 @@ mod tests {
         ));
     }
 
-    /// 669: the re-attestation verdict is never trusted from the bare flag; a
+    /// The re-attestation verdict is never trusted from the bare flag; a
     /// `--reattested` set without a verifying presentation proof fails closed.
     #[test]
     fn pass_refresh_rejects_bare_reattested_without_proof() {
@@ -1674,7 +1675,7 @@ mod tests {
         ));
     }
 
-    /// 669: a supplied re-attestation proof that does not verify (here, an
+    /// A supplied re-attestation proof that does not verify (here, an
     /// undeserializable artifact) is denied fail-closed; the proof is genuinely
     /// consumed rather than the flag trusted.
     #[test]
@@ -1708,8 +1709,8 @@ mod tests {
         assert!(!format!("{denied:?}").contains("bare flag is not trusted"));
     }
 
-    /// PASS-1: refresh now persists renewed/dormant issuances into the anti-farm
-    /// roster, so the revocation oracle is mandatory; omitting it fails closed.
+    /// Refresh persists renewed/dormant issuances into the anti-farm roster,
+    /// so the revocation oracle is mandatory; omitting it fails closed.
     #[test]
     fn pass_refresh_dispatch_requires_revocation_oracle() {
         let dir = temp_dir("refresh-requires-oracle");
@@ -1738,18 +1739,18 @@ mod tests {
         );
     }
 
-    /// Finding 1: a refresh run at OR JUST AFTER a window rollover scans the
-    /// EXPIRING window pinned by `prior_window_at` and mints the contiguous next
-    /// window. The round-2 fix only handled the exact instant `now == since`; a run
-    /// one second later (2026-07-01T00:00:01Z) silently scanned July and minted
-    /// August. With the expiring window pinned, June is scanned and July is minted.
+    /// A refresh run at OR JUST AFTER a window rollover scans the EXPIRING
+    /// window pinned by `prior_window_at` and mints the contiguous next window.
+    /// Deriving the windows from `now` alone would silently scan July and mint
+    /// August one second after the rollover (2026-07-01T00:00:01Z). With the
+    /// expiring window pinned, June is scanned and July is minted.
     #[test]
     fn refresh_windows_scan_the_expiring_window_with_explicit_prior() {
         const JULY_2026_START: u64 = 1_782_864_000; // 2026-07-01T00:00:00Z
         const JULY_2026_PLUS_1S: u64 = 1_782_864_001; // 2026-07-01T00:00:01Z
 
-        // The finding's scenario: a refresh at 2026-07-01T00:00:01Z of a June Pass
-        // (expiring window pinned to a June instant) scans June and mints July.
+        // A refresh at 2026-07-01T00:00:01Z of a June Pass (expiring window
+        // pinned to a June instant) scans June and mints July.
         let (prior, next) =
             refresh_windows(JULY_2026_PLUS_1S, Some(MID_JUNE_2026)).expect("rollover windows");
         assert_eq!(
@@ -1774,7 +1775,7 @@ mod tests {
         assert_eq!(prior_mid.until, next_mid.since);
     }
 
-    /// Finding 1: a refresh fired INSIDE the rollover early span with NO explicit
+    /// A refresh fired INSIDE the rollover early span with NO explicit
     /// `prior_window_at` is ambiguous (the just-ended window or the brand-new one),
     /// so it fails closed and demands the operator pin the expiring window rather
     /// than silently scanning the wrong month.
@@ -1789,7 +1790,7 @@ mod tests {
         ));
     }
 
-    /// Batch 6 / Finding: an explicit `--prior-window-at` that points at a FUTURE
+    /// An explicit `--prior-window-at` that points at a FUTURE
     /// window (one that has not begun relative to `now`) is denied. Without this
     /// bound, a refresh run in mid-June with `--prior-window-at` in July would scan
     /// the brand-new July window and mint/persist an August Pass, silently reserving
@@ -1826,11 +1827,11 @@ mod tests {
         assert_eq!(next_rollover.window_ym, "2026-07");
     }
 
-    /// Finding 2: a renewed/dormant refresh persists through the SAME atomic
+    /// A renewed/dormant refresh persists through the SAME atomic
     /// count/check/insert cap transaction `issue` uses, so a refresh cannot fill
     /// the next window past `window_token_capacity` (or the population cap) before
-    /// any first-window `issue` denies. The round-2 refresh persisted via plain
-    /// `record_pass_issuance`, bypassing the caps.
+    /// any first-window `issue` denies. Persisting via plain
+    /// `record_pass_issuance` would bypass the caps.
     #[test]
     fn refresh_persists_under_caps_and_denies_when_window_full() {
         let dir = temp_dir("refresh-caps");
@@ -1891,7 +1892,7 @@ mod tests {
         ));
     }
 
-    /// Finding 4: a late-window refresh fills the NEXT window, whose rows carry a
+    /// A late-window refresh fills the NEXT window, whose rows carry a
     /// FUTURE `valid_from = next_window.since`. The population cap must be counted at
     /// the window being filled, not at the refresh wall clock: otherwise every prior
     /// refresh into that same future window (all future-dated) is excluded from the
@@ -1931,7 +1932,7 @@ mod tests {
         ));
     }
 
-    /// Finding 7: a re-attestation proof supplied WITHOUT an external challenge is
+    /// A re-attestation proof supplied WITHOUT an external challenge is
     /// denied fail-closed; only the response's own embedded challenge would
     /// otherwise be checked, which a holder can self-generate.
     #[test]
@@ -1950,7 +1951,7 @@ mod tests {
         ));
     }
 
-    /// Finding 8: a tampered issued-Pass file (its signature no longer verifies)
+    /// A tampered issued-Pass file (its signature no longer verifies)
     /// is rejected BEFORE its artifact id can be folded into the public anchor
     /// batch; a genuine signed Pass is accepted.
     #[test]
@@ -1981,7 +1982,7 @@ mod tests {
             .expect("a signed Pass from a trusted issuer is accepted for anchoring");
         assert_eq!(accepted.len(), 1);
 
-        // Finding 3: the SAME genuine Pass is rejected when its issuer is NOT a
+        // The SAME genuine Pass is rejected when its issuer is NOT a
         // trusted Pass authority for the batch, so an operator cannot fold a
         // foreign/self-issued Pass into its public membership root.
         let foreign_trusted = vec![DidChio::from_public_key(Keypair::generate().public_key())
@@ -2012,7 +2013,7 @@ mod tests {
         ));
     }
 
-    /// Finding 5: `chio pass anchor` must accept an otherwise-valid issued Pass
+    /// `chio pass anchor` must accept an otherwise-valid issued Pass
     /// whose validity window has already ENDED (anchoring is historical membership
     /// evidence). The expiry-ignoring shape verifier evaluates the Pass at its OWN
     /// issuance instant, so a window-expired Pass anchors successfully where the
@@ -2060,13 +2061,13 @@ mod tests {
             .expect_err("a tampered Pass still fails the shape verification before anchoring");
     }
 
-    /// Finding 6: the revoked-leaf verifier now runs the SAME full Pass shape checks
-    /// as the issued side (schema, proof type/purpose, entitlement shape), ignoring
-    /// only expiry. A credential correctly SIGNED by a trusted issuer but carrying a
+    /// The revoked-leaf verifier runs the SAME full Pass shape checks as the
+    /// issued side (schema, proof type/purpose, entitlement shape), ignoring only
+    /// expiry. A credential correctly SIGNED by a trusted issuer but carrying a
     /// malformed proof envelope (proof_purpose tampered AFTER signing - the proof
-    /// fields are not covered by the issuer signature) passed the old raw-signature
-    /// revoked check yet would be rejected as an issued leaf. It is now rejected
-    /// before it can be anchored as a revoked leaf.
+    /// fields are not covered by the issuer signature) would clear a raw-signature
+    /// check, yet it must be rejected before it can be anchored as a revoked
+    /// leaf, exactly as the issued side would reject it.
     #[test]
     fn verify_revoked_pass_authenticity_rejects_malformed_but_signed_credential() {
         let dir = temp_dir("revoked-shape");
@@ -2090,9 +2091,9 @@ mod tests {
         verify_revoked_pass_authenticity(&issuance.pass, &trusted)
             .expect("a genuine revoked leaf is provable");
 
-        // Tamper the proof PURPOSE: the proof envelope is NOT covered by the issuer
-        // signature, so the credential is still validly signed (it passed the old
-        // raw-signature revoked check) yet now carries a malformed proof envelope.
+        // Tamper the proof PURPOSE: the proof envelope is NOT covered by the
+        // issuer signature, so the credential is still validly signed yet carries
+        // a malformed proof envelope.
         let mut malformed = issuance.pass.clone();
         malformed.proof.proof_purpose = "tampered-purpose".to_string();
         let denied = verify_revoked_pass_authenticity(&malformed, &trusted)
@@ -2103,7 +2104,7 @@ mod tests {
         ));
     }
 
-    /// Finding 10: a renewed/dormant refresh persists its full signed artifacts to
+    /// A renewed/dormant refresh persists its full signed artifacts to
     /// the requested `--out-pass` / `--out-capability` files (mirroring `issue`),
     /// rather than dropping everything but the capability id.
     #[test]

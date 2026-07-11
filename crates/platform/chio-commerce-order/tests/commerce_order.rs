@@ -1696,7 +1696,7 @@ fn commerce_order_replay_rejects_refund_before_completion() {
         .contains("unresolved payment recovery state"));
 }
 
-// === M1-18 (EVIDENCE, Gate G9): order-passport replay GREEN with the escrow
+// === Order-passport replay with the escrow
 // digest pinned into CommerceOrderContext.
 //
 // The escrow accept IS the settlement-packet-assembly transition: it locks the
@@ -1715,7 +1715,7 @@ fn escrow_offer_token(
     use chio_core_types::capability::token::{CapabilityToken, CapabilityTokenBody};
 
     let body = CapabilityTokenBody {
-        id: "offer-token-m1-18".to_string(),
+        id: "offer-token-escrow-replay".to_string(),
         issuer: issuer.public_key(),
         subject: subject.clone(),
         scope: ChioScope {
@@ -1777,7 +1777,7 @@ fn assemble_settlement_packet_event_log(
     bundle.order_context.current_state = "settlement_packet_assembled".to_string();
 }
 
-/// Run the M1-15 escrow `accept()` against the order at `fulfillment_attested`,
+/// Run the escrow `accept()` against the order at `fulfillment_attested`,
 /// then pin the resulting escrow digest and the advanced state back onto the
 /// bundle's order context. Returns the pinned escrow digest.
 fn pin_escrow_digest_via_accept(
@@ -1988,10 +1988,11 @@ fn order_passport_replay_fails_closed_on_escrow_digest_tamper() {
         "{corrupt_error}"
     );
 
-    // Tamper 2 (escrow digest, still well-formed): flipping one hex nibble of the
-    // pinned escrow digest no longer recomputes from the supplied escrow ledger
-    // bytes, so the replay FAILS CLOSED. An arbitrary well-formed 64-hex value can
-    // no longer ride into a verified order passport without its backing ledger.
+    // Tamper 2 (escrow digest, still well-formed): after flipping one hex nibble
+    // the pinned escrow digest no longer recomputes from the supplied escrow
+    // ledger bytes, so the replay FAILS CLOSED. An arbitrary well-formed 64-hex
+    // value can never ride into a verified order passport without its backing
+    // ledger.
     let mut flipped_chars: Vec<char> = escrow_digest.chars().collect();
     flipped_chars[0] = if flipped_chars[0] == 'a' { 'b' } else { 'a' };
     let flipped_digest: String = flipped_chars.into_iter().collect();

@@ -1,37 +1,36 @@
-// Chio Pass anti-farm pure functions (M0 task T7, Section 6 "Anti-farm +
-// distribution").
+// Chio Pass anti-farm pure functions.
 //
 // These are STORAGE-FREE pure functions: the per-window population cap /
 // admission throttle and the retroactive unpredictable snapshot selection. The
-// receipt scan (T8) and the refresh/issuance orchestrator (T9) that feed live
+// receipt scan and the refresh/issuance orchestrator that feed live
 // counts into these predicates live in the control plane and are out of scope
 // here.
 //
-// PHASE-0 ANTI-FARM STACK (Section 1.2 / Section 6). M0 makes the free tier
+// THE ANTI-FARM STACK. The tokenless launch makes the free tier
 // Sybil-bounded with NO money leg via five layers: soulbinding (the credential
 // is keyed to a single attested `did:chio`, [`verify_chio_pass_holder_binding`]),
-// the deterministic window-scoped capability id (CONTROL 2,
-// [`verify_window_scoped_capability_id`]), refresh-on-genuine-use (CONTROL 3,
-// the sizing half lives in [`snapshot_chio_pass_entitlements`]), the aggregate
-// pool ceiling (CONTROL 1, in the kernel), and the admission throttle in THIS
+// the deterministic window-scoped capability id
+// ([`verify_window_scoped_capability_id`]), refresh-on-genuine-use (the sizing
+// half lives in [`snapshot_chio_pass_entitlements`]), the aggregate
+// pool ceiling (in the kernel), and the admission throttle in THIS
 // module. Tier governs allotment SIZE/refill only, never existence: the per-feed
 // baseline floor is the already-shipped [`pass_baseline_read_uris`] and the
 // tier->size table lookup is the already-shipped [`allotment_units_for_tier`]
 // (NOT re-implemented here; the floor invariant is `Unverified > 0`, so a tier_0
 // newcomer always receives the costly half).
 //
-// ISSUER-INDEPENDENCE BOUNDARY (M0 vs Phase 2, Section 6.5). M0 inherits the
+// ISSUER-INDEPENDENCE BOUNDARY. This module inherits the
 // verified-weak, self-declared and optional
 // `chio_federation::reputation::issuer_independence_group_id`
-// (`chio-federation/reputation.rs:201`). It is cheap to forge, so M0 does NOT
-// gate the COSTLY allotment on a real issuer-independence count: the
-// bond-anchored independence fix is DEFERRED to Phase 2 (the escrow activation
-// deposit is Phase 1). What M0 ships instead is the BOUND, not the fix: the
-// aggregate pool ceiling (CONTROL 1) together with `window_token_capacity` and
+// (`chio-federation/reputation.rs:201`). It is cheap to forge, so the COSTLY
+// allotment is deliberately NOT gated on a real issuer-independence count: a
+// bond-anchored independence check is deferred until an escrow activation
+// deposit exists. What ships instead is the BOUND, not the fix: the
+// aggregate pool ceiling together with `window_token_capacity` and
 // `active_population_cap` here cap total free-tier drain at the board-approved
 // runway even under collusion. The federation
 // `minimum_independent_issuers` clearing check
-// (`chio-federation/reputation.rs:229`) remains the Phase-2 home for a real,
+// (`chio-federation/reputation.rs:229`) remains the future home for a real,
 // non-self-declared independence threshold; this module deliberately does not
 // duplicate or re-derive it.
 //
@@ -51,12 +50,12 @@
 /// `validation.rs:393`; the saturation test `bucket_count >= token_capacity` is
 /// at `validation.rs:201`). The cumulative active-Pass population cap is the
 /// second leg that bounds the residual self-declared issuer-independence
-/// weakness (Section 6.5).
+/// weakness.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ChioPassAdmissionPolicy {
     /// UTC calendar-month label (`"%Y-%m"`) the policy applies to; the same
-    /// string CONTROL 1/CONTROL 2 bind into the pool term and the capability id.
+    /// string the pool term and the capability id both bind.
     pub window_ym: String,
     /// Maximum number of Passes that may be ISSUED in this window. Zero is
     /// rejected fail-closed (mirrors the pheromone zero-capacity rejection).
@@ -107,8 +106,8 @@ pub fn evaluate_pass_admission(
 }
 
 /// A Pass-issuance candidate captured by a retroactive snapshot. The `tier` is
-/// the attested [`TrustTier`] reconciled from the provider-admission substrate
-/// (Section 6.1); it governs the later allotment SIZE only and is never a
+/// the attested [`TrustTier`] reconciled from the provider-admission substrate;
+/// it governs the later allotment SIZE only and is never a
 /// capital/solvency signal.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

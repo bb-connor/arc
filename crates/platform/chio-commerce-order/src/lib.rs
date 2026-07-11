@@ -439,9 +439,8 @@ fn verify_digest(field: &str, expected: &str, bytes: &[u8]) -> Result<(), Commer
 /// - `escrow::accept` pins the CANONICAL digest of the signed packet body (the same
 ///   way the escrow ledger pins its canonical `digest()`), so an escrow-accepted
 ///   order verifies regardless of the byte form its packet is stored in
-///   (pretty-printed, key-reordered, or newline-terminated). This is the
-///   re-canonicalizing check the round-2/round-3 escrow-ledger fix established, and
-///   it is what makes an escrow-backed order verifiable.
+///   (pretty-printed, key-reordered, or newline-terminated). This
+///   re-canonicalizing check is what makes an escrow-backed order verifiable.
 /// - The proof-room fixture pipeline pins the RAW digest of the on-disk artifact
 ///   file (`sha256` of the newline-terminated bytes the bundle ships). Dropping this
 ///   branch would reject every committed commerce-order fixture pinned that way, so
@@ -543,7 +542,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 /// order. Fail-closed: an `escrow_digest` with no backing ledger, a pinned digest
 /// that does not equal the ledger's CANONICAL digest (so a non-canonical wire
 /// encoding whose raw-byte hash is self-consistent is rejected), a ledger that
-/// violates conservation/Seam A, or a ledger bound to a different order is all
+/// violates conservation or pool isolation, or a ledger bound to a different order is all
 /// rejected, so an arbitrary 64-hex value (or a non-canonical ledger encoding)
 /// can never appear in a verified order passport. When no `escrow_digest` is
 /// present there is nothing to prove.
@@ -578,7 +577,7 @@ fn verify_escrow_digest(
     }
     // Re-check the ledger invariants a verified order passport must not vouch for
     // implicitly: value is conserved across all accounts and no leg names a
-    // freetier:global pool row (Seam A). A malformed ledger whose canonical digest
+    // freetier:global pool row. A malformed ledger whose canonical digest
     // happens to be the pinned value cannot ride into a verified passport.
     ledger.assert_conservation()?;
     // Bind the ledger's SCHEMA, ORDER, ECONOMICS, and PARTIES to the order context.
@@ -833,9 +832,9 @@ mod escrow_digest_verification_tests {
         ));
     }
 
-    /// Finding 3: a NON-CANONICAL ledger encoding whose raw-byte hash is pinned
-    /// (a self-consistent raw-byte hash) is denied, because the pinned digest is
-    /// now compared to the ledger's CANONICAL `digest()`, not to `sha256(raw wire
+    /// A NON-CANONICAL ledger encoding whose raw-byte hash is pinned
+    /// (a self-consistent raw-byte hash) is denied: the pinned digest is
+    /// compared to the ledger's CANONICAL `digest()`, never to `sha256(raw wire
     /// bytes)`. The accept/release path only ever pins the canonical digest, so a
     /// non-canonical encoding cannot be trusted.
     #[test]
@@ -904,7 +903,7 @@ mod escrow_digest_verification_tests {
         }
     }
 
-    /// Finding 6: a context that claims settlement reconciliation while pinning a
+    /// A context that claims settlement reconciliation while pinning a
     /// still-`Locked` ledger digest is denied. The release leg drains custody and
     /// yields a DIFFERENT canonical digest, so a Locked ledger whose digest the
     /// context pins proves only that custody was locked, never reconciled.
@@ -926,7 +925,7 @@ mod escrow_digest_verification_tests {
         ));
     }
 
-    /// Finding 6: the consistent reconciled pair (a `Released` ledger pinned by a
+    /// The consistent reconciled pair (a `Released` ledger pinned by a
     /// reconciled context) still verifies, so the status gate only denies the
     /// inconsistent lock-while-reconciled combination.
     #[test]
@@ -941,7 +940,7 @@ mod escrow_digest_verification_tests {
             .test_expect("a reconciled context with a released ledger verifies");
     }
 
-    /// Finding 2: a digest-consistent, conserved, same-order ledger whose AMOUNT
+    /// A digest-consistent, conserved, same-order ledger whose AMOUNT
     /// does not match the order quote is denied, so a 1 USD ledger can never ride
     /// into a verified passport for a 4200 USD order.
     #[test]
@@ -971,7 +970,7 @@ mod escrow_digest_verification_tests {
         ));
     }
 
-    /// Finding 2: a digest-consistent, conserved, same-order ledger whose
+    /// A digest-consistent, conserved, same-order ledger whose
     /// BENEFICIARY is not the order merchant is denied, so custody can never be
     /// vouched for paying a third account while the order names its real merchant.
     #[test]
@@ -994,7 +993,7 @@ mod escrow_digest_verification_tests {
         ));
     }
 
-    /// Batch 6 / Finding 2: a digest-consistent, conserved, same-order ledger whose
+    /// A digest-consistent, conserved, same-order ledger whose
     /// `schema` is NOT the canonical commerce escrow-ledger schema is denied, so a
     /// wrong-schema artifact can never ride a pinned digest into a verified passport.
     #[test]
@@ -1016,7 +1015,7 @@ mod escrow_digest_verification_tests {
         ));
     }
 
-    /// Batch 6 / Finding 3: the post-reconciliation terminal states `disputed` and
+    /// The post-reconciliation terminal states `disputed` and
     /// `refunded` are reached only AFTER custody was released, so a context in either
     /// state that pins a still-`Locked` ledger digest is denied. It would otherwise
     /// fall through to no status constraint and vouch that custody was merely locked,
@@ -1044,7 +1043,7 @@ mod escrow_digest_verification_tests {
         }
     }
 
-    /// Batch 6 / Finding 3: the consistent post-release pair (a `Released` ledger
+    /// The consistent post-release pair (a `Released` ledger
     /// pinned by a `disputed`/`refunded` context) still verifies, so the extended
     /// status gate only denies the inconsistent lock-while-post-release combination.
     #[test]

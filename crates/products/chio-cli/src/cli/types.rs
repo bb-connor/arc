@@ -358,7 +358,7 @@ pub(crate) enum Commands {
     /// The Chio Pass is a soulbound, portable reputation credential (NOT a
     /// passport): it gifts a metered free-tier allotment plus baseline gifted
     /// stream reads to one attested `did:chio`. These subcommands drive the
-    /// board-approved control-plane orchestrator (the M1 launch governance
+    /// board-approved control-plane orchestrator (the launch governance
     /// surface) end to end:
     ///
     /// - `issue` mints the first-window credential and its deterministic
@@ -596,8 +596,8 @@ pub(crate) enum Commands {
 pub(crate) enum PassCommands {
     /// Mint the first-window Chio Pass reputation credential for one subject.
     ///
-    /// Loads the board-approved M1 launch governance surface
-    /// (`ChioPassConfig::m1_launch_default`) and calls the control-plane
+    /// Loads the board-approved launch governance surface
+    /// (`ChioPassConfig::launch_default`) and calls the control-plane
     /// issuance entrypoint. The minted capability id is the deterministic
     /// `chiopass:<hash>` window-scoped id (subject + window only), so the same
     /// subject re-minted inside the same monthly window maps to a single budget

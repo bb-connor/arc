@@ -313,7 +313,7 @@ pub struct CommerceOrderVerificationBundle {
     /// field is skipped on the wire and the bundle serialization is unchanged.
     /// When `order_context.escrow_digest` IS present, `verify_commerce_order`
     /// requires these bytes and recomputes the digest from them, so an arbitrary
-    /// 64-hex `escrow_digest` can no longer ride into a verified order passport
+    /// 64-hex `escrow_digest` can never ride into a verified order passport
     /// without the locked/released escrow ledger that backs it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub escrow_ledger_bytes: Option<Vec<u8>>,
@@ -409,9 +409,9 @@ pub(super) struct CommercePaymentLifecycle {
 
 /// Settlement packet bound to a commerce order. The field layout and serde
 /// attributes are unchanged from the original deserialize-only shape: the
-/// `Serialize` derive and the wider visibility were added by M1-15 so the
-/// escrow path can emit this struct as the body of a `SignedExportEnvelope`,
-/// but the canonical serialization of any existing settlement-packet fixture is
+/// `Serialize` derive and the wider visibility exist so the escrow path can
+/// emit this struct as the body of a `SignedExportEnvelope`, while the
+/// canonical serialization of any existing settlement-packet fixture stays
 /// byte-identical.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]

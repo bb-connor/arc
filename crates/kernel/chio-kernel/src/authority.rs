@@ -276,7 +276,7 @@ mod m0_pass_mint_tests {
 
     #[test]
     fn rejects_inflated_resource_scope() {
-        // PR957 codex P1: a noncanonical Pass scope (here a wildcard resource grant
+        // A noncanonical Pass scope (here a wildcard resource grant
         // instead of the five baseline streams) must be rejected at the mint choke,
         // not silently signed. Otherwise the admission check would only re-derive
         // the deterministic id while a generic resource read still honored the

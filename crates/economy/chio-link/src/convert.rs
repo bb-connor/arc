@@ -191,7 +191,7 @@ mod tests {
 
 #[cfg(test)]
 mod do_not_weaken {
-    //! DO-NOT-WEAKEN regression suite (M1-7).
+    //! DO-NOT-WEAKEN regression suite.
     //!
     //! The pinned minor-unit table in `minor_units_for_currency` lists
     //! exactly USD, EUR, GBP, JPY, USDC, USDT, BTC, ETH, and LINK. CHIO

@@ -488,7 +488,7 @@ mod tests {
         let _ = fs::remove_file(path);
     }
 
-    /// Finding 9: a FUTURE-window Pass (its window has not opened yet) is NOT
+    /// A FUTURE-window Pass (its window has not opened yet) is NOT
     /// counted in the current live population, so it cannot prematurely deny an
     /// unrelated first-window issuance.
     #[test]
@@ -517,7 +517,7 @@ mod tests {
         let _ = fs::remove_file(path);
     }
 
-    /// Finding 4: the atomic admission guard enforces the anti-farm caps at write
+    /// The atomic admission guard enforces the anti-farm caps at write
     /// time. With the window cap full, a NEW distinct id is rejected and nothing
     /// is persisted; an idempotent re-record of an already-present id is still
     /// admitted; and the population cap is enforced the same way.

@@ -1,5 +1,5 @@
 //! Pass portable-reputation eligibility + trust-tier reconciliation bound to the
-//! shipped provider-admission substrate (M1-16, WS-PASS-ELIG).
+//! shipped provider-admission substrate.
 //!
 //! This module is ADDITIVE: it does not re-derive a parallel tier or selection
 //! path. Pass portable-reputation eligibility is obtained by routing through the
