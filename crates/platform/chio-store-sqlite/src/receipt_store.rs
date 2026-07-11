@@ -1382,6 +1382,21 @@ fn classify_writer_liveness(
     {
         return Liveness::Dead;
     }
+    // A bounded receipt operation that exceeded its budget is direct evidence the
+    // writer did not drain within budget, and it leaves `inflight` elevated. That
+    // is a stronger, earlier signal than the heuristic stall clock, so a still
+    // backlogged writer that has recorded a timeout is wedged immediately rather
+    // than admitted during the window between the operation budget and the stall
+    // threshold. A later successful batch flush clears `last_error`, so this
+    // self-heals once the writer catches up.
+    if counters.inflight > 0
+        && counters
+            .last_error
+            .as_deref()
+            .is_some_and(|error| error.contains("timed out"))
+    {
+        return Liveness::Wedged;
+    }
     let backlogged = counters.inflight > 0
         || counters.accepted_total
             > counters
@@ -1423,6 +1438,29 @@ mod writer_liveness_classifier_tests {
             failed_total: 1,
             inflight: 1,
             first_accept_unix_ms: Some(NOW - 20_000),
+            ..ReceiptWriterCounters::default()
+        };
+        assert_eq!(
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, NOW),
+            Liveness::Wedged
+        );
+    }
+
+    #[test]
+    fn recorded_append_timeout_reports_wedged_before_the_stall_threshold() {
+        // A bounded append that exceeded its budget records a "timed out" error
+        // and leaves inflight elevated, but the first accept is only 6s old under
+        // a 10s stall threshold. The stall clock alone would still report this
+        // healthy for the 4s window between the append budget and the stall
+        // threshold; the recorded timeout must deny admission on its own, because
+        // receipts are known not to be committing durably.
+        let counters = ReceiptWriterCounters {
+            accepted_total: 1,
+            failed_total: 1,
+            inflight: 1,
+            last_commit_unix_ms: None,
+            first_accept_unix_ms: Some(NOW - 6_000),
+            last_error: Some("sqlite receipt commit append timed out".to_string()),
             ..ReceiptWriterCounters::default()
         };
         assert_eq!(
