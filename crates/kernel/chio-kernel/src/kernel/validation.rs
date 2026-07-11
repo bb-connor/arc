@@ -1715,23 +1715,27 @@ impl ChioKernel {
         request: &ToolCallRequest,
         charge_result: Option<&BudgetChargeResult>,
     ) -> Result<Option<PaymentAuthorization>, PaymentError> {
-        // Derive the authorization amount. A MustPrepay intent with no budget charge
-        // (grant carries no monetary ceiling) uses the intent's quoted cost so the
-        // tool is not permitted to execute unpaid.
-        let (amount_units, currency) = if let Some(charge) = charge_result {
+        // Derive the authorization amount. A MustPrepay intent prepays its quoted
+        // cost, so the quote funds the prepayment whenever it is present, even when
+        // a provisional monetary budget hold accompanies it: that hold covers
+        // metered budget accounting, not the price the payer must prepay. Only a
+        // non-MustPrepay metered charge authorizes the charged amount, and a request
+        // with neither needs no payment.
+        let (amount_units, currency) = if let Some(amount) = Self::mustprepay_quoted_amount(request)
+        {
+            amount
+        } else if let Some(charge) = charge_result {
             (charge.cost_charged, charge.currency.clone())
         } else {
-            let Some(amount) = Self::mustprepay_quoted_amount(request) else {
-                return Ok(None);
-            };
-            amount
+            return Ok(None);
         };
 
         let Some(adapter) = self.payment_adapter.as_ref() else {
-            // No budget charge means this point is only reachable for MustPrepay.
             // The governed gate denies MustPrepay without an adapter earlier, but
-            // the payment boundary is fail-closed as defense-in-depth.
-            if charge_result.is_none() {
+            // the payment boundary is fail-closed as defense-in-depth: a MustPrepay
+            // intent (which may also carry a provisional charge) must never reach
+            // here without an adapter and be admitted unpaid.
+            if Self::is_governed_mustprepay_request(request) {
                 return Err(PaymentError::RailError(
                     "MustPrepay intent reached payment authorization without a configured adapter"
                         .to_string(),

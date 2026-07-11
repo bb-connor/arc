@@ -1237,3 +1237,188 @@ fn reconcile_stamps_mustprepay_prepayment_rail_reference() {
         "the reconcile receipt must carry the rail transaction id that funded the prepayment: {financial}"
     );
 }
+
+// Records the amount and currency presented to authorize so a test can assert
+// which figure funds the prepayment. Holds unsettled so the caller settles it.
+#[derive(Debug, Clone, Default)]
+struct AmountRecordingPaymentAdapter {
+    authorized_amount: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    authorized_currency: std::sync::Arc<std::sync::Mutex<String>>,
+}
+
+impl PaymentAdapter for AmountRecordingPaymentAdapter {
+    fn authorize(
+        &self,
+        request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        self.authorized_amount
+            .store(request.amount_units, std::sync::atomic::Ordering::SeqCst);
+        *self.authorized_currency.lock().unwrap() = request.currency.clone();
+        Ok(PaymentAuthorization {
+            authorization_id: "sim-amount-recording".to_string(),
+            settled: false,
+            metadata: serde_json::json!({ "adapter": "amount-recording" }),
+        })
+    }
+
+    fn capture(
+        &self,
+        authorization_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Ok(PaymentResult {
+            transaction_id: authorization_id.to_string(),
+            settlement_status: RailSettlementStatus::Settled,
+            metadata: serde_json::json!({ "adapter": "amount-recording" }),
+        })
+    }
+
+    fn release(
+        &self,
+        authorization_id: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Ok(PaymentResult {
+            transaction_id: authorization_id.to_string(),
+            settlement_status: RailSettlementStatus::Released,
+            metadata: serde_json::json!({ "adapter": "amount-recording" }),
+        })
+    }
+
+    fn refund(
+        &self,
+        transaction_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Ok(PaymentResult {
+            transaction_id: transaction_id.to_string(),
+            settlement_status: RailSettlementStatus::Refunded,
+            metadata: serde_json::json!({ "adapter": "amount-recording" }),
+        })
+    }
+}
+
+// A fabricated provisional monetary budget hold used to drive
+// `authorize_payment_if_needed` directly, modelling the charge a grant with a
+// per-invocation ceiling would produce alongside a MustPrepay quote.
+fn make_provisional_charge(cost_charged: u64, currency: &str) -> BudgetChargeResult {
+    BudgetChargeResult {
+        grant_index: 0,
+        cost_charged,
+        currency: currency.to_string(),
+        budget_total: 1000,
+        new_committed_cost_units: cost_charged,
+        budget_hold_id: "hold-provisional".to_string(),
+        authorize_metadata: BudgetCommitMetadata {
+            authority: None,
+            guarantee_level: crate::budget_store::BudgetGuaranteeLevel::SingleNodeAtomic,
+            budget_profile: crate::budget_store::BudgetAuthorityProfile::AuthoritativeHoldEvent,
+            metering_profile:
+                crate::budget_store::BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
+            budget_commit_index: None,
+            event_id: None,
+        },
+    }
+}
+
+// A governed MustPrepay intent whose quote (100) is the amount the payer prepays
+// while a provisional per-invocation budget hold (10) accompanies it. The
+// prepayment must fund the quoted cost, not the provisional hold, or the tool
+// executes against an underfunded prepayment. The charge is fabricated in a
+// different currency to prove the quote's currency (not the charge's) is what is
+// authorized for a cross-currency quote.
+#[test]
+fn governed_mustprepay_with_charge_funds_the_quoted_cost_not_the_hold() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let adapter = AmountRecordingPaymentAdapter::default();
+    let authorized_amount = adapter.authorized_amount.clone();
+    let authorized_currency = adapter.authorized_currency.clone();
+    kernel.set_payment_adapter(Box::new(adapter));
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 5, "USD")));
+
+    let agent_kp = Keypair::generate();
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 10, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let intent = make_mustprepay_intent("intent-charge-fund", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-charge-fund", &cap, &agent_kp, intent, &kernel);
+
+    // Provisional budget hold of 10 in a different currency accompanies the quote.
+    let charge = make_provisional_charge(10, "EUR");
+
+    let authorization = kernel
+        .authorize_payment_if_needed(&request, Some(&charge))
+        .expect("MustPrepay-with-charge authorization must succeed")
+        .expect("MustPrepay-with-charge must authorize a prepayment");
+    assert!(
+        !authorization.settled,
+        "the recording adapter holds the authorization unsettled"
+    );
+    assert_eq!(
+        authorized_amount.load(std::sync::atomic::Ordering::SeqCst),
+        100,
+        "a MustPrepay prepayment must fund the quoted cost (100), not the provisional budget hold (10)"
+    );
+    assert_eq!(
+        authorized_currency.lock().unwrap().as_str(),
+        "USD",
+        "the prepayment must be authorized in the quote's currency, not the charge's"
+    );
+}
+
+// A non-MustPrepay request with a provisional budget charge and no MustPrepay
+// quote still authorizes the charged amount: the quote-first reorder must not
+// disturb the metered charge path.
+#[test]
+fn non_mustprepay_charge_authorizes_the_charged_amount() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let adapter = AmountRecordingPaymentAdapter::default();
+    let authorized_amount = adapter.authorized_amount.clone();
+    let authorized_currency = adapter.authorized_currency.clone();
+    kernel.set_payment_adapter(Box::new(adapter));
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 5, "USD")));
+
+    let agent_kp = Keypair::generate();
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 10, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    // No governed intent means no MustPrepay quote: the charge alone drives payment.
+    let request = ToolCallRequest {
+        request_id: "req-metered-charge".to_string(),
+        capability: cap,
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    };
+    let charge = make_provisional_charge(10, "USD");
+
+    kernel
+        .authorize_payment_if_needed(&request, Some(&charge))
+        .expect("metered charge authorization must succeed")
+        .expect("a metered charge must authorize a payment");
+    assert_eq!(
+        authorized_amount.load(std::sync::atomic::Ordering::SeqCst),
+        10,
+        "a non-MustPrepay metered charge must authorize the charged amount"
+    );
+    assert_eq!(
+        authorized_currency.lock().unwrap().as_str(),
+        "USD",
+        "a metered charge must authorize in the charge's currency"
+    );
+}
