@@ -671,6 +671,104 @@ fn size_trigger_applies_when_time_cutoff_is_a_noop() -> Result<(), Box<dyn std::
     Ok(())
 }
 
+/// Rotation deletes evidence, so it must run on a verified chain. A store opened
+/// with `incremental_verification = false` seeds its writer head via the cheap
+/// `seed_head_snapshot`, which defers the full claim-log and checkpoint-chain
+/// audit to the next append, so a Verified head is NOT proof of integrity in that
+/// mode. A corrupt projection must make the rotation fail closed and delete
+/// nothing, rather than archive-and-delete against an unaudited log.
+#[test]
+fn non_incremental_rotation_validates_chain_before_deleting(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("retention-nonincremental-validate");
+    let archive = unique_db_path("retention-nonincremental-validate-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    // Build a checkpointed prefix at timestamp 100 (older than the cutoff below).
+    let receipt_id = {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+        let mut first_id = String::new();
+        for i in 0..2u64 {
+            let receipt = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("nonincr-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            if i == 0 {
+                first_id = receipt.id.clone();
+            }
+            store.append_chio_receipt_returning_seq(&receipt)?;
+        }
+        store.flush_receipt_writes()?;
+        assert!(
+            store.load_checkpoint_by_seq(1)?.is_some(),
+            "the prefix must be checkpointed so a rotation would otherwise archive it"
+        );
+        first_id
+    };
+
+    // Reopen with incremental_verification = false: the writer head is seeded via
+    // the cheap snapshot without auditing the claim log.
+    let store = SqliteReceiptStore::open_existing_with_options(
+        &path,
+        crate::SqliteStoreOptions {
+            pool: crate::SqlitePoolConfig::default(),
+            incremental_verification: false,
+        },
+    )?;
+    assert!(!store.incremental_verification_enabled());
+
+    // Corrupt a claim-log projection row. The snapshot seed never inspects it, so
+    // only the full pre-rotation verification catches this.
+    super::support::tamper_claim_log_tool_receipt(&store, &receipt_id, |receipt| {
+        receipt.tool_name = "tampered".to_string();
+    });
+
+    // Pre-create the archive file. A store opened via `open_existing_with_options`
+    // holds READ_WRITE-without-CREATE flags, so a fresh archive cannot be created
+    // by ATTACH; an existing archive (as after any prior rotation) is the state in
+    // which the copy-and-delete would otherwise proceed against the corrupt chain.
+    drop(rusqlite::Connection::open(&archive)?);
+
+    // Rotation must fail closed on the corrupt chain rather than archive-and-delete.
+    let error = store
+        .archive_receipts_before(150, archive_path)
+        .err()
+        .ok_or(
+            "rotation on a corrupt non-incremental chain must fail closed, not archive-and-delete",
+        )?;
+    assert!(
+        matches!(error, ReceiptStoreError::Conflict(_)),
+        "expected a fail-closed Conflict from the pre-rotation verification, got {error:?}"
+    );
+
+    // Fail-closed: nothing was deleted; the live evidence is intact.
+    let live = store.reader_connection_for_test()?;
+    let live_tool: i64 = live.query_row("SELECT COUNT(*) FROM chio_tool_receipts", [], |row| {
+        row.get(0)
+    })?;
+    assert_eq!(
+        live_tool, 2,
+        "no evidence may be deleted when the chain is unverified"
+    );
+    let live_log: i64 = live.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        live_log, 2,
+        "no claim-log rows may be deleted when the chain is unverified"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// A rotation is an in-flight writer, so `dispatch_rotate` increments
 /// `writer.inflight` before sending the Rotate
 /// command and the actor's Rotate arm must decrement it on dequeue. Without the

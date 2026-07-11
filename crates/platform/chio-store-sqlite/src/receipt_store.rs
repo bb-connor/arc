@@ -890,6 +890,24 @@ fn handle_non_append_command(
                     return;
                 }
             };
+            // Fail-closed: rotation deletes evidence, so a non-verified head must
+            // not authorize it. On a non-incremental (suspect) store the Verified
+            // state is NOT proof of chain integrity: that mode seeds the head via
+            // `seed_head_snapshot`, which defers the full claim-log and
+            // checkpoint-chain audit to the next append, so a metadata-only
+            // deployment could otherwise rotate and delete against an unaudited
+            // projection. Run the same full validation the non-incremental write
+            // pre-check runs before touching the store. Incremental stores
+            // maintain a per-append verified head, so their Verified state is
+            // already trustworthy and this O(N) audit is skipped.
+            if !incremental_verification {
+                let validation = verify_latest_checkpoint_integrity(&connection)
+                    .and_then(|()| validate_claim_receipt_log_entries(&connection));
+                if let Err(error) = validation {
+                    let _ = response.send(Err(error));
+                    return;
+                }
+            }
             // Panic isolation: the writer actor re-acquires a fresh connection
             // for every command, so a caught panic fails only THIS rotation
             // (fail-closed) and no state from the panicking closure is reused
