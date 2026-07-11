@@ -1,4 +1,4 @@
-//! Chio Pass control-plane orchestrator (M0 spec Section 6.3/6.4, task T9).
+//! Chio Pass control-plane orchestrator.
 //!
 //! This module is the control plane that owns the cross-crate Pass wiring: it
 //! needs BOTH the credential layer (`chio-credentials`) and the kernel scope/mint
@@ -15,10 +15,10 @@
 //!   distribution-throttle policy. It is loaded fail-closed (its `validate`
 //!   rejects every degenerate field), and it is the provenance for
 //!   `accepted_kernel_keys`: never an ad-hoc per-request value.
-//! - [`build_pass_scope`] is the C1 bridge: it turns a verified [`ChioPass`] into
-//!   the canonical Pass [`ChioScope`] of spec Section 2.7 (exactly one metered XCC
+//! - [`build_pass_scope`] turns a verified [`ChioPass`] into
+//!   the canonical Pass [`ChioScope`] (exactly one metered XCC
 //!   `ToolGrant` pinned at index 0 plus the five gifted-stream resource grants).
-//! - [`count_genuine_use`] is the CONTROL 3 storage-backed scan: it pages the
+//! - [`count_genuine_use`] is the storage-backed genuine-use scan: it pages the
 //!   receipt store and counts genuine-use receipts via the committed
 //!   `is_genuine_use_receipt`, rejecting any receipt signed by a kernel key
 //!   outside the pinned `accepted_kernel_keys` allowlist.
@@ -29,8 +29,8 @@
 //! - [`issue_chio_pass_command`] is the issuance command: it admits the candidate
 //!   against the distribution throttle, then mints the soulbound credential and
 //!   the window-scoped kernel capability.
-//! - [`prepare_pass_anchor_publication`] is the C6 read-only anchoring job (task
-//!   T10, spec Sections 3.4 / 6.6): it folds the committed `chio_pass_artifact_id`
+//! - [`prepare_pass_anchor_publication`] is the read-only anchoring job: it
+//!   folds the committed `chio_pass_artifact_id`
 //!   leaves of the issued + revoked Passes into an RFC6962 [`AnchorBatch`]
 //!   (Merkle `tree_root` plus one inclusion proof per Pass digest), wraps that root
 //!   in a [`KernelCheckpoint`] under a strictly-increasing per-operator
@@ -75,8 +75,7 @@ use chio_store_sqlite::SqliteReceiptStore;
 
 use crate::CliError;
 
-/// The single board-approved Chio Pass governance surface (spec Open Question 3 /
-/// Sections 2.5, 4.3, 6.4).
+/// The single board-approved Chio Pass governance surface.
 ///
 /// This is the ONE source of truth for every governance number and trust anchor
 /// the orchestrator consumes. It is loaded fail-closed: [`Self::validate`] rejects
@@ -86,31 +85,31 @@ use crate::CliError;
 /// against, never an ad-hoc per-request caller value.
 #[derive(Debug, Clone)]
 pub struct ChioPassConfig {
-    /// CONTROL 1 aggregate pool ceiling. Its `allotment_unit` MUST be the Pass XCC
+    /// Aggregate free-tier pool ceiling. Its `allotment_unit` MUST be the Pass XCC
     /// unit so the kernel recognises the co-debit as free-tier.
     pub free_tier_pool: FreeTierPoolConfig,
-    /// Tier -> allotment-units table (Section 2.5). The floor is unconditional;
+    /// Tier -> allotment-units table. The floor is unconditional;
     /// the tier scales SIZE only, never existence.
     pub tier_allotment_table: TierAllotmentTable,
-    /// Per-window distribution cap (anti-farm throttle, Section 6.1).
+    /// Per-window distribution cap (anti-farm throttle).
     pub window_token_capacity: u64,
-    /// Live-population cap (anti-farm throttle, Section 6.1). Counted against the
+    /// Live-population cap (anti-farm throttle). Counted against the
     /// revocation-oracle live set (non-revoked, non-expired Passes).
     pub active_population_cap: u64,
-    /// Board-pinned genuine-use floor for refresh. M0 ships the committed
+    /// Board-pinned genuine-use floor for refresh. Launch ships the committed
     /// [`MIN_GENUINE_USE_RECEIPTS`] (`1`); a higher board floor is enforced by the
-    /// orchestrator (Open Questions 1/5).
+    /// orchestrator.
     pub min_genuine_use_receipts: u32,
     /// Audit-only reference to the board approval that funded this surface.
     pub board_approval_ref: String,
-    /// Pinned trusted-kernel-key allowlist (Open Question 3). The genuine-use scan
+    /// Pinned trusted-kernel-key allowlist. The genuine-use scan
     /// counts a receipt only when `receipt.kernel_key` is a member here, upgrading
     /// `verify_signature` (self-consistency) to "a TRUSTED kernel signed it".
     pub accepted_kernel_keys: Vec<PublicKey>,
 }
 
 impl ChioPassConfig {
-    /// M0 placeholder governance numbers (Section 2.5 / Open Question 1).
+    /// Placeholder governance numbers.
     ///
     /// These REQUIRE board sign-off; this constructor is a convenience for wiring
     /// the single board-approved surface with the caller-pinned trust anchors (the
@@ -183,7 +182,7 @@ impl ChioPassConfig {
     }
 
     /// Build the per-window distribution-throttle policy from the board-pinned
-    /// capacities (Section 6.1). `window_ym` is the per-window label; the capacity
+    /// capacities. `window_ym` is the per-window label; the capacity
     /// and population cap are governance config.
     #[must_use]
     pub fn admission_policy_for_window(
@@ -212,7 +211,7 @@ pub struct ChioPassIssuance {
     pub window: AttestationWindowId,
 }
 
-/// The result of a rollover refresh (CONTROL 3, Section 4.3).
+/// The result of a rollover refresh.
 #[derive(Debug, Clone)]
 pub enum ChioPassRefreshResult {
     /// Re-attested with genuine use: a fresh tier-sized Pass + capability minted.
@@ -230,7 +229,7 @@ pub enum ChioPassRefreshResult {
     NotReattested { decision: ChioPassRefreshDecision },
 }
 
-/// The Pass -> [`ChioScope`] builder (C1, spec Section 6.3 / 2.7).
+/// The Pass -> [`ChioScope`] builder.
 ///
 /// Turns a verified [`ChioPass`] into the canonical Pass scope: EXACTLY one metered
 /// XCC `ToolGrant` pinned at index 0 (the only grant that opens a budget row), plus
@@ -238,7 +237,7 @@ pub enum ChioPassRefreshResult {
 /// `pass_baseline_resource_grants` builder, and ZERO prompt grants. The metered
 /// grant's `max_total_cost` is `Some(window_units)` (a `0` ceiling denies fail-closed,
 /// never `None`/unlimited) and `max_cost_per_invocation` is `Some(per_invocation_units)`
-/// in the XCC unit so CONTROL 1 recognises the pool co-debit.
+/// in the XCC unit so the kernel recognises the pool co-debit.
 ///
 /// # Errors
 ///
@@ -270,7 +269,7 @@ pub fn build_pass_scope(pass: &ChioPass, subject_tenant: &str) -> Result<ChioSco
     })
 }
 
-/// CONTROL 3 storage-backed genuine-use scan (spec Section 6.4).
+/// Storage-backed genuine-use scan.
 ///
 /// Pages the receipt store over `window` (own-tenant, agent-scoped, decision
 /// "allow") and counts the receipts that satisfy the committed
@@ -427,7 +426,7 @@ pub fn issue_chio_pass_command<A: CapabilityAuthority + ?Sized>(
             ));
         }
     }
-    // First window: the newcomer gets the unconditional tier floor (Section 2.5).
+    // First window: the newcomer gets the unconditional tier floor.
     mint_chio_pass(
         config,
         authority,
@@ -440,7 +439,7 @@ pub fn issue_chio_pass_command<A: CapabilityAuthority + ?Sized>(
     )
 }
 
-/// Rollover refresh orchestrator (CONTROL 3, spec Sections 4.3 / 6.4).
+/// Rollover refresh orchestrator.
 ///
 /// Scans the prior window's genuine use, sizes the next window via the committed
 /// [`chio_pass_refresh_decision`], and maps its outcome onto issuance:
@@ -486,7 +485,7 @@ pub fn refresh_chio_pass_window<A: CapabilityAuthority + ?Sized>(
     let subject_did = subject.to_string();
     let prior_capability_id = window_scoped_capability_id(&subject_did, prior_window)?;
     let next_capability_id = window_scoped_capability_id(&subject_did, next_window)?;
-    // CONTROL 3 scan: fail-closed (any store/crypto error -> Err -> no mint).
+    // Genuine-use scan: fail-closed (any store/crypto error -> Err -> no mint).
     let raw_count = count_genuine_use(
         store,
         &subject_public_key.to_hex(),
@@ -572,7 +571,7 @@ pub struct PreparedPassAnchorPublication {
     pub publication: PreparedEvmRootPublication,
 }
 
-/// The read-only Chio Pass anchoring job (C6, task T10; spec Sections 3.4 / 6.6).
+/// The read-only Chio Pass anchoring job.
 ///
 /// Folds the issued + revoked Pass digests into one anchorable Merkle root and the
 /// matching inclusion-proof artifacts, then prepares (does NOT send) the on-chain
@@ -1304,7 +1303,7 @@ mod tests {
             None,
         )
         .expect("genesis anchor publication");
-        // PR957 codex P2: the genesis checkpoint_seq is 1, not 0 (validate_checkpoint
+        // The genesis checkpoint_seq is 1, not 0 (validate_checkpoint
         // rejects seq 0).
         assert_eq!(genesis.checkpoint.body.checkpoint_seq, 1);
         assert!(genesis.checkpoint.body.previous_checkpoint_sha256.is_none());
@@ -1332,7 +1331,7 @@ mod tests {
 
     #[test]
     fn prepare_pass_anchor_publication_produces_validatable_checkpoints() {
-        // PR957 codex P2: the prepared genesis + successor checkpoints must pass the
+        // The prepared genesis + successor checkpoints must pass the
         // standard `validate_checkpoint` and continuity checks (seq >= 1, 1-based
         // batch ranges, covered entry count == tree_size), otherwise the anchoring
         // job cannot produce reusable checkpoints.
@@ -1380,7 +1379,7 @@ mod tests {
 
     #[test]
     fn prepare_pass_anchor_publication_rejects_binding_key_mismatch() {
-        // PR957 codex P2: the binding that attributes the on-chain operatorKeyHash must
+        // The binding that attributes the on-chain operatorKeyHash must
         // match the operator key that signed the checkpoint. Passing Alice's binding
         // with Bob's keypair would anchor a root whose advertised identity (Alice) does
         // not match its off-chain signer (Bob); reject it fail-closed.

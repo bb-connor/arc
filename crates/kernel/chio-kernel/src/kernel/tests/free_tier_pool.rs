@@ -1,10 +1,11 @@
-// Free-tier aggregate-pool tests (code-review C1 + PR957 codex P2).
+// Free-tier aggregate-pool tests.
 //
 // These tests live alongside the budget suite (`include!`d into the kernel test
 // module) and exercise the aggregate Chio Pass pool co-debit: post-execution
-// reconciliation of the worst-case hold down to realized cost (C1), and the
-// no-pool admission boundary that keeps unrelated custom private-unit budgets on
-// the normal path while still failing closed for genuine XCC Pass charges (P2).
+// reconciliation of the worst-case hold down to realized cost, the hard
+// monthly ceiling, and the no-pool admission boundary that keeps unrelated
+// custom private-unit budgets on the normal path while still failing closed
+// for genuine XCC Pass charges.
 
 /// The current UTC calendar-month attestation window, computed dynamically so
 /// these tests are not wall-clock time bombs.
@@ -176,7 +177,7 @@ fn free_tier_pool_reconciles_pass_charge_to_realized_cost_and_frees_room() {
 
 #[test]
 fn non_pass_private_unit_allowed_when_no_pool_configured() {
-    // PR957 codex P2: with NO free-tier pool installed, a capability budgeted in a
+    // With NO free-tier pool installed, a capability budgeted in a
     // custom private-use unit ("ABC", which is not the Pass XCC allotment unit) must
     // stay on the normal budget path and be allowed. Before the fix the no-pool branch
     // reversed and denied EVERY unpinned three-letter unit, breaking unrelated
@@ -206,7 +207,7 @@ fn non_pass_private_unit_allowed_when_no_pool_configured() {
 
 #[test]
 fn genuine_pass_xcc_denied_when_no_pool_configured() {
-    // PR957 codex P2 (DO-NOT-WEAKEN guard): the no-pool fix above must NOT widen the
+    // DO-NOT-WEAKEN: the no-pool admission boundary must NOT widen the
     // XCC-must-co-debit invariant. A genuine Pass XCC charge cannot co-debit an absent
     // aggregate ceiling, so with NO pool configured it MUST still fail closed.
     let mut kernel = make_kernel(make_monetary_config());
@@ -233,7 +234,7 @@ fn genuine_pass_xcc_denied_when_no_pool_configured() {
 }
 
 // ---------------------------------------------------------------------------
-// CONTROL-1 ceiling evidence: the aggregate pool holds under concurrency and
+// Ceiling evidence: the aggregate pool holds under concurrency and
 // denies fail-closed at exhaustion, so the treasury never overspends.
 
 const FT_SERVER: &str = "chio.pass.compute";
@@ -379,7 +380,7 @@ fn concurrent_free_tier_charges_are_atomic_against_the_pool_ceiling() {
 // 7. Symmetric reversal: cancelling a free-tier charge releases BOTH the per-Pass
 
 #[test]
-fn gate_1_pool_exhaustion_fails_closed_treasury_never_overspends() {
+fn pool_exhaustion_fails_closed_treasury_never_overspends() {
     const ALLOT: u64 = 100;
     const POOL: u64 = 3 * ALLOT;
     let kernel = pool_kernel(POOL);

@@ -42,7 +42,7 @@ pub const CHIO_PASS_CAPABILITY_ID_PREFIX: &str = "chiopass:";
 /// The interval is half-open `[since, until)`. A Pass-minted capability token
 /// binds `token.issued_at == since` and `token.expires_at == until`, and
 /// `window_ym` is the single term shared with the
-/// `freetier:global:<window_ym>` aggregate pool key (CONTROL 1).
+/// `freetier:global:<window_ym>` aggregate pool key.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AttestationWindowId {
     /// UTC calendar-month label formatted "%Y-%m" (for example "2026-06").
@@ -92,7 +92,7 @@ struct WindowScopedCapabilityIdInput<'a> {
 /// `0` by the caller.
 ///
 /// The id binds only `(domain, subjectDid, windowYm)`: it deliberately does not
-/// commit to scope or tier (a tier change reuses the same row), and under M0's
+/// commit to scope or tier (a tier change reuses the same row), and under the
 /// single issuing authority it carries no issuer column. `subject_did` must be
 /// the canonical `did:chio` string (`DidChio::as_str()`), never a raw
 /// caller-supplied value, so the row is stable across re-presentations.

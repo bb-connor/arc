@@ -294,7 +294,7 @@ impl ChioKernel {
             chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason()
         })?;
 
-        // B7 (M0 T6): a Pass-shaped capability (a `chiopass:` id OR an XCC metered
+        // A Pass-shaped capability (a `chiopass:` id OR an XCC metered
         // grant) must carry the deterministic window-scoped id recomputed from its
         // OWN subject DID and its issued_at-aligned attestation window, with
         // issued_at/expires_at pinned to the window boundaries. This is an additive,
@@ -1297,7 +1297,7 @@ impl ChioKernel {
         let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
         let merged_extra_metadata = merge_metadata_objects(financial_json, merged_extra_metadata);
 
-        // CONTROL 3 genuine-use binding: a genuine Pass (free-tier XCC) charge co-
+        // Genuine-use binding: a genuine Pass (free-tier XCC) charge co-
         // debited the aggregate pool, so stamp the allotment cost dimension on the
         // served receipt. Without it, a normal Pass invocation (whose tool injects
         // no custom `cost` block) would scan as non-genuine and the refresh would
