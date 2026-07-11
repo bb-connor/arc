@@ -795,14 +795,18 @@ impl ChioKernel {
         }
     }
 
-    /// Forward the validated request and optionally report actual invocation cost.
+    /// Forward the validated request and optionally report actual invocation
+    /// cost, enforcing the configured dispatch budget. This is the phase-level
+    /// dispatch entry point (`ToolEvaluator::dispatch`), so a custom evaluator or
+    /// phase-level caller cannot bypass the deadline and hang indefinitely on a
+    /// wedged tool server; it matches the budget the full evaluate path enforces.
     pub(crate) async fn dispatch_tool_call_with_cost(
         &self,
         request: &ToolCallRequest,
         has_monetary_grant: bool,
     ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
         self.require_presented_execution_nonce(request, &request.capability)?;
-        self.dispatch_tool_call_with_cost_after_nonce_check(request, has_monetary_grant)
+        self.dispatch_within_budget(request, has_monetary_grant)
             .await
     }
 

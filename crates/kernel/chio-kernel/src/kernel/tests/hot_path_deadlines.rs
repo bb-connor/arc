@@ -476,3 +476,49 @@ async fn healthy_writer_records_capability_snapshot_through_the_bounded_path(
     );
     Ok(())
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn phase_dispatch_honors_the_configured_dispatch_budget(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // The `ToolEvaluator::dispatch` phase entry point is reachable by custom
+    // evaluators independently of the full evaluate path. With a dispatch budget
+    // configured it must enforce the deadline too, so a wedged tool server fails
+    // closed within budget rather than hanging the caller indefinitely.
+    use crate::kernel::evaluator::{BlockingToolEvaluator, ToolEvaluator};
+
+    let invocations = Arc::new(AtomicU64::new(0));
+    let mut config = make_config();
+    config.deadlines.dispatch_budget_ms = 200;
+    let mut kernel = make_kernel(config);
+    kernel.register_tool_server(Box::new(HangingToolServer {
+        id: "srv-phase-hang".to_string(),
+        tools: vec!["noop".to_string()],
+        invocations: Arc::clone(&invocations),
+    }));
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-phase-hang", "noop")]),
+        300,
+    );
+    let request = make_request("req-phase-dispatch", &cap, "noop", "srv-phase-hang");
+    let kernel = Arc::new(kernel);
+
+    let start = std::time::Instant::now();
+    let result = BlockingToolEvaluator
+        .dispatch(&kernel, &request, false)
+        .await;
+    assert!(
+        start.elapsed() < Duration::from_secs(1),
+        "the phase dispatch deadline must fire near 200ms, well before a hung server"
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 1, "dispatch did start");
+    match result {
+        Err(KernelError::HotPathDeadlineExceeded { stage, .. }) => {
+            assert_eq!(stage, HotPathStage::Dispatch);
+        }
+        other => panic!("expected a dispatch deadline error, got {other:?}"),
+    }
+    Ok(())
+}
