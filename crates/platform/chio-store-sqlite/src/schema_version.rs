@@ -317,6 +317,23 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn approval_store_refuses_a_standalone_revocation_database(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // The revocation store lives in its own file alongside the sidecar
+        // database. A `--receipt-store` mistargeted at that revocation file must
+        // fail closed: `chio api protect` opens the approval store first, so if a
+        // lone `revoked_capabilities` table let it adopt the file, it would write
+        // approval tables into the revocation database and the receipt store would
+        // then accept the commingled file too.
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("sidecar.db.revocations");
+        crate::SqliteRevocationStore::open(&path)?;
+        assert!(crate::SqliteApprovalStore::open(&path).is_err());
+        assert!(crate::SqliteReceiptStore::open(&path).is_err());
+        Ok(())
+    }
+
     // Table-driven schema-version monotonicity (this crate has no proptest
     // dev-dependency): for every v_disk <= v_bin the reopen is stable and never
     // downgrades; for v_disk > v_bin the open refuses and leaves the file

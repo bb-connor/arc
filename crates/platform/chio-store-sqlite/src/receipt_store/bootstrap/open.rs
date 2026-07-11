@@ -6,18 +6,19 @@ const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
 
 /// Tables that identify a database this receipt store may open. `chio_tool_receipts`
 /// is the store's own anchor (also the table it shipped before schema stamping
-/// existed). The remaining tables belong to the approval store and the HTTP
-/// receipt sidecar, which `chio api protect` co-locates with this store in one
-/// SQLite file: the approval store opens and stamps that file first, so the
-/// receipt store must recognize its neighbor tables to adopt the shared sidecar
-/// database rather than refuse it. A sibling store of a different kind (a budget
-/// or authority database) carries none of these and is still refused.
+/// existed). The remaining tables belong to the approval store, which
+/// `chio api protect` co-locates with this store in one SQLite file: the approval
+/// store opens and stamps that file first, so the receipt store must recognize its
+/// neighbor tables to adopt the shared sidecar database rather than refuse it. The
+/// revocation store lives in a separate file, so `revoked_capabilities` is
+/// deliberately not an anchor: a path mistargeted at a standalone revocation
+/// database is refused rather than adopted. A sibling store of a different kind (a
+/// budget or authority database) carries none of these and is still refused.
 const RECEIPT_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
     "chio_tool_receipts",
     "chio_hitl_pending",
     "http_receipts",
     "tool_receipts",
-    "revoked_capabilities",
 ];
 
 fn configure_sqlite_connection(connection: &mut Connection) -> Result<(), ReceiptStoreError> {

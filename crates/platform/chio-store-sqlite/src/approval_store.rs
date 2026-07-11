@@ -33,17 +33,17 @@ pub struct SqliteApprovalStore {
 /// Approval-store schema revision. Bump on every schema-affecting change.
 const APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
 /// Tables shipped before schema stamping existed, used to adopt a pre-stamping
-/// approval database rather than reject it as foreign. `chio api protect` keeps
-/// the approval store in the same file as its receipt and revocation sidecar
-/// tables, and the approval store opens that file first on boot, so a legacy
-/// sidecar-only database must be recognized as ours through its sidecar tables
-/// rather than rejected before the receipt store can adopt it.
-const APPROVAL_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
-    "chio_hitl_pending",
-    "http_receipts",
-    "tool_receipts",
-    "revoked_capabilities",
-];
+/// approval database rather than reject it as foreign. `chio api protect`
+/// co-locates the approval store and the receipt store in one sidecar file and
+/// opens the approval store first on boot, so that file may already carry the
+/// receipt tables; recognizing them as a sibling sidecar store lets the approval
+/// store adopt the shared file instead of rejecting it before the receipt store
+/// can. The revocation store lives in a separate file, so `revoked_capabilities`
+/// is deliberately not an anchor: a path mistargeted at a standalone revocation
+/// database must fail closed here rather than have approval tables written into
+/// it (after which the receipt store would accept the commingled file too).
+const APPROVAL_STORE_LEGACY_ANCHOR_TABLES: &[&str] =
+    &["chio_hitl_pending", "http_receipts", "tool_receipts"];
 
 impl SqliteApprovalStore {
     /// Open the store at the given path. Creates the parent directory
