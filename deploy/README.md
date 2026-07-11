@@ -28,7 +28,6 @@ Search and replace the following before applying:
 | `APP_IMAGE_PLACEHOLDER` | Your application container image |
 | `ghcr.io/backbay-labs/chio-sidecar:latest` | Chio sidecar image you have built and pushed |
 | `PROJECT_ID`, `REGION` | GCP project and region (Cloud Run) |
-| `FILESTORE_IP` | Filestore instance IP backing the durable Cloud Run receipt volume |
 | `ACCOUNT_ID` | AWS account ID (ECS) |
 | `EFS_FILESYSTEM_ID` | ECS EFS filesystem holding the read-only spec/seed shares |
 | `EFS_SEED_ACCESS_POINT_ID` | ECS EFS access point for the seed directory |
@@ -50,7 +49,7 @@ Non-secret configuration is passed as CLI flags to the sidecar subcommand
 - `--listen` -- bind address (default `127.0.0.1:9090`; the manifests bind `0.0.0.0:9090`); the health route is fixed at `/chio/health`
 - `--upstream` -- the protected upstream base URL
 - `--spec` -- the OpenAPI document the kernel derives its route and scope table from (the operator-provided spec, not the upstream)
-- `--receipt-store` -- path to the durable SQLite audit log, on the read-write receipt volume
+- `--receipt-store` -- path to the SQLite audit log, on the read-write receipt volume (see durability caveats below)
 - `--authority-seed-file` -- path to the secret-mounted signing seed
 
 The kernel policy is derived from the OpenAPI spec plus these flags; there is no
@@ -63,20 +62,20 @@ and writers through a shared-memory index that only works when every connection
 is on the same host and a local (non-network) filesystem, so the store is a
 single-writer, single-host database:
 
-- Give the receipt database a **per-instance disk**, not a shared network
-  filesystem. WAL is not safe over Filestore/NFS, Amazon EFS, or Azure Files;
-  the sidecar fails closed at startup if the mounted filesystem cannot support
-  WAL rather than run without durability.
-- Run **exactly one writer** per database. The Cloud Run and Azure references
-  pin to a single instance, and the ECS reference attaches a per-task block
-  volume and expects `desiredCount: 1`. Two instances writing one receipt file
-  corrupt it.
-- To **scale horizontally**, give each instance its own receipt database or
-  front a client-server audit store; do not share one SQLite file across
-  instances. Cloud Run and Azure Container Apps have no per-instance persistent
-  disk, so durable receipts there require a per-instance disk platform (a
-  StatefulSet PVC, an ECS task with an attached block volume) or a client-server
-  store.
+- Give the receipt database a **local (non-network) filesystem**, never a shared
+  network filesystem. WAL is not safe over Filestore/NFS, Amazon EFS, or Azure
+  Files; the sidecar fails closed at startup if the mounted filesystem cannot
+  support WAL rather than run without durability.
+- For a **durable** audit trail, give the database a per-instance disk. The ECS
+  reference attaches a per-task block volume and expects `desiredCount: 1`. Two
+  instances writing one receipt file corrupt it, so run exactly one writer per
+  database.
+- Cloud Run and Azure Container Apps have **no per-instance persistent disk**, so
+  their references run the log on a local in-memory volume: WAL works, but the
+  log is lost on every instance or revision recycle. For durable receipts on
+  those platforms, front a client-server audit store or move to a per-instance
+  disk platform (a StatefulSet PVC, or an ECS task with an attached block
+  volume).
 
 ## Startup ordering
 

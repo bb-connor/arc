@@ -6,8 +6,6 @@
 #   PROJECT_ID / REGION              -- substitute for your GCP project and region
 #   projects/PROJECT_ID/secrets/...  -- create the secrets in Secret Manager first
 #   chio-openapi-spec / chio-authority-seed -- Secret Manager secrets mounted below
-#   FILESTORE_IP                     -- Filestore instance IP backing the durable
-#                                       receipt volume (see volumes: below)
 #   chio-sidecar-control-token       -- bearer token gating /metrics + control
 #                                       endpoints (a metrics scraper presents it)
 #
@@ -30,11 +28,11 @@ spec:
     metadata:
       annotations:
         # Keep at least one warm instance to amortise sidecar cold starts.
-        # The receipt store is a single-writer SQLite database, so this service
-        # pins maxScale to 1: exactly one instance ever opens the receipt volume.
-        # Fanning out to multiple instances that share one receipt file would
-        # corrupt it. To scale horizontally, give each instance its own receipt
-        # database or front a client-server audit store (see the volume note).
+        # The receipt store is a single-writer SQLite database on a per-instance
+        # volume, so this service pins maxScale to 1: one instance keeps one
+        # coherent audit stream. Fanning out gives each instance its own separate
+        # log; for a single durable audit trail across scale, front a
+        # client-server audit store (see the volume note).
         autoscaling.knative.dev/minScale: "1"
         autoscaling.knative.dev/maxScale: "1"
         # App waits until chio-sidecar startupProbe succeeds.
@@ -164,21 +162,17 @@ spec:
             items:
               - key: latest
                 path: authority.seed
-        # Durable audit store for a SINGLE writer. The receipt log is a SQLite
-        # database in WAL mode: WAL coordinates connections through a shared-memory
-        # index that requires every connection on the same host and a local
-        # filesystem, so it is not safe over a network filesystem and two instances
-        # writing the same file corrupt it. This service pins maxScale to 1 and the
-        # Filestore share below is mounted read-write by that one instance. If the
-        # mounted filesystem cannot support WAL, the sidecar refuses to start rather
-        # than run without durability. Cloud Run has no per-instance persistent
-        # disk, so a durable single-writer SQLite store here depends on the
-        # Filestore mount; horizontally-scaled or multi-writer deployments belong on
-        # a platform with a per-instance disk (a StatefulSet PVC, an ECS task with an
-        # attached block volume) or behind a client-server audit store. An emptyDir
-        # is ephemeral and drops the log on every revision recycle.
+        # Audit store for a SINGLE writer. The receipt log is a SQLite database in
+        # WAL mode: WAL coordinates connections through a shared-memory index that
+        # requires every connection on the same host and a local (non-network)
+        # filesystem, so it cannot run on Filestore/NFS. The sidecar refuses to
+        # start if the mounted filesystem cannot support WAL. Cloud Run has no
+        # per-instance persistent disk, so this reference runs the log on a local
+        # in-memory volume: WAL works, but the log is lost on every revision
+        # recycle. For a durable audit trail, run on a platform with a per-instance
+        # disk (a StatefulSet PVC, an ECS task with an attached block volume) or
+        # front a client-server audit store.
         - name: chio-receipts
-          nfs:
-            server: FILESTORE_IP
-            path: /chio-receipts
-            readOnly: false
+          emptyDir:
+            medium: Memory
+            sizeLimit: 128Mi
