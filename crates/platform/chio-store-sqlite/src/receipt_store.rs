@@ -2599,7 +2599,16 @@ impl SqliteReceiptStore {
     ) -> Result<ReceiptFlushReport, ReceiptStoreError> {
         let head = self.writer_head_snapshot();
         let connection = self.connection()?;
-        let latest_committed_entry_seq = latest_claim_log_entry_seq(&connection)?;
+        // After a full-prefix rotation the live claim-log table is empty, so
+        // MAX(entry_seq) drops to 0 while the latest checkpoint and the retention
+        // watermark still sit at the archived boundary W. Committed progress must
+        // fold in the archived prefix; floor the live committed seq at the
+        // watermark so a fully-archived store does not report committed
+        // regressing to 0 behind its checkpoints and corrupt operators' flush
+        // metrics. Mirrors receipt_checkpoint_status and
+        // receipt_store_health_read_only.
+        let latest_committed_entry_seq = latest_claim_log_entry_seq(&connection)?
+            .max(support::retention_watermark(&connection)?.unwrap_or(0));
         // The writer head snapshot is only refreshed by this handle's own
         // appends/writes. When another store instance or the operator CLI
         // extends the checkpoint chain and this handle has had no intervening
