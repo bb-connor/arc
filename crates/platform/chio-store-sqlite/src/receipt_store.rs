@@ -276,6 +276,65 @@ impl ReceiptCommitActor {
         }
     }
 
+    /// Bounded variant of `append`: identical up to the response wait, which is
+    /// capped at `timeout`. On expiry it does NOT decrement `inflight`. The
+    /// `try_send` succeeded, so the command is still queued or running on the
+    /// worker, which owns `inflight` and decrements it exactly once when it
+    /// drains the batch. Decrementing here too would double-count a slow-but-live
+    /// append and, under concurrency, could drive `inflight` to zero while work
+    /// is still queued, making writer health look drained before the actor
+    /// catches up. The timeout still fails this caller loudly and trips health
+    /// via `failed_total` / `last_error`; a genuinely wedged writer keeps
+    /// `inflight` elevated, which is the honest signal the liveness probe reads.
+    fn append_with_timeout(
+        &self,
+        receipt: ChioReceipt,
+        raw_json: String,
+        ensure_lineage: bool,
+        timeout: Duration,
+    ) -> Result<u64, ReceiptStoreError> {
+        let (response, result) = mpsc::sync_channel(1);
+        let command = ReceiptCommitCommand::Append(Box::new(ReceiptCommitRequest {
+            receipt,
+            raw_json,
+            ensure_lineage,
+            response,
+        }));
+        self.health.inflight.fetch_add(1, Ordering::SeqCst);
+        match self.sender.try_send(command) {
+            Ok(()) => {
+                self.health.accepted_total.fetch_add(1, Ordering::SeqCst);
+            }
+            Err(mpsc::TrySendError::Full(_)) => {
+                atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.saturated_total.fetch_add(1, Ordering::SeqCst);
+                return Err(receipt_actor_saturated_error());
+            }
+            Err(mpsc::TrySendError::Disconnected(_)) => {
+                atomic_saturating_sub(&self.health.inflight, 1);
+                return Err(receipt_actor_unavailable_error());
+            }
+        }
+        match result.recv_timeout(timeout) {
+            Ok(result) => result,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                self.health.failed_total.fetch_add(1, Ordering::SeqCst);
+                if let Ok(mut last_error) = self.health.last_error.lock() {
+                    *last_error = Some("sqlite receipt commit append timed out".to_string());
+                }
+                Err(receipt_actor_append_timeout_error(timeout))
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.failed_total.fetch_add(1, Ordering::SeqCst);
+                if let Ok(mut last_error) = self.health.last_error.lock() {
+                    *last_error = Some("sqlite receipt commit actor is unavailable".to_string());
+                }
+                Err(receipt_actor_unavailable_error())
+            }
+        }
+    }
+
     fn flush(&self) -> Result<(), ReceiptStoreError> {
         self.flush_with_receiver(|receiver| {
             receiver
@@ -484,6 +543,13 @@ fn receipt_actor_saturated_error() -> ReceiptStoreError {
 fn receipt_actor_flush_timeout_error(timeout: Duration) -> ReceiptStoreError {
     ReceiptStoreError::Timeout {
         operation: "sqlite receipt commit flush".to_string(),
+        timeout_ms: timeout.as_millis().min(u128::from(u64::MAX)) as u64,
+    }
+}
+
+fn receipt_actor_append_timeout_error(timeout: Duration) -> ReceiptStoreError {
+    ReceiptStoreError::Timeout {
+        operation: "sqlite receipt commit append".to_string(),
         timeout_ms: timeout.as_millis().min(u128::from(u64::MAX)) as u64,
     }
 }
@@ -2026,6 +2092,55 @@ impl SqliteReceiptStore {
             .append(receipt.clone(), raw_json.to_string(), ensure_lineage)
     }
 
+    fn append_verified_chio_receipt_record_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        raw_json: &str,
+        ensure_lineage: bool,
+        timeout: Duration,
+    ) -> Result<u64, ReceiptStoreError> {
+        ensure_chio_receipt_verified(receipt)?;
+        sqlite_i64(receipt.timestamp, "receipt timestamp")?;
+        self.receipt_commit_actor.append_with_timeout(
+            receipt.clone(),
+            raw_json.to_string(),
+            ensure_lineage,
+            timeout,
+        )
+    }
+
+    /// Best-effort writer liveness derived from the commit-actor counters. Dead
+    /// when the actor channel has disconnected; Wedged when an un-drained
+    /// backlog has made no commit progress for longer than the stall threshold;
+    /// otherwise Healthy. The stall threshold is a conservative fixed default so
+    /// the store needs no runtime config.
+    pub fn writer_liveness(&self) -> chio_kernel::ReceiptWriterLiveness {
+        use chio_kernel::ReceiptWriterLiveness as Liveness;
+        const WRITER_STALL_THRESHOLD_MS: u64 = 10_000;
+        let counters = self.receipt_commit_actor.writer_counters();
+        if counters
+            .last_error
+            .as_deref()
+            .is_some_and(|error| error.contains("unavailable"))
+        {
+            return Liveness::Dead;
+        }
+        let backlogged = counters.accepted_total
+            > counters
+                .committed_total
+                .saturating_add(counters.failed_total);
+        let stalled = match counters.last_commit_unix_ms {
+            Some(last_commit) => {
+                current_unix_ms().saturating_sub(last_commit) >= WRITER_STALL_THRESHOLD_MS
+            }
+            None => false,
+        };
+        if backlogged && stalled {
+            return Liveness::Wedged;
+        }
+        Liveness::Healthy
+    }
+
     pub fn append_chio_receipt_consuming_authorization(
         &self,
         receipt: &ChioReceipt,
@@ -2143,6 +2258,7 @@ impl SqliteReceiptStore {
         Ok(ReceiptStoreHealthReport {
             healthy,
             writer: self.receipt_commit_actor.writer_counters(),
+            writer_liveness: self.writer_liveness().as_label().to_string(),
             latest_committed_entry_seq: status.latest_committed_entry_seq,
             latest_checkpoint_seq: status.latest_checkpoint_seq,
             latest_checkpointed_entry_seq: status.latest_checkpointed_entry_seq,
@@ -2208,6 +2324,11 @@ impl SqliteReceiptStore {
                 Ok(ReceiptStoreHealthReport {
                     healthy: latest_committed_entry_seq >= latest_checkpointed_entry_seq,
                     writer: ReceiptWriterCounters::default(),
+                    // A read-only observer cannot see the owning writer's
+                    // in-memory liveness, so it is reported as unknown.
+                    writer_liveness: chio_kernel::ReceiptWriterLiveness::Unknown
+                        .as_label()
+                        .to_string(),
                     latest_committed_entry_seq,
                     latest_checkpoint_seq,
                     latest_checkpointed_entry_seq,
@@ -2223,6 +2344,9 @@ impl SqliteReceiptStore {
                 Ok(ReceiptStoreHealthReport {
                     healthy: false,
                     writer: ReceiptWriterCounters::default(),
+                    writer_liveness: chio_kernel::ReceiptWriterLiveness::Unknown
+                        .as_label()
+                        .to_string(),
                     latest_committed_entry_seq,
                     latest_checkpoint_seq: None,
                     latest_checkpointed_entry_seq: 0,
@@ -2878,6 +3002,45 @@ mod receipt_commit_actor_tests {
                 );
             }
         }
+        Ok(())
+    }
+
+    #[test]
+    fn append_with_timeout_maps_to_timeout_and_keeps_inflight_elevated(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // A commit actor whose worker never drains: try_send queues the command,
+        // but no reply ever arrives, so the bounded wait elapses.
+        let (sender, _receiver) = receipt_commit_channel();
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        let actor = ReceiptCommitActor { sender, health };
+        let inflight_before = actor.health.inflight.load(Ordering::SeqCst);
+
+        let start = std::time::Instant::now();
+        let error = actor.append_with_timeout(
+            actor_test_receipt()?,
+            "{}".to_string(),
+            false,
+            Duration::from_millis(250),
+        );
+        assert!(start.elapsed() < Duration::from_secs(2));
+
+        match error.err().ok_or("expected append timeout error")? {
+            ReceiptStoreError::Timeout { operation, .. } => {
+                assert_eq!(operation, "sqlite receipt commit append");
+            }
+            other => {
+                return Err(
+                    std::io::Error::other(format!("expected timeout error, got {other}")).into(),
+                );
+            }
+        }
+        // The timeout side must not decrement inflight; ownership stays with the
+        // actor, so a genuinely wedged writer keeps inflight elevated.
+        assert_eq!(
+            actor.health.inflight.load(Ordering::SeqCst),
+            inflight_before + 1
+        );
+        assert!(actor.health.failed_total.load(Ordering::SeqCst) >= 1);
         Ok(())
     }
 

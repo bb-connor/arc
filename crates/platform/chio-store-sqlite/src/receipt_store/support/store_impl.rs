@@ -299,6 +299,21 @@ impl ReceiptStore for SqliteReceiptStore {
         Ok(Some(seq))
     }
 
+    fn append_chio_receipt_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        let raw_json = serde_json::to_string(receipt)?;
+        let seq = self
+            .append_verified_chio_receipt_record_with_timeout(receipt, &raw_json, true, budget)?;
+        Ok(Some(seq))
+    }
+
+    fn writer_liveness(&self) -> chio_kernel::ReceiptWriterLiveness {
+        SqliteReceiptStore::writer_liveness(self)
+    }
+
     fn append_chio_receipt_consuming_authorization(
         &self,
         receipt: &ChioReceipt,
