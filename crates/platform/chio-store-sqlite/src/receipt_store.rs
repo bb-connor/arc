@@ -133,7 +133,6 @@ struct ReceiptCommitActor {
     writer: SupervisedThread,
 }
 
-#[derive(Default)]
 struct ReceiptCommitWriterHealth {
     accepted_total: AtomicU64,
     committed_total: AtomicU64,
@@ -155,6 +154,30 @@ struct ReceiptCommitWriterHealth {
     // pre-dispatch gate, so a tool is never executed against a store that cannot
     // persist its receipt.
     head_poisoned: AtomicBool,
+}
+
+impl Default for ReceiptCommitWriterHealth {
+    fn default() -> Self {
+        Self {
+            accepted_total: AtomicU64::new(0),
+            committed_total: AtomicU64::new(0),
+            failed_total: AtomicU64::new(0),
+            saturated_total: AtomicU64::new(0),
+            inflight: AtomicU64::new(0),
+            last_commit_unix_ms: AtomicU64::new(0),
+            last_error: Mutex::new(None),
+            head_checkpoint_seq: AtomicU64::new(0),
+            head_checkpointed_entry_seq: AtomicU64::new(0),
+            head_claim_log_count: AtomicU64::new(0),
+            head_claim_log_max_seq: AtomicU64::new(0),
+            // Fail closed until the actor thread seeds a verified head. The head
+            // is seeded asynchronously after construction, so starting open would
+            // let a corrupt or still-attaching store pass the pre-dispatch gate
+            // and run a tool before the first append could reject. The seed path
+            // clears this the moment it succeeds.
+            head_poisoned: AtomicBool::new(true),
+        }
+    }
 }
 
 impl ReceiptCommitWriterHealth {
@@ -2889,6 +2912,22 @@ fn canonical_receipt_json(canonical: &CanonicalBytes) -> Result<&str, ReceiptSto
 #[cfg(test)]
 mod receipt_commit_actor_tests {
     use super::*;
+
+    #[test]
+    fn writer_health_starts_with_a_poisoned_head_until_seeding_clears_it() {
+        // The commit writer seeds its verified head asynchronously on the actor
+        // thread. Until that seed succeeds, durable persistence is unproven, so a
+        // freshly constructed health mirror must report a poisoned head. Starting
+        // open would let a corrupt or still-attaching store pass
+        // `writer_serving_closed` and execute a tool before its first append can
+        // reject, which is exactly the fail-open window the pre-dispatch gate
+        // exists to prevent.
+        let health = ReceiptCommitWriterHealth::default();
+        assert!(
+            health.head_poisoned.load(Ordering::SeqCst),
+            "writer health must start head-poisoned (serving closed) until a seeded head clears it"
+        );
+    }
 
     /// A supervised writer that parks until shutdown, for actor send-path tests that
     /// drive the channel directly and do not need a real commit loop consuming it.
