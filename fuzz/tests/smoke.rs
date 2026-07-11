@@ -31,6 +31,7 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "oid4vp_presentation",
     "openapi_ingest",
     "receipt_log_replay",
+    "settlement_approval_witness",
     "wasm_guard_escape",
     "wasm_preinstantiate_validate",
     "wit_host_call_boundary",
@@ -258,4 +259,13 @@ fn openapi_ingest_smoke() {
 fn receipt_log_replay_smoke() {
     use chio_kernel_core::fuzz::fuzz_receipt_log_replay;
     assert_seed_floor("receipt_log_replay", fuzz_receipt_log_replay);
+}
+
+#[test]
+fn settlement_approval_witness_smoke() {
+    use chio_settle::fuzz::fuzz_settlement_approval_witness;
+    assert_seed_floor(
+        "settlement_approval_witness",
+        fuzz_settlement_approval_witness,
+    );
 }

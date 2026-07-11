@@ -902,3 +902,20 @@ path      = "fuzz/corpus/wasm_guard_escape/undeclared_imports.wasm"
 sha256    = "77a8a8a00e263052e3f473060a7ab9e5f6658b73fd0e535b57282cb9dba155f0"
 source    = "hand_curated_coverage"
 
+[[seed]]
+target    = "settlement_approval_witness"
+path      = "fuzz/corpus/settlement_approval_witness/valid_binding.bin"
+sha256    = "04029cbbb0c38060333a99a7ead8617ebf6b4eacec9d9fd7a34b39c11345c402"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "settlement_approval_witness"
+path      = "fuzz/corpus/settlement_approval_witness/caip2_chain.bin"
+sha256    = "8a70286950d499e41004547cef93dc4fa1652975ef6b8f3ce100b862c52a9f35"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "settlement_approval_witness"
+path      = "fuzz/corpus/settlement_approval_witness/truncated_binding.bin"
+sha256    = "df813c0377ca0c915b72018e4040f77b39291dc4ef45bd61c8d50e10e0198f84"
+source    = "hand_curated_coverage"

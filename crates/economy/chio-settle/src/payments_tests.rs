@@ -1,0 +1,2684 @@
+//! Unit tests for the verified-approval settlement lanes in
+//! [`crate::payments`]. Split into a sibling file to keep `payments.rs`
+//! under its hygiene line cap while every per-property regression stays
+//! next to the witness it guards. `super::` refers to the `payments`
+//! module because this file is included via `#[path]` inside it.
+
+use super::{
+    build_x402_payment_requirements, build_x402_payment_requirements_with_verified_approval,
+    evaluate_circle_nanopayment, evaluate_circle_nanopayment_with_verified_approval,
+    prepare_paymaster_compatibility, prepare_transfer_with_authorization,
+    prepare_transfer_with_verified_approval, verify_governed_approval, ApprovalBinding,
+    CircleNanopaymentPolicy, Eip3009Domain, Eip3009NonceStore, Erc4337PaymasterPolicy,
+    InMemoryEip3009NonceStore, NonceOutcome, PreparedCircleNanopayment,
+    PreparedTransferWithAuthorization, TransferWithAuthorizationInput, VerifiedApproval,
+    X402PaymentRequirements, X402SettlementMode,
+};
+use crate::approval_witness::{
+    ApprovalReplayStore, InMemoryApprovalReplayStore, CHIO_SETTLEMENT_BINDING_CONTEXT_KEY,
+};
+use crate::SettlementError;
+use chio_core::capability::governance::{
+    GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+    GovernedTransactionIntent,
+};
+use chio_core::capability::scope::MonetaryAmount;
+use chio_core::crypto::Keypair;
+use chio_core::web3::settlement::Web3SettlementDispatchArtifact;
+use serde_json::json;
+
+use chio_test_support::prelude::*;
+
+/// The request id `signed_approval` mints into every token and that
+/// `verified_for` passes as the expected request, so the request-binding
+/// check passes by default in the per-lane tests.
+const APPROVAL_REQUEST_ID: &str = "req-1";
+
+/// EIP-155 chain id of the sample dispatch (`"eip155:8453"`).
+const DISPATCH_CHAIN_ID: u64 = 8453;
+/// Beneficiary in `CHIO_WEB3_SETTLEMENT_DISPATCH_EXAMPLE.json`.
+const DISPATCH_PAYEE: &str = "0x2222222222222222222222222222222222222222";
+/// Settlement amount (minor units) in the example dispatch.
+const DISPATCH_AMOUNT: u128 = 150;
+/// Token/currency symbol of the example dispatch (`settlement_amount.currency`).
+const DISPATCH_TOKEN_SYMBOL: &str = "USD";
+/// A `now` inside any token window built by `approval_window`.
+const APPROVAL_NOW: u64 = 1_744_000_300;
+
+/// Build a minimal governed intent with NO monetary bound (no `max_amount`
+/// and no committed settlement binding). The witness gate refuses such an
+/// intent (fail-closed: an unbounded intent pins no ceiling on the spend), so
+/// this is used by the unbounded-rejection regressions and as the base for
+/// [`intent_committing_binding`].
+fn unbounded_intent(id: &str) -> GovernedTransactionIntent {
+    GovernedTransactionIntent {
+        id: id.to_string(),
+        server_id: "settlement-server".to_string(),
+        tool_name: "transfer_funds".to_string(),
+        purpose: "settlement binding test".to_string(),
+        max_amount: None,
+        commerce: None,
+        metered_billing: None,
+        runtime_attestation: None,
+        call_chain: None,
+        autonomy: None,
+        context: None,
+    }
+}
+
+/// Commit `binding`'s chain/payee/amount/token into an intent `context` under
+/// the reserved settlement-binding key, so `intent.binding_hash()` (and thus
+/// the approval signature) covers the concrete settlement economics. This
+/// mirrors production: the approver signs the intent that commits the spend and
+/// the caller resolves the matching `ApprovalBinding` from that same intent.
+fn intent_committing_binding(id: &str, binding: &ApprovalBinding) -> GovernedTransactionIntent {
+    let mut commitment = json!({
+        "chain_id": binding.chain_id,
+        "payee_address": binding.payee_address,
+        "amount_minor_units": binding.amount_minor_units,
+        "token_symbol": binding.token_symbol,
+    });
+    if let Some(contract) = binding.token_contract.as_ref() {
+        commitment["token_contract"] = json!(contract);
+    }
+    // Commit the optional fiat / dispatch / capability identity fields too, so
+    // the signed commitment matches the resolved binding the gate asserts
+    // against (the gate signature-pins these: a resolved field absent from the
+    // commitment, or vice versa, fails closed).
+    if let Some(currency) = binding.settlement_currency.as_ref() {
+        commitment["settlement_currency"] = json!(currency);
+    }
+    if let Some(dispatch_id) = binding.dispatch_id.as_ref() {
+        commitment["dispatch_id"] = json!(dispatch_id);
+    }
+    if let Some(capability_id) = binding.capability_id.as_ref() {
+        commitment["capability_id"] = json!(capability_id);
+    }
+    let mut intent = unbounded_intent(id);
+    intent.context = Some(json!({ CHIO_SETTLEMENT_BINDING_CONTEXT_KEY: commitment }));
+    intent
+}
+
+/// Build a governed intent that commits the sample dispatch's
+/// chain/payee/amount/token (matching [`dispatch_binding`]). This is the
+/// default monetary-bound intent for the gate happy-path and expiry tests.
+fn sample_intent(id: &str) -> GovernedTransactionIntent {
+    intent_committing_binding(id, &dispatch_binding())
+}
+
+/// Mint a signed, approved token over `intent`'s binding hash using
+/// `approver`, valid across `APPROVAL_NOW`.
+fn signed_approval(
+    approver: &Keypair,
+    subject: &Keypair,
+    intent: &GovernedTransactionIntent,
+) -> GovernedApprovalToken {
+    let body = GovernedApprovalTokenBody {
+        id: "approval-1".to_string(),
+        approver: approver.public_key(),
+        subject: subject.public_key(),
+        governed_intent_hash: intent.binding_hash().test_unwrap(),
+        request_id: APPROVAL_REQUEST_ID.to_string(),
+        issued_at: APPROVAL_NOW - 100,
+        expires_at: APPROVAL_NOW + 100,
+        decision: GovernedApprovalDecision::Approved,
+    };
+    GovernedApprovalToken::sign(body, approver).test_unwrap()
+}
+
+/// The dispatch id of `sample_dispatch` (CHIO_WEB3_SETTLEMENT_DISPATCH_EXAMPLE).
+const DISPATCH_ID: &str = "dispatch-web3-1";
+/// The capability id the x402 requirements resolve for `sample_dispatch`: the
+/// example dispatch carries no explicit `capability_id`, so the resolver falls
+/// back to the `dispatch_id`.
+const DISPATCH_CAPABILITY_ID: &str = DISPATCH_ID;
+
+/// A binding that matches the sample dispatch's chain/payee/amount/token AND
+/// its dispatch / capability identity. The dispatch-bearing lanes (x402 /
+/// Circle) require the binding to pin the dispatch identity, so the
+/// dispatch-derived bindings carry it.
+fn dispatch_binding() -> ApprovalBinding {
+    ApprovalBinding {
+        chain_id: DISPATCH_CHAIN_ID,
+        payee_address: DISPATCH_PAYEE.to_string(),
+        amount_minor_units: DISPATCH_AMOUNT,
+        token_symbol: DISPATCH_TOKEN_SYMBOL.to_string(),
+        // The dispatch lanes identify their token by symbol, not by a
+        // contract address, so no contract is pinned here.
+        token_contract: None,
+        // The sample dispatch settles a fiat amount whose currency equals the
+        // token symbol here (both `USD`), so no separate fiat currency is
+        // pinned; the rail-token helpers override the rail token only.
+        settlement_currency: None,
+        dispatch_id: Some(DISPATCH_ID.to_string()),
+        capability_id: Some(DISPATCH_CAPABILITY_ID.to_string()),
+        // Matches the `signed_approval` window so the EIP-3009 expiry
+        // bound never trips for dispatch-derived bindings.
+        approval_expires_at: APPROVAL_NOW + 100,
+    }
+}
+
+/// Verify a fresh approval for `binding`, returning the witness. The intent
+/// COMMITS `binding`, mirroring production (the approver signs the intent that
+/// commits the concrete spend and the caller resolves the matching binding
+/// from it), so the per-lane mismatch tests still produce a witness whose
+/// binding disagrees only with the live DISPATCH, not with the intent.
+fn verified_for(binding: ApprovalBinding) -> VerifiedApproval {
+    verified_for_with_token_expiry(binding, APPROVAL_NOW + 100)
+}
+
+/// Like [`verified_for`] but mints the approval token with an explicit
+/// `expires_at`, so a binding whose `approval_expires_at` is later than
+/// `APPROVAL_NOW + 100` (for example the EIP-3009 sample window) can still
+/// be witnessed without tripping the expiry clamp. `token_expires_at` must
+/// be `>= binding.approval_expires_at`.
+fn verified_for_with_token_expiry(
+    binding: ApprovalBinding,
+    token_expires_at: u64,
+) -> VerifiedApproval {
+    verified_for_intent_with_token_expiry(binding, "intent-dispatch", token_expires_at)
+}
+
+/// Like [`verified_for_with_token_expiry`] but commits the binding into an
+/// intent with the given id. Distinct intent ids model DISTINCT approvals:
+/// the issuance-level replay key is `(request_id, intent_hash)`, so two
+/// spends sharing one replay store need distinct intents (or requests) for
+/// both to issue.
+fn verified_for_intent_with_token_expiry(
+    binding: ApprovalBinding,
+    intent_id: &str,
+    token_expires_at: u64,
+) -> VerifiedApproval {
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    // Commit the very binding being verified so the intent-commitment check
+    // passes; the lanes still assert the binding against the live dispatch.
+    let intent = intent_committing_binding(intent_id, &binding);
+    let body = GovernedApprovalTokenBody {
+        id: "approval-1".to_string(),
+        approver: approver.public_key(),
+        subject: subject.public_key(),
+        governed_intent_hash: intent.binding_hash().test_unwrap(),
+        request_id: APPROVAL_REQUEST_ID.to_string(),
+        issued_at: APPROVAL_NOW - 100,
+        expires_at: token_expires_at,
+        decision: GovernedApprovalDecision::Approved,
+    };
+    let token = GovernedApprovalToken::sign(body, &approver).test_unwrap();
+    verify_governed_approval(
+        &token,
+        &intent,
+        &approver.public_key(),
+        &subject.public_key(),
+        APPROVAL_REQUEST_ID,
+        binding,
+        APPROVAL_NOW,
+    )
+    .test_unwrap()
+}
+
+fn sample_dispatch() -> Web3SettlementDispatchArtifact {
+    serde_json::from_str(include_str!(
+        "../../../../docs/standards/CHIO_WEB3_SETTLEMENT_DISPATCH_EXAMPLE.json"
+    ))
+    .test_unwrap()
+}
+
+const SAMPLE_CHAIN_ID: u64 = 8453;
+const SAMPLE_PAYEE: &str = "0x1000000000000000000000000000000000000002";
+const SAMPLE_VALUE: u128 = 42_000;
+const SAMPLE_VALID_AFTER: u64 = 1_744_000_000;
+const SAMPLE_VALID_BEFORE: u64 = 1_744_000_600;
+/// A `now` strictly inside `(validAfter, validBefore)`.
+const SAMPLE_NOW: u64 = 1_744_000_300;
+const SAMPLE_NONCE: &str = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+/// The token symbol the sample approval authorizes.
+const SAMPLE_TOKEN_SYMBOL: &str = "USDC";
+/// The token contract the sample EIP-3009 domain targets; the sample
+/// binding pins this so the contract-level check passes by default.
+const SAMPLE_TOKEN_CONTRACT: &str = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
+fn sample_domain() -> Eip3009Domain {
+    Eip3009Domain {
+        name: "USD Coin".to_string(),
+        version: "2".to_string(),
+        chain_id: SAMPLE_CHAIN_ID,
+        verifying_contract: SAMPLE_TOKEN_CONTRACT.to_string(),
+    }
+}
+
+fn sample_authorization() -> TransferWithAuthorizationInput {
+    TransferWithAuthorizationInput {
+        from_address: "0x1000000000000000000000000000000000000001".to_string(),
+        to_address: SAMPLE_PAYEE.to_string(),
+        value_minor_units: SAMPLE_VALUE,
+        valid_after: SAMPLE_VALID_AFTER,
+        valid_before: SAMPLE_VALID_BEFORE,
+        nonce: SAMPLE_NONCE.to_string(),
+    }
+}
+
+fn sample_binding() -> ApprovalBinding {
+    ApprovalBinding {
+        chain_id: SAMPLE_CHAIN_ID,
+        payee_address: SAMPLE_PAYEE.to_string(),
+        amount_minor_units: SAMPLE_VALUE,
+        token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
+        token_contract: Some(SAMPLE_TOKEN_CONTRACT.to_string()),
+        // The EIP-3009 lane settles off a domain + authorization with no
+        // dispatch, so it pins no fiat currency / dispatch / capability id.
+        settlement_currency: None,
+        dispatch_id: None,
+        capability_id: None,
+        // Approval expiry at least as late as the authorization window so
+        // the default sample does not trip the outlives-approval check.
+        approval_expires_at: SAMPLE_VALID_BEFORE,
+    }
+}
+
+#[test]
+fn builds_x402_requirements() {
+    let dispatch = sample_dispatch();
+    let requirements = build_x402_payment_requirements(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec!["USDC".to_string(), "EURC".to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+    )
+    .test_unwrap();
+
+    assert!(requirements.governed_authorization_required);
+    assert_eq!(requirements.dispatch_id, dispatch.dispatch_id);
+}
+
+#[test]
+fn x402_requirements_reject_blank_accepted_tokens() {
+    let dispatch = sample_dispatch();
+
+    let error = build_x402_payment_requirements(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec!["USDC".to_string(), " ".to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+    )
+    .test_unwrap_err();
+
+    assert!(error.to_string().contains("accepted token"));
+}
+
+#[test]
+fn prepares_transfer_with_authorization_digest() {
+    let store = InMemoryEip3009NonceStore::new();
+    let prepared = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &sample_binding(),
+        SAMPLE_NOW,
+        &store,
+    )
+    .test_unwrap();
+
+    assert!(prepared.authorization_digest.starts_with("0x"));
+    assert_eq!(prepared.authorization_digest.len(), 66);
+}
+
+#[test]
+fn replayed_nonce_is_rejected_on_second_use() {
+    let store = InMemoryEip3009NonceStore::new();
+
+    // First preparation with a fresh nonce succeeds.
+    let first = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &sample_binding(),
+        SAMPLE_NOW,
+        &store,
+    );
+    assert!(first.is_ok(), "first use of a fresh nonce must succeed");
+
+    // Replaying the same authorization (same from + nonce) against the
+    // same store must fail closed.
+    let replay = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &sample_binding(),
+        SAMPLE_NOW,
+        &store,
+    );
+    let error = replay.test_unwrap_err();
+    assert!(
+        error.to_string().contains("replay"),
+        "second use of the same nonce must be rejected by the nonce store, got: {error}"
+    );
+}
+
+#[test]
+fn replay_is_detected_even_with_checksum_cased_address_and_nonce() {
+    // EIP-3009 token contracts consume `(from, nonce)`; a re-cased hex
+    // string is the same authorizer/nonce and must not bypass replay
+    // detection.
+    let store = InMemoryEip3009NonceStore::new();
+    let _ = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &sample_binding(),
+        SAMPLE_NOW,
+        &store,
+    )
+    .test_unwrap();
+
+    let mut recased = sample_authorization();
+    recased.from_address = recased.from_address.to_uppercase().replace("0X", "0x");
+    recased.nonce = recased.nonce.to_uppercase().replace("0X", "0x");
+    let replay = prepare_transfer_with_authorization(
+        sample_domain(),
+        recased,
+        &sample_binding(),
+        SAMPLE_NOW,
+        &store,
+    );
+    assert!(
+        replay.test_unwrap_err().to_string().contains("replay"),
+        "case-variant of the same (from, nonce) must still be a replay"
+    );
+}
+
+#[test]
+fn expired_authorization_is_rejected() {
+    let store = InMemoryEip3009NonceStore::new();
+    // now == validBefore is outside the open window (requires now < validBefore).
+    let error = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &sample_binding(),
+        SAMPLE_VALID_BEFORE,
+        &store,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("expired"),
+        "an authorization at/after validBefore must be rejected, got: {error}"
+    );
+    assert!(
+        store.is_empty().test_unwrap(),
+        "a rejected (expired) authorization must not consume its nonce"
+    );
+}
+
+#[test]
+fn not_yet_valid_authorization_is_rejected() {
+    let store = InMemoryEip3009NonceStore::new();
+    // now == validAfter is outside the open window (requires now > validAfter).
+    let error = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &sample_binding(),
+        SAMPLE_VALID_AFTER,
+        &store,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("not yet valid"),
+        "an authorization at/before validAfter must be rejected, got: {error}"
+    );
+    assert!(
+        store.is_empty().test_unwrap(),
+        "a rejected (not-yet-valid) authorization must not consume its nonce"
+    );
+}
+
+#[test]
+fn chain_amount_and_payee_binding_mismatches_are_rejected() {
+    let store = InMemoryEip3009NonceStore::new();
+
+    // Chain mismatch.
+    let mut wrong_chain = sample_binding();
+    wrong_chain.chain_id = 1;
+    let error = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &wrong_chain,
+        SAMPLE_NOW,
+        &store,
+    )
+    .test_unwrap_err();
+    assert!(error.to_string().contains("chain mismatch"), "got: {error}");
+
+    // Amount mismatch.
+    let mut wrong_amount = sample_binding();
+    wrong_amount.amount_minor_units = SAMPLE_VALUE + 1;
+    let error = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &wrong_amount,
+        SAMPLE_NOW,
+        &store,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("amount mismatch"),
+        "got: {error}"
+    );
+
+    // Payee mismatch.
+    let mut wrong_payee = sample_binding();
+    wrong_payee.payee_address = "0x1000000000000000000000000000000000000009".to_string();
+    let error = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &wrong_payee,
+        SAMPLE_NOW,
+        &store,
+    )
+    .test_unwrap_err();
+    assert!(error.to_string().contains("payee mismatch"), "got: {error}");
+
+    // None of the rejected bindings may have consumed the nonce.
+    assert!(
+        store.is_empty().test_unwrap(),
+        "binding-mismatch rejections must not consume the nonce"
+    );
+}
+
+#[test]
+fn payee_binding_accepts_checksum_vs_lowercase_hex() {
+    // The bound payee may be checksum-cased while the authorization is
+    // lowercase (or vice versa); they must compare equal.
+    let store = InMemoryEip3009NonceStore::new();
+    let mut binding = sample_binding();
+    binding.payee_address = SAMPLE_PAYEE.to_uppercase().replace("0X", "0x");
+    let prepared = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &binding,
+        SAMPLE_NOW,
+        &store,
+    );
+    assert!(
+        prepared.is_ok(),
+        "checksum vs lowercase payee hex must be treated as the same address"
+    );
+}
+
+#[test]
+fn nonce_store_records_only_after_checks_pass() {
+    // A fresh, in-window, correctly-bound authorization records exactly
+    // one nonce entry.
+    let store = InMemoryEip3009NonceStore::new();
+    assert_eq!(
+        store.record_if_fresh("0xabc", "0xdef", 0).test_unwrap(),
+        NonceOutcome::Fresh
+    );
+    assert_eq!(
+        store.record_if_fresh("0xabc", "0xdef", 0).test_unwrap(),
+        NonceOutcome::Replayed
+    );
+}
+
+#[test]
+fn nonce_store_canonicalizes_prefix_and_casing() {
+    // The store must collapse `0x`-prefixed vs bare and checksum vs
+    // lowercase keys so none of those formatting differences can present
+    // the same (from, nonce) pair as Fresh twice.
+    let store = InMemoryEip3009NonceStore::new();
+    assert_eq!(
+        store.record_if_fresh("0xABC", "0xDEF", 0).test_unwrap(),
+        NonceOutcome::Fresh
+    );
+    // Same bytes, prefix stripped and lowercased: must be a replay.
+    assert_eq!(
+        store.record_if_fresh("abc", "def", 0).test_unwrap(),
+        NonceOutcome::Replayed,
+        "bare-hex form of an already-recorded 0x-prefixed key must replay"
+    );
+    // Same bytes, re-cased with prefix: must also replay.
+    assert_eq!(
+        store.record_if_fresh("0xAbC", "0xDeF", 0).test_unwrap(),
+        NonceOutcome::Replayed,
+        "re-cased form of an already-recorded key must replay"
+    );
+}
+
+#[test]
+fn replay_is_detected_across_prefixed_and_bare_authorization_forms() {
+    // End-to-end: the SAME authorization submitted once with 0x-prefixed
+    // from/nonce and again WITHOUT the prefix parses to identical
+    // Address/B256 bytes. Keying the store on the parsed canonical bytes
+    // means the second submission is a replay, not Fresh.
+    let store = InMemoryEip3009NonceStore::new();
+    let _ = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &sample_binding(),
+        SAMPLE_NOW,
+        &store,
+    )
+    .test_unwrap();
+
+    // Strip the `0x` prefix from from/nonce; Address/B256 parse both.
+    let mut bare = sample_authorization();
+    bare.from_address = bare
+        .from_address
+        .strip_prefix("0x")
+        .unwrap_or(&bare.from_address)
+        .to_string();
+    bare.nonce = bare
+        .nonce
+        .strip_prefix("0x")
+        .unwrap_or(&bare.nonce)
+        .to_string();
+
+    let replay = prepare_transfer_with_authorization(
+        sample_domain(),
+        bare,
+        &sample_binding(),
+        SAMPLE_NOW,
+        &store,
+    );
+    assert!(
+        replay.test_unwrap_err().to_string().contains("replay"),
+        "the unprefixed form of an already-prepared authorization must be a replay"
+    );
+}
+
+#[test]
+fn authorization_outliving_approval_is_rejected() {
+    // The EIP-3009 window is open and well-bound, but valid_before runs
+    // past the approval's expiry: the signed transfer would stay
+    // broadcastable after the approval lapses, so it must fail closed and
+    // not consume the nonce.
+    let store = InMemoryEip3009NonceStore::new();
+    let mut short_approval = sample_binding();
+    short_approval.approval_expires_at = SAMPLE_VALID_BEFORE - 1;
+    let error = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &short_approval,
+        SAMPLE_NOW,
+        &store,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("outlives approval"),
+        "an authorization that outlives its approval must be rejected, got: {error}"
+    );
+    assert!(
+        store.is_empty().test_unwrap(),
+        "an authorization rejected for outliving its approval must not consume its nonce"
+    );
+}
+
+#[test]
+fn authorization_ending_exactly_at_approval_expiry_is_accepted() {
+    // valid_before == approval_expires_at is the boundary the approval
+    // still covers; it must be accepted.
+    let store = InMemoryEip3009NonceStore::new();
+    let mut binding = sample_binding();
+    binding.approval_expires_at = SAMPLE_VALID_BEFORE;
+    let prepared = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &binding,
+        SAMPLE_NOW,
+        &store,
+    );
+    assert!(
+        prepared.is_ok(),
+        "valid_before == approval_expires_at must be within the approval window"
+    );
+}
+
+#[test]
+fn token_contract_mismatch_is_rejected() {
+    // The approval is bound to a DIFFERENT token contract than the
+    // EIP-3009 domain targets. Even with matching chain, payee, and
+    // amount, redirecting to another token on the same chain must fail
+    // closed and not consume the nonce.
+    let store = InMemoryEip3009NonceStore::new();
+    let mut wrong_token = sample_binding();
+    wrong_token.token_contract = Some("0x4444444444444444444444444444444444444444".to_string());
+    let error = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &wrong_token,
+        SAMPLE_NOW,
+        &store,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("token contract mismatch"),
+        "a different token contract on the same chain must be rejected, got: {error}"
+    );
+    assert!(
+        store.is_empty().test_unwrap(),
+        "a token-contract-mismatch rejection must not consume the nonce"
+    );
+}
+
+#[test]
+fn token_contract_binding_accepts_checksum_vs_lowercase_hex() {
+    // The bound token contract may be cased differently from the domain
+    // verifyingContract; they must compare equal as parsed addresses.
+    let store = InMemoryEip3009NonceStore::new();
+    let mut binding = sample_binding();
+    binding.token_contract = Some(SAMPLE_TOKEN_CONTRACT.to_lowercase());
+    let prepared = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &binding,
+        SAMPLE_NOW,
+        &store,
+    );
+    assert!(
+        prepared.is_ok(),
+        "checksum vs lowercase token contract hex must be the same address"
+    );
+}
+
+#[test]
+fn absent_token_contract_is_rejected_for_eip3009() {
+    // The EIP-3009 lane REQUIRES a bound token contract: a symbol alone
+    // cannot pin the on-chain token, so a captured authorization could be
+    // redirected to a different token contract on the same chain. With no
+    // bound contract the lane must fail closed and not consume the nonce.
+    let store = InMemoryEip3009NonceStore::new();
+    let mut binding = sample_binding();
+    binding.token_contract = None;
+    let error = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &binding,
+        SAMPLE_NOW,
+        &store,
+    )
+    .test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("requires an approval-bound token contract"),
+        "an EIP-3009 binding with no token contract must be rejected, got: {error}"
+    );
+    assert!(
+        store.is_empty().test_unwrap(),
+        "a binding rejected for an absent token contract must not consume the nonce"
+    );
+}
+
+#[test]
+fn same_nonce_on_a_different_token_contract_is_not_a_replay() {
+    // Per EIP-3009 the same `(from, nonce)` is an independent spend on a
+    // different token contract: the on-chain nonce state lives in the token
+    // contract and the EIP-712 domain separates the signatures. The
+    // off-chain store keys the nonce by its domain (chain + verifying
+    // contract), so reusing the same nonce value against a different token
+    // contract must still be Fresh, not a replay.
+    let store = InMemoryEip3009NonceStore::new();
+    let first = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &sample_binding(),
+        SAMPLE_NOW,
+        &store,
+    );
+    assert!(first.is_ok(), "first use of a fresh nonce must succeed");
+
+    // A different token contract on the same chain, with a binding that
+    // pins that contract. Same from + nonce value, different domain.
+    const OTHER_TOKEN_CONTRACT: &str = "0x4444444444444444444444444444444444444444";
+    let mut other_domain = sample_domain();
+    other_domain.verifying_contract = OTHER_TOKEN_CONTRACT.to_string();
+    let mut other_binding = sample_binding();
+    other_binding.token_contract = Some(OTHER_TOKEN_CONTRACT.to_string());
+
+    let second = prepare_transfer_with_authorization(
+        other_domain,
+        sample_authorization(),
+        &other_binding,
+        SAMPLE_NOW,
+        &store,
+    );
+    assert!(
+        second.is_ok(),
+        "the same nonce on a DIFFERENT token contract must not be a replay, got: {second:?}"
+    );
+    assert_eq!(
+        store.len().test_unwrap(),
+        2,
+        "each (chain, contract, from, nonce) tuple must record a distinct nonce entry"
+    );
+}
+
+#[test]
+fn same_nonce_on_the_same_token_contract_is_a_replay() {
+    // Sibling to the cross-contract test: with the SAME domain (chain +
+    // verifying contract) the same `(from, nonce)` must still be a replay,
+    // so folding the contract into the key does not weaken replay
+    // detection on the contract that actually consumes the nonce.
+    let store = InMemoryEip3009NonceStore::new();
+    let _ = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &sample_binding(),
+        SAMPLE_NOW,
+        &store,
+    )
+    .test_unwrap();
+    let replay = prepare_transfer_with_authorization(
+        sample_domain(),
+        sample_authorization(),
+        &sample_binding(),
+        SAMPLE_NOW,
+        &store,
+    );
+    assert!(
+        replay.test_unwrap_err().to_string().contains("replay"),
+        "the same nonce on the same token contract must still be a replay"
+    );
+}
+
+#[test]
+fn assert_token_symbol_is_case_insensitive_and_fails_closed() {
+    let binding = sample_binding();
+    // Case and surrounding whitespace must not matter.
+    assert!(binding.assert_token_symbol("x402", " usdc ").is_ok());
+    assert!(binding.assert_token_symbol("circle", "USDC").is_ok());
+    // A genuinely different token must be rejected.
+    let error = binding
+        .assert_token_symbol("x402", "EURC")
+        .test_unwrap_err();
+    assert!(
+        error.to_string().contains("token mismatch"),
+        "a different token symbol must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn evaluates_circle_nanopayment_candidate() {
+    let dispatch = sample_dispatch();
+    let prepared = evaluate_circle_nanopayment(
+        &dispatch,
+        &CircleNanopaymentPolicy {
+            enabled: true,
+            managed_balance_id: "bal_123".to_string(),
+            supported_chain_ids: vec!["eip155:8453".to_string()],
+            supported_token_symbols: vec!["USD".to_string()],
+            max_amount_minor_units: 200,
+            operator_managed_custody_explicit: true,
+        },
+    )
+    .test_unwrap()
+    .test_unwrap();
+
+    assert_eq!(prepared.dispatch_id, dispatch.dispatch_id);
+}
+
+#[test]
+fn evaluates_paymaster_compatibility() {
+    let dispatch = sample_dispatch();
+    let prepared = prepare_paymaster_compatibility(
+        &dispatch,
+        &Erc4337PaymasterPolicy {
+            entry_point: "0x1000000000000000000000000000000000000100".to_string(),
+            paymaster_address: "0x1000000000000000000000000000000000000101".to_string(),
+            supported_chain_ids: vec!["eip155:8453".to_string()],
+            max_sponsor_gas_limit: 300_000,
+            max_reimbursement_minor_units: 10,
+            settlement_deduction_explicit: true,
+        },
+        "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        250_000,
+        5,
+    )
+    .test_unwrap();
+
+    assert!(prepared.allowed);
+    assert!(prepared.rejection_reason.is_none());
+}
+
+// -----------------------------------------------------------------
+// GovernedApprovalToken verification gate.
+// -----------------------------------------------------------------
+
+/// Verify `token`/`intent` against the gate with the expected
+/// approver/subject/request defaulted from the same keypairs and
+/// `APPROVAL_NOW`. Returns the gate result so callers can assert on success
+/// or the specific rejection.
+fn verify_gate(
+    token: &GovernedApprovalToken,
+    intent: &GovernedTransactionIntent,
+    approver: &Keypair,
+    subject: &Keypair,
+    binding: ApprovalBinding,
+    now: u64,
+) -> Result<VerifiedApproval, SettlementError> {
+    verify_governed_approval(
+        token,
+        intent,
+        &approver.public_key(),
+        &subject.public_key(),
+        APPROVAL_REQUEST_ID,
+        binding,
+        now,
+    )
+}
+
+#[test]
+fn verify_governed_approval_accepts_a_valid_token() {
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = sample_intent("intent-ok");
+    let token = signed_approval(&approver, &subject, &intent);
+
+    let verified = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap();
+
+    assert_eq!(verified.approval_id(), "approval-1");
+    assert_eq!(verified.request_id(), APPROVAL_REQUEST_ID);
+    assert_eq!(verified.governed_intent_hash(), token.governed_intent_hash);
+    assert_eq!(verified.binding(), &dispatch_binding());
+}
+
+#[test]
+fn verify_governed_approval_rejects_a_bad_signature() {
+    // A token whose signature does not match its body (forged / tampered)
+    // must fail closed regardless of every other field being well-formed.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = sample_intent("intent-badsig");
+    let mut token = signed_approval(&approver, &subject, &intent);
+
+    // Tamper with the body AFTER signing so the signature no longer
+    // covers it.
+    token.issued_at = token.issued_at.wrapping_sub(1);
+
+    let error = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("signature is invalid"),
+        "tampered token must be rejected on signature, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_rejects_an_expired_token() {
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = sample_intent("intent-expired");
+    let token = signed_approval(&approver, &subject, &intent);
+
+    // now == expires_at is outside the window (validate_time requires
+    // now < expires_at).
+    let error = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        dispatch_binding(),
+        token.expires_at,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("validity window"),
+        "an expired approval must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_rejects_a_denied_decision() {
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = sample_intent("intent-denied");
+    // Sign a DENIED token so the signature is valid but the decision is
+    // not an approval.
+    let body = GovernedApprovalTokenBody {
+        id: "approval-denied".to_string(),
+        approver: approver.public_key(),
+        subject: subject.public_key(),
+        governed_intent_hash: intent.binding_hash().test_unwrap(),
+        request_id: APPROVAL_REQUEST_ID.to_string(),
+        issued_at: APPROVAL_NOW - 100,
+        expires_at: APPROVAL_NOW + 100,
+        decision: GovernedApprovalDecision::Denied,
+    };
+    let token = GovernedApprovalToken::sign(body, &approver).test_unwrap();
+
+    let error = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("approval decision"),
+        "a denied token must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_rejects_an_unexpected_approver() {
+    // A validly-signed token from the wrong approver key is rejected:
+    // signature validity alone does not establish authority.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = sample_intent("intent-wrong-approver");
+    let token = signed_approval(&approver, &subject, &intent);
+
+    let unexpected = Keypair::generate();
+    let error = verify_governed_approval(
+        &token,
+        &intent,
+        &unexpected.public_key(),
+        &subject.public_key(),
+        APPROVAL_REQUEST_ID,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("expected principal"),
+        "an unexpected approver must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_rejects_intent_not_covered_by_the_token() {
+    // The token commits to intent A's hash; presenting a different
+    // intent B (whose hash differs) must be rejected. This defeats
+    // cross-intent replay of an otherwise-valid approval.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let approved_intent = sample_intent("intent-A");
+    let token = signed_approval(&approver, &subject, &approved_intent);
+
+    let other_intent = sample_intent("intent-B");
+    let error = verify_gate(
+        &token,
+        &other_intent,
+        &approver,
+        &subject,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("intent hash mismatch"),
+        "an approval that does not cover this intent must be rejected, got: {error}"
+    );
+}
+
+// -----------------------------------------------------------------
+// Witness gate: subject / request binding, issuance-level single use,
+// and the expiry / amount clamps.
+// -----------------------------------------------------------------
+
+#[test]
+fn verify_governed_approval_rejects_a_wrong_subject() {
+    // Subject binding. A validly-signed, approved token whose subject
+    // is NOT the expected subject must be rejected even though intent
+    // hash and approver match. Without the subject check a captured
+    // approval for one principal could settle a different principal's
+    // spend.
+    let approver = Keypair::generate();
+    let token_subject = Keypair::generate();
+    let intent = sample_intent("intent-wrong-subject");
+    let token = signed_approval(&approver, &token_subject, &intent);
+
+    // Verify with a DIFFERENT expected subject.
+    let expected_subject = Keypair::generate();
+    let error = verify_governed_approval(
+        &token,
+        &intent,
+        &approver.public_key(),
+        &expected_subject.public_key(),
+        APPROVAL_REQUEST_ID,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("subject does not match"),
+        "a token for a different subject must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_rejects_a_wrong_request_id() {
+    // Request binding. A token whose request_id differs from the
+    // expected request must be rejected: an approval minted for request A
+    // cannot authorize settlement for request B even with the same
+    // intent/approver/subject.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = sample_intent("intent-wrong-request");
+    let token = signed_approval(&approver, &subject, &intent);
+
+    let error = verify_governed_approval(
+        &token,
+        &intent,
+        &approver.public_key(),
+        &subject.public_key(),
+        "req-OTHER",
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("request binding does not match"),
+        "a token for a different request must be rejected, got: {error}"
+    );
+}
+
+/// Verify `token` over `intent` with matching expectations, returning the
+/// witness. Wrapper around [`verify_gate`] for the issuance-level replay
+/// tests, which re-verify the SAME token to model a second settlement
+/// attempt from the same approval.
+fn witness_for(
+    token: &GovernedApprovalToken,
+    intent: &GovernedTransactionIntent,
+    approver: &Keypair,
+    subject: &Keypair,
+) -> VerifiedApproval {
+    verify_gate(
+        token,
+        intent,
+        approver,
+        subject,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap()
+}
+
+#[test]
+fn issued_settlement_artifact_is_single_use_with_a_shared_store() {
+    // Replay / single-use, consumed at ISSUANCE. The same approval can be
+    // verified twice (verification is read-only over the store), but the
+    // slot is recorded when a lane returns a settlement artifact: the first
+    // x402 issuance succeeds and the second attempt from the same approval
+    // against the same shared store fails closed.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = sample_intent("intent-replay");
+    let token = signed_approval(&approver, &subject, &intent);
+    let store = InMemoryApprovalReplayStore::new();
+    let dispatch = sample_dispatch();
+
+    let first = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        witness_for(&token, &intent, &approver, &subject),
+        APPROVAL_NOW,
+        &store,
+    );
+    assert!(first.is_ok(), "the first issuance must succeed: {first:?}");
+    assert_eq!(store.len().test_unwrap(), 1);
+
+    let replay = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        witness_for(&token, &intent, &approver, &subject),
+        APPROVAL_NOW,
+        &store,
+    )
+    .test_unwrap_err();
+    assert!(
+        replay.to_string().contains("already been consumed"),
+        "a second issuance from the same approval must be rejected, got: {replay}"
+    );
+}
+
+#[test]
+fn lane_rejection_does_not_burn_replay_slot() {
+    // The replay record happens at ISSUANCE: a witness that passes the gate
+    // but fails a LANE assertion (here a dispatch-identity mismatch) must
+    // not consume its slot, so a corrected pairing of the same approval can
+    // still settle against the same store.
+    let store = InMemoryApprovalReplayStore::new();
+    let other = sample_dispatch_with_other_dispatch_id();
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &other,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(dispatch_binding()),
+        APPROVAL_NOW,
+        &store,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("dispatch mismatch"),
+        "got: {error}"
+    );
+    assert!(
+        store.is_empty().test_unwrap(),
+        "a lane-level rejection must not record a replay entry"
+    );
+
+    // The corrected pairing (right dispatch) still issues against the same
+    // store.
+    let ok = build_x402_payment_requirements_with_verified_approval(
+        &sample_dispatch(),
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(dispatch_binding()),
+        APPROVAL_NOW,
+        &store,
+    );
+    assert!(ok.is_ok(), "a corrected pairing must still issue: {ok:?}");
+    assert_eq!(store.len().test_unwrap(), 1);
+}
+
+#[test]
+fn verify_governed_approval_rejects_a_binding_outliving_the_token() {
+    // Expiry clamp. A binding whose approval_expires_at is LATER than
+    // the token's own expires_at must be rejected, so an EIP-3009
+    // valid_before clamped to the binding cannot outlive the
+    // GovernedApprovalToken.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = sample_intent("intent-overexpiry");
+    let token = signed_approval(&approver, &subject, &intent);
+
+    let mut binding = dispatch_binding();
+    binding.approval_expires_at = token.expires_at + 1;
+    let error =
+        verify_gate(&token, &intent, &approver, &subject, binding, APPROVAL_NOW).test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("outlives the governed approval token expiry"),
+        "a binding expiry past the token expiry must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_accepts_binding_expiry_equal_to_token_expiry() {
+    // Boundary: binding expiry == token expiry is still bounded by the
+    // token, so it must be accepted.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = sample_intent("intent-expiry-boundary");
+    let token = signed_approval(&approver, &subject, &intent);
+
+    let mut binding = dispatch_binding();
+    binding.approval_expires_at = token.expires_at;
+    let verified =
+        verify_gate(&token, &intent, &approver, &subject, binding, APPROVAL_NOW).test_unwrap();
+    assert_eq!(verified.binding().approval_expires_at, token.expires_at);
+}
+
+/// Build an intent that COMMITS `binding`'s chain/payee/amount/token AND pins
+/// an explicit `max_amount` of `units`/`currency`. A settlement witness
+/// REQUIRES a committed `chioSettlementBinding` (the max_amount-only mode
+/// yields no settlement-capable witness), so the max_amount-clamp
+/// regressions commit a binding the caller-resolved binding matches (so the
+/// commitment check passes) while the separate `max_amount` is what the clamp
+/// exercises.
+fn intent_committing_with_max_amount(
+    id: &str,
+    binding: &ApprovalBinding,
+    units: u64,
+    currency: &str,
+) -> GovernedTransactionIntent {
+    let mut intent = intent_committing_binding(id, binding);
+    intent.max_amount = Some(MonetaryAmount {
+        units,
+        currency: currency.to_string(),
+    });
+    intent
+}
+
+#[test]
+fn verify_governed_approval_rejects_a_binding_over_intent_max_amount() {
+    // Intent amount clamp. When the intent pins max_amount, a binding
+    // whose amount exceeds it must be rejected before any witness exists. The
+    // intent commits the same over-max binding (so the commitment check passes
+    // and only the max_amount clamp can reject): an intent whose committed
+    // amount exceeds its own max_amount is self-inconsistent and fails closed.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let mut binding = dispatch_binding();
+    binding.amount_minor_units = DISPATCH_AMOUNT + 1; // one over the approved max
+    let intent = intent_committing_with_max_amount(
+        "intent-overamount",
+        &binding,
+        DISPATCH_AMOUNT as u64,
+        DISPATCH_TOKEN_SYMBOL,
+    );
+    let token = signed_approval(&approver, &subject, &intent);
+
+    let error =
+        verify_gate(&token, &intent, &approver, &subject, binding, APPROVAL_NOW).test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("exceeds the intent-approved maximum"),
+        "an over-amount binding must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_rejects_a_binding_with_wrong_intent_currency() {
+    // Intent currency clamp. With max_amount set, a binding whose
+    // token symbol differs from the approved currency must be rejected. The
+    // intent commits a binding whose token is "EUR" (matching the caller
+    // binding, so the commitment check passes) while max_amount approves
+    // DISPATCH_TOKEN_SYMBOL, so only the currency clamp can reject.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let mut binding = dispatch_binding();
+    binding.token_symbol = "EUR".to_string();
+    let intent = intent_committing_with_max_amount(
+        "intent-wrongccy",
+        &binding,
+        DISPATCH_AMOUNT as u64,
+        DISPATCH_TOKEN_SYMBOL,
+    );
+    let token = signed_approval(&approver, &subject, &intent);
+
+    let error =
+        verify_gate(&token, &intent, &approver, &subject, binding, APPROVAL_NOW).test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("does not match the intent-approved currency"),
+        "a wrong-currency binding must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_accepts_a_binding_at_intent_max_amount() {
+    // Boundary: amount == max and matching currency is within the
+    // approved ceiling and must verify. The intent commits the dispatch
+    // binding (the settlement witness requirement) AND pins a matching
+    // max_amount.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = intent_committing_with_max_amount(
+        "intent-atmax",
+        &dispatch_binding(),
+        DISPATCH_AMOUNT as u64,
+        DISPATCH_TOKEN_SYMBOL,
+    );
+    let token = signed_approval(&approver, &subject, &intent);
+
+    let verified = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap();
+    assert_eq!(verified.binding().amount_minor_units, DISPATCH_AMOUNT);
+}
+
+// -----------------------------------------------------------------
+// Witness gate: signed-binding commitment, lifetime cap, and
+// cross-lane single use.
+// -----------------------------------------------------------------
+
+#[test]
+fn verify_governed_approval_rejects_an_unbounded_intent() {
+    // Committed settlement binding required. An intent that commits no
+    // `chioSettlementBinding` pins no chain/payee/token, so the gate must
+    // refuse to issue a settlement witness for it. Without this fail-closed
+    // check an arbitrary caller-supplied ApprovalBinding (any chain/payee/
+    // token) would be accepted for an unbounded intent.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = unbounded_intent("intent-unbounded");
+    let token = signed_approval(&approver, &subject, &intent);
+
+    let error = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("commits no chioSettlementBinding"),
+        "an intent with no committed settlement binding must not yield a witness, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_rejects_a_max_amount_only_intent() {
+    // The max_amount-only mode must NOT produce a settlement
+    // witness. An intent that pins a `max_amount` ceiling but commits no
+    // `chioSettlementBinding` leaves chain/payee/token caller-chosen, so the
+    // value lanes (x402/EIP-3009/Circle) could settle on any chain to any payee
+    // in any token. The gate fails closed: a settlement-capable witness requires
+    // a signed binding, so the max_amount-only intent is rejected even though it
+    // carries an amount ceiling.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let mut intent = unbounded_intent("intent-max-only");
+    intent.max_amount = Some(MonetaryAmount {
+        units: DISPATCH_AMOUNT as u64,
+        currency: DISPATCH_TOKEN_SYMBOL.to_string(),
+    });
+    let token = signed_approval(&approver, &subject, &intent);
+
+    let error = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("commits no chioSettlementBinding"),
+        "a max_amount-only intent must not yield a settlement witness, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_rejects_a_caller_substituted_chain_payee_token() {
+    // Bind payee/chain/token to the SIGNED intent. The intent commits a
+    // concrete chain/payee/amount/token via its binding hash; a caller that
+    // resolves a binding with a SUBSTITUTED chain, payee, or token (one the
+    // approval never signed) must be rejected, so the witness carries the
+    // signed chain/payee/token, not caller-chosen ones.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    // The approver signs a binding committing the dispatch chain/payee/token.
+    let intent = intent_committing_binding("intent-committed", &dispatch_binding());
+    let token = signed_approval(&approver, &subject, &intent);
+
+    // Substituted chain.
+    let mut wrong_chain = dispatch_binding();
+    wrong_chain.chain_id = 1;
+    let error = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        wrong_chain,
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("does not match the intent-committed chain"),
+        "a substituted chain must be rejected, got: {error}"
+    );
+
+    // Substituted payee.
+    let mut wrong_payee = dispatch_binding();
+    wrong_payee.payee_address = "0x3333333333333333333333333333333333333333".to_string();
+    let error = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        wrong_payee,
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("does not match the intent-committed payee"),
+        "a substituted payee must be rejected, got: {error}"
+    );
+
+    // Substituted token symbol.
+    let mut wrong_token = dispatch_binding();
+    wrong_token.token_symbol = "EURC".to_string();
+    let error = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        wrong_token,
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("does not match the intent-committed token"),
+        "a substituted token must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_rejects_a_caller_substituted_token_contract() {
+    // Token contract binding. When the intent commits a token contract,
+    // a binding that omits or substitutes the contract must be rejected, so a
+    // captured approval cannot be redirected to a different token contract on
+    // the same chain.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let committed = ApprovalBinding {
+        chain_id: SAMPLE_CHAIN_ID,
+        payee_address: SAMPLE_PAYEE.to_string(),
+        amount_minor_units: SAMPLE_VALUE,
+        token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
+        token_contract: Some(SAMPLE_TOKEN_CONTRACT.to_string()),
+        settlement_currency: None,
+        dispatch_id: None,
+        capability_id: None,
+        approval_expires_at: APPROVAL_NOW + 100,
+    };
+    let intent = intent_committing_binding("intent-committed-contract", &committed);
+    let token = signed_approval(&approver, &subject, &intent);
+
+    // Substituted token contract on the same chain.
+    let mut wrong_contract = committed.clone();
+    wrong_contract.token_contract = Some("0x4444444444444444444444444444444444444444".to_string());
+    let error = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        wrong_contract,
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("token contract does not match the intent-committed contract"),
+        "a substituted token contract must be rejected, got: {error}"
+    );
+
+    // Omitted token contract while the intent committed one.
+    let mut omitted = committed.clone();
+    omitted.token_contract = None;
+    let error =
+        verify_gate(&token, &intent, &approver, &subject, omitted, APPROVAL_NOW).test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("omits the token contract the intent committed"),
+        "omitting the committed token contract must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_rejects_an_uncommitted_token_contract() {
+    // The EIP-3009 token contract must be SIGNED, not
+    // caller-substituted. When the intent commits NO token_contract, a caller
+    // that introduces one in its resolved binding could redirect the EIP-3009
+    // lane (which only checks domain.verifyingContract == binding.token_contract,
+    // both caller-supplied) to an attacker-chosen contract the approver never
+    // signed. The gate fails closed: a binding that carries a contract the intent
+    // never committed is rejected.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    // The committed binding pins chain/payee/amount/token but NO contract.
+    let committed = ApprovalBinding {
+        chain_id: SAMPLE_CHAIN_ID,
+        payee_address: SAMPLE_PAYEE.to_string(),
+        amount_minor_units: SAMPLE_VALUE,
+        token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
+        token_contract: None,
+        settlement_currency: None,
+        dispatch_id: None,
+        capability_id: None,
+        approval_expires_at: APPROVAL_NOW + 100,
+    };
+    let intent = intent_committing_binding("intent-no-committed-contract", &committed);
+    let token = signed_approval(&approver, &subject, &intent);
+
+    // The caller resolves a binding that SUBSTITUTES a token contract the
+    // intent never committed.
+    let mut substituted = committed.clone();
+    substituted.token_contract = Some(SAMPLE_TOKEN_CONTRACT.to_string());
+    let error = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        substituted,
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("carries a token contract the intent never committed"),
+        "a token contract the intent never signed must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_accepts_a_binding_matching_the_committed_intent() {
+    // Happy path: an intent that commits the settlement binding
+    // and a caller binding that matches it verifies, with no separate
+    // max_amount required (the committed binding IS the monetary bound).
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = intent_committing_binding("intent-committed-ok", &dispatch_binding());
+    let token = signed_approval(&approver, &subject, &intent);
+
+    let verified = verify_gate(
+        &token,
+        &intent,
+        &approver,
+        &subject,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap();
+    assert_eq!(verified.binding(), &dispatch_binding());
+}
+
+#[test]
+fn verify_governed_approval_rejects_a_token_over_the_lifetime_cap() {
+    // Lifetime cap. The verifier otherwise only checks
+    // now-in-window, so a token whose `expires_at` is far past `issued_at`
+    // would mint a long-lived witness that could outlive the single-use replay
+    // entry. Mirror the kernel cap (MAX_APPROVAL_TTL_SECS = 3600s): a token
+    // whose `(expires_at - issued_at)` exceeds the cap is rejected even though
+    // `APPROVAL_NOW` is inside its window. The replay slot must NOT be burned by
+    // the rejection.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = intent_committing_binding("intent-overlong", &dispatch_binding());
+    // Lifetime 4100s (> 3600s cap) with APPROVAL_NOW strictly inside the window.
+    let body = GovernedApprovalTokenBody {
+        id: "approval-overlong".to_string(),
+        approver: approver.public_key(),
+        subject: subject.public_key(),
+        governed_intent_hash: intent.binding_hash().test_unwrap(),
+        request_id: APPROVAL_REQUEST_ID.to_string(),
+        issued_at: APPROVAL_NOW - 100,
+        expires_at: APPROVAL_NOW + 4_000,
+        decision: GovernedApprovalDecision::Approved,
+    };
+    let token = GovernedApprovalToken::sign(body, &approver).test_unwrap();
+
+    let error = verify_governed_approval(
+        &token,
+        &intent,
+        &approver.public_key(),
+        &subject.public_key(),
+        APPROVAL_REQUEST_ID,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("lifetime") && error.to_string().contains("exceeds the maximum"),
+        "a token whose lifetime exceeds the cap must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn verify_governed_approval_accepts_a_token_at_the_lifetime_cap() {
+    // Boundary: a token whose lifetime is EXACTLY the cap (3600s) is accepted.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = intent_committing_binding("intent-atcap", &dispatch_binding());
+    let body = GovernedApprovalTokenBody {
+        id: "approval-atcap".to_string(),
+        approver: approver.public_key(),
+        subject: subject.public_key(),
+        governed_intent_hash: intent.binding_hash().test_unwrap(),
+        request_id: APPROVAL_REQUEST_ID.to_string(),
+        issued_at: APPROVAL_NOW - 100,
+        // issued_at + 3600 == exactly the cap.
+        expires_at: APPROVAL_NOW - 100 + 3_600,
+        decision: GovernedApprovalDecision::Approved,
+    };
+    let token = GovernedApprovalToken::sign(body, &approver).test_unwrap();
+
+    let verified = verify_governed_approval(
+        &token,
+        &intent,
+        &approver.public_key(),
+        &subject.public_key(),
+        APPROVAL_REQUEST_ID,
+        dispatch_binding(),
+        APPROVAL_NOW,
+    )
+    .test_unwrap();
+    assert_eq!(verified.approval_id(), "approval-atcap");
+}
+
+#[test]
+fn verification_does_not_consume_the_replay_slot() {
+    // Verification is a read-only proof over the token: re-verifying the
+    // same approval (for example after a crash between verification and
+    // settlement, or after a lane rejected the first witness) must succeed,
+    // and the later witness must still be able to issue. Only issuance
+    // consumes the slot.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = sample_intent("intent-shared-store");
+    let token = signed_approval(&approver, &subject, &intent);
+
+    let first = witness_for(&token, &intent, &approver, &subject);
+    drop(first);
+    let second = witness_for(&token, &intent, &approver, &subject);
+
+    let store = InMemoryApprovalReplayStore::new();
+    let issued = build_x402_payment_requirements_with_verified_approval(
+        &sample_dispatch(),
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        second,
+        APPROVAL_NOW,
+        &store,
+    );
+    assert!(
+        issued.is_ok(),
+        "a dropped witness must not block a later issuance: {issued:?}"
+    );
+}
+
+#[test]
+fn same_approval_cannot_issue_on_two_lanes() {
+    // Cross-lane replay. The single-use unit is the issued settlement
+    // artifact, across ALL lanes sharing one store: after the x402 lane
+    // issues requirements for an approval, the Circle lane presented with a
+    // witness for the SAME approval must fail closed rather than prepare a
+    // second settlement of the same spend.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let intent = sample_intent("intent-cross-lane");
+    let token = signed_approval(&approver, &subject, &intent);
+
+    // A single durable store shared across every lane.
+    let shared_store = InMemoryApprovalReplayStore::new();
+    let dispatch = sample_dispatch();
+
+    let x402 = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        witness_for(&token, &intent, &approver, &subject),
+        APPROVAL_NOW,
+        &shared_store,
+    );
+    assert!(x402.is_ok(), "the x402 issuance must succeed: {x402:?}");
+
+    let circle = evaluate_circle_nanopayment_with_verified_approval(
+        &dispatch,
+        &sample_circle_policy(),
+        witness_for(&token, &intent, &approver, &subject),
+        APPROVAL_NOW,
+        &shared_store,
+    )
+    .test_unwrap_err();
+    assert!(
+        circle.to_string().contains("already been consumed"),
+        "the same approval must not settle on a second lane, got: {circle}"
+    );
+}
+
+/// There are no public bypass exports: the raw x402/Circle/EIP-3009
+/// preparation functions are `pub(crate)` and not re-exported from the
+/// crate root, so downstream cannot construct a settlement that skips the
+/// `VerifiedApproval` witness. This compile-time test pins the only
+/// exported lane entry points to the `*_with_verified_approval` variants;
+/// it would fail to compile if a bypass export were reintroduced because
+/// the function-pointer type carries the `VerifiedApproval` argument.
+// The explicit fn-pointer types are the assertion: they pin each exported
+// lane entry point to its witness-bound signature, so the type complexity is
+// intentional here.
+#[allow(clippy::type_complexity)]
+#[test]
+fn exported_lane_entry_points_require_a_verified_approval_witness() {
+    // The witness is taken BY VALUE on every lane (single-use), every lane
+    // threads a lane-use clock (re-checks approval expiry at lane use), and
+    // every lane threads the shared replay store it consumes the approval
+    // slot into at issuance. These fn-pointer types would fail to compile if
+    // a lane reverted to borrowing the witness, dropped its clock, or
+    // dropped the replay store.
+    let _x402: fn(
+        &Web3SettlementDispatchArtifact,
+        &str,
+        &str,
+        Vec<String>,
+        X402SettlementMode,
+        VerifiedApproval,
+        u64,
+        &dyn ApprovalReplayStore,
+    ) -> Result<X402PaymentRequirements, SettlementError> =
+        build_x402_payment_requirements_with_verified_approval;
+    let _eip3009: fn(
+        Eip3009Domain,
+        TransferWithAuthorizationInput,
+        VerifiedApproval,
+        u64,
+        &dyn Eip3009NonceStore,
+        &dyn ApprovalReplayStore,
+    ) -> Result<PreparedTransferWithAuthorization, SettlementError> =
+        prepare_transfer_with_verified_approval;
+    let _circle: fn(
+        &Web3SettlementDispatchArtifact,
+        &CircleNanopaymentPolicy,
+        VerifiedApproval,
+        u64,
+        &dyn ApprovalReplayStore,
+    ) -> Result<Option<PreparedCircleNanopayment>, SettlementError> =
+        evaluate_circle_nanopayment_with_verified_approval;
+}
+
+// -----------------------------------------------------------------
+// x402 lane binds against the verified approval.
+// -----------------------------------------------------------------
+
+#[test]
+fn x402_with_verified_approval_authorizes_a_matching_dispatch() {
+    let dispatch = sample_dispatch();
+    let approval = verified_for(dispatch_binding());
+
+    let requirements = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        // The approval-bound token (DISPATCH_TOKEN_SYMBOL) must be among
+        // the accepted tokens.
+        vec![DISPATCH_TOKEN_SYMBOL.to_string(), "USDC".to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        approval,
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap();
+
+    assert!(requirements.governed_authorization_required);
+    assert_eq!(requirements.dispatch_id, dispatch.dispatch_id);
+    // The accepted-token list is filtered down to the approval-bound token:
+    // the "USDC" extra must NOT be advertised.
+    assert_eq!(
+        requirements.accepted_tokens,
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        "x402 requirements must advertise only the approval-bound token"
+    );
+}
+
+#[test]
+fn x402_with_verified_approval_rejects_a_token_not_accepted() {
+    // The approval is bound to DISPATCH_TOKEN_SYMBOL, but the x402
+    // requirements would only accept a different token. Offering to
+    // settle a governed spend in an unapproved token must fail closed.
+    let dispatch = sample_dispatch();
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec!["USDC".to_string(), "EURC".to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(dispatch_binding()),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(error.to_string().contains("token mismatch"), "got: {error}");
+}
+
+#[test]
+fn x402_with_verified_approval_rejects_binding_mismatches() {
+    let dispatch = sample_dispatch();
+
+    // Chain mismatch: the chain id is derived from the dispatch
+    // (eip155:8453 -> 8453), so an approval BOUND to a different chain
+    // must fail closed against the dispatch chain.
+    let mut wrong_chain = dispatch_binding();
+    wrong_chain.chain_id = 1;
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(wrong_chain),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(error.to_string().contains("chain mismatch"), "got: {error}");
+
+    // Payee mismatch: approval bound to a different payee than the
+    // dispatch beneficiary.
+    let mut wrong_payee = dispatch_binding();
+    wrong_payee.payee_address = "0x3333333333333333333333333333333333333333".to_string();
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(wrong_payee),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(error.to_string().contains("payee mismatch"), "got: {error}");
+
+    // Amount mismatch: approval bound to a different amount.
+    let mut wrong_amount = dispatch_binding();
+    wrong_amount.amount_minor_units = DISPATCH_AMOUNT + 1;
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(wrong_amount),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("amount mismatch"),
+        "got: {error}"
+    );
+}
+
+/// A binding over the sample dispatch's chain/payee/amount but bound to the
+/// on-chain RAIL token `token_symbol` (for example `"USDC"`), distinct from the
+/// dispatch's fiat settlement currency (`"USD"`). Used by the x402
+/// regressions that separate the rail token from the fiat currency.
+fn dispatch_binding_with_rail_token(token_symbol: &str) -> ApprovalBinding {
+    let mut binding = dispatch_binding();
+    binding.token_symbol = token_symbol.to_string();
+    binding
+}
+
+#[test]
+fn x402_with_verified_approval_accepts_a_base_usdc_dispatch_with_fiat_usd() {
+    // x402 keeps the on-chain RAIL token SEPARATE from the fiat
+    // settlement currency. The sample dispatch settles a fiat amount in USD
+    // (settlement_amount.currency == "USD") while the rail token is USDC. A
+    // normal Base/USDC approval binds the RAIL token USDC, and accepted_tokens
+    // advertises USDC. This MUST be accepted: comparing the bound token to the
+    // fiat currency ("USDC" != "USD") would wrongly reject it.
+    // The fiat settlement currency stays a separate amount field unchanged.
+    let dispatch = sample_dispatch();
+    assert_eq!(
+        dispatch.settlement_amount.currency, "USD",
+        "the sample dispatch's fiat settlement currency is USD"
+    );
+    let approval = verified_for(dispatch_binding_with_rail_token("USDC"));
+
+    let requirements = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        // The rail token the facilitator pulls, distinct from the fiat USD.
+        vec!["USDC".to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        approval,
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap();
+
+    assert_eq!(
+        requirements.accepted_tokens,
+        vec!["USDC".to_string()],
+        "x402 must advertise the approval-bound rail token"
+    );
+    // The fiat settlement currency is carried through unchanged as a SEPARATE
+    // amount field; it is NOT asserted to equal the rail token.
+    assert_eq!(
+        requirements.currency, "USD",
+        "the fiat settlement currency stays separate from the rail token"
+    );
+    assert_eq!(
+        requirements.amount_minor_units,
+        dispatch.settlement_amount.units
+    );
+}
+
+#[test]
+fn x402_with_verified_approval_rejects_a_non_bound_accepted_token() {
+    // A normal Base/USDC approval (rail token USDC, fiat currency
+    // USD) must still REJECT an accepted-token list that does not contain the
+    // bound rail token: offering to settle in EURC when the approval bound USDC
+    // must fail closed, even though the dispatch's fiat currency is USD and so
+    // never appears in accepted_tokens.
+    let dispatch = sample_dispatch();
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec!["EURC".to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(dispatch_binding_with_rail_token("USDC")),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("token mismatch"),
+        "an accepted-token list without the bound rail token must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn x402_with_verified_approval_filters_a_non_bound_accepted_token() {
+    // When accepted_tokens lists BOTH the bound rail token and a
+    // non-bound one (USDC bound, [USDC, EURC] offered), the lane must filter the
+    // list down to the bound token so EURC is never advertised to the
+    // facilitator, while the fiat USD settlement currency stays separate.
+    let dispatch = sample_dispatch();
+    let requirements = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec!["USDC".to_string(), "EURC".to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(dispatch_binding_with_rail_token("USDC")),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap();
+    assert_eq!(
+        requirements.accepted_tokens,
+        vec!["USDC".to_string()],
+        "the non-bound EURC must be filtered out"
+    );
+    assert_eq!(requirements.currency, "USD");
+}
+
+#[test]
+fn x402_with_verified_approval_rejects_a_non_eip155_dispatch_chain() {
+    // Chain from dispatch. A dispatch whose chain_id is not a valid
+    // eip155 namespace cannot be coerced into a numeric chain id, so the
+    // verifier fails closed before binding.
+    let mut dispatch = sample_dispatch();
+    dispatch.chain_id = "solana:mainnet".to_string();
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(dispatch_binding()),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("not an eip155 namespace"),
+        "a non-eip155 dispatch chain must be rejected, got: {error}"
+    );
+}
+
+// -----------------------------------------------------------------
+// EIP-3009 lane binds against the verified approval.
+// -----------------------------------------------------------------
+
+/// The approval binding that matches `sample_authorization` on the EIP-3009
+/// lane (contract-pinned, no dispatch identity).
+fn eip3009_binding() -> ApprovalBinding {
+    ApprovalBinding {
+        chain_id: SAMPLE_CHAIN_ID,
+        payee_address: SAMPLE_PAYEE.to_string(),
+        amount_minor_units: SAMPLE_VALUE,
+        token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
+        token_contract: Some(SAMPLE_TOKEN_CONTRACT.to_string()),
+        settlement_currency: None,
+        dispatch_id: None,
+        capability_id: None,
+        approval_expires_at: SAMPLE_VALID_BEFORE,
+    }
+}
+
+/// A verified approval whose binding matches `sample_authorization`. The
+/// approval token expiry is set to the EIP-3009 sample window so the
+/// binding's `approval_expires_at == SAMPLE_VALID_BEFORE` stays within the
+/// token (the expiry clamp requires binding expiry <= token expiry).
+fn verified_for_eip3009_authorization() -> VerifiedApproval {
+    verified_for_with_token_expiry(eip3009_binding(), SAMPLE_VALID_BEFORE)
+}
+
+#[test]
+fn eip3009_with_verified_approval_authorizes_a_matching_authorization() {
+    let store = InMemoryEip3009NonceStore::new();
+    let prepared = prepare_transfer_with_verified_approval(
+        sample_domain(),
+        sample_authorization(),
+        verified_for_eip3009_authorization(),
+        SAMPLE_NOW,
+        &store,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap();
+    assert!(prepared.authorization_digest.starts_with("0x"));
+    assert_eq!(prepared.authorization_digest.len(), 66);
+}
+
+#[test]
+fn eip3009_with_verified_approval_rejects_a_payee_mismatch() {
+    // The verified approval authorizes a DIFFERENT payee than the
+    // EIP-3009 authorization's `to`. Binding assertion fails closed and
+    // the nonce is not consumed.
+    let store = InMemoryEip3009NonceStore::new();
+    let approval = verified_for_with_token_expiry(
+        ApprovalBinding {
+            chain_id: SAMPLE_CHAIN_ID,
+            payee_address: "0x1000000000000000000000000000000000000009".to_string(),
+            amount_minor_units: SAMPLE_VALUE,
+            token_symbol: SAMPLE_TOKEN_SYMBOL.to_string(),
+            token_contract: Some(SAMPLE_TOKEN_CONTRACT.to_string()),
+            settlement_currency: None,
+            dispatch_id: None,
+            capability_id: None,
+            approval_expires_at: SAMPLE_VALID_BEFORE,
+        },
+        SAMPLE_VALID_BEFORE,
+    );
+    let error = prepare_transfer_with_verified_approval(
+        sample_domain(),
+        sample_authorization(),
+        approval,
+        SAMPLE_NOW,
+        &store,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(error.to_string().contains("payee mismatch"), "got: {error}");
+    assert!(
+        store.is_empty().test_unwrap(),
+        "a binding-mismatch rejection must not consume the nonce"
+    );
+}
+
+#[test]
+fn eip3009_with_verified_approval_rejects_an_expired_authorization() {
+    // The verified approval is fine, but the EIP-3009 authorization
+    // window is closed: the lane still fails closed.
+    let store = InMemoryEip3009NonceStore::new();
+    let error = prepare_transfer_with_verified_approval(
+        sample_domain(),
+        sample_authorization(),
+        verified_for_eip3009_authorization(),
+        SAMPLE_VALID_BEFORE,
+        &store,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(error.to_string().contains("expired"), "got: {error}");
+}
+
+// -----------------------------------------------------------------
+// Circle lane binds against the verified approval.
+// -----------------------------------------------------------------
+
+fn sample_circle_policy() -> CircleNanopaymentPolicy {
+    CircleNanopaymentPolicy {
+        enabled: true,
+        managed_balance_id: "bal_123".to_string(),
+        supported_chain_ids: vec!["eip155:8453".to_string()],
+        supported_token_symbols: vec!["USD".to_string()],
+        max_amount_minor_units: 200,
+        operator_managed_custody_explicit: true,
+    }
+}
+
+#[test]
+fn circle_with_verified_approval_authorizes_a_matching_dispatch() {
+    let dispatch = sample_dispatch();
+    let prepared = evaluate_circle_nanopayment_with_verified_approval(
+        &dispatch,
+        &sample_circle_policy(),
+        verified_for(dispatch_binding()),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap()
+    .test_unwrap();
+    assert_eq!(prepared.dispatch_id, dispatch.dispatch_id);
+}
+
+#[test]
+fn circle_with_verified_approval_rejects_binding_mismatches() {
+    let dispatch = sample_dispatch();
+
+    // Chain mismatch: the chain id is derived from the dispatch, so an
+    // approval bound to a different chain fails closed.
+    let mut wrong_chain = dispatch_binding();
+    wrong_chain.chain_id = 1;
+    let error = evaluate_circle_nanopayment_with_verified_approval(
+        &dispatch,
+        &sample_circle_policy(),
+        verified_for(wrong_chain),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(error.to_string().contains("chain mismatch"), "got: {error}");
+
+    // Payee mismatch.
+    let mut wrong_payee = dispatch_binding();
+    wrong_payee.payee_address = "0x3333333333333333333333333333333333333333".to_string();
+    let error = evaluate_circle_nanopayment_with_verified_approval(
+        &dispatch,
+        &sample_circle_policy(),
+        verified_for(wrong_payee),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(error.to_string().contains("payee mismatch"), "got: {error}");
+
+    // Amount mismatch.
+    let mut wrong_amount = dispatch_binding();
+    wrong_amount.amount_minor_units = DISPATCH_AMOUNT + 1;
+    let error = evaluate_circle_nanopayment_with_verified_approval(
+        &dispatch,
+        &sample_circle_policy(),
+        verified_for(wrong_amount),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("amount mismatch"),
+        "got: {error}"
+    );
+
+    // Token mismatch: approval bound to a different token than the
+    // dispatch settles in. Redirecting a governed spend to another token
+    // must fail closed.
+    let mut wrong_token = dispatch_binding();
+    wrong_token.token_symbol = "EURC".to_string();
+    let error = evaluate_circle_nanopayment_with_verified_approval(
+        &dispatch,
+        &sample_circle_policy(),
+        verified_for(wrong_token),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(error.to_string().contains("token mismatch"), "got: {error}");
+}
+
+// -----------------------------------------------------------------
+// Single-use issuance, lane-use expiry, and accepted-token filtering.
+// -----------------------------------------------------------------
+
+#[test]
+fn x402_filters_extra_accepted_tokens_down_to_the_bound_token() {
+    // Filter x402 accepted_tokens. The approval is bound to
+    // DISPATCH_TOKEN_SYMBOL but the caller offers `[bound, EURC, USDC]`. A
+    // membership check alone would return the whole list and still advertise
+    // EURC/USDC to the facilitator; the lane must filter the list down to the
+    // approval-bound token so only it is advertised.
+    let dispatch = sample_dispatch();
+    let requirements = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![
+            DISPATCH_TOKEN_SYMBOL.to_string(),
+            "EURC".to_string(),
+            "USDC".to_string(),
+        ],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(dispatch_binding()),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap();
+    assert_eq!(
+        requirements.accepted_tokens,
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        "x402 must advertise only the approval-bound token, not the extras"
+    );
+}
+
+#[test]
+fn x402_rejects_settlement_after_approval_expiry_at_lane_use() {
+    // Re-check expiry at x402 lane use. The witness is verified inside its
+    // window (`approval_expires_at == APPROVAL_NOW + 100`) but the lane is
+    // exercised at `approval_expires_at` (held past expiry). The lane-use clock
+    // must reject it, so a witness verified just before expiry cannot build
+    // requirements after it lapses.
+    let dispatch = sample_dispatch();
+    let approval = verified_for(dispatch_binding());
+    let expiry = approval.binding().approval_expires_at;
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        approval,
+        expiry,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("approval expired"),
+        "x402 must reject a held witness used at/after approval expiry, got: {error}"
+    );
+}
+
+#[test]
+fn circle_rejects_settlement_after_approval_expiry_at_lane_use() {
+    // Re-check expiry at Circle lane use. Same scenario as the x402 lane:
+    // a witness held until `approval_expires_at` must be rejected before any
+    // payout is prepared.
+    let dispatch = sample_dispatch();
+    let approval = verified_for(dispatch_binding());
+    let expiry = approval.binding().approval_expires_at;
+    let error = evaluate_circle_nanopayment_with_verified_approval(
+        &dispatch,
+        &sample_circle_policy(),
+        approval,
+        expiry,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("approval expired"),
+        "Circle must reject a held witness used at/after approval expiry, got: {error}"
+    );
+}
+
+#[test]
+fn eip3009_rejects_settlement_after_approval_expiry_at_lane_use() {
+    // Re-check expiry at EIP-3009 lane use. The approval window closes at
+    // its `approval_expires_at`; exercising the lane at that instant (now ==
+    // approval_expires_at) must be rejected by the lane-use expiry re-check
+    // before any digest is built, even though the rest of the binding matches.
+    let store = InMemoryEip3009NonceStore::new();
+    let error = prepare_transfer_with_verified_approval(
+        sample_domain(),
+        sample_authorization(),
+        verified_for_eip3009_authorization(),
+        SAMPLE_VALID_BEFORE,
+        &store,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("expired"),
+        "EIP-3009 must reject a held witness used at/after approval expiry, got: {error}"
+    );
+    assert!(
+        store.is_empty().test_unwrap(),
+        "an expiry-rejected lane use must not consume a nonce"
+    );
+}
+
+#[test]
+fn a_consumed_witness_cannot_authorize_a_second_transfer() {
+    // Single-use witness. The EIP-3009 lane CONSUMES the witness by value,
+    // so a single witness prepares exactly one transfer. The witness is moved
+    // into the first call and `VerifiedApproval` is NOT `Clone`, so it cannot
+    // be retained and reused with a fresh EIP-3009 nonce to forge a second
+    // transfer: a second spend must mint its OWN approval (distinct intent,
+    // hence a distinct replay key) and its own witness. The compile-time
+    // fn-pointer test pins the by-value signature; here both spends share ONE
+    // replay store to show a distinct approval still issues while the first
+    // approval's slot stays consumed.
+    let store = InMemoryEip3009NonceStore::new();
+    let replay_store = InMemoryApprovalReplayStore::new();
+
+    let approval = verified_for_eip3009_authorization();
+    let first = prepare_transfer_with_verified_approval(
+        sample_domain(),
+        sample_authorization(),
+        approval,
+        SAMPLE_NOW,
+        &store,
+        &replay_store,
+    );
+    assert!(
+        first.is_ok(),
+        "the first lane use of a witness must succeed"
+    );
+
+    // `approval` was moved into the first call and cannot be referenced again
+    // (it is not `Clone`), so a second transfer with a FRESH nonce must be
+    // authorized by a NEW approval over its own intent rather than a reused
+    // one.
+    let mut second_authorization = sample_authorization();
+    second_authorization.nonce =
+        "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string();
+    let second = prepare_transfer_with_verified_approval(
+        sample_domain(),
+        second_authorization,
+        verified_for_intent_with_token_expiry(
+            eip3009_binding(),
+            "intent-second-spend",
+            SAMPLE_VALID_BEFORE,
+        ),
+        SAMPLE_NOW,
+        &store,
+        &replay_store,
+    );
+    assert!(
+        second.is_ok(),
+        "a second spend must be authorized by its OWN approval and witness: {second:?}"
+    );
+    assert_eq!(
+        replay_store.len().test_unwrap(),
+        2,
+        "each issued transfer must consume its own approval slot"
+    );
+}
+
+// -----------------------------------------------------------------
+// Fiat-currency max_amount clamp, dispatch-identity binding, and
+// contract-pinned approvals on the symbol-only x402 lane.
+// -----------------------------------------------------------------
+
+/// An x402 binding over the sample dispatch's chain/payee/amount/identity but
+/// bound to the on-chain RAIL token `rail` (for example `"USDC"`) while the
+/// dispatch settles a fiat amount in `fiat` (for example `"USD"`). The fiat
+/// settlement currency is pinned via `settlement_currency`, so a committed
+/// `max_amount` clamp compares against the fiat currency, not the rail token.
+fn dispatch_binding_with_rail_and_fiat(rail: &str, fiat: &str) -> ApprovalBinding {
+    let mut binding = dispatch_binding();
+    binding.token_symbol = rail.to_string();
+    binding.settlement_currency = Some(fiat.to_string());
+    binding
+}
+
+/// Build an intent that commits `binding` (rail token + fiat settlement
+/// currency + dispatch identity) AND pins an explicit fiat `max_amount`, then
+/// mint the matching approved token. Models a real USDC/USD x402 approval that
+/// also carries a budget clamp.
+fn intent_and_token_for_x402_with_fiat_max(
+    approver: &Keypair,
+    subject: &Keypair,
+    binding: &ApprovalBinding,
+    max_units: u64,
+    max_currency: &str,
+) -> (GovernedTransactionIntent, GovernedApprovalToken) {
+    let mut intent = intent_committing_binding("intent-x402-fiat-max", binding);
+    intent.max_amount = Some(MonetaryAmount {
+        units: max_units,
+        currency: max_currency.to_string(),
+    });
+    let token = signed_approval(approver, subject, &intent);
+    (intent, token)
+}
+
+#[test]
+fn x402_witness_with_fiat_max_amount_and_usdc_rail_is_accepted_and_still_clamps() {
+    // A valid Base/USDC x402 approval binds the RAIL token USDC but
+    // settles a fiat amount in USD, and ALSO carries a fiat `max_amount` (USD)
+    // as a budget clamp. Comparing the rail token (USDC) to
+    // `max_amount.currency` (USD) would wrongly reject the witness, forcing
+    // callers to DROP `max_amount` to use the path (losing the budget clamp).
+    // The clamp must compare `max_amount` against the FIAT settlement currency,
+    // so this verifies AND the x402 lane advertises the rail token.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let binding = dispatch_binding_with_rail_and_fiat("USDC", "USD");
+    let (intent, token) = intent_and_token_for_x402_with_fiat_max(
+        &approver,
+        &subject,
+        &binding,
+        // A fiat ceiling at or above the dispatch amount, denominated in USD.
+        DISPATCH_AMOUNT as u64,
+        "USD",
+    );
+
+    // The witness verifies even though it carries a fiat max_amount: the clamp
+    // compares USD (fiat) vs USD (max_amount.currency), not USDC vs USD.
+    let approval =
+        verify_gate(&token, &intent, &approver, &subject, binding, APPROVAL_NOW).test_unwrap();
+
+    let dispatch = sample_dispatch();
+    let requirements = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec!["USDC".to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        approval,
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap();
+    assert_eq!(
+        requirements.accepted_tokens,
+        vec!["USDC".to_string()],
+        "the USDC/USD x402 witness with a fiat max_amount must be accepted and advertise USDC"
+    );
+    // The fiat settlement currency stays separate from the rail token.
+    assert_eq!(requirements.currency, "USD");
+}
+
+#[test]
+fn x402_fiat_max_amount_still_clamps_an_over_budget_binding() {
+    // The fiat clamp is not weakened: a binding whose amount
+    // exceeds the intent's fiat `max_amount` (both in USD) must still be
+    // rejected at verification, even though the rail token is USDC. This proves
+    // the clamp exercises the fiat currency rather than being silently
+    // dropped.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let mut binding = dispatch_binding_with_rail_and_fiat("USDC", "USD");
+    binding.amount_minor_units = DISPATCH_AMOUNT + 1; // one over the fiat max
+    let (intent, token) = intent_and_token_for_x402_with_fiat_max(
+        &approver,
+        &subject,
+        &binding,
+        DISPATCH_AMOUNT as u64,
+        "USD",
+    );
+    let error =
+        verify_gate(&token, &intent, &approver, &subject, binding, APPROVAL_NOW).test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("exceeds the intent-approved maximum"),
+        "the fiat max_amount must still clamp an over-budget binding, got: {error}"
+    );
+}
+
+#[test]
+fn x402_fiat_max_amount_rejects_a_mismatched_fiat_currency() {
+    // The currency half of the clamp compares against the FIAT
+    // settlement currency. A binding whose fiat settlement currency is EUR while
+    // the intent's max_amount approves USD must be rejected: the clamp must not
+    // silently accept a different fiat currency just because the rail token
+    // happens to differ from both.
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let binding = dispatch_binding_with_rail_and_fiat("USDC", "EUR");
+    let (intent, token) = intent_and_token_for_x402_with_fiat_max(
+        &approver,
+        &subject,
+        &binding,
+        DISPATCH_AMOUNT as u64,
+        "USD",
+    );
+    let error =
+        verify_gate(&token, &intent, &approver, &subject, binding, APPROVAL_NOW).test_unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("does not match the intent-approved currency"),
+        "a fiat-currency mismatch must be rejected, got: {error}"
+    );
+}
+
+/// A clone of the sample dispatch with the SAME economics (chain / payee /
+/// amount / currency) but a DIFFERENT `dispatch_id`. Models an attacker pairing
+/// a verified approval with a different dispatch that has identical economics.
+fn sample_dispatch_with_other_dispatch_id() -> Web3SettlementDispatchArtifact {
+    let mut dispatch = sample_dispatch();
+    dispatch.dispatch_id = "dispatch-web3-OTHER".to_string();
+    dispatch
+}
+
+#[test]
+fn x402_rejects_a_witness_paired_with_a_different_dispatch_id() {
+    // The witness is bound to the canonical dispatch identity
+    // (dispatch-web3-1), but the caller presents a DIFFERENT dispatch with the
+    // same chain/payee/amount/token and a different `dispatch_id`. Without the
+    // dispatch-identity binding the x402 wrapper would happily produce
+    // requirements echoing the OTHER dispatch's id. It must fail closed.
+    let other = sample_dispatch_with_other_dispatch_id();
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &other,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(dispatch_binding()),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("dispatch mismatch"),
+        "an approval paired with a different dispatch_id must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn circle_rejects_a_witness_paired_with_a_different_dispatch_id() {
+    // Same scenario on the Circle lane: the prepared payout copies
+    // `dispatch.dispatch_id`, so a witness bound to dispatch-web3-1 must not
+    // produce a payout for a different dispatch carrying the same economics.
+    let other = sample_dispatch_with_other_dispatch_id();
+    let error = evaluate_circle_nanopayment_with_verified_approval(
+        &other,
+        &sample_circle_policy(),
+        verified_for(dispatch_binding()),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("dispatch mismatch"),
+        "Circle must reject an approval paired with a different dispatch_id, got: {error}"
+    );
+}
+
+#[test]
+fn x402_rejects_a_witness_paired_with_a_different_capability_id() {
+    // The x402 requirements echo a capability id resolved from the
+    // dispatch. A witness whose signed binding pins a DIFFERENT capability id
+    // (modeling an approval issued for another dispatch's capability with the
+    // same economics) must fail closed against the live dispatch's resolved
+    // capability id, so settlement artifacts cannot be produced for the wrong
+    // capability.
+    let mut binding = dispatch_binding();
+    binding.capability_id = Some("cap-other".to_string());
+    // The intent commits the same (wrong) capability id, so the gate's
+    // signature-pinning check passes; only the lane assertion against the live
+    // dispatch can reject.
+    let approval = verified_for(binding);
+
+    let dispatch = sample_dispatch();
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        approval,
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("capability mismatch"),
+        "an approval paired with a different capability_id must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn x402_rejects_a_witness_with_no_bound_dispatch_identity() {
+    // Defense in depth: the dispatch-bearing lane requires a
+    // SIGNED dispatch identity. A witness whose binding pins no dispatch id (for
+    // example one resolved for a non-x402 use) must not settle on the x402 lane.
+    let mut binding = dispatch_binding();
+    binding.dispatch_id = None;
+    binding.capability_id = None;
+    let dispatch = sample_dispatch();
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(binding),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("dispatch identity unbound"),
+        "an x402 witness with no bound dispatch identity must be rejected, got: {error}"
+    );
+}
+
+#[test]
+fn x402_rejects_a_contract_pinned_approval_on_the_symbol_only_lane() {
+    // When the signed binding pins a concrete `token_contract`, the
+    // verifier proved THAT contract was approved. The x402 lane identifies its
+    // token by SYMBOL only and returns requirements with no contract identity,
+    // so a facilitator resolving the symbol to a DIFFERENT contract could settle
+    // an unapproved token contract. A contract-pinned approval must fail closed
+    // on the symbol-only x402 lane.
+    let mut binding = dispatch_binding();
+    binding.token_contract = Some(SAMPLE_TOKEN_CONTRACT.to_string());
+    let dispatch = sample_dispatch();
+    let error = build_x402_payment_requirements_with_verified_approval(
+        &dispatch,
+        "https://facilitator.example/x402",
+        "https://tool.example/v1/run",
+        vec![DISPATCH_TOKEN_SYMBOL.to_string()],
+        X402SettlementMode::PrepaidAuthorization,
+        verified_for(binding),
+        APPROVAL_NOW,
+        &InMemoryApprovalReplayStore::new(),
+    )
+    .test_unwrap_err();
+    assert!(
+        error.to_string().contains("contract-pinned approval"),
+        "a contract-pinned approval must be rejected on the symbol-only x402 lane, got: {error}"
+    );
+}

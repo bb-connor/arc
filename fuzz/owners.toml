@@ -64,6 +64,10 @@ path  = "crates/protocol/chio-openapi-mcp-bridge"
 crate = "chio-kernel-core"
 path  = "crates/kernel/chio-kernel-core"
 
+[targets.settlement_approval_witness]
+crate = "chio-settle"
+path  = "crates/economy/chio-settle"
+
 [targets.eval_receipt_bundle]
 crate = "chio-eval-receipt"
 path  = "crates/sdk/chio-eval-receipt"

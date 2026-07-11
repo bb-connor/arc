@@ -17,13 +17,15 @@
 //! - [`approval_store`] / [`batch_approval_store`] -- human-approval state.
 //! - [`capability_lineage`] / [`revocation_store`] -- capability provenance and
 //!   revocation.
-//! - [`execution_nonce_store`] / [`dead_letters`] / [`iou_store`] -- nonce
-//!   replay guard, settlement dead letters, and IOU envelopes.
+//! - [`execution_nonce_store`] / [`approval_replay_store`] / [`dead_letters`]
+//!   / [`iou_store`] -- nonce and governed-approval replay guards, settlement
+//!   dead letters, and IOU envelopes.
 //! - [`encrypted_blob`] / [`memory_provenance_store`] / [`evidence_export`] --
 //!   encrypted payloads, memory provenance, and evidence export.
 
 #![forbid(unsafe_code)]
 
+pub mod approval_replay_store;
 pub mod approval_store;
 pub mod authority;
 pub mod batch_approval_store;
