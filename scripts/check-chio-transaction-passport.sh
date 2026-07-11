@@ -152,7 +152,7 @@ export CHIO_PUBLIC_SETTLEMENT_TRUSTED_ESCROW_RUNTIME_CODEHASH="${CHIO_PUBLIC_SET
 export CHIO_PUBLIC_SETTLEMENT_TRUSTED_BOND_VAULT_RUNTIME_CODEHASH="${CHIO_PUBLIC_SETTLEMENT_TRUSTED_BOND_VAULT_RUNTIME_CODEHASH:-0x17f7936469584b38404765ac44bd7e2384337983e4bc6448a3500d0637711f09}"
 export CHIO_PUBLIC_SETTLEMENT_ALLOWED_CHAIN_IDS="${CHIO_PUBLIC_SETTLEMENT_ALLOWED_CHAIN_IDS:-eip155:8453,eip155:42161}"
 export CHIO_PUBLIC_SETTLEMENT_MINIMUM_CONFIRMATIONS="${CHIO_PUBLIC_SETTLEMENT_MINIMUM_CONFIRMATIONS:-1}"
-# RPI-1: public-settlement finality is grounded on an INDEPENDENT chain head the
+# Public-settlement finality is grounded on an INDEPENDENT chain head the
 # verifier observes, never on the producer-supplied (unsigned) chain-snapshot
 # depth. The offline-finality positive fixture's verifier policy requires the
 # `finality_verified` claim, so the verifier must be given the matching

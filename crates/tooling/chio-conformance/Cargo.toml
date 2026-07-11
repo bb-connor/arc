@@ -167,12 +167,12 @@ zeroize = { workspace = true }
 # state machine via the chio-anchor crate. tokio drives the async
 # trait surface; tiny_http stages the mock Rekor server.
 chio-anchor = { workspace = true }
-# M2-2 (WS-CL-RECOMPUTE-GATE) recompute-sole-lane conformance test
+# The recompute-sole-lane conformance test
 # (eas_attestation_not_anchoring_inclusion_proof.rs) drives the chio-web3
 # `verify_anchor_inclusion_proof` readback lane directly to prove an external
 # EAS/SAS attestation is not admissible as an anchoring inclusion proof.
 chio-web3 = { workspace = true }
-# M2-7 (WS-CL-SLASH-LANE-GATE) single-slash-lane conformance harness
+# The single-slash-lane conformance harness
 # (slash_routes_only_through_comptroller.rs) drives the comptroller
 # adjudication surface (`validate_risk_report`) directly to prove a slash
 # routes only through the comptroller and that there is no second slash lane.
@@ -217,13 +217,13 @@ wat = "1.246"
 # drive validate_signed and verify_tenant_sig deny branches with forged
 # tenant signatures.
 chio-tee-frame = { workspace = true }
-# M2-8 (WS-CL-CAPITAL-SOURCE-GATE) single-source capital-book conformance test
+# The single-source capital-book conformance test
 # (capital_book_single_source_gate.rs) stages a real SqliteReceiptStore with
 # adversarial facility/bond/currency configurations and drives the production
 # capital-book builder (chio-control-plane build_signed_capital_book_report,
 # which delegates to build_capital_book_report_from_store) to prove the
 # prudential single-source rule denies fail-closed. chio-credit supplies the
-# M2-1 off-chain netted-view projection (collapse_positions_to_canonical) used
+# off-chain netted-view projection (collapse_positions_to_canonical) used
 # to prove the read-only collapse does not flip the single-source rule. The
 # chio-conformance <- chio-control-plane edge is a dev-dependency-only cycle
 # (chio-control-plane normal-depends on chio-conformance), which Cargo permits.

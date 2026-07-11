@@ -985,7 +985,7 @@ fn proof_verify_accepts_trust_market_context_fixture() {
 
 #[test]
 fn proof_verify_accepts_public_settlement_fixture() {
-    // RPI-1: finality is claimed only when grounded on an independent chain head
+    // Finality is claimed only when grounded on an independent chain head
     // the verifier observes. Supply the head matching the fixture's snapshot.
     let independent_head = serde_json::json!({
         "chain_id": "eip155:8453",
@@ -1133,7 +1133,7 @@ fn proof_verify_rejects_public_settlement_trust_market_refs_without_configured_c
         ],
     );
 
-    // RPI-1: supply the independent chain head so the finality claim is emitted.
+    // Supply the independent chain head so the finality claim is emitted.
     let independent_head = serde_json::json!({
         "chain_id": "eip155:8453",
         "observed_block_number": 12_345_678,

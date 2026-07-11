@@ -1,13 +1,12 @@
 //! Off-chain single-denomination netting collapse for the exposure ledger.
 //!
-//! The token theses claimed that an on-chain credit instrument is required to
-//! net per-currency credit exposure into a single denomination and free the
-//! capital that per-currency segregation locks up. This module realizes that
-//! exact benefit as a READ-ONLY off-chain projection over the already-signed
-//! per-currency [`ExposureLedgerCurrencyPosition`] entries, with ZERO on-chain
-//! instrument and ZERO new contract. It is the kill-evidence against any
-//! on-chain credit token: the single-denomination netting and capital-allocation
-//! benefit is computable off-chain from Chio truth that already exists.
+//! Nets per-currency credit exposure into a single canonical denomination and
+//! quantifies the capital that per-currency segregation locks up, as a
+//! READ-ONLY off-chain projection over the already-signed per-currency
+//! [`ExposureLedgerCurrencyPosition`] entries. No on-chain instrument and no
+//! new contract are involved: the single-denomination netting and
+//! capital-allocation benefit is computed off-chain from signed Chio state
+//! that already exists.
 //!
 //! # Fail-closed invariants
 //!
@@ -586,7 +585,7 @@ impl ExposureLedgerReport {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod do_not_weaken {
-    //! DO-NOT-WEAKEN regression suite (M2-5).
+    //! DO-NOT-WEAKEN regression suite.
     //!
     //! The off-chain single-denomination collapse is a projection, not an
     //! authority: it must carry the three prudential netting flags straight
@@ -767,7 +766,7 @@ mod tests {
         );
     }
 
-    /// PR959 codex P2: duplicate same-currency rows are rejected fail-closed and
+    /// Duplicate same-currency rows are rejected fail-closed and
     /// produce NO phantom capital-freed benefit. The segregated baseline sums each
     /// row's worst-case requirement, so two USD rows (reserved=100, pending=100)
     /// would report segregated=200 against netted=100 and advertise a fictitious
@@ -821,7 +820,7 @@ mod tests {
         );
     }
 
-    /// KILL-EVIDENCE: all three prudential netting flags read false after the
+    /// All three prudential netting flags read false after the
     /// collapse, and the projection requires no on-chain instrument or contract.
     #[test]
     fn netted_view_support_boundary_flags_stay_false() {
@@ -964,7 +963,7 @@ mod tests {
         );
     }
 
-    /// PR959 codex P2: a zero-numerator rate fails closed rather than collapsing
+    /// A zero-numerator rate fails closed rather than collapsing
     /// a positive exposure to zero canonical units.
     #[test]
     fn netting_zero_numerator_fails_closed() {
@@ -1089,7 +1088,7 @@ mod tests {
         assert!(!report.support_boundary.cross_currency_netting_supported);
     }
 
-    /// PR959 codex P2 (re-review): a report whose summary flags truncation is
+    /// A report whose summary flags truncation is
     /// refused by the collapse. A paginated query that hit its receipt or
     /// decision limit accumulates `positions` from ONLY the returned page, so its
     /// per-currency outstanding (and the segregated baseline) is understated.
@@ -1186,7 +1185,7 @@ mod tests {
         assert_eq!(view, decoded);
     }
 
-    /// PR959 codex P1: a conversion that exceeds `u64::MAX` fails closed with a
+    /// A conversion that exceeds `u64::MAX` fails closed with a
     /// [`ExposureLedgerNettingError::ConversionOverflow`] rather than capping at
     /// `u64::MAX`, since a capped figure would understate outstanding exposure.
     #[test]
@@ -1228,7 +1227,7 @@ mod tests {
         assert_eq!(parity.convert(u64::MAX).unwrap(), u64::MAX);
     }
 
-    /// PR959 codex P1: a single position whose unsettled channel
+    /// A single position whose unsettled channel
     /// (`pending + failed`) exceeds `u64::MAX` fails closed with an
     /// [`ExposureLedgerNettingError::UnsettledExposureOverflow`] rather than
     /// saturating, because a capped unsettled figure would understate the
@@ -1266,7 +1265,7 @@ mod tests {
         assert_eq!(at_max.outstanding_exposure_units().unwrap(), u64::MAX);
     }
 
-    /// PR959 codex P1: summing individually valid positions past `u64::MAX` in
+    /// Summing individually valid positions past `u64::MAX` in
     /// the aggregate canonical book fails closed with an
     /// [`ExposureLedgerNettingError::AggregateOverflow`] rather than capping,
     /// because a capped aggregate would understate the netted exposure and
@@ -1277,8 +1276,8 @@ mod tests {
         // with reserved_units = u64::MAX, both convert one-to-one and push the
         // aggregate outstanding past u64::MAX; the collapse fails closed instead of
         // publishing a capped reserved_units = u64::MAX. Distinct currencies are
-        // used because duplicate same-currency rows are now rejected before they can
-        // aggregate (PR959 codex P2 finding 3).
+        // used because duplicate same-currency rows are rejected before they can
+        // aggregate.
         let reserved_max = |currency: &str| ExposureLedgerCurrencyPosition {
             reserved_units: u64::MAX,
             ..position(currency)
@@ -1312,7 +1311,7 @@ mod tests {
         );
     }
 
-    /// PR959 codex P2: a pinned-parity currency (USD or USDC) supplied a
+    /// A pinned-parity currency (USD or USDC) supplied a
     /// non-parity explicit override is rejected before the override can halve
     /// canonical exposure; the USD/USDC pin is not negotiable.
     #[test]
@@ -1362,7 +1361,7 @@ mod tests {
         );
     }
 
-    /// PR959 codex P2: the recovery channel rounds DOWN so the net-loss channel
+    /// The recovery channel rounds DOWN so the net-loss channel
     /// is never understated after subtraction. With 2 EUR provisional loss and 1
     /// EUR recovered at 11/10 the net loss must be 2 USDC, not the 1 USDC that
     /// rounding the gross recovery up would produce.

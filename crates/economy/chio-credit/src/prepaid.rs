@@ -1,4 +1,4 @@
-//! Escrow-socketed closed-loop prepaid credit VIEW (M2-17).
+//! Escrow-socketed closed-loop prepaid credit VIEW.
 //!
 //! A user may prepay funds into the existing immutable [`ChioEscrow`] by
 //! creating an escrow deposit (the depositor is the original funder). Those
@@ -19,12 +19,12 @@
 //! [`crate::netting`]: the benefit (a spendable, refundable closed-loop credit)
 //! is computable off-chain from escrow truth that already exists.
 //!
-//! # SHIP is gated, not declared
+//! # Shipping is gated, not declared
 //!
-//! This is the VIEW + non-transferability logic only. The SHIP/READY
-//! declaration (M2-23) is BLOCKED on a licensed issuer-of-record partner, a
-//! MiCA e-money opinion (RG-MICA), and a closed-loop sign-off (RG-CLOSEDLOOP).
-//! Every ship-gated support-boundary flag stays default-`false`: there is no
+//! This is the VIEW + non-transferability logic only. The path stays disabled
+//! (`ship_ready = false`) until a licensed issuer-of-record partner, a MiCA
+//! e-money opinion, and a closed-loop legal sign-off are in place. Every
+//! ship-gated support-boundary flag stays default-`false`: there is no
 //! live, default-on, transferable, or open-loop path here.
 //!
 //! # The socket
@@ -211,7 +211,8 @@ pub enum PrepaidCreditLifecycle {
 /// refundable to the original funder only, and currency-pinned. The second block
 /// is the DO-NOT-WEAKEN / ship-gated set, every flag default-`false`: no
 /// third-party transferability, no open-loop spend, no live/default-on path, no
-/// declared SHIP, and no new contract, restricted-ERC20 vault, or off-TCB ledger.
+/// ship-ready declaration, and no new contract, restricted-ERC20 vault, or
+/// off-TCB ledger.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PrepaidCreditSupportBoundary {
@@ -474,14 +475,15 @@ pub fn project_closed_loop_prepaid(
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod do_not_weaken {
-    //! DO-NOT-WEAKEN regression suite (M2-17).
+    //! DO-NOT-WEAKEN regression suite.
     //!
     //! The closed-loop prepaid view is a projection, not an authority, and its
-    //! SHIP declaration (M2-23) is gated. These locks freeze that posture at
+    //! ship-ready declaration is gated. These locks freeze that posture at
     //! the default level: the closed-loop markers stay `true` and every
     //! ship-gated flag stays `false`. A future weakening (flipping a flag to
-    //! `true`, declaring SHIP, requiring a new contract / restricted-ERC20
-    //! vault / off-TCB ledger, or repointing the currency pin) is caught here.
+    //! `true`, declaring ship-readiness, requiring a new contract /
+    //! restricted-ERC20 vault / off-TCB ledger, or repointing the currency
+    //! pin) is caught here.
     use super::*;
 
     #[test]
@@ -502,7 +504,7 @@ mod do_not_weaken {
         );
         assert!(
             !boundary.ship_ready,
-            "SHIP must not be declared: M2-23 is gated on a licensed partner + MiCA + closed-loop opinions"
+            "ship_ready must stay false: shipping is gated on a licensed partner + MiCA + closed-loop opinions"
         );
         assert!(
             !boundary.new_contract_required,

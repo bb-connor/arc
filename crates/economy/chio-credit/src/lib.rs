@@ -990,7 +990,7 @@ include!("credit/capital_and_execution.rs");
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod do_not_weaken {
-    //! DO-NOT-WEAKEN regression suite (M1-7, extended M2-5).
+    //! DO-NOT-WEAKEN regression suite.
     //!
     //! Three credit invariants are frozen here:
     //!
@@ -1008,11 +1008,10 @@ mod do_not_weaken {
     //!    `true`, or minting on a zero cost, would weaken the obligation
     //!    surface; do not do it.
     //!
-    //! (M2-5) The third prudential netting flag is now directly locked
-    //! here. Previously it was only asserted indirectly through the
-    //! off-chain collapse equality check; a direct default lock closes
-    //! the gap so a future weakening of the capital-book default is
-    //! caught without having to run the collapse.
+    //! The third prudential netting flag is locked directly here, not
+    //! only through the off-chain collapse equality check, so a
+    //! weakened capital-book default is caught without having to run
+    //! the collapse.
     use super::{
         CapitalBookSupportBoundary, CreditScorecardSupportBoundary, ExposureLedgerSupportBoundary,
         LocalCreditAccount,
@@ -1049,7 +1048,7 @@ mod do_not_weaken {
 
     #[test]
     fn capital_book_boundary_does_not_support_mixed_currency_netting() {
-        // (M2-5) Direct default lock on the third prudential netting flag.
+        // Direct default lock on the third prudential netting flag.
         // The capital book never nets across currencies on its own authority;
         // per-currency fail-closed accounting is the prudential safeguard.
         let boundary = CapitalBookSupportBoundary::default();
@@ -1061,7 +1060,7 @@ mod do_not_weaken {
 
     #[test]
     fn off_chain_netting_collapse_keeps_all_three_flags_false() {
-        // KILL-EVIDENCE: the off-chain single-denomination collapse realizes the
+        // The off-chain single-denomination collapse realizes the
         // netting/capital-allocation benefit on a mixed-currency book WITHOUT
         // flipping any prudential support-boundary flag. The netted view is a
         // read-only projection; the per-currency books are the safeguard.

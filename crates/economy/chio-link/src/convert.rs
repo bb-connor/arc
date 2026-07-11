@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn xcc_stays_unpriced_for_the_pass_pool_gate() {
-        // PR959 codex P1: XCC (the Chio Pass free-tier allotment unit) MUST stay
+        // XCC (the Chio Pass free-tier allotment unit) MUST stay
         // unpriced. The kernel free-tier pool detector classifies a unit as
         // private-use only when this lookup fails, so pinning XCC here would
         // re-route genuine XCC grants onto the normal budget path and bypass the

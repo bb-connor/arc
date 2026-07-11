@@ -728,8 +728,8 @@ pub fn prepare_pass_anchor_publication(
             "Pass anchor batch requires at least one issued or revoked Pass digest".to_string(),
         ));
     }
-    // Fail closed on a duplicate digest across the issued + revoked sets (PR959
-    // codex P2). A Pass artifact id and its revocation record share the same
+    // Fail closed on a duplicate digest across the issued + revoked sets.
+    // A Pass artifact id and its revocation record share the same
     // `chio_pass_artifact_id` digest, so a Pass present in both `issued_passes`
     // and `revoked_records` would anchor one digest twice and let the proof
     // panel seal while showing the SAME Pass as both Issued and Revoked -
@@ -836,7 +836,7 @@ pub fn prepare_pass_anchor_publication(
 }
 
 /// The display schema label the sealed Pass proof panel domain-separates its seal
-/// digest under (task M2-18).
+/// digest under.
 ///
 /// This is a DISPLAY-ONLY label, NOT a signed-artifact schema: it is never
 /// registered with `is_supported_signed_artifact_schema`, never signed, and never
@@ -896,7 +896,7 @@ pub enum PassProofPanelVerdict {
 }
 
 /// A sealed, tamper-evident, READ-ONLY projection of an already-produced Chio Pass
-/// proof set (task M2-18, deferred from M1).
+/// proof set.
 ///
 /// This is a VIEW, not a gate: it grants nothing, mutates nothing, authorizes
 /// nothing, and mints nothing. It takes the prepared (un-broadcast) Pass anchoring
@@ -2310,7 +2310,7 @@ mod tests {
         .pass
     }
 
-    /// PR959 codex P2: the same Pass present as both issued and revoked anchors
+    /// The same Pass present as both issued and revoked anchors
     /// the identical artifact digest twice, which would let the proof panel seal
     /// while showing one digest as Issued and the same digest as Revoked. The
     /// prepared publication fails closed on the duplicate instead.
@@ -2343,10 +2343,10 @@ mod tests {
         }
     }
 
-    /// PR959 codex P2 (6th re-review): the proof panel classifies every leaf past
+    /// The proof panel classifies every leaf past
     /// `issued_count` as `Revoked` purely by POSITION, so a NON-revoked lifecycle
     /// record placed on the revoked side would anchor a leaf the panel then presents
-    /// as a (false) revocation proof. `prepare_pass_anchor_publication` now fails
+    /// as a (false) revocation proof. `prepare_pass_anchor_publication` fails
     /// closed when a revoked-side record is not in `Revoked` lifecycle state.
     #[test]
     fn prepare_pass_anchor_publication_rejects_non_revoked_record_on_revoked_side() {
@@ -3170,7 +3170,7 @@ mod tests {
         let _ = std::fs::remove_file(format!("{}-shm", path.display()));
     }
 
-    // -- M2-18: sealed Chio Pass proof panel (read-only, recompute-bound) ------
+    // -- Sealed Chio Pass proof panel (read-only, recompute-bound) -------------
 
     /// Prepare a Pass proof set of two issued Passes plus one revoked Pass (whose
     /// revocation digest is the committed Pass artifact id), so the panel has both
@@ -3318,21 +3318,21 @@ mod tests {
         bad_checkpoint.checkpoint.body.merkle_root = Hash::zero();
         assert_tampered(&bad_checkpoint, "checkpoint root mismatch");
 
-        // (e) PR959 codex P2: an issued_count past the anchored digest count is
-        // tampering. The old clamp silently absorbed it, re-labelled every row as
-        // issued, hid the revocation rows, and still sealed (fail-open); the panel
-        // now fails closed on a count it cannot support.
+        // (e) An issued_count past the anchored digest count is
+        // tampering. Clamping it would silently re-label every row as
+        // issued, hide the revocation rows, and still seal (fail-open); the panel
+        // fails closed on a count it cannot support.
         let mut over_count = prepared_two_issued_one_revoked();
         over_count.issued_count = over_count.anchored_digests.len() + 1;
         assert_tampered(&over_count, "issued_count exceeds digest count");
 
-        // (f) PR959 codex P2 (finding 5): a checkpoint whose SIGNED BODY was altered
+        // (f) A checkpoint whose SIGNED BODY was altered
         // (here `issued_at`) while its `merkle_root` stays fixed. The root
-        // cross-check still matches the recomputed root, so the old panel sealed; the
-        // panel now re-runs the kernel's own `validate_checkpoint`, whose signature
-        // re-verification fails closed on the tampered body. `issued_at` is touched
-        // by neither the root cross-check nor the call_data binding, so ONLY
-        // `validate_checkpoint` catches it.
+        // cross-check still matches the recomputed root, so a root check alone
+        // would seal; the panel re-runs the kernel's own `validate_checkpoint`,
+        // whose signature re-verification fails closed on the tampered body.
+        // `issued_at` is touched by neither the root cross-check nor the
+        // call_data binding, so ONLY `validate_checkpoint` catches it.
         let mut tampered_checkpoint = prepared_two_issued_one_revoked();
         tampered_checkpoint.checkpoint.body.issued_at ^= 1;
         assert_tampered(
@@ -3340,7 +3340,7 @@ mod tests {
             "checkpoint body tampered, root unchanged",
         );
 
-        // (g) PR959 codex P2 (finding 6): the publication's display `merkle_root`
+        // (g) The publication's display `merkle_root`
         // still equals the recomputed root, but the broadcastable `call_data` is
         // swapped for a DIFFERENT prepared product's payload (a different root,
         // operator key hash, and digest set). The panel decodes the broadcast payload
@@ -3352,7 +3352,7 @@ mod tests {
         wrong_call_data.publication.call_data = divergent.publication.call_data.clone();
         assert_tampered(&wrong_call_data, "call_data publishes a different root");
 
-        // (h) PR959 codex P2 (re-review): the broadcast TARGET is tampered. The
+        // (h) The broadcast TARGET is tampered. The
         // ABI `call_data`, roots, sequence, and operator key all stay consistent
         // with the checkpoint, but `contract_address` (the `to` of the broadcast)
         // is repointed to a DIFFERENT contract. `publish_root` uses that mutable
@@ -3368,12 +3368,12 @@ mod tests {
             "publication broadcasts to a different contract",
         );
 
-        // (i) PR959 codex P2 (re-review): the broadcast chain id is repointed.
+        // (i) The broadcast chain id is repointed.
         let mut wrong_chain = prepared_two_issued_one_revoked();
         wrong_chain.publication.chain_id = "0xdeadbeef".to_string();
         assert_tampered(&wrong_chain, "publication broadcasts to a different chain");
 
-        // (j) PR959 codex P2 (5th re-review): the broadcast RPC endpoint is
+        // (j) The broadcast RPC endpoint is
         // repointed. The ABI `call_data`, roots, sequence, operator key, contract
         // target, and chain id all stay consistent, but `rpc_url` (the endpoint
         // `publish_root`/gas estimation actually post to) is swapped for a
@@ -3389,11 +3389,11 @@ mod tests {
         );
     }
 
-    /// PR959 codex P2 (6th re-review): the seal now commits the trusted anchor
+    /// The seal commits the trusted anchor
     /// target (chain id + root-registry contract) the publication envelope was
     /// validated against, and `verify_seal` cross-binds it. A panel sealed against a
-    /// caller-supplied target that matched a TAMPERED publication is therefore no
-    /// longer indistinguishable from one sealed against the registered root-registry
+    /// caller-supplied target that matched a TAMPERED publication is therefore
+    /// distinguishable from one sealed against the registered root-registry
     /// target: verify_seal against the registered target fails closed.
     #[test]
     fn sealed_pass_proof_panel_binds_target_to_seal() {
@@ -3434,8 +3434,8 @@ mod tests {
         // attacker contract AND seal against that same attacker target. The recompute
         // matches (publication == supplied target) so the panel SEALS, but the
         // committed target records the attacker contract, so verify_seal against the
-        // registered root-registry target fails closed - the substitution is no longer
-        // indistinguishable from a genuine seal.
+        // registered root-registry target fails closed - the substitution is
+        // distinguishable from a genuine seal.
         let attacker_contract = "0x000000000000000000000000000000000000bEEF".to_string();
         let mut tampered = prepared_two_issued_one_revoked();
         tampered.publication.contract_address = attacker_contract.clone();

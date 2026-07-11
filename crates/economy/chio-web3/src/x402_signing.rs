@@ -1,7 +1,6 @@
-//! Custody-neutral, prepare-only x402 settlement attestation signing (M2-14,
-//! WS-CL-X402-VERIFY).
+//! Custody-neutral, prepare-only x402 settlement attestation signing.
 //!
-//! This is the signing leg of the x402 verify workstream. Chio SIGNS a
+//! This is the signing leg of x402 verification. Chio SIGNS a
 //! settlement/anchor attestation with its kernel key: the kernel key attests
 //! that the public settlement proof recomputes (recompute is the SOLE proof
 //! lane, see [`crate::settlement_proof::verify_public_settlement_proof`]). The
@@ -13,14 +12,14 @@
 //!
 //! - The attestation explicitly carries `value_moved_on_chain = false`: signing
 //!   the proof never moves value on chain.
-//! - The live money-movement leg (the CDP leg, M2-16) is OUT of scope and
-//!   entry-gated; it is never carried here. The prepare-only broadcast intent
-//!   records only that this leg is blocked.
+//! - The live money-movement leg (the external partner/CDP leg) is OUT of
+//!   scope and entry-gated; it is never carried here. The prepare-only
+//!   broadcast intent records only that this leg is blocked.
 //! - Signing is rejected fail-closed for any mainnet or non-allow-listed chain
 //!   (`mainnet_blocked` and `allowed_chain_ids` are enforced).
 //!
 //! Value-movement authority and tool-call authority are fail-closed BY
-//! CONSTRUCTION, composing with M2-12's [`ToolCallAuthorization`]: there is no
+//! CONSTRUCTION, composing with [`ToolCallAuthorization`]: there is no
 //! constructor in this module that yields an authorized decision, so a
 //! custody-neutral attestation can only ever produce DENY.
 
@@ -45,7 +44,7 @@ pub const CHIO_X402_PREPARE_ONLY_BROADCAST_INTENT_SCHEMA: &str =
 /// There is exactly one representable variant: the path is custody-neutral by
 /// construction. Chio's kernel key only attests that the settlement proof
 /// recomputes; it never holds or moves user value. The money movement is the
-/// external partner/CDP leg (M2-16), which is out of scope here and blocked.
+/// external partner/CDP leg, which is out of scope here and blocked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum X402CustodyModel {
@@ -56,8 +55,9 @@ pub enum X402CustodyModel {
 /// Where the live money-movement leg sits relative to this path.
 ///
 /// The only representable state is "out of scope, blocked, pending partner":
-/// the live CDP money-movement leg is M2-16 and is entry-gated. This path never
-/// carries an executable money-movement instruction.
+/// the live CDP money-movement leg is entry-gated behind a partner
+/// integration. This path never carries an executable money-movement
+/// instruction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum X402LiveMoneyMovementLeg {
@@ -67,12 +67,12 @@ pub enum X402LiveMoneyMovementLeg {
 
 /// A value-movement authorization decision for the x402 path.
 ///
-/// Fail-closed BY CONSTRUCTION, mirroring M2-12's [`ToolCallAuthorization`].
+/// Fail-closed BY CONSTRUCTION, mirroring [`ToolCallAuthorization`].
 /// It carries a single private flag and there is deliberately NO constructor in
 /// this module that yields an authorized decision: there is no `From`/`Into`,
 /// no `Deserialize`, and no path from a signed attestation to an authorized
 /// value-movement decision. Signing a proof attests it; it never authorizes
-/// value to move. The live money-movement leg (M2-16) is the only thing that
+/// value to move. The live money-movement leg is the only thing that
 /// could authorize value movement, and it is out of scope and blocked here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ValueMovementAuthorization {
@@ -151,7 +151,7 @@ impl X402SignedSettlementAttestation {
     /// DENY decision without reading any field, so no value of any field can
     /// flip it. Attesting a settlement proof proves the payment settled and the
     /// evidence recomputes; it grants no authority to move value. The live
-    /// money-movement leg (M2-16) is the only authority for value movement and
+    /// money-movement leg is the only authority for value movement and
     /// is out of scope and blocked here.
     #[must_use]
     pub const fn value_movement_authorization(&self) -> ValueMovementAuthorization {
@@ -165,7 +165,7 @@ impl X402SignedSettlementAttestation {
     }
 
     /// The tool-call authorization carried by this attestation: always
-    /// [`ToolCallAuthorization::denied`] (composes with M2-12).
+    /// [`ToolCallAuthorization::denied`].
     #[must_use]
     pub const fn tool_call_authorization(&self) -> ToolCallAuthorization {
         ToolCallAuthorization::denied()
@@ -182,7 +182,7 @@ impl X402SignedSettlementAttestation {
 ///
 /// This is NOT a broadcastable transaction: it explicitly records that no value
 /// moves on chain (`value_moved_on_chain = false`), that the path is
-/// prepare-only and testnet-gated, and that the live money-movement leg (M2-16)
+/// prepare-only and testnet-gated, and that the live money-movement leg
 /// is out of scope and blocked. It binds to the attestation by id and digest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -373,7 +373,7 @@ pub fn sign_x402_settlement_attestation(
     let report = verify_public_settlement_proof(bundle, trust)?;
     // Defense in depth: the recomputed chain id must remain testnet-gated.
     enforce_x402_prepare_only_testnet_gate(&report.chain_context.chain_id, trust)?;
-    // Fail-closed finality grounding (RPI-1 follow-on): the recompute lane WITHHOLDS
+    // Fail-closed finality grounding: the recompute lane WITHHOLDS
     // the finality claim unless an INDEPENDENT chain head grounded the confirmation
     // depth (`verify_public_settlement_proof` emits
     // `CLAIM_PUBLIC_SETTLEMENT_FINALITY_VERIFIED` only when
@@ -502,7 +502,7 @@ pub fn verify_x402_settlement_attestation(
 ///
 /// The intent moves NO value: it records `value_moved_on_chain = false`, marks
 /// the path prepare-only and testnet-gated, and records the live money-movement
-/// leg as out of scope and blocked (M2-16). The attestation is re-verified
+/// leg as out of scope and blocked. The attestation is re-verified
 /// fail-closed before the intent is produced.
 ///
 /// # Errors

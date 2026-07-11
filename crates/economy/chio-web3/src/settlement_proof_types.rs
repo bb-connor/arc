@@ -436,10 +436,7 @@ impl ToolCallAuthorization {
     /// Any field that gates authorization but requires runtime, usage, proof, or
     /// request context to evaluate MUST fail closed (DENY) here and route through
     /// the lane that holds that context (the kernel capability/budget lane, the
-    /// edge DPoP lane). This helper has repeatedly grown gaps as `ToolGrant` gained
-    /// new gating fields (a zero invocation cap, monetary caps, a DPoP requirement),
-    /// each silently authorized until patched; the posture below closes that class
-    /// definitively. When a NEW field is added to `ToolGrant`, this helper MUST
+    /// edge DPoP lane). When a NEW field is added to `ToolGrant`, this helper MUST
     /// treat it as deny-by-default until it is explicitly proven fully evaluable
     /// from the static inputs above and added to the positive checks below.
     ///

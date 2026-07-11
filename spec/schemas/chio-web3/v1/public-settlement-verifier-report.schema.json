@@ -117,7 +117,7 @@
       ],
       "properties": {
         "status": {
-          "$comment": "The ungrounded value was added to this v1 enum in place (2026-06): it downgrades an affirmative final/closed status when no independent chain head grounds the confirmation depth. Validators generated from the pre-addition enum reject reports carrying it (fail-closed). The shipped verifier hard-denies bundles without an independent head, so ungrounded is a reserved second-layer status; bump to v2 before relying on it wire-side if external validators pin this enum.",
+          "$comment": "The ungrounded value is added in place to this v1 enum: it downgrades an affirmative final/closed status when no independent chain head grounds the confirmation depth. Validators generated from the pre-addition enum reject reports carrying it (fail-closed). The shipped verifier hard-denies bundles without an independent head, so ungrounded is a reserved second-layer status; bump to v2 before relying on it wire-side if external validators pin this enum.",
           "enum": [
             "final",
             "closed",

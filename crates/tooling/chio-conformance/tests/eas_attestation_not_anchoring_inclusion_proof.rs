@@ -1,5 +1,5 @@
 //! Negative conformance test: an external EAS/SAS attestation is not an
-//! anchoring inclusion proof (M2-2, WS-CL-RECOMPUTE-GATE).
+//! anchoring inclusion proof.
 //!
 //! Threat: an integrator carries an external standard (an Ethereum/Solana
 //! Attestation Service record) that *asserts* a Merkle root was anchored,

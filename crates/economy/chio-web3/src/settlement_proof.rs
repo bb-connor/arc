@@ -52,7 +52,7 @@ pub(crate) const PUBLIC_SETTLEMENT_FINALITY_REPORT_STATUSES: &[&str] = &[
     "failed",
     "reorged",
     "not_final",
-    // RPI-1: emitted in place of an affirmative-finality status when finality is
+    // Emitted in place of an affirmative-finality status when finality is
     // not independently grounded (no independent chain head).
     "ungrounded",
 ];
@@ -128,7 +128,7 @@ pub fn verify_public_settlement_proof(
         &mut verified_claims,
         CLAIM_PUBLIC_SETTLEMENT_CHAIN_CONTEXT_VERIFIED,
     );
-    // Fail-closed finality grounding (RPI-1): finality is asserted ONLY when an
+    // Fail-closed finality grounding: finality is asserted ONLY when an
     // INDEPENDENT chain head is supplied. `validate_finality` checks the
     // producer-supplied `chain_snapshot.latest_block_number` /
     // `observed_confirmations`, which are UNSIGNED bundle fields a malicious
@@ -198,7 +198,7 @@ pub fn verify_public_settlement_proof(
         },
         public_witness,
         finality_decision: PublicSettlementFinalityDecision {
-            // RPI-1 (fail-closed finality grounding): the `status` field must never
+            // Fail-closed finality grounding: the `status` field must never
             // ASSERT grounded finality without an independent chain head. The raw
             // lifecycle-derived status can read `final`/`closed` from the
             // producer-supplied settlement state and confirmation depth, so a
@@ -2053,8 +2053,8 @@ pub(crate) const FINALITY_STATUS_UNGROUNDED: &str = "ungrounded";
 
 /// The finality statuses that affirmatively assert the settlement is final and
 /// confirmed on chain. These derive from the `Settled` lifecycle state and may be
-/// reported ONLY when an INDEPENDENT chain head grounds the confirmation depth
-/// (RPI-1). The remaining statuses (`partially_settled`, the reversal/dispute
+/// reported ONLY when an INDEPENDENT chain head grounds the confirmation depth.
+/// The remaining statuses (`partially_settled`, the reversal/dispute
 /// outcomes, and `not_final`) are NOT affirmative-finality assertions, so they are
 /// never downgraded.
 const GROUNDED_FINALITY_STATUSES: &[&str] = &["final", "closed"];

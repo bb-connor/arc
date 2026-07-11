@@ -1422,7 +1422,7 @@ fn settlement_receipt_rejects_oracle_grant_currency_mismatch() {
 
 fn sample_matching_independent_chain_head() -> PublicSettlementIndependentChainHead {
     // Matches the sample bundle's chain snapshot so finality grounds on an
-    // independent head (RPI-1). Same values the offline-finality fixture pins.
+    // independent head. Same values the offline-finality fixture pins.
     PublicSettlementIndependentChainHead {
         chain_id: "eip155:8453".to_string(),
         observed_block_number: 12_345_678,
@@ -1435,7 +1435,7 @@ fn sample_matching_independent_chain_head() -> PublicSettlementIndependentChainH
 #[test]
 fn public_settlement_proof_emits_verifier_report() {
     let bundle = sample_public_settlement_proof_bundle();
-    // RPI-1: the finality claim is grounded on an independent chain head.
+    // The finality claim is grounded on an independent chain head.
     let mut trust = sample_public_settlement_verifier_trust();
     trust.independent_chain_head = Some(sample_matching_independent_chain_head());
     let report = verify_public_settlement_proof(&bundle, &trust).unwrap();
@@ -1501,7 +1501,7 @@ fn public_settlement_proof_emits_verifier_report() {
         .contains(&CLAIM_PUBLIC_SETTLEMENT_PUBLIC_WITNESS_VERIFIED.to_string()));
 }
 
-/// M2-2 (WS-CL-RECOMPUTE-GATE) fail-closed negative: a fully verified x402
+/// Fail-closed negative: a fully verified x402
 /// settlement RECEIPT binds settlement and payment claims ONLY. It never
 /// authorizes a tool call. Payment success is not authorization; tool-call
 /// authority belongs to the capability/governance lane, so a "verified"
@@ -1549,7 +1549,7 @@ fn verified_x402_settlement_receipt_does_not_authorize_tool_call() {
     // authorization verdict and no capability grant to be mistaken for one.
     assert_ne!(report.verdict, "authorized");
 
-    // M2-12 structural inversion: the report cannot occupy an authorization
+    // Structural inversion: the report cannot occupy an authorization
     // position. Its tool-call authorization is the fail-closed DENY decision.
     assert!(!report.authorizes_tool_call());
     assert_eq!(
@@ -1558,7 +1558,7 @@ fn verified_x402_settlement_receipt_does_not_authorize_tool_call() {
     );
 }
 
-/// M2-12 (WS-CL-X402-VERIFY): a tool-call authorization is fail-closed BY
+/// A tool-call authorization is fail-closed BY
 /// CONSTRUCTION. Its `Default` and `denied()` are DENY, and an authorized
 /// state is unrepresentable except via an explicit positive capability grant.
 #[test]
@@ -1571,7 +1571,7 @@ fn tool_call_authorization_defaults_to_denied() {
     );
 }
 
-/// M2-12: the ONLY path to an authorized decision is an explicit positive
+/// The ONLY path to an authorized decision is an explicit positive
 /// capability grant. A matching grant carrying `Invoke` authorizes; every other
 /// case (wrong tool, no `Invoke` operation) fails closed to DENY.
 #[test]
@@ -1606,7 +1606,7 @@ fn tool_call_authorization_requires_explicit_capability_grant() {
     );
 }
 
-/// PR959 codex P2 (5th re-review, class closure): an INVOCATION cap cannot be
+/// An INVOCATION cap cannot be
 /// evaluated without the grant's running call count, which lives in the kernel
 /// budget lane, not in this argument-less helper. `max_invocations = Some(0)`
 /// permits zero calls outright, and even a positive cap (`Some(n)`) cannot be
@@ -1651,7 +1651,7 @@ fn tool_call_authorization_denies_invocation_capped_grant() {
     );
 }
 
-/// PR959 codex P2 (5th re-review): a grant that REQUIRES a DPoP proof
+/// A grant that REQUIRES a DPoP proof
 /// (`dpop_required = Some(true)`) cannot be authorized by this argument-less
 /// helper, which holds no proof. The ACP/edge lane denies a DPoP-required grant
 /// without a valid proof, so authorizing it here would advertise a capability the
@@ -1696,7 +1696,7 @@ fn tool_call_authorization_denies_dpop_required_grant() {
     );
 }
 
-/// PR959 codex P2 (re-review): a capability whose MONETARY budget is unusable or
+/// A capability whose MONETARY budget is unusable or
 /// unconfirmable authorizes nothing here. The argument-less helper has no per-call
 /// cost and no running-total usage, so it cannot evaluate a monetary cap: a
 /// `max_cost_per_invocation = Some(0)` cap denies every non-zero-cost call, an
@@ -1761,7 +1761,7 @@ fn tool_call_authorization_denies_monetary_capped_grant() {
     );
 }
 
-/// M2-12: a fully verified settlement report NEVER authorizes a tool call, and
+/// A fully verified settlement report NEVER authorizes a tool call, and
 /// this holds STRUCTURALLY rather than as a runtime string check. Even after
 /// forging a `"authorized"` verdict and injecting capability-shaped claims, the
 /// decision stays DENY, because `authorizes_tool_call` reads no field of the
@@ -2538,7 +2538,7 @@ fn public_settlement_proof_accepts_matching_independent_head() {
     assert!(verify_public_settlement_proof(&bundle, &trust).is_ok());
 }
 
-/// RPI-1 (fail-closed finality grounding): a bundle whose producer fabricates
+/// Fail-closed finality grounding: a bundle whose producer fabricates
 /// the chain-snapshot confirmation depth cannot verify at all WITHOUT an
 /// independent chain head: the verifier hard-denies rather than emitting any
 /// report whose status or claims could be mistaken for grounded finality.
@@ -2583,7 +2583,7 @@ fn public_settlement_proof_denies_without_independent_head() {
     );
 }
 
-/// PR959 codex P2 (honor grant constraints): the argument-less tool-call
+/// The argument-less tool-call
 /// authorization helper cannot evaluate a grant's parameter constraints against
 /// a request it never sees, so a CONSTRAINED grant must fail closed rather than
 /// authorize every invocation of the tool.
@@ -3067,7 +3067,7 @@ fn reference_artifacts_parse_and_validate() {
 }
 
 // ---------------------------------------------------------------------------
-// M2-14 (WS-CL-X402-VERIFY): custody-neutral, prepare-only x402 signing path.
+// Custody-neutral, prepare-only x402 signing path.
 // ---------------------------------------------------------------------------
 
 /// Base Sepolia testnet chain id used for the prepare-only x402 signing tests.
@@ -3122,8 +3122,8 @@ fn sample_testnet_x402_verifier_trust() -> PublicSettlementVerifierTrust {
     trust.allowed_chain_ids = vec![X402_TESTNET_CHAIN_ID.to_string()];
     trust.mainnet_blocked = true;
     // Ground finality on an independent chain head matching the testnet bundle so
-    // the recompute emits the finality claim the signing path now requires
-    // (RPI-1 follow-on). Without this the report carries no grounded finality and
+    // the recompute emits the finality claim the signing path requires.
+    // Without this the report carries no grounded finality and
     // the kernel must refuse to sign.
     trust.independent_chain_head = Some(PublicSettlementIndependentChainHead {
         chain_id: X402_TESTNET_CHAIN_ID.to_string(),
@@ -3135,7 +3135,7 @@ fn sample_testnet_x402_verifier_trust() -> PublicSettlementVerifierTrust {
     trust
 }
 
-/// M2-14: the custody-neutral prepare-only signing path produces a kernel-signed
+/// The custody-neutral prepare-only signing path produces a kernel-signed
 /// attestation that explicitly moves NO value on chain. The signed body carries
 /// `value_moved_on_chain = false`, `prepare_only = true`, `testnet_gated = true`,
 /// and the custody-neutral model. The attestation verifies and round-trips
@@ -3193,9 +3193,9 @@ fn x402_prepare_only_signing_is_value_neutral_and_recompute_bound() {
     verify_x402_settlement_attestation(&decoded, &trust).unwrap();
 }
 
-/// M2-14: the signing path is custody-neutral. The signed attestation carries NO
+/// The signing path is custody-neutral. The signed attestation carries NO
 /// value-movement authority and NO tool-call authority; both are fail-closed BY
-/// CONSTRUCTION (composing with M2-12). The signed body has no authority field
+/// CONSTRUCTION. The signed body has no authority field
 /// at all, and flipping the value-moved flag is rejected fail-closed on verify.
 #[test]
 fn x402_attestation_carries_no_value_movement_authority_by_construction() {
@@ -3246,7 +3246,7 @@ fn x402_attestation_carries_no_value_movement_authority_by_construction() {
     ));
 }
 
-/// PR959 codex P2 (6th re-review): the x402 attestation VERIFIER must re-run the
+/// The x402 attestation VERIFIER must re-run the
 /// signed-body field invariants the signer enforces, not just schema + flags +
 /// chain + key + signature. A trusted-kernel-signed body hand-built with an empty
 /// required identifier (here `bundle_id`) passes the signature check but must be
@@ -3286,7 +3286,7 @@ fn x402_verify_rejects_signed_body_with_empty_required_field() {
     );
 }
 
-/// M2-14: testnet-gated, fail-closed. A mainnet chain (here Base mainnet) is
+/// Testnet-gated, fail-closed. A mainnet chain (here Base mainnet) is
 /// rejected by the prepare-only signing path even when the proof itself would
 /// recompute and the chain is allow-listed.
 #[test]
@@ -3305,7 +3305,7 @@ fn x402_prepare_only_signing_rejects_mainnet_chain() {
     ));
 }
 
-/// PR959 codex P2: the testnet gate does not rely on the partial mainnet
+/// The testnet gate does not rely on the partial mainnet
 /// deny-list. An allow-listed chain that the mainnet detector does not enumerate
 /// (here Gnosis mainnet `eip155:100`, which is not a known testnet either) fails
 /// closed instead of being signed for, even on a mainnet-blocked policy.
@@ -3326,7 +3326,7 @@ fn x402_prepare_only_signing_rejects_unknown_chain_fail_closed() {
     ));
 }
 
-/// M2-14: testnet-gated, fail-closed. A chain that is not on the verifier
+/// Testnet-gated, fail-closed. A chain that is not on the verifier
 /// allow-list is rejected by the prepare-only signing path.
 #[test]
 fn x402_prepare_only_signing_rejects_non_allowed_chain() {
@@ -3343,7 +3343,7 @@ fn x402_prepare_only_signing_rejects_non_allowed_chain() {
     ));
 }
 
-/// M2-14: testnet-gated, fail-closed. The path refuses to sign unless the
+/// Testnet-gated, fail-closed. The path refuses to sign unless the
 /// verifier policy explicitly blocks mainnet.
 #[test]
 fn x402_prepare_only_signing_requires_mainnet_blocked_policy() {
@@ -3359,7 +3359,7 @@ fn x402_prepare_only_signing_requires_mainnet_blocked_policy() {
     ));
 }
 
-/// M2-14: an empty attestation id is rejected fail-closed.
+/// An empty attestation id is rejected fail-closed.
 #[test]
 fn x402_prepare_only_signing_rejects_blank_attestation_id() {
     let bundle = sample_testnet_public_settlement_proof_bundle();
@@ -3374,7 +3374,7 @@ fn x402_prepare_only_signing_rejects_blank_attestation_id() {
     ));
 }
 
-/// M2-13 Test-B follow-on (RPI-1): the prepare-only x402 signing path is
+/// The prepare-only x402 signing path is
 /// fail-closed on finality grounding. Without an independent chain head the
 /// inner recompute itself denies, so no report exists to attest and signing
 /// returns the denial; the signing gate additionally requires the grounded
@@ -3409,7 +3409,7 @@ fn x402_prepare_only_signing_requires_grounded_finality_claim() {
     .expect("a grounded finality claim permits signing");
 }
 
-/// M2-14: verification is fail-closed on the attesting key. An attestation
+/// Verification is fail-closed on the attesting key. An attestation
 /// signed by a key that is not a trusted kernel key is rejected, even though the
 /// underlying settlement proof recomputes.
 #[test]
@@ -3433,7 +3433,7 @@ fn x402_verify_rejects_untrusted_kernel_key() {
     ));
 }
 
-/// M2-14: a tampered signature is rejected fail-closed by the recompute-and-check
+/// A tampered signature is rejected fail-closed by the recompute-and-check
 /// signature verification over the canonical body.
 #[test]
 fn x402_verify_rejects_tampered_signature() {
@@ -3460,9 +3460,10 @@ fn x402_verify_rejects_tampered_signature() {
     ));
 }
 
-/// M2-14: the prepare-only broadcast intent moves NO value. It records
+/// The prepare-only broadcast intent moves NO value. It records
 /// `value_moved_on_chain = false`, is prepare-only and testnet-gated, and marks
-/// the live money-movement leg (the CDP leg, M2-16) as out of scope and blocked.
+/// the live money-movement leg (the external partner/CDP leg) as out of scope
+/// and blocked.
 #[test]
 fn x402_prepare_only_broadcast_intent_moves_no_value() {
     let bundle = sample_testnet_public_settlement_proof_bundle();
@@ -3506,7 +3507,7 @@ fn x402_prepare_only_broadcast_intent_moves_no_value() {
     );
 }
 
-/// M2-14: building a broadcast intent re-verifies the attestation fail-closed.
+/// Building a broadcast intent re-verifies the attestation fail-closed.
 /// A trust context that no longer allows the chain rejects the intent.
 #[test]
 fn x402_prepare_only_broadcast_intent_rejects_unverifiable_attestation() {

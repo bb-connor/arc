@@ -1,9 +1,9 @@
-//! M2-8 (WS-CL-CAPITAL-SOURCE-GATE): single-source capital-book conformance harness.
+//! Single-source capital-book conformance harness.
 //!
 //! Threat / prudential rule: the Chio capital book is the source-of-funds truth
 //! that attributes committed and disbursed funds to exactly one coherent capital
-//! source. The token theses wanted to blend many facilities, many reserve
-//! books, and many currencies into one auto-netting on-chain instrument. The
+//! source. An auto-netting on-chain instrument would blend many facilities,
+//! many reserve books, and many currencies into one book. The
 //! prudential safeguard is the opposite: the capital book MUST be single-source
 //! and fail closed. The production builder
 //! (`build_capital_book_report_from_store`, reached here through the public
@@ -19,9 +19,9 @@
 //!
 //! This harness stages a REAL [`SqliteReceiptStore`] with each adversarial
 //! configuration and drives the REAL production builder, asserting the deny
-//! fires fail-closed. It also pins the M2 DO-NOT-WEAKEN invariant
+//! fires fail-closed. It also pins the DO-NOT-WEAKEN invariant
 //! ([`CapitalBookSupportBoundary::mixed_currency_netting_supported`] stays
-//! `false`, books stay per-currency `mixed_currency_book`), and proves the M2-1
+//! `false`, books stay per-currency `mixed_currency_book`), and proves the
 //! off-chain netted VIEW is a read-only projection that does NOT flip the
 //! single-source rule: collapsing a mixed-currency book to one canonical
 //! denomination leaves every prudential netting flag false.
@@ -319,12 +319,12 @@ fn single_source_capital_book_is_admitted_and_stays_per_currency() {
     assert!(report.support_boundary.source_of_funds_authoritative);
 }
 
-// (c) READ-ONLY PROJECTION: the M2-1 off-chain netted VIEW does NOT flip the
+// (c) READ-ONLY PROJECTION: the off-chain netted VIEW does NOT flip the
 // single-source rule. Collapsing a mixed-currency book to one canonical
 // denomination is a read-only projection: every prudential netting flag stays
 // false and the capital-book support-boundary default is unchanged.
 #[test]
-fn m2_1_netted_view_does_not_flip_single_source_rule() {
+fn netted_view_does_not_flip_single_source_rule() {
     let usd = ExposureLedgerCurrencyPosition {
         currency: "USD".to_string(),
         governed_max_exposure_units: 0,

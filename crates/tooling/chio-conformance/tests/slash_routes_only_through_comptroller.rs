@@ -1,11 +1,10 @@
-//! Single-slash-lane conformance harness (M2-7, WS-CL-SLASH-LANE-GATE).
+//! Single-slash-lane conformance harness.
 //!
-//! BUILD-NOW, GATE-LATER. The full enforceable slashing machinery lands in M4;
-//! the enforceable-slashing gate itself is an M4 deliverable. This harness is
-//! that gate's standing invariant: it pins the CURRENT shape of slashing so M4
-//! has to stay GREEN against it. M4 may grow the slash machinery, but it must
-//! not grow a SECOND slash lane or a parallel slash authority - doing so turns
-//! this harness RED.
+//! The full enforceable slashing machinery is a later deliverable. This
+//! harness is its standing invariant: it pins the CURRENT shape of slashing
+//! so future growth has to stay GREEN against it. The slash machinery may
+//! grow, but it must not grow a SECOND slash lane or a parallel slash
+//! authority - doing so turns this harness RED.
 //!
 //! Invariant under test (single slash lane):
 //!
@@ -26,8 +25,8 @@
 //!       reserve cannot be slashed twice on the same (reserve, claim), and a
 //!       slash reversal cannot be enacted without a prior adjudicated slash.
 //!
-//! M1-9 added `freetier:global` pool isolation (the Sybil-ceiling term is never
-//! capital); that guard rides along inside the same single comptroller lane and
+//! `freetier:global` pool isolation (the Sybil-ceiling term is never
+//! capital) rides along inside the same single comptroller lane and
 //! is not re-asserted here (covered by the comptroller's own suite).
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]

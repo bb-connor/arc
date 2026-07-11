@@ -736,7 +736,7 @@ mod tests {
         }
     }
 
-    /// PR959 codex P2: exercising before the option's issuance time fails closed,
+    /// Exercising before the option's issuance time fails closed,
     /// so a caller cannot bind a quote before it exists or before its validity
     /// window opens. The lower bound is checked alongside the expiry upper bound.
     #[test]
@@ -854,7 +854,7 @@ mod tests {
         }
     }
 
-    /// PR959 codex P2: an option deserialized (or directly built) past
+    /// An option deserialized (or directly built) past
     /// `try_new`'s checks - here with an empty `quote_id` and a lowercase
     /// currency - is rejected at exercise rather than binding a price.
     #[test]
@@ -889,7 +889,7 @@ mod tests {
         }
     }
 
-    /// PR959 codex P2: a hand-built grade that claims `band = Full` with
+    /// A hand-built grade that claims `band = Full` with
     /// `required_score = 0` (no evidence required, none verified) is internally
     /// inconsistent and cannot bind a price - exercise fails closed instead of
     /// charging the unsurcharged base at a Full minimum.
@@ -919,7 +919,7 @@ mod tests {
         assert!(real.is_internally_consistent());
     }
 
-    /// PR959 codex P2: a graded price that would exceed `u64::MAX` fails closed
+    /// A graded price that would exceed `u64::MAX` fails closed
     /// rather than saturating to `u64::MAX` and UNDER-charging the bound quote.
     #[test]
     fn exercise_rejects_overflowing_graded_price() {
@@ -952,13 +952,13 @@ mod tests {
         }
     }
 
-    /// PR959 codex P2 (5th re-review): `checked_graded_price` is the public
+    /// `checked_graded_price` is the public
     /// fail-closed binding-price path, so it must reject an internally inconsistent
     /// grade rather than silently undercharge. A hand-built/decoded grade with
     /// `verified_score > required_score` (here required=1, verified=2) makes the
     /// missing-evidence term saturate to zero, dropping the surcharge and binding
     /// the BASE price. A direct caller that does not route through `exercise`
-    /// (which validates first) would undercharge; the binding path now fails closed
+    /// (which validates first) would undercharge; the binding path fails closed
     /// on the inconsistency BEFORE computing the surcharge.
     #[test]
     fn checked_graded_price_rejects_inconsistent_grade() {
@@ -989,9 +989,9 @@ mod tests {
         }
     }
 
-    /// PR959 codex P2 (6th re-review): `checked_graded_price` is the public
+    /// `checked_graded_price` is the public
     /// fail-closed binding-price path, so it must re-run EVERY constructor field
-    /// invariant - not just the grade-consistency check the 5th re-review added. A
+    /// invariant, not just the grade-consistency check. A
     /// hand-built/decoded option can carry a non-canonical (lowercase) currency
     /// `try_new`/`exercise` would reject; the binding path must reject it too rather
     /// than bind a price in a non-canonical currency.
@@ -1019,7 +1019,7 @@ mod tests {
     }
 }
 
-/// Property tests for [`VerifiabilityGrade`] (M2-11).
+/// Property tests for [`VerifiabilityGrade`].
 ///
 /// `proptest` is not a dev-dependency of this crate, so rather than add a new
 /// dependency these tests enumerate the *entire* powerset of the evidence

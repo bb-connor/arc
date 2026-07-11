@@ -1,4 +1,4 @@
-//! x402 Test B (M2-13, WS-CL-X402-VERIFY): a verified x402 payment receipt
+//! A verified x402 payment receipt
 //! does NOT authorize a tool call, and this holds STRUCTURALLY.
 //!
 //! Threat: an integrator settles an x402 payment, watches the public
@@ -196,7 +196,7 @@ fn verified_x402_payment_settles_but_does_not_authorize_tool_call() {
         }
     }
 
-    // The core x402 Test B assertion: a verified payment does NOT authorize a
+    // The core assertion: a verified payment does NOT authorize a
     // tool call. The decision is the fail-closed DENY.
     assert!(!report.authorizes_tool_call());
     assert_eq!(

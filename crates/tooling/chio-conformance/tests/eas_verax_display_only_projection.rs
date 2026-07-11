@@ -1,4 +1,4 @@
-//! M2-9 (WS-CL-EAS-VERAX-PROJ): EAS/Verax carried ONLY as
+//! EAS/Verax carried ONLY as
 //! `chio.agent-web-proof-envelope.v1` projections, recompute the sole proof lane.
 //!
 //! Threat: an integrator carries an external attestation-service record (an
@@ -10,8 +10,8 @@
 //! surfaces, not proof surfaces: a verifier that trusts an attester signature
 //! would admit settlement state that was never recomputed.
 //!
-//! Invariant (M2-2 / WS-CL-RECOMPUTE-GATE, viewed from the projection angle):
-//! EAS/Verax attestations are carried ONLY as Agent Web proof-envelope
+//! Invariant (recompute is the sole proof lane, viewed from the projection
+//! angle): EAS/Verax attestations are carried ONLY as Agent Web proof-envelope
 //! projections (a VIEW for display/interop). They are NEVER admissible as a
 //! recompute proof. The recompute lane (`chio-web3 verify_anchor_inclusion_proof`,
 //! the verifier-side mirror of the on-chain `getRoot` / `verifyInclusionDetailed`
@@ -141,7 +141,7 @@ fn spec(source_protocol: &str) -> &'static ProofEnvelopeProjectionSpec {
 
 /// A genuine inclusion proof whose committed root recomputes from the receipt
 /// leaf and a kernel-signed checkpoint statement. This is the only shape the
-/// recompute lane admits (the M2-2 fixture).
+/// recompute lane admits.
 const ANCHOR_INCLUSION_PROOF_FIXTURE: &str =
     include_str!("../../../../docs/standards/CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json");
 
