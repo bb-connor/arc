@@ -25,7 +25,7 @@ use alloc::vec::Vec;
 
 use chio_core_types::capability::{
     attenuation::{
-        validate_delegation_chain, validate_delegation_chain_with_trust_root, ScopeHash,
+        validate_capability_delegation_chain, validate_delegation_chain_with_trust_root, ScopeHash,
     },
     crypto_floor::{CapabilityCryptoFloor, CapabilityFloorVerifyError},
     features::CapabilityNegotiation,
@@ -377,21 +377,12 @@ pub fn verify_capability_full(
 }
 
 fn verify_delegation_chain_shape(token: &CapabilityToken) -> Result<(), CapabilityError> {
-    if token.delegation_chain.is_empty() {
-        return Ok(());
-    }
-    validate_delegation_chain(&token.delegation_chain, None)
-        .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
-    let Some(final_link) = token.delegation_chain.last() else {
-        return Ok(());
-    };
-    let final_delegatee = &final_link.delegatee;
-    if final_delegatee != &token.subject {
-        return Err(CapabilityError::AttenuationViolation(
-            "delegation chain final delegatee does not match capability subject".to_string(),
-        ));
-    }
-    Ok(())
+    validate_capability_delegation_chain(token, None).map_err(|err| match err {
+        chio_core_types::Error::DelegationChainBroken { reason } => {
+            CapabilityError::AttenuationViolation(reason)
+        }
+        other => CapabilityError::AttenuationViolation(other.to_string()),
+    })
 }
 
 fn verify_chain_binding_with_trust_root(
@@ -789,6 +780,200 @@ mod tests {
         .expect_err("expired attenuated token must fail before chain binding");
 
         assert_eq!(err, CapabilityError::Expired);
+        assert_eq!(resolver.calls(), 0);
+    }
+
+    #[test]
+    fn delegation_family_leaf_issuer_continuity_rejects_trusted_unrelated_signer_across_chain_aware_entrypoints(
+    ) {
+        let final_delegator = Keypair::generate();
+        let leaf_subject = Keypair::generate();
+        let unrelated_signer = Keypair::generate();
+        let parent_link = DelegationLink::sign(
+            DelegationLinkBody {
+                capability_id: "parent-capability".to_string(),
+                delegator: final_delegator.public_key(),
+                delegatee: leaf_subject.public_key(),
+                attenuations: Vec::new(),
+                timestamp: 100,
+                scope_hash: Some(scope_hash(&ChioScope::default()).expect("scope hash")),
+            },
+            &final_delegator,
+        )
+        .expect("sign parent link");
+        let token = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "trusted-unrelated-leaf-signer".to_string(),
+                issuer: unrelated_signer.public_key(),
+                subject: leaf_subject.public_key(),
+                scope: ChioScope::default(),
+                issued_at: 100,
+                expires_at: 200,
+                delegation_chain: vec![parent_link],
+                aggregate_invocation_budget: None,
+            },
+            &unrelated_signer,
+        )
+        .expect("sign unrelated leaf");
+        let clock = crate::FixedClock::new(150);
+        let trust_root_hash = scope_hash(&ChioScope::default()).expect("trust root hash");
+        let resolver =
+            CountingTrustRootResolver::new(unrelated_signer.public_key(), trust_root_hash.clone());
+        let expected = CapabilityError::AttenuationViolation(
+            "delegation chain final delegator does not match capability issuer".to_string(),
+        );
+
+        assert_eq!(
+            verify_capability_with_floor_and_trust_root(
+                &token,
+                &[unrelated_signer.public_key()],
+                &clock,
+                CapabilityCryptoFloor::AllowClassical,
+                &trust_root_hash,
+            )
+            .expect_err("trusted unrelated leaf signer must fail"),
+            expected
+        );
+        assert_eq!(
+            verify_capability_with_floor_and_resolver(
+                &token,
+                &[unrelated_signer.public_key()],
+                &clock,
+                CapabilityCryptoFloor::AllowClassical,
+                &resolver,
+            )
+            .expect_err("resolver entrypoint must reject unrelated signer"),
+            expected
+        );
+
+        let peer = CapabilityNegotiation::t1_default();
+        let mut budgets = NoopBudgetRegistry;
+        assert_eq!(
+            verify_capability_full(
+                &token,
+                &[unrelated_signer.public_key()],
+                &clock,
+                CapabilityCryptoFloor::AllowClassical,
+                &peer,
+                &resolver,
+                &mut budgets,
+            )
+            .expect_err("full verifier must reject unrelated signer"),
+            expected
+        );
+        assert_eq!(resolver.calls(), 0);
+    }
+
+    #[test]
+    fn delegation_family_leaf_issuer_continuity_accepts_final_not_root_delegator() {
+        let root_delegator = Keypair::generate();
+        let final_delegator = Keypair::generate();
+        let leaf_subject = Keypair::generate();
+        let root_hash = scope_hash(&ChioScope::default()).expect("root hash");
+        let first_link = DelegationLink::sign(
+            DelegationLinkBody {
+                capability_id: "root-capability".to_string(),
+                delegator: root_delegator.public_key(),
+                delegatee: final_delegator.public_key(),
+                attenuations: Vec::new(),
+                timestamp: 100,
+                scope_hash: Some(root_hash.clone()),
+            },
+            &root_delegator,
+        )
+        .expect("sign first link");
+        let final_link = DelegationLink::sign(
+            DelegationLinkBody {
+                capability_id: "intermediate-capability".to_string(),
+                delegator: final_delegator.public_key(),
+                delegatee: leaf_subject.public_key(),
+                attenuations: Vec::new(),
+                timestamp: 101,
+                scope_hash: Some(root_hash.clone()),
+            },
+            &final_delegator,
+        )
+        .expect("sign final link");
+        let token = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "final-delegator-leaf".to_string(),
+                issuer: final_delegator.public_key(),
+                subject: leaf_subject.public_key(),
+                scope: ChioScope::default(),
+                issued_at: 101,
+                expires_at: 200,
+                delegation_chain: vec![first_link, final_link],
+                aggregate_invocation_budget: None,
+            },
+            &final_delegator,
+        )
+        .expect("sign final leaf");
+        let clock = crate::FixedClock::new(150);
+
+        let verified = verify_capability_with_floor_and_trust_root(
+            &token,
+            &[final_delegator.public_key()],
+            &clock,
+            CapabilityCryptoFloor::AllowClassical,
+            &root_hash,
+        )
+        .expect("leaf issuer must match the final, not first, delegator");
+        assert_eq!(verified.id, token.id);
+    }
+
+    #[test]
+    fn delegation_family_leaf_issuer_continuity_precedes_budget_admission() {
+        let final_delegator = Keypair::generate();
+        let leaf_subject = Keypair::generate();
+        let unrelated_signer = Keypair::generate();
+        let parent_link = DelegationLink::sign(
+            DelegationLinkBody {
+                capability_id: "unregistered-parent".to_string(),
+                delegator: final_delegator.public_key(),
+                delegatee: leaf_subject.public_key(),
+                attenuations: Vec::new(),
+                timestamp: 100,
+                scope_hash: None,
+            },
+            &final_delegator,
+        )
+        .expect("sign parent link");
+        let token = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "continuity-before-budget".to_string(),
+                issuer: unrelated_signer.public_key(),
+                subject: leaf_subject.public_key(),
+                scope: ChioScope::default(),
+                issued_at: 100,
+                expires_at: 200,
+                delegation_chain: vec![parent_link],
+                aggregate_invocation_budget: None,
+            },
+            &unrelated_signer,
+        )
+        .expect("sign unrelated leaf");
+        let clock = crate::FixedClock::new(150);
+        let peer = CapabilityNegotiation::t1_default();
+        let resolver = counting_resolver_for(&unrelated_signer);
+        let mut budgets = InMemoryBudgetRegistry::new();
+
+        let error = verify_capability_full(
+            &token,
+            &[unrelated_signer.public_key()],
+            &clock,
+            CapabilityCryptoFloor::AllowClassical,
+            &peer,
+            &resolver,
+            &mut budgets,
+        )
+        .expect_err("continuity must fail before unknown-parent budget admission");
+
+        assert_eq!(
+            error,
+            CapabilityError::AttenuationViolation(
+                "delegation chain final delegator does not match capability issuer".to_string()
+            )
+        );
         assert_eq!(resolver.calls(), 0);
     }
 
@@ -1217,7 +1402,7 @@ mod tests {
             CapabilityTokenAttenuationBody {
                 body: CapabilityTokenBody {
                     id: "delegated-multi-hop-without-witnesses".to_string(),
-                    issuer: issuer.public_key(),
+                    issuer: intermediate.public_key(),
                     subject: subject.public_key(),
                     scope: authorized_scope,
                     issued_at: 100,
@@ -1230,12 +1415,12 @@ mod tests {
                 attenuation_proof: proof,
                 budget_share_bps: None,
             },
-            &issuer,
+            &intermediate,
         )
         .expect("sign attenuated token");
         let clock = crate::FixedClock::new(150);
         let peer = CapabilityNegotiation::t1_default();
-        let issuer_public = issuer.public_key();
+        let issuer_public = intermediate.public_key();
         let resolver_issuer = issuer_public.clone();
         let trust_roots = move |candidate: &PublicKey| {
             if candidate == &resolver_issuer {

@@ -1,5 +1,5 @@
 fn make_chain_bound_plain_capability(
-    kernel: &ChioKernel,
+    leaf_signer: &Keypair,
     id: &str,
     subject: PublicKey,
     scope: ChioScope,
@@ -9,7 +9,7 @@ fn make_chain_bound_plain_capability(
     CapabilityToken::sign(
         CapabilityTokenBody {
             id: id.to_string(),
-            issuer: kernel.config.keypair.public_key(),
+            issuer: leaf_signer.public_key(),
             subject,
             scope,
             issued_at,
@@ -17,7 +17,7 @@ fn make_chain_bound_plain_capability(
             delegation_chain,
             aggregate_invocation_budget: None,
         },
-        &kernel.config.keypair,
+        leaf_signer,
     )
     .unwrap()
 }

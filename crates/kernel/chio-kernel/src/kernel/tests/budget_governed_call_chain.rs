@@ -419,7 +419,7 @@ fn governed_call_chain_receipt_observes_capability_lineage_subjects() {
         .unwrap();
     drop(seed_store);
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
-    set_capability_trust_root_for_scope(&kernel, &root_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &root_kp, &root_scope);
     kernel
         .register_budget_parent(root_capability.id.clone(), 10_000)
         .unwrap();
@@ -433,7 +433,7 @@ fn governed_call_chain_receipt_observes_capability_lineage_subjects() {
         current_unix_timestamp(),
     );
     let delegated_capability = make_chain_bound_capability(
-        &kernel,
+        &root_kp,
         "cap-governed-child",
         child_kp.public_key(),
         child_scope,
@@ -512,7 +512,7 @@ fn governed_call_chain_receipt_verifies_signed_upstream_delegator_proof() {
         .unwrap();
     drop(seed_store);
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
-    set_capability_trust_root_for_scope(&kernel, &root_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &root_kp, &root_scope);
     kernel
         .register_budget_parent(root_capability.id.clone(), 10_000)
         .unwrap();
@@ -526,7 +526,7 @@ fn governed_call_chain_receipt_verifies_signed_upstream_delegator_proof() {
         current_unix_timestamp(),
     );
     let delegated_capability = make_chain_bound_capability(
-        &kernel,
+        &root_kp,
         "cap-governed-upstream-proof",
         child_kp.public_key(),
         child_scope,
@@ -747,7 +747,11 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
         .unwrap();
     drop(seed_store);
     verified_kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
-    set_capability_trust_root_for_scope(&verified_kernel, &root_scope);
+    trust_delegated_leaf_signer_for_scope(
+        &mut verified_kernel,
+        &root_kp,
+        &root_scope,
+    );
     verified_kernel
         .register_budget_parent(root_capability.id.clone(), 10_000)
         .unwrap();
@@ -761,7 +765,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
         current_unix_timestamp(),
     );
     let delegated_capability = make_chain_bound_capability(
-        &verified_kernel,
+        &root_kp,
         "cap-governed-execution-order",
         child_kp.public_key(),
         child_scope,
@@ -853,7 +857,7 @@ fn governed_request_rejects_upstream_call_chain_proof_subject_mismatch() {
     drop(seed_store);
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
 
-    set_capability_trust_root_for_scope(&kernel, &root_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &root_kp, &root_scope);
     kernel
         .register_budget_parent(root_capability.id.clone(), 10_000)
         .unwrap();
@@ -866,7 +870,7 @@ fn governed_request_rejects_upstream_call_chain_proof_subject_mismatch() {
         current_unix_timestamp(),
     );
     let delegated_capability = make_chain_bound_capability(
-        &kernel,
+        &root_kp,
         "cap-governed-upstream-proof-subject-mismatch",
         child_kp.public_key(),
         child_scope,
@@ -946,7 +950,7 @@ fn governed_request_rejects_call_chain_delegator_subject_that_conflicts_with_cap
     drop(seed_store);
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
 
-    set_capability_trust_root_for_scope(&kernel, &root_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &root_kp, &root_scope);
     kernel
         .register_budget_parent(root_capability.id.clone(), 10_000)
         .unwrap();
@@ -959,7 +963,7 @@ fn governed_request_rejects_call_chain_delegator_subject_that_conflicts_with_cap
         current_unix_timestamp(),
     );
     let delegated_capability = make_chain_bound_capability(
-        &kernel,
+        &root_kp,
         "cap-governed-child-mismatch",
         child_kp.public_key(),
         child_scope,

@@ -441,14 +441,10 @@ fn make_sibling_sum_monetary_fixture(prefix: &str) -> SiblingSumMonetaryFixture 
     kernel
         .register_budget_parent(parent.id.clone(), 5_000)
         .unwrap();
-    kernel.set_capability_trust_root(
-        kernel.config.keypair.public_key(),
-        scope_hash(&parent_scope).unwrap(),
-    );
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
 
     let child_a_id = format!("cap-{prefix}-child-a");
     let child_a = make_v2_delegated_child(V2DelegatedChildInput {
-        kernel: &kernel,
         parent: &parent,
         parent_kp: &parent_kp,
         child_kp: &child_a_kp,
@@ -459,7 +455,6 @@ fn make_sibling_sum_monetary_fixture(prefix: &str) -> SiblingSumMonetaryFixture 
     });
     let child_b_id = format!("cap-{prefix}-child-b");
     let child_b = make_v2_delegated_child(V2DelegatedChildInput {
-        kernel: &kernel,
         parent: &parent,
         parent_kp: &parent_kp,
         child_kp: &child_b_kp,
@@ -520,14 +515,10 @@ fn make_sibling_sum_invocation_fixture(prefix: &str) -> SiblingSumInvocationFixt
     kernel
         .register_budget_parent(parent.id.clone(), 5_000)
         .unwrap();
-    kernel.set_capability_trust_root(
-        kernel.config.keypair.public_key(),
-        scope_hash(&parent_scope).unwrap(),
-    );
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
 
     let child_a_id = format!("cap-{prefix}-child-a");
     let child_a = make_v2_delegated_child(V2DelegatedChildInput {
-        kernel: &kernel,
         parent: &parent,
         parent_kp: &parent_kp,
         child_kp: &child_a_kp,
@@ -538,7 +529,6 @@ fn make_sibling_sum_invocation_fixture(prefix: &str) -> SiblingSumInvocationFixt
     });
     let child_b_id = format!("cap-{prefix}-child-b");
     let child_b = make_v2_delegated_child(V2DelegatedChildInput {
-        kernel: &kernel,
         parent: &parent,
         parent_kp: &parent_kp,
         child_kp: &child_b_kp,

@@ -226,6 +226,32 @@ pub fn validate_delegation_chain(chain: &[DelegationLink], max_depth: Option<u32
     Ok(())
 }
 
+/// Validate a delegation chain and bind its final hop to the leaf capability.
+///
+/// Link signatures, adjacency, and timestamps are authenticated before the
+/// leaf issuer and subject continuity checks run. Empty chains remain valid.
+pub fn validate_capability_delegation_chain(
+    token: &CapabilityToken,
+    max_depth: Option<u32>,
+) -> Result<()> {
+    validate_delegation_chain(&token.delegation_chain, max_depth)?;
+    let Some(final_link) = token.delegation_chain.last() else {
+        return Ok(());
+    };
+    if token.issuer != final_link.delegator {
+        return Err(Error::DelegationChainBroken {
+            reason: "delegation chain final delegator does not match capability issuer".to_string(),
+        });
+    }
+    if token.subject != final_link.delegatee {
+        return Err(Error::DelegationChainBroken {
+            reason: "delegation chain final delegatee does not match capability subject"
+                .to_string(),
+        });
+    }
+    Ok(())
+}
+
 /// Validate a delegation chain under the chain-binding rule.
 ///
 /// Defends against parent-scope inflation: an issuer with true authority

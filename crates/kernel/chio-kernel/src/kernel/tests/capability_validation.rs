@@ -473,7 +473,7 @@ fn revoked_ancestor_capability_denies_descendant() {
         .unwrap();
     drop(seed_store);
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
-    set_capability_trust_root_for_scope(&kernel, &scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &scope);
     kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
 
     let link = make_chain_bound_delegation_link(
@@ -484,7 +484,7 @@ fn revoked_ancestor_capability_denies_descendant() {
         current_unix_timestamp(),
     );
     let child = make_chain_bound_capability(
-        &kernel,
+        &parent_kp,
         "cap-child",
         child_kp.public_key(),
         scope.clone(),
@@ -528,7 +528,7 @@ fn delegated_tool_call_records_observed_capability_lineage() {
     drop(seed_store);
 
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
-    set_capability_trust_root_for_scope(&kernel, &parent_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
     kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
 
     let link_timestamp = current_unix_timestamp();
@@ -540,7 +540,7 @@ fn delegated_tool_call_records_observed_capability_lineage() {
         link_timestamp,
     );
     let child = make_chain_bound_capability(
-        &kernel,
+        &parent_kp,
         "cap-observed-child",
         child_kp.public_key(),
         child_scope,
@@ -587,7 +587,7 @@ fn delegated_tool_call_without_parent_snapshot_denies() {
     let parent_scope = make_scope(vec![parent_grant]);
     let parent = make_capability(&kernel, &parent_kp, parent_scope.clone(), 300);
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
-    set_capability_trust_root_for_scope(&kernel, &parent_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
     kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
 
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
@@ -599,7 +599,7 @@ fn delegated_tool_call_without_parent_snapshot_denies() {
         current_unix_timestamp(),
     );
     let child = make_chain_bound_capability(
-        &kernel,
+        &parent_kp,
         "cap-missing-parent",
         child_kp.public_key(),
         child_scope,
@@ -644,7 +644,7 @@ fn delegated_tool_call_without_delegate_operation_denies() {
         .unwrap();
     drop(seed_store);
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
-    set_capability_trust_root_for_scope(&kernel, &parent_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
     kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
 
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
@@ -656,7 +656,7 @@ fn delegated_tool_call_without_delegate_operation_denies() {
         current_unix_timestamp(),
     );
     let child = make_chain_bound_capability(
-        &kernel,
+        &parent_kp,
         "cap-missing-delegate",
         child_kp.public_key(),
         child_scope,
@@ -712,7 +712,7 @@ fn delegated_tool_call_with_scope_escalation_denies() {
         .unwrap();
     drop(seed_store);
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
-    set_capability_trust_root_for_scope(&kernel, &parent_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
     kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
 
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
@@ -725,7 +725,7 @@ fn delegated_tool_call_with_scope_escalation_denies() {
         link_timestamp,
     );
     let child = make_chain_bound_plain_capability(
-        &kernel,
+        &parent_kp,
         "cap-escalated-child",
         child_kp.public_key(),
         child_scope.clone(),
@@ -770,7 +770,7 @@ fn delegated_tool_call_with_delegatee_subject_mismatch_denies() {
         .unwrap();
     drop(seed_store);
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
-    set_capability_trust_root_for_scope(&kernel, &parent_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
     kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
 
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
@@ -782,7 +782,7 @@ fn delegated_tool_call_with_delegatee_subject_mismatch_denies() {
         current_unix_timestamp(),
     );
     let child = make_chain_bound_capability(
-        &kernel,
+        &parent_kp,
         "cap-delegatee-mismatch",
         child_kp.public_key(),
         child_scope,
@@ -839,7 +839,7 @@ fn delegated_tool_call_exceeding_configured_max_depth_denies() {
     let parent = CapabilityToken::sign(
         CapabilityTokenBody {
             id: "cap-max-depth-parent".to_string(),
-            issuer: kernel.config.keypair.public_key(),
+            issuer: root_kp.public_key(),
             subject: parent_kp.public_key(),
             scope: delegable_scope.clone(),
             issued_at: current_unix_timestamp(),
@@ -847,7 +847,7 @@ fn delegated_tool_call_exceeding_configured_max_depth_denies() {
             delegation_chain: vec![root_to_parent.clone()],
             aggregate_invocation_budget: None,
         },
-        &kernel.config.keypair,
+        &root_kp,
     )
     .unwrap();
     seed_store
@@ -856,7 +856,7 @@ fn delegated_tool_call_exceeding_configured_max_depth_denies() {
     drop(seed_store);
 
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
-    set_capability_trust_root_for_scope(&kernel, &delegable_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &delegable_scope);
     kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
 
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
@@ -868,7 +868,7 @@ fn delegated_tool_call_exceeding_configured_max_depth_denies() {
         current_unix_timestamp(),
     );
     let child = make_chain_bound_plain_capability(
-        &kernel,
+        &parent_kp,
         "cap-max-depth-child",
         child_kp.public_key(),
         child_scope,
@@ -916,7 +916,7 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
     let parent = CapabilityToken::sign(
         CapabilityTokenBody {
             id: "cap-truncated-parent".to_string(),
-            issuer: kernel.config.keypair.public_key(),
+            issuer: root_kp.public_key(),
             subject: parent_kp.public_key(),
             scope: delegable_scope.clone(),
             issued_at: current_unix_timestamp(),
@@ -924,7 +924,7 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
             delegation_chain: vec![root_to_parent],
             aggregate_invocation_budget: None,
         },
-        &kernel.config.keypair,
+        &root_kp,
     )
     .unwrap();
     seed_store
@@ -933,7 +933,7 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
     drop(seed_store);
 
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
-    set_capability_trust_root_for_scope(&kernel, &delegable_scope);
+    trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &delegable_scope);
     kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
 
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
@@ -945,7 +945,7 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
         current_unix_timestamp(),
     );
     let child = make_chain_bound_capability(
-        &kernel,
+        &parent_kp,
         "cap-truncated-child",
         child_kp.public_key(),
         child_scope,

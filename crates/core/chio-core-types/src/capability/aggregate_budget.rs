@@ -1,4 +1,4 @@
-//! Aggregate invocation budget wire types and structural validation.
+//! Aggregate invocation budget wire types, issuance, and authority verification.
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -12,7 +12,7 @@ use crate::crypto::{
 use crate::error::{Error, Result};
 use crate::signer_binding::ensure_keypair_matches_embedded_key;
 
-use super::attenuation::{scope_hash, ScopeHash};
+use super::attenuation::{scope_hash, validate_capability_delegation_chain, ScopeHash};
 use super::scope::ChioScope;
 use super::token::{CapabilityToken, CapabilityTokenBody};
 
@@ -241,6 +241,269 @@ impl VerifiedAggregateFamilyRoot {
     }
 }
 
+/// Authenticated legacy root facts returned by a trusted resolver.
+///
+/// Construction alone does not confer authority. A value becomes authoritative
+/// only when returned by the caller-selected [`AggregateFamilyRootResolver`].
+/// Private fields prevent mutation after resolution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct LegacyUnboundAggregateRoot {
+    root_capability_id: String,
+    root_subject: PublicKey,
+    root_scope_hash: ScopeHash,
+    root_expires_at: u64,
+}
+
+impl LegacyUnboundAggregateRoot {
+    /// Build an immutable legacy root record for a trusted resolver.
+    #[must_use]
+    pub fn new(
+        root_capability_id: String,
+        root_subject: PublicKey,
+        root_scope_hash: ScopeHash,
+        root_expires_at: u64,
+    ) -> Self {
+        Self {
+            root_capability_id,
+            root_subject,
+            root_scope_hash,
+            root_expires_at,
+        }
+    }
+
+    /// Authenticated legacy root capability identifier.
+    #[must_use]
+    pub fn root_capability_id(&self) -> &str {
+        &self.root_capability_id
+    }
+
+    /// Authenticated legacy root subject.
+    #[must_use]
+    pub fn root_subject(&self) -> &PublicKey {
+        &self.root_subject
+    }
+
+    /// Authenticated legacy root scope hash.
+    #[must_use]
+    pub fn root_scope_hash(&self) -> &str {
+        &self.root_scope_hash
+    }
+
+    /// Authenticated legacy root expiry.
+    #[must_use]
+    pub fn root_expires_at(&self) -> u64 {
+        self.root_expires_at
+    }
+}
+
+/// Authenticated aggregate-root state returned by a trusted resolver.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum AggregateFamilyRootResolution {
+    /// The authenticated root predates aggregate family binding.
+    LegacyUnbound(LegacyUnboundAggregateRoot),
+    /// The authenticated root established immutable family authority.
+    FamilyBound(VerifiedAggregateFamilyRoot),
+}
+
+/// Typed failures from aggregate family-root resolution.
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum AggregateFamilyRootResolutionError {
+    /// No authenticated root record exists for the requested capability ID.
+    #[cfg_attr(feature = "std", error("aggregate family root record is missing"))]
+    Missing,
+    /// The trusted authority could not perform the lookup.
+    #[cfg_attr(
+        feature = "std",
+        error("aggregate family root resolver unavailable: {0}")
+    )]
+    Unavailable(String),
+    /// The trusted authority found an invalid or inconsistent record.
+    #[cfg_attr(feature = "std", error("aggregate family root record is corrupt: {0}"))]
+    Corrupt(String),
+}
+
+#[cfg(not(feature = "std"))]
+impl core::fmt::Display for AggregateFamilyRootResolutionError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Missing => write!(f, "aggregate family root record is missing"),
+            Self::Unavailable(reason) => {
+                write!(f, "aggregate family root resolver unavailable: {reason}")
+            }
+            Self::Corrupt(reason) => {
+                write!(f, "aggregate family root record is corrupt: {reason}")
+            }
+        }
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl core::error::Error for AggregateFamilyRootResolutionError {}
+
+/// Trusted aggregate family-root authority lookup.
+///
+/// Implementations authenticate both legacy and family-bound records. Missing,
+/// unavailable, and corrupt state must be returned as typed errors and never
+/// converted into [`AggregateFamilyRootResolution::LegacyUnbound`].
+pub trait AggregateFamilyRootResolver {
+    /// Resolve the authenticated root record keyed by the first delegation
+    /// link's capability identifier.
+    fn resolve_aggregate_family_root(
+        &self,
+        root_capability_id: &str,
+    ) -> core::result::Result<AggregateFamilyRootResolution, AggregateFamilyRootResolutionError>;
+}
+
+impl<F> AggregateFamilyRootResolver for F
+where
+    F: Fn(
+        &str,
+    ) -> core::result::Result<
+        AggregateFamilyRootResolution,
+        AggregateFamilyRootResolutionError,
+    >,
+{
+    fn resolve_aggregate_family_root(
+        &self,
+        root_capability_id: &str,
+    ) -> core::result::Result<AggregateFamilyRootResolution, AggregateFamilyRootResolutionError>
+    {
+        (self)(root_capability_id)
+    }
+}
+
+/// Immutable authority for a capability-scoped aggregate maximum.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct VerifiedCapabilityAggregateAuthority {
+    owner: String,
+    max_invocations: u32,
+}
+
+impl VerifiedCapabilityAggregateAuthority {
+    /// Capability identifier that owns this aggregate maximum.
+    #[must_use]
+    pub fn owner(&self) -> &str {
+        &self.owner
+    }
+
+    /// Immutable authenticated maximum.
+    #[must_use]
+    pub fn max_invocations(&self) -> u32 {
+        self.max_invocations
+    }
+}
+
+/// Authenticated aggregate invocation authority for either supported scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum VerifiedAggregateInvocationAuthority {
+    /// The maximum belongs only to the verified leaf capability.
+    Capability(VerifiedCapabilityAggregateAuthority),
+    /// The maximum belongs to the authenticated delegation family.
+    DelegationFamily(VerifiedAggregateFamilyRoot),
+}
+
+impl VerifiedAggregateInvocationAuthority {
+    /// Authenticated aggregate scope.
+    #[must_use]
+    pub fn scope(&self) -> AggregateInvocationScope {
+        match self {
+            Self::Capability(_) => AggregateInvocationScope::Capability,
+            Self::DelegationFamily(_) => AggregateInvocationScope::DelegationFamily,
+        }
+    }
+
+    /// Immutable quota owner.
+    #[must_use]
+    pub fn owner(&self) -> &str {
+        match self {
+            Self::Capability(authority) => authority.owner(),
+            Self::DelegationFamily(root) => root.family_owner(),
+        }
+    }
+
+    /// Immutable authenticated maximum.
+    #[must_use]
+    pub fn max_invocations(&self) -> u32 {
+        match self {
+            Self::Capability(authority) => authority.max_invocations(),
+            Self::DelegationFamily(root) => root.max_invocations(),
+        }
+    }
+
+    /// Complete-envelope root-binding digest for family authority.
+    #[must_use]
+    pub fn root_binding_digest(&self) -> Option<&str> {
+        match self {
+            Self::Capability(_) => None,
+            Self::DelegationFamily(root) => Some(root.root_binding_digest()),
+        }
+    }
+
+    /// Borrow the verified family root when this is family authority.
+    #[must_use]
+    pub fn family_root(&self) -> Option<&VerifiedAggregateFamilyRoot> {
+        match self {
+            Self::Capability(_) => None,
+            Self::DelegationFamily(root) => Some(root),
+        }
+    }
+}
+
+/// Fail-closed errors from aggregate authority verification.
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum AggregateInvocationAuthorityError {
+    /// Leaf, chain, or aggregate authority authentication failed.
+    #[cfg_attr(feature = "std", error("aggregate authority verification failed: {0}"))]
+    Verification(#[cfg_attr(feature = "std", source)] Error),
+    /// Trusted root resolution failed.
+    #[cfg_attr(feature = "std", error("aggregate family root resolution failed: {0}"))]
+    RootResolution(#[cfg_attr(feature = "std", source)] AggregateFamilyRootResolutionError),
+}
+
+impl From<Error> for AggregateInvocationAuthorityError {
+    fn from(error: Error) -> Self {
+        Self::Verification(error)
+    }
+}
+
+impl From<AggregateFamilyRootResolutionError> for AggregateInvocationAuthorityError {
+    fn from(error: AggregateFamilyRootResolutionError) -> Self {
+        Self::RootResolution(error)
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl core::fmt::Display for AggregateInvocationAuthorityError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Verification(error) => {
+                write!(f, "aggregate authority verification failed: {error}")
+            }
+            Self::RootResolution(error) => {
+                write!(f, "aggregate family root resolution failed: {error}")
+            }
+        }
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl core::error::Error for AggregateInvocationAuthorityError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            Self::Verification(error) => Some(error),
+            Self::RootResolution(error) => Some(error),
+        }
+    }
+}
+
 /// Issue a direct aggregate delegation-family root with an Ed25519 keypair.
 ///
 /// Callers provide only an ordinary, empty-chain capability body and the
@@ -452,6 +715,205 @@ pub fn verify_direct_aggregate_family_root(
         family_owner,
         root_binding: binding.clone(),
     })
+}
+
+/// Authenticate aggregate authority for a direct capability or descendant.
+///
+/// Direct family roots use [`verify_direct_aggregate_family_root`]. Every
+/// descendant first authenticates the leaf and complete delegation chain, then
+/// resolves the first link's root capability ID through the trusted resolver.
+/// The resolver is never called for direct tokens or unauthenticated chains.
+pub fn verify_aggregate_invocation_authority(
+    token: &CapabilityToken,
+    trusted_leaf_issuers: &[PublicKey],
+    resolver: &dyn AggregateFamilyRootResolver,
+) -> core::result::Result<
+    Option<VerifiedAggregateInvocationAuthority>,
+    AggregateInvocationAuthorityError,
+> {
+    ensure_algorithm_consistency(
+        token.algorithm,
+        &token.issuer,
+        &token.signature,
+        "aggregate authority capability algorithm does not match issuer and signature",
+    )?;
+    if !token.verify_signature()? {
+        return Err(Error::InvalidSignature(
+            "aggregate authority capability signature invalid".to_string(),
+        )
+        .into());
+    }
+    if !trusted_leaf_issuers.contains(&token.issuer) {
+        return Err(Error::InvalidPublicKey(
+            "aggregate authority capability issuer is not trusted".to_string(),
+        )
+        .into());
+    }
+    validate_capability_delegation_chain(token, None)?;
+
+    if token.delegation_chain.is_empty() {
+        return verify_direct_aggregate_authority(token, trusted_leaf_issuers);
+    }
+
+    let first_link =
+        token
+            .delegation_chain
+            .first()
+            .ok_or_else(|| Error::DelegationChainBroken {
+                reason: "delegation chain unexpectedly empty after non-empty check".to_string(),
+            })?;
+    let lookup_root_id = first_link.capability_id.as_str();
+    let resolved = resolver.resolve_aggregate_family_root(lookup_root_id)?;
+
+    match resolved {
+        AggregateFamilyRootResolution::LegacyUnbound(root) => {
+            ensure_resolved_record_matches_lookup(root.root_capability_id(), lookup_root_id)?;
+            let authority = match token.aggregate_invocation_budget.as_ref() {
+                None => None,
+                Some(budget) if budget.scope == AggregateInvocationScope::Capability => {
+                    Some(capability_aggregate_authority(token, budget))
+                }
+                Some(_) => {
+                    return Err(Error::AttenuationViolation {
+                        reason:
+                            "legacy-unbound root cannot create a delegation-family aggregate budget"
+                                .to_string(),
+                    }
+                    .into());
+                }
+            };
+            verify_resolved_root_lineage(
+                token,
+                first_link,
+                root.root_subject(),
+                root.root_scope_hash(),
+                root.root_expires_at(),
+            )?;
+            Ok(authority)
+        }
+        AggregateFamilyRootResolution::FamilyBound(root) => {
+            ensure_resolved_record_matches_lookup(root.root_capability_id(), lookup_root_id)?;
+            let budget = token.aggregate_invocation_budget.as_ref().ok_or_else(|| {
+                Error::AttenuationViolation {
+                    reason: "family-bound descendant must preserve aggregate_invocation_budget"
+                        .to_string(),
+                }
+            })?;
+            if budget.scope != AggregateInvocationScope::DelegationFamily {
+                return Err(Error::AttenuationViolation {
+                    reason: "family-bound descendant cannot downgrade aggregate scope".to_string(),
+                }
+                .into());
+            }
+            if budget.max_invocations != root.max_invocations() {
+                return Err(Error::AttenuationViolation {
+                    reason: "family-bound descendant changed the immutable aggregate maximum"
+                        .to_string(),
+                }
+                .into());
+            }
+            let binding =
+                budget
+                    .root_binding
+                    .as_ref()
+                    .ok_or_else(|| Error::AttenuationViolation {
+                        reason: "family-bound descendant must preserve the root binding"
+                            .to_string(),
+                    })?;
+            if binding.preservation_digest()? != root.root_binding_digest() {
+                return Err(Error::AttenuationViolation {
+                    reason: "family-bound descendant changed the root binding envelope".to_string(),
+                }
+                .into());
+            }
+            verify_resolved_root_lineage(
+                token,
+                first_link,
+                root.root_subject(),
+                root.root_scope_hash(),
+                root.root_expires_at(),
+            )?;
+            Ok(Some(
+                VerifiedAggregateInvocationAuthority::DelegationFamily(root),
+            ))
+        }
+    }
+}
+
+fn verify_direct_aggregate_authority(
+    token: &CapabilityToken,
+    trusted_issuers: &[PublicKey],
+) -> core::result::Result<
+    Option<VerifiedAggregateInvocationAuthority>,
+    AggregateInvocationAuthorityError,
+> {
+    let Some(budget) = token.aggregate_invocation_budget.as_ref() else {
+        return Ok(None);
+    };
+    match budget.scope {
+        AggregateInvocationScope::Capability => {
+            Ok(Some(capability_aggregate_authority(token, budget)))
+        }
+        AggregateInvocationScope::DelegationFamily => {
+            let root = verify_direct_aggregate_family_root(token, trusted_issuers)?;
+            Ok(Some(
+                VerifiedAggregateInvocationAuthority::DelegationFamily(root),
+            ))
+        }
+    }
+}
+
+fn capability_aggregate_authority(
+    token: &CapabilityToken,
+    budget: &AggregateInvocationBudget,
+) -> VerifiedAggregateInvocationAuthority {
+    VerifiedAggregateInvocationAuthority::Capability(VerifiedCapabilityAggregateAuthority {
+        owner: token.id.clone(),
+        max_invocations: budget.max_invocations,
+    })
+}
+
+fn ensure_resolved_record_matches_lookup(
+    resolved_root_id: &str,
+    lookup_root_id: &str,
+) -> core::result::Result<(), AggregateInvocationAuthorityError> {
+    if resolved_root_id == lookup_root_id {
+        return Ok(());
+    }
+    Err(AggregateFamilyRootResolutionError::Corrupt(
+        "resolved root capability ID does not match lookup key".to_string(),
+    )
+    .into())
+}
+
+fn verify_resolved_root_lineage(
+    token: &CapabilityToken,
+    first_link: &super::attenuation::DelegationLink,
+    root_subject: &PublicKey,
+    root_scope_hash: &str,
+    root_expires_at: u64,
+) -> core::result::Result<(), AggregateInvocationAuthorityError> {
+    if &first_link.delegator != root_subject {
+        return Err(Error::AttenuationViolation {
+            reason: "delegation chain first delegator does not match resolved root subject"
+                .to_string(),
+        }
+        .into());
+    }
+    if first_link.scope_hash.as_deref() != Some(root_scope_hash) {
+        return Err(Error::AttenuationViolation {
+            reason: "delegation chain first scope hash does not match resolved root scope hash"
+                .to_string(),
+        }
+        .into());
+    }
+    if token.expires_at > root_expires_at {
+        return Err(Error::AttenuationViolation {
+            reason: "descendant capability outlives resolved aggregate root".to_string(),
+        }
+        .into());
+    }
+    Ok(())
 }
 
 fn domain_separated_bytes<T: Serialize>(domain: &str, value: &T) -> Result<Vec<u8>> {

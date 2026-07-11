@@ -1173,7 +1173,7 @@ fn make_chain_bound_delegation_link(
 }
 
 fn make_chain_bound_capability(
-    kernel: &ChioKernel,
+    leaf_signer: &Keypair,
     id: &str,
     subject: PublicKey,
     scope: ChioScope,
@@ -1196,7 +1196,7 @@ fn make_chain_bound_capability(
         CapabilityTokenAttenuationBody {
             body: CapabilityTokenBody {
                 id: id.to_string(),
-                issuer: kernel.config.keypair.public_key(),
+                issuer: leaf_signer.public_key(),
                 subject,
                 scope,
                 issued_at,
@@ -1209,17 +1209,24 @@ fn make_chain_bound_capability(
             attenuation_proof: proof,
             budget_share_bps,
         },
-        &kernel.config.keypair,
+        leaf_signer,
     )
     .unwrap()
 }
 
-fn set_capability_trust_root_for_scope(kernel: &ChioKernel, scope: &ChioScope) {
-    kernel.set_capability_trust_root(kernel.config.keypair.public_key(), scope_hash(scope).unwrap());
+fn trust_delegated_leaf_signer_for_scope(
+    kernel: &mut ChioKernel,
+    leaf_signer: &Keypair,
+    scope: &ChioScope,
+) {
+    let public_key = leaf_signer.public_key();
+    if !kernel.config.ca_public_keys.contains(&public_key) {
+        kernel.config.ca_public_keys.push(public_key.clone());
+    }
+    kernel.set_capability_trust_root(public_key, scope_hash(scope).unwrap());
 }
 
 struct V2DelegatedChildInput<'a> {
-    kernel: &'a ChioKernel,
     parent: &'a CapabilityToken,
     parent_kp: &'a Keypair,
     child_kp: &'a Keypair,
@@ -1260,7 +1267,7 @@ fn make_v2_delegated_child(input: V2DelegatedChildInput<'_>) -> CapabilityToken 
         CapabilityTokenAttenuationBody {
             body: CapabilityTokenBody {
                 id: input.id.to_string(),
-                issuer: input.kernel.config.keypair.public_key(),
+                issuer: input.parent_kp.public_key(),
                 subject: input.child_kp.public_key(),
                 scope: input.child_scope,
                 issued_at,
@@ -1273,7 +1280,7 @@ fn make_v2_delegated_child(input: V2DelegatedChildInput<'_>) -> CapabilityToken 
             attenuation_proof: proof,
             budget_share_bps: Some(input.share_bps),
         },
-        &input.kernel.config.keypair,
+        input.parent_kp,
     )
     .unwrap()
 }
