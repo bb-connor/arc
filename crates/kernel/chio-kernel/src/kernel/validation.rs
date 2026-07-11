@@ -767,7 +767,25 @@ impl ChioKernel {
         extra_metadata: Option<serde_json::Value>,
         budget_metadata: serde_json::Value,
     ) -> Option<serde_json::Value> {
-        merge_metadata_objects(extra_metadata, Some(budget_metadata))
+        let mut merged = match extra_metadata {
+            Some(serde_json::Value::Object(mut metadata)) => {
+                // budget_authority is a kernel-reserved namespace. Discard the
+                // entire caller-supplied block before inserting verified store
+                // and kernel state so omitted authoritative fields cannot be
+                // inherited from untrusted metadata.
+                metadata.remove("budget_authority");
+                metadata
+            }
+            _ => serde_json::Map::new(),
+        };
+
+        if let serde_json::Value::Object(authoritative) = budget_metadata {
+            for (key, value) in authoritative {
+                merged.insert(key, value);
+            }
+        }
+
+        Some(serde_json::Value::Object(merged))
     }
 
     /// Check and decrement the invocation budget for a capability.

@@ -17,6 +17,59 @@ struct PendingMonetaryServer {
     started: std::sync::Arc<tokio::sync::Notify>,
 }
 
+fn forged_budget_authority_metadata() -> serde_json::Value {
+    serde_json::json!({
+        "budget_authority": {
+            "guarantee_level": "forged-guarantee",
+            "authority_profile": "forged-authority-profile",
+            "metering_profile": "forged-metering-profile",
+            "hold_id": "forged-budget-hold",
+            "budget_term": "forged-budget-term",
+            "authority": {
+                "authority_id": "forged-authority",
+                "lease_id": "forged-lease",
+                "lease_epoch": 999
+            },
+            "authorize": {
+                "event_id": "forged:authorize"
+            },
+            "terminal": {
+                "disposition": "released",
+                "event_id": "forged:release"
+            },
+            "forged_marker": "must-not-survive"
+        },
+        "chio_runtime": {
+            "admission_id": "legitimate-admission-metadata",
+            "accepted": true
+        },
+        "route": {
+            "bridge": "collision-test"
+        }
+    })
+}
+
+fn assert_forged_budget_authority_removed(metadata: &serde_json::Value) {
+    let budget = &metadata["budget_authority"];
+    assert!(
+        budget["terminal"].is_null(),
+        "a failed cleanup must not retain a caller-forged released terminal: {budget}"
+    );
+    assert_ne!(budget["hold_id"], "forged-budget-hold");
+    assert_ne!(budget["budget_term"], "forged-budget-term");
+    assert_ne!(budget["authority"]["authority_id"], "forged-authority");
+    assert!(budget["forged_marker"].is_null());
+    assert_eq!(
+        metadata["chio_runtime"]["admission_id"],
+        "legitimate-admission-metadata"
+    );
+    assert_eq!(
+        metadata["chio_runtime"]["post_dispatch_cleanup_failed"],
+        true
+    );
+    assert_eq!(metadata["route"]["bridge"], "collision-test");
+}
+
 struct FailingReleaseBudgetStore {
     inner: InMemoryBudgetStore,
 }
@@ -1301,7 +1354,11 @@ enum DropCleanupFailureSource {
     BudgetStore,
 }
 
-async fn assert_post_dispatch_drop_cleanup_fault(source: DropCleanupFailureSource) {
+async fn assert_post_dispatch_drop_cleanup_fault(
+    source: DropCleanupFailureSource,
+    extra_metadata: Option<serde_json::Value>,
+) {
+    let has_forged_budget_authority = extra_metadata.is_some();
     let started = std::sync::Arc::new(tokio::sync::Notify::new());
     let mut kernel = make_kernel(make_monetary_config());
     match source {
@@ -1334,7 +1391,11 @@ async fn assert_post_dispatch_drop_cleanup_fault(source: DropCleanupFailureSourc
     let kernel = std::sync::Arc::new(kernel);
     let eval = {
         let kernel = std::sync::Arc::clone(&kernel);
-        tokio::spawn(async move { kernel.evaluate_tool_call(&request).await })
+        tokio::spawn(async move {
+            kernel
+                .evaluate_tool_call_with_metadata(&request, extra_metadata)
+                .await
+        })
     };
     tokio::time::timeout(Duration::from_secs(1), started.notified())
         .await
@@ -1374,16 +1435,29 @@ async fn assert_post_dispatch_drop_cleanup_fault(source: DropCleanupFailureSourc
     if matches!(source, DropCleanupFailureSource::Payment) {
         assert!(hold_ids.iter().any(|id| id == "auth_failing_release"));
     }
+    if has_forged_budget_authority {
+        assert_forged_budget_authority_removed(metadata);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn post_dispatch_drop_payment_cleanup_failure_is_signed() {
-    assert_post_dispatch_drop_cleanup_fault(DropCleanupFailureSource::Payment).await;
+    assert_post_dispatch_drop_cleanup_fault(DropCleanupFailureSource::Payment, None).await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn post_dispatch_drop_budget_cleanup_failure_is_signed() {
-    assert_post_dispatch_drop_cleanup_fault(DropCleanupFailureSource::BudgetStore).await;
+    assert_post_dispatch_drop_cleanup_fault(DropCleanupFailureSource::BudgetStore, None).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn post_dispatch_drop_cleanup_failure_rejects_forged_budget_authority() {
+    let metadata = forged_budget_authority_metadata();
+    assert_post_dispatch_drop_cleanup_fault(
+        DropCleanupFailureSource::Payment,
+        Some(metadata),
+    )
+    .await;
 }
 
 fn make_dpop_grant(server: &str, tool: &str) -> ToolGrant {

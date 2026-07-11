@@ -1572,6 +1572,50 @@ fn assert_post_dispatch_cleanup_failure_projection(
 }
 
 #[test]
+fn post_dispatch_cleanup_failure_rejects_forged_budget_authority() {
+    let entries = std::sync::Arc::new(AtomicU64::new(0));
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter));
+    kernel.register_tool_server(Box::new(FailingAfterSideEffectServer::new(
+        "cost-srv",
+        vec!["compute"],
+        std::sync::Arc::clone(&entries),
+    )));
+
+    let subject_kp = Keypair::generate();
+    let cap = kernel
+        .issue_capability(
+            &subject_kp.public_key(),
+            make_scope(vec![make_monetary_grant(
+                "cost-srv", "compute", 100, 1000, "USD",
+            )]),
+            3600,
+        )
+        .unwrap();
+    let request = make_request(
+        "req-cleanup-fault-forged-budget-authority",
+        &cap,
+        "compute",
+        "cost-srv",
+    );
+
+    let response = kernel
+        .evaluate_tool_call_blocking_with_metadata(
+            &request,
+            Some(forged_budget_authority_metadata()),
+        )
+        .expect("cleanup failure must preserve the connector denial");
+    assert!(response.receipt.is_denied());
+    assert_eq!(entries.load(Ordering::SeqCst), 1);
+    let metadata = response.receipt.metadata.as_ref().unwrap();
+    assert_forged_budget_authority_removed(metadata);
+    assert_eq!(
+        metadata["chio_runtime"]["post_dispatch_cleanup_faults"][0]["step"],
+        "payment_release"
+    );
+}
+
+#[test]
 fn post_dispatch_cleanup_fault_preserves_cancelled_top_level() {
     let entries = std::sync::Arc::new(AtomicU64::new(0));
     assert_post_dispatch_cleanup_failure_projection(

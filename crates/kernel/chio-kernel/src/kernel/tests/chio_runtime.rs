@@ -4189,6 +4189,57 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_async(
 }
 
 #[test]
+fn url_elicitation_cleanup_failure_rejects_forged_budget_authority(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut kernel = make_kernel(make_monetary_config());
+    let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
+        "cost-srv",
+        vec!["compute"],
+        std::sync::Arc::clone(&stream_attempts),
+    )));
+    kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter));
+
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_monetary_grant(
+            "cost-srv", "compute", 100, 1_000, "USD",
+        )]),
+        300,
+    );
+    let request = make_request_with_arguments(
+        "req-url-cleanup-fault-forged-budget-authority",
+        &cap,
+        "compute",
+        "cost-srv",
+        serde_json::json!({}),
+    );
+
+    let result = kernel.evaluate_tool_call_blocking_with_metadata(
+        &request,
+        Some(forged_budget_authority_metadata()),
+    );
+    assert!(matches!(
+        result,
+        Err(KernelError::UrlElicitationsRequired { .. })
+    ));
+    assert_eq!(stream_attempts.load(Ordering::SeqCst), 1);
+    let receipt_log = kernel.receipt_log();
+    assert_eq!(receipt_log.len(), 1);
+    let receipt = receipt_log.get(0).unwrap();
+    assert!(receipt.is_incomplete());
+    let metadata = receipt.metadata.as_ref().unwrap();
+    assert_forged_budget_authority_removed(metadata);
+    assert_eq!(
+        metadata["chio_runtime"]["post_dispatch_cleanup_faults"][0]["step"],
+        "payment_release"
+    );
+    Ok(())
+}
+
+#[test]
 fn url_elicitation_monetary_release_failure_records_hold_ids_nested_flow(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Nested-flow mirror of the async monetary-release-failure test: the
