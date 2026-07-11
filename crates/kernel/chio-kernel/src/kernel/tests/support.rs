@@ -1932,6 +1932,47 @@ impl ReceiptStore for DeadWriterReceiptStore {
     }
 }
 
+/// A commit writer that is always serving closed and, once armed, fails every
+/// capability-lineage write like a poisoned writer. It records whether the
+/// lineage write was attempted so a test can prove the pre-dispatch gate denies
+/// BEFORE any writer-backed metadata write runs. Arming is deferred so capability
+/// issuance during test setup (which also records lineage) still succeeds.
+struct SnapshotTrackingDeadWriterStore {
+    snapshot_attempted: std::sync::Arc<AtomicBool>,
+    fail_snapshots: std::sync::Arc<AtomicBool>,
+}
+
+impl ReceiptStore for SnapshotTrackingDeadWriterStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn writer_serving_closed(&self) -> bool {
+        true
+    }
+
+    fn record_capability_snapshot(
+        &self,
+        _token: &CapabilityToken,
+        _parent_capability_id: Option<&str>,
+    ) -> Result<(), ReceiptStoreError> {
+        if self.fail_snapshots.load(Ordering::SeqCst) {
+            self.snapshot_attempted.store(true, Ordering::SeqCst);
+            return Err(ReceiptStoreError::Pool(
+                "capability lineage write rejected by a dead receipt writer".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// A store-authoritative point-lookup store: appended chio receipts are retained
 /// in-memory and `load_chio_receipt` resolves them by id. Models a durable store
 /// that implements point loads, so an evicted parent receipt still resolves from

@@ -36,6 +36,58 @@ fn dead_commit_writer_denies_before_the_tool_executes() {
 }
 
 #[test]
+fn dead_commit_writer_denies_before_the_capability_lineage_write() {
+    let mut kernel = make_kernel(make_config());
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-a",
+        vec!["read_file"],
+        std::sync::Arc::clone(&invocations),
+    )));
+    let snapshot_attempted = std::sync::Arc::new(AtomicBool::new(false));
+    let fail_snapshots = std::sync::Arc::new(AtomicBool::new(false));
+    kernel
+        .set_receipt_store(Box::new(SnapshotTrackingDeadWriterStore {
+            snapshot_attempted: std::sync::Arc::clone(&snapshot_attempted),
+            fail_snapshots: std::sync::Arc::clone(&fail_snapshots),
+        }))
+        .unwrap();
+
+    let agent_kp = make_keypair();
+    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+    let request = make_request("req-dead-writer-lineage", &cap, "read_file", "srv-a");
+
+    // Arm the writer only after issuance: from here a lineage write fails like a
+    // poisoned writer, so the evaluation below is what must be gated.
+    fail_snapshots.store(true, Ordering::SeqCst);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    // The writer-readiness gate must run BEFORE the capability-lineage write. A
+    // serving-closed writer must produce the clean fail-closed persistence deny
+    // rather than first attempting a metadata write through the dead writer and
+    // surfacing that write's error (or a 500) instead.
+    assert_eq!(response.verdict, Verdict::Deny);
+    let reason = response.reason.unwrap_or_default();
+    assert!(
+        reason.contains("commit writer is not serving"),
+        "expected a receipt-persistence-degraded deny, got: {reason}"
+    );
+    // The load-bearing property: no writer-backed metadata write is attempted
+    // once the gate has denied, so nothing is pushed through the dead writer.
+    assert!(
+        !snapshot_attempted.load(Ordering::SeqCst),
+        "the capability lineage write must not be attempted after the writer gate denies"
+    );
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        0,
+        "a degraded commit writer must deny before the tool executes"
+    );
+}
+
+#[test]
 fn kernel_persists_tool_receipts_to_sqlite_store() {
     let path = unique_receipt_db_path("chio-kernel-tool-receipts");
     let mut kernel = make_kernel(make_config());
