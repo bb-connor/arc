@@ -1,6 +1,6 @@
 use alloc::collections::BTreeMap;
 
-use crate::crypto::{Keypair, PublicKey, SigningBackend};
+use crate::crypto::{Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend};
 use crate::error::{Error, Result};
 use crate::runtime_attestation::AttestationVerifierFamily;
 use crate::session::SessionAnchorReference;
@@ -38,6 +38,74 @@ fn make_scope(grants: Vec<ToolGrant>) -> ChioScope {
     ChioScope {
         grants,
         ..ChioScope::default()
+    }
+}
+
+struct SameAlgorithmWrongKeyBackend {
+    advertised_keypair: Keypair,
+    signing_keypair: Keypair,
+}
+
+impl SigningBackend for SameAlgorithmWrongKeyBackend {
+    fn algorithm(&self) -> SigningAlgorithm {
+        SigningAlgorithm::Ed25519
+    }
+
+    fn public_key(&self) -> PublicKey {
+        self.advertised_keypair.public_key()
+    }
+
+    fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
+        Ok(self.signing_keypair.sign(message))
+    }
+}
+
+struct CapabilityAlgorithmMismatchBackend {
+    keypair: Keypair,
+}
+
+impl SigningBackend for CapabilityAlgorithmMismatchBackend {
+    fn algorithm(&self) -> SigningAlgorithm {
+        SigningAlgorithm::P256
+    }
+
+    fn public_key(&self) -> PublicKey {
+        self.keypair.public_key()
+    }
+
+    fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
+        Ok(self.keypair.sign(message))
+    }
+}
+
+struct CapabilitySignatureAlgorithmMismatchBackend {
+    keypair: Keypair,
+}
+
+impl SigningBackend for CapabilitySignatureAlgorithmMismatchBackend {
+    fn algorithm(&self) -> SigningAlgorithm {
+        SigningAlgorithm::Ed25519
+    }
+
+    fn public_key(&self) -> PublicKey {
+        self.keypair.public_key()
+    }
+
+    fn sign_bytes(&self, _message: &[u8]) -> Result<Signature> {
+        Ok(Signature::from_p256_der(&[1_u8, 2, 3]))
+    }
+}
+
+fn capability_backend_test_body(issuer: PublicKey, id: &str) -> CapabilityTokenBody {
+    CapabilityTokenBody {
+        id: id.to_string(),
+        issuer,
+        subject: Keypair::generate().public_key(),
+        scope: ChioScope::default(),
+        issued_at: 1000,
+        expires_at: 2000,
+        delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     }
 }
 
@@ -1763,7 +1831,8 @@ fn ed25519_capability_token_is_byte_identical_without_algorithm_field() {
 
 #[test]
 fn capability_token_backend_signing_with_ed25519_verifies() {
-    let backend = crate::crypto::Ed25519Backend::generate();
+    let keypair = Keypair::from_seed(&[42_u8; 32]);
+    let backend = crate::crypto::Ed25519Backend::new(Keypair::from_seed(&[42_u8; 32]));
     let subject = Keypair::generate();
     let body = CapabilityTokenBody {
         id: "cap-backend".to_string(),
@@ -1775,12 +1844,73 @@ fn capability_token_backend_signing_with_ed25519_verifies() {
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
     };
+    let keypair_token = CapabilityToken::sign(body.clone(), &keypair).unwrap();
     let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
     assert_eq!(
         token.algorithm,
         Some(crate::crypto::SigningAlgorithm::Ed25519)
     );
     assert!(token.verify_signature().unwrap());
+    assert_eq!(
+        serde_json::to_vec(&token).unwrap(),
+        serde_json::to_vec(&keypair_token).unwrap()
+    );
+}
+
+#[test]
+fn capability_token_backend_rejects_same_algorithm_wrong_key_signature() {
+    let backend = SameAlgorithmWrongKeyBackend {
+        advertised_keypair: Keypair::generate(),
+        signing_keypair: Keypair::generate(),
+    };
+    let body =
+        capability_backend_test_body(backend.public_key(), "cap-backend-same-algorithm-wrong-key");
+
+    match CapabilityToken::sign_with_backend(body, &backend).unwrap_err() {
+        Error::InvalidSignature(reason) => assert_eq!(
+            reason,
+            "capability token backend signature failed verification"
+        ),
+        error => panic!("expected invalid signature, got {error:?}"),
+    }
+}
+
+#[test]
+fn capability_token_backend_rejects_public_key_algorithm_mismatch() {
+    let backend = CapabilityAlgorithmMismatchBackend {
+        keypair: Keypair::generate(),
+    };
+    let body = capability_backend_test_body(
+        backend.public_key(),
+        "cap-backend-public-key-algorithm-mismatch",
+    );
+
+    match CapabilityToken::sign_with_backend(body, &backend).unwrap_err() {
+        Error::InvalidSignature(reason) => assert_eq!(
+            reason,
+            "capability token backend algorithm does not match public key"
+        ),
+        error => panic!("expected invalid signature, got {error:?}"),
+    }
+}
+
+#[test]
+fn capability_token_backend_rejects_returned_signature_algorithm_mismatch() {
+    let backend = CapabilitySignatureAlgorithmMismatchBackend {
+        keypair: Keypair::generate(),
+    };
+    let body = capability_backend_test_body(
+        backend.public_key(),
+        "cap-backend-signature-algorithm-mismatch",
+    );
+
+    match CapabilityToken::sign_with_backend(body, &backend).unwrap_err() {
+        Error::InvalidSignature(reason) => assert_eq!(
+            reason,
+            "capability token backend algorithm does not match returned signature"
+        ),
+        error => panic!("expected invalid signature, got {error:?}"),
+    }
 }
 
 #[cfg(feature = "fips")]

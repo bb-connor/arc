@@ -10,9 +10,7 @@ use crate::crypto::{
     SigningAlgorithm, SigningBackend,
 };
 use crate::error::{Error, Result};
-use crate::signer_binding::{
-    ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
-};
+use crate::signer_binding::ensure_keypair_matches_embedded_key;
 
 use super::attenuation::{scope_hash, ScopeHash};
 use super::scope::ChioScope;
@@ -278,9 +276,14 @@ pub fn issue_aggregate_family_root_with_backend(
     backend: &dyn SigningBackend,
 ) -> Result<CapabilityToken> {
     validate_direct_root_issuance_body(&body)?;
-    ensure_backend_matches_embedded_key(&body.issuer, backend, "aggregate family root", "issuer")?;
-    let algorithm = backend.algorithm();
-    if backend.public_key().algorithm() != algorithm {
+    let expected_issuer = backend.public_key();
+    let expected_algorithm = backend.algorithm();
+    if body.issuer != expected_issuer {
+        return Err(Error::InvalidPublicKey(
+            "aggregate family root issuer does not match signing key".to_string(),
+        ));
+    }
+    if expected_issuer.algorithm() != expected_algorithm {
         return Err(Error::InvalidSignature(
             "aggregate family root backend algorithm does not match public key".to_string(),
         ));
@@ -288,10 +291,16 @@ pub fn issue_aggregate_family_root_with_backend(
 
     let commitment = commitment_from_body(&body, max_invocations)?;
     let binding_body = binding_body_from_commitment(&commitment)?;
-    let signature = backend.sign_bytes(&binding_body.signing_bytes()?)?;
-    if signature.algorithm() != algorithm {
+    let binding_signing_bytes = binding_body.signing_bytes()?;
+    let signature = backend.sign_bytes(&binding_signing_bytes)?;
+    if signature.algorithm() != expected_algorithm {
         return Err(Error::InvalidSignature(
             "aggregate family root backend algorithm does not match returned signature".to_string(),
+        ));
+    }
+    if !expected_issuer.verify(&binding_signing_bytes, &signature) {
+        return Err(Error::InvalidSignature(
+            "aggregate family root binding signature invalid".to_string(),
         ));
     }
     body.aggregate_invocation_budget = Some(AggregateInvocationBudget {
@@ -299,11 +308,13 @@ pub fn issue_aggregate_family_root_with_backend(
         max_invocations,
         root_binding: Some(AggregateBudgetRootBinding {
             body: binding_body,
-            algorithm: (!algorithm.is_default()).then_some(algorithm),
+            algorithm: (!expected_algorithm.is_default()).then_some(expected_algorithm),
             signature,
         }),
     });
-    CapabilityToken::sign_with_backend(body, backend)
+    let token = CapabilityToken::sign_with_backend(body, backend)?;
+    verify_direct_aggregate_family_root(&token, core::slice::from_ref(&expected_issuer))?;
+    Ok(token)
 }
 
 /// Authenticate and project a direct aggregate delegation-family root.
@@ -520,6 +531,7 @@ fn ensure_algorithm_consistency(
 mod tests {
     use super::*;
     use alloc::vec;
+    use core::sync::atomic::{AtomicUsize, Ordering};
 
     use crate::capability::attenuation::{scope_hash, DelegationLink, DelegationLinkBody};
     use crate::capability::token::{CapabilityToken, CapabilityTokenBody};
@@ -663,6 +675,32 @@ mod tests {
 
         fn sign_bytes(&self, _message: &[u8]) -> Result<Signature> {
             Ok(Signature::from_p256_der(&[1_u8, 2, 3]))
+        }
+    }
+
+    struct TwoStageSignatureBackend {
+        expected_keypair: Keypair,
+        other_keypair: Keypair,
+        expected_signature_first: bool,
+        sign_calls: AtomicUsize,
+    }
+
+    impl SigningBackend for TwoStageSignatureBackend {
+        fn algorithm(&self) -> SigningAlgorithm {
+            SigningAlgorithm::Ed25519
+        }
+
+        fn public_key(&self) -> PublicKey {
+            self.expected_keypair.public_key()
+        }
+
+        fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
+            let first_call = self.sign_calls.fetch_add(1, Ordering::SeqCst) == 0;
+            if first_call == self.expected_signature_first {
+                Ok(self.expected_keypair.sign(message))
+            } else {
+                Ok(self.other_keypair.sign(message))
+            }
         }
     }
 
@@ -878,6 +916,49 @@ mod tests {
             error,
             "aggregate family root backend algorithm does not match returned signature",
         );
+    }
+
+    #[test]
+    fn aggregate_invocation_root_issuance_rejects_stateful_second_signature_key_drift() {
+        let backend = TwoStageSignatureBackend {
+            expected_keypair: fixed_issuer(),
+            other_keypair: Keypair::from_seed(&[7_u8; 32]),
+            expected_signature_first: true,
+            sign_calls: AtomicUsize::new(0),
+        };
+        let subject = fixed_subject();
+        let body = ordinary_root_body(
+            &backend.public_key(),
+            &subject.public_key(),
+            "cap-second-signature-key-drift",
+        );
+
+        let error = issue_aggregate_family_root_with_backend(body, 3, &backend).unwrap_err();
+        assert_invalid_signature(
+            error,
+            "capability token backend signature failed verification",
+        );
+        assert_eq!(backend.sign_calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn aggregate_invocation_root_issuance_rejects_same_algorithm_wrong_key_binding_signature() {
+        let backend = TwoStageSignatureBackend {
+            expected_keypair: fixed_issuer(),
+            other_keypair: Keypair::from_seed(&[8_u8; 32]),
+            expected_signature_first: false,
+            sign_calls: AtomicUsize::new(0),
+        };
+        let subject = fixed_subject();
+        let body = ordinary_root_body(
+            &backend.public_key(),
+            &subject.public_key(),
+            "cap-wrong-key-binding-signature",
+        );
+
+        let error = issue_aggregate_family_root_with_backend(body, 3, &backend).unwrap_err();
+        assert_invalid_signature(error, "aggregate family root binding signature invalid");
+        assert_eq!(backend.sign_calls.load(Ordering::SeqCst), 1);
     }
 
     #[test]

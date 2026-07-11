@@ -10,9 +10,7 @@ use crate::crypto::{
 };
 use crate::error::{Error, Result};
 use crate::schema_binding::ensure_schema_matches;
-use crate::signer_binding::{
-    ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
-};
+use crate::signer_binding::ensure_keypair_matches_embedded_key;
 
 use super::aggregate_budget::AggregateInvocationBudget;
 use super::attenuation::{
@@ -447,16 +445,29 @@ impl CapabilityToken {
     ///
     /// Use this entry point to produce FIPS-algorithm (P-256 / P-384) tokens
     /// when operating under the `fips` feature. The `body.issuer` field must
-    /// equal `backend.public_key()`; otherwise verification will fail.
+    /// equal `backend.public_key()`; otherwise issuance fails.
     ///
-    /// The resulting token's `algorithm` envelope field is populated with the
-    /// backend's algorithm. It is informational only -- verification
-    /// dispatches off the `signature` hex prefix, not this field.
+    /// The resulting token's `algorithm` envelope field records the validated
+    /// backend snapshot. It is excluded from the signed body for Ed25519 wire
+    /// compatibility. [`Self::verify_signature`] dispatches from the issuer
+    /// and signature material, while [`Self::verify_signature_with_floor`]
+    /// additionally rejects an envelope/signature algorithm mismatch.
     pub fn sign_with_backend(
         body: CapabilityTokenBody,
         backend: &dyn SigningBackend,
     ) -> Result<Self> {
-        ensure_backend_matches_embedded_key(&body.issuer, backend, "capability token", "issuer")?;
+        let expected_issuer = backend.public_key();
+        let expected_algorithm = backend.algorithm();
+        if body.issuer != expected_issuer {
+            return Err(Error::InvalidPublicKey(
+                "capability token issuer does not match signing key".to_string(),
+            ));
+        }
+        if expected_issuer.algorithm() != expected_algorithm {
+            return Err(Error::InvalidSignature(
+                "capability token backend algorithm does not match public key".to_string(),
+            ));
+        }
         if let Some(budget) = body.aggregate_invocation_budget.as_ref() {
             budget.validate_for_scope(&body.scope)?;
         }
@@ -468,7 +479,17 @@ impl CapabilityToken {
             attenuation_proof: None,
             budget_share_bps: None,
         };
-        let (signature, _bytes) = sign_canonical_with_backend(backend, &signing_body)?;
+        let (signature, canonical_bytes) = sign_canonical_with_backend(backend, &signing_body)?;
+        if signature.algorithm() != expected_algorithm {
+            return Err(Error::InvalidSignature(
+                "capability token backend algorithm does not match returned signature".to_string(),
+            ));
+        }
+        if !expected_issuer.verify(&canonical_bytes, &signature) {
+            return Err(Error::InvalidSignature(
+                "capability token backend signature failed verification".to_string(),
+            ));
+        }
         Ok(Self {
             schema: CHIO_CAPABILITY_SCHEMA.to_string(),
             id: body.id,
@@ -478,7 +499,7 @@ impl CapabilityToken {
             issued_at: body.issued_at,
             expires_at: body.expires_at,
             delegation_chain: body.delegation_chain,
-            algorithm: Some(backend.algorithm()),
+            algorithm: Some(expected_algorithm),
             caveats: Vec::new(),
             scope_attenuations: None,
             attenuation_proof: None,
