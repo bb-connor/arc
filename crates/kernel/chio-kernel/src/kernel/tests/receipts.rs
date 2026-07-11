@@ -1,4 +1,41 @@
 #[test]
+fn dead_commit_writer_denies_before_the_tool_executes() {
+    let mut kernel = make_kernel(make_config());
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-a",
+        vec!["read_file"],
+        std::sync::Arc::clone(&invocations),
+    )));
+    kernel
+        .set_receipt_store(Box::new(DeadWriterReceiptStore))
+        .unwrap();
+
+    let agent_kp = make_keypair();
+    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+    let request = make_request("req-dead-writer", &cap, "read_file", "srv-a");
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    // The pre-dispatch gate reads the writer flag and fails closed: an authorized
+    // call is denied because durable persistence can no longer be trusted.
+    assert_eq!(response.verdict, Verdict::Deny);
+    let reason = response.reason.unwrap_or_default();
+    assert!(
+        reason.contains("commit writer is not serving"),
+        "expected a receipt-persistence-degraded deny, got: {reason}"
+    );
+    // The load-bearing property: the tool never ran, so no evidence-less side
+    // effect occurred.
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        0,
+        "a degraded commit writer must deny before the tool executes"
+    );
+}
+
+#[test]
 fn kernel_persists_tool_receipts_to_sqlite_store() {
     let path = unique_receipt_db_path("chio-kernel-tool-receipts");
     let mut kernel = make_kernel(make_config());

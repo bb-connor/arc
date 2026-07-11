@@ -289,16 +289,29 @@ impl ChioKernel {
         if remote_kernel_id.is_none() {
             return Ok(());
         }
-        if self.receipt_store.is_none() {
-            return Err(KernelError::Internal(
+        match &self.receipt_store {
+            None => Err(KernelError::Internal(
                 "federated receipt persistence unavailable: no durable receipt store configured"
                     .to_string(),
-            ));
+            )),
+            Some(store) if store.writer_serving_closed() => Err(KernelError::Internal(
+                "federated receipt persistence degraded: commit writer is not serving".to_string(),
+            )),
+            Some(_) => Ok(()),
         }
-        Ok(())
     }
 
     pub(crate) fn ensure_receipt_persistence_ready(&self) -> Result<(), KernelError> {
+        if let Some(store) = &self.receipt_store {
+            // A known-dead or degraded commit writer denies at the door: the tool
+            // never runs, so no side effect occurs without a durable receipt path.
+            if store.writer_serving_closed() {
+                return Err(KernelError::Internal(
+                    "durable receipt persistence degraded: commit writer is not serving"
+                        .to_string(),
+                ));
+            }
+        }
         if self.receipt_store.is_some() || self.config.allow_ephemeral_receipt_log {
             return Ok(());
         }

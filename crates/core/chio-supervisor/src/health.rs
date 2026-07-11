@@ -9,10 +9,11 @@ use crate::sync::{Arc, AtomicU32, AtomicU64, AtomicU8, Mutex, Ordering};
 
 /// Severity of a supervised surface. Ordered by increasing severity; the flag only
 /// ever raises the level and never lowers it except through [`HealthFlag::clear`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HealthLevel {
     /// Serving normally.
+    #[default]
     Healthy = 0,
     /// Tripped after `trip_after` consecutive restarts. The surface reports degraded
     /// and, if TCB-critical, fails evaluations closed. Restarts may still be running.

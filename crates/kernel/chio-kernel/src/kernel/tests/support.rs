@@ -1910,6 +1910,28 @@ impl ReceiptStore for AppendOnlyReceiptStore {
     }
 }
 
+/// A receipt store whose supervised commit writer has died. Appends would still
+/// nominally succeed, but the writer flag reports serving-closed, so the kernel
+/// pre-dispatch gate must fail closed before any tool executes.
+struct DeadWriterReceiptStore;
+
+impl ReceiptStore for DeadWriterReceiptStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn writer_serving_closed(&self) -> bool {
+        true
+    }
+}
+
 /// A store-authoritative point-lookup store: appended chio receipts are retained
 /// in-memory and `load_chio_receipt` resolves them by id. Models a durable store
 /// that implements point loads, so an evicted parent receipt still resolves from

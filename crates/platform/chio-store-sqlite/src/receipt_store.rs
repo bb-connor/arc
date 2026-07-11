@@ -5,7 +5,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -96,6 +95,7 @@ use chio_kernel::{
     LIABILITY_CLAIM_WORKFLOW_REPORT_SCHEMA, LIABILITY_MARKET_WORKFLOW_REPORT_SCHEMA,
     LIABILITY_PROVIDER_LIST_REPORT_SCHEMA, LIABILITY_PROVIDER_RESOLUTION_REPORT_SCHEMA,
 };
+use chio_supervisor::{HealthLevel, SupervisedOutcome, SupervisedThread, SupervisorConfig};
 use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -127,6 +127,10 @@ const RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY: usize = RECEIPT_GROUP_COMMIT_MAX_BA
 struct ReceiptCommitActor {
     sender: mpsc::SyncSender<ReceiptCommitCommand>,
     health: Arc<ReceiptCommitWriterHealth>,
+    /// Retains the writer thread's join handle and its supervised health flag. The
+    /// flag is TCB-critical: any writer death or degradation trips it, and the kernel
+    /// pre-dispatch gate reads it to fail closed before a tool executes.
+    writer: SupervisedThread,
 }
 
 #[derive(Default)]
@@ -223,10 +227,62 @@ impl ReceiptCommitActor {
         let (sender, receiver) = receipt_commit_channel();
         let health = Arc::new(ReceiptCommitWriterHealth::default());
         let actor_health = Arc::clone(&health);
-        thread::spawn(move || {
-            receipt_commit_actor_loop(pool, receiver, actor_health, incremental_verification)
+        let config = SupervisorConfig {
+            name: "chio-receipt-writer",
+            // Durable receipt persistence is on the money path: a degraded writer must
+            // fail evaluations closed rather than execute tools without a receipt.
+            tcb_critical: true,
+            // Any writer fault is immediately operator-visible on this surface.
+            trip_after: 1,
+            max_restarts: 5,
+            base_backoff: Duration::from_millis(100),
+            max_backoff: Duration::from_secs(30),
+        };
+        // The loop body borrows the receiver so it survives a restart with the same
+        // still-open channel; the caller's sender stays valid across restarts. The
+        // pool and health handle are cheap to clone (an Arc bump each) per attempt.
+        let writer = SupervisedThread::spawn(config, move |_shutdown| {
+            receipt_commit_actor_loop(
+                pool.clone(),
+                &receiver,
+                Arc::clone(&actor_health),
+                incremental_verification,
+            );
+            // The loop returns only once every command sender has dropped: an orderly
+            // store shutdown, not a fault. Do not restart or trip the flag.
+            SupervisedOutcome::Shutdown
         });
-        Self { sender, health }
+        Self {
+            sender,
+            health,
+            writer,
+        }
+    }
+
+    /// Typed error for a commit writer that is no longer serving, carrying the
+    /// supervisor's restart count and last recorded reason so the condition is
+    /// inspectable rather than an opaque pool-error string.
+    fn writer_dead_error(&self) -> ReceiptStoreError {
+        let snapshot = self.writer.health().snapshot();
+        ReceiptStoreError::WriterDead {
+            restarts: snapshot.restart_total,
+            last_error: snapshot
+                .reason
+                .unwrap_or_else(|| "receipt commit writer channel disconnected".to_string()),
+        }
+    }
+
+    /// True when the supervised writer has left the healthy state, so the kernel
+    /// pre-dispatch gate must fail closed.
+    fn writer_serving_closed(&self) -> bool {
+        self.writer.health().is_serving_closed()
+    }
+
+    /// The supervised writer's severity and cumulative restart count, for the
+    /// health report.
+    fn writer_health_summary(&self) -> (HealthLevel, u64) {
+        let snapshot = self.writer.health().snapshot();
+        (snapshot.level, snapshot.restart_total)
     }
 
     fn append(
@@ -263,7 +319,7 @@ impl ReceiptCommitActor {
             }
             Err(mpsc::TrySendError::Disconnected(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
-                return Err(receipt_actor_unavailable_error());
+                return Err(self.writer_dead_error());
             }
         }
         match result.recv() {
@@ -271,24 +327,22 @@ impl ReceiptCommitActor {
             Err(_) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
                 self.health.failed_total.fetch_add(1, Ordering::SeqCst);
-                Err(receipt_actor_unavailable_error())
+                Err(self.writer_dead_error())
             }
         }
     }
 
     fn flush(&self) -> Result<(), ReceiptStoreError> {
-        self.flush_with_receiver(|receiver| {
-            receiver
-                .recv()
-                .map_err(|_| receipt_actor_unavailable_error())?
-        })
+        let dead = self.writer_dead_error();
+        self.flush_with_receiver(|receiver| receiver.recv().map_err(|_| dead)?)
     }
 
     fn flush_with_timeout(&self, timeout: Duration) -> Result<(), ReceiptStoreError> {
+        let dead = self.writer_dead_error();
         self.flush_with_receiver(|receiver| match receiver.recv_timeout(timeout) {
             Ok(result) => result,
             Err(mpsc::RecvTimeoutError::Timeout) => Err(receipt_actor_flush_timeout_error(timeout)),
-            Err(mpsc::RecvTimeoutError::Disconnected) => Err(receipt_actor_unavailable_error()),
+            Err(mpsc::RecvTimeoutError::Disconnected) => Err(dead),
         })
     }
 
@@ -306,7 +360,7 @@ impl ReceiptCommitActor {
                 return Err(receipt_actor_saturated_error());
             }
             Err(mpsc::TrySendError::Disconnected(_)) => {
-                return Err(receipt_actor_unavailable_error());
+                return Err(self.writer_dead_error());
             }
         }
         receive(result)
@@ -507,7 +561,7 @@ fn poisoned_head_error(message: &str) -> ReceiptStoreError {
 
 fn receipt_commit_actor_loop(
     pool: Pool<SqliteConnectionManager>,
-    receiver: mpsc::Receiver<ReceiptCommitCommand>,
+    receiver: &mpsc::Receiver<ReceiptCommitCommand>,
     health: Arc<ReceiptCommitWriterHealth>,
     incremental_verification: bool,
 ) {
@@ -1761,6 +1815,13 @@ fn receipt_store_error_snapshot(error: &ReceiptStoreError) -> ReceiptStoreError 
         }
         ReceiptStoreError::Conflict(message) => ReceiptStoreError::Conflict(message.clone()),
         ReceiptStoreError::NotFound(message) => ReceiptStoreError::NotFound(message.clone()),
+        ReceiptStoreError::WriterDead {
+            restarts,
+            last_error,
+        } => ReceiptStoreError::WriterDead {
+            restarts: *restarts,
+            last_error: last_error.clone(),
+        },
     }
 }
 
@@ -2130,12 +2191,18 @@ impl SqliteReceiptStore {
                 status.latest_committed_entry_seq,
             )?;
         }
+        let (writer_level, writer_restart_total) =
+            self.receipt_commit_actor.writer_health_summary();
+        // A dead or degraded writer can never read green even when the last completed
+        // batch left no `last_error`: the supervised flag is the source of truth for
+        // writer liveness, and `last_error` only reflects the last batch attempt.
         let healthy = status.healthy
             && self
                 .receipt_commit_actor
                 .writer_counters()
                 .last_error
-                .is_none();
+                .is_none()
+            && matches!(writer_level, HealthLevel::Healthy);
         let (uncheckpointed_start_seq, uncheckpointed_end_seq) = uncheckpointed_range(
             status.latest_checkpointed_entry_seq,
             status.latest_committed_entry_seq,
@@ -2150,7 +2217,15 @@ impl SqliteReceiptStore {
             uncheckpointed_end_seq,
             checkpoint_error: status.checkpoint_error,
             db_size_bytes: self.db_size_bytes().ok(),
+            writer_level,
+            writer_restart_total,
         })
+    }
+
+    /// Whether the supervised commit writer has left the healthy state, so the
+    /// kernel pre-dispatch gate must deny before a tool executes.
+    pub fn writer_serving_closed(&self) -> bool {
+        self.receipt_commit_actor.writer_serving_closed()
     }
 
     /// Sample receipt-store health from a READ-ONLY connection.
@@ -2215,6 +2290,9 @@ impl SqliteReceiptStore {
                     uncheckpointed_end_seq,
                     checkpoint_error: None,
                     db_size_bytes: None,
+                    // A read-only observer cannot see the owning writer's supervisor.
+                    writer_level: HealthLevel::default(),
+                    writer_restart_total: 0,
                 })
             }
             Err(error) => {
@@ -2230,6 +2308,8 @@ impl SqliteReceiptStore {
                     uncheckpointed_end_seq,
                     checkpoint_error: Some(error.to_string()),
                     db_size_bytes: None,
+                    writer_level: HealthLevel::default(),
+                    writer_restart_total: 0,
                 })
             }
         }
@@ -2783,6 +2863,27 @@ fn canonical_receipt_json(canonical: &CanonicalBytes) -> Result<&str, ReceiptSto
 mod receipt_commit_actor_tests {
     use super::*;
 
+    /// A supervised writer that parks until shutdown, for actor send-path tests that
+    /// drive the channel directly and do not need a real commit loop consuming it.
+    fn idle_writer() -> SupervisedThread {
+        SupervisedThread::spawn(
+            SupervisorConfig {
+                name: "test-idle-writer",
+                tcb_critical: true,
+                trip_after: 1,
+                max_restarts: 1,
+                base_backoff: Duration::from_millis(1),
+                max_backoff: Duration::from_millis(1),
+            },
+            |shutdown| {
+                while !shutdown.load(Ordering::SeqCst) {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                SupervisedOutcome::Shutdown
+            },
+        )
+    }
+
     fn actor_test_receipt() -> Result<ChioReceipt, ReceiptStoreError> {
         let keypair = chio_core::crypto::Keypair::generate();
         ChioReceipt::sign(
@@ -2844,7 +2945,11 @@ mod receipt_commit_actor_tests {
             let (response, _result) = mpsc::sync_channel(1);
             sender.try_send(ReceiptCommitCommand::Flush(response))?;
         }
-        let actor = ReceiptCommitActor { sender, health };
+        let actor = ReceiptCommitActor {
+            sender,
+            health,
+            writer: idle_writer(),
+        };
 
         let error = actor.append(actor_test_receipt()?, "{}".to_string(), false);
 
@@ -2860,7 +2965,11 @@ mod receipt_commit_actor_tests {
     fn receipt_commit_actor_flush_honors_timeout() -> Result<(), Box<dyn std::error::Error>> {
         let (sender, _receiver) = receipt_commit_channel();
         let health = Arc::new(ReceiptCommitWriterHealth::default());
-        let actor = ReceiptCommitActor { sender, health };
+        let actor = ReceiptCommitActor {
+            sender,
+            health,
+            writer: idle_writer(),
+        };
 
         let error = actor.flush_with_timeout(Duration::from_millis(1));
 
