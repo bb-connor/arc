@@ -94,8 +94,12 @@ impl HotPathDeadlineConfig {
 
     pub fn guard_budget_for(&self, name: &str) -> Option<Duration> {
         match self.per_guard_budget_ms.get(name) {
+            // A per-guard `0` disables only this guard's override, not the
+            // pipeline deadline: any per-guard entry forces the offloaded path,
+            // so falling through to the pipeline budget keeps an override-of-zero
+            // guard bounded instead of running unbounded.
+            None | Some(0) => self.guard_pipeline_budget(),
             Some(ms) => Self::ms_to_budget(*ms),
-            None => self.guard_pipeline_budget(),
         }
     }
 
@@ -202,6 +206,38 @@ mod hot_path_deadline_config_tests {
             cfg.dispatch_budget_for("other-srv"),
             Some(Duration::from_millis(150))
         );
+    }
+
+    #[test]
+    fn per_guard_zero_override_inherits_pipeline_budget() {
+        // A per-guard entry of `0` disables only that guard's own override; the
+        // guard must still inherit the overall pipeline budget rather than run
+        // unbounded (any per-guard entry forces the offloaded, timed path).
+        let mut per_guard = BTreeMap::new();
+        per_guard.insert("disabled-override".to_string(), 0u64);
+        let cfg = HotPathDeadlineConfig {
+            guard_pipeline_budget_ms: 1_000,
+            per_guard_budget_ms: per_guard,
+            ..HotPathDeadlineConfig::default()
+        };
+        assert_eq!(
+            cfg.guard_budget_for("disabled-override"),
+            Some(Duration::from_millis(1_000))
+        );
+    }
+
+    #[test]
+    fn per_guard_zero_override_stays_unbounded_without_pipeline_budget() {
+        // With no pipeline budget configured, a `0` override genuinely means no
+        // deadline for that guard.
+        let mut per_guard = BTreeMap::new();
+        per_guard.insert("disabled-override".to_string(), 0u64);
+        let cfg = HotPathDeadlineConfig {
+            guard_pipeline_budget_ms: 0,
+            per_guard_budget_ms: per_guard,
+            ..HotPathDeadlineConfig::default()
+        };
+        assert_eq!(cfg.guard_budget_for("disabled-override"), None);
     }
 }
 
