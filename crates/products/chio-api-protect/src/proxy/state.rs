@@ -10,6 +10,10 @@ pub(crate) struct ToolReceiptLog {
     pub(crate) receipts: Vec<ChioReceipt>,
 }
 
+/// Reserved primary key the readiness probe writes and immediately rolls back,
+/// so exercising the receipt write path never leaves a durable row.
+const RECEIPT_READINESS_PROBE_ID: &str = "__chio_readiness_probe__";
+
 pub(crate) struct SqliteReceiptStore {
     connection: Connection,
 }
@@ -38,14 +42,28 @@ impl SqliteReceiptStore {
         Ok(Self { connection })
     }
 
-    /// Cheap reachability check of the receipt database, for the readiness probe.
-    /// A trivial query confirms the connection is still usable; a failure means the
-    /// database was rotated out or otherwise broken, so receipts can no longer be
-    /// persisted and the sidecar can only deny fail closed.
+    /// Reachability check of the receipt write path, for the readiness probe.
+    /// A bare `SELECT 1` answers even when the receipt tables have been dropped or
+    /// the database has gone read-only or full, so it would keep an instance in
+    /// rotation while every append fails after an already-allowed upstream call.
+    /// This exercises the real receipt tables and the write path inside a
+    /// transaction that is always rolled back: a dropped table, a read-only mount,
+    /// or a full disk fails readiness, and no probe row is ever persisted.
     pub(crate) fn is_reachable(&self) -> bool {
-        self.connection
-            .query_row("SELECT 1", [], |_| Ok(()))
-            .is_ok()
+        self.probe_receipt_write_path().is_ok()
+    }
+
+    fn probe_receipt_write_path(&self) -> Result<(), rusqlite::Error> {
+        let tx = self.connection.unchecked_transaction()?;
+        tx.execute(
+            "INSERT OR REPLACE INTO http_receipts (id, receipt_json) VALUES (?1, ?2)",
+            params![RECEIPT_READINESS_PROBE_ID, "{}"],
+        )?;
+        tx.execute(
+            "INSERT OR REPLACE INTO tool_receipts (id, receipt_json) VALUES (?1, ?2)",
+            params![RECEIPT_READINESS_PROBE_ID, "{}"],
+        )?;
+        tx.rollback()
     }
 
     pub(crate) fn load_receipts(&self) -> Result<Vec<HttpReceipt>, ProtectError> {

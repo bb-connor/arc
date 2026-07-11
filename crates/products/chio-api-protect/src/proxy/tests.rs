@@ -3084,3 +3084,32 @@ async fn readiness_consults_the_store_reachability_signal() {
         "a freshly opened store must be reachable"
     );
 }
+
+#[tokio::test]
+async fn reachability_probe_touches_the_write_path_and_persists_nothing() {
+    let db_path = temp_receipt_db_path();
+    let store = SqliteReceiptStore::open(&db_path).test_unwrap();
+
+    // A healthy store probes reachable, and the probe rolls back: exercising the
+    // write path must not leave a durable receipt behind.
+    assert!(
+        store.is_reachable(),
+        "a freshly opened store must be reachable"
+    );
+    assert!(
+        store.load_receipts().test_unwrap().is_empty(),
+        "the readiness probe must not persist a receipt"
+    );
+
+    // Drop the receipt table out of band, as a bad migration or schema corruption
+    // would. A bare connection check would still answer here; the write-path probe
+    // must not, so an instance that can no longer persist receipts leaves rotation.
+    let side = rusqlite::Connection::open(&db_path).test_unwrap();
+    side.execute("DROP TABLE http_receipts", []).test_unwrap();
+    drop(side);
+
+    assert!(
+        !store.is_reachable(),
+        "a store that can no longer persist receipts must fail readiness"
+    );
+}
