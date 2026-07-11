@@ -215,6 +215,7 @@ impl ChioKernel {
             child_receipt_mirror_gauge,
             receipt_store: None,
             receipt_store_write_lock: Mutex::new(()),
+            retention_maintenance: None,
             payment_adapter: None,
             price_oracle: None,
             runtime_admission_hook: None,
@@ -510,6 +511,15 @@ impl ChioKernel {
                         .to_string(),
                 ));
             }
+        }
+        // Spawn the retention maintenance worker only when retention is
+        // configured; an unconfigured deployment gets no background thread.
+        if let Some(config) = self.config.retention_config.clone() {
+            self.retention_maintenance =
+                Some(crate::receipt_store::RetentionMaintenanceHandle::spawn(
+                    Arc::clone(&receipt_store),
+                    config,
+                ));
         }
         self.receipt_store = Some(receipt_store);
         Ok(())
