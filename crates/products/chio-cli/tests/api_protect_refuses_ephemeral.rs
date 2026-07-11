@@ -1,6 +1,7 @@
 //! The sidecar refuses to boot without a durable receipt store unless ephemeral
 //! receipts are explicitly opted in, so a manifest that forgets `--receipt-store`
 //! fails loudly at startup instead of silently losing audit evidence.
+#![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::process::{Command, Stdio};
 use std::time::Duration;
