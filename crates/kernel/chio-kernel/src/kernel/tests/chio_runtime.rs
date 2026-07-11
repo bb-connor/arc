@@ -72,17 +72,11 @@ struct IncompleteStreamAfterSideEffectServer {
     side_effects: std::sync::Arc<AtomicU64>,
 }
 
-// A registered tool server (passes the pre-dispatch
-// `ensure_registered_tool_target` check, so the runtime admission hook
-// still fires and reserves) whose dispatch call itself fails with
-// `KernelError::ToolNotRegistered`. This is the only way to exercise the
-// generic-error arm's `dispatch_error_precedes_tool_side_effect(&e) ==
-// true` branch: after Task 3's pre-dispatch hoist, an actually-unregistered
-// server_id is denied before the admission hook ever runs, so it can never
-// reach that arm.
+// A registered server whose connector returns ToolNotRegistered after entry.
 struct ToolNotRegisteredDispatchServer {
     id: String,
     tools: Vec<String>,
+    stream_attempts: std::sync::Arc<AtomicU64>,
 }
 
 struct NoopNestedFlowClient;
@@ -547,10 +541,11 @@ impl ToolServerConnection for IncompleteStreamAfterSideEffectServer {
 }
 
 impl ToolNotRegisteredDispatchServer {
-    fn new(id: &str, tools: Vec<&str>) -> Self {
+    fn new(id: &str, tools: Vec<&str>, stream_attempts: std::sync::Arc<AtomicU64>) -> Self {
         Self {
             id: id.to_string(),
             tools: tools.into_iter().map(String::from).collect(),
+            stream_attempts,
         }
     }
 }
@@ -571,6 +566,7 @@ impl ToolServerConnection for ToolNotRegisteredDispatchServer {
         _arguments: serde_json::Value,
         _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<Option<ToolServerStreamResult>, KernelError> {
+        self.stream_attempts.fetch_add(1, Ordering::SeqCst);
         Err(KernelError::ToolNotRegistered(format!(
             "tool \"{tool_name}\" withdrawn from server roster before dispatch"
         )))
@@ -1395,7 +1391,7 @@ fn chio_runtime_admission_does_not_release_destructive_lease_after_dispatch_fail
 }
 
 #[test]
-fn chio_runtime_admission_releases_reservations_on_pre_side_effect_dispatch_error(
+fn chio_runtime_admission_retains_reservations_on_url_elicitation_connector_error(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
@@ -1448,8 +1444,17 @@ fn chio_runtime_admission_releases_reservations_on_pre_side_effect_dispatch_erro
     assert_eq!(stream_attempts.load(Ordering::SeqCst), 1);
     assert_eq!(
         releases.load(Ordering::SeqCst),
-        1,
-        "runtime reservations must be released when dispatch fails before a tool side effect"
+        0,
+        "connector-returned URL elicitation cannot prove that no side effect occurred"
+    );
+    let receipt_log = kernel.receipt_log();
+    assert_eq!(receipt_log.len(), 1);
+    let receipt = receipt_log.get(0).unwrap();
+    assert!(receipt.is_incomplete());
+    assert_eq!(
+        receipt.metadata.as_ref().unwrap()["chio_runtime"]
+            ["reservations_retained_fail_closed"],
+        true
     );
     Ok(())
 }
@@ -3196,21 +3201,14 @@ fn post_invocation_block_marks_reservations_retained(
 }
 
 #[test]
-fn generic_error_pre_side_effect_releases_without_marker(
+fn connector_tool_not_registered_retains_reservations_and_marks_receipt(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // A registered tool server whose dispatch call fails with
-    // ToolNotRegistered (e.g. the tool was withdrawn from its roster
-    // between admission and dispatch). The server_id itself IS registered,
-    // so the pre-dispatch `ensure_registered_tool_target` check passes and
-    // the runtime admission hook fires and reserves normally; the failure
-    // surfaces only from the dispatch call itself, landing in the
-    // generic-error arm. ToolNotRegistered precedes any side effect, so
-    // reservations are RELEASED and the deny receipt must NOT carry the
-    // retained marker.
     let mut kernel = make_kernel(make_config());
+    let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(ToolNotRegisteredDispatchServer::new(
         "srv-chio-runtime",
         vec!["destructive_update"],
+        std::sync::Arc::clone(&stream_attempts),
     )));
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
@@ -3252,9 +3250,10 @@ fn generic_error_pre_side_effect_releases_without_marker(
         .is_some_and(|reason| reason.contains("destructive_update")));
     assert_eq!(
         releases.load(Ordering::SeqCst),
-        1,
-        "ToolNotRegistered precedes any side effect, so reservations are released"
+        0,
+        "a connector error variant cannot prove that no side effect occurred"
     );
+    assert_eq!(stream_attempts.load(Ordering::SeqCst), 1);
     let metadata = response
         .receipt
         .metadata
@@ -3262,28 +3261,23 @@ fn generic_error_pre_side_effect_releases_without_marker(
     let runtime = metadata["chio_runtime"]
         .as_object()
         .ok_or_else(|| std::io::Error::other("chio_runtime block missing"))?;
-    assert!(
-        !runtime.contains_key("reservations_retained_fail_closed"),
-        "a released reservation must not be marked as retained"
+    assert_eq!(runtime["reservations_retained_fail_closed"], true);
+    assert_eq!(
+        runtime["retained_destructive_lease_id"],
+        "lease-tool-not-registered"
     );
-    assert!(!runtime.contains_key("retained_destructive_lease_id"));
     Ok(())
 }
 
 #[test]
-fn dispatch_not_registered_releases_full_budget_state() -> Result<(), Box<dyn std::error::Error>> {
-    // When a registered server's dispatch fails with ToolNotRegistered (no tool
-    // side effect), the async generic-error arm must reverse ALL pre-dispatch
-    // budget state, not just runtime-admission reservations. A max_invocations
-    // grant consumes an invocation slot at admission via check_and_increment_budget,
-    // and unwind_aborted_monetary_invocation is a no-op for a non-monetary
-    // Invocation mutation, so the slot must be released here or a valid retry under
-    // the same grant would be wrongly denied for budget exhaustion even though
-    // nothing ever dispatched.
+fn connector_tool_not_registered_retains_invocation_top_level(
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
+    let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(ToolNotRegisteredDispatchServer::new(
         "srv-chio-runtime",
         vec!["destructive_update"],
+        std::sync::Arc::clone(&stream_attempts),
     )));
 
     let agent_kp = make_keypair();
@@ -3307,31 +3301,24 @@ fn dispatch_not_registered_releases_full_budget_state() -> Result<(), Box<dyn st
 
     let response = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(response.verdict, Verdict::Deny);
-
-    // The single invocation slot consumed at admission must be free again: the
-    // dispatch produced no side effect, so the pre-execution increment is
-    // reversed and a retry re-admits.
-    let slot_reusable =
-        kernel.with_budget_store(|store| Ok(store.try_increment(&cap.id, 0, Some(1))?))?;
-    assert!(
-        slot_reusable,
-        "a pre-side-effect dispatch error must reverse the invocation increment so a retry re-admits"
-    );
+    assert_eq!(stream_attempts.load(Ordering::SeqCst), 1);
+    let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert!(!kernel
+        .budget_store
+        .try_increment(&cap.id, 0, Some(1))?);
     Ok(())
 }
 
 #[test]
-fn dispatch_not_registered_releases_full_budget_state_nested_flow(
+fn connector_tool_not_registered_retains_invocation_nested_flow(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Mirror of dispatch_not_registered_releases_full_budget_state for the
-    // nested-flow evaluation arm. Its generic-error arm must route a
-    // pre-side-effect dispatch error through the full pre-dispatch cleanup,
-    // releasing the pre-execution budget mutation (and the sibling-sum capability
-    // admission), not just the runtime-admission reservations.
     let mut kernel = make_kernel(make_config());
+    let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(ToolNotRegisteredDispatchServer::new(
         "srv-chio-runtime",
         vec!["destructive_update"],
+        std::sync::Arc::clone(&stream_attempts),
     )));
 
     let agent_kp = make_keypair();
@@ -3371,32 +3358,18 @@ fn dispatch_not_registered_releases_full_budget_state_nested_flow(
             .await
     })?;
     assert_eq!(response.verdict, Verdict::Deny);
-
-    // The nested-flow arm must also reverse the invocation increment on a
-    // pre-side-effect dispatch error so the slot is reusable.
-    let slot_reusable =
-        kernel.with_budget_store(|store| Ok(store.try_increment(&cap.id, 0, Some(1))?))?;
-    assert!(
-        slot_reusable,
-        "the nested-flow pre-side-effect dispatch error must reverse the invocation increment so a retry re-admits"
-    );
+    assert_eq!(stream_attempts.load(Ordering::SeqCst), 1);
+    let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert!(!kernel
+        .budget_store
+        .try_increment(&cap.id, 0, Some(1))?);
     Ok(())
 }
 
 #[test]
-fn url_elicitation_required_releases_full_budget_state() -> Result<(), Box<dyn std::error::Error>> {
-    // UrlElicitationsRequired is classified by
-    // dispatch_error_precedes_tool_side_effect() as a no-side-effect dispatch
-    // error, exactly like ToolNotRegistered. The tool never runs; the client
-    // completes the URL elicitations and re-sends a FRESH tool call that
-    // re-admits from scratch, so ALL pre-dispatch budget state must be reversed.
-    // A max_invocations grant consumes an invocation slot at admission, and
-    // unwind_aborted_monetary_invocation is a no-op for a non-monetary
-    // Invocation mutation, so the slot must be released here or the authorize
-    // -> retry could never re-admit under the same grant. The async arm returns
-    // Err(UrlElicitationsRequired) (so the elicitations payload propagates to
-    // the edge), not a Deny response, so the slot reusability is asserted
-    // directly against the budget store.
+fn connector_url_elicitation_retains_invocation_top_level(
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
@@ -3435,26 +3408,20 @@ fn url_elicitation_required_releases_full_budget_state() -> Result<(), Box<dyn s
         "dispatch must have been attempted so the error came from dispatch, not admission"
     );
 
-    // The single invocation slot consumed at admission must be free again: no
-    // side effect occurred, so the pre-execution increment is reversed and a
-    // retry (after the client completes the elicitations) re-admits.
-    let slot_reusable =
-        kernel.with_budget_store(|store| Ok(store.try_increment(&cap.id, 0, Some(1))?))?;
-    assert!(
-        slot_reusable,
-        "UrlElicitationsRequired precedes any side effect, so the invocation increment must be reversed for the retry to re-admit"
-    );
+    let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert!(!kernel
+        .budget_store
+        .try_increment(&cap.id, 0, Some(1))?);
+    let receipt_log = kernel.receipt_log();
+    assert_eq!(receipt_log.len(), 1);
+    assert!(receipt_log.get(0).unwrap().is_incomplete());
     Ok(())
 }
 
 #[test]
-fn url_elicitation_required_releases_full_budget_state_nested_flow(
+fn connector_url_elicitation_retains_invocation_nested_flow(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Mirror of url_elicitation_required_releases_full_budget_state for the
-    // nested-flow evaluation arm, which carried the same leak: it released only
-    // the runtime-admission reservations on a UrlElicitationsRequired dispatch
-    // error, leaking the pre-execution budget mutation (and the sibling-sum
-    // capability admission).
     let mut kernel = make_kernel(make_config());
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
@@ -3509,14 +3476,14 @@ fn url_elicitation_required_releases_full_budget_state_nested_flow(
         "dispatch must have been attempted so the error came from dispatch, not admission"
     );
 
-    // The nested-flow arm must also reverse the invocation increment on a
-    // UrlElicitationsRequired dispatch error so the slot is reusable.
-    let slot_reusable =
-        kernel.with_budget_store(|store| Ok(store.try_increment(&cap.id, 0, Some(1))?))?;
-    assert!(
-        slot_reusable,
-        "the nested-flow UrlElicitationsRequired must reverse the invocation increment so a retry re-admits"
-    );
+    let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert!(!kernel
+        .budget_store
+        .try_increment(&cap.id, 0, Some(1))?);
+    let receipt_log = kernel.receipt_log();
+    assert_eq!(receipt_log.len(), 1);
+    assert!(receipt_log.get(0).unwrap().is_incomplete());
     Ok(())
 }
 
@@ -3703,13 +3670,8 @@ fn url_elicitation_idempotent_readmit_preserves_sibling_budget_nested_flow(
 }
 
 #[test]
-fn url_elicitation_release_failure_continues_full_budget_cleanup(
+fn url_elicitation_retains_runtime_reservations_and_invocation_top_level(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // A runtime-reservation release failure during the UrlElicitationsRequired
-    // cleanup must be RECORDED and the remaining cleanup (the invocation-slot
-    // reversal) must still run. The response must stay Err(UrlElicitationsRequired)
-    // (not an internal cleanup error) so the elicitations payload still reaches the
-    // edge.
     let mut kernel = make_kernel(make_config());
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
@@ -3758,30 +3720,29 @@ fn url_elicitation_release_failure_continues_full_budget_cleanup(
     );
     assert_eq!(
         releases.load(Ordering::SeqCst),
-        1,
-        "the failing runtime-admission release must be attempted"
+        0,
+        "post-dispatch URL elicitation retains runtime reservations"
     );
-    let slot_reusable =
-        kernel.with_budget_store(|store| Ok(store.try_increment(&cap.id, 0, Some(1))?))?;
-    assert!(
-        slot_reusable,
-        "cleanup must CONTINUE past the runtime-release failure and reverse the invocation slot"
+    let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert!(!kernel
+        .budget_store
+        .try_increment(&cap.id, 0, Some(1))?);
+    let receipt_log = kernel.receipt_log();
+    assert_eq!(receipt_log.len(), 1);
+    let receipt = receipt_log.get(0).unwrap();
+    assert!(receipt.is_incomplete());
+    assert_eq!(
+        receipt.metadata.as_ref().unwrap()["chio_runtime"]
+            ["reservations_retained_fail_closed"],
+        true
     );
-    // The arm returns Err(UrlElicitationsRequired) and records no terminal receipt,
-    // so a failed runtime-admission release would otherwise leave the stuck lease
-    // with NO append-only entry. A signed fault receipt naming the stuck lease must
-    // be recorded.
-    assert_url_elicitation_release_fault_recorded(
-        &kernel,
-        "lease-url-elicitation-release-failure",
-    )?;
     Ok(())
 }
 
 #[test]
-fn url_elicitation_release_failure_continues_full_budget_cleanup_nested_flow(
+fn url_elicitation_retains_runtime_reservations_and_invocation_nested_flow(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Nested-flow mirror of the async continue-on-release-failure test.
     let mut kernel = make_kernel(make_config());
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
@@ -3841,173 +3802,28 @@ fn url_elicitation_release_failure_continues_full_budget_cleanup_nested_flow(
     );
     assert_eq!(
         releases.load(Ordering::SeqCst),
-        1,
-        "the failing runtime-admission release must be attempted"
+        0,
+        "nested post-dispatch URL elicitation retains runtime reservations"
     );
-    let slot_reusable =
-        kernel.with_budget_store(|store| Ok(store.try_increment(&cap.id, 0, Some(1))?))?;
-    assert!(
-        slot_reusable,
-        "the nested cleanup must CONTINUE past the release failure and reverse the invocation slot"
-    );
-    // Nested mirror: the stuck lease must land a signed fault receipt on the
-    // append-only log even though the arm returns Err(UrlElicitationsRequired).
-    assert_url_elicitation_release_fault_recorded(
-        &kernel,
-        "lease-url-elicitation-release-failure-nested",
-    )?;
-    Ok(())
-}
-
-/// Assert that a failed runtime-admission release during a URL-elicitation
-/// pre-dispatch unwind recorded a signed cancellation fault receipt naming the
-/// stuck `lease_id`. Shared by the async and nested-flow release-failure tests.
-fn assert_url_elicitation_release_fault_recorded(
-    kernel: &ChioKernel,
-    lease_id: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+    let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert!(!kernel
+        .budget_store
+        .try_increment(&cap.id, 0, Some(1))?);
     let receipt_log = kernel.receipt_log();
-    let receipts = receipt_log.receipts();
-    let fault_receipt = receipts
-        .iter()
-        .find(|receipt| {
-            receipt.is_cancelled()
-                && receipt.metadata.as_ref().is_some_and(|metadata| {
-                    metadata["chio_runtime"]["reservation_release_failed"] == true
-                })
-        })
-        .ok_or_else(|| {
-            std::io::Error::other(
-                "a failed URL-elicitation runtime-admission release must record a signed fault receipt",
-            )
-        })?;
-    let receipt_metadata = fault_receipt
-        .metadata
-        .as_ref()
-        .ok_or_else(|| std::io::Error::other("fault receipt metadata missing"))?;
-    // The stuck lease id must survive so an operator can locate the reservation.
+    assert_eq!(receipt_log.len(), 1);
+    let receipt = receipt_log.get(0).unwrap();
+    assert!(receipt.is_incomplete());
     assert_eq!(
-        receipt_metadata["chio_runtime"]["reserved_destructive_lease_id"],
-        lease_id
-    );
-    let faults = receipt_metadata["chio_runtime"]["pre_dispatch_cleanup_faults"]
-        .as_array()
-        .ok_or_else(|| std::io::Error::other("fault list missing"))?;
-    assert!(
-        faults.iter().any(|fault| {
-            fault["step"] == "url_elicitation_runtime_admission_release"
-                && fault["hold_ids"]
-                    .as_array()
-                    .is_some_and(|ids| ids.iter().any(|id| id == lease_id))
-        }),
-        "the fault must name the URL-elicitation release step and the stuck lease id: {faults:?}"
+        receipt.metadata.as_ref().unwrap()["chio_runtime"]
+            ["reservations_retained_fail_closed"],
+        true
     );
     Ok(())
 }
 
-/// A [`BudgetStore`] wrapper that fails the pre-execution BUDGET reversal
-/// (`reverse_charge_cost`) so a URL-elicitation cleanup exercises the
-/// record-and-continue budget path. All other operations delegate to a real
-/// in-memory store so admission still increments the invocation slot.
-struct FailingReverseBudgetStore {
-    inner: InMemoryBudgetStore,
-}
-
-impl FailingReverseBudgetStore {
-    fn new() -> Self {
-        Self {
-            inner: InMemoryBudgetStore::new(),
-        }
-    }
-}
-
-impl BudgetStore for FailingReverseBudgetStore {
-    fn try_increment(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.inner
-            .try_increment(capability_id, grant_index, max_invocations)
-    }
-
-    fn try_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.inner.try_charge_cost(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-        )
-    }
-
-    fn reverse_charge_cost(
-        &self,
-        _capability_id: &str,
-        _grant_index: usize,
-        _cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        // Injected transient budget-store fault on the reversal path.
-        Err(BudgetStoreError::Invariant(
-            "injected reverse_charge_cost failure".to_string(),
-        ))
-    }
-
-    fn reduce_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.inner
-            .reduce_charge_cost(capability_id, grant_index, cost_units)
-    }
-
-    fn settle_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        exposed_cost_units: u64,
-        realized_cost_units: u64,
-    ) -> Result<(), BudgetStoreError> {
-        self.inner.settle_charge_cost(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-        )
-    }
-
-    fn list_usages(
-        &self,
-        limit: usize,
-        capability_id: Option<&str>,
-    ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
-        self.inner.list_usages(limit, capability_id)
-    }
-
-    fn get_usage(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
-        self.inner.get_usage(capability_id, grant_index)
-    }
-}
-
-/// Assert that a failed BUDGET reversal during a URL-elicitation pre-dispatch
-/// unwind recorded a signed cancellation fault receipt naming the `step` and
-/// the stuck `hold_id`. Shared by the async and nested-flow tests.
+/// Assert that a failed post-dispatch budget or payment release recorded a
+/// signed cancellation receipt naming the cleanup step and stuck hold.
 fn assert_url_elicitation_budget_cleanup_fault_recorded(
     kernel: &ChioKernel,
     step: &str,
@@ -4017,8 +3833,8 @@ fn assert_url_elicitation_budget_cleanup_fault_recorded(
     let found = receipt_log.receipts().iter().any(|receipt| {
         receipt.is_cancelled()
             && receipt.metadata.as_ref().is_some_and(|metadata| {
-                metadata["chio_runtime"]["pre_dispatch_cleanup_failed"] == true
-                    && metadata["chio_runtime"]["pre_dispatch_cleanup_faults"]
+                metadata["chio_runtime"]["post_dispatch_cleanup_failed"] == true
+                    && metadata["chio_runtime"]["post_dispatch_cleanup_faults"]
                         .as_array()
                         .is_some_and(|faults| {
                             faults.iter().any(|fault| {
@@ -4032,129 +3848,8 @@ fn assert_url_elicitation_budget_cleanup_fault_recorded(
     });
     assert!(
         found,
-        "a failed URL-elicitation budget reversal must record a signed fault receipt naming step `{step}` and the stuck hold `{hold_id}`"
+        "a failed URL-elicitation post-dispatch release must record a signed fault receipt naming step `{step}` and the stuck hold `{hold_id}`"
     );
-    Ok(())
-}
-
-#[test]
-fn url_elicitation_budget_reversal_failure_preserves_elicitation_async(
-) -> Result<(), Box<dyn std::error::Error>> {
-    // A transient BUDGET-store failure while reversing the pre-execution invocation
-    // slot during a UrlElicitationsRequired cleanup must be RECORDED and the arm
-    // must still return Err(UrlElicitationsRequired) (not the internal budget error)
-    // so the elicitations payload still reaches the edge. A bare `?` on
-    // reverse_pre_execution_budget_mutation would instead replace the elicitation
-    // error with the budget error.
-    let mut kernel = make_kernel(make_config());
-    let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
-        "srv-chio-runtime",
-        vec!["destructive_update"],
-        std::sync::Arc::clone(&stream_attempts),
-    )));
-    kernel.set_budget_store_handle(std::sync::Arc::new(FailingReverseBudgetStore::new()));
-
-    let agent_kp = make_keypair();
-    let cap = make_capability(
-        &kernel,
-        &agent_kp,
-        make_scope(vec![make_invocation_limited_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-            1,
-        )]),
-        300,
-    );
-    let request = make_request_with_arguments(
-        "req-url-elicitation-budget-reversal-failure-async",
-        &cap,
-        "destructive_update",
-        "srv-chio-runtime",
-        serde_json::json!({"record": "vendor-ledger-7", "value": "closed"}),
-    );
-
-    let result = kernel.evaluate_tool_call_blocking(&request);
-    assert!(
-        matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
-        "a budget-reversal failure must not replace the elicitation with an internal cleanup error: {result:?}"
-    );
-    assert_eq!(
-        stream_attempts.load(Ordering::SeqCst),
-        1,
-        "dispatch must have been attempted so the error came from dispatch, not admission"
-    );
-    assert_url_elicitation_budget_cleanup_fault_recorded(
-        &kernel,
-        "url_elicitation_budget_reversal",
-        &cap.id,
-    )?;
-    Ok(())
-}
-
-#[test]
-fn url_elicitation_budget_reversal_failure_preserves_elicitation_nested_flow(
-) -> Result<(), Box<dyn std::error::Error>> {
-    // Nested-flow mirror of the async budget-reversal-failure test (both arms).
-    let mut kernel = make_kernel(make_config());
-    let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
-        "srv-chio-runtime",
-        vec!["destructive_update"],
-        std::sync::Arc::clone(&stream_attempts),
-    )));
-    kernel.set_budget_store_handle(std::sync::Arc::new(FailingReverseBudgetStore::new()));
-
-    let agent_kp = make_keypair();
-    let cap = make_capability(
-        &kernel,
-        &agent_kp,
-        make_scope(vec![make_invocation_limited_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-            1,
-        )]),
-        300,
-    );
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;
-    kernel.activate_session(&session_id)?;
-    let context = make_operation_context(
-        &session_id,
-        "req-url-elicitation-budget-reversal-failure-nested",
-        &agent_kp.public_key().to_hex(),
-    );
-    kernel.begin_session_request(&context, OperationKind::ToolCall, true)?;
-    let request = make_request_with_arguments(
-        "req-url-elicitation-budget-reversal-failure-nested",
-        &cap,
-        "destructive_update",
-        "srv-chio-runtime",
-        serde_json::json!({"record": "vendor-ledger-7", "value": "closed"}),
-    );
-
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
-    let result = rt.block_on(async {
-        let mut client = NoopNestedFlowClient;
-        kernel
-            .evaluate_tool_call_with_nested_flow_client_async(&context, &request, &mut client, None)
-            .await
-    });
-    assert!(
-        matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
-        "the nested budget-reversal failure must not mask the elicitation error: {result:?}"
-    );
-    assert_eq!(
-        stream_attempts.load(Ordering::SeqCst),
-        1,
-        "dispatch must have been attempted so the error came from dispatch, not admission"
-    );
-    assert_url_elicitation_budget_cleanup_fault_recorded(
-        &kernel,
-        "url_elicitation_budget_reversal",
-        &cap.id,
-    )?;
     Ok(())
 }
 
@@ -4297,7 +3992,7 @@ fn retained_marker_requires_a_real_reservation() -> Result<(), Box<dyn std::erro
 
 /// A [`PaymentAdapter`] that authorizes cleanly but FAILS on release, so a
 /// monetary UrlElicitationsRequired cleanup exercises the payment-release
-/// failure arm of `unwind_aborted_monetary_invocation`. The authorization id is
+/// failure arm of the post-dispatch release helper. The authorization id is
 /// deterministic so a test can assert it lands in the recorded fault's `hold_ids`.
 struct FailingReleasePaymentAdapter;
 
@@ -4345,7 +4040,7 @@ impl PaymentAdapter for FailingReleasePaymentAdapter {
 }
 
 #[test]
-fn url_elicitation_monetary_reversal_failure_records_monetary_hold_ids_async(
+fn url_elicitation_monetary_release_failure_records_hold_ids_async(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // When a MONETARY request hits UrlElicitationsRequired and the payment release
     // fails during cleanup, the append-only fault must name the stuck MONETARY hold
@@ -4378,24 +4073,24 @@ fn url_elicitation_monetary_reversal_failure_records_monetary_hold_ids_async(
     let result = kernel.evaluate_tool_call_blocking(&request);
     assert!(
         matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
-        "a monetary reversal failure must not replace the elicitation: {result:?}"
+        "a monetary release failure must not replace the elicitation: {result:?}"
     );
     assert_eq!(
         stream_attempts.load(Ordering::SeqCst),
         1,
-        "dispatch must have been attempted so the reversal ran on the monetary arm"
+        "dispatch must have been attempted so release ran on the monetary arm"
     );
     // The stuck payment authorization id must land in the fault hold_ids.
     assert_url_elicitation_budget_cleanup_fault_recorded(
         &kernel,
-        "url_elicitation_budget_reversal",
+        "url_elicitation_post_dispatch_budget_release",
         "auth_failing_release",
     )?;
     Ok(())
 }
 
 #[test]
-fn url_elicitation_monetary_reversal_failure_records_monetary_hold_ids_nested_flow(
+fn url_elicitation_monetary_release_failure_records_hold_ids_nested_flow(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Nested-flow mirror of the async monetary-reversal-failure test: the
     // nested arm must ALSO name the stuck payment authorization id in the fault.
@@ -4442,16 +4137,16 @@ fn url_elicitation_monetary_reversal_failure_records_monetary_hold_ids_nested_fl
     });
     assert!(
         matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
-        "the nested monetary reversal failure must not mask the elicitation: {result:?}"
+        "the nested monetary release failure must not mask the elicitation: {result:?}"
     );
     assert_eq!(
         stream_attempts.load(Ordering::SeqCst),
         1,
-        "dispatch must have been attempted so the reversal ran on the monetary arm"
+        "dispatch must have been attempted so release ran on the monetary arm"
     );
     assert_url_elicitation_budget_cleanup_fault_recorded(
         &kernel,
-        "url_elicitation_budget_reversal",
+        "url_elicitation_post_dispatch_budget_release",
         "auth_failing_release",
     )?;
     Ok(())

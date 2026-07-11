@@ -19,10 +19,7 @@ pub use kernel_struct::{
     DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS,
 };
 
-pub(crate) use kernel_drop_guard::{
-    dispatch_error_precedes_tool_side_effect, reserved_runtime_admission_ids,
-    PostAdmissionDropGuard, PostAdmissionReceiptContext,
-};
+pub(crate) use kernel_drop_guard::{PostAdmissionDropGuard, PostAdmissionReceiptContext};
 pub(crate) use kernel_scopes::{
     current_scoped_receipt_federation_admission, current_scoped_receipt_tenant_id,
     extract_tenant_id_from_auth_context, scope_receipt_federation_admission,
@@ -565,6 +562,10 @@ impl BudgetChargeResult {
 
     fn reverse_event_id(&self) -> String {
         format!("{}:reverse", self.budget_hold_id)
+    }
+
+    fn release_event_id(&self) -> String {
+        format!("{}:release", self.budget_hold_id)
     }
 
     fn reconcile_event_id(&self) -> String {

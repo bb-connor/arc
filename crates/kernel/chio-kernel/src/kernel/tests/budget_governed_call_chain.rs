@@ -68,6 +68,58 @@ fn governed_monetary_allow_receipt_contains_approval_metadata() {
 }
 
 #[test]
+fn governed_request_denies_when_approval_replay_store_is_unavailable() {
+    let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.approval_replay_store = None;
+    kernel.register_tool_server(Box::new(CountingMonetaryServer {
+        id: "cost-srv".to_string(),
+        invocations: std::sync::Arc::clone(&invocations),
+    }));
+
+    let subject_kp = Keypair::generate();
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&subject_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let request_id = "req-governed-replay-store-unavailable";
+    let intent = make_governed_intent(
+        "intent-governed-replay-store-unavailable",
+        "cost-srv",
+        "compute",
+        "settle approved invoice",
+        100,
+        "USD",
+    );
+    let approval_token = make_governed_approval_token(
+        &kernel.config.keypair,
+        &subject_kp.public_key(),
+        &intent,
+        request_id,
+    );
+    let mut request = make_request(request_id, &cap, "compute", "cost-srv");
+    request.arguments = serde_json::json!({ "invoice_id": "inv-replay-store" });
+    request.governed_intent = Some(intent);
+    request.approval_token = Some(approval_token);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("approval replay store not configured")));
+    assert_eq!(
+        invocations.load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
+
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(usage.invocation_count, 0);
+    assert_eq!(usage.committed_cost_units().unwrap(), 0);
+}
+
+#[test]
 fn governed_monetary_allow_receipt_preserves_metered_billing_quote_context() {
     let mut kernel = make_kernel(make_monetary_config());
     let agent_kp = Keypair::generate();

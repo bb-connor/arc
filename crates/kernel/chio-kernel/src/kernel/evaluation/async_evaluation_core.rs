@@ -596,6 +596,31 @@ impl ChioKernel {
             });
         }
 
+        // Resolve the kernel-local target before dispatch is marked started.
+        // This is the only ToolNotRegistered condition that proves no connector
+        // code ran and therefore still qualifies for full pre-dispatch reversal.
+        if !self.tool_servers.contains_key(&request.server_id) {
+            let error = KernelError::ToolNotRegistered(format!(
+                "server \"{}\" / tool \"{}\"",
+                request.server_id, request.tool_name
+            ));
+            let msg = error.to_string();
+            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool server error");
+            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
+                    request,
+                    reason: &msg,
+                    timestamp: now,
+                    matched_grant_index,
+                    cap,
+                    budget_mutation: &budget_mutation,
+                    payment_authorization: payment_authorization.as_ref(),
+                    runtime_admission_metadata: extra_metadata,
+                    budget_lease_acquired,
+                })
+            });
+        }
+
         let tool_started_at = Instant::now();
         let has_monetary = budget_mutation.charge_result().is_some();
         let mut post_admission_drop_guard = PostAdmissionDropGuard::new(
@@ -620,105 +645,55 @@ impl ChioKernel {
         let (tool_output, reported_cost) = match dispatch_result {
             Ok(result) => result,
             Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
-                // UrlElicitationsRequired precedes any tool side effect
-                // (dispatch_error_precedes_tool_side_effect == true): the tool
-                // did not execute. The client completes the URL elicitations and
-                // re-sends a FRESH tool call that re-admits from scratch; there
-                // is no in-kernel resume that reuses this admission. The
-                // post-admission drop guard is disarmed above, so this arm owns
-                // the unwind and must reverse ALL pre-dispatch state: the
-                // runtime-admission reservations, the sibling-sum capability
-                // admission, and the pre-execution budget mutation (monetary
-                // unwind or the invocation-slot / budget-charge reversal).
-                // Reversing only the runtime reservations leaked a delegated
-                // capability's admitted child share and a max_invocations
-                // grant's consumed slot, wrongly starving the retry or later
-                // valid siblings. The error is still returned so the
-                // elicitations payload propagates to the edge, which registers
-                // them and returns the url-elicitation-required response.
-                // Finding 2 (codex round 8) / round 9: RELEASE the runtime-
-                // reservation and CONTINUE the remaining cleanup rather than
-                // `?`-short-circuiting, matching the generic pre-dispatch denial
-                // path. A transient release failure must not leave the
-                // invocation slot / child share consumed, nor replace the
-                // elicitation response with an internal cleanup error. But if
-                // the release FAILS the stuck lease must still land on the
-                // append-only log: this arm returns Err(UrlElicitationsRequired)
-                // and records no terminal receipt, so a discarded failure would
-                // burn the lease silently. The helper records a signed fault
-                // receipt naming the stuck lease on failure, and is a no-op on a
-                // clean release; the elicitation error is still returned below.
-                self.release_runtime_admission_reservations_for_url_elicitation_cleanup(
+                // Connector code was entered before this error was returned, so
+                // the variant is not proof that no side effect occurred. Retain
+                // invocation usage and fail-closed runtime/delegation leases,
+                // while releasing only payment and monetary exposure. Preserve
+                // the UrlElicitationsRequired return shape for edge handling.
+                match self.release_post_dispatch_monetary_invocation(
                     request,
-                    matched_grant_index,
-                    extra_metadata.clone(),
-                    &pre_invocation_guard_evidence,
-                );
-                // Finding 1 (codex round 8) + refcount: release this
-                // evaluation's sibling-sum child-budget lease ONLY when it
-                // acquired one. The reference-counted release frees the shared
-                // edge only when the last holder releases, so an overlapping
-                // evaluation that still holds it keeps its share. RECORD-AND-
-                // CONTINUE on failure (Fix #2): a transient budget-store failure
-                // must not replace the Err(UrlElicitationsRequired) response, so
-                // record a signed fault receipt naming the stuck child share and
-                // keep unwinding rather than `?`-short-circuiting.
-                if budget_lease_acquired {
-                    if let Err(reason) = self.release_admitted_capability_budget(cap) {
+                    cap,
+                    budget_mutation.charge_result(),
+                    payment_authorization.as_ref(),
+                ) {
+                    Ok(released) => {
+                        let metadata = match (budget_mutation.charge_result(), released.as_ref()) {
+                            (Some(charge), Some(release)) => self.merge_budget_receipt_metadata(
+                                extra_metadata.clone(),
+                                self.budget_execution_receipt_metadata(
+                                    charge,
+                                    Some(("released", release)),
+                                ),
+                            ),
+                            _ => extra_metadata.clone(),
+                        };
+                        self.record_url_elicitation_post_dispatch_receipt(
+                            request,
+                            &error.to_string(),
+                            now,
+                            matched_grant_index,
+                            metadata,
+                            &pre_invocation_guard_evidence,
+                        );
+                    }
+                    Err(release_error) => {
                         let mut hold_ids = vec![cap.id.clone()];
-                        if let Some(parent_link) = cap.delegation_chain.last() {
-                            hold_ids.push(parent_link.capability_id.clone());
+                        if let Some(payment_authorization) = payment_authorization.as_ref() {
+                            hold_ids.push(payment_authorization.authorization_id.clone());
+                        }
+                        if let Some(charge) = budget_mutation.charge_result() {
+                            hold_ids.push(charge.budget_hold_id().to_string());
                         }
                         self.record_url_elicitation_budget_cleanup_fault(
                             request,
                             matched_grant_index,
-                            "url_elicitation_child_budget_release",
-                            &redacted!(&reason).to_string(),
+                            "url_elicitation_post_dispatch_budget_release",
+                            &redacted!(&release_error).to_string(),
                             hold_ids,
                             extra_metadata.clone(),
                             &pre_invocation_guard_evidence,
                         );
                     }
-                }
-                // Pre-execution budget reversal (monetary unwind or the
-                // invocation-slot / budget-charge reversal). RECORD-AND-CONTINUE
-                // on failure (Fix #2) so a budget-store fault does not mask the
-                // elicitation error; the stuck slot lands a signed fault receipt.
-                let budget_reversal = match payment_authorization.as_ref() {
-                    Some(payment_authorization) => self
-                        .unwind_aborted_monetary_invocation(
-                            request,
-                            cap,
-                            budget_mutation.charge_result(),
-                            Some(payment_authorization),
-                        )
-                        .map(|_| ()),
-                    None => self
-                        .reverse_pre_execution_budget_mutation(cap, &budget_mutation)
-                        .map(|_| ()),
-                };
-                if let Err(reversal_error) = budget_reversal {
-                    // Record the stuck MONETARY hold ids, not just the capability
-                    // id (round-11): on the monetary-reversal-failure path the
-                    // payment authorization id and the budget_hold_id are the
-                    // actual holds that need manual recovery, so an operator can
-                    // locate them from the signed fault alone.
-                    let mut hold_ids = vec![cap.id.clone()];
-                    if let Some(payment_authorization) = payment_authorization.as_ref() {
-                        hold_ids.push(payment_authorization.authorization_id.clone());
-                    }
-                    if let Some(charge) = budget_mutation.charge_result() {
-                        hold_ids.push(charge.budget_hold_id().to_string());
-                    }
-                    self.record_url_elicitation_budget_cleanup_fault(
-                        request,
-                        matched_grant_index,
-                        "url_elicitation_budget_reversal",
-                        &redacted!(&reversal_error).to_string(),
-                        hold_ids,
-                        extra_metadata,
-                        &pre_invocation_guard_evidence,
-                    );
                 }
                 warn!(
                     request_id = %request.request_id,
@@ -728,7 +703,7 @@ impl ChioKernel {
                 return Err(error);
             }
             Err(KernelError::RequestCancelled { reason, .. }) => {
-                let unwind = self.unwind_aborted_monetary_invocation(
+                let released = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
                     budget_mutation.charge_result(),
@@ -748,13 +723,13 @@ impl ChioKernel {
                             now,
                             Some(matched_grant_index),
                             self.mark_runtime_admission_reservations_retained_fail_closed(
-                                match (budget_mutation.charge_result(), unwind.as_ref()) {
-                                    (Some(charge), Some(reverse)) => self
+                                match (budget_mutation.charge_result(), released.as_ref()) {
+                                    (Some(charge), Some(release)) => self
                                         .merge_budget_receipt_metadata(
                                             extra_metadata.clone(),
                                             self.budget_execution_receipt_metadata(
                                                 charge,
-                                                Some(("reversed", reverse)),
+                                                Some(("released", release)),
                                             ),
                                         ),
                                     _ => extra_metadata.clone(),
@@ -765,7 +740,7 @@ impl ChioKernel {
                 );
             }
             Err(KernelError::RequestIncomplete(reason)) => {
-                let unwind = self.unwind_aborted_monetary_invocation(
+                let released = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
                     budget_mutation.charge_result(),
@@ -786,13 +761,13 @@ impl ChioKernel {
                             now,
                             Some(matched_grant_index),
                             self.mark_runtime_admission_reservations_retained_fail_closed(
-                                match (budget_mutation.charge_result(), unwind.as_ref()) {
-                                    (Some(charge), Some(reverse)) => self
+                                match (budget_mutation.charge_result(), released.as_ref()) {
+                                    (Some(charge), Some(release)) => self
                                         .merge_budget_receipt_metadata(
                                             extra_metadata.clone(),
                                             self.budget_execution_receipt_metadata(
                                                 charge,
-                                                Some(("reversed", reverse)),
+                                                Some(("released", release)),
                                             ),
                                         ),
                                     _ => extra_metadata.clone(),
@@ -805,36 +780,10 @@ impl ChioKernel {
             Err(e) => {
                 let msg = e.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool server error");
-                if dispatch_error_precedes_tool_side_effect(&e) {
-                    // No tool side effect occurred (e.g. ToolNotRegistered). The
-                    // post-admission drop guard is already disarmed, so this arm
-                    // owns the unwind and must reverse ALL pre-dispatch state:
-                    // the runtime-admission reservations, the sibling-sum
-                    // capability admission, and the pre-execution budget
-                    // mutation. Releasing only the runtime reservations leaks the
-                    // consumed child share / invocation slot and wrongly starves
-                    // later valid siblings or retries under the same grant.
-                    return self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                                request,
-                                reason: &msg,
-                                timestamp: now,
-                                matched_grant_index,
-                                cap,
-                                budget_mutation: &budget_mutation,
-                                payment_authorization: payment_authorization.as_ref(),
-                                runtime_admission_metadata: extra_metadata,
-                                budget_lease_acquired,
-                            })
-                        },
-                    );
-                }
                 // A tool side effect may have executed: retain the runtime
-                // admission reservations (fail-closed) and reverse only the
-                // monetary charge.
-                let unwind = self.unwind_aborted_monetary_invocation(
+                // admission reservations and invocation usage (fail-closed),
+                // while releasing payment and monetary exposure.
+                let released = self.release_post_dispatch_monetary_invocation(
                     request,
                     cap,
                     budget_mutation.charge_result(),
@@ -843,17 +792,18 @@ impl ChioKernel {
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
-                        let deny_metadata = match (budget_mutation.charge_result(), unwind.as_ref())
-                        {
-                            (Some(charge), Some(reverse)) => self.merge_budget_receipt_metadata(
-                                extra_metadata.clone(),
-                                self.budget_execution_receipt_metadata(
-                                    charge,
-                                    Some(("reversed", reverse)),
-                                ),
-                            ),
-                            _ => extra_metadata.clone(),
-                        };
+                        let deny_metadata =
+                            match (budget_mutation.charge_result(), released.as_ref()) {
+                                (Some(charge), Some(release)) => self
+                                    .merge_budget_receipt_metadata(
+                                        extra_metadata.clone(),
+                                        self.budget_execution_receipt_metadata(
+                                            charge,
+                                            Some(("released", release)),
+                                        ),
+                                    ),
+                                _ => extra_metadata.clone(),
+                            };
                         let deny_metadata = self
                             .mark_runtime_admission_reservations_retained_fail_closed(
                                 deny_metadata,

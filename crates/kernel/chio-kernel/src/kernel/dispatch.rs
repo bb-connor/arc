@@ -4,7 +4,7 @@
 //! hook invocation, the tool-dispatch entrypoints, and child-receipt
 //! recording.
 
-use crate::budget_store::BudgetReverseHoldDecision;
+use crate::budget_store::{BudgetReleaseHoldDecision, BudgetReverseHoldDecision};
 use chio_log_redact::redacted;
 
 use super::*;
@@ -202,6 +202,43 @@ impl ChioKernel {
         }
 
         Ok(Some(self.reverse_budget_charge(&cap.id, charge)?))
+    }
+
+    pub(crate) fn release_post_dispatch_monetary_invocation(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        charge_result: Option<&BudgetChargeResult>,
+        payment_authorization: Option<&PaymentAuthorization>,
+    ) -> Result<Option<BudgetReleaseHoldDecision>, KernelError> {
+        let Some(charge) = charge_result else {
+            return Ok(None);
+        };
+
+        if let Some(authorization) = payment_authorization {
+            let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
+                KernelError::Internal(
+                    "payment authorization present without configured adapter".to_string(),
+                )
+            })?;
+            let release_result = if authorization.settled {
+                adapter.refund(
+                    &authorization.authorization_id,
+                    charge.cost_charged,
+                    &charge.currency,
+                    &request.request_id,
+                )
+            } else {
+                adapter.release(&authorization.authorization_id, &request.request_id)
+            };
+            if let Err(error) = release_result {
+                return Err(KernelError::Internal(format!(
+                    "failed to release payment after dispatched tool invocation: {error}"
+                )));
+            }
+        }
+
+        Ok(Some(self.release_budget_charge(&cap.id, charge)?))
     }
 
     pub(crate) fn record_observed_capability_snapshot(

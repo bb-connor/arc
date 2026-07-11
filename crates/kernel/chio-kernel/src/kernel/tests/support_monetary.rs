@@ -1161,7 +1161,8 @@ async fn dropping_async_evaluate_after_monetary_admission_unwinds_budget_payment
     assert!(join.is_cancelled());
 
     let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
-    assert_eq!(usage.invocation_count, 0);
+    assert_eq!(usage.invocation_count, 1);
+    assert_eq!(usage.total_cost_exposed, 0);
     assert_eq!(usage.committed_cost_units().unwrap(), 0);
     assert_eq!(
         payment
@@ -1184,6 +1185,11 @@ async fn dropping_async_evaluate_after_monetary_admission_unwinds_budget_payment
     assert!(receipt.is_cancelled());
     assert_eq!(receipt.evidence.len(), 1);
     assert_eq!(receipt.evidence[0].guard_name, "abort-evidence");
+    let terminal = &receipt.metadata.as_ref().unwrap()["budget_authority"]["terminal"];
+    assert_eq!(terminal["disposition"], "released");
+    assert!(terminal["event_id"]
+        .as_str()
+        .is_some_and(|event_id| event_id.ends_with(":release")));
 }
 
 fn make_dpop_grant(server: &str, tool: &str) -> ToolGrant {

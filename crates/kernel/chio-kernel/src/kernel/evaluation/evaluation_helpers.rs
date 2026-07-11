@@ -1,21 +1,9 @@
 use super::*;
 
-/// Reason recorded on the signed fault receipt when a runtime-admission
-/// reservation release FAILS during a URL-elicitation pre-dispatch unwind. The
-/// elicitation arm returns `Err(UrlElicitationsRequired)` and records no
-/// terminal receipt, so this fault receipt is the only append-only entry that
-/// locates the possibly-stuck lease.
-const URL_ELICITATION_CLEANUP_FAULT_REASON: &str =
-    "runtime-admission reservation release failed during URL-elicitation pre-dispatch cleanup";
-
-/// Reason recorded on the signed fault receipt when a BUDGET cleanup step (the
-/// sibling-sum child-budget lease release or the pre-execution budget reversal)
-/// FAILS during a URL-elicitation pre-dispatch unwind. Like the runtime-release
-/// fault, the elicitation arm returns `Err(UrlElicitationsRequired)` and records
-/// no terminal receipt, so this fault receipt is the only append-only entry that
-/// locates the stuck child share or invocation/budget slot.
+/// Reason recorded on the signed fault receipt when post-dispatch monetary
+/// cleanup fails while preserving an externally visible URL-elicitation error.
 const URL_ELICITATION_BUDGET_CLEANUP_FAULT_REASON: &str =
-    "budget cleanup failed during URL-elicitation pre-dispatch cleanup";
+    "budget cleanup failed after URL-elicitation connector dispatch";
 
 pub(super) struct PreDispatchCleanupDeny<'a> {
     pub(super) request: &'a ToolCallRequest,
@@ -44,91 +32,39 @@ impl ChioKernel {
         build()
     }
 
-    /// Release runtime-admission reservations during a URL-elicitation
-    /// pre-dispatch unwind, recording a signed fault receipt when the release
-    /// FAILS. The URL-elicitation arm returns `Err(UrlElicitationsRequired)` to
-    /// propagate the elicitation payload and so records NO terminal receipt; a
-    /// failed reservation release would therefore leave the stuck lease on NO
-    /// append-only entry (round-9 finding). When
-    /// `release_runtime_admission_reservations_for_pre_dispatch_denial` folds a
-    /// `reservation_release_failed` marker into the returned metadata, record a
-    /// signed cancellation/fault receipt naming the stuck lease id(s) and the
-    /// failure reason (the round-8 pre-dispatch fault-receipt shape) so an
-    /// operator can locate the possibly-stuck reservation. Best-effort: a
-    /// receipt-recording failure is logged with an `audit_fault` field. The
-    /// caller still returns `Err(UrlElicitationsRequired)`, preserving the
-    /// elicitation response.
-    pub(super) fn release_runtime_admission_reservations_for_url_elicitation_cleanup(
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn record_url_elicitation_post_dispatch_receipt(
         &self,
         request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
         matched_grant_index: usize,
         metadata: Option<serde_json::Value>,
         pre_invocation_guard_evidence: &[chio_core::receipt::metadata::GuardEvidence],
     ) {
-        let released =
-            self.release_runtime_admission_reservations_for_pre_dispatch_denial(metadata);
-        let runtime = released
-            .as_ref()
-            .and_then(|value| value.get("chio_runtime"))
-            .and_then(serde_json::Value::as_object);
-        let release_failed = runtime
-            .and_then(|runtime| runtime.get("reservation_release_failed"))
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false);
-        if !release_failed {
-            return;
-        }
-        // The `released` metadata already carries the stuck lease's reserved
-        // ids and the `reservation_release_failure_reason`; fold in an explicit
-        // cleanup-fault entry (step + reason + hold_ids) mirroring the round-8
-        // pre-dispatch fault-receipt shape so the stuck lease is queryable.
-        let reason = runtime
-            .and_then(|runtime| runtime.get("reservation_release_failure_reason"))
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or("runtime admission reservation release failed")
-            .to_string();
-        let hold_ids = reserved_runtime_admission_ids(released.as_ref());
-        let fault_metadata = merge_metadata_objects(
-            released,
-            Some(serde_json::json!({
-                "chio_runtime": {
-                    "pre_dispatch_cleanup_failed": true,
-                    "pre_dispatch_cleanup_faults": [{
-                        "step": "url_elicitation_runtime_admission_release",
-                        "reason": reason,
-                        "hold_ids": hold_ids,
-                    }],
-                }
-            })),
-        );
+        let metadata = self.mark_runtime_admission_reservations_retained_fail_closed(metadata);
         let _guard_evidence_scope =
             scope_pre_invocation_guard_evidence(pre_invocation_guard_evidence.to_vec());
-        if let Err(error) = self.build_cancelled_response_with_metadata(
+        if let Err(error) = self.build_incomplete_response_with_output_and_metadata(
             request,
-            URL_ELICITATION_CLEANUP_FAULT_REASON,
-            current_unix_timestamp(),
+            None,
+            reason,
+            timestamp,
             Some(matched_grant_index),
-            fault_metadata,
+            metadata,
         ) {
             warn!(
                 request_id = %request.request_id,
                 reason = %redacted!(&error),
-                audit_fault = "url_elicitation_cleanup_reservation_release_unrecorded",
-                "failed to record URL-elicitation cleanup reservation-release fault receipt"
+                audit_fault = "url_elicitation_terminal_receipt_unrecorded",
+                "failed to record URL-elicitation post-dispatch receipt"
             );
         }
     }
 
-    /// Record a signed fault receipt for a BUDGET cleanup step that FAILED
-    /// during the URL-elicitation pre-dispatch unwind (Fix: the child-budget
-    /// lease release and the pre-execution budget reversal now RECORD-AND-
-    /// CONTINUE instead of `?`-short-circuiting, so a transient budget-store
-    /// failure cannot replace the `Err(UrlElicitationsRequired)` response). The
-    /// arm returns the elicitation error and records no terminal receipt, so
-    /// without this the stuck child share / budget slot would land on NO
-    /// append-only entry. Best-effort: a receipt-recording failure is logged
-    /// with an `audit_fault` field; the caller still returns the elicitation
-    /// error.
+    /// Record a signed fault receipt when post-dispatch monetary release fails.
+    /// The caller still returns `Err(UrlElicitationsRequired)`, preserving the
+    /// edge response while making the stuck payment or budget hold auditable.
     // The fault receipt legitimately needs the request, grant, failing step,
     // reason, stuck hold ids, admission metadata, and guard evidence to locate
     // the stuck reservation; grouping them into a params struct would only
@@ -148,8 +84,8 @@ impl ChioKernel {
             metadata,
             Some(serde_json::json!({
                 "chio_runtime": {
-                    "pre_dispatch_cleanup_failed": true,
-                    "pre_dispatch_cleanup_faults": [{
+                    "post_dispatch_cleanup_failed": true,
+                    "post_dispatch_cleanup_faults": [{
                         "step": step,
                         "reason": reason,
                         "hold_ids": hold_ids,
@@ -157,6 +93,8 @@ impl ChioKernel {
                 }
             })),
         );
+        let fault_metadata =
+            self.mark_runtime_admission_reservations_retained_fail_closed(fault_metadata);
         let _guard_evidence_scope =
             scope_pre_invocation_guard_evidence(pre_invocation_guard_evidence.to_vec());
         if let Err(error) = self.build_cancelled_response_with_metadata(

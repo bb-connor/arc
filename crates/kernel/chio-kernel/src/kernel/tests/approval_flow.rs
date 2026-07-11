@@ -498,30 +498,64 @@ fn hitl_batch_store_find_and_record() {
 // ---------------------------------------------------------------------
 
 #[test]
-fn hitl_token_verification_rejects_expired_tokens() {
+fn governed_approval_token_binds_signed_fields_and_validity_window() {
     let approver = CoreKeypair::generate();
     let subject = CoreKeypair::generate();
     let body = GovernedApprovalTokenBody {
-        id: "expired".into(),
+        id: "bound-token".into(),
         approver: approver.public_key(),
         subject: subject.public_key(),
-        governed_intent_hash: "h".into(),
-        request_id: "a".into(),
-        issued_at: 10,
-        expires_at: 20, // in the past relative to now=100
+        governed_intent_hash: "intent-hash".into(),
+        request_id: "approval-bound".into(),
+        issued_at: 100,
+        expires_at: 200,
         decision: GovernedApprovalDecision::Approved,
     };
     let token = GovernedApprovalToken::sign(body, &approver).unwrap();
+    assert!(token.verify_signature().unwrap());
+
+    let rejects_signature = |candidate: &GovernedApprovalToken| {
+        assert!(!candidate.verify_signature().unwrap());
+    };
+
+    let mut changed = token.clone();
+    changed.request_id = "approval-other".into();
+    rejects_signature(&changed);
+
+    let mut changed = token.clone();
+    changed.governed_intent_hash = "other-intent-hash".into();
+    rejects_signature(&changed);
+
+    let mut changed = token.clone();
+    changed.subject = CoreKeypair::generate().public_key();
+    rejects_signature(&changed);
+
+    let mut changed = token.clone();
+    changed.approver = CoreKeypair::generate().public_key();
+    rejects_signature(&changed);
+
+    let mut changed = token.clone();
+    changed.decision = GovernedApprovalDecision::Denied;
+    rejects_signature(&changed);
+
+    let mut changed = token.clone();
+    changed.issued_at = 99;
+    rejects_signature(&changed);
+
+    let mut changed = token.clone();
+    changed.expires_at = 201;
+    rejects_signature(&changed);
+
     let req = ApprovalRequest {
-        approval_id: "a".into(),
+        approval_id: "approval-bound".into(),
         policy_id: "p".into(),
-        subject_id: "s".into(),
+        subject_id: "subject".into(),
         capability_id: "c".into(),
         subject_public_key: Some(subject.public_key()),
         tool_server: "srv".into(),
         tool_name: "tool".into(),
         action: "invoke".into(),
-        parameter_hash: "h".into(),
+        parameter_hash: "intent-hash".into(),
         expires_at: 1000,
         callback_hint: None,
         created_at: 0,
@@ -531,10 +565,18 @@ fn hitl_token_verification_rejects_expired_tokens() {
         triggered_by: vec![],
     };
     let approval_token = ApprovalToken {
-        approval_id: "a".into(),
+        approval_id: "approval-bound".into(),
         governed_token: token,
         approver: approver.public_key(),
     };
-    let err = approval_token.verify_against(&req, 100).unwrap_err();
-    assert!(err.to_string().contains("expired"));
+    assert_eq!(
+        approval_token.verify_against(&req, 150).unwrap(),
+        GovernedApprovalDecision::Approved
+    );
+
+    let early = approval_token.verify_against(&req, 99).unwrap_err();
+    assert!(early.to_string().contains("not yet valid"));
+
+    let expired = approval_token.verify_against(&req, 200).unwrap_err();
+    assert!(expired.to_string().contains("expired"));
 }

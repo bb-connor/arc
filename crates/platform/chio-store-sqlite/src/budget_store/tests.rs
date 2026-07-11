@@ -449,7 +449,7 @@ fn budget_store_try_charge_cost_with_ids_is_idempotent_inmemory() {
 }
 
 #[test]
-fn budget_store_try_charge_cost_with_ids_is_idempotent_sqlite() {
+fn budget_store_event_retry_after_reopen_is_idempotent_sqlite() {
     let path = unique_db_path("chio-charge-cost-idempotent");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let hold_id = "hold-cap-1-0";
@@ -467,6 +467,13 @@ fn budget_store_try_charge_cost_with_ids_is_idempotent_sqlite() {
             Some(event_id),
         )
         .unwrap());
+
+    let before_reopen = store.get_usage("cap-1", 0).unwrap().unwrap();
+    assert_eq!(before_reopen.invocation_count, 1);
+    assert_usage_totals(&before_reopen, 100, 0);
+    drop(store);
+
+    let store = SqliteBudgetStore::open(&path).unwrap();
     assert!(store
         .try_charge_cost_with_ids(
             "cap-1",

@@ -11,7 +11,8 @@ use super::*;
 use crate::budget_store::{
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetEventAuthority,
     BudgetHoldMutationDecision, BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
-    BudgetReverseHoldDecision, BudgetReverseHoldRequest,
+    BudgetReleaseHoldDecision, BudgetReleaseHoldRequest, BudgetReverseHoldDecision,
+    BudgetReverseHoldRequest,
 };
 
 impl ChioKernel {
@@ -879,6 +880,24 @@ impl ChioKernel {
                 reversed_exposure_units: charge.cost_charged,
                 hold_id: Some(charge.budget_hold_id.clone()),
                 event_id: Some(charge.reverse_event_id()),
+                authority,
+            })?)
+        })
+    }
+
+    pub(crate) fn release_budget_charge(
+        &self,
+        capability_id: &str,
+        charge: &BudgetChargeResult,
+    ) -> Result<BudgetReleaseHoldDecision, KernelError> {
+        let authority = charge.authorize_metadata.authority.clone();
+        self.with_budget_store(|store| {
+            Ok(store.release_budget_hold(BudgetReleaseHoldRequest {
+                capability_id: capability_id.to_string(),
+                grant_index: charge.grant_index,
+                released_exposure_units: charge.cost_charged,
+                hold_id: Some(charge.budget_hold_id.clone()),
+                event_id: Some(charge.release_event_id()),
                 authority,
             })?)
         })

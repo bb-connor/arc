@@ -6,7 +6,7 @@ use crate::{CapabilityToken, ChildRequestReceipt, PaymentAuthorization, ToolCall
 
 use super::{
     current_unix_timestamp, merge_metadata_objects, scope_pre_invocation_guard_evidence,
-    ChioKernel, KernelError, PreExecutionBudgetMutation,
+    ChioKernel, PreExecutionBudgetMutation,
 };
 
 const POST_ADMISSION_DROP_REASON: &str = "tool evaluation future dropped after admission";
@@ -135,26 +135,26 @@ impl<'a> PostAdmissionDropGuard<'a> {
         self.armed = false;
     }
 
-    /// Reverse the pre-execution monetary hold, if any, and fold the
-    /// reversal into the receipt metadata. Charge-gated: a `None`
+    /// Release the pre-execution monetary exposure, if any, and fold the
+    /// release into the receipt metadata. Charge-gated: a `None`
     /// charge_result (every non-monetary grant) returns the base metadata
     /// unchanged. Errors are logged; a Drop impl cannot surface them.
-    fn unwind_charge_from_drop(&self) -> Option<serde_json::Value> {
+    fn release_charge_from_post_dispatch_drop(&self) -> Option<serde_json::Value> {
         let base = self.receipt_context.extra_metadata.clone();
         let Some(charge) = self.budget_mutation.charge_result() else {
             return base;
         };
-        let unwind = self.kernel.unwind_aborted_monetary_invocation(
+        let release = self.kernel.release_post_dispatch_monetary_invocation(
             self.request,
             self.cap,
             self.budget_mutation.charge_result(),
             self.payment_authorization,
         );
-        match &unwind {
-            Ok(Some(reverse)) => self.kernel.merge_budget_receipt_metadata(
+        match &release {
+            Ok(Some(released)) => self.kernel.merge_budget_receipt_metadata(
                 base,
                 self.kernel
-                    .budget_execution_receipt_metadata(charge, Some(("reversed", reverse))),
+                    .budget_execution_receipt_metadata(charge, Some(("released", released))),
             ),
             Ok(None) => base,
             Err(error) => {
@@ -400,11 +400,13 @@ impl Drop for PostAdmissionDropGuard<'_> {
         // completed child requests off the log (RFC-0002 receipt-completeness).
         self.flush_buffered_child_receipts_from_drop();
 
-        // Charge-gated section: reverse the pre-execution monetary hold, if
-        // any, folding the reversal into the post-dispatch receipt metadata.
+        // Charge-gated section: release the pre-execution monetary exposure,
+        // if any, folding the release into the post-dispatch receipt metadata.
+        // The invocation count remains consumed because dispatch started and a
+        // tool-side effect may already have occurred.
         // Best-effort from a Drop context; a non-monetary grant returns the
         // base metadata unchanged.
-        let reversed_metadata = self.unwind_charge_from_drop();
+        let released_metadata = self.release_charge_from_post_dispatch_drop();
 
         // Post-dispatch drop. The tool-server invoke was in flight; a side
         // effect MAY have executed. Fail closed: retain the runtime-
@@ -416,7 +418,7 @@ impl Drop for PostAdmissionDropGuard<'_> {
         // operator-recoverable (closes the F08 audit gap).
         let receipt_metadata = self
             .kernel
-            .mark_runtime_admission_reservations_retained_fail_closed(reversed_metadata);
+            .mark_runtime_admission_reservations_retained_fail_closed(released_metadata);
 
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             self.receipt_context.pre_invocation_guard_evidence.clone(),
@@ -436,11 +438,4 @@ impl Drop for PostAdmissionDropGuard<'_> {
             );
         }
     }
-}
-
-pub(crate) fn dispatch_error_precedes_tool_side_effect(error: &KernelError) -> bool {
-    matches!(
-        error,
-        KernelError::ToolNotRegistered(_) | KernelError::UrlElicitationsRequired { .. }
-    )
 }

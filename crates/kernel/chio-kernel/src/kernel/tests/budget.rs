@@ -35,6 +35,50 @@ fn budget_exhaustion() {
 }
 
 #[test]
+fn single_invocation_budget_dispatches_once() {
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    let mut kernel = make_kernel(make_config());
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-a",
+        vec!["read_file"],
+        std::sync::Arc::clone(&invocations),
+    )));
+
+    let subject_kp = make_keypair();
+    let mut grant = make_grant("srv-a", "read_file");
+    grant.max_invocations = Some(1);
+    let cap = make_capability(&kernel, &subject_kp, make_scope(vec![grant]), 300);
+
+    let first = kernel
+        .evaluate_tool_call_blocking(&make_request(
+            "req-single-limit-1",
+            &cap,
+            "read_file",
+            "srv-a",
+        ))
+        .unwrap();
+    assert_eq!(first.verdict, Verdict::Allow);
+
+    let second = kernel
+        .evaluate_tool_call_blocking(&make_request(
+            "req-single-limit-2",
+            &cap,
+            "read_file",
+            "srv-a",
+        ))
+        .unwrap();
+    assert_eq!(second.verdict, Verdict::Deny);
+    assert!(second
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("budget")));
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(usage.invocation_count, 1);
+}
+
+#[test]
 fn budgets_are_tracked_per_matching_grant() {
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new(
@@ -97,6 +141,86 @@ fn budgets_are_tracked_per_matching_grant() {
         .unwrap();
     assert_eq!(denied.verdict, Verdict::Deny);
     assert!(denied.reason.as_deref().unwrap_or("").contains("budget"));
+
+    let read_usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    let write_usage = kernel.budget_store.get_usage(&cap.id, 1).unwrap().unwrap();
+    assert_eq!(read_usage.invocation_count, 2);
+    assert_eq!(write_usage.invocation_count, 1);
+}
+
+#[test]
+fn pre_dispatch_guard_denial_reverses_invocation_budget() {
+    struct DenyOnce {
+        denied: AtomicBool,
+    }
+
+    impl Guard for DenyOnce {
+        fn name(&self) -> &str {
+            "deny-once"
+        }
+
+        fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
+            if self.denied.swap(true, Ordering::SeqCst) {
+                Ok(GuardDecision::allow())
+            } else {
+                Ok(GuardDecision::deny(Vec::new()))
+            }
+        }
+    }
+
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    let mut kernel = make_kernel(make_config());
+    kernel.add_guard(Box::new(DenyOnce {
+        denied: AtomicBool::new(false),
+    }));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-a",
+        vec!["read_file"],
+        std::sync::Arc::clone(&invocations),
+    )));
+
+    let subject_kp = make_keypair();
+    let mut grant = make_grant("srv-a", "read_file");
+    grant.max_invocations = Some(1);
+    let cap = make_capability(&kernel, &subject_kp, make_scope(vec![grant]), 300);
+
+    let denied = kernel
+        .evaluate_tool_call_blocking(&make_request(
+            "req-guard-reversal-1",
+            &cap,
+            "read_file",
+            "srv-a",
+        ))
+        .unwrap();
+    assert_eq!(denied.verdict, Verdict::Deny);
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    let reversed = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(reversed.invocation_count, 0);
+
+    let allowed = kernel
+        .evaluate_tool_call_blocking(&make_request(
+            "req-guard-reversal-2",
+            &cap,
+            "read_file",
+            "srv-a",
+        ))
+        .unwrap();
+    assert_eq!(allowed.verdict, Verdict::Allow);
+
+    let exhausted = kernel
+        .evaluate_tool_call_blocking(&make_request(
+            "req-guard-reversal-3",
+            &cap,
+            "read_file",
+            "srv-a",
+        ))
+        .unwrap();
+    assert_eq!(exhausted.verdict, Verdict::Deny);
+    assert!(exhausted
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("budget")));
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
 
 #[test]
@@ -1079,6 +1203,54 @@ fn monetary_server_not_reporting_cost_charges_max_cost_per_invocation() {
 }
 
 #[test]
+fn monetary_dispatch_failure_keeps_invocation_consumed() {
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.register_tool_server(Box::new(FailingAfterSideEffectServer::new(
+        "cost-srv",
+        vec!["compute"],
+        std::sync::Arc::clone(&invocations),
+    )));
+
+    let subject_kp = Keypair::generate();
+    let mut grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+    grant.max_invocations = Some(1);
+    let cap = kernel
+        .issue_capability(&subject_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let request = |request_id: &str| make_request(request_id, &cap, "compute", "cost-srv");
+
+    let failed = kernel
+        .evaluate_tool_call_blocking(&request("req-dispatch-failure-1"))
+        .unwrap();
+    assert_eq!(failed.verdict, Verdict::Deny);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(
+        usage.invocation_count, 1,
+        "a dispatch failure must retain the consumed invocation"
+    );
+    assert_eq!(usage.total_cost_exposed, 0);
+    let terminal = &failed.receipt.metadata.as_ref().unwrap()["budget_authority"]["terminal"];
+    assert_eq!(terminal["disposition"], "released");
+    assert_eq!(terminal["committed_cost_units_after"], 0);
+    assert!(terminal["event_id"]
+        .as_str()
+        .is_some_and(|event_id| event_id.ends_with(":release")));
+
+    let retry = kernel
+        .evaluate_tool_call_blocking(&request("req-dispatch-failure-2"))
+        .unwrap();
+    assert_eq!(retry.verdict, Verdict::Deny);
+    assert!(retry
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("budget")));
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
 fn monetary_tool_server_error_releases_precharged_budget() {
     let mut kernel = make_kernel(make_monetary_config());
     let agent_kp = Keypair::generate();
@@ -1109,14 +1281,174 @@ fn monetary_tool_server_error_releases_precharged_budget() {
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    let usage = kernel
-
-        .budget_store
-        .get_usage(&cap.id, 0)
-        .unwrap()
-        .unwrap();
-    assert_eq!(usage.invocation_count, 0);
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert_eq!(usage.total_cost_exposed, 0);
     assert_eq!(usage.committed_cost_units().unwrap(), 0);
+    let terminal = &response.receipt.metadata.as_ref().unwrap()["budget_authority"]["terminal"];
+    assert_eq!(terminal["disposition"], "released");
+    assert!(terminal["event_id"]
+        .as_str()
+        .is_some_and(|event_id| event_id.ends_with(":release")));
+}
+
+fn assert_monetary_post_dispatch_error_releases_exposure(
+    server: Box<dyn ToolServerConnection>,
+    server_entries: std::sync::Arc<AtomicU64>,
+    request_id: &str,
+    nested: bool,
+) {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.register_tool_server(server);
+    let subject_kp = Keypair::generate();
+    let mut grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+    grant.max_invocations = Some(1);
+    let cap = kernel
+        .issue_capability(&subject_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let request = make_request(request_id, &cap, "compute", "cost-srv");
+
+    let response = if nested {
+        let session_id = kernel
+            .open_session(subject_kp.public_key().to_hex(), vec![cap.clone()])
+            .unwrap();
+        kernel.activate_session(&session_id).unwrap();
+        let context = make_operation_context(
+            &session_id,
+            request_id,
+            &subject_kp.public_key().to_hex(),
+        );
+        kernel
+            .begin_session_request(&context, OperationKind::ToolCall, true)
+            .unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime
+            .block_on(async {
+                let mut client = NoopNestedFlowClient;
+                kernel
+                    .evaluate_tool_call_with_nested_flow_client_async(
+                        &context,
+                        &request,
+                        &mut client,
+                        None,
+                    )
+                    .await
+            })
+            .unwrap()
+    } else {
+        kernel.evaluate_tool_call_blocking(&request).unwrap()
+    };
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(server_entries.load(Ordering::SeqCst), 1);
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert_eq!(usage.total_cost_exposed, 0);
+    assert!(!kernel
+        .budget_store
+        .try_increment(&cap.id, 0, Some(1))
+        .unwrap());
+
+    let terminal = &response.receipt.metadata.as_ref().unwrap()["budget_authority"]["terminal"];
+    assert_eq!(terminal["disposition"], "released");
+    assert_eq!(terminal["exposure_units"], 100);
+    assert_eq!(terminal["committed_cost_units_after"], 0);
+    assert!(terminal["event_id"]
+        .as_str()
+        .is_some_and(|event_id| event_id.ends_with(":release")));
+}
+
+#[test]
+fn monetary_cancelled_connector_error_releases_exposure_top_level() {
+    let entries = std::sync::Arc::new(AtomicU64::new(0));
+    assert_monetary_post_dispatch_error_releases_exposure(
+        Box::new(CancellationAfterSideEffectServer::new(
+            "cost-srv",
+            vec!["compute"],
+            std::sync::Arc::clone(&entries),
+        )),
+        entries,
+        "req-monetary-cancelled-top-level",
+        false,
+    );
+}
+
+#[test]
+fn monetary_incomplete_connector_error_releases_exposure_top_level() {
+    let entries = std::sync::Arc::new(AtomicU64::new(0));
+    assert_monetary_post_dispatch_error_releases_exposure(
+        Box::new(IncompleteAfterSideEffectServer::new(
+            "cost-srv",
+            vec!["compute"],
+            std::sync::Arc::clone(&entries),
+        )),
+        entries,
+        "req-monetary-incomplete-top-level",
+        false,
+    );
+}
+
+#[test]
+fn monetary_generic_connector_error_releases_exposure_top_level() {
+    let entries = std::sync::Arc::new(AtomicU64::new(0));
+    assert_monetary_post_dispatch_error_releases_exposure(
+        Box::new(FailingAfterSideEffectServer::new(
+            "cost-srv",
+            vec!["compute"],
+            std::sync::Arc::clone(&entries),
+        )),
+        entries,
+        "req-monetary-generic-top-level",
+        false,
+    );
+}
+
+#[test]
+fn monetary_cancelled_connector_error_releases_exposure_nested() {
+    let entries = std::sync::Arc::new(AtomicU64::new(0));
+    assert_monetary_post_dispatch_error_releases_exposure(
+        Box::new(CancellationAfterSideEffectServer::new(
+            "cost-srv",
+            vec!["compute"],
+            std::sync::Arc::clone(&entries),
+        )),
+        entries,
+        "req-monetary-cancelled-nested",
+        true,
+    );
+}
+
+#[test]
+fn monetary_incomplete_connector_error_releases_exposure_nested() {
+    let entries = std::sync::Arc::new(AtomicU64::new(0));
+    assert_monetary_post_dispatch_error_releases_exposure(
+        Box::new(IncompleteAfterSideEffectServer::new(
+            "cost-srv",
+            vec!["compute"],
+            std::sync::Arc::clone(&entries),
+        )),
+        entries,
+        "req-monetary-incomplete-nested",
+        true,
+    );
+}
+
+#[test]
+fn monetary_generic_connector_error_releases_exposure_nested() {
+    let entries = std::sync::Arc::new(AtomicU64::new(0));
+    assert_monetary_post_dispatch_error_releases_exposure(
+        Box::new(FailingAfterSideEffectServer::new(
+            "cost-srv",
+            vec!["compute"],
+            std::sync::Arc::clone(&entries),
+        )),
+        entries,
+        "req-monetary-generic-nested",
+        true,
+    );
 }
 
 #[test]
