@@ -1289,6 +1289,54 @@ fn fully_archived_store_reopens_writable() -> Result<(), Box<dyn std::error::Err
     Ok(())
 }
 
+/// After a full-prefix rotation the live claim-log table is empty, so the
+/// writable checkpoint-status path must floor committed progress at the
+/// retention watermark just like the read-only health path. Otherwise it
+/// reports committed progress regressing to 0 while the checkpoint chain still
+/// sits at the archived boundary W, corrupting health and metrics.
+#[test]
+fn checkpoint_status_floors_committed_at_watermark_after_full_archive(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("status-floor-watermark");
+    let archive = unique_db_path("status-floor-watermark-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for i in 0..4u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("sf-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    store.flush_receipt_writes()?;
+    let archived = store.archive_receipts_before(150, archive_path)?;
+    assert_eq!(archived, 4, "the whole history archives");
+
+    let status = store.receipt_checkpoint_status(None)?;
+    assert_eq!(
+        status.retention_watermark_entry_seq,
+        Some(4),
+        "the watermark records the fully archived boundary"
+    );
+    assert_eq!(
+        status.latest_checkpointed_entry_seq, 4,
+        "the checkpoint chain still sits at the archived boundary"
+    );
+    assert_eq!(
+        status.latest_committed_entry_seq, 4,
+        "committed progress must fold in the archived prefix, not regress to 0"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// The read-only health path must survive a store created before the retention
 /// migration: a missing watermark ledger is "never archived" (None), not a hard
 /// error that denies the observer every health report.

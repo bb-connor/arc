@@ -2483,11 +2483,19 @@ impl SqliteReceiptStore {
     ) -> Result<ReceiptCheckpointStatusReport, ReceiptStoreError> {
         self.validate_claim_receipt_log_projection_current()?;
         let connection = self.connection()?;
-        let latest_committed_entry_seq = latest_claim_log_entry_seq(&connection)?;
         // Read once and reuse across every branch below: the watermark is
         // reported even on an error/unhealthy status so retention visibility
         // does not depend on checkpoint health.
         let retention_watermark_entry_seq = support::retention_watermark(&connection)?;
+        // After a full-prefix rotation the live claim-log table is empty, so
+        // MAX(entry_seq) drops to 0 while the latest checkpoint and the
+        // retention watermark still sit at the archived boundary W. Committed
+        // progress must fold in the archived prefix; floor the live committed
+        // seq at the watermark so a fully-archived store does not report
+        // committed regressing to 0 behind its checkpoints. Mirrors
+        // receipt_store_health_read_only.
+        let latest_committed_entry_seq = latest_claim_log_entry_seq(&connection)?
+            .max(retention_watermark_entry_seq.unwrap_or(0));
         match verify_checkpoint_chain_integrity(&connection) {
             Ok(latest) => {
                 let latest_checkpoint_seq = latest
