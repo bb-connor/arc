@@ -134,8 +134,13 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             '/etc/chio/spec/openapi.yaml'
             '--listen'
             '0.0.0.0:9090'
-            '--receipt-store'
-            '/var/lib/chio/receipts.db'
+            // Container Apps has no per-replica persistent disk, so the audit log
+            // cannot be durable here. Opt into ephemeral in-memory receipts
+            // explicitly instead of pointing --receipt-store at scratch storage,
+            // which would boot reporting a durable backend yet lose every receipt
+            // on revision recycle. For a durable audit trail, front a client-server
+            // store or run on a per-instance-disk platform.
+            '--allow-ephemeral-receipts'
             '--authority-seed-file'
             '/etc/chio/seed/authority.seed'
           ]
@@ -157,10 +162,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               volumeName: 'chio-authority-seed'
               mountPath: '/etc/chio/seed'
-            }
-            {
-              volumeName: 'chio-receipts'
-              mountPath: '/var/lib/chio'
             }
           ]
           probes: [
@@ -215,26 +216,18 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
           ]
         }
-        // Audit store for a SINGLE writer. The receipt log is a SQLite database
-        // in WAL mode: WAL coordinates connections through a shared-memory index
-        // that requires every connection on the same host and a local
-        // (non-network) filesystem, so it cannot run on an Azure Files share. The
-        // sidecar refuses to start if the mounted filesystem cannot support WAL.
-        // Container Apps has no per-replica persistent disk, so this template runs
-        // the log on a per-replica local volume: WAL works, but the log is lost on
-        // every revision recycle. For a durable audit trail, front a client-server
-        // audit store or move to a per-instance disk platform (a StatefulSet PVC,
-        // or an ECS task with an attached block volume).
-        {
-          name: 'chio-receipts'
-          storageType: 'EmptyDir'
-        }
+        // No receipt-store volume: this template keeps the audit log in memory
+        // (--allow-ephemeral-receipts) because Container Apps offers no per-replica
+        // persistent disk. A durable receipt log is a single-writer SQLite database
+        // in WAL mode, which needs a local (non-network) filesystem and so cannot
+        // run on an Azure Files share. For a durable audit trail, front a
+        // client-server audit store or move to a per-instance disk platform (a
+        // StatefulSet PVC, or an ECS task with an attached block volume).
       ]
-      // The receipt store is a single-writer SQLite database on a per-replica
-      // local volume, so maxReplicas is pinned to 1: one replica keeps one
-      // coherent audit stream. Fanning out gives each replica its own separate
-      // log; for a single durable audit trail across scale, front a client-server
-      // audit store.
+      // The audit log is an explicitly ephemeral in-memory stream, so maxReplicas
+      // is pinned to 1: one replica keeps one coherent stream. Fanning out gives
+      // each replica its own separate log; for a single durable audit trail across
+      // scale or restart, front a client-server audit store.
       scale: {
         minReplicas: 1
         maxReplicas: 1

@@ -28,11 +28,12 @@ spec:
     metadata:
       annotations:
         # Keep at least one warm instance to amortise sidecar cold starts.
-        # The receipt store is a single-writer SQLite database on a per-instance
-        # volume, so this service pins maxScale to 1: one instance keeps one
-        # coherent audit stream. Fanning out gives each instance its own separate
-        # log; for a single durable audit trail across scale, front a
-        # client-server audit store (see the volume note).
+        # This reference runs an explicitly ephemeral in-memory audit log
+        # (--allow-ephemeral-receipts): Cloud Run has no per-instance persistent
+        # disk, so there is no durable local backend to pin. maxScale stays 1 so a
+        # single instance keeps one coherent in-memory audit stream; for a durable
+        # audit trail across scale or restart, front a client-server audit store
+        # or move to a per-instance-disk platform (see the sidecar args note).
         autoscaling.knative.dev/minScale: "1"
         autoscaling.knative.dev/maxScale: "1"
         # App waits until chio-sidecar startupProbe succeeds.
@@ -108,8 +109,13 @@ spec:
             - "/etc/chio/spec/openapi.yaml"
             - "--listen"
             - "0.0.0.0:9090"
-            - "--receipt-store"
-            - "/var/lib/chio/receipts.db"
+            # Cloud Run has no per-instance persistent disk, so the audit log
+            # cannot be durable here. Opt into ephemeral in-memory receipts
+            # explicitly instead of pointing --receipt-store at scratch storage,
+            # which would boot reporting a durable backend yet lose every receipt
+            # on revision recycle. For a durable audit trail, front a client-server
+            # store or run on a per-instance-disk platform.
+            - "--allow-ephemeral-receipts"
             - "--authority-seed-file"
             - "/etc/chio/seed/authority.seed"
           env:
@@ -130,8 +136,6 @@ spec:
               mountPath: /etc/chio/spec
             - name: chio-authority-seed
               mountPath: /etc/chio/seed
-            - name: chio-receipts
-              mountPath: /var/lib/chio
           resources:
             limits:
               cpu: "500m"
@@ -162,17 +166,10 @@ spec:
             items:
               - key: latest
                 path: authority.seed
-        # Audit store for a SINGLE writer. The receipt log is a SQLite database in
-        # WAL mode: WAL coordinates connections through a shared-memory index that
-        # requires every connection on the same host and a local (non-network)
-        # filesystem, so it cannot run on Filestore/NFS. The sidecar refuses to
-        # start if the mounted filesystem cannot support WAL. Cloud Run has no
-        # per-instance persistent disk, so this reference runs the log on a local
-        # in-memory volume: WAL works, but the log is lost on every revision
-        # recycle. For a durable audit trail, run on a platform with a per-instance
-        # disk (a StatefulSet PVC, an ECS task with an attached block volume) or
-        # front a client-server audit store.
-        - name: chio-receipts
-          emptyDir:
-            medium: Memory
-            sizeLimit: 128Mi
+        # No receipt-store volume: this reference keeps the audit log in memory
+        # (--allow-ephemeral-receipts) because Cloud Run offers no per-instance
+        # persistent disk. A durable receipt log is a single-writer SQLite database
+        # in WAL mode, which needs a local (non-network) filesystem and so cannot
+        # run on Filestore/NFS. For a durable audit trail, run on a platform with a
+        # per-instance disk (a StatefulSet PVC, an ECS task with an attached block
+        # volume) or front a client-server audit store.
