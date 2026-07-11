@@ -63,7 +63,9 @@ impl McpRateLimiter {
 }
 
 async fn rate_limit_mcp_request(
-    axum::extract::ConnectInfo(remote_addr): axum::extract::ConnectInfo<SocketAddr>,
+    axum::extract::ConnectInfo(chio_http_serve::CappedPeerAddr(remote_addr)): axum::extract::ConnectInfo<
+        chio_http_serve::CappedPeerAddr,
+    >,
     State(limiter): State<McpRateLimiter>,
     request: Request,
     next: axum::middleware::Next,
@@ -248,14 +250,29 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
     );
     eprintln!("remote MCP edge listening on http://{local_addr}{MCP_ENDPOINT_PATH}");
 
-    let hygiene = chio_http_serve::ServeHygieneConfig::default();
+    // The generic per-request timeout is left off here. The edge's GET and POST
+    // routes return Server-Sent Event streams that stay open indefinitely while a
+    // session waits for notifications, so a blanket request timeout would close a
+    // healthy idle stream with 408 and force resumable clients into reconnect
+    // churn. Request bodies are already bounded by `read_limited_mcp_post_body`,
+    // per-IP request rate is capped by the rate limiter, and the drain deadline
+    // bounds any stream still open at shutdown.
+    let hygiene = chio_http_serve::ServeHygieneConfig {
+        request_timeout: None,
+        ..chio_http_serve::ServeHygieneConfig::default()
+    };
     let router = chio_http_serve::apply_server_hygiene(router, &hygiene);
-    // The edge serves with per-connection `ConnectInfo<SocketAddr>`, which is
-    // bound to the concrete listener, so the accept ceiling comes from the
-    // request concurrency limit rather than a listener connection cap.
+    // Cap simultaneously accepted connections at the accept loop so a slow or idle
+    // connection flood cannot exhaust file descriptors before any request reaches
+    // the concurrency limit. The peer address stays available to the per-IP rate
+    // limiter via `CappedPeerAddr`.
+    let listener = chio_http_serve::MaxConnListener::new(
+        listener,
+        hygiene.max_connections.unwrap_or(usize::MAX),
+    );
     let server = axum::serve(
         listener,
-        router.into_make_service_with_connect_info::<SocketAddr>(),
+        router.into_make_service_with_connect_info::<chio_http_serve::CappedPeerAddr>(),
     )
     .with_graceful_shutdown(controller.signalled());
 
