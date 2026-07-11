@@ -1438,10 +1438,14 @@ mod property_tests {
             )
     }
 
-    fn arb_book() -> impl Strategy<Value = (Vec<ExposureLedgerCurrencyPosition>, ExposureLedgerNettingRates)>
-    {
-        proptest::sample::subsequence(CURRENCY_POOL.to_vec(), 1..=CURRENCY_POOL.len()).prop_flat_map(
-            |currencies| {
+    fn arb_book() -> impl Strategy<
+        Value = (
+            Vec<ExposureLedgerCurrencyPosition>,
+            ExposureLedgerNettingRates,
+        ),
+    > {
+        proptest::sample::subsequence(CURRENCY_POOL.to_vec(), 1..=CURRENCY_POOL.len())
+            .prop_flat_map(|currencies| {
                 let positions = currencies
                     .iter()
                     .map(|currency| arb_position((*currency).to_string()))
@@ -1467,8 +1471,7 @@ mod property_tests {
                 (positions, rates).prop_map(|(positions, rates)| {
                     (positions, ExposureLedgerNettingRates::new(rates))
                 })
-            },
-        )
+            })
     }
 
     proptest! {

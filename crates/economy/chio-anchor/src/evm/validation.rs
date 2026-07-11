@@ -281,4 +281,3 @@ pub fn validate_publication_call_data_against_checkpoint(
     }
     Ok(())
 }
-

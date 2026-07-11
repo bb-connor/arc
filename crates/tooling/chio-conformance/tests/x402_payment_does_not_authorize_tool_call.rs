@@ -126,8 +126,7 @@ fn trust_for(bundle: &PublicSettlementProofBundle) -> PublicSettlementVerifierTr
             chain_id: bundle.chain_id.clone(),
             observed_block_number: 12_345_678,
             observed_block_hash:
-                "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-                    .to_string(),
+                "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
             latest_block_number: 12_345_701,
         }),
         trusted_dispute_event_blocks: Vec::new(),
