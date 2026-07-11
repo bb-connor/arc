@@ -913,27 +913,42 @@ impl ChioKernel {
         }
     }
 
-    /// Build a denial response, including FinancialReceiptMetadata when the
+    /// Persist a single already-signed child receipt: a commit-bounded durable
+    /// append under the kernel-wide receipt write lock, then the in-process log.
+    /// Child receipts hold that lock, so an unbounded wait would let a wedged
+    /// writer pin every subsequent receipt write; the bounded append fails
+    /// closed on timeout. The in-process log is appended only after the durable
+    /// append succeeds, so a failed append never records a child receipt that is
+    /// absent from the durable log.
+    pub(crate) fn record_child_receipt(
+        &self,
+        receipt: &ChildRequestReceipt,
+    ) -> Result<(), KernelError> {
+        let receipt_store_write = self
+            .receipt_store_write_lock
+            .lock()
+            .map_err(|_| KernelError::Internal("receipt store write lock poisoned".to_string()))?;
+        self.with_receipt_store(|store| {
+            Ok(store.append_child_receipt_with_timeout(
+                receipt,
+                self.config.deadlines.receipt_append_budget(),
+            )?)
+        })?;
+        drop(receipt_store_write);
+        self.append_child_receipt_to_local_log(receipt.clone());
+        Ok(())
+    }
+
+    /// Persist a batch of already-signed child receipts in order, stopping at the
+    /// first append that fails closed. Callers that must not lose the unpersisted
+    /// remainder should drain their buffer per receipt instead (see
+    /// `PostAdmissionDropGuard::record_buffered_child_receipts`).
     pub(crate) fn record_child_receipts(
         &self,
         receipts: Vec<ChildRequestReceipt>,
     ) -> Result<(), KernelError> {
-        for receipt in receipts {
-            let receipt_store_write = self.receipt_store_write_lock.lock().map_err(|_| {
-                KernelError::Internal("receipt store write lock poisoned".to_string())
-            })?;
-            // Bound the commit round trip under the same append budget as
-            // top-level receipts. Child receipts hold the kernel-wide receipt
-            // write lock, so an unbounded wait here would let a wedged writer pin
-            // every subsequent receipt write. On timeout this fails closed.
-            self.with_receipt_store(|store| {
-                Ok(store.append_child_receipt_with_timeout(
-                    &receipt,
-                    self.config.deadlines.receipt_append_budget(),
-                )?)
-            })?;
-            drop(receipt_store_write);
-            self.append_child_receipt_to_local_log(receipt);
+        for receipt in &receipts {
+            self.record_child_receipt(receipt)?;
         }
         Ok(())
     }

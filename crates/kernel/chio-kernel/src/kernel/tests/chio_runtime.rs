@@ -2826,6 +2826,130 @@ fn nested_flow_child_receipt_timeout_records_cancellation(
     Ok(())
 }
 
+/// A durable store whose bounded child-receipt append fails closed on its first
+/// call and succeeds afterward, modeling a commit writer that is momentarily
+/// saturated during the normal record path but has drained before the drop-path
+/// flush retries. Parent (chio) receipt appends always succeed.
+struct ChildAppendFailsOnceStore {
+    child_appends: std::sync::Arc<AtomicU64>,
+}
+
+impl ReceiptStore for ChildAppendFailsOnceStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+    fn append_child_receipt_with_timeout(
+        &self,
+        _receipt: &ChildRequestReceipt,
+        _budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        if self.child_appends.fetch_add(1, Ordering::SeqCst) == 0 {
+            return Err(ReceiptStoreError::Timeout {
+                operation: "append_child_receipt".to_string(),
+                timeout_ms: 0,
+            });
+        }
+        Ok(Some(1))
+    }
+}
+
+// A commit writer that times out the buffered child-receipt append on the
+// normal record path, then drains, must not lose the already-signed child
+// receipt. The still-armed drop path retries the flush, so the completed child
+// operation lands on the append-only log. Draining the guard buffer before the
+// append succeeded would leave the drop-path retry with nothing to flush and
+// strand the child receipt.
+#[test]
+fn nested_flow_transient_child_append_timeout_preserves_child_receipt(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let child_ops = std::sync::Arc::new(AtomicU64::new(0));
+    let child_appends = std::sync::Arc::new(AtomicU64::new(0));
+    let mut kernel = make_kernel(make_config());
+    kernel.set_receipt_store(Box::new(ChildAppendFailsOnceStore {
+        child_appends: std::sync::Arc::clone(&child_appends),
+    }))?;
+    kernel.register_tool_server(Box::new(NestedChildOpServer::new(
+        "srv-chio-runtime",
+        vec!["destructive_update"],
+        std::sync::Arc::clone(&child_ops),
+        false,
+    )));
+
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
+        300,
+    );
+    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;
+    kernel.activate_session(&session_id)?;
+    let context = make_operation_context(
+        &session_id,
+        "req-chio-nested-child-retry",
+        &agent_kp.public_key().to_hex(),
+    );
+    kernel.begin_session_request(&context, OperationKind::ToolCall, true)?;
+    let request = make_request_with_arguments(
+        "req-chio-nested-child-retry",
+        &cap,
+        "destructive_update",
+        "srv-chio-runtime",
+        serde_json::json!({"record": "vendor-ledger-7", "value": "closed"}),
+    );
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    let result = rt.block_on(async {
+        let mut client = NoopNestedFlowClient;
+        kernel
+            .evaluate_tool_call_with_nested_flow_client_async(&context, &request, &mut client, None)
+            .await
+    });
+
+    assert_eq!(
+        child_ops.load(Ordering::SeqCst),
+        1,
+        "the nested child op must have run once before the child-receipt append"
+    );
+    assert!(
+        result.is_err(),
+        "the first child-receipt append timeout must surface as an error"
+    );
+    assert_eq!(
+        child_appends.load(Ordering::SeqCst),
+        2,
+        "the normal path times out once and the drop path retries the append"
+    );
+    let receipt_log = kernel.receipt_log();
+    assert_eq!(
+        receipt_log.len(),
+        1,
+        "the abort cleanup records exactly one signed cancellation receipt"
+    );
+    assert!(
+        receipt_log
+            .get(0)
+            .ok_or_else(|| std::io::Error::other("terminal receipt missing"))?
+            .is_cancelled(),
+        "the terminal receipt must be a signed cancellation"
+    );
+    let child_receipt_log = kernel.child_receipt_log();
+    assert_eq!(
+        child_receipt_log.len(),
+        1,
+        "the buffered child receipt must be preserved and flushed on the drop-path retry, not lost"
+    );
+    Ok(())
+}
+
 // Post-dispatch parent drop: the already-signed buffered child receipt must be
 // flushed onto the append-only log alongside the parent cancellation receipt.
 // Without the drop-path flush the child receipt is discarded with the dropped

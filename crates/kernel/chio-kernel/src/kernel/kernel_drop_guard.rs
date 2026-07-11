@@ -116,11 +116,19 @@ impl<'a> PostAdmissionDropGuard<'a> {
         &mut self.child_receipts
     }
 
-    /// Take the buffered child receipts for the normal (non-drop) record path.
-    /// The guard is left holding an empty buffer, so a subsequent disarmed drop
-    /// flushes nothing and the receipts are never double-recorded.
-    pub(crate) fn take_child_receipts(&mut self) -> Vec<ChildRequestReceipt> {
-        std::mem::take(&mut self.child_receipts)
+    /// Record the buffered child receipts on the normal (non-drop) path,
+    /// removing each from the buffer only once it is durably persisted. If a
+    /// bounded append fails, the not-yet-persisted receipts stay buffered so the
+    /// still-armed drop path flushes them onto the append-only log instead of
+    /// discarding them with the dropped future. The guard must stay armed until
+    /// this returns `Ok`; the caller disarms only on success, so the disarmed
+    /// drop then flushes an empty buffer and never double-records.
+    pub(crate) fn record_buffered_child_receipts(&mut self) -> Result<(), KernelError> {
+        while !self.child_receipts.is_empty() {
+            self.kernel.record_child_receipt(&self.child_receipts[0])?;
+            self.child_receipts.remove(0);
+        }
+        Ok(())
     }
 
     /// Mark that the tool-server dispatch await has been entered. After this

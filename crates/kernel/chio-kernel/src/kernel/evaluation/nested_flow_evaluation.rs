@@ -660,17 +660,19 @@ impl ChioKernel {
             }
             _ => dispatch_call.await,
         };
-        // Persist the buffered child receipts while the guard is still armed. If
-        // the commit writer is saturated and the bounded append times out, the
-        // `?` returns with the guard armed and dispatch marked started, so its
-        // drop runs the post-dispatch abort cleanup: reverse the pre-execution
-        // monetary hold, retain the runtime reservations fail-closed, and record
-        // a signed cancellation receipt. Recording after disarming would instead
-        // return the timeout error with those holds still admitted and no
-        // terminal receipt on the log. `take_child_receipts` empties the buffer,
-        // so the disarmed drop on the success path flushes nothing and the
-        // receipts are never double-recorded.
-        self.record_child_receipts(post_admission_drop_guard.take_child_receipts())?;
+        // Persist the buffered child receipts while the guard is still armed,
+        // draining each from the guard only once it durably lands. If the commit
+        // writer is saturated and a bounded append times out, the `?` returns
+        // with the guard armed and dispatch marked started, so its drop runs the
+        // post-dispatch abort cleanup: flush the child receipts that had not yet
+        // persisted, reverse the pre-execution monetary hold, retain the runtime
+        // reservations fail-closed, and record a signed cancellation receipt.
+        // Because the guard keeps the not-yet-persisted receipts, a mid-flush
+        // append failure cannot lose an already-signed child receipt; recording
+        // through a drained buffer would instead drop it. On success the guard is
+        // disarmed with an empty buffer, so the disarmed drop flushes nothing and
+        // no receipt is double-recorded.
+        post_admission_drop_guard.record_buffered_child_receipts()?;
         post_admission_drop_guard.disarm();
         drop(post_admission_drop_guard);
         let tool_output = match tool_output_result {
