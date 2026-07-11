@@ -55,8 +55,7 @@ use chio_core_types::capability::token::{
 use chio_core_types::crypto::SigningAlgorithm;
 use chio_disclosure_lineage::{
     verify_disclosure_lineage_bundle_with_trust, DisclosureLeakageLedger, DisclosureLineageBundle,
-    DisclosureLineageVerifierTrust,
-    DisclosureLineageVerifierReport,
+    DisclosureLineageVerifierReport, DisclosureLineageVerifierTrust,
 };
 
 use crate::kernel::KernelError;
@@ -1663,22 +1662,20 @@ mod tests {
     fn own_data_gift_emits_verified_bundle_for_both_own_streams() {
         let bundle = own_data_bundle(TENANT);
         for stream in [ChioPassStream::OwnReceipts, ChioPassStream::OwnLineage] {
-            let report =
-                emit_own_data_gift_bundle(stream, TENANT, &bundle, &lineage_trust())
-                    .expect("own-data gift verifies");
+            let report = emit_own_data_gift_bundle(stream, TENANT, &bundle, &lineage_trust())
+                .expect("own-data gift verifies");
             assert_eq!(report.verdict, "verified");
             assert_eq!(report.transaction_passport_ref, "passport-own-data");
 
             // Routed through the per-stream dispatcher it yields the bundle gift:
             // the VERIFIED bundle (the emittable own data) AND its report.
-            let gift =
-                emit_pass_stream_gift(
-                    stream,
-                    TENANT,
-                    PassStreamSelection::OwnDataBundle(&bundle),
-                    &lineage_trust(),
-                )
-                    .expect("dispatcher emits bundle");
+            let gift = emit_pass_stream_gift(
+                stream,
+                TENANT,
+                PassStreamSelection::OwnDataBundle(&bundle),
+                &lineage_trust(),
+            )
+            .expect("dispatcher emits bundle");
             let PassStreamGift::OwnDataBundle {
                 bundle: emitted_bundle,
                 report: emitted_report,
@@ -1737,14 +1734,13 @@ mod tests {
             ChioPassStream::MarketplaceListings,
             ChioPassStream::PheromoneConcentration,
         ] {
-            let gift =
-                emit_pass_stream_gift(
-                    stream,
-                    TENANT,
-                    PassStreamSelection::AggregateBody(&body),
-                    &lineage_trust(),
-                )
-                .expect("aggregate view");
+            let gift = emit_pass_stream_gift(
+                stream,
+                TENANT,
+                PassStreamSelection::AggregateBody(&body),
+                &lineage_trust(),
+            )
+            .expect("aggregate view");
             let PassStreamGift::AggregateView(view) = gift else {
                 panic!("aggregate stream must emit a redacted view");
             };
@@ -1772,7 +1768,12 @@ mod tests {
         // served as this holder's own-data gift.
         let bundle = own_data_bundle("did:chioother");
         assert!(matches!(
-            emit_own_data_gift_bundle(ChioPassStream::OwnReceipts, TENANT, &bundle, &lineage_trust()),
+            emit_own_data_gift_bundle(
+                ChioPassStream::OwnReceipts,
+                TENANT,
+                &bundle,
+                &lineage_trust()
+            ),
             Err(KernelError::PassOwnDataGiftInvalid(_))
         ));
     }
@@ -1786,7 +1787,12 @@ mod tests {
         bundle.privacy_profile.required_holder_binding = Some(format!("holder:{TENANT}"));
         assert!(verify_disclosure_lineage_bundle_with_trust(&bundle, &lineage_trust()).is_ok());
         assert!(matches!(
-            emit_own_data_gift_bundle(ChioPassStream::OwnReceipts, TENANT, &bundle, &lineage_trust()),
+            emit_own_data_gift_bundle(
+                ChioPassStream::OwnReceipts,
+                TENANT,
+                &bundle,
+                &lineage_trust()
+            ),
             Err(KernelError::PassOwnDataGiftInvalid(_))
         ));
     }
