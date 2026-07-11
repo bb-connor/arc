@@ -180,6 +180,16 @@ fn verify_capability_base(
         }
     }
 
+    // Aggregate limits are signed and structurally valid, but no production
+    // quota authority enforces them yet. Deny after signature authentication
+    // and before any admission-side mutation so callers cannot mistake the
+    // wire field for an active security guarantee.
+    if token.aggregate_invocation_budget.is_some() {
+        return Err(CapabilityError::AttenuationViolation(
+            "aggregate invocation budget enforcement is disabled".to_string(),
+        ));
+    }
+
     // Time-bound check.
     let now = clock.now_unix_secs();
     match classify_time_window(now, token.issued_at, token.expires_at) {
@@ -442,8 +452,10 @@ fn verify_chain_binding_with_negotiation(
 mod tests {
     use super::*;
     use crate::InMemoryBudgetRegistry;
+    use alloc::format;
     use alloc::vec;
     use chio_core_types::capability::{
+        aggregate_budget::{AggregateInvocationBudget, AggregateInvocationScope},
         attenuation::{
             compute_attenuation_witness, scope_hash, AttenuationProof, DelegationLink,
             DelegationLinkBody,
@@ -483,6 +495,68 @@ mod tests {
             } else {
                 None
             }
+        }
+    }
+
+    fn aggregate_budget_token(issuer: &Keypair, max_invocations: u32) -> CapabilityToken {
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: format!("cap-aggregate-{max_invocations}"),
+                issuer: issuer.public_key(),
+                subject: Keypair::generate().public_key(),
+                scope: ChioScope::default(),
+                issued_at: 100,
+                expires_at: 200,
+                delegation_chain: Vec::new(),
+                aggregate_invocation_budget: Some(AggregateInvocationBudget {
+                    scope: AggregateInvocationScope::Capability,
+                    max_invocations,
+                    root_binding: None,
+                }),
+            },
+            issuer,
+        )
+        .expect("sign structurally valid aggregate capability")
+    }
+
+    fn assert_aggregate_enforcement_disabled(error: CapabilityError) {
+        assert_eq!(
+            error,
+            CapabilityError::AttenuationViolation(
+                "aggregate invocation budget enforcement is disabled".to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn aggregate_invocation_enforcement_disabled_rejects_portable_and_full_verification() {
+        let issuer = Keypair::generate();
+        let clock = crate::FixedClock::new(150);
+        let peer = CapabilityNegotiation::t1_default();
+        let trust_roots = |_issuer: &PublicKey| None;
+
+        for max_invocations in [0, 7] {
+            let token = aggregate_budget_token(&issuer, max_invocations);
+            assert!(token
+                .verify_signature()
+                .expect("core-types signature verification remains valid"));
+
+            let portable_error = verify_capability(&token, &[issuer.public_key()], &clock)
+                .expect_err("portable verification must deny unenforced aggregate budgets");
+            assert_aggregate_enforcement_disabled(portable_error);
+
+            let mut budgets = NoopBudgetRegistry;
+            let full_error = verify_capability_full(
+                &token,
+                &[issuer.public_key()],
+                &clock,
+                CapabilityCryptoFloor::AllowClassical,
+                &peer,
+                &trust_roots,
+                &mut budgets,
+            )
+            .expect_err("full verification must deny unenforced aggregate budgets");
+            assert_aggregate_enforcement_disabled(full_error);
         }
     }
 

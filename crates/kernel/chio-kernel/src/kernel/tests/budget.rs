@@ -79,6 +79,55 @@ fn single_invocation_budget_dispatches_once() {
 }
 
 #[test]
+fn aggregate_invocation_enforcement_disabled_denies_before_hosted_dispatch() {
+    use chio_core::capability::aggregate_budget::{
+        AggregateInvocationBudget, AggregateInvocationScope,
+    };
+
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    let mut kernel = make_kernel(make_config());
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-a",
+        vec!["read_file"],
+        std::sync::Arc::clone(&invocations),
+    )));
+
+    let subject_kp = make_keypair();
+    let ordinary = make_capability(
+        &kernel,
+        &subject_kp,
+        make_scope(vec![make_grant("srv-a", "read_file")]),
+        300,
+    );
+    let mut body = ordinary.body();
+    body.aggregate_invocation_budget = Some(AggregateInvocationBudget {
+        scope: AggregateInvocationScope::Capability,
+        max_invocations: 0,
+        root_binding: None,
+    });
+    let aggregate = CapabilityToken::sign(body, &kernel.config.keypair)
+        .expect("sign structurally valid aggregate capability");
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&make_request(
+            "req-unenforced-aggregate",
+            &aggregate,
+            "read_file",
+            "srv-a",
+        ))
+        .expect("hosted evaluation");
+
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        0,
+        "aggregate-bearing capability must be denied before tool server entry"
+    );
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response.reason.as_deref().is_some_and(|reason| reason
+        .contains("aggregate invocation budget enforcement is disabled")));
+}
+
+#[test]
 fn budgets_are_tracked_per_matching_grant() {
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new(
