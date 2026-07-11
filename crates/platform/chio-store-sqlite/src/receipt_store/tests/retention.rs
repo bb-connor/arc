@@ -763,6 +763,93 @@ fn non_incremental_rotation_validates_chain_before_deleting(
     Ok(())
 }
 
+/// Rotation deletes evidence, so it must never run against a claim-log
+/// projection that has already drifted from its source rows - even on an
+/// incremental store, whose per-append verified head never re-checks a
+/// retroactive source-row deletion. A store in the drift shape (source receipts
+/// deleted, orphaned claim-log rows left behind) must make the rotation fail
+/// closed and delete nothing, rather than co-archive the orphans without their
+/// receipts and then delete the live claim log, destroying the evidence
+/// `retention_repair` needs to recover.
+#[test]
+fn incremental_rotation_rejects_projection_drift() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("incremental-drift-rotation");
+    let archive = unique_db_path("incremental-drift-rotation-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    // A default open() store runs incremental verification, so the pre-rotation
+    // checkpoint audit is skipped; only the projection audit can catch the drift.
+    let store = SqliteReceiptStore::open(&path)?;
+    assert!(store.incremental_verification_enabled());
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for i in 0..4u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("id-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    store.flush_receipt_writes()?;
+
+    // Fabricate the drift shape on the same live instance: co-archive the
+    // claim-log for [1,2] and delete ONLY their source rows, leaving orphaned
+    // claim-log rows. The incremental head stays Verified because it never
+    // re-audits the retroactive source deletion.
+    store.writer_handle().run_write({
+        let archive_path = archive_path.to_string();
+        move |connection| {
+            let escaped = archive_path.replace('\'', "''");
+            connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
+            connection.execute_batch(
+                "CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries \
+                   (entry_seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, receipt_kind TEXT NOT NULL, \
+                    source_seq INTEGER NOT NULL, timestamp INTEGER NOT NULL, capability_id TEXT, session_id TEXT, \
+                    parent_request_id TEXT, request_id TEXT, subject_key TEXT, issuer_key TEXT, tool_server TEXT, \
+                    tool_name TEXT, raw_json TEXT NOT NULL); \
+                 INSERT OR IGNORE INTO archive.claim_receipt_log_entries \
+                   SELECT * FROM main.claim_receipt_log_entries WHERE entry_seq <= 2; \
+                 DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
+                 DELETE FROM main.chio_tool_receipts WHERE seq <= 2; \
+                 CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
+                   BEFORE DELETE ON chio_tool_receipts \
+                   BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END;",
+            )?;
+            connection.execute_batch("DETACH DATABASE archive")?;
+            Ok(())
+        }
+    })?;
+
+    // The rotation must detect the projection drift and fail closed BEFORE any
+    // archive-and-delete.
+    let error = store
+        .archive_receipts_before(150, archive_path)
+        .err()
+        .ok_or("rotation over a drifted projection must fail closed, not archive-and-delete")?;
+    assert!(
+        matches!(error, ReceiptStoreError::Conflict(_)),
+        "expected a fail-closed Conflict from the projection audit, got {error:?}"
+    );
+
+    // Fail-closed: the orphaned claim-log rows survive, so repair can still run.
+    let live = store.reader_connection_for_test()?;
+    let orphans: i64 = live.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq <= 2",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        orphans, 2,
+        "orphaned claim-log rows must survive the refusal"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// A store reopened through `open_existing` holds READ_WRITE-without-CREATE
 /// connection flags so that a missing main database fails closed. Because
 /// `ATTACH DATABASE` inherits those flags, the first retention rotation against
