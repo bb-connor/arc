@@ -106,10 +106,17 @@ fn budget_ms_saturating(budget: std::time::Duration) -> u64 {
 }
 
 thread_local! {
-    /// Cached per-thread result of probing whether this context's Tokio runtime
-    /// has a timer driver. The probe constructs a throwaway timer, which panics
-    /// on a timerless runtime, so it runs at most once per worker thread.
-    static DISPATCH_TIMER_AVAILABLE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+    /// Cached probe of whether the currently entered Tokio runtime has a timer
+    /// driver, keyed by that runtime's id. Timer availability is a property of the
+    /// entered runtime, not the OS thread, so caching a bare verdict per thread
+    /// would let a timerless verdict leak into a later timer-enabled runtime on
+    /// the same thread (skipping deadlines) or a timer-enabled verdict leak into a
+    /// later timerless one (panicking on timer construction). The key is the
+    /// runtime id (`None` for "no runtime entered"); the verdict is re-probed
+    /// whenever the entered runtime changes. Within a single runtime the cache
+    /// keeps the panic-hook swap off the steady-state hot path.
+    static DISPATCH_TIMER_AVAILABLE: std::cell::Cell<Option<(Option<tokio::runtime::Id>, bool)>> =
+        const { std::cell::Cell::new(None) };
 }
 
 /// Serializes the panic-hook swap in [`dispatch_timer_available`] so concurrent
@@ -126,12 +133,17 @@ static TIMER_PROBE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 /// constructing one zero-duration timer under a caught unwind. The panic is
 /// synchronous at construction, and the panic hook is silenced for the probe so
 /// a timerless host does not emit a spurious backtrace. The swap is serialized
-/// so the real hook is always restored, and the result is cached per thread;
-/// callers fall back to running the guarded work inline when it is false.
+/// so the real hook is always restored, and the result is cached per runtime per
+/// thread; callers fall back to running the guarded work inline when it is false.
 pub(crate) fn dispatch_timer_available() -> bool {
+    let current_runtime = tokio::runtime::Handle::try_current()
+        .ok()
+        .map(|handle| handle.id());
     DISPATCH_TIMER_AVAILABLE.with(|cached| {
-        if let Some(available) = cached.get() {
-            return available;
+        if let Some((probed_runtime, available)) = cached.get() {
+            if probed_runtime == current_runtime {
+                return available;
+            }
         }
         let available = {
             let _serialized = TIMER_PROBE_LOCK
@@ -149,7 +161,7 @@ pub(crate) fn dispatch_timer_available() -> bool {
             std::panic::set_hook(previous_hook);
             result
         };
-        cached.set(Some(available));
+        cached.set(Some((current_runtime, available)));
         available
     })
 }
@@ -158,9 +170,36 @@ pub(crate) fn dispatch_timer_available() -> bool {
 mod timer_probe_tests {
     use super::dispatch_timer_available;
 
-    // The two runtimes run in separate `#[test]` functions on purpose: the probe
-    // caches its verdict per thread, and libtest gives each test its own thread,
-    // so a timerless verdict on one thread cannot leak into the timer-enabled one.
+    // The probe verdict is keyed by runtime id, so each runtime is probed under
+    // its own key. `re_probes_when_the_entered_runtime_changes_on_one_thread`
+    // exercises two runtimes on one thread directly; the two single-runtime tests
+    // below pin the per-runtime verdicts in isolation.
+
+    #[test]
+    fn re_probes_when_the_entered_runtime_changes_on_one_thread(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // A timerless runtime, then a timer-enabled one, both entered from this
+        // same OS thread. A per-thread-only cache would reuse the timerless
+        // verdict and wrongly report no timer in the second runtime; keying on the
+        // runtime id re-probes when the entered runtime changes.
+        let timerless = tokio::runtime::Builder::new_current_thread().build()?;
+        timerless.block_on(async {
+            assert!(!dispatch_timer_available());
+        });
+        let timed = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()?;
+        timed.block_on(async {
+            assert!(dispatch_timer_available());
+            let elapsed = tokio::time::timeout(
+                std::time::Duration::from_millis(1),
+                std::future::pending::<()>(),
+            )
+            .await;
+            assert!(elapsed.is_err(), "the timer must actually fire here");
+        });
+        Ok(())
+    }
 
     #[test]
     fn reports_false_in_a_runtime_without_a_time_driver() -> Result<(), Box<dyn std::error::Error>>
