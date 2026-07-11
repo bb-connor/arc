@@ -1,4 +1,4 @@
-//! Single-use replay store and chain-id parsing for the C2 (BAC-541)
+//! Single-use replay store and chain-id parsing for the
 //! [`crate::payments::VerifiedApproval`] witness.
 //!
 //! These are the durable seams the exported `verify_governed_approval` path

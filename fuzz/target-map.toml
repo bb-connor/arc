@@ -242,7 +242,7 @@ triggers = [
     "fuzz/corpus/settlement_approval_witness/**",
 ]
 seeds    = "fuzz/corpus/settlement_approval_witness"
-notes    = "C2 approval-witness gate: settlement-binding parse, CAIP-2 parse, verify_governed_approval, EIP-3009 lane wrapper; trust-boundary."
+notes    = "Approval-witness gate: settlement-binding parse, CAIP-2 parse, verify_governed_approval, EIP-3009 lane wrapper; trust-boundary."
 
 [targets.eval_receipt_bundle]
 crate    = "chio-eval-receipt"

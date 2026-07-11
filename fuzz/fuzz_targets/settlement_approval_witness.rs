@@ -1,4 +1,4 @@
-//! Trust-boundary fuzz target for the `chio-settle` C2 approval witness:
+//! Trust-boundary fuzz target for the `chio-settle` approval witness:
 //! settlement-binding parse, CAIP-2 chain-id parse, the
 //! `verify_governed_approval` gate, and the EIP-3009 lane wrapper.
 

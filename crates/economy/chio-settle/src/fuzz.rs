@@ -1,4 +1,4 @@
-//! libFuzzer entry-point module for the C2 (BAC-541) approval-witness
+//! libFuzzer entry-point module for the settlement approval-witness
 //! trust boundary.
 //!
 //! Gated behind the `fuzz` Cargo feature so it only compiles into the

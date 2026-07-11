@@ -137,11 +137,11 @@ pub struct PreparedPaymasterCompatibility {
 /// Build the raw x402 payment requirements straight off a dispatch with NO
 /// approval binding.
 ///
-/// This is the legacy x402 preparation path. It is `pub(crate)` so downstream
-/// cannot bypass the C2 (BAC-541) witness: the only exported x402 entry point
-/// is [`build_x402_payment_requirements_with_verified_approval`], which
-/// requires a [`VerifiedApproval`] and delegates here only after asserting the
-/// live dispatch against the verified binding.
+/// It is `pub(crate)` so downstream cannot bypass the approval witness: the
+/// only exported x402 entry point is
+/// [`build_x402_payment_requirements_with_verified_approval`], which requires
+/// a [`VerifiedApproval`] and delegates here only after asserting the live
+/// dispatch against the verified binding.
 pub(crate) fn build_x402_payment_requirements(
     dispatch: &Web3SettlementDispatchArtifact,
     facilitator_url: &str,
@@ -192,8 +192,7 @@ fn resolve_x402_capability_id(dispatch: &Web3SettlementDispatchArtifact) -> Stri
         .unwrap_or_else(|| dispatch.dispatch_id.clone())
 }
 
-/// Build x402 payment requirements bound to a verified governing approval
-/// (C2 / BAC-541).
+/// Build x402 payment requirements bound to a verified governing approval.
 ///
 /// The x402 lane advertises `governed_authorization_required` as a bare
 /// bool; on its own that flag is unenforced. This entry point closes the
@@ -444,7 +443,7 @@ pub struct ApprovalBinding {
     /// token (`"USDC"`); the two are different strings. When the intent ALSO
     /// pins a `max_amount`, the gate clamps `max_amount.currency` against THIS
     /// fiat currency (via [`Self::settlement_currency`]), NOT the rail token, so
-    /// a valid USDC/USD x402 approval carrying a fiat `max_amount` is no longer
+    /// a valid USDC/USD x402 approval carrying a fiat `max_amount` is not
     /// wrongly rejected. `None` means the rail token doubles as the settlement
     /// currency (Circle / EIP-3009, where they coincide). When the intent
     /// commits a `settlement_currency` this must equal it (signature-pinned).
@@ -603,8 +602,8 @@ impl ApprovalBinding {
 }
 
 // ---------------------------------------------------------------------------
-// C2 (BAC-541): verify a real GovernedApprovalToken and DERIVE the binding
-// from the verified token before any lane settles.
+// Approval witness gate: verify a real GovernedApprovalToken and DERIVE the
+// binding from the verified token before any lane settles.
 // ---------------------------------------------------------------------------
 //
 // THE TRUST PATH (read this before changing it)
@@ -710,7 +709,7 @@ impl VerifiedApproval {
 }
 
 /// Verify a [`GovernedApprovalToken`] and derive the trusted settlement
-/// [`ApprovalBinding`] from it. This is the single C2 (BAC-541) gate every
+/// [`ApprovalBinding`] from it. This is the single witness gate every
 /// settlement lane funnels through before it will bind a spend.
 ///
 /// Fail-closed checks, in order:
@@ -1401,10 +1400,10 @@ impl Eip3009NonceStore for InMemoryEip3009NonceStore {
 /// expiry, and binding checks pass, so a rejected authorization does not burn
 /// its nonce.
 ///
-/// This is the legacy EIP-3009 preparation path. It is `pub(crate)` so
-/// downstream cannot bypass the C2 (BAC-541) witness: the only exported
-/// EIP-3009 entry point is [`prepare_transfer_with_verified_approval`], which
-/// requires a [`VerifiedApproval`] and derives the binding from it.
+/// It is `pub(crate)` so downstream cannot bypass the approval witness: the
+/// only exported EIP-3009 entry point is
+/// [`prepare_transfer_with_verified_approval`], which requires a
+/// [`VerifiedApproval`] and derives the binding from it.
 pub(crate) fn prepare_transfer_with_authorization(
     domain: Eip3009Domain,
     authorization: TransferWithAuthorizationInput,
@@ -1614,11 +1613,10 @@ pub(crate) fn prepare_transfer_with_authorization(
 }
 
 /// Prepare an EIP-3009 authorization digest bound to a *verified* governing
-/// approval (C2 / BAC-541).
+/// approval.
 ///
-/// This is the C2-strengthened entry point: rather than trusting a
-/// caller-supplied [`ApprovalBinding`] (the C3 / BAC-542 seam), it derives
-/// the binding from a [`VerifiedApproval`] that
+/// Rather than trusting a caller-supplied [`ApprovalBinding`], this entry
+/// point derives the binding from a [`VerifiedApproval`] that
 /// [`verify_governed_approval`] could only have produced after checking the
 /// token's signature, decision, validity window, approver identity, and
 /// intent coverage. The lane-level chain / payee / amount / nonce / window
@@ -1676,11 +1674,11 @@ pub fn prepare_transfer_with_verified_approval(
 /// Evaluate a Circle nanopayment candidate straight off a dispatch with NO
 /// approval binding.
 ///
-/// This is the legacy Circle preparation path. It is `pub(crate)` so
-/// downstream cannot bypass the C2 (BAC-541) witness: the only exported Circle
-/// entry point is [`evaluate_circle_nanopayment_with_verified_approval`],
-/// which requires a [`VerifiedApproval`] and asserts the dispatch against the
-/// verified binding before delegating here.
+/// It is `pub(crate)` so downstream cannot bypass the approval witness: the
+/// only exported Circle entry point is
+/// [`evaluate_circle_nanopayment_with_verified_approval`], which requires a
+/// [`VerifiedApproval`] and asserts the dispatch against the verified binding
+/// before delegating here.
 pub(crate) fn evaluate_circle_nanopayment(
     dispatch: &Web3SettlementDispatchArtifact,
     policy: &CircleNanopaymentPolicy,
@@ -1732,7 +1730,7 @@ pub(crate) fn evaluate_circle_nanopayment(
 }
 
 /// Evaluate a Circle nanopayment candidate bound to a *verified* governing
-/// approval (C2 / BAC-541).
+/// approval.
 ///
 /// The Circle lane otherwise prepares an operator-custodied payout straight
 /// off the dispatch with no approval check. This entry point asserts the

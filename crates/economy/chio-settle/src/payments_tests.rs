@@ -1,4 +1,4 @@
-//! Unit tests for the C2 (BAC-541) verified-approval settlement lanes in
+//! Unit tests for the verified-approval settlement lanes in
 //! [`crate::payments`]. Split into a sibling file to keep `payments.rs`
 //! under its hygiene line cap while every per-property regression stays
 //! next to the witness it guards. `super::` refers to the `payments`
@@ -46,16 +46,16 @@ const DISPATCH_TOKEN_SYMBOL: &str = "USD";
 const APPROVAL_NOW: u64 = 1_744_000_300;
 
 /// Build a minimal governed intent with NO monetary bound (no `max_amount`
-/// and no committed settlement binding). The witness gate now refuses such an
+/// and no committed settlement binding). The witness gate refuses such an
 /// intent (fail-closed: an unbounded intent pins no ceiling on the spend), so
-/// this is used by the property-3 unbounded-rejection regression and as the
-/// base for [`intent_with_max_amount`].
+/// this is used by the unbounded-rejection regressions and as the base for
+/// [`intent_committing_binding`].
 fn unbounded_intent(id: &str) -> GovernedTransactionIntent {
     GovernedTransactionIntent {
         id: id.to_string(),
         server_id: "settlement-server".to_string(),
         tool_name: "transfer_funds".to_string(),
-        purpose: "C2 settlement binding test".to_string(),
+        purpose: "settlement binding test".to_string(),
         max_amount: None,
         commerce: None,
         metered_billing: None,
@@ -135,7 +135,7 @@ const DISPATCH_CAPABILITY_ID: &str = DISPATCH_ID;
 
 /// A binding that matches the sample dispatch's chain/payee/amount/token AND
 /// its dispatch / capability identity. The dispatch-bearing lanes (x402 /
-/// Circle) now require the binding to pin the dispatch identity, so the
+/// Circle) require the binding to pin the dispatch identity, so the
 /// dispatch-derived bindings carry it.
 fn dispatch_binding() -> ApprovalBinding {
     ApprovalBinding {
@@ -148,7 +148,7 @@ fn dispatch_binding() -> ApprovalBinding {
         token_contract: None,
         // The sample dispatch settles a fiat amount whose currency equals the
         // token symbol here (both `USD`), so no separate fiat currency is
-        // pinned; the round-7 rail-token helper overrides the rail token only.
+        // pinned; the rail-token helpers override the rail token only.
         settlement_currency: None,
         dispatch_id: Some(DISPATCH_ID.to_string()),
         capability_id: Some(DISPATCH_CAPABILITY_ID.to_string()),
@@ -838,7 +838,7 @@ fn evaluates_paymaster_compatibility() {
 }
 
 // -----------------------------------------------------------------
-// C2 (BAC-541): GovernedApprovalToken verification gate.
+// GovernedApprovalToken verification gate.
 // -----------------------------------------------------------------
 
 /// Verify `token`/`intent` against the gate with the expected
@@ -1026,12 +1026,13 @@ fn verify_governed_approval_rejects_intent_not_covered_by_the_token() {
 }
 
 // -----------------------------------------------------------------
-// C2 round-5: per-property regressions on the witness gate.
+// Witness gate: subject / request binding, issuance-level single use,
+// and the expiry / amount clamps.
 // -----------------------------------------------------------------
 
 #[test]
 fn verify_governed_approval_rejects_a_wrong_subject() {
-    // (1) Subject binding. A validly-signed, approved token whose subject
+    // Subject binding. A validly-signed, approved token whose subject
     // is NOT the expected subject must be rejected even though intent
     // hash and approver match. Without the subject check a captured
     // approval for one principal could settle a different principal's
@@ -1061,7 +1062,7 @@ fn verify_governed_approval_rejects_a_wrong_subject() {
 
 #[test]
 fn verify_governed_approval_rejects_a_wrong_request_id() {
-    // (1) Request binding. A token whose request_id differs from the
+    // Request binding. A token whose request_id differs from the
     // expected request must be rejected: an approval minted for request A
     // cannot authorize settlement for request B even with the same
     // intent/approver/subject.
@@ -1109,7 +1110,7 @@ fn witness_for(
 
 #[test]
 fn issued_settlement_artifact_is_single_use_with_a_shared_store() {
-    // (2) Replay / single-use, consumed at ISSUANCE. The same approval can be
+    // Replay / single-use, consumed at ISSUANCE. The same approval can be
     // verified twice (verification is read-only over the store), but the
     // slot is recorded when a lane returns a settlement artifact: the first
     // x402 issuance succeeds and the second attempt from the same approval
@@ -1197,7 +1198,7 @@ fn lane_rejection_does_not_burn_replay_slot() {
 
 #[test]
 fn verify_governed_approval_rejects_a_binding_outliving_the_token() {
-    // (3) Expiry clamp. A binding whose approval_expires_at is LATER than
+    // Expiry clamp. A binding whose approval_expires_at is LATER than
     // the token's own expires_at must be rejected, so an EIP-3009
     // valid_before clamped to the binding cannot outlive the
     // GovernedApprovalToken.
@@ -1235,9 +1236,9 @@ fn verify_governed_approval_accepts_binding_expiry_equal_to_token_expiry() {
 }
 
 /// Build an intent that COMMITS `binding`'s chain/payee/amount/token AND pins
-/// an explicit `max_amount` of `units`/`currency`. A settlement witness now
-/// REQUIRES a committed `chioSettlementBinding` (the max_amount-only mode no
-/// longer yields a settlement-capable witness), so the max_amount-clamp
+/// an explicit `max_amount` of `units`/`currency`. A settlement witness
+/// REQUIRES a committed `chioSettlementBinding` (the max_amount-only mode
+/// yields no settlement-capable witness), so the max_amount-clamp
 /// regressions commit a binding the caller-resolved binding matches (so the
 /// commitment check passes) while the separate `max_amount` is what the clamp
 /// exercises.
@@ -1257,7 +1258,7 @@ fn intent_committing_with_max_amount(
 
 #[test]
 fn verify_governed_approval_rejects_a_binding_over_intent_max_amount() {
-    // (4) Intent amount clamp. When the intent pins max_amount, a binding
+    // Intent amount clamp. When the intent pins max_amount, a binding
     // whose amount exceeds it must be rejected before any witness exists. The
     // intent commits the same over-max binding (so the commitment check passes
     // and only the max_amount clamp can reject): an intent whose committed
@@ -1286,7 +1287,7 @@ fn verify_governed_approval_rejects_a_binding_over_intent_max_amount() {
 
 #[test]
 fn verify_governed_approval_rejects_a_binding_with_wrong_intent_currency() {
-    // (4) Intent currency clamp. With max_amount set, a binding whose
+    // Intent currency clamp. With max_amount set, a binding whose
     // token symbol differs from the approved currency must be rejected. The
     // intent commits a binding whose token is "EUR" (matching the caller
     // binding, so the commitment check passes) while max_amount approves
@@ -1342,12 +1343,13 @@ fn verify_governed_approval_accepts_a_binding_at_intent_max_amount() {
 }
 
 // -----------------------------------------------------------------
-// C2 round-6: per-property fail-closed regressions.
+// Witness gate: signed-binding commitment, lifetime cap, and
+// cross-lane single use.
 // -----------------------------------------------------------------
 
 #[test]
 fn verify_governed_approval_rejects_an_unbounded_intent() {
-    // (8) Committed settlement binding required. An intent that commits no
+    // Committed settlement binding required. An intent that commits no
     // `chioSettlementBinding` pins no chain/payee/token, so the gate must
     // refuse to issue a settlement witness for it. Without this fail-closed
     // check an arbitrary caller-supplied ApprovalBinding (any chain/payee/
@@ -1376,7 +1378,7 @@ fn verify_governed_approval_rejects_an_unbounded_intent() {
 
 #[test]
 fn verify_governed_approval_rejects_a_max_amount_only_intent() {
-    // (8) P1 round-7: the max_amount-only mode must NOT produce a settlement
+    // The max_amount-only mode must NOT produce a settlement
     // witness. An intent that pins a `max_amount` ceiling but commits no
     // `chioSettlementBinding` leaves chain/payee/token caller-chosen, so the
     // value lanes (x402/EIP-3009/Circle) could settle on any chain to any payee
@@ -1411,7 +1413,7 @@ fn verify_governed_approval_rejects_a_max_amount_only_intent() {
 
 #[test]
 fn verify_governed_approval_rejects_a_caller_substituted_chain_payee_token() {
-    // (4) Bind payee/chain/token to the SIGNED intent. The intent commits a
+    // Bind payee/chain/token to the SIGNED intent. The intent commits a
     // concrete chain/payee/amount/token via its binding hash; a caller that
     // resolves a binding with a SUBSTITUTED chain, payee, or token (one the
     // approval never signed) must be rejected, so the witness carries the
@@ -1482,7 +1484,7 @@ fn verify_governed_approval_rejects_a_caller_substituted_chain_payee_token() {
 
 #[test]
 fn verify_governed_approval_rejects_a_caller_substituted_token_contract() {
-    // (4) Token contract binding. When the intent commits a token contract,
+    // Token contract binding. When the intent commits a token contract,
     // a binding that omits or substitutes the contract must be rejected, so a
     // captured approval cannot be redirected to a different token contract on
     // the same chain.
@@ -1536,7 +1538,7 @@ fn verify_governed_approval_rejects_a_caller_substituted_token_contract() {
 
 #[test]
 fn verify_governed_approval_rejects_an_uncommitted_token_contract() {
-    // (P1 round-7) The EIP-3009 token contract must be SIGNED, not
+    // The EIP-3009 token contract must be SIGNED, not
     // caller-substituted. When the intent commits NO token_contract, a caller
     // that introduces one in its resolved binding could redirect the EIP-3009
     // lane (which only checks domain.verifyingContract == binding.token_contract,
@@ -1583,7 +1585,7 @@ fn verify_governed_approval_rejects_an_uncommitted_token_contract() {
 
 #[test]
 fn verify_governed_approval_accepts_a_binding_matching_the_committed_intent() {
-    // Happy path for (3)/(4): an intent that commits the settlement binding
+    // Happy path: an intent that commits the settlement binding
     // and a caller binding that matches it verifies, with no separate
     // max_amount required (the committed binding IS the monetary bound).
     let approver = Keypair::generate();
@@ -1605,7 +1607,7 @@ fn verify_governed_approval_accepts_a_binding_matching_the_committed_intent() {
 
 #[test]
 fn verify_governed_approval_rejects_a_token_over_the_lifetime_cap() {
-    // (10) P1 round-7: lifetime cap. The verifier otherwise only checks
+    // Lifetime cap. The verifier otherwise only checks
     // now-in-window, so a token whose `expires_at` is far past `issued_at`
     // would mint a long-lived witness that could outlive the single-use replay
     // entry. Mirror the kernel cap (MAX_APPROVAL_TTL_SECS = 3600s): a token
@@ -1751,7 +1753,7 @@ fn same_approval_cannot_issue_on_two_lanes() {
     );
 }
 
-/// The public bypass exports are gone: the legacy x402/Circle/EIP-3009
+/// There are no public bypass exports: the raw x402/Circle/EIP-3009
 /// preparation functions are `pub(crate)` and not re-exported from the
 /// crate root, so downstream cannot construct a settlement that skips the
 /// `VerifiedApproval` witness. This compile-time test pins the only
@@ -1801,7 +1803,7 @@ fn exported_lane_entry_points_require_a_verified_approval_witness() {
 }
 
 // -----------------------------------------------------------------
-// C2: x402 lane binds against the verified approval.
+// x402 lane binds against the verified approval.
 // -----------------------------------------------------------------
 
 #[test]
@@ -1915,7 +1917,7 @@ fn x402_with_verified_approval_rejects_binding_mismatches() {
 
 /// A binding over the sample dispatch's chain/payee/amount but bound to the
 /// on-chain RAIL token `token_symbol` (for example `"USDC"`), distinct from the
-/// dispatch's fiat settlement currency (`"USD"`). Used by the P2 round-7 x402
+/// dispatch's fiat settlement currency (`"USD"`). Used by the x402
 /// regressions that separate the rail token from the fiat currency.
 fn dispatch_binding_with_rail_token(token_symbol: &str) -> ApprovalBinding {
     let mut binding = dispatch_binding();
@@ -1925,12 +1927,12 @@ fn dispatch_binding_with_rail_token(token_symbol: &str) -> ApprovalBinding {
 
 #[test]
 fn x402_with_verified_approval_accepts_a_base_usdc_dispatch_with_fiat_usd() {
-    // (P2 round-7) x402 keeps the on-chain RAIL token SEPARATE from the fiat
+    // x402 keeps the on-chain RAIL token SEPARATE from the fiat
     // settlement currency. The sample dispatch settles a fiat amount in USD
     // (settlement_amount.currency == "USD") while the rail token is USDC. A
     // normal Base/USDC approval binds the RAIL token USDC, and accepted_tokens
-    // advertises USDC. This MUST be accepted: the round-6 code wrongly compared
-    // the bound token to the fiat currency ("USDC" != "USD") and rejected it.
+    // advertises USDC. This MUST be accepted: comparing the bound token to the
+    // fiat currency ("USDC" != "USD") would wrongly reject it.
     // The fiat settlement currency stays a separate amount field unchanged.
     let dispatch = sample_dispatch();
     assert_eq!(
@@ -1971,7 +1973,7 @@ fn x402_with_verified_approval_accepts_a_base_usdc_dispatch_with_fiat_usd() {
 
 #[test]
 fn x402_with_verified_approval_rejects_a_non_bound_accepted_token() {
-    // (P2 round-7) A normal Base/USDC approval (rail token USDC, fiat currency
+    // A normal Base/USDC approval (rail token USDC, fiat currency
     // USD) must still REJECT an accepted-token list that does not contain the
     // bound rail token: offering to settle in EURC when the approval bound USDC
     // must fail closed, even though the dispatch's fiat currency is USD and so
@@ -1996,7 +1998,7 @@ fn x402_with_verified_approval_rejects_a_non_bound_accepted_token() {
 
 #[test]
 fn x402_with_verified_approval_filters_a_non_bound_accepted_token() {
-    // (P2 round-7) When accepted_tokens lists BOTH the bound rail token and a
+    // When accepted_tokens lists BOTH the bound rail token and a
     // non-bound one (USDC bound, [USDC, EURC] offered), the lane must filter the
     // list down to the bound token so EURC is never advertised to the
     // facilitator, while the fiat USD settlement currency stays separate.
@@ -2022,7 +2024,7 @@ fn x402_with_verified_approval_filters_a_non_bound_accepted_token() {
 
 #[test]
 fn x402_with_verified_approval_rejects_a_non_eip155_dispatch_chain() {
-    // (6) Chain from dispatch. A dispatch whose chain_id is not a valid
+    // Chain from dispatch. A dispatch whose chain_id is not a valid
     // eip155 namespace cannot be coerced into a numeric chain id, so the
     // verifier fails closed before binding.
     let mut dispatch = sample_dispatch();
@@ -2045,7 +2047,7 @@ fn x402_with_verified_approval_rejects_a_non_eip155_dispatch_chain() {
 }
 
 // -----------------------------------------------------------------
-// C2: EIP-3009 lane binds against the verified approval.
+// EIP-3009 lane binds against the verified approval.
 // -----------------------------------------------------------------
 
 /// The approval binding that matches `sample_authorization` on the EIP-3009
@@ -2142,7 +2144,7 @@ fn eip3009_with_verified_approval_rejects_an_expired_authorization() {
 }
 
 // -----------------------------------------------------------------
-// C2: Circle lane binds against the verified approval.
+// Circle lane binds against the verified approval.
 // -----------------------------------------------------------------
 
 fn sample_circle_policy() -> CircleNanopaymentPolicy {
@@ -2235,12 +2237,12 @@ fn circle_with_verified_approval_rejects_binding_mismatches() {
 }
 
 // -----------------------------------------------------------------
-// C2 round-6: single-use, lane-use expiry, and accepted-token filtering.
+// Single-use issuance, lane-use expiry, and accepted-token filtering.
 // -----------------------------------------------------------------
 
 #[test]
 fn x402_filters_extra_accepted_tokens_down_to_the_bound_token() {
-    // (6) Filter x402 accepted_tokens. The approval is bound to
+    // Filter x402 accepted_tokens. The approval is bound to
     // DISPATCH_TOKEN_SYMBOL but the caller offers `[bound, EURC, USDC]`. A
     // membership check alone would return the whole list and still advertise
     // EURC/USDC to the facilitator; the lane must filter the list down to the
@@ -2270,7 +2272,7 @@ fn x402_filters_extra_accepted_tokens_down_to_the_bound_token() {
 
 #[test]
 fn x402_rejects_settlement_after_approval_expiry_at_lane_use() {
-    // (5) Re-check expiry at x402 lane use. The witness is verified inside its
+    // Re-check expiry at x402 lane use. The witness is verified inside its
     // window (`approval_expires_at == APPROVAL_NOW + 100`) but the lane is
     // exercised at `approval_expires_at` (held past expiry). The lane-use clock
     // must reject it, so a witness verified just before expiry cannot build
@@ -2297,7 +2299,7 @@ fn x402_rejects_settlement_after_approval_expiry_at_lane_use() {
 
 #[test]
 fn circle_rejects_settlement_after_approval_expiry_at_lane_use() {
-    // (5) Re-check expiry at Circle lane use. Same scenario as the x402 lane:
+    // Re-check expiry at Circle lane use. Same scenario as the x402 lane:
     // a witness held until `approval_expires_at` must be rejected before any
     // payout is prepared.
     let dispatch = sample_dispatch();
@@ -2319,7 +2321,7 @@ fn circle_rejects_settlement_after_approval_expiry_at_lane_use() {
 
 #[test]
 fn eip3009_rejects_settlement_after_approval_expiry_at_lane_use() {
-    // (5) Re-check expiry at EIP-3009 lane use. The approval window closes at
+    // Re-check expiry at EIP-3009 lane use. The approval window closes at
     // its `approval_expires_at`; exercising the lane at that instant (now ==
     // approval_expires_at) must be rejected by the lane-use expiry re-check
     // before any digest is built, even though the rest of the binding matches.
@@ -2345,7 +2347,7 @@ fn eip3009_rejects_settlement_after_approval_expiry_at_lane_use() {
 
 #[test]
 fn a_consumed_witness_cannot_authorize_a_second_transfer() {
-    // (2) Single-use witness. The EIP-3009 lane CONSUMES the witness by value,
+    // Single-use witness. The EIP-3009 lane CONSUMES the witness by value,
     // so a single witness prepares exactly one transfer. The witness is moved
     // into the first call and `VerifiedApproval` is NOT `Clone`, so it cannot
     // be retained and reused with a fresh EIP-3009 nonce to forge a second
@@ -2402,8 +2404,8 @@ fn a_consumed_witness_cannot_authorize_a_second_transfer() {
 }
 
 // -----------------------------------------------------------------
-// C2 round-8 (P2): fiat-currency max_amount clamp, dispatch identity
-// binding, and contract-pinned approvals on the symbol-only x402 lane.
+// Fiat-currency max_amount clamp, dispatch-identity binding, and
+// contract-pinned approvals on the symbol-only x402 lane.
 // -----------------------------------------------------------------
 
 /// An x402 binding over the sample dispatch's chain/payee/amount/identity but
@@ -2440,10 +2442,10 @@ fn intent_and_token_for_x402_with_fiat_max(
 
 #[test]
 fn x402_witness_with_fiat_max_amount_and_usdc_rail_is_accepted_and_still_clamps() {
-    // (P2 round-8) A valid Base/USDC x402 approval binds the RAIL token USDC but
+    // A valid Base/USDC x402 approval binds the RAIL token USDC but
     // settles a fiat amount in USD, and ALSO carries a fiat `max_amount` (USD)
-    // as a budget clamp. The round-7 clamp compared the rail token (USDC) to
-    // `max_amount.currency` (USD) and wrongly rejected the witness, forcing
+    // as a budget clamp. Comparing the rail token (USDC) to
+    // `max_amount.currency` (USD) would wrongly reject the witness, forcing
     // callers to DROP `max_amount` to use the path (losing the budget clamp).
     // The clamp must compare `max_amount` against the FIAT settlement currency,
     // so this verifies AND the x402 lane advertises the rail token.
@@ -2487,10 +2489,10 @@ fn x402_witness_with_fiat_max_amount_and_usdc_rail_is_accepted_and_still_clamps(
 
 #[test]
 fn x402_fiat_max_amount_still_clamps_an_over_budget_binding() {
-    // (P2 round-8) The fiat clamp is not weakened: a binding whose amount
+    // The fiat clamp is not weakened: a binding whose amount
     // exceeds the intent's fiat `max_amount` (both in USD) must still be
     // rejected at verification, even though the rail token is USDC. This proves
-    // the clamp now exercises the fiat currency rather than being silently
+    // the clamp exercises the fiat currency rather than being silently
     // dropped.
     let approver = Keypair::generate();
     let subject = Keypair::generate();
@@ -2515,7 +2517,7 @@ fn x402_fiat_max_amount_still_clamps_an_over_budget_binding() {
 
 #[test]
 fn x402_fiat_max_amount_rejects_a_mismatched_fiat_currency() {
-    // (P2 round-8) The currency half of the clamp now compares against the FIAT
+    // The currency half of the clamp compares against the FIAT
     // settlement currency. A binding whose fiat settlement currency is EUR while
     // the intent's max_amount approves USD must be rejected: the clamp must not
     // silently accept a different fiat currency just because the rail token
@@ -2551,7 +2553,7 @@ fn sample_dispatch_with_other_dispatch_id() -> Web3SettlementDispatchArtifact {
 
 #[test]
 fn x402_rejects_a_witness_paired_with_a_different_dispatch_id() {
-    // (P2 round-8) The witness is bound to the canonical dispatch identity
+    // The witness is bound to the canonical dispatch identity
     // (dispatch-web3-1), but the caller presents a DIFFERENT dispatch with the
     // same chain/payee/amount/token and a different `dispatch_id`. Without the
     // dispatch-identity binding the x402 wrapper would happily produce
@@ -2576,7 +2578,7 @@ fn x402_rejects_a_witness_paired_with_a_different_dispatch_id() {
 
 #[test]
 fn circle_rejects_a_witness_paired_with_a_different_dispatch_id() {
-    // (P2 round-8) Same scenario on the Circle lane: the prepared payout copies
+    // Same scenario on the Circle lane: the prepared payout copies
     // `dispatch.dispatch_id`, so a witness bound to dispatch-web3-1 must not
     // produce a payout for a different dispatch carrying the same economics.
     let other = sample_dispatch_with_other_dispatch_id();
@@ -2596,7 +2598,7 @@ fn circle_rejects_a_witness_paired_with_a_different_dispatch_id() {
 
 #[test]
 fn x402_rejects_a_witness_paired_with_a_different_capability_id() {
-    // (P2 round-8) The x402 requirements echo a capability id resolved from the
+    // The x402 requirements echo a capability id resolved from the
     // dispatch. A witness whose signed binding pins a DIFFERENT capability id
     // (modeling an approval issued for another dispatch's capability with the
     // same economics) must fail closed against the live dispatch's resolved
@@ -2629,7 +2631,7 @@ fn x402_rejects_a_witness_paired_with_a_different_capability_id() {
 
 #[test]
 fn x402_rejects_a_witness_with_no_bound_dispatch_identity() {
-    // (P2 round-8) Defense in depth: the dispatch-bearing lane requires a
+    // Defense in depth: the dispatch-bearing lane requires a
     // SIGNED dispatch identity. A witness whose binding pins no dispatch id (for
     // example one resolved for a non-x402 use) must not settle on the x402 lane.
     let mut binding = dispatch_binding();
@@ -2655,7 +2657,7 @@ fn x402_rejects_a_witness_with_no_bound_dispatch_identity() {
 
 #[test]
 fn x402_rejects_a_contract_pinned_approval_on_the_symbol_only_lane() {
-    // (P2 round-8) When the signed binding pins a concrete `token_contract`, the
+    // When the signed binding pins a concrete `token_contract`, the
     // verifier proved THAT contract was approved. The x402 lane identifies its
     // token by SYMBOL only and returns requirements with no contract identity,
     // so a facilitator resolving the symbol to a DIFFERENT contract could settle
