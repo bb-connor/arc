@@ -1726,6 +1726,135 @@ async fn sidecar_release_reaches_a_replica_booted_before_the_revocation() {
 }
 
 #[tokio::test]
+async fn sidecar_validate_capability_honors_a_durable_only_revocation() {
+    let receipt_db = temp_receipt_db_path();
+
+    // Replica B mints a token and keeps serving; its in-memory revocation set is
+    // never reloaded after boot.
+    let replica_b = test_state_with_receipt_db(
+        Vec::new(),
+        "http://127.0.0.1:1".to_string(),
+        Some(&receipt_db),
+    );
+    let mint_response = build_app(Arc::clone(&replica_b))
+        .oneshot(loopback_post(
+            "/v1/capabilities",
+            serde_json::json!({
+                "subject": Keypair::generate().public_key().to_hex(),
+                "scope": { "grants": [], "resource_grants": [], "prompt_grants": [] },
+                "ttl_seconds": 600,
+            }),
+        ))
+        .await
+        .test_unwrap();
+    let token: CapabilityToken = serde_json::from_slice(
+        &to_bytes(mint_response.into_body(), 1024 * 1024)
+            .await
+            .test_unwrap(),
+    )
+    .test_unwrap();
+
+    // Replica A releases the capability on the shared durable store.
+    let replica_a = test_state_with_receipt_db(
+        Vec::new(),
+        "http://127.0.0.1:1".to_string(),
+        Some(&receipt_db),
+    );
+    let release_response = build_app(Arc::clone(&replica_a))
+        .oneshot(loopback_post(
+            "/v1/capabilities/release",
+            serde_json::json!({ "capability_id": token.id, "reason": "completed" }),
+        ))
+        .await
+        .test_unwrap();
+    assert_eq!(release_response.status(), StatusCode::OK);
+
+    // Replica B never reloaded its in-memory set, yet validate consults the
+    // durable store and reports the token as revoked. Without that lookup the
+    // freshly minted, trusted, signed token would validate as live.
+    assert!(replica_b.revoked_capability_ids.lock().await.is_empty());
+    let validate_response = build_app(Arc::clone(&replica_b))
+        .oneshot(loopback_post(
+            "/v1/capabilities/validate",
+            serde_json::to_value(&token).test_unwrap(),
+        ))
+        .await
+        .test_unwrap();
+    let json: serde_json::Value = serde_json::from_slice(
+        &to_bytes(validate_response.into_body(), 1024 * 1024)
+            .await
+            .test_unwrap(),
+    )
+    .test_unwrap();
+    assert_eq!(json["valid"], false);
+    assert!(json["reason"].as_str().test_unwrap().contains("revoked"));
+
+    let _ = std::fs::remove_file(&receipt_db);
+    let _ = std::fs::remove_file(format!("{receipt_db}.revocations"));
+}
+
+#[tokio::test]
+async fn sidecar_evaluate_tool_call_honors_a_durable_only_revocation() {
+    let receipt_db = temp_receipt_db_path();
+
+    let replica_b = test_state_with_receipt_db(
+        Vec::new(),
+        "http://127.0.0.1:1".to_string(),
+        Some(&receipt_db),
+    );
+    let replica_a = test_state_with_receipt_db(
+        Vec::new(),
+        "http://127.0.0.1:1".to_string(),
+        Some(&receipt_db),
+    );
+
+    // Replica A releases the capability on the shared durable store.
+    let release_response = build_app(Arc::clone(&replica_a))
+        .oneshot(loopback_post(
+            "/v1/capabilities/release",
+            serde_json::json!({ "capability_id": "cap-durable-revoked" }),
+        ))
+        .await
+        .test_unwrap();
+    assert_eq!(release_response.status(), StatusCode::OK);
+
+    // Replica B never reloaded its in-memory set, yet the advisory evaluation
+    // consults the durable store and drops the call as revoked. Without that
+    // lookup the advisory checks would report as passed.
+    assert!(replica_b.revoked_capability_ids.lock().await.is_empty());
+    let evaluate_response = build_app(Arc::clone(&replica_b))
+        .oneshot(loopback_post(
+            "/v1/evaluate/advisory",
+            serde_json::json!({
+                "capability_id": "cap-durable-revoked",
+                "tool_server": "fs",
+                "tool_name": "read",
+                "parameters": {},
+            }),
+        ))
+        .await
+        .test_unwrap();
+    assert_eq!(evaluate_response.status(), StatusCode::OK);
+    let receipt_bytes = to_bytes(evaluate_response.into_body(), 1024 * 1024)
+        .await
+        .test_unwrap();
+    let (_body, receipt) = parse_advisory_evaluation_body(&receipt_bytes);
+    assert_eq!(
+        receipt.observation_outcome,
+        Some(ObservationOutcome::Dropped)
+    );
+    let alias_outcome = receipt
+        .metadata
+        .as_ref()
+        .and_then(|m| m.get("advisory_check_outcome"))
+        .and_then(|v| v.as_str());
+    assert_eq!(alias_outcome, Some("capability_revoked"));
+
+    let _ = std::fs::remove_file(&receipt_db);
+    let _ = std::fs::remove_file(format!("{receipt_db}.revocations"));
+}
+
+#[tokio::test]
 async fn sidecar_release_requires_persistent_receipt_store() {
     let state = test_state(
         vec![RouteEntry {

@@ -670,12 +670,9 @@ pub(crate) async fn sidecar_validate_capability_handler(
     let expires_at = Some(token.expires_at);
 
     // Fail-closed: revoked capabilities are invalid even if the signature
-    // verifies and `expires_at` is in the future.
-    let revoked = state
-        .revoked_capability_ids
-        .lock()
-        .await
-        .contains(&capability_id);
+    // verifies and `expires_at` is in the future. Consult the durable store as
+    // well so a revocation a sibling replica recorded is honored here too.
+    let revoked = state.capability_is_revoked(&capability_id).await;
     if revoked {
         return (
             StatusCode::OK,
@@ -1075,10 +1072,8 @@ pub(crate) async fn sidecar_evaluate_tool_call_handler(
         .map(|hash| hash.trim().to_ascii_lowercase());
 
     let revoked = state
-        .revoked_capability_ids
-        .lock()
-        .await
-        .contains(&evaluate_request.capability_id);
+        .capability_is_revoked(&evaluate_request.capability_id)
+        .await;
 
     let hash_mismatch = match claimed_hash.as_ref() {
         Some(claimed) => !claimed.is_empty() && *claimed != parameter_hash,

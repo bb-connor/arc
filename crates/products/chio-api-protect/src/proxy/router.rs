@@ -337,29 +337,11 @@ pub(crate) async fn find_revoked_capability_id(
 ) -> Option<String> {
     let capability_id = presented_capability_id(raw_capability)
         .or_else(|| capability_id_hint.map(ToOwned::to_owned))?;
-    if state
-        .revoked_capability_ids
-        .lock()
-        .await
-        .contains(&capability_id)
-    {
-        return Some(capability_id);
+    if state.capability_is_revoked(&capability_id).await {
+        Some(capability_id)
+    } else {
+        None
     }
-    // The in-memory set is loaded once at boot, so a revocation recorded by a
-    // sibling replica after this process started is only visible in the shared
-    // durable store. Consult it before admitting the capability, and fail closed
-    // if the store cannot confirm the capability is live.
-    if let Some(revocation_store) = &state.revocation_store {
-        match revocation_store.is_revoked(&capability_id) {
-            Ok(false) => {}
-            Ok(true) => return Some(capability_id),
-            Err(error) => {
-                warn!("failed to query durable revocation store: {error}");
-                return Some(capability_id);
-            }
-        }
-    }
-    None
 }
 
 pub(crate) async fn revoked_proxy_response(

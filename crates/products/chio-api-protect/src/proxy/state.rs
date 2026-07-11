@@ -174,6 +174,35 @@ pub(crate) struct ProxyState {
     pub(crate) revocation_backend: &'static str,
 }
 
+impl ProxyState {
+    /// Whether a capability has been revoked. The in-memory set is loaded once at
+    /// boot, so a revocation a sibling replica recorded after this process
+    /// started is only visible in the shared durable store; consult it as well.
+    /// Fails closed: if the durable store cannot be queried, treat the capability
+    /// as revoked rather than admit one that may have been released.
+    pub(crate) async fn capability_is_revoked(&self, capability_id: &str) -> bool {
+        if self
+            .revoked_capability_ids
+            .lock()
+            .await
+            .contains(capability_id)
+        {
+            return true;
+        }
+        if let Some(revocation_store) = &self.revocation_store {
+            match revocation_store.is_revoked(capability_id) {
+                Ok(false) => {}
+                Ok(true) => return true,
+                Err(error) => {
+                    warn!("failed to query durable revocation store: {error}");
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
 /// The protect proxy.
 pub struct ProtectProxy {
     config: ProtectConfig,
