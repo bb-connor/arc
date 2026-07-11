@@ -626,6 +626,10 @@ pub(super) fn rotate_on_writer_connection(
     // that predates this pragma so the first rotation on the drained writer
     // starts reclaiming freed pages. A no-op once migrated.
     super::support::migrate_auto_vacuum_incremental_if_needed(connection)?;
+    // The delete transaction writes archived ids into the tombstone table; make
+    // sure it and its reuse-reject triggers exist even on a store opened before
+    // this migration.
+    super::support::ensure_receipt_retention_tombstones(connection)?;
     let Some(cutoff) = resolve_rotation_cutoff(connection, config)? else {
         return Ok(0);
     };
@@ -1095,6 +1099,14 @@ fn delete_archived_prefix_in_tx(
         DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete;
         DROP TRIGGER IF EXISTS chio_child_receipts_reject_delete;
         DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete;
+
+        -- Tombstone every archived receipt id BEFORE its claim-log row is
+        -- deleted so the append path still rejects a reused id once its live
+        -- UNIQUE(receipt_id) sentinel is gone. Idempotent for a re-run.
+        INSERT OR IGNORE INTO receipt_retention_tombstones
+            (receipt_id, receipt_kind, archived_through_entry_seq, tombstoned_at)
+            SELECT receipt_id, receipt_kind, {w}, {now}
+            FROM claim_receipt_log_entries WHERE entry_seq <= {w};
 
         DELETE FROM settlement_reconciliations WHERE receipt_id IN (
             SELECT receipt_id FROM claim_receipt_log_entries

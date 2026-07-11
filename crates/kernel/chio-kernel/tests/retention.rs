@@ -237,6 +237,48 @@ mod retention {
         let _ = fs::remove_file(&archive_path);
     }
 
+    /// Once a receipt id has been co-archived and deleted, re-appending it must
+    /// be rejected: the live UNIQUE(receipt_id) sentinel is gone, but the
+    /// archive already holds it, so accepting it as a new live receipt would
+    /// overlap the archived and live histories and make a lookup by that id
+    /// ambiguous.
+    #[test]
+    fn archived_receipt_id_cannot_be_reappended() {
+        let live_path = unique_db_path("retention-reuse-live");
+        let archive_path = unique_db_path("retention-reuse-archive");
+
+        let store = SqliteReceiptStore::open(&live_path).unwrap();
+        let kp = Keypair::generate();
+        let mut seqs = Vec::new();
+        for i in 0..3usize {
+            let receipt = receipt_with_ts_and_keypair(&format!("reuse-{i}"), 100 + i as u64, &kp);
+            seqs.push(store.append_chio_receipt_returning_seq(&receipt).unwrap());
+        }
+        checkpoint_range(&store, 1, seqs[0], seqs[2], &kp, None);
+
+        let archived = store
+            .archive_receipts_before(150, archive_path.to_str().unwrap())
+            .unwrap();
+        assert_eq!(archived, 3, "the checkpointed prefix archives");
+        assert_eq!(store.tool_receipt_count().unwrap(), 0);
+
+        // Replaying an archived id (a retry or a forged append) must fail rather
+        // than silently insert a second live copy.
+        let replay = receipt_with_ts_and_keypair("reuse-0", 100, &kp);
+        assert!(
+            store.append_chio_receipt_returning_seq(&replay).is_err(),
+            "an archived receipt id must not be re-appended as a new live receipt"
+        );
+        assert_eq!(
+            store.tool_receipt_count().unwrap(),
+            0,
+            "the rejected replay must not add an overlapping live row"
+        );
+
+        let _ = fs::remove_file(&live_path);
+        let _ = fs::remove_file(&archive_path);
+    }
+
     /// A repeated rotation at the same cutoff is a clean no-op: the watermark
     /// already covers the archived prefix, so nothing new is archived and the
     /// live store is untouched (monotonic watermark, idempotent re-run).

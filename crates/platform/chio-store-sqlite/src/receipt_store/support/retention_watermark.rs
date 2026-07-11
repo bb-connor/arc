@@ -56,6 +56,50 @@ pub(crate) fn ensure_receipt_retention_watermark_table(
     Ok(())
 }
 
+/// Tombstones for receipt ids removed from the live store by a retention
+/// rotation, plus the DB triggers that keep an archived id from being reused.
+///
+/// A rotation deletes the live receipt rows (and their `UNIQUE(receipt_id)`
+/// sentinel) once they are co-archived. Without a record of what left, the
+/// append path's `ON CONFLICT(receipt_id) DO NOTHING` sees an archived id as
+/// brand new and inserts a second live receipt/claim-log entry for it, so a
+/// retry or a forged append overlaps the archived and live histories and makes a
+/// point lookup by receipt id ambiguous. The tombstone table preserves the
+/// uniqueness sentinel across archival (one small row per archived id, not the
+/// full receipt), and the two `BEFORE INSERT` triggers RAISE(ABORT) any source
+/// insert whose id is tombstoned, DB-enforced like the immutability guards so a
+/// writer that bypasses the Rust append path still cannot resurrect an archived
+/// id. Created on every writable open (new and existing).
+pub(crate) fn ensure_receipt_retention_tombstones(
+    connection: &rusqlite::Connection,
+) -> Result<(), ReceiptStoreError> {
+    connection.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS receipt_retention_tombstones (
+            receipt_id                 TEXT PRIMARY KEY,
+            receipt_kind               TEXT NOT NULL,
+            archived_through_entry_seq INTEGER NOT NULL,
+            tombstoned_at              INTEGER NOT NULL
+        );
+
+        CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_archived_reuse
+        BEFORE INSERT ON chio_tool_receipts
+        WHEN EXISTS (SELECT 1 FROM receipt_retention_tombstones WHERE receipt_id = NEW.receipt_id)
+        BEGIN
+            SELECT RAISE(ABORT, 'receipt_id was archived by retention and cannot be re-appended');
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS chio_child_receipts_reject_archived_reuse
+        BEFORE INSERT ON chio_child_receipts
+        WHEN EXISTS (SELECT 1 FROM receipt_retention_tombstones WHERE receipt_id = NEW.receipt_id)
+        BEGIN
+            SELECT RAISE(ABORT, 'receipt_id was archived by retention and cannot be re-appended');
+        END;
+        "#,
+    )?;
+    Ok(())
+}
+
 /// The current effective archival watermark, or `None` if the store has never
 /// archived (no ledger rows).
 ///

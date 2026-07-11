@@ -1078,6 +1078,7 @@ impl SqliteReceiptStore {
         super::support::drop_transparency_projection_guards(&connection)?;
         let backfill_result = (|| -> Result<(), ReceiptStoreError> {
             super::support::ensure_receipt_retention_watermark_table(&connection)?;
+            super::support::ensure_receipt_retention_tombstones(&connection)?;
             backfill_tool_receipt_attribution_columns(&connection)?;
             super::support::backfill_provenance_lineage_tables(&mut connection)?;
             super::support::backfill_claim_receipt_log_entries(&mut connection)?;
