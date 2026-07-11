@@ -908,6 +908,78 @@ fn bricked_store_repair_restores_append() -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
+/// A store created before the retention migration and bricked by old deletes
+/// has no watermark ledger, and repair opens it via `open_existing` (which does
+/// not run the writable open() migration). Repair must create the ledger before
+/// recording the repair watermark; otherwise the watermark insert fails on a
+/// missing table, rolls the whole repair transaction back, and leaves the
+/// legacy store unrepaired.
+#[test]
+fn repair_creates_missing_watermark_ledger_on_legacy_store(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("legacy-repair-watermark");
+    let archive = unique_db_path("legacy-repair-watermark-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+        for i in 0..4u64 {
+            let r = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("lg-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store.append_chio_receipt_returning_seq(&r)?;
+        }
+        store.flush_receipt_writes()?;
+        // Fabricate a legacy bricked state: co-archive the claim-log for [1,2],
+        // delete only the source rows (set drift), AND drop the watermark ledger
+        // so the store looks like it predates the retention migration.
+        store.writer_handle().run_write({
+            let archive_path = archive_path.to_string();
+            move |connection| {
+                let escaped = archive_path.replace('\'', "''");
+                connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
+                connection.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries \
+                       (entry_seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, receipt_kind TEXT NOT NULL, \
+                        source_seq INTEGER NOT NULL, timestamp INTEGER NOT NULL, capability_id TEXT, session_id TEXT, \
+                        parent_request_id TEXT, request_id TEXT, subject_key TEXT, issuer_key TEXT, tool_server TEXT, \
+                        tool_name TEXT, raw_json TEXT NOT NULL); \
+                     INSERT OR IGNORE INTO archive.claim_receipt_log_entries \
+                       SELECT * FROM main.claim_receipt_log_entries WHERE entry_seq <= 2; \
+                     DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
+                     DELETE FROM main.chio_tool_receipts WHERE seq <= 2; \
+                     CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
+                       BEFORE DELETE ON chio_tool_receipts \
+                       BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END; \
+                     DROP TABLE IF EXISTS receipt_retention_watermark;",
+                )?;
+                connection.execute_batch("DETACH DATABASE archive")?;
+                Ok(())
+            }
+        })?;
+    }
+
+    // Repair via open_existing (skips backfill). Without the ledger creation the
+    // watermark insert fails with "no such table: receipt_retention_watermark".
+    let store = SqliteReceiptStore::open_existing(&path)?;
+    let removed = store.retention_repair(archive_path)?;
+    assert!(removed > 0, "repair removed the extra claim-log rows");
+    drop(store);
+
+    // The repair recorded a watermark and the store reopens healthy.
+    let repaired = SqliteReceiptStore::open(&path)?;
+    assert!(repaired.receipt_store_health()?.healthy);
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// Co-archival identity must pin the receipt-table primary key `seq`, not just
 /// `receipt_id` + `raw_json`. The projection's `source_seq` (copied verbatim)
 /// points at that `seq`, so an archive that already holds the same receipt under

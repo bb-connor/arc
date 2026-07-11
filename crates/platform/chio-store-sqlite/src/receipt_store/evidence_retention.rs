@@ -1114,6 +1114,12 @@ pub(super) fn retention_repair_on_writer(
             params![entry_seq],
         )?;
     }
+    // A store created before the retention migration has no watermark ledger,
+    // and repair runs on an `open_existing` connection, which skips the writable
+    // open() migration that would create it. Create the ledger before recording
+    // the repair watermark; otherwise the insert fails on a missing table and
+    // rolls the whole repair back, leaving the bricked store unrepaired.
+    super::support::ensure_receipt_retention_watermark_table(&tx)?;
     insert_receipt_retention_watermark(&tx, rounded_watermark, now, archive_path, None, now)?;
     ensure_transparency_projection_guards(&tx)?;
     tx.commit()?;
