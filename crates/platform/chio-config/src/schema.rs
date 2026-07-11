@@ -55,6 +55,29 @@ pub struct KernelConfig {
     /// Log level override for the kernel.
     #[serde(default = "default_log_level")]
     pub log_level: String,
+
+    /// Hot-path wall-clock budgets. Optional; validated at load.
+    #[serde(default)]
+    pub deadlines: KernelDeadlinesFileConfig,
+}
+
+/// Config-file surface for the runtime hot-path deadline budgets. Only the
+/// scalar budgets are exposed here; the per-guard and per-server override maps
+/// are set programmatically. All fields optional so an absent
+/// `[kernel.deadlines]` table is valid.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KernelDeadlinesFileConfig {
+    #[serde(default)]
+    pub guard_pipeline_budget_ms: Option<u64>,
+    #[serde(default)]
+    pub dispatch_budget_ms: Option<u64>,
+    #[serde(default)]
+    pub receipt_append_budget_ms: Option<u64>,
+    #[serde(default)]
+    pub receipt_writer_poll_ms: Option<u64>,
+    #[serde(default)]
+    pub receipt_writer_stall_ms: Option<u64>,
 }
 
 /// A single adapter entry that connects to an upstream API.
