@@ -178,7 +178,7 @@ impl ChioPassConfig {
         // BOARD-PENDING: replace with the ratified launch governance reference once
         // the board vote lands. This audit-only ref records provenance and never
         // enters any arithmetic; it is non-empty so `validate` accepts the surface.
-        let board_approval_ref = "board-approval-pending/chio-pass-M1-launch".to_string();
+        let board_approval_ref = "board-approval-pending/chio-pass-launch".to_string();
         // BOARD-PENDING: monthly aggregate free-tier POOL ceiling, in XCC. Documented
         // launch default = active_population_cap (100_000) x the attested tier floor
         // (1_000 XCC). The pool ceiling makes liability min(N x allotment, pool), so
