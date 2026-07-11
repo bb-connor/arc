@@ -211,6 +211,16 @@ fn require_durable_or_ephemeral_optin(
     Ok(())
 }
 
+/// The receipt-store path to hand the proxy as a durable backend, or `None` when
+/// the configured path only opens an in-memory database. The boot gate already
+/// forces an explicit ephemeral opt-in for in-memory paths; passing such a path
+/// on as `receipt_db` would make the proxy open in-memory stores yet advertise a
+/// durable receipt backend, so it is mapped to the same no-store path an operator
+/// gets from `--allow-ephemeral-receipts` without a `--receipt-store`.
+fn durable_receipt_db_path(receipt_store: Option<&Path>) -> Option<&Path> {
+    receipt_store.filter(|path| !is_in_memory_sqlite_path(path))
+}
+
 pub(crate) fn cmd_api_protect(
     upstream: &str,
     spec_path: Option<&Path>,
@@ -243,7 +253,7 @@ pub(crate) fn cmd_api_protect(
             spec_content: None,
             spec_path: spec_path.map(|path| path.display().to_string()),
             listen_addr: listen_addr.to_string(),
-            receipt_db: receipt_store.map(|path| path.display().to_string()),
+            receipt_db: durable_receipt_db_path(receipt_store).map(|path| path.display().to_string()),
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
@@ -307,7 +317,7 @@ pub(crate) fn cmd_start(
             spec_content: Some(CHIO_START_SIDECAR_OPENAPI_SPEC.to_string()),
             spec_path: None,
             listen_addr: listen_addr.to_string(),
-            receipt_db: receipt_store.map(|path| path.display().to_string()),
+            receipt_db: durable_receipt_db_path(receipt_store).map(|path| path.display().to_string()),
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
@@ -1288,6 +1298,29 @@ mod runtime_local_error_domain_tests {
             )
             .is_ok(),
             "a filesystem receipt path is durable and needs no ephemeral opt-in"
+        );
+    }
+
+    #[test]
+    fn in_memory_receipt_store_is_not_carried_through_as_durable() {
+        // An in-memory path that cleared the boot gate must not reach the proxy
+        // as a receipt_db, or the proxy opens in-memory stores yet reports a
+        // durable receipt backend. It collapses to the no-store ephemeral path.
+        for sentinel in [
+            ":memory:",
+            "file::memory:",
+            "file:audit?mode=memory&cache=shared",
+        ] {
+            assert!(
+                durable_receipt_db_path(Some(Path::new(sentinel))).is_none(),
+                "in-memory path {sentinel} must not be treated as a durable receipt_db"
+            );
+        }
+        assert!(durable_receipt_db_path(None).is_none());
+        assert_eq!(
+            durable_receipt_db_path(Some(Path::new("/var/lib/chio/receipts.db"))),
+            Some(Path::new("/var/lib/chio/receipts.db")),
+            "a filesystem path is a durable receipt_db and passes through"
         );
     }
 
