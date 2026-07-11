@@ -204,17 +204,17 @@ impl BudgetNode {
     }
 }
 
-/// A draft spend that a caller wants to check against the tree. Every
-/// dimension is optional: a request that only consumes tokens sets only
-/// `tokens`.
+/// A draft spend that a caller wants to check against the tree. Dimension
+/// values are optional, but every path containing a monetary cap requires a
+/// matching currency even when `spend_units` is zero.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AggregateSpend {
     /// Spend in minor currency units.
     #[serde(default)]
     pub spend_units: u64,
 
-    /// Currency code associated with `spend_units`. Must match the
-    /// checked node's currency for spend limits to apply.
+    /// Currency code associated with `spend_units`. Missing or mismatched
+    /// currency denies evaluation against any spend-capped node.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub currency: Option<String>,
 
@@ -242,7 +242,7 @@ impl AggregateSpend {
         }
     }
 
-    /// Construct from a token count.
+    /// Construct from a token count without a currency.
     #[must_use]
     pub fn with_tokens(tokens: u64) -> Self {
         Self {
@@ -251,7 +251,7 @@ impl AggregateSpend {
         }
     }
 
-    /// Construct from a request count.
+    /// Construct from a request count without a currency.
     #[must_use]
     pub fn with_requests(requests: u64) -> Self {
         Self {
@@ -260,22 +260,12 @@ impl AggregateSpend {
         }
     }
 
-    /// Construct from a warehouse byte count.
+    /// Construct from a warehouse byte count without a currency.
     #[must_use]
     pub fn with_warehouse_bytes(bytes: u64) -> Self {
         Self {
             warehouse_bytes: bytes,
             ..Self::default()
-        }
-    }
-
-    fn saturating_add(&self, other: &Self) -> Self {
-        Self {
-            spend_units: self.spend_units.saturating_add(other.spend_units),
-            currency: self.currency.clone().or_else(|| other.currency.clone()),
-            tokens: self.tokens.saturating_add(other.tokens),
-            requests: self.requests.saturating_add(other.requests),
-            warehouse_bytes: self.warehouse_bytes.saturating_add(other.warehouse_bytes),
         }
     }
 }
@@ -350,6 +340,24 @@ pub enum BudgetDenyReason {
         /// The projected post-charge value, formatted as a decimal string.
         would_reach: String,
     },
+    /// A spend-capped node cannot compare the draft and current snapshot.
+    CurrencyMismatch {
+        /// The node whose monetary cap requires comparison.
+        node: BudgetNodeId,
+        /// Currency configured on the node.
+        node_currency: Option<String>,
+        /// Currency carried by the current snapshot.
+        current_currency: Option<String>,
+        /// Currency carried by the draft.
+        draft_currency: Option<String>,
+    },
+    /// Checked projection arithmetic overflowed.
+    ArithmeticOverflow {
+        /// The node whose projection overflowed.
+        node: BudgetNodeId,
+        /// Dimension whose projection overflowed.
+        dimension: String,
+    },
     /// The caller-supplied snapshot's window is older than allowed for
     /// this node's window. Callers should refresh the snapshot.
     WindowExpired {
@@ -369,7 +377,7 @@ pub enum BudgetDenyReason {
 pub enum BudgetDecision {
     /// The draft spend is within every ancestor's cap.
     Allow,
-    /// The draft spend would exceed a cap, or the leaf is unknown.
+    /// The draft is invalid, uncomparable, outside a cap, or the leaf is unknown.
     Deny {
         /// Cause of the denial. The tree deny path returns the
         /// closest-to-root offender so operators see the most restrictive
@@ -607,25 +615,48 @@ impl BudgetTree {
             }
             let zero = PerWindowSpend::default();
             let current_spend = current.per_node.get(node_id).unwrap_or(&zero);
-            let projected = current_spend.current.saturating_add(&draft);
             let limits = &node.limits;
 
             if let Some(cap) = limits.max_spend_units {
-                let currency_matches = match (&limits.currency, &draft.currency) {
-                    (Some(a), Some(b)) => a == b,
-                    // If the node has no currency or the draft has no
-                    // currency, the spend cap only activates on matched
-                    // currency; mismatched currency means we skip.
-                    _ => false,
+                let node_currency = limits.currency.as_deref();
+                let current_currency = current_spend.current.currency.as_deref();
+                let draft_currency = draft.currency.as_deref();
+                let current_matches = current_currency
+                    .map(|currency| Some(currency) == node_currency)
+                    .unwrap_or(current_spend.current.spend_units == 0);
+
+                if node_currency.is_none() || draft_currency != node_currency || !current_matches {
+                    offender = Some((
+                        idx,
+                        BudgetDenyReason::CurrencyMismatch {
+                            node: node_id.clone(),
+                            node_currency: limits.currency.clone(),
+                            current_currency: current_spend.current.currency.clone(),
+                            draft_currency: draft.currency.clone(),
+                        },
+                    ));
+                    continue;
+                }
+
+                let Some(projected_spend) = current_spend
+                    .current
+                    .spend_units
+                    .checked_add(draft.spend_units)
+                else {
+                    offender = Some((
+                        idx,
+                        BudgetDenyReason::ArithmeticOverflow {
+                            node: node_id.clone(),
+                            dimension: "spend".to_string(),
+                        },
+                    ));
+                    continue;
                 };
-                if currency_matches && projected.spend_units > cap {
-                    let cap_str =
-                        format!("{} {}", cap, limits.currency.clone().unwrap_or_default());
-                    let reach_str = format!(
-                        "{} {}",
-                        projected.spend_units,
-                        projected.currency.clone().unwrap_or_default()
-                    );
+
+                if projected_spend > cap {
+                    let currency = node_currency.unwrap_or_default();
+                    let cap_str = format!("{cap} {currency}");
+                    let reach_str = format!("{projected_spend} {currency}");
                     let candidate = BudgetDenyReason::DimensionExceeded {
                         node: node_id.clone(),
                         dimension: "spend".to_string(),
@@ -637,36 +668,45 @@ impl BudgetTree {
             }
 
             if let Some(cap) = limits.max_tokens {
-                if projected.tokens > cap {
+                let projected = current_spend.current.tokens.saturating_add(draft.tokens);
+                if projected > cap {
                     let candidate = BudgetDenyReason::DimensionExceeded {
                         node: node_id.clone(),
                         dimension: "tokens".to_string(),
                         cap: cap.to_string(),
-                        would_reach: projected.tokens.to_string(),
+                        would_reach: projected.to_string(),
                     };
                     offender = Some((idx, candidate));
                 }
             }
 
             if let Some(cap) = limits.max_requests {
-                if projected.requests > cap {
+                let projected = current_spend
+                    .current
+                    .requests
+                    .saturating_add(draft.requests);
+                if projected > cap {
                     let candidate = BudgetDenyReason::DimensionExceeded {
                         node: node_id.clone(),
                         dimension: "requests".to_string(),
                         cap: cap.to_string(),
-                        would_reach: projected.requests.to_string(),
+                        would_reach: projected.to_string(),
                     };
                     offender = Some((idx, candidate));
                 }
             }
 
             if let Some(cap) = limits.max_warehouse_bytes {
-                if projected.warehouse_bytes > cap {
+                let projected = current_spend
+                    .current
+                    .warehouse_bytes
+                    .saturating_add(draft.warehouse_bytes);
+                if projected > cap {
                     let candidate = BudgetDenyReason::DimensionExceeded {
                         node: node_id.clone(),
                         dimension: "warehouse_bytes".to_string(),
                         cap: cap.to_string(),
-                        would_reach: projected.warehouse_bytes.to_string(),
+                        would_reach: projected.to_string(),
                     };
                     offender = Some((idx, candidate));
                 }

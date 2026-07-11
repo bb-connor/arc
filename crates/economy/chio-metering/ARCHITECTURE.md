@@ -25,9 +25,11 @@ this crate performs deterministic aggregation, validation, and policy checks.
 - Invalid budget-tree shape rejects at construction or deserialization time.
 - Spend limits that set `max_spend_units` must include a non-empty currency, so
   monetary caps cannot silently become inert.
+- A spend-capped node denies drafts whose currency is absent or mismatched. A
+  snapshot currency must match when present and may be absent only at zero.
 - Budget evaluation never mutates caller-provided snapshots.
-- Overflows in spend aggregation, query totals, billing totals, and flat budget
-  counters saturate instead of wrapping.
+- Hierarchical monetary aggregation rejects overflow. Query totals, billing
+  totals, and flat budget counters saturate instead of wrapping.
 - Mixed-currency summaries omit aggregate monetary totals unless every included
   monetary record uses the same currency.
 - Hierarchical budget evaluation walks from leaf to root and returns the
@@ -40,4 +42,4 @@ violations, query filters, query grouping, export records, hierarchy insertion,
 hierarchy serialization, ancestor traversal, disabled nodes, and construction
 validation. Integration tests exercise hierarchy enforcement around parent
 caps, rolling-window reset behavior, multiple dimensions, and unknown node
-denial.
+denial, including currency mismatches and monetary overflow.

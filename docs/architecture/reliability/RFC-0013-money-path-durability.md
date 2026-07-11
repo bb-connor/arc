@@ -655,15 +655,18 @@ implementation is a follow-up tracked in the wave-3 program.
 
 ### F72: fail-closed currency mismatch in BudgetTree
 
-Add a `BudgetDenyReason` variant and deny instead of skip. In `budget_hierarchy.rs`:
+Add typed mismatch and overflow denials. In `budget_hierarchy.rs`:
 
 ```rust
-/// A spend cap exists but the draft currency is absent or differs from the node's.
-/// Fail-closed: an uncomparable spend cap denies rather than being skipped.
 CurrencyMismatch {
     node: BudgetNodeId,
     node_currency: Option<String>,
+    current_currency: Option<String>,
     draft_currency: Option<String>,
+},
+ArithmeticOverflow {
+    node: BudgetNodeId,
+    dimension: String,
 },
 ```
 
@@ -671,26 +674,49 @@ Replace the skip at `budget_hierarchy.rs:613-637`:
 
 ```rust
 if let Some(cap) = limits.max_spend_units {
-    match (&limits.currency, &draft.currency) {
-        (Some(node_c), Some(draft_c)) if node_c == draft_c => {
-            if projected.spend_units > cap { /* DimensionExceeded as today */ }
-        }
-        _ => {
-            offender = Some((idx, BudgetDenyReason::CurrencyMismatch {
+    let comparable = limits.currency.as_deref().is_some_and(|currency| {
+        draft.currency.as_deref() == Some(currency)
+            && match current_spend.current.currency.as_deref() {
+                Some(current) => current == currency,
+                None => current_spend.current.spend_units == 0,
+            }
+    });
+    if !comparable {
+        offender = Some((
+            idx,
+            BudgetDenyReason::CurrencyMismatch {
                 node: node_id.clone(),
                 node_currency: limits.currency.clone(),
+                current_currency: current_spend.current.currency.clone(),
                 draft_currency: draft.currency.clone(),
-            }));
-        }
+            },
+        ));
+        continue;
     }
+    let Some(projected_spend) = current_spend
+        .current
+        .spend_units
+        .checked_add(draft.spend_units)
+    else {
+        offender = Some((
+            idx,
+            BudgetDenyReason::ArithmeticOverflow {
+                node: node_id.clone(),
+                dimension: "spend".to_string(),
+            },
+        ));
+        continue;
+    };
 }
 ```
 
 This realizes ADR-0006's stated fail-closed stance on cross-currency comparison at the
 tree layer (the ADR notes the kernel per-invocation check already fails a USD-vs-EUR
-mismatch; this closes the same gap in the hierarchy). Tree-load validation may
-additionally reject a tree whose nodes disagree on currency, so the mismatch is caught
-at config time; the runtime deny remains as the fail-closed backstop.
+mismatch; this closes the same gap in the hierarchy). The existing
+`DimensionExceeded` branch compares `projected_spend` with `cap` only after these
+checks. A present snapshot currency must match even when the current amount is zero.
+An absent snapshot currency is valid only for a zero amount, which adopts the matched
+draft currency for the projection.
 
 ### F73: durable SQLite EIP-3009 nonce store
 
