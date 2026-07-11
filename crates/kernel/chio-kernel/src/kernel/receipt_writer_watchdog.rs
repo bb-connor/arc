@@ -45,6 +45,15 @@ impl ReceiptWriterWatchdogHandle {
         }
     }
 
+    /// Whether a background poll task is currently installed.
+    #[cfg(test)]
+    pub(crate) fn is_running(&self) -> bool {
+        match self.join.lock() {
+            Ok(join) => join.is_some(),
+            Err(poisoned) => poisoned.into_inner().is_some(),
+        }
+    }
+
     pub(crate) async fn shutdown(&self) {
         let handle = {
             let mut join = match self.join.lock() {

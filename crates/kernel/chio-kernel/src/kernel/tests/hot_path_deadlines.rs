@@ -589,3 +589,24 @@ fn always_offload_moves_guards_off_the_async_worker_without_a_timer(
     });
     Ok(())
 }
+
+#[test]
+fn watchdog_does_not_start_without_a_timer() -> Result<(), Box<dyn std::error::Error>> {
+    // Starting the watchdog in a runtime with no time driver would panic when its
+    // poll interval is constructed. It must degrade to not starting instead, and
+    // the pre-dispatch gate keeps sampling the store directly.
+    let kernel = Arc::new(make_kernel(make_config()));
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+    runtime.block_on(async {
+        assert!(
+            !super::dispatch::dispatch_timer_available(),
+            "the test runtime must be timerless"
+        );
+        kernel.spawn_receipt_writer_watchdog();
+        assert!(
+            !kernel.receipt_writer_watchdog_is_running(),
+            "no watchdog poll task may start without a time driver"
+        );
+    });
+    Ok(())
+}

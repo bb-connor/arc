@@ -379,10 +379,24 @@ impl ChioKernel {
             .publish(self.sample_receipt_writer_liveness());
     }
 
+    /// Whether the background receipt-writer watchdog poll task is installed.
+    #[cfg(test)]
+    pub(crate) fn receipt_writer_watchdog_is_running(&self) -> bool {
+        self.receipt_writer_watchdog.is_running()
+    }
+
     /// Start the receipt-writer liveness watchdog. Opt-in: the hosting edge
     /// calls this in an async context. It polls the store's liveness on the
     /// configured cadence and publishes the verdict the pre-dispatch gate reads.
     pub fn spawn_receipt_writer_watchdog(self: &std::sync::Arc<Self>) {
+        // The watchdog polls on a `tokio::time::interval`, which panics in a
+        // runtime built without a time driver. Skip the background poll in that
+        // case rather than crash the host: the pre-dispatch gate already falls
+        // back to sampling the store's writer liveness directly when no verdict
+        // is published, so a timerless host stays fail-closed without the task.
+        if !super::dispatch::dispatch_timer_available() {
+            return;
+        }
         let poll =
             std::time::Duration::from_millis(self.config.deadlines.receipt_writer_poll_ms.max(1));
         let kernel = std::sync::Arc::clone(self);
