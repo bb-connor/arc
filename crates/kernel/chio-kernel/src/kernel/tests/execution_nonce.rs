@@ -1894,16 +1894,98 @@ fn delegated_invocation_reserve_request(
 }
 
 #[test]
-fn delegated_reserving_child_with_non_monetary_grant_releases_sibling_share() {
+fn delegated_reserving_child_with_non_monetary_grant_holds_sibling_share_until_reconciled() {
     // A non-monetary grant (max_invocations only, no cost ceiling) adopts its
-    // debited invocation into a durable reserved hold, but records no sibling
-    // share against it (there is no monetary envelope to share). Child A's
-    // reserve-for-caller authorization must therefore release its admitted
-    // sibling-sum share immediately: nothing that closes the hold would ever
-    // release it later. A second delegated child under the same parent must then
-    // still be admitted. Retaining the share would leak it for the parent's
-    // entire lifetime and wrongly deny later siblings.
-    let fixture = make_sibling_sum_invocation_fixture("delegated-reserve-non-monetary");
+    // debited invocation into a durable zero-exposure reserved hold on the
+    // reserve-for-caller path. That hold is real and stays open until the caller
+    // executes downstream, so child A's admitted sibling-sum share must be
+    // RETAINED and recorded against the hold, exactly as a monetary reserve does.
+    // A second delegated child under the same parent must be denied while child
+    // A's invocation hold is open, or the parent's sibling budget is
+    // over-subscribed. The share is freed only when the hold closes.
+    let fixture = make_sibling_sum_invocation_fixture("delegated-reserve-invocation-reconcile");
+    let mut kernel = fixture.kernel;
+    install_strict_nonce_store(&mut kernel);
+
+    let first = delegated_invocation_reserve_request(
+        "req-a-reserve",
+        &fixture.child_a,
+        &fixture.child_a_kp,
+    );
+    let reserved_a = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    assert_eq!(
+        reserved_a.verdict,
+        Verdict::Allow,
+        "child A non-monetary reservation should be admitted: {:?}",
+        reserved_a.reason
+    );
+    let nonce = *reserved_a
+        .execution_nonce
+        .clone()
+        .expect("child A invocation reservation mints a nonce");
+
+    let second = delegated_invocation_reserve_request(
+        "req-b-reserve",
+        &fixture.child_b,
+        &fixture.child_b_kp,
+    );
+    let denied_b = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&second, None)
+        .unwrap();
+    assert_eq!(
+        denied_b.verdict,
+        Verdict::Deny,
+        "child B must be denied while child A's invocation reservation is open: {:?}",
+        denied_b.reason
+    );
+    assert!(
+        denied_b.reason.as_deref().is_some_and(|reason| {
+            reason.contains("sibling-sum") || reason.contains("sibling sum")
+        }),
+        "child B denial must cite sibling-sum over-subscription: {:?}",
+        denied_b.reason
+    );
+
+    // Reconcile child A's zero-exposure invocation hold at zero realized cost:
+    // closing it releases child A's retained sibling share.
+    let realized = ToolInvocationCost {
+        units: 0,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &realized)
+        .unwrap();
+    assert_eq!(reconciled.verdict, Verdict::Allow);
+
+    let third = delegated_invocation_reserve_request(
+        "req-b-reserve-2",
+        &fixture.child_b,
+        &fixture.child_b_kp,
+    );
+    let admitted_b = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&third, None)
+        .unwrap();
+    assert_eq!(
+        admitted_b.verdict,
+        Verdict::Allow,
+        "child B must be admitted after child A's invocation reservation is reconciled: {:?}",
+        admitted_b.reason
+    );
+
+    let _ = std::fs::remove_file(fixture.path);
+}
+
+#[test]
+fn delegated_reserving_child_with_non_monetary_grant_sibling_share_freed_after_ttl_reap() {
+    // The invocation-only reserve-for-caller hold retains child A's sibling share
+    // for the life of the hold. If the caller never executes, the TTL reaper
+    // forfeits the expired hold and releases the share back to the parent, so a
+    // sibling can then be admitted. Confirms the reaper's per-hold-id share
+    // release covers the zero-exposure invocation hold.
+    let fixture = make_sibling_sum_invocation_fixture("delegated-reserve-invocation-reap");
     let mut kernel = fixture.kernel;
     install_strict_nonce_store(&mut kernel);
 
@@ -1927,14 +2009,36 @@ fn delegated_reserving_child_with_non_monetary_grant_releases_sibling_share() {
         &fixture.child_b,
         &fixture.child_b_kp,
     );
-    let admitted_b = kernel
+    let denied_b = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(&second, None)
+        .unwrap();
+    assert_eq!(
+        denied_b.verdict,
+        Verdict::Deny,
+        "child B must be denied while child A's invocation reservation is open: {:?}",
+        denied_b.reason
+    );
+
+    // The TTL reaper forfeits child A's abandoned invocation reservation, closing
+    // the zero-exposure hold and freeing child A's retained sibling share.
+    assert_eq!(
+        kernel.reap_expired_reserved_budget_holds(i64::MAX).unwrap(),
+        1,
+        "the reaper settles child A's expired invocation reserved hold"
+    );
+
+    let third = delegated_invocation_reserve_request(
+        "req-b-reserve-2",
+        &fixture.child_b,
+        &fixture.child_b_kp,
+    );
+    let admitted_b = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&third, None)
         .unwrap();
     assert_eq!(
         admitted_b.verdict,
         Verdict::Allow,
-        "child B must still be admitted: a non-monetary reserve has no hold to \
-         hold child A's share against, so the share must be released, not leaked: {:?}",
+        "child B must be admitted after child A's invocation reservation is reaped: {:?}",
         admitted_b.reason
     );
 

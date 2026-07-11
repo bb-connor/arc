@@ -295,13 +295,22 @@ impl ChioKernel {
                         // adopting it into a durable reserved hold failed, so no hold
                         // exists to reap or reconcile. Reverse the bare invocation
                         // debit (no hold id) so the grant is not left permanently
-                        // short an invocation, then surface the error. The sibling
-                        // share was already released for this non-monetary grant.
+                        // short an invocation, and release the delegated child's
+                        // sibling-sum share this reservation was holding, before
+                        // surfacing the error. The receipt is not yet persisted, so
+                        // no orphaned receipt stands over the released state.
                         self.with_budget_store(|store| {
                             Ok(store.reverse_charge_cost(&cap.id, *grant_index, 0)?)
                         })?;
+                        self.release_admitted_capability_budget(cap)
+                            .map_err(KernelError::DelegationInvalid)?;
                         return Err(error);
                     }
+                    // The invocation hold is durable: keep the delegated child's
+                    // sibling-sum share admitted and record it against the hold so
+                    // reconcile-by-nonce or the TTL reaper releases the parent's
+                    // headroom when the hold closes, matching the monetary reserve.
+                    self.record_reserved_sibling_share(hold_id.as_str(), cap);
                 }
             }
         }

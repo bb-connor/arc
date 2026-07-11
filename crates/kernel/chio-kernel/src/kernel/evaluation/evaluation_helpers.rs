@@ -357,17 +357,18 @@ impl ChioKernel {
                 runtime_admission_metadata,
             );
 
-        // A non-monetary grant (max_invocations-only or unlimited) authorizes no
-        // reserved monetary hold, so nothing durable exists to record the
-        // delegated child's admitted sibling-sum share against and later release
-        // it (reconcile-by-nonce and the TTL reaper both key off a hold). Release
-        // the share now, matching the reverse-for-retry preflight; otherwise it
-        // would stay admitted for the parent's whole lifetime, permanently
-        // shrinking its sibling-sum headroom. Only a monetary reserved hold below
-        // retains the share, recorded against the hold and released when it closes.
-        // The reference-counted release runs only when THIS evaluation acquired a
-        // lease, so it never frees an overlapping sibling's still-held share.
-        if budget_mutation.charge_result().is_none() && budget_lease_acquired {
+        // Only an unlimited grant (no reserved hold at all) authorizes nothing
+        // durable to record the delegated child's admitted sibling-sum share
+        // against, so its share is released now, matching the reverse-for-retry
+        // preflight; otherwise it would stay admitted for the parent's whole
+        // lifetime, permanently shrinking its sibling-sum headroom. A monetary OR
+        // an invocation-only grant creates a durable reserved hold below, so its
+        // share is RETAINED and recorded against that hold, then released when the
+        // hold closes (reconcile-by-nonce or the TTL reaper, both keyed off the
+        // hold id). The reference-counted release runs only when THIS evaluation
+        // acquired a lease, so it never frees an overlapping sibling's still-held
+        // share.
+        if matches!(budget_mutation, PreExecutionBudgetMutation::None) && budget_lease_acquired {
             self.release_admitted_capability_budget(&request.capability)
                 .map_err(KernelError::DelegationInvalid)?;
         }
