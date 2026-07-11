@@ -179,6 +179,7 @@ pub const CHIO_RECEIPT_SECONDS_SINCE_LAST_CHECKPOINT: &str =
 pub const CHIO_RECEIPT_UNCHECKPOINTED_SEQ_RANGE: &str = "chio_receipt_uncheckpointed_seq_range";
 pub const CHIO_RECEIPT_WRITE_TOTAL: &str = "chio_receipt_write_total";
 pub const CHIO_RECEIPT_WRITE_LATENCY_SECONDS: &str = "chio_receipt_write_latency_seconds";
+pub const CHIO_SETTLEMENT_UNRESOLVED_TOTAL: &str = "chio_settlement_unresolved_total";
 pub const CHIO_SIDECAR_REQUESTS_TOTAL: &str = "chio_sidecar_requests_total";
 pub const CHIO_SIGNING_QUEUE_BLOCK_TOTAL: &str = "chio_signing_queue_block_total";
 pub const CHIO_SOC_EXPORT_TOTAL: &str = "chio_soc_export_total";
@@ -535,6 +536,12 @@ pub const REGISTRY: &[MetricDescriptor] = &[
         help = "Total receipt write outcomes after policy or guard evaluation.",
         kind = Counter,
         labels = ["outcome"]
+    ),
+    describe!(
+        name = CHIO_SETTLEMENT_UNRESOLVED_TOTAL,
+        help = "Total settlement observer routing invocations with an unresolved outcome.",
+        kind = Counter,
+        labels = []
     ),
     describe!(
         name = CHIO_SIDECAR_REQUESTS_TOTAL,

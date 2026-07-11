@@ -3,6 +3,7 @@
 include!("tests/support.rs");
 include!("tests/support_delegation_plain.rs");
 include!("tests/support_monetary.rs");
+include!("tests/settlement_routing.rs");
 include!("tests/capability_validation.rs");
 include!("tests/guard_pipeline.rs");
 include!("tests/receipts.rs");

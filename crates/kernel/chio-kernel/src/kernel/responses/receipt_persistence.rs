@@ -162,21 +162,50 @@ impl ChioKernel {
     }
 
     pub(crate) fn record_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), KernelError> {
-        // Scope the receipt-store write lock so it is released before the
-        // settlement observer runs. Holding the mutex across
-        // `run_settlement_observer` would serialize all concurrent receipt
-        // persistence behind potentially I/O-bound hook latency; the observer
-        // needs only a fully-persisted receipt, so the guard is dropped first.
-        // Checkpoint construction runs on the store's writer actor, so this
-        // critical section holds no checkpoint work.
+        let settlement_visible_at_ms = self
+            .settlement_observer
+            .as_ref()
+            .map(|_| current_unix_timestamp_ms());
         {
             let _receipt_store_write = self.receipt_store_write_lock.lock().map_err(|_| {
                 KernelError::Internal("receipt store write lock poisoned".to_string())
             })?;
-            self.with_receipt_store(|store| Ok(store.append_chio_receipt_returning_seq(receipt)?))?;
+            if let Some(next_visible_at_ms) = settlement_visible_at_ms {
+                self.with_receipt_store(|store| {
+                    Ok(store.append_chio_receipt_with_pending_observation(
+                        receipt,
+                        &PendingSettlementObservation { next_visible_at_ms },
+                    )?)
+                })?;
+            } else {
+                self.with_receipt_store(|store| {
+                    Ok(store.append_chio_receipt_returning_seq(receipt)?)
+                })?;
+            }
             self.append_chio_receipt_to_local_log(receipt.clone());
         }
-        let _settlement_status = self.run_settlement_observer(receipt);
+
+        let Some(runtime) = self.settlement_observer.as_ref() else {
+            return Ok(());
+        };
+        let Some(next_visible_at_ms) = settlement_visible_at_ms else {
+            return Ok(());
+        };
+        let claim_now_ms = current_unix_timestamp_ms().max(next_visible_at_ms);
+        let claim = match runtime.claim_receipt(&receipt.id, receipt.timestamp, claim_now_ms) {
+            Ok(Some(claim)) => claim,
+            Ok(None) => return Ok(()),
+            Err(error) => {
+                crate::settlement_routing::record_unresolved_claim_failure(&receipt.id, &error);
+                return Ok(());
+            }
+        };
+        let status = self.run_settlement_observer(receipt);
+        runtime.record_claimed_status(
+            &claim,
+            &status,
+            current_unix_timestamp_ms().max(claim_now_ms),
+        );
         Ok(())
     }
 }

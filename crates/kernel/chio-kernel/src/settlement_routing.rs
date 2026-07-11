@@ -1,21 +1,22 @@
 use std::sync::Arc;
 
-use chio_settle::{RetryPolicy, RetryPolicyError, SettlementHook, SettlementOutcomeStore};
+use chio_settle::{
+    RetryPolicy, RetryPolicyError, SettlementAttemptClaim, SettlementFailureClass, SettlementHook,
+    SettlementOutcome, SettlementOutcomeStore, SettlementRoute, SettlementRouteError,
+    SettlementRouteErrorClass, SettlementRoutingInput,
+};
 
-#[cfg(test)]
 use crate::kernel::settlement_observer::SettlementObserverStatus;
-#[cfg(test)]
-use chio_settle::{SettlementFailureClass, SettlementOutcome, SettlementRoutingInput};
 
-#[cfg(test)]
 const INVALID_HOOK_SKIP_DETAIL: &str =
     "settlement hook returned skipped for a positive economic observation";
 
+const INLINE_SETTLEMENT_WORKER_ID: &str = "kernel-inline-observer";
+const INLINE_SETTLEMENT_LEASE_MS: u64 = 30_000;
+
 pub(crate) struct SettlementObserverRuntime {
     hook: Arc<dyn SettlementHook>,
-    #[allow(dead_code)]
     outcome_store: Arc<dyn SettlementOutcomeStore>,
-    #[allow(dead_code)]
     retry_policy: RetryPolicy,
     store_binding: chio_settle::SettlementStoreBinding,
 }
@@ -44,22 +45,88 @@ impl SettlementObserverRuntime {
         &self.hook
     }
 
-    #[cfg(test)]
-    pub(crate) fn outcome_store(&self) -> &Arc<dyn SettlementOutcomeStore> {
-        &self.outcome_store
-    }
-
-    #[cfg(test)]
-    pub(crate) const fn retry_policy(&self) -> RetryPolicy {
-        self.retry_policy
-    }
-
     pub(crate) const fn store_binding(&self) -> chio_settle::SettlementStoreBinding {
         self.store_binding
     }
+
+    pub(crate) fn claim_receipt(
+        &self,
+        receipt_id: &str,
+        finalized_at: u64,
+        now_ms: u64,
+    ) -> Result<Option<SettlementAttemptClaim>, SettlementRouteError> {
+        let claim = self.outcome_store.claim_receipt(
+            receipt_id,
+            INLINE_SETTLEMENT_WORKER_ID,
+            now_ms,
+            INLINE_SETTLEMENT_LEASE_MS,
+        )?;
+        if let Some(claim) = claim.as_ref() {
+            if claim.receipt_id != receipt_id
+                || claim.finalized_at != finalized_at
+                || claim.row_version == 0
+                || claim.lease_owner != INLINE_SETTLEMENT_WORKER_ID
+                || claim.lease_token.is_empty()
+                || claim.lease_until_ms <= now_ms
+            {
+                return Err(SettlementRouteError::InvalidRecord {
+                    detail: "claimed settlement row does not match the requested receipt"
+                        .to_string(),
+                });
+            }
+        }
+        Ok(claim)
+    }
+
+    pub(crate) fn record_claimed_status(
+        &self,
+        claim: &SettlementAttemptClaim,
+        status: &SettlementObserverStatus,
+        observed_at_ms: u64,
+    ) {
+        self.record_claimed_status_with_metrics(
+            claim,
+            status,
+            observed_at_ms,
+            &RuntimeSettlementRoutingMetrics,
+        );
+    }
+
+    fn record_claimed_status_with_metrics(
+        &self,
+        claim: &SettlementAttemptClaim,
+        status: &SettlementObserverStatus,
+        observed_at_ms: u64,
+        metrics: &dyn SettlementRoutingMetrics,
+    ) {
+        let Some(input) = normalize_status(status) else {
+            return;
+        };
+        let outcome_class = settlement_outcome_class(&input);
+        let route = self.outcome_store.record_claimed_outcome(
+            claim,
+            &input,
+            self.retry_policy,
+            observed_at_ms,
+        );
+        let clean = matches!(
+            (&input, &route),
+            (
+                SettlementRoutingInput::Accepted | SettlementRoutingInput::Skipped { .. },
+                Ok(SettlementRoute::NoAction)
+            )
+        );
+        if !clean {
+            record_unresolved(
+                &claim.receipt_id,
+                outcome_class,
+                settlement_persistence_class(&route),
+                metrics,
+            );
+        }
+    }
 }
 
-#[cfg(test)]
 fn normalize_failure(
     class: SettlementFailureClass,
     reason: &chio_settle::SettlementFailureReason,
@@ -74,10 +141,7 @@ fn normalize_failure(
     }
 }
 
-#[cfg(test)]
-pub(crate) fn normalize_status(
-    status: &SettlementObserverStatus,
-) -> Option<SettlementRoutingInput> {
+fn normalize_status(status: &SettlementObserverStatus) -> Option<SettlementRoutingInput> {
     match status {
         SettlementObserverStatus::NotRegistered => None,
         SettlementObserverStatus::Skipped { reason } => {
@@ -112,9 +176,75 @@ pub(crate) fn normalize_status(
     }
 }
 
+trait SettlementRoutingMetrics {
+    fn increment_unresolved(&self);
+}
+
+struct RuntimeSettlementRoutingMetrics;
+
+impl SettlementRoutingMetrics for RuntimeSettlementRoutingMetrics {
+    fn increment_unresolved(&self) {
+        chio_metrics_spec::runtime::families::SETTLEMENT_UNRESOLVED.incr(&[]);
+    }
+}
+
+const fn settlement_outcome_class(input: &SettlementRoutingInput) -> &'static str {
+    match input {
+        SettlementRoutingInput::Accepted | SettlementRoutingInput::Skipped { .. } => "cleanup",
+        SettlementRoutingInput::Retryable { .. } => "retryable",
+        SettlementRoutingInput::Permanent { .. } => "permanent",
+    }
+}
+
+fn settlement_persistence_class(
+    route: &Result<SettlementRoute, SettlementRouteError>,
+) -> &'static str {
+    match route {
+        Ok(SettlementRoute::NoAction) => "no_action",
+        Ok(SettlementRoute::RetryScheduled { .. }) => "retry_scheduled",
+        Ok(SettlementRoute::DeadLettered { .. }) => "dead_lettered",
+        Err(error) => settlement_persistence_error_class(error),
+    }
+}
+
+const fn settlement_persistence_error_class(error: &SettlementRouteError) -> &'static str {
+    match error.class() {
+        SettlementRouteErrorClass::Backend => "backend_error",
+        SettlementRouteErrorClass::Conflict => "conflict",
+        SettlementRouteErrorClass::InvalidRecord => "invalid_record",
+    }
+}
+
+fn record_unresolved(
+    receipt_id: &str,
+    outcome_class: &'static str,
+    persistence_class: &'static str,
+    metrics: &dyn SettlementRoutingMetrics,
+) {
+    tracing::warn!(
+        receipt_id,
+        outcome_class,
+        persistence_class,
+        "settlement observer outcome unresolved"
+    );
+    metrics.increment_unresolved();
+}
+
+pub(crate) fn record_unresolved_claim_failure(receipt_id: &str, error: &SettlementRouteError) {
+    record_unresolved(
+        receipt_id,
+        "claim",
+        settlement_persistence_error_class(error),
+        &RuntimeSettlementRoutingMetrics,
+    );
+}
+
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
 
     use chio_core::receipt::{body::ChioReceipt, lineage::ChildRequestReceipt};
     use chio_settle::{
@@ -148,6 +278,82 @@ mod tests {
         projection: AtomicReceiptProjection,
         binding: SettlementStoreBinding,
         exposes_binding: bool,
+    }
+
+    struct RoutingOutcomeStore {
+        claim: Result<Option<SettlementAttemptClaim>, SettlementRouteError>,
+        route: Result<SettlementRoute, SettlementRouteError>,
+        recorded: AtomicUsize,
+    }
+
+    impl RoutingOutcomeStore {
+        fn new(route: Result<SettlementRoute, SettlementRouteError>) -> Arc<Self> {
+            Arc::new(Self {
+                claim: Ok(None),
+                route,
+                recorded: AtomicUsize::new(0),
+            })
+        }
+
+        fn with_claim(claim: SettlementAttemptClaim) -> Arc<Self> {
+            Arc::new(Self {
+                claim: Ok(Some(claim)),
+                route: Ok(SettlementRoute::NoAction),
+                recorded: AtomicUsize::new(0),
+            })
+        }
+
+        fn recorded_len(&self) -> usize {
+            self.recorded.load(Ordering::SeqCst)
+        }
+    }
+
+    impl SettlementOutcomeStore for RoutingOutcomeStore {
+        fn settlement_store_binding(&self) -> SettlementStoreBinding {
+            SettlementStoreBinding::from_digest([9; 32])
+        }
+
+        fn claim_receipt(
+            &self,
+            _receipt_id: &str,
+            _worker_id: &str,
+            _now_ms: u64,
+            _lease_ms: u64,
+        ) -> Result<Option<SettlementAttemptClaim>, SettlementRouteError> {
+            self.claim.clone()
+        }
+
+        fn claim_due(
+            &self,
+            _worker_id: &str,
+            _now_ms: u64,
+            _lease_ms: u64,
+            _limit: usize,
+        ) -> Result<Vec<SettlementAttemptClaim>, SettlementRouteError> {
+            Ok(Vec::new())
+        }
+
+        fn record_claimed_outcome(
+            &self,
+            _claim: &SettlementAttemptClaim,
+            _outcome: &SettlementRoutingInput,
+            _policy: RetryPolicy,
+            _observed_at_ms: u64,
+        ) -> Result<SettlementRoute, SettlementRouteError> {
+            self.recorded.fetch_add(1, Ordering::SeqCst);
+            self.route.clone()
+        }
+    }
+
+    #[derive(Default)]
+    struct FakeRoutingMetrics {
+        calls: AtomicUsize,
+    }
+
+    impl SettlementRoutingMetrics for FakeRoutingMetrics {
+        fn increment_unresolved(&self) {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+        }
     }
 
     impl SettlementOutcomeStore for TestAtomicStore {
@@ -278,6 +484,26 @@ mod tests {
         SettlementFailureReason::from_detail(code, "detail")
     }
 
+    fn attempt_claim(receipt_id: &str, finalized_at: u64) -> SettlementAttemptClaim {
+        SettlementAttemptClaim {
+            receipt_id: receipt_id.to_string(),
+            finalized_at,
+            attempts: 0,
+            row_version: 1,
+            lease_owner: INLINE_SETTLEMENT_WORKER_ID.to_string(),
+            lease_token: "lease-token".to_string(),
+            lease_until_ms: 10_000,
+        }
+    }
+
+    fn routing_runtime(store: &Arc<RoutingOutcomeStore>) -> SettlementObserverRuntime {
+        let outcome_store: Arc<dyn SettlementOutcomeStore> = store.clone();
+        match SettlementObserverRuntime::new(hook(), outcome_store, RetryPolicy::default()) {
+            Ok(runtime) => runtime,
+            Err(error) => panic!("test runtime rejected: {error}"),
+        }
+    }
+
     #[test]
     fn settlement_status_normalization_is_exhaustive() {
         let rpc = failure(SettlementFailureCode::Rpc);
@@ -387,6 +613,120 @@ mod tests {
     }
 
     #[test]
+    fn routing_sink_counts_each_unresolved_invocation_once() {
+        let retryable = failure(SettlementFailureCode::Rpc);
+        let permanent = failure(SettlementFailureCode::InvalidBinding);
+        let cases = vec![
+            (
+                SettlementObserverStatus::NotRegistered,
+                Ok(SettlementRoute::NoAction),
+                0,
+                0,
+            ),
+            (
+                SettlementObserverStatus::Observed {
+                    outcome: SettlementOutcome::accepted("transcript"),
+                },
+                Ok(SettlementRoute::NoAction),
+                0,
+                1,
+            ),
+            (
+                SettlementObserverStatus::Skipped {
+                    reason: SettlementSkipReason::ZeroCharge,
+                },
+                Ok(SettlementRoute::NoAction),
+                0,
+                1,
+            ),
+            (
+                SettlementObserverStatus::Observed {
+                    outcome: SettlementOutcome::accepted("transcript"),
+                },
+                Err(SettlementRouteError::Backend {
+                    detail: "unbounded backend detail".to_string(),
+                }),
+                1,
+                1,
+            ),
+            (
+                SettlementObserverStatus::Observed {
+                    outcome: SettlementOutcome::accepted("transcript"),
+                },
+                Ok(SettlementRoute::RetryScheduled {
+                    attempt: 1,
+                    next_visible_at_ms: 20,
+                }),
+                1,
+                1,
+            ),
+            (
+                SettlementObserverStatus::Observed {
+                    outcome: SettlementOutcome::retryable(retryable.clone()),
+                },
+                Ok(SettlementRoute::RetryScheduled {
+                    attempt: 1,
+                    next_visible_at_ms: 20,
+                }),
+                1,
+                1,
+            ),
+            (
+                SettlementObserverStatus::Observed {
+                    outcome: SettlementOutcome::permanent(permanent.clone()),
+                },
+                Ok(SettlementRoute::DeadLettered { attempts: 1 }),
+                1,
+                1,
+            ),
+            (
+                SettlementObserverStatus::HookFailed {
+                    class: SettlementFailureClass::Retryable,
+                    reason: retryable,
+                },
+                Err(SettlementRouteError::Conflict {
+                    detail: "stale lease".to_string(),
+                }),
+                1,
+                1,
+            ),
+        ];
+
+        for (status, route, expected_metrics, expected_records) in cases {
+            let store = RoutingOutcomeStore::new(route);
+            let runtime = routing_runtime(&store);
+            let metrics = FakeRoutingMetrics::default();
+            runtime.record_claimed_status_with_metrics(
+                &attempt_claim("receipt-1", 1),
+                &status,
+                2,
+                &metrics,
+            );
+
+            assert_eq!(metrics.calls.load(Ordering::SeqCst), expected_metrics);
+            assert_eq!(store.recorded_len(), expected_records);
+        }
+
+        let claim_metrics = FakeRoutingMetrics::default();
+        record_unresolved("receipt-1", "claim", "backend_error", &claim_metrics);
+        assert_eq!(claim_metrics.calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn claim_validation_rejects_a_row_for_another_receipt() {
+        let store = RoutingOutcomeStore::with_claim(attempt_claim("receipt-b", 7));
+        let runtime = routing_runtime(&store);
+
+        let result = runtime.claim_receipt("receipt-a", 7, 1);
+
+        assert!(matches!(
+            result,
+            Err(SettlementRouteError::InvalidRecord { .. })
+        ));
+        assert_eq!(store.recorded_len(), 0);
+    }
+
+    #[test]
     fn runtime_retains_the_complete_routing_configuration() {
         let hook = hook();
         let store = atomic_store(AtomicReceiptProjection::SettlementObservationV1);
@@ -402,8 +742,8 @@ mod tests {
         };
 
         assert!(Arc::ptr_eq(&runtime.hook(), &hook));
-        assert!(Arc::ptr_eq(runtime.outcome_store(), &outcome_store));
-        assert_eq!(runtime.retry_policy(), policy);
+        assert!(Arc::ptr_eq(&runtime.outcome_store, &outcome_store));
+        assert_eq!(runtime.retry_policy, policy);
     }
 
     #[test]

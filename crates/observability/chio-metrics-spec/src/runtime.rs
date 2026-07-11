@@ -308,6 +308,8 @@ impl LabeledHistogram {
 /// Process-global family instances. Each family has a single producer;
 /// renderers read them here.
 pub mod families {
+    use std::sync::LazyLock;
+
     use super::{LabeledCounter, LabeledGauge, LabeledHistogram};
     use crate::*;
 
@@ -352,6 +354,11 @@ pub mod families {
     // agree from the start.
     pub static SIGNING_QUEUE_BLOCK: LabeledCounter =
         LabeledCounter::new(CHIO_SIGNING_QUEUE_BLOCK_TOTAL, &["reason"]);
+    pub static SETTLEMENT_UNRESOLVED: LazyLock<LabeledCounter> = LazyLock::new(|| {
+        let counter = LabeledCounter::new(CHIO_SETTLEMENT_UNRESOLVED_TOTAL, &[]);
+        counter.preregister(&[]);
+        counter
+    });
 
     // Receipt-log watchdog gauges. Producer: the serve-mode watchdog loop
     // sampling ReceiptStoreHealthReport; renderer: the kernel /metrics endpoint.
@@ -374,6 +381,7 @@ pub fn preregister_known_label_sets() {
     families::SIGNING_QUEUE_BLOCK.preregister(&["channel_full"]);
     families::SIGNING_QUEUE_BLOCK.preregister(&["byte_budget"]);
     families::SIGNING_QUEUE_BLOCK.preregister(&["oversized"]);
+    families::SETTLEMENT_UNRESOLVED.preregister(&[]);
     families::OTEL_INGRESS_DROP.preregister(&[]);
     families::OTEL_SINK_DROP.preregister(&[]);
     // DLQ/SOC/alert-dispatch known exporters and routes are seeded by the SIEM
@@ -603,11 +611,12 @@ mod tests {
     }
 
     #[test]
-    fn preregister_known_label_sets_seeds_fail_open_and_dispatch() {
+    fn preregister_known_label_sets_seeds_fixed_series() {
         preregister_known_label_sets();
         let mut out = String::new();
         families::FAIL_OPEN_SUSPECTED.render(&mut out);
         families::DISPATCH_FAILURE.render(&mut out);
+        families::SETTLEMENT_UNRESOLVED.render(&mut out);
         assert!(
             out.contains("chio_fail_open_suspected_total{surface=\"tower\"} 0"),
             "{out}"
@@ -624,5 +633,6 @@ mod tests {
             !out.contains("outcome=\"denied\""),
             "a deny must not be seeded on the dispatch-failure family: {out}"
         );
+        assert!(out.contains("chio_settlement_unresolved_total 0"), "{out}");
     }
 }

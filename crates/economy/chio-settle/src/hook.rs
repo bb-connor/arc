@@ -524,6 +524,10 @@ impl SettlementHookError {
 ///   batching is necessary (see [`SettlementObservation::ordering_key`]).
 /// - Be safe to call concurrently from a tokio runtime; the kernel
 ///   observer slot does not serialize calls.
+/// - Keep `observe` bounded and local. An accepted outcome must follow a
+///   durable local write, not unbounded network I/O.
+/// - Make durable effects idempotent by receipt id. Lease recovery may replay
+///   an observation after a process exits or an invocation exceeds its lease.
 pub trait SettlementHook: Send + Sync {
     /// Observe a finalized receipt and route it through the settlement
     /// pipeline. See the trait-level docs for ordering and failure
