@@ -1,5 +1,14 @@
 use super::*;
 
+/// Receipt-store schema revision. Bump on every schema-affecting change so an
+/// older binary refuses to open a database it cannot fully interpret.
+const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+
+/// Tables the receipt store shipped before schema stamping existed. A zero-stamp
+/// database carrying one of these is adopted as a legacy Chio store rather than
+/// rejected as foreign.
+const RECEIPT_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["chio_tool_receipts"];
+
 fn configure_sqlite_connection(connection: &mut Connection) -> Result<(), ReceiptStoreError> {
     connection.execute_batch(
         r#"
@@ -128,6 +137,12 @@ impl SqliteReceiptStore {
         if !create_if_missing {
             require_existing_receipt_schema(path, &connection)?;
             configure_sqlite_connection(&mut connection)?;
+            crate::check_schema_version(
+                &connection,
+                RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
+                RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
+            )
+            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
             super::support::ensure_transparency_projection_guards(&connection)?;
             drop(connection);
 
@@ -156,6 +171,12 @@ impl SqliteReceiptStore {
         }
 
         configure_sqlite_connection(&mut connection)?;
+        crate::check_schema_version(
+            &connection,
+            RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
+            RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
+        )
+        .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
         connection.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS chio_tool_receipts (
@@ -1084,6 +1105,9 @@ impl SqliteReceiptStore {
                 )));
             }
         }
+
+        crate::stamp_schema_version(&connection, RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION)
+            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
 
         drop(connection);
 

@@ -30,6 +30,12 @@ pub struct SqliteApprovalStore {
     pool: Pool<SqliteConnectionManager>,
 }
 
+/// Approval-store schema revision. Bump on every schema-affecting change.
+const APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
+/// approval database rather than reject it as foreign.
+const APPROVAL_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["chio_hitl_pending"];
+
 impl SqliteApprovalStore {
     /// Open the store at the given path. Creates the parent directory
     /// if needed.
@@ -68,6 +74,12 @@ impl SqliteApprovalStore {
             .pool
             .get()
             .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
+        crate::check_schema_version(
+            &conn,
+            APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION,
+            APPROVAL_STORE_LEGACY_ANCHOR_TABLES,
+        )
+        .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
         conn.execute_batch(
             r#"
             PRAGMA journal_mode = WAL;
@@ -112,6 +124,8 @@ impl SqliteApprovalStore {
             "#,
         )
         .map_err(|e| ApprovalStoreError::Backend(format!("migration: {e}")))?;
+        crate::stamp_schema_version(&conn, APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION)
+            .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
         Ok(())
     }
 }

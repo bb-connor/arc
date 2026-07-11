@@ -69,6 +69,12 @@ pub struct SqliteExecutionNonceStore {
     pool: Pool<SqliteConnectionManager>,
 }
 
+/// Execution-nonce-store schema revision. Bump on every schema-affecting change.
+const EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
+/// execution-nonce database rather than reject it as foreign.
+const EXECUTION_NONCE_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["chio_execution_nonces"];
+
 impl SqliteExecutionNonceStore {
     /// Open the store at the given path. Creates the parent directory
     /// if needed.
@@ -100,6 +106,12 @@ impl SqliteExecutionNonceStore {
             .pool
             .get()
             .map_err(|e| SqliteExecutionNonceStoreError(format!("pool acquire: {e}")))?;
+        crate::check_schema_version(
+            &conn,
+            EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION,
+            EXECUTION_NONCE_STORE_LEGACY_ANCHOR_TABLES,
+        )
+        .map_err(|error| SqliteExecutionNonceStoreError(error.to_string()))?;
         conn.execute_batch(
             r#"
             PRAGMA journal_mode = WAL;
@@ -116,6 +128,8 @@ impl SqliteExecutionNonceStore {
                 ON chio_execution_nonces(expires_at);
             "#,
         )?;
+        crate::stamp_schema_version(&conn, EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION)
+            .map_err(|error| SqliteExecutionNonceStoreError(error.to_string()))?;
         Ok(())
     }
 

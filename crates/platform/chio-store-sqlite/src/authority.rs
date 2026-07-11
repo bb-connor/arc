@@ -20,6 +20,12 @@ pub struct SqliteCapabilityAuthority {
     cached_trusted_public_keys: Mutex<Vec<PublicKey>>,
 }
 
+/// Authority-store schema revision. Bump on every schema-affecting change.
+const AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
+/// authority database rather than reject it as foreign.
+const AUTHORITY_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["authority_state"];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthorityClusterFence {
     pub leader_url: Option<String>,
@@ -297,6 +303,12 @@ impl SqliteCapabilityAuthority {
 
     fn open_connection(path: &Path) -> Result<Connection, AuthorityStoreError> {
         let connection = Connection::open(path)?;
+        crate::check_schema_version(
+            &connection,
+            AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION,
+            AUTHORITY_STORE_LEGACY_ANCHOR_TABLES,
+        )
+        .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
         connection.execute_batch(
             r#"
             PRAGMA journal_mode = WAL;
@@ -357,6 +369,8 @@ impl SqliteCapabilityAuthority {
                 [],
             )?;
         }
+        crate::stamp_schema_version(&connection, AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION)
+            .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
         Ok(connection)
     }
 

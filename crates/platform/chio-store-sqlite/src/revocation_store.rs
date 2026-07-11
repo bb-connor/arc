@@ -9,6 +9,12 @@ pub struct SqliteRevocationStore {
     connection: Mutex<Connection>,
 }
 
+/// Revocation-store schema revision. Bump on every schema-affecting change.
+const REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
+/// revocation database rather than reject it as foreign.
+const REVOCATION_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["revoked_capabilities"];
+
 impl SqliteRevocationStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, RevocationStoreError> {
         let path = path.as_ref();
@@ -17,6 +23,12 @@ impl SqliteRevocationStore {
         }
 
         let connection = Connection::open(path)?;
+        crate::check_schema_version(
+            &connection,
+            REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
+            REVOCATION_STORE_LEGACY_ANCHOR_TABLES,
+        )
+        .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
         connection.execute_batch(
             r#"
             PRAGMA journal_mode = WAL;
@@ -32,6 +44,8 @@ impl SqliteRevocationStore {
                 ON revoked_capabilities(revoked_at);
             "#,
         )?;
+        crate::stamp_schema_version(&connection, REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION)
+            .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
 
         Ok(Self {
             connection: Mutex::new(connection),

@@ -98,6 +98,40 @@ fn sqlite_receipt_store_configures_durable_pragmas() {
 }
 
 #[test]
+fn sqlite_receipt_store_stamps_application_id_and_refuses_future_database() {
+    let path = unique_db_path("chio-receipts-schema-stamp");
+
+    // A fresh open stamps the Chio application_id and schema version 0.
+    {
+        let store = SqliteReceiptStore::open(&path).test_unwrap();
+        let connection = store.connection().test_unwrap();
+        let app_id: i32 = connection
+            .query_row("PRAGMA application_id", [], |row| row.get(0))
+            .test_unwrap();
+        assert_eq!(app_id, crate::CHIO_SQLITE_APPLICATION_ID);
+        let user_version: i32 = connection
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .test_unwrap();
+        assert_eq!(user_version, 0);
+    }
+
+    // Simulate a database written by a newer binary and confirm the older binary
+    // refuses to open it rather than silently misreading a future schema.
+    {
+        let connection = rusqlite::Connection::open(&path).test_unwrap();
+        connection
+            .execute_batch("PRAGMA user_version = 99;")
+            .test_unwrap();
+    }
+    assert!(
+        SqliteReceiptStore::open_existing(&path).is_err(),
+        "a future-version receipt database must be refused"
+    );
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn flush_receipt_writes_reports_prior_committed_entries() {
     let path = unique_db_path("chio-receipts-flush");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
