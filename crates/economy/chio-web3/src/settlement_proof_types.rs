@@ -475,6 +475,16 @@ impl ToolCallAuthorization {
     ///   a DPoP-required grant without a proof, so authorizing it here would
     ///   advertise a capability the edge lane would deny; `Some(true)` fails closed.
     ///   `None`/`Some(false)` require no proof and are evaluable.
+    ///
+    /// Drift checklist: this helper mirrors, but does not share, the kernel
+    /// capability lane. The complete set of `ToolGrant` fields it evaluates is
+    /// `server_id`, `tool_name`, `operations`, `constraints`, `max_invocations`,
+    /// `max_cost_per_invocation`, `max_total_cost`, and `dpop_required`. If
+    /// `ToolGrant` gains any new gating field, this helper does not see it and
+    /// its positive ("granted") case diverges from real kernel authorization
+    /// until the field is added here deny-by-default. Drift is deny-safe (an
+    /// unknown field can only make the kernel stricter than this mirror), but
+    /// the conformance harness's positive case goes stale.
     #[must_use]
     pub fn from_capability_grant(grant: &ToolGrant, server_id: &str, tool_name: &str) -> Self {
         // Identity + operation: fully evaluable from the static inputs.

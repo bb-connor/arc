@@ -22,6 +22,14 @@ mod evidence;
 mod policy;
 mod protocols;
 
+/// The ids of every source protocol registered in the projection manifest, in
+/// registration order. Conformance harnesses pin display-only discipline
+/// against this list: a protocol absent here has NO projection registration at
+/// all, so it cannot have been silently promoted to a proof-admissible lane.
+pub fn registered_source_protocol_ids() -> Vec<&'static str> {
+    protocols::registered_source_protocol_ids().collect()
+}
+
 use artifacts::{
     validate_envelope, validate_external_subject, validate_projection_manifest,
     AgentWebProofEnvelope, ProjectionManifest,

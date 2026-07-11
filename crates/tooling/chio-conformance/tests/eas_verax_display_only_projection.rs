@@ -388,3 +388,26 @@ fn recompute_via_get_root_verify_inclusion_remains_the_sole_proof_lane() {
         serde_json::from_value(fixture_value()).expect("genuine proof deserializes");
     verify_anchor_inclusion_proof(&proof).expect("genuine recomputing proof must verify");
 }
+
+/// Production drift guard: the register above is a test-local EXTENSION of the
+/// production source-protocol manifest, so this asserts against the production
+/// crate that EAS and Verax remain UNREGISTERED there. If a future change
+/// registers either as a source protocol, this fails and forces a conscious
+/// re-review of the display-only discipline (facts 1-5 above) against the real
+/// registration, instead of this harness silently asserting a stale mirror.
+#[test]
+fn production_register_carries_no_eas_or_verax_projection() {
+    let ids = chio_agent_web_interop::registered_source_protocol_ids();
+    assert!(
+        !ids.is_empty(),
+        "the production source-protocol manifest must be readable"
+    );
+    for id in ids {
+        let lowered = id.to_ascii_lowercase();
+        assert!(
+            !lowered.contains("eas") && !lowered.contains("verax"),
+            "EAS/Verax must stay display-only projections with no production \
+             source-protocol registration, found registered id `{id}`"
+        );
+    }
+}
