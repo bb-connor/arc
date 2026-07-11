@@ -649,7 +649,7 @@ impl ChioKernel {
             .deadlines
             .dispatch_budget_for(&request.server_id)
         {
-            Some(budget) if tokio::runtime::Handle::try_current().is_ok() => {
+            Some(budget) if crate::kernel::dispatch::dispatch_timer_available() => {
                 match tokio::time::timeout(budget, dispatch_call).await {
                     Ok(result) => result,
                     Err(_elapsed) => Err(KernelError::HotPathDeadlineExceeded {

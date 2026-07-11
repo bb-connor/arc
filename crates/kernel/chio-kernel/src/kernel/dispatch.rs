@@ -105,6 +105,103 @@ fn budget_ms_saturating(budget: std::time::Duration) -> u64 {
     budget.as_millis().min(u128::from(u64::MAX)) as u64
 }
 
+thread_local! {
+    /// Cached per-thread result of probing whether this context's Tokio runtime
+    /// has a timer driver. The probe constructs a throwaway timer, which panics
+    /// on a timerless runtime, so it runs at most once per worker thread.
+    static DISPATCH_TIMER_AVAILABLE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Serializes the panic-hook swap in [`dispatch_timer_available`] so concurrent
+/// first-probes on different worker threads cannot interleave their
+/// take/set-hook pairs and leave the silencing hook installed process-wide.
+static TIMER_PROBE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Whether `tokio::time::timeout` can run in the current context without
+/// panicking, i.e. a Tokio runtime is entered and its time driver is enabled.
+///
+/// `Handle::try_current()` only proves a runtime is entered, not that timers are
+/// enabled; a host runtime built without `enable_time` panics when a timer is
+/// constructed. Tokio exposes no query for the driver, so this probes by
+/// constructing one zero-duration timer under a caught unwind. The panic is
+/// synchronous at construction, and the panic hook is silenced for the probe so
+/// a timerless host does not emit a spurious backtrace. The swap is serialized
+/// so the real hook is always restored, and the result is cached per thread;
+/// callers fall back to running the guarded work inline when it is false.
+pub(crate) fn dispatch_timer_available() -> bool {
+    DISPATCH_TIMER_AVAILABLE.with(|cached| {
+        if let Some(available) = cached.get() {
+            return available;
+        }
+        let available = {
+            let _serialized = TIMER_PROBE_LOCK
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let previous_hook = std::panic::take_hook();
+            std::panic::set_hook(Box::new(|_| {}));
+            let result = std::panic::catch_unwind(|| {
+                drop(tokio::time::timeout(
+                    std::time::Duration::ZERO,
+                    std::future::ready(()),
+                ));
+            })
+            .is_ok();
+            std::panic::set_hook(previous_hook);
+            result
+        };
+        cached.set(Some(available));
+        available
+    })
+}
+
+#[cfg(test)]
+mod timer_probe_tests {
+    use super::dispatch_timer_available;
+
+    // The two runtimes run in separate `#[test]` functions on purpose: the probe
+    // caches its verdict per thread, and libtest gives each test its own thread,
+    // so a timerless verdict on one thread cannot leak into the timer-enabled one.
+
+    #[test]
+    fn reports_false_in_a_runtime_without_a_time_driver() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+        runtime.block_on(async {
+            assert!(!dispatch_timer_available());
+            // Mirror the hot-path guard: only wrap work in a timer when the probe
+            // allows it, so a timerless runtime degrades to inline instead of
+            // panicking on timer construction.
+            let ran_inline = if dispatch_timer_available() {
+                tokio::time::timeout(std::time::Duration::from_millis(1), std::future::ready(()))
+                    .await
+                    .is_ok()
+            } else {
+                std::future::ready(()).await;
+                true
+            };
+            assert!(ran_inline);
+        });
+        Ok(())
+    }
+
+    #[test]
+    fn reports_true_in_a_runtime_with_a_time_driver() -> Result<(), Box<dyn std::error::Error>> {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()?;
+        runtime.block_on(async {
+            assert!(dispatch_timer_available());
+            let elapsed = tokio::time::timeout(
+                std::time::Duration::from_millis(1),
+                std::future::pending::<()>(),
+            )
+            .await;
+            assert!(elapsed.is_err(), "the timer must actually fire here");
+        });
+        Ok(())
+    }
+}
+
 impl ChioKernel {
     pub(crate) fn validate_parent_request_continuation(
         &self,
@@ -408,11 +505,11 @@ impl ChioKernel {
 
     /// Async wrapper deciding how to run the synchronous guard pipeline. When a
     /// pipeline budget, a per-guard override, or `always_offload_guards`
-    /// applies (and a Tokio runtime is present), the sync core runs under
-    /// `spawn_blocking` wrapped in `tokio::time::timeout`, so a blocking guard
-    /// can no longer pin an async worker and a hung guard fails closed as
-    /// `HotPathDeadlineExceeded`. Otherwise, or with no runtime, it keeps the
-    /// inline behavior.
+    /// applies (and the current runtime has a timer driver), the sync core runs
+    /// under `spawn_blocking` wrapped in `tokio::time::timeout`, so a blocking
+    /// guard can no longer pin an async worker and a hung guard fails closed as
+    /// `HotPathDeadlineExceeded`. Otherwise, or with no timer-enabled runtime,
+    /// it keeps the inline behavior.
     ///
     /// `tokio::time::timeout` drops the `JoinHandle` on expiry, which detaches
     /// (does not kill) the blocking thread: a runaway guard runs to completion
@@ -432,7 +529,7 @@ impl ChioKernel {
             || has_per_guard
             || self.config.deadlines.always_offload_guards;
 
-        if !want_offload || tokio::runtime::Handle::try_current().is_err() {
+        if !want_offload || !dispatch_timer_available() {
             return self.run_guards(
                 request,
                 scope,
@@ -736,7 +833,7 @@ impl ChioKernel {
             .dispatch_budget_for(&request.server_id)
         {
             None => call.await,
-            Some(_) if tokio::runtime::Handle::try_current().is_err() => call.await,
+            Some(_) if !dispatch_timer_available() => call.await,
             Some(budget) => match tokio::time::timeout(budget, call).await {
                 Ok(result) => result,
                 Err(_elapsed) => Err(KernelError::HotPathDeadlineExceeded {
