@@ -65,6 +65,16 @@ pub(crate) fn ensure_receipt_retention_watermark_table(
 pub(crate) fn retention_watermark(
     connection: &rusqlite::Connection,
 ) -> Result<Option<u64>, ReceiptStoreError> {
+    // A store created before the retention migration has no watermark ledger,
+    // and read-only observers (the SIEM watchdog, CLI inspectors) open such a
+    // store without the writable `open()` migration that creates the table. A
+    // missing table means "never archived" (None), not a hard error that would
+    // deny every reader a health report. Fail-closed safe: a None watermark
+    // disables the chain-verification skip exemption, so even a store whose
+    // ledger was dropped out of band falls back to full verification.
+    if !receipt_retention_watermark_table_exists(connection)? {
+        return Ok(None);
+    }
     let value: Option<i64> = connection.query_row(
         "SELECT MAX(archived_through_entry_seq) FROM receipt_retention_watermark",
         [],
@@ -74,6 +84,20 @@ pub(crate) fn retention_watermark(
         None => Ok(None),
         Some(raw) => Ok(Some(sqlite_u64(raw, "retention watermark")?)),
     }
+}
+
+fn receipt_retention_watermark_table_exists(
+    connection: &rusqlite::Connection,
+) -> Result<bool, ReceiptStoreError> {
+    let exists: Option<i64> = connection
+        .query_row(
+            "SELECT 1 FROM sqlite_master \
+             WHERE type = 'table' AND name = 'receipt_retention_watermark'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(exists.is_some())
 }
 
 /// True if any checkpoint has ever been persisted. Called by the claim-log

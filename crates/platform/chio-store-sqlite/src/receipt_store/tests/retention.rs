@@ -1083,6 +1083,44 @@ fn fully_archived_store_reopens_writable() -> Result<(), Box<dyn std::error::Err
     Ok(())
 }
 
+/// The read-only health path must survive a store created before the retention
+/// migration: a missing watermark ledger is "never archived" (None), not a hard
+/// error that denies the observer every health report.
+#[test]
+fn read_only_health_ok_on_pre_retention_schema() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("read-only-pre-retention");
+    let keypair = super::support::receipt_test_keypair();
+
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+        for i in 0..2u64 {
+            let r =
+                super::support::sample_receipt_with_keypair(&format!("pr-{i}"), i + 1, &keypair);
+            store.append_chio_receipt_returning_seq(&r)?;
+        }
+        store.flush_receipt_writes()?;
+        // Simulate a pre-retention schema by dropping the watermark ledger the
+        // migration would have created. A read-only observer opens without the
+        // writable migration, so it must tolerate the missing table.
+        store.writer_handle().run_write(|connection| {
+            connection.execute_batch("DROP TABLE IF EXISTS receipt_retention_watermark;")?;
+            Ok(())
+        })?;
+        store.flush_receipt_writes()?;
+    }
+
+    let report = SqliteReceiptStore::receipt_store_health_read_only(&path)?;
+    assert!(
+        report.healthy,
+        "a pre-retention store must still report health to a read-only observer"
+    );
+    assert_eq!(report.retention_watermark_entry_seq, None);
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 /// Primary correctness proof: a state-machine proptest that drives random
 /// interleaved sequences of tool/child appends (non-monotonic
 /// timestamps within an aged band, to exercise the MAX(timestamp)-over-prefix
