@@ -308,6 +308,13 @@ impl ChioKernel {
     }
 
     pub(crate) fn ensure_revocation_durability_ready(&self) -> Result<(), KernelError> {
+        // A remote revocation view (federation/oracle) is consulted on every
+        // delegated dispatch and is re-synced from its source after a restart, so
+        // an installed view is itself a durable revocation source: it satisfies
+        // the gate even when the local per-row store is the default in-memory one.
+        if self.revocation_view.is_some() {
+            return Ok(());
+        }
         let ephemeral = self.with_revocation_store(|store| Ok(store.is_ephemeral()))?;
         if !ephemeral || self.config.allow_ephemeral_revocation_store {
             return Ok(());

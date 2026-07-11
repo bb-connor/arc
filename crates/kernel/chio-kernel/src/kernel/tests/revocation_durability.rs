@@ -23,3 +23,18 @@ fn revocation_gate_allows_ephemeral_store_with_optin() {
     let kernel = make_kernel(config);
     assert!(kernel.ensure_revocation_durability_ready().is_ok());
 }
+
+#[test]
+fn revocation_gate_allows_an_installed_view_without_a_durable_store() {
+    let mut config = make_config();
+    // No ephemeral opt-in, and only the default in-memory per-row store.
+    config.allow_ephemeral_revocation_store = false;
+    let mut kernel = make_kernel(config);
+    // A federation/oracle revocation view is a durable remote source consulted on
+    // every delegated dispatch, so installing one satisfies the gate without also
+    // wiring an otherwise-unused durable per-row store.
+    kernel.set_revocation_view(std::sync::Arc::new(
+        chio_kernel_core::RevocationView::new(),
+    ));
+    assert!(kernel.ensure_revocation_durability_ready().is_ok());
+}
