@@ -7,7 +7,12 @@ use crate::health::HealthFlag;
 use crate::time::now_unix_ms;
 use std::future::Future;
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use tokio::task::JoinHandle;
+use std::sync::{Arc, Mutex};
+use tokio::task::{AbortHandle, JoinHandle};
+
+/// Shared slot holding the abort handle for the iteration child that is currently
+/// running, so the supervisor can cancel it on shutdown.
+type ActiveChild = Arc<Mutex<Option<AbortHandle>>>;
 
 /// A supervised tokio task that owns its join handle and a [`HealthFlag`]. Retaining
 /// the handle is the fix for the historical pattern of spawning a long-lived loop and
@@ -15,6 +20,11 @@ use tokio::task::JoinHandle;
 pub struct SupervisedTask {
     handle: JoinHandle<()>,
     health: HealthFlag,
+    /// Abort handle for the iteration child that is currently running. Each
+    /// iteration runs in its own child task, so aborting only the supervisor loop
+    /// drops (and thereby detaches) that child, leaving a worker running after its
+    /// health handle is gone. Cancelling this on shutdown stops it too.
+    active_child: ActiveChild,
 }
 
 impl SupervisedTask {
@@ -28,8 +38,18 @@ impl SupervisedTask {
         Fut: Future<Output = SupervisedOutcome> + Send + 'static,
     {
         let health = HealthFlag::new(config.tcb_critical);
-        let handle = supervise_task(config, health.clone(), iteration);
-        Self { handle, health }
+        let active_child: ActiveChild = Arc::new(Mutex::new(None));
+        let handle = supervise_task_tracking_child(
+            config,
+            health.clone(),
+            Arc::clone(&active_child),
+            iteration,
+        );
+        Self {
+            handle,
+            health,
+            active_child,
+        }
     }
 
     /// A cloneable handle to this task's health.
@@ -46,9 +66,16 @@ impl SupervisedTask {
         self.handle.is_finished()
     }
 
-    /// Abort the supervisor loop. Used during process shutdown.
+    /// Abort the supervisor loop and the iteration child it is currently running.
+    /// Used during process shutdown. Aborting only the supervisor loop would drop
+    /// its join handle and detach the child, leaving a worker running unsupervised.
     pub fn abort(&self) {
         self.handle.abort();
+        if let Ok(mut slot) = self.active_child.lock() {
+            if let Some(child) = slot.take() {
+                child.abort();
+            }
+        }
     }
 }
 
@@ -61,6 +88,24 @@ impl SupervisedTask {
 pub fn supervise_task<F, Fut>(
     config: SupervisorConfig,
     health: HealthFlag,
+    iteration: F,
+) -> JoinHandle<()>
+where
+    F: FnMut() -> Fut + Send + 'static,
+    Fut: Future<Output = SupervisedOutcome> + Send + 'static,
+{
+    // The standalone primitive exposes no shutdown handle, so it tracks the active
+    // child in a private slot it never reads back.
+    supervise_task_tracking_child(config, health, Arc::new(Mutex::new(None)), iteration)
+}
+
+/// Supervise `iteration` in a loop, publishing each running child's abort handle
+/// into `active_child` so [`SupervisedTask::abort`] can cancel the in-flight
+/// iteration rather than detaching it.
+fn supervise_task_tracking_child<F, Fut>(
+    config: SupervisorConfig,
+    health: HealthFlag,
+    active_child: ActiveChild,
     mut iteration: F,
 ) -> JoinHandle<()>
 where
@@ -78,11 +123,19 @@ where
             // a panic inside the future (a restart-worthy failure).
             let spawned = catch_unwind(AssertUnwindSafe(&mut iteration)).map(tokio::spawn);
             let outcome = match spawned {
-                Ok(handle) => match handle.await {
-                    Ok(outcome) => outcome,
-                    Err(join_error) if join_error.is_panic() => SupervisedOutcome::Restart,
-                    Err(_cancelled) => return,
-                },
+                Ok(handle) => {
+                    // Publish the child's abort handle before awaiting it, so a
+                    // concurrent shutdown cancels this iteration instead of
+                    // detaching it.
+                    if let Ok(mut slot) = active_child.lock() {
+                        *slot = Some(handle.abort_handle());
+                    }
+                    match handle.await {
+                        Ok(outcome) => outcome,
+                        Err(join_error) if join_error.is_panic() => SupervisedOutcome::Restart,
+                        Err(_cancelled) => return,
+                    }
+                }
                 Err(_panic) => SupervisedOutcome::Restart,
             };
             match outcome {
@@ -117,7 +170,7 @@ where
 mod tests {
     use super::*;
     use crate::HealthLevel;
-    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -251,5 +304,50 @@ mod tests {
         .unwrap_or(());
         assert_eq!(health.level(), HealthLevel::Healthy);
         task.abort();
+    }
+
+    #[tokio::test]
+    async fn abort_cancels_the_in_flight_child_iteration() {
+        // Each iteration runs in its own child task. Aborting the supervisor must
+        // cancel the running child too; if the child is merely detached it keeps
+        // running unsupervised after the health handle is gone.
+        let started = Arc::new(AtomicBool::new(false));
+        let completed = Arc::new(AtomicBool::new(false));
+        let worker_started = Arc::clone(&started);
+        let worker_completed = Arc::clone(&completed);
+        let task = SupervisedTask::spawn(fast_config("abort-child", false, 5), move || {
+            let worker_started = Arc::clone(&worker_started);
+            let worker_completed = Arc::clone(&worker_completed);
+            async move {
+                worker_started.store(true, Ordering::SeqCst);
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                // Only reached if the child ran to completion instead of being
+                // cancelled by the abort below.
+                worker_completed.store(true, Ordering::SeqCst);
+                SupervisedOutcome::Continue
+            }
+        });
+
+        // Abort while the child is mid-sleep.
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while !started.load(Ordering::SeqCst) {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .unwrap_or(());
+        task.abort();
+
+        // Wait well past the child's remaining sleep: a detached child would
+        // finish and set `completed`, a cancelled one never does.
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+        assert!(
+            started.load(Ordering::SeqCst),
+            "the iteration should have started"
+        );
+        assert!(
+            !completed.load(Ordering::SeqCst),
+            "abort must cancel the in-flight child iteration, not detach it to run to completion"
+        );
     }
 }
