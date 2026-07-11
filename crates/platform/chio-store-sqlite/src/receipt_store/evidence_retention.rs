@@ -512,6 +512,30 @@ fn live_db_size_bytes_on_connection(
     Ok((live_pages as u64) * (page_size.max(0) as u64))
 }
 
+/// Materialize the sibling archive database file before a rotation `ATTACH`es
+/// it.
+///
+/// The live store's writer connection is opened READ_WRITE without
+/// `SQLITE_OPEN_CREATE` so that opening a store whose main database is missing
+/// fails closed instead of silently creating an empty one. `ATTACH DATABASE`
+/// inherits the main connection's open flags, so the first rotation against such
+/// a store would be unable to create a not-yet-existing archive and would fail.
+/// Opening the archive path once with `SQLITE_OPEN_CREATE` creates an empty
+/// database file (a zero-length file is a valid empty SQLite database) that the
+/// subsequent no-CREATE `ATTACH` can open, without loosening the main store's
+/// flags. An already-present archive is opened and closed unchanged, so this is
+/// a no-op on every rotation after the first and never rewrites a prior archive;
+/// the co-archival identity verification still fails closed on a foreign or
+/// divergent archive.
+fn ensure_archive_file_exists(archive_path: &str) -> Result<(), ReceiptStoreError> {
+    let flags = rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
+        | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
+        | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX;
+    let connection = rusqlite::Connection::open_with_flags(archive_path, flags)?;
+    drop(connection);
+    Ok(())
+}
+
 /// Entry point run on the single writer connection by the `Rotate` command.
 pub(super) fn rotate_on_writer_connection(
     connection: &mut rusqlite::Connection,
@@ -557,6 +581,7 @@ fn archive_range(
     }
     let w = sqlite_i64(watermark, "archival watermark")?;
 
+    ensure_archive_file_exists(archive_path)?;
     let escaped_path = archive_path.replace('\'', "''");
     connection.execute_batch(&format!("ATTACH DATABASE '{escaped_path}' AS archive"))?;
 
@@ -1062,6 +1087,7 @@ pub(super) fn retention_repair_on_writer(
     // 2. Assert every extra id is present in the archive, and its range is
     //    checkpoint-covered. Refuse otherwise (never delete a non-archived row,
     //    never touch the uncheckpointed suffix).
+    ensure_archive_file_exists(archive_path)?;
     let escaped = archive_path.replace('\'', "''");
     connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
     let assert_result = (|| -> Result<u64, ReceiptStoreError> {

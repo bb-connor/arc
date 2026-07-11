@@ -727,12 +727,6 @@ fn non_incremental_rotation_validates_chain_before_deleting(
         receipt.tool_name = "tampered".to_string();
     });
 
-    // Pre-create the archive file. A store opened via `open_existing_with_options`
-    // holds READ_WRITE-without-CREATE flags, so a fresh archive cannot be created
-    // by ATTACH; an existing archive (as after any prior rotation) is the state in
-    // which the copy-and-delete would otherwise proceed against the corrupt chain.
-    drop(rusqlite::Connection::open(&archive)?);
-
     // Rotation must fail closed on the corrupt chain rather than archive-and-delete.
     let error = store
         .archive_receipts_before(150, archive_path)
@@ -762,6 +756,68 @@ fn non_incremental_rotation_validates_chain_before_deleting(
     assert_eq!(
         live_log, 2,
         "no claim-log rows may be deleted when the chain is unverified"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
+/// A store reopened through `open_existing` holds READ_WRITE-without-CREATE
+/// connection flags so that a missing main database fails closed. Because
+/// `ATTACH DATABASE` inherits those flags, the first retention rotation against
+/// such a store must still create its not-yet-existing sibling archive rather
+/// than fail on the ATTACH. The rotation materializes the archive with CREATE
+/// permission before attaching it, so the first rotation succeeds and the
+/// archive appears.
+#[test]
+fn first_rotation_creates_archive_on_open_existing_store() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("open-existing-first-rotation");
+    let archive = unique_db_path("open-existing-first-rotation-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    // Build a store with a fully checkpointed prefix that will age past the
+    // cutoff, then close it so the reopen exercises the open_existing flags.
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+        for i in 0..4u64 {
+            let receipt = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("first-rotation-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store.append_chio_receipt_returning_seq(&receipt)?;
+        }
+        store.flush_receipt_writes()?;
+        assert!(
+            store.load_checkpoint_by_seq(1)?.is_some(),
+            "the prefix must be checkpointed so the rotation has something to archive"
+        );
+    }
+
+    // The first rotation is responsible for creating the archive; it must not
+    // exist yet.
+    assert!(
+        !archive.exists(),
+        "the archive must be absent before the first rotation"
+    );
+
+    // Reopen through open_existing (READ_WRITE without CREATE). Without the
+    // pre-ATTACH archive creation the rotation fails here: the inherited
+    // no-CREATE flags cannot create the sibling archive at ATTACH time.
+    let store = SqliteReceiptStore::open_existing(&path)?;
+    let archived = store.archive_receipts_before(150, archive_path)?;
+    assert_eq!(
+        archived, 4,
+        "the aged checkpointed prefix archives on the first rotation"
+    );
+    assert!(
+        archive.exists(),
+        "the first rotation created the sibling archive database"
     );
 
     let _ = std::fs::remove_file(&path);
