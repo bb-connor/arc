@@ -57,10 +57,42 @@ pub struct ChioEvaluator {
 }
 
 impl ChioEvaluator {
-    /// Create a new evaluator with the given keypair and policy hash.
+    /// Create a fail-closed evaluator with the given keypair and policy hash.
+    ///
+    /// No durable store is attached, so the first mediated call denies until a
+    /// durable store is wired through [`ChioEvaluator::builder`]. Use
+    /// [`ChioEvaluator::new_ephemeral`] for a local scaffold that intends
+    /// in-memory persistence.
     pub fn new(keypair: Keypair, policy_hash: String) -> Self {
         Self {
             authority: HttpAuthority::new(keypair, policy_hash),
+            identity_extractor: crate::identity::extract_identity,
+            route_resolver: default_route_resolver,
+            fail_open: false,
+        }
+    }
+
+    /// Create an explicitly ephemeral evaluator (in-memory receipt log and
+    /// revocation store) for local scaffolds and tests.
+    pub fn new_ephemeral(keypair: Keypair, policy_hash: String) -> Self {
+        Self {
+            authority: HttpAuthority::new_ephemeral(keypair, policy_hash),
+            identity_extractor: crate::identity::extract_identity,
+            route_resolver: default_route_resolver,
+            fail_open: false,
+        }
+    }
+
+    /// Start building an evaluator backed by durable receipt and revocation
+    /// stores.
+    #[must_use]
+    pub fn builder(keypair: Keypair, policy_hash: String) -> ChioEvaluatorBuilder {
+        ChioEvaluatorBuilder {
+            keypair,
+            policy_hash,
+            receipt_store: None,
+            revocation_store: None,
+            allow_ephemeral: false,
             identity_extractor: crate::identity::extract_identity,
             route_resolver: default_route_resolver,
             fail_open: false,
@@ -214,6 +246,82 @@ fn policy_mode(method: HttpMethod) -> HttpAuthorityPolicy {
     }
 }
 
+/// Builder for a [`ChioEvaluator`] backed by durable stores. `build` is
+/// fallible because attaching a durable receipt store hydrates checkpoint
+/// counters and can fail. `allow_ephemeral` defaults to `false` (fail-closed).
+pub struct ChioEvaluatorBuilder {
+    keypair: Keypair,
+    policy_hash: String,
+    receipt_store: Option<std::sync::Arc<dyn chio_kernel::ReceiptStore>>,
+    revocation_store: Option<std::sync::Arc<dyn chio_kernel::RevocationStore>>,
+    allow_ephemeral: bool,
+    identity_extractor: IdentityExtractor,
+    route_resolver: RouteResolver,
+    fail_open: bool,
+}
+
+impl ChioEvaluatorBuilder {
+    #[must_use]
+    pub fn receipt_store(mut self, store: std::sync::Arc<dyn chio_kernel::ReceiptStore>) -> Self {
+        self.receipt_store = Some(store);
+        self
+    }
+
+    #[must_use]
+    pub fn revocation_store(
+        mut self,
+        store: std::sync::Arc<dyn chio_kernel::RevocationStore>,
+    ) -> Self {
+        self.revocation_store = Some(store);
+        self
+    }
+
+    #[must_use]
+    pub fn allow_ephemeral(mut self, allow: bool) -> Self {
+        self.allow_ephemeral = allow;
+        self
+    }
+
+    #[must_use]
+    pub fn with_identity_extractor(mut self, extractor: IdentityExtractor) -> Self {
+        self.identity_extractor = extractor;
+        self
+    }
+
+    #[must_use]
+    pub fn with_route_resolver(mut self, resolver: RouteResolver) -> Self {
+        self.route_resolver = resolver;
+        self
+    }
+
+    #[must_use]
+    pub fn with_fail_open(mut self, fail_open: bool) -> Self {
+        self.fail_open = fail_open;
+        self
+    }
+
+    pub fn build(self) -> Result<ChioEvaluator, ChioTowerError> {
+        let mut builder = HttpAuthority::builder()
+            .allow_ephemeral_receipt_log(self.allow_ephemeral)
+            .allow_ephemeral_revocation_store(self.allow_ephemeral);
+        if let Some(store) = self.receipt_store {
+            builder = builder.receipt_store(store);
+        }
+        if let Some(store) = self.revocation_store {
+            builder = builder.revocation_store(store);
+        }
+        let authority = builder
+            .build(self.keypair, self.policy_hash)
+            .map_err(ChioTowerError::from)?;
+        Ok(ChioEvaluator {
+            authority,
+            identity_extractor: self.identity_extractor,
+            route_resolver: self.route_resolver,
+            fail_open: self.fail_open,
+        })
+    }
+}
+
 impl From<HttpAuthorityError> for ChioTowerError {
     fn from(value: HttpAuthorityError) -> Self {
         match value {
@@ -324,7 +432,7 @@ mod tests {
     #[test]
     fn evaluate_safe_method_allowed() {
         let keypair = Keypair::generate();
-        let evaluator = ChioEvaluator::new(keypair, "test-policy".to_string());
+        let evaluator = ChioEvaluator::new_ephemeral(keypair, "test-policy".to_string());
         let caller = CallerIdentity::anonymous();
         let headers = http::HeaderMap::new();
 
@@ -350,9 +458,42 @@ mod tests {
     }
 
     #[test]
+    fn builder_with_durable_stores_allows_safe_method() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let receipt_store: std::sync::Arc<dyn chio_kernel::ReceiptStore> = std::sync::Arc::new(
+            chio_store_sqlite::SqliteReceiptStore::open(dir.path().join("receipts.db"))?,
+        );
+        let revocation_store: std::sync::Arc<dyn chio_kernel::RevocationStore> =
+            std::sync::Arc::new(chio_store_sqlite::SqliteRevocationStore::open(
+                dir.path().join("revocations.db"),
+            )?);
+        let evaluator = ChioEvaluator::builder(Keypair::generate(), "test-policy".to_string())
+            .receipt_store(receipt_store)
+            .revocation_store(revocation_store)
+            .build()?;
+        assert!(!evaluator.is_fail_open());
+
+        let caller = CallerIdentity::anonymous();
+        let headers = http::HeaderMap::new();
+        let result = evaluate(
+            &evaluator,
+            "GET",
+            "/pets",
+            &HashMap::new(),
+            caller,
+            &headers,
+        )?;
+        assert!(
+            result.verdict.is_allowed(),
+            "a durable-backed evaluator must allow a safe request"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn evaluate_unsafe_method_denied_without_capability() {
         let keypair = Keypair::generate();
-        let evaluator = ChioEvaluator::new(keypair, "test-policy".to_string());
+        let evaluator = ChioEvaluator::new_ephemeral(keypair, "test-policy".to_string());
         let caller = CallerIdentity::anonymous();
         let headers = http::HeaderMap::new();
 
@@ -381,7 +522,7 @@ mod tests {
     #[test]
     fn evaluate_unsafe_method_allowed_with_capability() {
         let keypair = Keypair::generate();
-        let evaluator = ChioEvaluator::new(keypair.clone(), "test-policy".to_string());
+        let evaluator = ChioEvaluator::new_ephemeral(keypair.clone(), "test-policy".to_string());
         let caller = CallerIdentity::anonymous();
         let mut headers = http::HeaderMap::new();
         headers.insert(
@@ -411,7 +552,7 @@ mod tests {
     #[test]
     fn evaluate_invalid_method() {
         let keypair = Keypair::generate();
-        let evaluator = ChioEvaluator::new(keypair, "test-policy".to_string());
+        let evaluator = ChioEvaluator::new_ephemeral(keypair, "test-policy".to_string());
         let caller = CallerIdentity::anonymous();
         let headers = http::HeaderMap::new();
 
@@ -429,7 +570,7 @@ mod tests {
     #[test]
     fn evaluate_all_safe_methods() {
         let keypair = Keypair::generate();
-        let evaluator = ChioEvaluator::new(keypair, "test-policy".to_string());
+        let evaluator = ChioEvaluator::new_ephemeral(keypair, "test-policy".to_string());
         let headers = http::HeaderMap::new();
 
         for method in &["GET", "HEAD", "OPTIONS"] {
@@ -450,7 +591,7 @@ mod tests {
     #[test]
     fn evaluate_all_unsafe_methods_denied() {
         let keypair = Keypair::generate();
-        let evaluator = ChioEvaluator::new(keypair, "test-policy".to_string());
+        let evaluator = ChioEvaluator::new_ephemeral(keypair, "test-policy".to_string());
         let headers = http::HeaderMap::new();
 
         for method in &["POST", "PUT", "PATCH", "DELETE"] {
@@ -474,7 +615,8 @@ mod tests {
     #[test]
     fn fail_open_mode() {
         let keypair = Keypair::generate();
-        let evaluator = ChioEvaluator::new(keypair, "test-policy".to_string()).with_fail_open(true);
+        let evaluator =
+            ChioEvaluator::new_ephemeral(keypair, "test-policy".to_string()).with_fail_open(true);
         assert!(evaluator.is_fail_open());
     }
 
@@ -485,8 +627,8 @@ mod tests {
             path.trim_end_matches('/').to_string()
         }
         let keypair = Keypair::generate();
-        let evaluator =
-            ChioEvaluator::new(keypair, "test-policy".to_string()).with_route_resolver(resolver);
+        let evaluator = ChioEvaluator::new_ephemeral(keypair, "test-policy".to_string())
+            .with_route_resolver(resolver);
 
         let caller = CallerIdentity::anonymous();
         let headers = http::HeaderMap::new();
@@ -515,7 +657,7 @@ mod tests {
     #[test]
     fn evaluator_clone() {
         let keypair = Keypair::generate();
-        let evaluator = ChioEvaluator::new(keypair, "test-policy".to_string());
+        let evaluator = ChioEvaluator::new_ephemeral(keypair, "test-policy".to_string());
         let cloned = evaluator.clone();
 
         let caller = CallerIdentity::anonymous();
@@ -542,7 +684,7 @@ mod tests {
     #[test]
     fn evaluate_invalid_capability_is_denied() {
         let keypair = Keypair::generate();
-        let evaluator = ChioEvaluator::new(keypair, "test-policy".to_string());
+        let evaluator = ChioEvaluator::new_ephemeral(keypair, "test-policy".to_string());
         let caller = CallerIdentity::anonymous();
         let mut headers = http::HeaderMap::new();
         headers.insert(
@@ -571,7 +713,7 @@ mod tests {
     #[test]
     fn evaluate_query_parameters_affect_content_hash() {
         let keypair = Keypair::generate();
-        let evaluator = ChioEvaluator::new(keypair, "test-policy".to_string());
+        let evaluator = ChioEvaluator::new_ephemeral(keypair, "test-policy".to_string());
         let caller = CallerIdentity::anonymous();
         let headers = http::HeaderMap::new();
         let mut query_a = HashMap::new();
@@ -597,7 +739,7 @@ mod tests {
     #[test]
     fn finalize_receipt_marks_final_scope() {
         let keypair = Keypair::generate();
-        let evaluator = ChioEvaluator::new(keypair, "test-policy".to_string());
+        let evaluator = ChioEvaluator::new_ephemeral(keypair, "test-policy".to_string());
         let caller = CallerIdentity::anonymous();
         let headers = http::HeaderMap::new();
         let query = HashMap::new();

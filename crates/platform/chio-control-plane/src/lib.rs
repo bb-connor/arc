@@ -340,6 +340,7 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
         max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: kernel_policy.require_web3_evidence,
         allow_ephemeral_receipt_log: kernel_policy.allow_ephemeral_receipt_log,
+        allow_ephemeral_revocation_store: kernel_policy.allow_ephemeral_revocation_store,
         checkpoint_batch_size: kernel_policy.checkpoint_batch_size,
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
@@ -657,6 +658,7 @@ mod tests {
             retention_config: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
         })
     }
 

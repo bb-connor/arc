@@ -11,9 +11,10 @@ use chio_cross_protocol::discovery::{DiscoveryProtocol, TargetProtocolRegistry};
 use chio_cross_protocol::routing::{plan_authoritative_route, route_selection_metadata};
 use chio_kernel::{
     ApprovalStore, ChioKernel, ExecutionNonceConfig, ExecutionNonceStore, Guard, GuardContext,
-    GuardDecision, InMemoryApprovalStore, KernelConfig, KernelError, SignedExecutionNonce,
-    ToolCallRequest, ToolServerConnection, Verdict as KernelVerdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    GuardDecision, InMemoryApprovalStore, KernelConfig, KernelError, ReceiptStore, RevocationStore,
+    SignedExecutionNonce, ToolCallRequest, ToolServerConnection, Verdict as KernelVerdict,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -235,14 +236,143 @@ impl Guard for HttpProjectionGuard {
     }
 }
 
+/// Builder for an [`HttpAuthority`] whose embedded kernel is backed by durable
+/// stores. Unlike the `-> Self` constructors, `build` attaches the receipt and
+/// revocation stores before the kernel is Arc-wrapped, and it is fallible
+/// because attaching a receipt store hydrates checkpoint counters and can fail.
+/// Both ephemeral opt-ins default to `false` (fail-closed).
+#[derive(Default)]
+pub struct HttpAuthorityBuilder {
+    approval_store: Option<Arc<dyn ApprovalStore>>,
+    receipt_store: Option<Arc<dyn ReceiptStore>>,
+    revocation_store: Option<Arc<dyn RevocationStore>>,
+    trusted_capability_issuers: Vec<PublicKey>,
+    allow_ephemeral_receipt_log: bool,
+    allow_ephemeral_revocation_store: bool,
+}
+
+impl HttpAuthorityBuilder {
+    #[must_use]
+    pub fn receipt_store(mut self, store: Arc<dyn ReceiptStore>) -> Self {
+        self.receipt_store = Some(store);
+        self
+    }
+
+    #[must_use]
+    pub fn revocation_store(mut self, store: Arc<dyn RevocationStore>) -> Self {
+        self.revocation_store = Some(store);
+        self
+    }
+
+    #[must_use]
+    pub fn approval_store(mut self, store: Arc<dyn ApprovalStore>) -> Self {
+        self.approval_store = Some(store);
+        self
+    }
+
+    #[must_use]
+    pub fn trusted_capability_issuers(mut self, issuers: Vec<PublicKey>) -> Self {
+        self.trusted_capability_issuers = issuers;
+        self
+    }
+
+    #[must_use]
+    pub fn allow_ephemeral_receipt_log(mut self, allow: bool) -> Self {
+        self.allow_ephemeral_receipt_log = allow;
+        self
+    }
+
+    #[must_use]
+    pub fn allow_ephemeral_revocation_store(mut self, allow: bool) -> Self {
+        self.allow_ephemeral_revocation_store = allow;
+        self
+    }
+
+    pub fn build(
+        self,
+        keypair: Keypair,
+        policy_hash: String,
+    ) -> Result<HttpAuthority, HttpAuthorityError> {
+        let approval_store = self
+            .approval_store
+            .unwrap_or_else(|| Arc::new(InMemoryApprovalStore::new()));
+        let keypair = Arc::new(keypair);
+        let signer_public_key = keypair.public_key();
+        let mut trusted = self.trusted_capability_issuers;
+        if !trusted.contains(&signer_public_key) {
+            trusted.push(signer_public_key.clone());
+        }
+        let kernel_subject = Keypair::generate().public_key();
+        let kernel_agent_id = kernel_subject.to_hex();
+
+        let mut kernel = ChioKernel::new(HttpAuthority::kernel_config(
+            keypair.as_ref().clone(),
+            trusted.clone(),
+            policy_hash.clone(),
+            self.allow_ephemeral_receipt_log,
+            self.allow_ephemeral_revocation_store,
+        ));
+        if let Some(store) = self.receipt_store {
+            kernel
+                .set_receipt_store_handle(store)
+                .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))?;
+        }
+        if let Some(store) = self.revocation_store {
+            kernel.set_revocation_store_handle(store);
+        }
+        kernel.register_tool_server(Box::new(HttpAuthorizationServer));
+        kernel.add_guard(Box::new(HttpProjectionGuard));
+
+        Ok(HttpAuthority {
+            keypair,
+            policy_hash,
+            kernel: Arc::new(kernel),
+            kernel_subject,
+            kernel_agent_id,
+            approval_store,
+            trusted_capability_issuers: trusted,
+        })
+    }
+}
+
 impl HttpAuthority {
+    /// Start building an authority whose embedded kernel is backed by durable
+    /// receipt and revocation stores. Stores must be attached before the kernel
+    /// is wrapped in an [`Arc`], which is what this builder does.
+    #[must_use]
+    pub fn builder() -> HttpAuthorityBuilder {
+        HttpAuthorityBuilder::default()
+    }
+
+    /// Fail-closed constructor: no receipt or revocation store is attached and
+    /// both ephemeral opt-ins are off. Existing callers compile unchanged, but
+    /// the first mediated call now denies with a durable-persistence error
+    /// until a durable store is wired through [`HttpAuthority::builder`]. This
+    /// matches the kernel-backed lanes, which already deny when durable
+    /// persistence is missing.
     #[must_use]
     pub fn new(keypair: Keypair, policy_hash: String) -> Self {
-        Self::new_with_approval_store_and_trusted_issuers(
+        Self::assemble(
             keypair,
             policy_hash,
             Arc::new(InMemoryApprovalStore::new()),
             Vec::new(),
+            false,
+            false,
+        )
+    }
+
+    /// Explicitly ephemeral constructor (in-memory receipt log and revocation
+    /// store) for local scaffolds and tests that intend ephemerality.
+    #[must_use]
+    pub fn new_ephemeral(keypair: Keypair, policy_hash: String) -> Self {
+        Self::assemble(
+            keypair,
+            policy_hash,
+            Arc::new(InMemoryApprovalStore::new()),
+            Vec::new(),
+            true,
+            true,
         )
     }
 
@@ -252,12 +382,7 @@ impl HttpAuthority {
         policy_hash: String,
         approval_store: Arc<dyn ApprovalStore>,
     ) -> Self {
-        Self::new_with_approval_store_and_trusted_issuers(
-            keypair,
-            policy_hash,
-            approval_store,
-            Vec::new(),
-        )
+        Self::assemble(keypair, policy_hash, approval_store, Vec::new(), true, true)
     }
 
     #[must_use]
@@ -265,7 +390,29 @@ impl HttpAuthority {
         keypair: Keypair,
         policy_hash: String,
         approval_store: Arc<dyn ApprovalStore>,
+        trusted_capability_issuers: Vec<PublicKey>,
+    ) -> Self {
+        Self::assemble(
+            keypair,
+            policy_hash,
+            approval_store,
+            trusted_capability_issuers,
+            true,
+            true,
+        )
+    }
+
+    /// Infallible assembly shared by every `-> Self` constructor: build the
+    /// kernel config, register the tool server and projection guard, and
+    /// Arc-wrap. No receipt store is attached here (attaching one is fallible
+    /// and lives in the builder), so these constructors keep their signatures.
+    fn assemble(
+        keypair: Keypair,
+        policy_hash: String,
+        approval_store: Arc<dyn ApprovalStore>,
         mut trusted_capability_issuers: Vec<PublicKey>,
+        allow_ephemeral_receipt_log: bool,
+        allow_ephemeral_revocation_store: bool,
     ) -> Self {
         let keypair = Arc::new(keypair);
         let signer_public_key = keypair.public_key();
@@ -275,22 +422,13 @@ impl HttpAuthority {
         let kernel_subject = Keypair::generate().public_key();
         let kernel_agent_id = kernel_subject.to_hex();
 
-        let mut kernel = ChioKernel::new(KernelConfig {
-            keypair: keypair.as_ref().clone(),
-            ca_public_keys: trusted_capability_issuers.clone(),
-            max_delegation_depth: 8,
-            policy_hash: policy_hash.clone(),
-            allow_sampling: false,
-            allow_sampling_tool_use: false,
-            allow_elicitation: false,
-            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-            require_web3_evidence: false,
-            allow_ephemeral_receipt_log: true,
-            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-            retention_config: None,
-            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        });
+        let mut kernel = ChioKernel::new(Self::kernel_config(
+            keypair.as_ref().clone(),
+            trusted_capability_issuers.clone(),
+            policy_hash.clone(),
+            allow_ephemeral_receipt_log,
+            allow_ephemeral_revocation_store,
+        ));
         kernel.register_tool_server(Box::new(HttpAuthorizationServer));
         kernel.add_guard(Box::new(HttpProjectionGuard));
 
@@ -302,6 +440,35 @@ impl HttpAuthority {
             kernel_agent_id,
             approval_store,
             trusted_capability_issuers,
+        }
+    }
+
+    /// The embedded kernel configuration for the HTTP mediation lane. The two
+    /// ephemeral flags are the only durability knobs a caller varies; every
+    /// other field is fixed for this lane.
+    fn kernel_config(
+        keypair: Keypair,
+        ca_public_keys: Vec<PublicKey>,
+        policy_hash: String,
+        allow_ephemeral_receipt_log: bool,
+        allow_ephemeral_revocation_store: bool,
+    ) -> KernelConfig {
+        KernelConfig {
+            keypair,
+            ca_public_keys,
+            max_delegation_depth: 8,
+            policy_hash,
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log,
+            allow_ephemeral_revocation_store,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         }
     }
 

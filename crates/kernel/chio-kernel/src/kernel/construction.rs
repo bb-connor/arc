@@ -307,6 +307,16 @@ impl ChioKernel {
         ))
     }
 
+    pub(crate) fn ensure_revocation_durability_ready(&self) -> Result<(), KernelError> {
+        let ephemeral = self.with_revocation_store(|store| Ok(store.is_ephemeral()))?;
+        if !ephemeral || self.config.allow_ephemeral_revocation_store {
+            return Ok(());
+        }
+        Err(KernelError::Internal(
+            "durable revocation state unavailable: no revocation store configured".to_string(),
+        ))
+    }
+
     pub(crate) fn scope_receipt_federation_admission_for_request(
         &self,
         request_id: &str,

@@ -334,6 +334,7 @@ pub(crate) fn execute_runtime_loopback_step(
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         allow_ephemeral_receipt_log: false,
+        allow_ephemeral_revocation_store: false,
     });
     kernel.set_federation_local_kernel_id(step.request.host_kernel_id.clone());
     let receipt_store_nonce =

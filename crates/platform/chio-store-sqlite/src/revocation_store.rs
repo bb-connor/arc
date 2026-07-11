@@ -171,6 +171,10 @@ impl RevocationStore for SqliteRevocationStore {
             .optional()?;
         Ok(inserted.is_some())
     }
+
+    fn is_ephemeral(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]

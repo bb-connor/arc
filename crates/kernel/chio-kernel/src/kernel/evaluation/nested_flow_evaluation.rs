@@ -225,6 +225,17 @@ impl ChioKernel {
                 request, &msg, now, None, None,
             );
         }
+        if let Err(error) = self.ensure_revocation_durability_ready() {
+            let msg = error.to_string();
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&msg),
+                "revocation durability unavailable pre-dispatch (nested flow)"
+            );
+            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
+                request, &msg, now, None, None,
+            );
+        }
 
         let (matched_grant_index, budget_mutation) = match self.check_and_increment_budget(
             &request.request_id,

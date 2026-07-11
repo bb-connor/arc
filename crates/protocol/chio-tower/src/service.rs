@@ -389,7 +389,7 @@ mod tests {
 
     fn make_service() -> (Keypair, ChioEvaluator) {
         let keypair = Keypair::generate();
-        let evaluator = ChioEvaluator::new(keypair.clone(), "test-policy".to_string());
+        let evaluator = ChioEvaluator::new_ephemeral(keypair.clone(), "test-policy".to_string());
         (keypair, evaluator)
     }
 
