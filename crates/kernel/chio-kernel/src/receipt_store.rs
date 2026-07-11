@@ -290,7 +290,7 @@ pub enum ReceiptStoreError {
     )]
     RetentionWatermarkRegression { attempted: u64, current: u64 },
 
-    #[error("claim receipt log projection is missing over a checkpointed or archived range (watermark {watermark}); refusing to regenerate an ordering that would not match checkpoint boundaries; run `chio receipt retention repair`")]
+    #[error("claim receipt log projection is missing over a checkpointed or archived range (watermark {watermark}); the entry ordering cannot be safely regenerated to match committed checkpoint boundaries; restore the claim_receipt_log_entries projection from a backup taken before it was lost")]
     ArchivedRangeProjection { watermark: u64 },
 
     #[error("tenant-scoped retention is not expressible as a prefix watermark and is unsupported; no data was modified")]

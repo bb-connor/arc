@@ -90,6 +90,18 @@ fn backfill_refuses_regeneration_over_checkpointed_range() -> Result<(), Box<dyn
         message.contains("checkpointed or archived range"),
         "unexpected error: {message}"
     );
+    // `chio receipt retention repair` only removes claim-log rows whose source
+    // rows are already gone; with an empty projection it removes nothing and
+    // leaves the store bricked, so the guidance must not point there. It must
+    // name an applicable recovery instead.
+    assert!(
+        !message.contains("retention repair"),
+        "must not point at the no-op retention repair for a missing projection: {message}"
+    );
+    assert!(
+        message.contains("restore") && message.contains("backup"),
+        "must direct operators to an applicable recovery path: {message}"
+    );
 
     let _ = std::fs::remove_file(&path);
     Ok(())
