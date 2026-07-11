@@ -1,5 +1,9 @@
 use super::*;
 
+use chio_http_serve::{
+    apply_server_hygiene, run_until_drained, ServeError, ServeHygieneConfig, ShutdownController,
+};
+
 /// Stored receipts for inspection and querying.
 pub(crate) struct ReceiptLog {
     pub(crate) receipts: Vec<HttpReceipt>,
@@ -320,12 +324,30 @@ impl ProtectProxy {
 
         observer(local_addr);
 
-        axum::serve(
+        let hygiene = ServeHygieneConfig::default();
+        let app = apply_server_hygiene(app, &hygiene);
+        let controller = ShutdownController::install();
+        // This site serves with per-connection `ConnectInfo<SocketAddr>`, which
+        // is bound to the concrete listener, so the accept ceiling comes from
+        // the request concurrency limit rather than a listener connection cap.
+        let server = axum::serve(
             listener,
             app.into_make_service_with_connect_info::<SocketAddr>(),
         )
+        .with_graceful_shutdown(controller.signalled());
+
+        // Every proxied call writes its receipt synchronously inside the request
+        // handler, so completing the in-flight requests during the drain is the
+        // whole durability guarantee: there is nothing queued to flush afterward.
+        run_until_drained(
+            server,
+            controller.subscribe(),
+            hygiene.drain_timeout,
+            async { Ok::<(), String>(()) },
+        )
         .await
-        .map_err(ProtectError::Io)?;
+        .map(|_outcome| ())
+        .map_err(protect_serve_error)?;
 
         Ok(())
     }
@@ -333,5 +355,12 @@ impl ProtectProxy {
     /// Build routes from spec content for testing.
     pub fn routes_from_spec(spec_content: &str) -> Result<Vec<RouteEntry>, ProtectError> {
         Self::build_routes(spec_content)
+    }
+}
+
+fn protect_serve_error(error: ServeError) -> ProtectError {
+    match error {
+        ServeError::Io(source) => ProtectError::Io(source),
+        ServeError::Flush(message) => ProtectError::Io(std::io::Error::other(message)),
     }
 }

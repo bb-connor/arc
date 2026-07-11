@@ -234,8 +234,14 @@ pub(crate) async fn handle_internal_lineage_delta(
     .into_response()
 }
 
-pub(crate) async fn run_cluster_sync_loop(state: TrustServiceState) {
+pub(crate) async fn run_cluster_sync_loop(
+    state: TrustServiceState,
+    mut shutdown: tokio::sync::watch::Receiver<bool>,
+) {
     loop {
+        if *shutdown.borrow_and_update() {
+            return;
+        }
         let sync_state = state.clone();
         match tokio::task::spawn_blocking(move || sync_cluster_once(&sync_state)).await {
             Ok(Ok(())) => {}
@@ -251,15 +257,22 @@ pub(crate) async fn run_cluster_sync_loop(state: TrustServiceState) {
         }
         // The loop is the sole sync driver: race the inter-round sleep against a
         // writer kick so a waiting budget write is served promptly without
-        // spawning its own sync storm.
+        // spawning its own sync storm, and against the shutdown signal so the
+        // loop stops promptly during a drain rather than after a full interval.
         match state.cluster_progress.as_ref() {
             Some(progress) => {
                 tokio::select! {
                     _ = tokio::time::sleep(state.config.cluster_sync_interval) => {}
                     _ = progress.awaited_kick() => {}
+                    _ = shutdown.changed() => {}
                 }
             }
-            None => tokio::time::sleep(state.config.cluster_sync_interval).await,
+            None => {
+                tokio::select! {
+                    _ = tokio::time::sleep(state.config.cluster_sync_interval) => {}
+                    _ = shutdown.changed() => {}
+                }
+            }
         }
     }
 }

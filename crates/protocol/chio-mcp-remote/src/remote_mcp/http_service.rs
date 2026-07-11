@@ -199,9 +199,11 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
         local_auth_server: local_auth_server.map(Arc::new),
     };
 
+    let controller = chio_http_serve::ShutdownController::install();
     let reaper_state = state.clone();
+    let reaper_shutdown = controller.subscribe();
     tokio::spawn(async move {
-        session_reaper_loop(reaper_state).await;
+        session_reaper_loop(reaper_state, reaper_shutdown).await;
     });
 
     let mcp_routes = Router::new()
@@ -246,12 +248,32 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
     );
     eprintln!("remote MCP edge listening on http://{local_addr}{MCP_ENDPOINT_PATH}");
 
-    axum::serve(
+    let hygiene = chio_http_serve::ServeHygieneConfig::default();
+    let router = chio_http_serve::apply_server_hygiene(router, &hygiene);
+    // The edge serves with per-connection `ConnectInfo<SocketAddr>`, which is
+    // bound to the concrete listener, so the accept ceiling comes from the
+    // request concurrency limit rather than a listener connection cap.
+    let server = axum::serve(
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
     )
-        .await
-        .map_err(|error| CliError::cli_other_error(format!("remote MCP edge server failed: {error}")))
+    .with_graceful_shutdown(controller.signalled());
+
+    // Draining the in-flight requests is the primary durability guarantee here:
+    // the receipt commit actor acknowledges an append only after the batch
+    // reaches WAL, so every acknowledged receipt is already durable once the
+    // request that wrote it finishes. Each session kernel runs behind its own
+    // worker thread reachable only through its message channel, so there is no
+    // in-process handle to flush after the drain.
+    chio_http_serve::run_until_drained(
+        server,
+        controller.subscribe(),
+        hygiene.drain_timeout,
+        async { Ok::<(), String>(()) },
+    )
+    .await
+    .map(|_outcome| ())
+    .map_err(|error| CliError::cli_other_error(format!("remote MCP edge server failed: {error}")))
 }
 
 async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> Response {

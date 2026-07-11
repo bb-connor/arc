@@ -30,6 +30,7 @@ chio-errors = { workspace = true }
 chio-enterprise-export = { workspace = true }
 chio-did = { workspace = true }
 chio-external-guards = { workspace = true }
+chio-http-serve = { workspace = true }
 chio-kernel = { workspace = true }
 chio-metrics-spec = { workspace = true }
 chio-guards = { workspace = true }
