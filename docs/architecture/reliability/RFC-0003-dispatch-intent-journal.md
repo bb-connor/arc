@@ -197,21 +197,148 @@ CREATE TABLE IF NOT EXISTS chio_dispatch_intents (
     monetary              INTEGER NOT NULL,        -- 0 | 1
     rail                  TEXT,                    -- adapter/rail id, known pre-authorize
     rail_authorization_id TEXT,                    -- attached post-authorize (money path)
+    outcome_eligibility_digest TEXT,               -- nullable WS3 signed selector binding
     tenant_id             TEXT,
     created_at_unix_ms    INTEGER NOT NULL,
-    state                 TEXT NOT NULL DEFAULT 'open', -- 'open' | 'dead_letter'
-    resolution_detail     TEXT                     -- reconciler outcome annotation
+    state                 TEXT NOT NULL DEFAULT 'open'
+        CHECK (state IN ('open', 'dead_letter')),
+    incident_id           TEXT,
+    resolution_detail     TEXT,                    -- reconciler outcome annotation
+    CHECK (
+        (state = 'open' AND incident_id IS NULL)
+        OR (state = 'dead_letter' AND incident_id IS NOT NULL)
+    )
 );
 
 CREATE INDEX IF NOT EXISTS idx_chio_dispatch_intents_state
     ON chio_dispatch_intents(state);
+
+CREATE TABLE IF NOT EXISTS chio_outcome_eligibility_records (
+    eligibility_seq       INTEGER PRIMARY KEY,
+    request_id            TEXT UNIQUE NOT NULL,
+    eligibility_digest    TEXT UNIQUE NOT NULL,
+    schema                TEXT NOT NULL
+        CHECK (schema = 'chio.outcome.eligibility.v1'),
+    canonical_envelope    BLOB NOT NULL,
+    lifecycle             TEXT NOT NULL DEFAULT 'prepared'
+        CHECK (lifecycle IN (
+            'prepared', 'dispatch_started', 'dispatch_accepted', 'receipt_bound',
+            'incident_bound', 'not_dispatched'
+        )),
+    row_version           INTEGER NOT NULL DEFAULT 0 CHECK (row_version >= 0),
+    acceptance_digest     TEXT,
+    canonical_acceptance_envelope BLOB,
+    dispatch_accepted_at_unix_ms INTEGER,
+    receipt_id            TEXT,
+    incident_id           TEXT,
+    incident_class        TEXT CHECK (incident_class IN ('platform', 'provider')),
+    created_at_unix_ms    INTEGER NOT NULL,
+    resolved_at_unix_ms   INTEGER,
+    CHECK (
+        (lifecycle IN ('prepared', 'dispatch_started')
+            AND acceptance_digest IS NULL
+            AND canonical_acceptance_envelope IS NULL
+            AND dispatch_accepted_at_unix_ms IS NULL
+            AND receipt_id IS NULL AND incident_id IS NULL
+            AND incident_class IS NULL
+            AND resolved_at_unix_ms IS NULL)
+        OR (lifecycle = 'dispatch_accepted'
+            AND acceptance_digest IS NOT NULL
+            AND canonical_acceptance_envelope IS NOT NULL
+            AND dispatch_accepted_at_unix_ms IS NOT NULL
+            AND receipt_id IS NULL AND incident_id IS NULL
+            AND incident_class IS NULL AND resolved_at_unix_ms IS NULL)
+        OR (lifecycle = 'receipt_bound'
+            AND acceptance_digest IS NOT NULL
+            AND canonical_acceptance_envelope IS NOT NULL
+            AND dispatch_accepted_at_unix_ms IS NOT NULL
+            AND receipt_id IS NOT NULL AND incident_id IS NULL
+            AND incident_class IS NULL AND resolved_at_unix_ms IS NOT NULL)
+        OR (lifecycle = 'incident_bound' AND receipt_id IS NULL
+            AND incident_id IS NOT NULL AND incident_class = 'provider'
+            AND resolved_at_unix_ms IS NOT NULL
+            AND acceptance_digest IS NOT NULL
+            AND canonical_acceptance_envelope IS NOT NULL
+            AND dispatch_accepted_at_unix_ms IS NOT NULL)
+        OR (lifecycle = 'not_dispatched'
+            AND acceptance_digest IS NULL
+            AND canonical_acceptance_envelope IS NULL
+            AND dispatch_accepted_at_unix_ms IS NULL
+            AND ((receipt_id IS NOT NULL AND incident_id IS NULL
+                    AND incident_class IS NULL)
+                OR (receipt_id IS NULL AND incident_id IS NOT NULL
+                    AND incident_class = 'platform'))
+            AND resolved_at_unix_ms IS NOT NULL)
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_chio_outcome_eligibility_lifecycle
+    ON chio_outcome_eligibility_records(lifecycle);
+
+CREATE INDEX IF NOT EXISTS idx_chio_outcome_eligibility_time
+    ON chio_outcome_eligibility_records(created_at_unix_ms, eligibility_seq);
+
+CREATE INDEX IF NOT EXISTS idx_chio_outcome_eligibility_acceptance_time
+    ON chio_outcome_eligibility_records(
+        dispatch_accepted_at_unix_ms, eligibility_seq
+    ) WHERE dispatch_accepted_at_unix_ms IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS chio_outcome_eligibility_events (
+    event_seq             INTEGER PRIMARY KEY,
+    eligibility_seq       INTEGER NOT NULL,
+    record_version        INTEGER NOT NULL CHECK (record_version >= 0),
+    request_id            TEXT NOT NULL,
+    eligibility_digest    TEXT NOT NULL,
+    transition            TEXT NOT NULL CHECK (transition IN (
+        'prepared', 'dispatch_started', 'dispatch_accepted', 'receipt_bound',
+        'incident_bound', 'not_dispatched'
+    )),
+    acceptance_digest     TEXT,
+    dispatch_accepted_at_unix_ms INTEGER,
+    receipt_id            TEXT,
+    incident_id           TEXT,
+    incident_class        TEXT CHECK (incident_class IN ('platform', 'provider')),
+    event_at_unix_ms      INTEGER NOT NULL,
+    leaf_hash             TEXT NOT NULL,
+    UNIQUE (eligibility_seq, record_version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_chio_outcome_eligibility_events_request
+    ON chio_outcome_eligibility_events(request_id, event_seq);
 ```
 
 `request_id` is the primary key: at most one open intent per request. A second write
 for the same `request_id` (a retry that reused the id) collides and is rejected
 fail-closed rather than duplicating an effect record. The row carries no arguments,
-only `parameter_hash`, so it holds no additional sensitive payload beyond what the
-receipt already commits.
+only `parameter_hash` and optional digests, so it holds no raw arguments or
+additional sensitive payload beyond what the receipt already commits. The
+`outcome_eligibility_digest` column is NULL for ordinary calls. When non-NULL,
+the WS3 extension requires the matching canonical signed
+`chio.outcome.eligibility.v1` row to be inserted in the same intent-writer
+transaction; a digest-only row is invalid and denies before dispatch.
+The eligibility row is retained after intent consumption because it is the
+request-keyed denominator evidence for WS3 SLA proofs. Its lifecycle starts as
+`prepared`. After rail authorization and every other pre-tool check succeeds, a
+durable compare-and-swap moves it to `dispatch_started` immediately before the
+transport handoff. That marker is platform state and is not provider SLA
+evidence. A qualified server must durably accept the request and return a
+provider-authenticated acceptance before the store may transition to
+`dispatch_accepted`. Only `dispatch_accepted` may become `receipt_bound` or a
+provider-class `incident_bound`. Ambiguous failure from `dispatch_started`
+creates a platform incident on the intent but leaves the eligibility lifecycle
+unresolved and makes SLA proof incomplete. Only an authenticated server result
+that the request was never durably accepted may move it to `not_dispatched`. A pre-tool abort or recovery moves `prepared` to
+`not_dispatched`, retaining a receipt or incident reference but excluding the
+request from provider SLA math. A retained terminal eligibility row without an
+open intent is therefore expected; only creating `prepared` eligibility without
+its matching intent is invalid.
+
+The store allocates `eligibility_seq` and `event_seq` from monotonic,
+transactional counters with no gaps among committed rows. Creation inserts the
+version-zero `prepared` event. Every lifecycle CAS increments `row_version` and
+inserts one immutable event carrying that same version in the same transaction;
+event rows cannot be updated or deleted. `eligibility_seq` is the stable record
+position, while the event sequence is the append-only consistency history.
 
 ### New Rust types
 
@@ -245,6 +372,8 @@ pub struct DispatchIntentRecord {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rail_authorization_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outcome_eligibility_digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tenant_id: Option<String>,
     pub created_at_unix_ms: u64,
 }
@@ -256,6 +385,9 @@ pub struct DispatchIntentKey {
     pub request_id: String,
     /// Must equal the receipt's action.parameter_hash; a mismatch fails closed.
     pub parameter_hash: String,
+    /// None for the base path; Some for WS3 and must match intent, record, and receipt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outcome_eligibility_digest: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tenant_id: Option<String>,
 }
@@ -316,6 +448,30 @@ struct ReceiptCommitRequest {
 enum DispatchIntentOp {
     /// Pre-dispatch durable intent write.
     Insert(DispatchIntentRecord),
+    /// WS3 pre-dispatch write; envelope bytes were verified by the kernel.
+    InsertOutcomeEligible {
+        intent: DispatchIntentRecord,
+        eligibility_schema: String,
+        eligibility_request_id: String,
+        eligibility_digest: String,
+        canonical_eligibility_envelope: Vec<u8>,
+    },
+    /// WS3 durable boundary immediately before invoking the tool dispatcher.
+    MarkOutcomeDispatchStarted {
+        request_id: String,
+        eligibility_digest: String,
+        expected_version: u64,
+        started_at_unix_ms: u64,
+    },
+    /// WS3 provider durably accepted ownership of this exact request.
+    MarkOutcomeDispatchAccepted {
+        request_id: String,
+        eligibility_digest: String,
+        expected_version: u64,
+        acceptance_digest: String,
+        canonical_acceptance_envelope: Vec<u8>,
+        accepted_at_unix_ms: u64,
+    },
     /// Post-authorize best-effort rail reference attach (money path).
     AttachRailRef {
         request_id: String,
@@ -353,7 +509,40 @@ intents). The batch is then processed inside the single `Immediate` transaction:
 - For an `Intent` carrying `DispatchIntentOp::Insert`:
   `insert_dispatch_intent_tx(&tx, &intent)` (a plain `INSERT ... ON
   CONFLICT(request_id) DO NOTHING`; zero rows changed maps to
-  `ReceiptStoreError::Conflict`, fail-closed).
+  `ReceiptStoreError::Conflict`, fail-closed). A base insert requires
+  `outcome_eligibility_digest = None`. WS3 adds a sibling typed insert command
+  carrying the verified canonical eligibility envelope; that command recomputes
+  its digest and inserts both the eligibility record and intent in this same
+  transaction. Non-NULL digest without the matching typed attachment, an
+  attachment on an ordinary request, or a byte/digest/schema mismatch aborts the
+  transaction before dispatch.
+- For `DispatchIntentOp::InsertOutcomeEligible`, require the intent's non-NULL
+  digest to equal `eligibility_digest`, require both request ids to match,
+  require the exact v1 schema, recompute SHA-256 over the canonical envelope,
+  decode and reverify its kernel signature and request binding, then insert the
+  eligibility row with lifecycle `prepared`, allocate its stable
+  `eligibility_seq`, append its immutable version-zero `prepared` event, and
+  insert the intent. All three inserts occur in one transaction and use strict
+  conflict handling: identical replay returns the existing set only if every
+  stored byte and field is equal; any partial, duplicate-but-different, or
+  pre-existing subset is a conflict.
+- For `DispatchIntentOp::MarkOutcomeDispatchStarted`, select the exact open
+  intent and eligibility digest, compare-and-swap `prepared` at
+  `expected_version` to `dispatch_started`, increment the version, and append
+  the matching immutable transition event. The caller blocks until this
+  transaction is durable, then invokes the qualified durable-acceptance
+  transport. A failure denies before handoff and enters the typed pre-dispatch
+  cancellation path; it never falls through to transport.
+- For `DispatchIntentOp::MarkOutcomeDispatchAccepted`, recompute and verify the
+  signed `chio.outcome.dispatch-acceptance.v1` envelope against the configured
+  provider binding, exact request/eligibility/parameter digests, and transport
+  idempotency key. The store assigns `accepted_at_unix_ms` from its trusted
+  clock, compare-and-swaps `dispatch_started` at the expected version to
+  `dispatch_accepted`, persists the acceptance bytes/digest, and appends the
+  immutable event in one commit. Caller timestamps do not set the SLA window.
+  Missing or invalid acceptance records a platform incident but leaves
+  `dispatch_started` unresolved; it never creates provider SLA evidence and
+  blocks the global SLA ambiguity gate until a trusted query resolves it.
 - For an `Intent` carrying `DispatchIntentOp::AttachRailRef`:
   `attach_dispatch_intent_rail_ref_tx(&tx, ...)` (an `UPDATE chio_dispatch_intents
   SET rail_authorization_id = ?2 WHERE request_id = ?1 AND state = 'open'`). Zero
@@ -362,12 +551,25 @@ intents). The batch is then processed inside the single `Immediate` transaction:
   path below), it never aborts the shared batch the way `Insert` and consume
   failures do.
 - For an `Append` with `consume_intent = Some(key)`: run
-  `finalize_dispatch_intent_tx(&tx, &key)` and `append_chio_receipt_tx(&tx, ...)` in
-  that order, both inside the one transaction. `finalize_dispatch_intent_tx` is a
-  `DELETE FROM chio_dispatch_intents WHERE request_id = ?1 AND parameter_hash = ?2`
-  guarded on `tenant_id`; a `parameter_hash` mismatch or missing row is a
-  `ReceiptStoreError::Conflict` and aborts the whole batch (fail-closed, no partial
-  commit).
+  `finalize_dispatch_intent_tx(&tx, &key, &receipt)` and
+  `append_chio_receipt_tx(&tx, ...)` in that order, both inside the one
+  transaction. The finalizer first selects the intent by `request_id` and
+  requires exact `parameter_hash`, `tenant_id`, and
+  `outcome_eligibility_digest` equality. The ordinary path supplies `None` and
+  can consume only a NULL-digest intent. The WS3 path supplies `Some(digest)`;
+  it recomputes that digest from the stored canonical eligibility envelope,
+  verifies its schema, signature, request id, and intent binding, and requires
+  the receipt's signed `chio.outcome.verdict.v1` metadata to carry the same
+  digest. It also recomputes the stored canonical acceptance-envelope digest,
+  reverifies its provider signature and exact request/eligibility/parameter
+  binding, and requires verdict metadata to carry that digest. It then compare-and-swaps the eligibility lifecycle from
+  `dispatch_accepted` at the exact expected version to `receipt_bound`, increments
+  the version, appends the immutable transition event with the receipt id and
+  resolution time, and deletes the intent. Only after those checks and
+  transition does it append the receipt.
+  A missing row, stale lifecycle, NULL/non-NULL mismatch, wrong digest, or
+  receipt-metadata mismatch is `ReceiptStoreError::Conflict` and aborts the
+  whole batch (fail-closed, no partial commit).
 - For an `Append` with `consume_intent = None`: unchanged behavior.
 
 Because the intent DELETE and the receipt INSERT share the one `tx.commit()` at
@@ -375,6 +577,28 @@ Because the intent DELETE and the receipt INSERT share the one `tx.commit()` at
 and the receipt absent; a successful commit removes the intent and persists the
 receipt. This is the requirement's "consume in the same writer transaction" property,
 built on the existing group-commit machinery rather than a new writer.
+For WS3, that same commit also changes the retained eligibility row to
+`receipt_bound`; there is no state in which a receipt consumed the intent while
+its eligibility evidence still claims `dispatch_accepted`.
+
+WS3 pre-tool termination uses a separate typed transaction, never the outcome
+receipt finalizer. After payment release or no-movement proof is durably known,
+`cancel_outcome_intent_before_dispatch` compare-and-swaps only `prepared` to
+`not_dispatched`, appends its immutable event, binds either the pre-dispatch
+denial receipt or terminal incident, and deletes or dead-letters the intent in
+  the same commit. A `dispatch_started` or `dispatch_accepted` record cannot take this path. Pending or
+unknown payment cleanup remains an incident, but its eligibility lifecycle is
+still `not_dispatched` because the durable dispatch boundary proves the tool was
+not invoked; provider SLA math never treats a rail or local preflight failure as
+a provider outcome failure.
+
+After transport handoff, only
+`resolve_outcome_dispatch_not_accepted` may move `dispatch_started` to
+`not_dispatched`. It requires the qualified provider's authenticated,
+query-bound `NotAccepted` result for the exact idempotency key and eligibility
+digest, records that proof digest and the platform incident, increments the
+version, and appends the immutable event in one transaction. Local inference,
+timeout, connection failure, or an unavailable query cannot invoke this path.
 
 Durability of the pre-dispatch intent write: `record_dispatch_intent` sends an
 `Intent` command and blocks on the response channel exactly as `append` does at
@@ -438,7 +662,8 @@ before ever returning `SafeToReplay`. Given a class, the method:
 - Otherwise builds a `DispatchIntentRecord` whose `parameter_hash` comes from
   `ToolCallAction::from_parameters(request.arguments.clone())`
   (`decision.rs:44`), sets `rail` to the configured adapter id for monetary calls
-  (leaving `rail_authorization_id = None` until authorize returns), and calls
+  (leaving `rail_authorization_id = None` until authorize returns and
+  `outcome_eligibility_digest = None` for the base path), and calls
   `store.record_dispatch_intent(&intent)`. Any error maps to a new fail-closed
   variant, reverses the already-applied pre-execution budget hold (routed through
   `unwind_aborted_monetary_invocation`, the same charge-gated reversal the
@@ -472,7 +697,10 @@ already-known `request_id` (or the full `DispatchIntentKey`), so the plumbing fr
 `async_evaluation_core` through `allow_responses.rs:72`
 (`record_chio_receipt_with_federation`) into `record_chio_receipt` must carry the
 handle; the receipt is not a sufficient source. The `parameter_hash` binding still
-proves the consumed intent matches the exact call the receipt attests. Placing the
+proves the consumed intent matches the exact call the receipt attests. For WS3,
+that handle also carries the verified eligibility digest, and the receipt sink
+must extract the same digest from signed outcome-verdict metadata; callers cannot
+supply an unrelated digest out of band. Placing the
 consume decision at the `record_chio_receipt` level is deliberate: post-dispatch
 deny receipts and terminal records funnel through the same sink
 (`record_chio_receipt_with_federation` is also called from `deny_responses.rs:97`
@@ -486,6 +714,36 @@ change is which store method runs under the lock. Unlike the return type of
 cannot advance the checkpoint), `append_chio_receipt_consuming_intent` returns
 `Result<Option<u64>, ReceiptStoreError>` precisely so the returned `seq` still drives
 `should_checkpoint_after_seq`.
+
+### WS3 durable provider acceptance
+
+Outcome-priced dispatch is allowed only through a tool-server transport that
+implements a durable acceptance handshake. Before acknowledging, the server
+stores the exact request under its idempotency key in a durable queue that it
+owns across client disconnects and restarts. It then returns a signed
+`chio.outcome.dispatch-acceptance.v1` envelope binding schema, acceptance id,
+request id, eligibility digest, parameter hash, provider/listing binding,
+server queue id, idempotency key, and provider key id/epoch. The kernel resolves
+that key from the already verified provider binding; an embedded key is never a
+trust root. The acceptance ID uses a domain-separated canonical body preimage
+excluding its own ID and signature.
+
+The acknowledgement means the provider has durably assumed responsibility to
+execute exactly once or expose a terminal signed outcome through an idempotent
+status query, regardless of a later kernel crash. A socket write, connection
+accept, in-memory queue, or ordinary synchronous function entry is not durable
+acceptance. The kernel records the verified envelope and a trusted store receipt
+time in the `dispatch_accepted` CAS. If the acknowledgement is lost after server
+commit, restart reconciliation queries the qualified server by the exact
+idempotency key and eligibility digest and can recover the same envelope. Until
+that proof is recovered, the request is a platform incident and provider SLA
+math excludes it.
+
+No current in-tree generic tool server is assumed to satisfy this contract.
+WS3 activation requires the transport capability, restart/query qualification,
+provider-key trust configuration, schema gates, and crash tests. A server that
+cannot prove durable acceptance may still serve ordinary Chio calls but cannot
+serve outcome-priced calls or contribute provider SLA denominator evidence.
 
 ### Boot-time reconciliation
 
@@ -502,11 +760,31 @@ requests). It selects `WHERE state = 'open'` and, per row:
   reconciler still dead-letters the intent (fail-closed: a heuristic match never
   silently deletes evidence) and records the probable receipt id in
   `resolution_detail` so the operator can close it in one look.
+- For WS3, signed verdict metadata makes the eligibility-digest lookup exact
+  even though the generic receipt lacks `request_id`. Reconciliation verifies
+  that metadata and the stored envelope before using the receipt id. Finding a
+  receipt while the intent remains open is an invariant violation, so it still
+  produces a typed incident rather than silently repairing state.
+- For a WS3 row in `dispatch_started`, reconciliation first queries the
+  qualified provider's durable queue by idempotency key and eligibility digest.
+  A verified recovered acceptance runs the normal `dispatch_accepted` CAS with
+  the trusted local recovery time. An authenticated `NotAccepted` result moves
+  the row to `not_dispatched` with the platform incident. An unavailable,
+  unauthenticated, or ambiguous query records the incident on the dead-letter
+  intent but leaves lifecycle `dispatch_started`, so SLA verification remains
+  incomplete instead of silently excluding a possibly accepted request.
 - Otherwise the intent is an orphan: an effect may have occurred with no receipt.
   The kernel cannot safely re-execute a side effect, so the default action is
-  dead-letter, not blind replay. It sets `state = 'dead_letter'` and writes the
-  reconciler's outcome into `resolution_detail`. The dead-letter row itself is the
-  durable, operator-visible incident record: it is counted in
+  dead-letter, not blind replay. In one transaction it creates the terminal
+  incident id, sets `state = 'dead_letter'`, writes the same id into the typed
+  `incident_id` column, writes the reconciler's outcome into
+  `resolution_detail`, and, for a WS3 intent, compare-and-swaps the matching
+  eligibility row from `dispatch_accepted` to `incident_bound` with that
+  incident id, `incident_class = 'provider'`, and the immutable transition event.
+  If the record is still `prepared`, it transitions to `not_dispatched` with a
+  platform incident. A `dispatch_started` row follows the query rule above and
+  never becomes terminal merely because the query is unavailable. The
+  dead-letter row itself is the durable, operator-visible incident record: it is counted in
   `ReceiptStoreHealthReport`, flips `healthy` to false, and is visible to the CLI
   `trust receipt health` command; alert routing for a nonzero count rides the
   RFC-0009 observability and alerting wiring.
@@ -515,7 +793,11 @@ requests). It selects `WHERE state = 'open'` and, per row:
   actually moved (RFC-0013 supplies the idempotent query/reconcile contract), and
   annotates the incident with the outcome.
 - Replay is permitted only for operations the reconciler proves idempotent and
-  non-side-effecting; the default posture treats every orphan as dead-letter.
+  non-side-effecting; the default posture treats every orphan as dead-letter. A
+  `SafeToReplay` decision does not resolve or delete the WS3 eligibility row: the
+  intent and eligibility remain in their existing nonterminal state until the
+  replay commits a bound receipt or a later terminal reconciliation binds an
+  incident. Replay cannot skip the durable `dispatch_started` CAS.
 
 ```rust
 pub trait DispatchIntentReconciler: Send + Sync {
@@ -536,6 +818,68 @@ pub enum DispatchIntentResolution {
     MonetaryReconciled { rail_reference: String },
 }
 ```
+
+### Outcome eligibility checkpoints (WS3 extension)
+
+The mutable eligibility table is not itself a completeness proof. WS3 therefore
+adds a domain-separated signed artifact,
+`chio.dispatch.recovery-checkpoint.v1`. Its body carries `schema`,
+`checkpoint_id`, store generation, configured checkpoint-authority id and key
+epoch, previous checkpoint digest, high-water eligibility and event sequences,
+record and event counts, a record-state root ordered by `eligibility_seq`, an
+append-only event root ordered by `event_seq`, an immutable creation-time index
+root ordered by `(created_at_unix_ms, eligibility_seq)`, a write-once provider
+acceptance-time index root ordered by
+`(dispatch_accepted_at_unix_ms, eligibility_seq)`, an unresolved
+`dispatch_started` root and count, and issuance time.
+`checkpoint_id` is SHA-256 over the RFC 8785 canonical body excluding
+`checkpoint_id`; the detached signature and envelope digest are outside that
+preimage. The verifier resolves the authority and epoch from trusted local
+configuration. An embedded or self-selected key never establishes trust.
+
+Each event leaf is the domain-separated hash of its complete canonical row,
+including sequence, record version, request id, eligibility digest, transition,
+acceptance digest/time, incident class, terminal references, and event time.
+Each record-state leaf binds its stable
+eligibility sequence, canonical envelope digest, current lifecycle and version,
+acceptance digest/time, incident class, terminal references, and
+creation/resolution times. Creation and acceptance times come from the trusted
+store clock and each index enforces a nondecreasing high-water mark; the
+eligibility sequence breaks ties. Creation is immutable after version zero and
+acceptance is written exactly once by the authenticated acceptance CAS.
+
+Checkpoint creation first places a barrier behind the single writer, then signs
+one transactionally consistent snapshot. A later checkpoint proves that its
+event tree extends the prior event prefix. The verifier replays every new event
+from the earlier state root, requires exactly the next version for its stable
+record position, and recomputes the later state root and counts. A missing,
+duplicate, reordered, or mutated transition fails verification. This is the
+update proof that a mutable lifecycle leaf alone cannot provide.
+
+An SLA window proof supplies the complete global provider-acceptance-time range
+for the declared interval, with predecessor and successor boundary leaves, rather than a
+submitter-selected provider subset. It also supplies each selected record's
+state leaf at the cutoff and the required lifecycle-event proof. The verifier
+locally applies the provider/listing/pricing/predicate selector to that complete
+range. Prepared, dispatch-started, not-dispatched, and platform-incident rows
+remain visible in the record/event roots but have no acceptance-time index entry
+and cannot enter this denominator. This can be larger than a provider-specific index, but it is the minimal
+v1 design that proves non-omission. A later authenticated provider index may
+optimize the proof without changing the denominator.
+
+V1 deliberately uses a global fail-closed ambiguity gate: the checkpoint's
+unresolved `dispatch_started` count must be zero before any SLA breach proof is
+accepted. This is conservative but prevents an acknowledgement lost outside a
+self-selected range from hiding a provider-accepted request. The root lists the
+exact unresolved record positions for operations; reconciliation must recover a
+valid acceptance or authenticated `NotAccepted` result before aggregation can
+resume. A later version may prove a narrower safe exclusion only with an
+authenticated temporal contract.
+
+The checkpoint schema, known-schema allowlist entry, JSON schema, positive and
+tamper fixtures, registry manifest entry, and unknown-schema negative land with
+WS3 before SLA aggregation activates. No API may claim a complete eligibility
+range from table scans or cursors without this signed checkpoint contract.
 
 ### Health surface
 
@@ -637,15 +981,30 @@ effect has run.
 
 ## Wire, schema, and receipt impact
 
-- Signed receipt payloads are unchanged. No new receipt kind. The intent row is never
-  signed and never entered into `chio_tool_receipts` or the Merkle tree, so
-  checkpoint and inclusion-proof semantics (ADR-0008) are untouched.
+- The base RFC adds no receipt kind or payload field. WS3 separately adds signed
+  outcome-verdict metadata carrying eligibility and dispatch-acceptance digests,
+  as specified in its versioned contract; this remains an ordinary tool receipt,
+  not a new receipt kind. Intent and eligibility rows are never entered into
+  `chio_tool_receipts` or its Merkle tree, so ADR-0008 receipt checkpoint and
+  inclusion-proof semantics are untouched.
 - New non-audit SQLite table `chio_dispatch_intents` (schema above), created
   idempotently in the `SqliteReceiptStore::open` / `open_with_pool_config` path
   (the DDL batch at `open.rs:129` runs for both fresh and existing files, so
   existing databases gain the table on next kernel open via `CREATE TABLE IF NOT
   EXISTS`). `open_existing` (`open.rs:102-126`) returns early and runs no DDL by
   design; see migration notes below.
+- WS3 reserves the nullable `outcome_eligibility_digest` column and adds the
+  request-keyed `chio_outcome_eligibility_records` table plus immutable
+  `chio_outcome_eligibility_events` shown above. They remain
+  non-audit operational state; the signed eligibility envelope is not inserted
+  into the receipt log or counted as a checkpoint receipt. The dispatch and
+  recovery checkpoint projection does include an authenticated leaf for every
+  eligibility record, binding request id, envelope and acceptance digests,
+  lifecycle/version, incident class, bound receipt or incident id, and
+  transition time. Its signed state, event, acceptance-time, and unresolved
+  roots supply WS3's
+  complete eligibility-record root and count without pretending the record is a
+  tool receipt.
 - `ReceiptStoreHealthReport` gains two `#[serde(default)]` count fields (additive,
   camelCase, backward compatible with existing JSON consumers).
 - Any serialized intent record or reconciliation report uses RFC 8785 canonical JSON,
@@ -661,8 +1020,26 @@ effect has run.
   database that never journaled has no orphans, so this is an accurate report, not a
   fail-open of the invariant (the serving kernel always opens through the DDL path
   and always has the table before its first intent write).
-- No data migration: there are no historical intents. Existing receipts are
-  unaffected.
+- When WS3 lands after this RFC, the serving `open` path checks
+  `PRAGMA table_info(chio_dispatch_intents)` and adds
+  `outcome_eligibility_digest TEXT` exactly once before accepting traffic.
+  Fresh databases receive it in the base DDL. The migration and
+  eligibility record/event table and checkpoint-projection metadata creation
+  share one startup transaction; a partial migration aborts startup.
+  `open_existing` readers treat an absent column or table as unsupported and do
+  not claim eligibility or SLA-proof support.
+- No eligibility backfill is required. Existing intent rows remain NULL in the
+  additive column and can be consumed only through the base `None` path;
+  outcome-priced dispatch is available only for newly created, atomically bound
+  intent and eligibility rows. Existing receipts are unaffected.
+- Eligibility rows and events are never pruned while their intent is open, their
+  lifecycle is nonterminal, or any referenced SLA window can still be filed or
+  verified. After the maximum applicable SLA
+  evidence-retention window and checkpoint finality, compaction may replace a
+  resolved row only with a tombstone committed to an archived
+  dispatch/recovery checkpoint root that preserves the request id, eligibility
+  digest, terminal binding, and range position. A database delete without that
+  archived completeness witness is forbidden.
 - Staged rollout via `DispatchIntentJournalMode`. Ship defaulting to `Off` in the
   first release to de-risk latency, enable `SideEffecting` in the second once soak
   data is in hand, and make `SideEffecting` the compiled default in the third. The
@@ -677,20 +1054,50 @@ effect has run.
 - Unit: intent insert collision on duplicate `request_id` fails closed; consume
   DELETE with mismatched `parameter_hash` aborts the batch and rolls back the receipt
   insert; read-only class writes no row.
+- WS3 extension: a base insert with a non-NULL eligibility digest rejects;
+  typed insert with canonical signed eligibility writes record and intent
+  together; forced failure leaves neither; unknown schema, envelope digest
+  mismatch, request mismatch, duplicate request with different bytes, and
+  creation of a `prepared` eligibility record without its intent all reject. A
+  durable exact-version transition marks platform-owned `dispatch_started`
+  before transport handoff. Only a valid provider-bound durable acknowledgement
+  produces `dispatch_accepted`. A WS3 receipt with the correct digest atomically
+  transitions that accepted record to `receipt_bound`, appends the receipt, and deletes
+  the intent; wrong or missing
+  receipt metadata, record bytes, digest, request, or lifecycle rolls back all
+  operations. A pre-tool abort atomically produces `not_dispatched`, while
+  terminal recovery from `dispatch_started` produces a platform incident, while
+  recovery from `dispatch_accepted` produces a provider incident; resolved
+  terminal records without open intents are valid and remain queryable. Existing
+  NULL rows round-trip unchanged through the additive migration.
 - Property: for a random interleaving of appends and intents in one batch, after
   `commit_receipt_batch` every consumed intent is gone and every receipt is present,
   and no orphan is created for a committed receipt (the `receipt XOR open_intent`
-  invariant).
+  invariant). For WS3, each eligibility row is exactly one of `prepared` or
+  `dispatch_started` with its open intent, `dispatch_accepted` with its signed
+  durable acknowledgement and open intent, `receipt_bound` with its digest-bound
+  receipt, `incident_bound` with its typed provider incident, or `not_dispatched` with
+  typed proof that the provider never durably accepted the call. Every committed
+  lifecycle version has exactly one immutable ordered event.
+- Checkpoint/range tests prove creation-time and provider-acceptance-time indexes
+  independently. Preparation on one side of an SLA boundary and durable
+  acceptance on the other is included only by acceptance time. Omitted or
+  duplicated acceptance leaves, boundary leaves, acknowledgement digests,
+  incident classes, or transition versions reject.
 - Loom: model the actor channel with concurrent `Intent` and `Append` (consume)
   commands plus a `Flush`, asserting no lost or double-consumed intent and correct
   `inflight` accounting, extending the existing writer-counter reasoning at
   `receipt_store.rs:168-199`.
 - Crash/chaos (load-chaos program): SIGKILL the kernel at three injection points
-  (after prepaid authorize at `async_evaluation_core.rs:469`, after tool dispatch at
-  525-527, and mid-batch inside `append_receipt_batch`), restart, run
+  (after prepaid authorize at `async_evaluation_core.rs:469`, after transport
+  send but before durable acceptance, after provider durable acceptance but
+  before the local acceptance CAS, after accepted tool dispatch, and mid-batch
+  inside `append_receipt_batch`), restart, run
   `reconcile_dispatch_intents`, and assert every killed request resolves to either a
   durable receipt or a dead-letter incident, never silence. This is the specific test
-  that proves the change: `intent_journal_crash_reconciles_every_effect`.
+  that proves the change: `intent_journal_crash_reconciles_every_effect`. The
+  provider status query recovers a committed acknowledgement; a pre-acceptance
+  crash remains a platform incident and never enters provider SLA math.
 - Soak: sustained side-effecting load with periodic kills; assert
   `open_dispatch_intents` returns to zero after each reconciliation and TTFRH for
   read-only calls is unchanged within noise.

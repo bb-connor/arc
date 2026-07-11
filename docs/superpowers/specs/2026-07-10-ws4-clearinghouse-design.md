@@ -1,312 +1,333 @@
-# WS4 Design: Chio Clearinghouse (multilateral netting)
+# WS4 Design: Chio Clearinghouse
 
 - Date: 2026-07-10
-- Program: agent-economy program, wave 2 (see 2026-07-10-agent-economy-program-design.md)
-- Depends on: WS1 for dispatch of netted settlement; netting engine and artifacts land independently
-- Claim track: implementation (netting output is signed intent and evidence, never settlement truth)
-- Branch: chio/ws4-clearinghouse off main
+- Program: agent-economy program, wave 2 (see `2026-07-10-agent-economy-program-design.md`)
+- Depends on: `chio_credit::obligation`, an authoritative participant mapping,
+  WS1 for dispatch, and a production FROST verifier plus trusted roster/key epoch
+  before round-finalization activation
+- Claim track: implementation (signed netting intent and reconciliation evidence, never settlement truth)
+- Branch: `chio/ws4-clearinghouse` off `main`
 
 ## Goal
 
-Turn N counterparties' signed economic-position evidence into a deterministic,
-reproducible set of netted pairwise obligations for a settlement epoch, so that
-one settlement packet per counterparty pair replaces many per-call settlements.
-The netting output is signed intent plus reconciliation evidence: never custody,
-never finality, never a clearing or settlement rail. Any verifier holding the
-same inputs recomputes byte-identical outputs.
+Reserve a complete single-currency set of canonical obligations and derive a
+deterministic, smaller set of settlement intents. V1 cancels bilateral flows,
+computes each participant's net balance, and canonically matches debtors to
+creditors. It does not treat kernel signers as creditors, ingest the same debt
+from two report families, mutate intent after signing, or describe netting as
+custody or finality.
 
-## Context
+## Ground truth and prerequisites
 
-`docs/reference/AGENT_ECONOMY.md:1267` scopes "Cross-Org Settlement" as a later
-phase: a "Batch settlement engine walking delegation chains" with "Net position
-calculation per organization" and "Multi-currency support and exchange rate
-snapshotting" (lines 1269-1273). WS4 pulls that engine forward as a pure
-deterministic function over already-signed evidence, without touching the
-contract-freeze posture.
+- Exposure-ledger rows and IOU envelopes can describe the same receipt. Reading
+  both directly double counts one debt.
+- `IouEnvelope.issuer_key` is a kernel signer, not a creditor. Participant and
+  destination identity cannot be inferred from it or from `tool_server`.
+- A bounded exposure report can omit older obligations. A report at its item
+  limit is not proof that an epoch input is complete.
+- Cycle cancellation alone is not netting. For `A -> B -> C`, there is no
+  cycle, yet balances permit the equivalent `A -> C` settlement.
+- A settlement packet cannot contain empty reconciliation fields that are later
+  filled without invalidating its signature.
 
-The inputs already exist as signed artifacts. `EXPOSURE_LEDGER_SCHEMA`
-(`chio.credit.exposure-ledger.v1`, `crates/economy/chio-credit/src/lib.rs:62`)
-carries `ExposureLedgerReport` (`lib.rs:332`), signed as `SignedExposureLedgerReport`
-(`lib.rs:345`). It is subject-scoped and partitions positions by currency
-(`ExposureLedgerCurrencyPosition`, `lib.rs:244`) rather than netting across them
-(`AGENT_ECONOMY.md:893`). Its embedded `receipts` entries (`ExposureLedgerReceiptEntry`,
-`lib.rs:259`) carry the directional atoms this design needs: `subject_key`,
-`issuer_key`, `tool_server`, `settlement_status`, `financial_amount`.
-`IouEnvelopeBody` (`crates/economy/chio-credit/src/hook.rs:57`, schema
-`chio.credit.iou-envelope.v1` at `hook.rs:22`) is an explicit debt atom:
-`tenant_id` owes (`hook.rs:71`), `issuer_key` is owed (`hook.rs:87`),
-`amount_units` and `currency` (`hook.rs:82`). `SettlementStatus`
-(`crates/core/chio-core-types/src/receipt/economics.rs:115`) distinguishes
-`Pending`, `Settled`, `Failed`, `NotApplicable`.
+WS4 therefore has two hard prerequisites:
 
-Cross-currency precedent is uniformly fail-closed:
-`ExposureLedgerSupportBoundary.cross_currency_netting_supported` defaults false
-(`lib.rs:226`, `lib.rs:237`); `CapitalBookSupportBoundary.mixed_currency_netting_supported`
-defaults false (`crates/economy/chio-credit/src/credit/capital_and_execution/capital_book.rs:56`,
-`:65`); billing export nulls its total on mixed currency
-(`crates/economy/chio-metering/src/export.rs:127`, test at `:236`). Permitted
-conversion uses signed integer-rational evidence: `OracleConversionEvidence`
-(`crates/core/chio-core-types/src/oracle.rs:9`, schema at `:7`) with
-`rate_numerator` / `rate_denominator` as `u64` (`oracle.rs:16`), produced from
-`ExchangeRate` (`crates/economy/chio-link/src/lib.rs:60`) via `to_conversion_evidence`
-(`lib.rs:150`) after `ensure_fresh` (`lib.rs:104`).
-
-Downstream, `SettlementCommitment` (`crates/economy/chio-settle/src/lib.rs:93`)
-lives in a `#![cfg(feature = "web3")]` runtime crate (`lib.rs:9`), dispatches via
-`prepare_merkle_release` (`chio-settle/src/evm/prepare.rs:248`), and reconciles
-through `SettlementOutcome` (`chio-settle/src/lib.rs:54`). The commerce packet
-`chio.commerce.settlement-packet.v1` (`spec/PROTOCOL.md:1120`) binds "settlement
-dispatch, reconciliation, destination, amount, currency, and external settlement
-references" and fails closed on "settlement packet mismatch, duplicate completion"
-(`PROTOCOL.md:1126`). The ladder class `settle.commitment` is quorum-required
-(`spec/CHIO_LADDER.md:707`: `co_sign: n_of_m`, `{n:2,m:3}`, `consistency_anchor:
-frost-quorum`). Control-plane report and mutate endpoints build from the receipt
-store, sign with `SignedExportEnvelope::sign`, and register a path
-(`crates/platform/chio-control-plane/src/trust_control/credit_and_loss.rs:39`,
-`service_runtime/router.rs:317`). Money is `MonetaryAmount` (`chio-credit/src/lib.rs:52`).
+1. The shared producer emits one immutable
+   `chio_credit::obligation::ObligationAtom` per receipt-backed debt. It
+   deduplicates source artifacts before WS4 and preserves the authoritative
+   debtor, payee-bound creditor, amount, and currency. Current settlement
+   lifecycle, version, and
+   `chio_credit::obligation::ObligationDisposition` are separate authenticated
+   records owned by the same module and store contract.
+2. A configured participant authority emits a signed, versioned participant
+   snapshot that maps every debtor and creditor identity/key to one canonical
+   participant id and settlement destination. WS4 has no fallback mapping and
+   does not defer this requirement to a later workstream.
 
 ## In scope
 
-1. A new pure crate `crates/economy/chio-clearing` (`#![forbid(unsafe_code)]`, no
-   I/O) that computes a netting round from signed inputs and emits signed artifacts.
-2. A deterministic engine: bilateral netting per currency, then multilateral cycle
-   cancellation, integer math only, canonical ordering, reproducible byte-for-byte.
-3. Four artifact families under `chio.clearing.<artifact>.v1`: netting round,
-   net-position statement, clearing settlement packet, round dispute.
-4. Per-currency netting by default; evidence-gated cross-currency netting only when
-   a signed `OracleConversionEvidence` covers every conversion used.
-5. Control-plane round orchestration (propose, report, dispute) following the
-   trust-control report/mutate pattern, plus a `chio-store-sqlite` persistence trait.
-6. A new ladder action class `clearing.round_finalize` with a declared dispute
-   window; finalization is quorum-gated and fail-closed on dispute.
-7. Reconciliation binding: WS1 settlement outcomes bind back to packets; unsettled
-   or failed net positions reopen into the next round.
+1. A pure `chio_credit::clearing` module for deterministic v1 netting.
+   `chio-credit` already owns the canonical obligation and v1 adds no crate.
+2. Exactly one currency per round.
+3. Bilateral cancellation followed by participant-balance computation and
+   deterministic debtor-to-creditor matching.
+4. Transactional input reservation using the shared
+   `clearing_reserved` disposition.
+5. Immutable round and settlement-intent artifacts, plus separate immutable
+   reconciliation artifacts.
+6. Complete input/output manifests, disputes, quorum-gated finalization,
+   schemas, public verifier coverage, and ladder registration. Artifacts may land
+   before the FROST prerequisite; no finalization becomes dispatchable without it.
 
-## Out of scope (explicit cuts)
+## Out of scope
 
-- Fund movement, custody, and on-chain dispatch. Packets are intent; WS1 and the
-  quorum-gated `settle.commitment` surface execute them. No new Solidity or contract
-  surface (program invariant 6); the freeze is untouched.
-- Any inter-organization clearing network, message bus, or live-state consensus.
-  WS4 nets a fixed set of locally submitted signed inputs; it is not the
-  "cross-network clearing" that `AGENT_ECONOMY.md:1015` and `:1028` disclaim.
-- Live price fetching. The oracle runtime (`chio-link`) is not a dependency; only
-  the already-signed `OracleConversionEvidence` type is consumed.
-- The canonical participant-identity registry (organization to key set). WS4 binds
-  a signed participant set into each round and defers the registry to WS6.
-- Rewriting exposure-ledger or IOU schemas. WS4 reads them unchanged.
+- Direct ingestion of exposure reports or IOU envelopes, cross-currency
+  conversion, FX evidence, and mixed-currency totals.
+- Live participant discovery, inferred organization/key mappings, or a
+  participant snapshot signed only by the round proposer.
+- Fund movement, custody, on-chain dispatch, new Solidity, and any settlement
+  finality claim.
+- A clearing network, live-state consensus, or distributed-linearizable truth.
+- Partial, paginated, capped, or "best available" round input.
 
 ## Design
 
-### Netting algorithm (deterministic)
+### Canonical input and reservation
 
-`compute_netting_round(input) -> NettingRoundArtifact` takes a `round_id`, `epoch`,
-`algorithm_version`, a canonical participant set, per-participant
-`SignedExposureLedgerReport`s and signed `IouEnvelope`s, and optional signed
-`OracleConversionEvidence`.
+`compute_netting_round` accepts:
 
-1. Verify and bind. Every envelope is checked (`SignedExportEnvelope::verify_signature`
-   at `lineage.rs:431`, `IouEnvelope::verify_signature` at `hook.rs:108`). Any
-   failure rejects the whole round. Each accepted input is hashed over its canonical
-   JSON (RFC 8785) into the input manifest.
-2. Extract obligation atoms per currency. From exposure-ledger receipt entries with
-   `settlement_status == Pending` and a `financial_amount`: debtor owns `subject_key`,
-   creditor owns `issuer_key` (or the `tool_server` provider), amount is
-   `financial_amount`. From IOU envelopes: debtor is `tenant_id`, creditor is
-   `issuer_key`, amount is `amount_units`. `Settled` and `NotApplicable` are excluded;
-   `Failed` routes to reconciliation, not netting. An atom whose debtor or creditor
-   does not resolve to a declared participant rejects the round (no silent drop).
-3. Bilateral netting. Order each pair canonically (`party_a < party_b` by id bytes).
-   Per currency, `gross_out` sums `a -> b` atoms and `gross_in` sums `b -> a`, both
-   with `saturating_add` over atoms in canonical (currency, debtor, creditor,
-   source-digest) order. The net is `net_debtor = party_a if gross_out >= gross_in
-   else party_b` and `net_amount = larger.saturating_sub(smaller)`, so it never wraps
-   and the sign rides the debtor field.
-4. Multilateral cancellation. Per currency, treat post-bilateral obligations as
-   directed edges (`debtor -> creditor`, weight). Repeat: starting from participants
-   in canonical order and exploring out-edges in canonical creditor order, take the
-   first simple cycle; let `m` be its minimum edge weight; subtract `m` (saturating)
-   from every edge and drop zeroed edges. Each pass zeroes at least one edge, so the
-   loop terminates; canonical start and neighbor order fix the sequence. Residual
-   edges are the settlement obligations.
-5. Emit. One `NetPositionStatement` per pair per currency (`gross_out`, `gross_in`,
-   `bilateral_net`, `multilateral_adjustment`, residual `net_settlement_amount`).
-   One `ClearingSettlementPacket` per pair per epoch for each residual above zero.
+- `round_id`, `epoch`, `algorithm_version`, and one `currency`;
+- a trusted participant-snapshot body and digest;
+- a complete canonical atom manifest; and
+- reservation proofs for every atom.
 
-A per-currency conservation invariant holds: the sum of net-debtor amounts equals
-the sum of net-creditor amounts. Determinism rests on canonical participant and atom
-ordering, saturating integer math (never wrapping), per-currency isolation, and
-RFC 8785 output.
+Every atom must:
 
-### Artifacts and types (schema ids chio.clearing.<artifact>.v1)
+- have a unique `obligation_id` and canonical digest;
+- bind one signed receipt and authoritative payee-bound creditor;
+- match the round currency;
+- have a separate settlement-lifecycle record that is currently outstanding at
+  the submitted version; and
+- have a separate `chio_credit::obligation::ObligationDisposition` atomically
+  changed from `per_call` to `clearing_reserved { round_id }` by the shared
+  store contract.
 
-- `chio.clearing.netting-round.v1` (`NettingRoundArtifact`): `round_id`, `epoch`,
-  `algorithm_version`, `generated_at`, canonical `participants`, a
-  `ClearingSupportBoundary` (mirroring the exposure-ledger boundary, with
-  `cross_currency_netting_supported` defaulting false), an `input_manifest`
-  (per input: participant, artifact kind, schema, canonical digest, signer key),
-  an `output_manifest` (statement and packet digests), and a per-currency summary
-  (atom count, gross total, netted total, cycles cancelled, `arithmetic_saturated`).
-  Signed as `SignedNettingRound = SignedExportEnvelope<NettingRoundArtifact>`.
-- `chio.clearing.net-position-statement.v1` (`NetPositionStatement`): `round_id`,
-  `epoch`, `currency`, canonical `party_a` / `party_b`, `gross_out`, `gross_in`,
-  `bilateral_net`, `multilateral_adjustment`, `net_settlement_amount` (`MonetaryAmount`),
-  `net_debtor`, `net_creditor`, contributing input digests, `dispute_window`. Signed
-  individually so a pair can present only its own statement.
-- `chio.clearing.settlement-packet.v1` (`ClearingSettlementPacket`): a
-  settlement-packet-family member consistent with `PROTOCOL.md:1120`. Binds
-  `packet_id`, `round_id`, `epoch`, `net_debtor`, `net_creditor`, `destination`,
-  `amount` (`MonetaryAmount`), `currency`, source statement digest, `reconciliation`
-  (unbound until settled), `external_settlement_references` (empty until WS1
-  dispatch). It is intent for a `settle.commitment`, not a `SettlementCommitment`
-  (`chio-settle/src/lib.rs:93`) itself.
-- `chio.clearing.round-dispute.v1` (`RoundDispute`): `round_id`, disputing
-  participant, disputed statement digests, reason code, evidence references. A valid
-  in-window dispute blocks finalization.
+The control plane first reads candidate versions, then reserves all candidates
+in one transaction. If any compare-and-swap fails, no reservation remains and
+no round is emitted. Exact duplicate ids, even with equal bytes, reject the
+submitted manifest so the caller cannot make cardinality ambiguous. An atom in
+`assigned` or `channelized` is ineligible.
 
-All four are canonical-JSON serde types with `deny_unknown_fields`, versioned schema
-constants, and JSON schemas under `spec/schemas/` (program invariant 5).
+Each reservation proof binds the atom digest, old and new versions, prior and
+new disposition, round id, and authority signature. The input manifest commits
+to the sorted list and its count. A source must provide a closed epoch range,
+start/end checkpoints, and completeness proof. Any `has_more` condition,
+unconsumed cursor, count mismatch, missing range position, or capped report
+rejects the round.
 
-### Data flow
+### Deterministic v1 algorithm
 
-The control plane gathers per-participant `SignedExposureLedgerReport`s (built via
-the existing exposure-ledger endpoint, `credit_and_loss.rs:39`), IOU envelopes, and
-optional conversion evidence for one epoch, runs `compute_netting_round` pure in
-`chio-clearing`, then signs the round, statements, and packets and persists them
-behind a `chio-store-sqlite` trait. The round publishes in a proposed state, opening
-the dispute window. After the window closes with no valid dispute and an assembled
-`clearing.round_finalize` quorum, the round finalizes and its packets become
-dispatchable. WS1 settlement outcomes (`SettlementOutcome`, `chio-settle/src/lib.rs:54`)
-bind to each packet; unsettled or failed net positions reopen as carried-forward atoms
-in the next round's inputs.
+All sorting compares canonical participant-id bytes. All addition,
+subtraction, and signed balance conversion is checked. Overflow rejects the
+round, and every emitted amount must convert exactly to
+`MonetaryAmount.units: u64`. There is no saturating result or
+`arithmetic_saturated` success state.
 
-### Integration points
+1. Verify the participant snapshot, atom digests and source receipt signatures,
+   completeness proof, reservation proofs, exact currency, unique ids, and
+   canonical order.
+2. Aggregate directed amounts by ordered pair
+   (`debtor`, `creditor`) with checked `u128` sums.
+3. Bilateral cancellation: for each unordered pair, subtract the smaller
+   direction from the larger and retain at most one residual direction.
+4. Compute each participant balance from the residual graph:
+   credits received minus debts owed. Zero balances drop. Partition negative
+   balances into debtors and positive balances into creditors.
+5. Check that absolute total debtor balance equals total creditor balance.
+6. Sort debtors and creditors canonically. Match the first debtor to the first
+   creditor for the minimum remaining amount, advance each exhausted side, and
+   repeat until both lists are empty.
+7. Emit one immutable settlement intent per non-zero match and one participant
+   statement per participant. Also emit a deterministic transformation witness
+   that lets a verifier replay how every input atom contributed to bilateral
+   cancellation, participant balances, and the final intents.
 
-- chio-credit (types only): consumes `ExposureLedgerReport` /
-  `SignedExposureLedgerReport` and `IouEnvelope`. New dependency
-  `chio-clearing -> chio-credit`.
-- chio-core-types: `MonetaryAmount`, `OracleConversionEvidence`, `SignedExportEnvelope`,
-  `SettlementStatus`. No dependency on `chio-link` or `chio-settle` (both
-  web3-feature-gated), keeping `chio-clearing` pure.
-- chio-control-plane: new endpoints follow `service_runtime/router.rs:317` (GET round
-  report, POST propose, POST dispute, POST finalize) using the `credit_and_loss.rs`
-  build-then-sign pattern with `TrustHttpError`.
-- WS1 / chio-settle: packets feed `settle.commitment` dispatch; reconciliation returns
-  via `SettlementOutcome`. The coupling is the packet schema plus WS1 wiring, never a
-  direct crate dependency.
-- spec: register `chio.clearing.settlement-packet.v1` in the `PROTOCOL.md:1098`
-  settlement-packet family, and add `clearing.round_finalize` to `CHIO_LADDER.md:602` in
-  the same phase (program invariant 8). It mirrors `settle.commitment` (`CHIO_LADDER.md:707`):
-  `mode: receipt_backed`, `destructive: true`, `co_sign: n_of_m`, `co_sign_quorum: {n:2,
-  m:3, scope: treaty}`, `consistency_model: quorum-required`, `consistency_anchor:
-  frost-quorum`. Proposing a round and filing a dispute are non-destructive; only
-  finalization, which unlocks dispatch, is destructive and quorum-gated.
+This deliberately reduces `A -> B -> C` to `A -> C` when the values permit.
+The canonical greedy match is not claimed to minimize rail fees under every fee
+model; it is deterministic, conserves balances, and emits at most
+`debtors + creditors - 1` intents.
 
-### Error handling (fail-closed)
+### Artifacts
 
-- The whole round rejects on any invalid input signature or any obligation atom with
-  an unresolved debtor or creditor (no silent drop).
-- Mixed currency without full conversion evidence nets each currency separately with no
-  cross-currency total (mirrors `export.rs:127`); conversion evidence that is unsigned,
-  stale, or future-dated is refused, falling back to separate netting rather than
-  coercing a rate.
-- A saturating sum sets `arithmetic_saturated` and blocks finalization rather than
-  emitting a wrong net.
-- If a participant's derived pairwise obligations exceed its own signed exposure-ledger
-  currency position, the round rejects: a participant's signed truth bounds its obligations.
-- A valid in-window dispute, or an unassembled quorum, blocks finalization; packets stay
-  non-dispatchable.
-- Failed or absent settlement reopens the net position into the next round; it is never
-  silently dropped.
+All artifacts are RFC 8785 canonical JSON with `deny_unknown_fields`,
+versioned schema identifiers, and signatures over immutable bodies.
+
+- `chio.clearing.netting-round-core.v1` binds the round, epoch, currency,
+  algorithm, participant snapshot digest, complete input manifest root and
+  count, reservation-proof root, dispute window, and generation time. Its
+  `round_core_digest` is computed before any output and is the only round
+  digest bound by statements and intents.
+- `chio.clearing.participant-statement.v1` binds one participant's gross debit,
+  gross credit, bilateral adjustment, final net balance, contributing atom
+  digests, and `round_core_digest`.
+- `chio.clearing.settlement-intent.v1` binds `intent_id`,
+  `round_core_digest`, debtor and creditor participant ids, the authoritative
+  destination from the participant snapshot, amount and currency, contributing
+  reservation root, and dispatch idempotency key. It contains no mutable
+  reconciliation field or external transaction placeholder.
+- `chio.clearing.output-manifest.v1` binds `round_core_digest`, the complete
+  participant-statement, settlement-intent, and atom-transformation roots and
+  counts. Those leaves bind only the core, so this digest graph is acyclic.
+- `chio.clearing.participant-acceptance.v1` binds the output-manifest digest,
+  participant statement digest, participant id, and acceptance signature.
+- `chio.clearing.round-finalization.v1` binds `round_core_digest`,
+  output-manifest digest, complete participant-acceptance root and count, and
+  the governance quorum proof, active roster digest, and quorum key epoch.
+  Nothing upstream binds the finalization digest.
+- `chio.clearing.settlement-reconciliation.v1` is emitted later and separately.
+  It binds the immutable intent digest, WS1 settlement outcome digest, external
+  references, observed status, attempt number, and observation time.
+- `chio.clearing.zero-intent-reconciliation.v1` is a distinct signed
+  reconciliation variant for a finalized round whose output manifest proves
+  `settlement_intent_count == 0`. It binds the finalization digest, empty intent
+  root, complete input-reservation root, atom ids and expected lifecycle
+  versions, outcome `netted_without_rail`, and the fresh lifecycle-transition
+  authority digest. It cannot represent a non-empty round.
+- `chio.clearing.round-abort.v1` binds the round core, optional output-manifest
+  digest, complete reservation root and expected disposition versions, a closed
+  reason enum, a durable WS1 dispatch-journal proof that no round intent was ever
+  dispatched, and fresh `clearing.round_abort` capability/policy/guard authority.
+  The configured disposition authority signs it; a proposer signature or an
+  empty external-reference field is insufficient.
+- The atom-transformation manifest is a complete deterministic witness, not a
+  second obligation record. Each row references an immutable atom digest and
+  the bilateral, balance, and intent steps that transformed it. Replaying all
+  rows must reconstruct both the complete input root and every output intent.
+- `chio.clearing.round-dispute.v1` binds `round_core_digest`, optional
+  output-manifest digest, disputing participant, disputed leaf digests, reason
+  code, and evidence references.
+
+A statement or intent alone is not a complete round proof. Verification
+requires its inclusion in the signed output manifest and a valid finalization
+that includes every participant acceptance.
+
+### Lifecycle and exclusive routing
+
+1. Reserve all atoms by transactional compare-and-swap and persist the
+   reservation manifest.
+2. Sign the round core, compute statements, intents, and transformation rows
+   against `round_core_digest`, then sign the output manifest over their roots.
+3. Open the declared dispute window. Every affected participant signs its
+   statement and the output-manifest digest, thereby accepting the v1 setoff
+   and counterparty substitution for this round. A missing participant
+   acceptance, valid in-window dispute, or incomplete governance quorum blocks
+   finalization.
+4. Finalization checks that every atom's separate disposition record is still
+   reserved to this round at the expected version, then signs the separate
+   round-finalization artifact. An intent is dispatchable only with inclusion
+   proofs for the output manifest and finalization plus a FROST aggregate whose
+   transcript resolves to the configured active roster and key epoch. Individual
+   participant acceptances are attributable evidence, not a fallback quorum
+   authorization. With no production FROST provider, finalization returns
+   `UnsupportedQuorum` and remains non-dispatchable.
+5. WS1 dispatches each intent idempotently. Per-call, assignment, and channel
+   settlement must skip all `clearing_reserved` atoms.
+6. Each attempt emits a separate reconciliation artifact. It never edits an
+   intent or round.
+7. Only after every round intent reconciles as settled does one transaction
+   advance every input atom's separate settlement lifecycle to satisfied. The
+   immutable atoms do not change. A verified `chio.clearing.round-abort.v1` may
+   compare-and-swap
+   dispositions back to `per_call` only before the first intent dispatch. Once
+   any dispatch begins, failure creates a reconciliation incident and the
+   remaining intents retry idempotently; no input returns to `per_call` and no
+   carried-forward copy is created.
+
+A zero-intent round is not silently treated as settled. After every participant
+accepts the output manifest and the governance quorum finalizes it, WS4 emits a
+signed `chio.clearing.zero-intent-reconciliation.v1` artifact. Only that typed
+artifact, with fresh lifecycle-transition authority and successful expected-
+version compare-and-swap, allows the atom lifecycles to advance without a rail
+outcome.
+
+Before the first dispatch, a failed round keeps its atoms unavailable to every
+other settlement path until the signed abort/release transition succeeds. After
+the first dispatch, they remain reserved until all intents settle or an explicit
+compensating reconciliation is authorized; they never return directly to
+`per_call`. Operational recovery cannot silently duplicate them.
+
+### Participant authority
+
+The participant snapshot is signed by the configured clearing governance
+authority and acknowledged by each included participant. It binds participant
+id, accepted identity/key aliases, creditor and debtor roles, settlement
+destination, validity window, version, and the accepted v1 netting algorithm.
+The snapshot must cover every atom and every output destination. Round-specific
+participant signatures are still required before finalization. Unknown aliases,
+expired snapshots, conflicting mappings, and a proposer self-signing an
+otherwise untrusted mapping reject the round.
+
+### Fail-closed errors
+
+Invalid signature, untrusted participant authority, missing participant
+acknowledgement, unresolved or conflicting identity, duplicate atom, incomplete
+input range, stale lifecycle or disposition version, reservation conflict,
+wrong disposition,
+mixed currency, checked-arithmetic failure, conservation failure, output count
+or root mismatch, transformation-witness mismatch, missing participant
+acceptance, in-window dispute, missing quorum, stale reservation at finalize,
+missing or inactive FROST key epoch, roster/transcript mismatch, duplicate
+dispatch, unauthorized or post-dispatch abort, malformed zero-intent
+reconciliation, and reconciliation/intent mismatch all deny.
 
 ## Alternatives considered
 
-1. Crate placement: new pure `chio-clearing` (recommended), extend `chio-credit`, or
-   extend `chio-settle`. `chio-settle` is `#![cfg(feature = "web3")]` (`lib.rs:9`), so
-   it cannot host an always-compiled pure artifact family, and settlement execution is
-   downstream of netting. `chio-credit` is subject-scoped credit, IOU, and capital
-   (already a 924-line `lib.rs`); multilateral cross-counterparty netting is a distinct
-   concern that would overload it. Recommendation: a new pure `crates/economy/chio-clearing`,
-   independently testable and matching program invariant 4.
-2. Netting granularity: bilateral only, bilateral plus multilateral cycle cancellation
-   (recommended), or full collapse to one net per participant. Cancellation minimizes
-   settlement count and amount while preserving the per-pair statements the settlement
-   packets and per-pair disputes require; collapsing to one net per participant loses
-   the who-owes-whom those need. Recommendation: bilateral then multilateral cancellation.
-3. Cross-currency: reject any mixed-currency round, per-currency by default with
-   evidence-gated conversion (recommended), or always convert to a base currency.
-   Per-currency-default matches every precedent (`lib.rs:226`, `capital_book.rs:56`,
-   `export.rs:127`) and fails closed; always-convert would fabricate cross-rate risk
-   into settlement intent. Recommendation: per-currency by default, cross-currency only
-   under attached signed `OracleConversionEvidence`.
+1. A new `chio-clearing` crate was rejected for v1. `chio-credit` already owns
+   the atom and settlement-exposure contract needed by the pure algorithm.
+   Extract only if an actual dependency cycle or independent release boundary
+   appears.
+2. Direct exposure-ledger plus IOU ingestion was rejected because the two can
+   represent one receipt. The shared canonical atom is the only input.
+3. Cycle cancellation was rejected as the final algorithm because it cannot
+   reduce acyclic chains. Balance computation plus deterministic matching does.
+4. Cross-currency v1 was rejected. One round has one currency, with no
+   conversion or aggregate mixed total.
+5. Mutable packets were rejected. Intent and later observations are separate
+   signed artifacts.
+6. "Use the proposer participant list" was rejected. Settlement routing needs
+   an authoritative mapping before WS4 can run.
 
-## Claim and release framing
+## Claim framing
 
-Claim track: implementation (program design lines 147-150). Netting output is signed,
-evidence-referential intent plus reconciliation evidence: not custody, not finality, not
-an insurer-of-record, not a rail. "Clearinghouse" names the deterministic netting
-function, not a custodial clearing counterparty, and is explicitly distinct from the
-"cross-network clearing" that `AGENT_ECONOMY.md:1015` disclaims. Per program invariant 7,
-no round asserts distributed-linearizable truth: a round is a pure function over a fixed
-input set, reproducible by any verifier, not a consensus over live state. Settlement
-packets ride the existing quorum-gated surface (invariant 8); any new on-chain need is a
-family-v2 proposal, out of scope (invariant 6). A Pending obligation never becomes a
-settled fact until WS1 reconciliation binds an outcome to its packet.
+WS4 emits deterministic signed intent over a complete reserved snapshot. It is
+not custody, finality, a settlement rail, or consensus over live state.
+"Clearinghouse" names the netting function. Settlement truth exists only in
+separate WS1 reconciliation evidence, and original atoms remain exclusively
+reserved until that evidence is applied.
 
 ## Testing strategy
 
-- Reproducibility: property test shuffling input, participant, and atom order, asserting
-  byte-identical canonical-JSON artifacts; golden multi-participant, multi-currency
-  vectors snapshotted with `insta` using `sort_maps` for cross-environment stability.
-- Correctness: per-currency conservation (net debtors equal net creditors); a k-cycle
-  cancels to zero; a chain reduces to its endpoints.
-- Fail-closed: invalid signature, unresolved atom, stale or absent conversion evidence,
-  arithmetic saturation, and obligations exceeding a signed position each reject or
-  degrade as specified.
-- Lifecycle: an in-window dispute or unassembled quorum blocks finalize; an out-of-window
-  dispute is ignored; a failed settlement reopens its position into the next round while a
-  settled packet does not.
-- Conformance: schema registration for the four families; settlement-packet-family
-  membership against `PROTOCOL.md:1098`; `clearing.round_finalize` passing ladder
-  validation (`n_of_m` requires `co_sign_quorum`, `quorum-required` requires
-  `consistency_anchor`, `CHIO_LADDER.md:281`). The workspace gate (build, test, clippy
-  `-D warnings`, fmt) passes.
+- Deduplication: the same receipt represented by exposure and IOU sources
+  produces one upstream atom; duplicate ids and digest aliases reject at WS4.
+- Algorithm: reverse bilateral flows cancel; cycles cancel through balances;
+  `A -> B -> C` reduces to `A -> C`; shuffled inputs produce byte-identical
+  outputs; debtor and creditor totals conserve exactly.
+- Arithmetic: every checked overflow and signed-balance conversion failure
+  rejects, with no truncated or saturated output.
+- Completeness: capped reports, unconsumed cursors, missing positions, wrong
+  counts, and omitted manifest leaves reject.
+- Reservation races: two rounds contend for one atom and exactly one
+  transactional reservation succeeds; per-call and channel observers skip the
+  winner.
+- Identity: missing, expired, conflicting, or proposer-only mappings reject;
+  destinations must match the authoritative snapshot.
+- Immutability: changing reconciliation data cannot change an intent; mismatched
+  reconciliation rejects.
+- Digest graph: core, output leaves, output manifest, acceptances, and
+  finalization hash in one direction with no circular dependency.
+- Authority and lifecycle: every affected participant accepts the full round;
+  no atom is satisfied until all intents settle; after the first dispatch a
+  failed intent cannot release originals to `per_call`.
+- Quorum: complete participant acceptances without the configured FROST
+  aggregate, a stale key epoch, or a mismatched roster remain non-dispatchable.
+- Zero/abort lifecycle: a typed zero-intent reconciliation requires a finalized
+  empty output and fresh lifecycle authority; abort requires proof of zero
+  dispatches and stale expected versions reject atom release.
+- Lifecycle, schema registry parity, public verifier positives,
+  unknown-schema negatives, and workspace gates.
 
 ## Implementation phases
 
-- Phase 1 (artifacts and engine, independent of WS1): the `chio-clearing` crate, the
-  four schema families with constants and JSON schemas, `compute_netting_round`, and the
-  property, golden, conservation, and fail-closed tests. No I/O, no wiring. Lands
-  independently, per the wave-2 rule that artifact crates precede production money wiring.
-- Phase 2 (persistence and control plane): the `chio-store-sqlite` trait, the propose,
-  report, and dispute endpoints, artifact signing, and the dispute-window state machine.
-  Still no money movement.
-- Phase 3 (ladder, finalize, reconciliation): add `clearing.round_finalize` to
-  `CHIO_LADDER.md:602`, the quorum-gated finalize path, the `PROTOCOL.md:1098`
-  settlement-packet reconciliation, packet binding to WS1 `settle.commitment` dispatch
-  and `SettlementOutcome`, and the reopen-unsettled logic. Gated on WS1 for dispatch.
-
-## Open questions
-
-1. Participant identity. Exposure ledgers key on `subject_key` / `capability_id` /
-   `tool_server`, IOUs on `tenant_id` / `issuer_key`, settlement on `operator_identity`
-   (`chio-settle/src/lib.rs:100`). WS4 binds a signed participant set into each round and
-   defers the durable organization-to-key registry to WS6. Where is the authoritative
-   mapping owned?
-2. Protocol family placement. Registering `chio.clearing.settlement-packet.v1` as a
-   sibling of `chio.commerce.settlement-packet.v1` (`PROTOCOL.md:1120`) needs a normative
-   edit; confirm it extends the commerce family versus a distinct clearing family reusing
-   the same binding rules.
-3. Dispute window and epoch cadence: operator-signed fiscal parameters (WS8) with a fixed
-   fallback, or set by which authority?
-4. Reopened positions. When a Failed or unsettled net position reopens, how is
-   double-counting avoided against a still-Pending original that also reappears in the
-   exposure ledger?
-5. Obligation volume. `ExposureLedgerReceiptEntry` lists are bounded to 200
-   (`MAX_EXPOSURE_LEDGER_RECEIPT_LIMIT`, `lib.rs:83`). Deep histories may exceed that; does
-   WS4 need a continuation or an explicit obligation-manifest artifact instead of embedded
-   receipts?
-6. Support-boundary reconciliation. The round should reuse `mixed_currency_netting_supported`
-   (`capital_book.rs:56`) and `cross_currency_netting_supported` (`lib.rs:226`) semantics
-   (default false, raised only with per-round conversion evidence). Confirm one shared flag
-   name and that raising it is never a global capability.
+1. Prerequisite gate: land the canonical deduplicated
+   `chio_credit::obligation::ObligationAtom` producer,
+   `chio_credit::obligation::ObligationDisposition` store contract and SQLite
+   implementation, complete epoch manifest, and authoritative participant
+   snapshot. WS4 stops if any is missing.
+2. Land the pure `chio_credit::clearing` single-currency engine and immutable
+   artifacts with algorithm, completeness, and verifier tests.
+3. Add transactional reservation, propose/report/dispute endpoints, and
+   disabled quorum-finalization verification. Still no money movement.
+4. After the production FROST verifier and trusted roster/key epoch are live,
+   activate finalization, bind immutable intents to WS1 dispatch, and emit
+   separate reconciliation artifacts. Prove release/retry without copying an
+   obligation. No endorsement-only fallback.

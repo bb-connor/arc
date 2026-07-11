@@ -3,7 +3,8 @@
 - Date: 2026-07-10
 - Program: agent-economy program, wave 3 (harness skeleton may land during wave 2; see `2026-07-10-agent-economy-program-design.md`)
 - Depends on: attacks target wave-2 markets; WS8 parameters widen the attack surface
-- Claim track: external evidence (produces signed economic-robustness matrices; makes no new capability claims itself)
+- Claim track: internal qualification (self-signed synthetic runs are not
+  external evidence or underwriting facts)
 - Branch: `chio/ws9-economic-wind-tunnel` off `main`
 
 ## Goal
@@ -14,8 +15,11 @@ seeded adversarial economic campaigns replayed against the real pure
 economy validators, emitting signed pass/finding matrices. Each scenario
 declares the fail-closed behavior an invariant should exhibit; a run that
 observes a breach produces a finding routed like a bug, not a capability
-claim. The matrices are the external-evidence artifact future underwriting
-and insurance claims cite (`2026-07-10-agent-economy-program-design.md:150`).
+claim. A signed matrix authenticates who asserted the declared harness, source,
+binary, command, and corpus digests; the runner separately verifies those bytes
+before signing. The self-signature does not independently prove what executed.
+It is internal qualification output, not independent external evidence, not an
+underwriting input, and not an insurance fact.
 
 ## Context
 
@@ -54,12 +58,13 @@ is one scenario class; Adversary suite tabulates targets and findings):
   (`bidding.rs:369`), out-of-scope requests (`bidding.rs:376`), and
   reservations that do not cover total liability (`bidding.rs:480`,
   `token_offer_total_liability` at `bidding.rs:512`).
-- Credit exposure and underwriting. Exposure-ledger limits are bounded
-  (`crates/economy/chio-credit/src/lib.rs:83`); the backtest surfaces
-  over-utilization (`crates/economy/chio-credit/src/risk_reports.rs:401`,
-  `risk_reports.rs:442`); the underwriting fuzz target guards monotonic
-  tier ceilings and fail-closed revocation
-  (`fuzz/fuzz_targets/underwriting_policy_input.rs:16`).
+- Credit exposure and underwriting. `MAX_EXPOSURE_LEDGER_*`
+  (`crates/economy/chio-credit/src/lib.rs:83`) bounds query result sizes, not
+  admitted exposure. The backtest surfaces over-utilization after the fact
+  (`crates/economy/chio-credit/src/risk_reports.rs:401`,
+  `risk_reports.rs:442`), and the underwriting fuzz target checks tier ceilings
+  and revocation inputs (`fuzz/fuzz_targets/underwriting_policy_input.rs:16`).
+  None is evidence of an atomic new-exposure admission boundary.
 - Oracle circuit breaker. `ensure_within_threshold`
   (`crates/economy/chio-link/src/circuit_breaker.rs:49`) trips
   `CircuitBreakerTripped` when integer `divergence_bps`
@@ -84,11 +89,11 @@ The output artifact follows the autonomy qualification matrix:
 
 ## In scope
 
-1. A new pure crate `chio-econ-sim` (placement resolved in Alternatives)
-   holding: economic scenario and corpus types, a deterministic campaign
-   engine, the `chio.econsim.*` artifact types with validators, and
-   per-scenario-class fail-closed assertions against the real economy
-   validators. `#![forbid(unsafe_code)]`, no I/O, integer economics.
+1. Reuse existing unit, property, fuzz, conformance, and arena determinism tests
+   to establish one honest production-validator target per scenario before
+   adding a harness abstraction. Add only the smallest shared test helper needed
+   for seeded multi-step campaigns; create a new crate only if the existing test
+   homes prove unworkable.
 2. Six v1 scenario classes, each declaring its target validator, its
    expected fail-closed behavior, and its finding condition:
    `sybil-pricing-ring`, `collusion-bid-ring`, `credit-exhaustion`,
@@ -96,13 +101,18 @@ The output artifact follows the autonomy qualification matrix:
 3. `chio.econsim.scenario-result.v1` and
    `chio.econsim.qualification-matrix.v1` schemas under
    `spec/schemas/chio-econsim/v1/`, with schema-id constants and
-   conformance coverage.
+   conformance coverage. If the matrix remains signed, it also lands in the
+   schema registry, hash manifest, `KNOWN_SIGNED_ARTIFACT_SCHEMAS`, positive
+   fixtures, and unknown-schema negatives.
 4. A thin driver (a `chio econsim` CLI subcommand or an xtask) that loads
    corpora from disk, runs the engine, signs the matrix, and writes the
-   bundle. Disk and key access live only here, never in the pure crate.
+   bundle. Disk and key access live only here, never in the pure test helpers
+   or any later extracted crate.
 5. An advisory (non-blocking) CI facet under `ci-gates/`, following the
    fail-closed enumerated-manifest pattern of `ci-gates/runtime.toml`,
-   promotable to blocking per scenario class.
+   promotable to blocking per scenario class. The facet may be advisory to
+   unrelated changes, but its command exits nonzero for any unresolved High or
+   Critical finding or a scenario with no valid production target.
 6. Economic negative tests added to `chio-conformance` asserting the exact
    fail-closed error for each class, alongside the existing budget-split
    tests (`crates/tooling/chio-conformance/tests/budget_split_rejects_oversubscribed_siblings.rs:88`,
@@ -120,6 +130,10 @@ The output artifact follows the autonomy qualification matrix:
   is untouched.
 - No new capability claim; passing matrices evidence fail-closed behavior on
   the tested corpora, nothing broader.
+- No external-evidence or underwriting role. Self-signing authenticates who
+  made the run assertion and binds the declared byte digests; it does not prove
+  that those bytes executed, supplies no independent observation, and cannot
+  change an underwriting evidence class.
 - No on-chain settlement DoS modeling; `settlement-dos` targets the pure
   retry classifier, not a network.
 
@@ -134,20 +148,35 @@ expectation. Unlike the arena's single-step `AdversaryAction`, economic
 campaigns are multi-step and accumulate state, so the engine models a
 campaign as an action sequence over a running integer ledger.
 
-| Class | Target validator (path:line) | Expected fail-closed | Finding |
-|-------|------------------------------|----------------------|---------|
-| `sybil-pricing-ring` | `qualifies_for_tier_3` (`tier.rs:135`); `compute_marketplace_credit_limit` (`marketplace_limits.rs:82`) | single-feed flood stays tier_2; ring aggregate credit does not exceed the sum of legitimately-earned per-identity ceilings | tier_3 reached with < 2 distinct feeds, or ring credit exceeds that sum |
-| `collusion-bid-ring` | `bid` / `accept` (`bidding.rs:308`, `bidding.rs:439`) | every ask binds provider authority and a reservation covering total liability; sub-ceiling and out-of-scope bids reject | an accepted bid settles without covering reservation, or a mismatched-authority ask mints |
-| `credit-exhaustion` | exposure ledger (`chio-credit/src/lib.rs:83`); underwriting ceilings (`underwriting_policy_input.rs:16`) | aggregate open exposure never exceeds the subject-tier ceiling; revoked/expired facilities admit no new exposure | a campaign opens exposure above the ceiling, or a revoked facility still admits |
-| `oracle-divergence` | `ensure_within_threshold` (`circuit_breaker.rs:49`) | over-threshold divergence trips the breaker; stale feeds (past `max_age_seconds` at virtual clock) reject; conversion needs signed evidence | a divergent or stale pair passes, or mixed-currency aggregates without conversion evidence |
-| `fee-structuring` | `RequireApprovalAbove` (`scope.rs:300`) | cumulative spend crossing the threshold requires approval | N sub-threshold calls summing above the threshold complete with no approval token |
-| `settlement-dos` | `classify_attempt` (`retry.rs:123`) | the retry envelope is bounded and converges to `DeadLetter`; backoff caps | the envelope does not converge, or dead-letter volume per receipt is unbounded |
+| Class | Production target | Qualifying assertion | Explicit limit |
+|-------|-------------------|----------------------|----------------|
+| `sybil-pricing-ring` | `qualifies_for_tier_3` (`tier.rs:135`) and `compute_marketplace_credit_limit` (`marketplace_limits.rs:82`) | a single-feed flood cannot reach tier 3, and the same identity receives the limit for its resulting tier | these functions do not detect coordinated identities or cap aggregate ring credit; the matrix cannot claim they do |
+| `collusion-bid-ring` | `bid` / `accept` (`bidding.rs:308`, `bidding.rs:439`) | authority, scope, price floor, and reservation-liability checks reject exact malformed bids | these validators enforce transaction integrity, not collusion detection; the class name does not widen the assertion |
+| `credit-exhaustion` | no production admission validator identified | `TargetMissing` until a function that atomically compares current open exposure with the applicable facility or tier ceiling is named | `MAX_EXPOSURE_LEDGER_*` at `chio-credit/src/lib.rs:83` bounds query results, and the backtest reports over-utilization after the fact; neither prevents new exposure |
+| `oracle-divergence` | `ensure_within_threshold` (`circuit_breaker.rs:49`), `ExchangeRate::ensure_fresh` (`chio-link/src/lib.rs:104`), and the actual conversion verifier | over-threshold divergence, stale rates, and conversion without required signed evidence each reject at their named boundary | one function does not establish all three properties; the case records each invoked target separately |
+| `fee-structuring` | no cumulative-spend admission validator identified; `RequireApprovalAbove` (`scope.rs:300`) is per request | `TargetMissing` until an accumulator-bound validator consumes prior approved spend | a sequence of sub-threshold calls cannot be qualified by repeatedly invoking a per-request constraint |
+| `settlement-dos` | `classify_attempt` (`retry.rs:123`) | one receipt's retry sequence reaches `DeadLetter` at the configured bound and computed backoff remains capped | the pure classifier does not bound queue size, duplicate dead letters, worker throughput, or adversarial volume |
 
-`fee-structuring` is the class most likely to surface a genuine finding:
-`RequireApprovalAbove` is a per-request constraint, so cross-call
-structuring may be unguarded today. WS9 ships it as an honest probe whose
-test asserts the harness detects and records the outcome, whichever way the
-current code lands (see Open questions).
+A scenario can be `Held` only for the assertion implemented by its named
+production target. `credit-exhaustion` and `fee-structuring` begin as
+`TargetMissing` High findings rather than simulated passes. The narrower sybil,
+bid, oracle, and retry cases must retain their explicit limits in the result so
+the class label cannot imply a broader control.
+
+The missing controls have named owners outside WS9:
+
+- `AE-CREDIT-ADMISSION-1`, owned by `chio-credit` plus the WS1 canonical
+  obligation store, must atomically compare current outstanding and reserved
+  facility exposure plus the proposed amount against the applicable signed
+  facility/tier ceiling before a new obligation can commit.
+- `AE-CUMULATIVE-APPROVAL-1`, owned by `chio-kernel` budget/governed-intent
+  admission, must consume an authority-bound cumulative approved-spend ledger so
+  a sequence of sub-threshold calls cannot bypass `RequireApprovalAbove`.
+
+Both controls require their own design, implementation, concurrency tests, and
+owning-crate review. WS9 only diagnoses and reruns them. They are hard
+dependencies of WS9 Phase 3 and the Wave 3 exit; a scheduled matrix, waiver, or
+advisory facet cannot substitute.
 
 ### Simulation harness (deterministic)
 
@@ -156,7 +185,7 @@ corpus), reusing the arena determinism primitives: a ChaCha20 PRNG from a
 recorded `u64` seed and a fixed virtual clock, under the arena contract at
 `crates/core/chio-arena/src/adversary/mod.rs:21`. All money is integer:
 `MonetaryAmount` u64 minor units, basis points, integer rationals;
-arithmetic saturates or fails closed and never wraps
+checked arithmetic fails closed on overflow and never wraps
 (`2026-07-10-agent-economy-program-design.md:94`). Reputation tier scores
 stay f64 because they are risk coefficients, not money, and run through the
 real gate unchanged. Corpora are synthetic receipt and exposure records
@@ -173,17 +202,40 @@ owns no clock or storage, matching the pure-function discipline of
   `schema`, `scenario_id` (class plus population), `seed` (u64),
   `corpus_manifest_digest` (sha256 hex), `requirement_ids` (spec and
   invariant anchors the class defends), `expected_disposition`
-  (`FailClosed`), `observed_disposition` (`FailClosed | Breach`),
-  `outcome` (`Held | Finding`, where `Finding` means observed is `Breach`),
-  `notes`. This mirrors `AutonomousQualificationCase` (`model.rs:532`).
+  (`FailClosed`), `observed_disposition`
+  (`FailClosed | Breach | NotRun { reason: TargetMissing }`),
+  `target_status` (`Bound | Missing`), `outcome` (`Held | Finding |
+  TargetMissing`), conditional `finding_severity` (`Low | Medium | High |
+  Critical`), `assertion_scope`, and `explicit_limits`. The signed scenario
+  manifest fixes `breach_severity` for each class. `Held` requires a
+  bound production target and exact expected disposition; `TargetMissing`
+  requires `observed_disposition = NotRun { reason: TargetMissing }` and is
+  never a pass or a fabricated breach. Cross-field validation is total: `Held`
+  requires `observed_disposition = FailClosed` and no severity;
+  `Finding` requires `observed_disposition = Breach` and the scenario's exact
+  fixed severity; `TargetMissing`
+  requires `High`; and a panic overrides the scenario mapping and requires
+  `Critical`. Any other combination rejects. This
+  mirrors `AutonomousQualificationCase` (`model.rs:532`) without borrowing its
+  external-evidence meaning.
 - `chio.econsim.qualification-matrix.v1`. Aggregate. Fields: `schema`,
-  `profile_id`, `harness_provenance` (crate version and toolchain), and
+  `profile_id`, `harness_provenance`, and
   `cases: Vec<scenario-result>`. Validated like
   `validate_autonomous_qualification_matrix` (`validation.rs:794`):
   supported schema, non-empty `profile_id`, non-empty `cases`, unique
-  scenario ids, non-empty `requirement_ids`. Signed as
+  scenario ids, non-empty `requirement_ids`, and explicit limits per case.
+  The diagnostic runner may assemble a matrix containing any outcome, but the
+  signing boundary rejects `TargetMissing` and unresolved High or Critical
+  findings. `harness_provenance` binds the git commit, clean/dirty state plus
+  source-tree digest, executable SHA-256, `Cargo.lock` digest, enabled feature
+  set, target triple, rustc and Cargo versions, exact normalized command,
+  scenario-manifest digest, corpus-manifest digest, and runner key id. The
+  driver recomputes each local digest before signing and rejects a mismatch.
+  These fields remain runner assertions rather than independent execution
+  proof. Admissible internal matrices are signed as
   `SignedExportEnvelope<QualificationMatrix>`
-  (`lineage.rs:421`). This is the external-evidence artifact.
+  (`lineage.rs:421`). The signature authenticates the runner and binds its
+  internal run assertion only.
 
 ### CI integration
 
@@ -192,13 +244,16 @@ Add an econsim facet manifest under `ci-gates/`, structured like
 enumerates exactly the v1 scenario classes, rejects an unknown class, and
 carries a manifest-enumeration test that rejects a short manifest. Each
 entry names the committed `chio.econsim.qualification-matrix.v1` fixture to
-schema-validate and the `cargo test -p chio-econ-sim` selectors that re-run
-the campaign and assert observed equals expected. The gate is advisory
+schema-validate and the existing crate or conformance test selectors that
+re-run the campaign and assert observed equals expected. The gate is advisory
 (non-blocking) first, as the `runtime-attack-simulation` facet models attack
 fixtures without gating unrelated work (`runtime.toml:98`, laundering docs
 at `runtime.toml:107`), then promotes to blocking per class once stable. A
 newly observed `Finding` opens a finding record routed to the owning
-workstream; it never silently flips a matrix to green.
+workstream; it never silently flips a matrix to green. The runner exits nonzero
+when any High or Critical finding remains unresolved or any scenario reports
+`TargetMissing`, writes diagnostic scenario results, and emits no signed
+qualification matrix, even while the repository-wide facet remains advisory.
 
 ### Error handling
 
@@ -207,21 +262,22 @@ Fail-closed throughout. A corpus whose bytes do not match the recorded
 error, matching the arena's unknown-class rejection
 (`crates/core/chio-arena/src/adversary/mod.rs:76`); a replay whose two runs
 diverge fails the determinism gate; a missing or zero seed rejects; integer
-overflow saturates or fails closed, never wraps. A validator panic on
+overflow fails closed. A validator panic on
 adversarial input is itself a `Finding` (the campaign records `Breach` with
-the panic captured), not a harness crash; a signing failure emits no matrix.
+the panic captured), and the runner exits nonzero for its default Critical
+severity. A signing failure emits no matrix. Matrix generation never succeeds
+past unresolved High or Critical findings, missing severity, invalid
+outcome/severity combinations, provenance-digest mismatch, dirty state not
+explicitly allowed by the profile, or missing targets.
 
 ## Alternatives considered
 
-1. New pure crate `crates/economy/chio-econ-sim` reusing the arena
-   determinism substrate. Recommended. Invariant 4
-   (`2026-07-10-agent-economy-program-design.md:104`) places new signed
-   artifact families in `crates/economy/` as pure contract crates, and the
-   matrices are economic evidence cited by underwriting and insurance
-   consumers. The crate depends downward on `chio-reputation` (trust), the
-   economy validators, and `chio-arena` rng/clock (core), so there is no
-   layering inversion. The `crates/tooling/` alternative next to
-   `chio-conformance` is defensible; see Open questions.
+1. Add the six cases to existing owning-crate tests and `chio-conformance`,
+   reusing arena seed and clock helpers where multi-step replay needs them.
+   Recommended first step: it exposes missing production targets before a new
+   abstraction can make simulated behavior look real. A pure `chio-econ-sim`
+   crate may be extracted later only if repeated campaign orchestration cannot
+   live cleanly in those existing homes.
 2. Extend the arena `Adversary` trait and `chio-adversarial-suite` with
    economic classes. Rejected as the home. The arena models one tool-call
    step and one guard verdict (`mod.rs:114`), refereed by the kernel-guard
@@ -233,28 +289,33 @@ the panic captured), not a harness crash; a signing failure emits no matrix.
    (`CapitalPoolSimulationReport`, `model.rs:389`). Rejected: it couples a
    general wind tunnel to the insurance and capital-pool domain and
    overloads a market crate with adversary logic. WS9 borrows the
-   qualification-matrix shape, not the crate. `chio-conformance` stays the
-   home for the boolean fail-closed assertions; `chio-econ-sim` owns the
-   signed matrices and the campaign engine.
+   qualification-matrix shape, not the crate. `chio-conformance` and the owning
+   crate tests stay the initial home for boolean fail-closed assertions; the
+   thin driver owns internal matrix assembly.
 
 ## Claim and release framing
 
-WS9 is external evidence, not a capability claim
-(`2026-07-10-agent-economy-program-design.md:150`). A passing
+WS9 is internal qualification, not external evidence, an underwriting fact, or
+a capability claim. A passing
 `chio.econsim.qualification-matrix.v1` states only that, on the named
 corpora and seed, the tested validators fail closed as declared; it asserts
 nothing about untested corpora, live money, or distributed truth
 (`2026-07-10-agent-economy-program-design.md:121`). A `Finding` is a bug in
 the owning workstream, never a claim that Chio "supports" the attacked
-behavior. Matrix digests may be cited as evidence inputs by underwriting and
-insurance surfaces without widening any public claim.
+behavior. Self-signing authenticates the signer and binds the asserted byte
+digests, but it does not prove execution and supplies no independent
+observation. Matrix digests must not be consumed as underwriting or insurance
+evidence; any future external claim requires an independently run qualification
+campaign and a separately reviewed evidence policy.
 
 ## Testing strategy
 
 - Per-class fail-closed unit tests against the real validator: single-feed
   sybil flood stays tier_2; a divergent feed trips `CircuitBreakerTripped`;
-  oversubscribed exposure rejects; a retryable flood converges to
-  `DeadLetter`; a mismatched-authority ask fails to mint.
+  stale rates fail `ensure_fresh`; a retry sequence converges to `DeadLetter`;
+  a mismatched-authority ask fails to mint. Credit exhaustion and cumulative
+  fee structuring assert `NotRun { reason: TargetMissing }` plus a
+  `TargetMissing` High outcome until their named admission validators exist.
 - Determinism gate: two runs of one seed produce byte-identical
   scenario-results and matrix, mirroring
   `crates/core/chio-arena/tests/determinism_gate.rs` and `rng_determinism.rs`.
@@ -264,41 +325,50 @@ insurance surfaces without widening any public claim.
   committed schemas (invariant 5,
   `2026-07-10-agent-economy-program-design.md:110`); the matrix validator
   enforces unique ids and non-empty cases.
-- `fee-structuring` ships a test asserting the harness records its outcome
-  (Held or Finding) deterministically, stable whichever way the current code
-  lands.
+- `fee-structuring` cannot report `Held` from the per-request constraint. Its
+  deterministic `TargetMissing` High finding keeps the runner nonzero until a
+  cumulative admission validator is supplied.
+- Exit-status tests prove a High or Critical finding, a panic, or a missing
+  target prevents successful matrix generation; Low and Medium findings remain
+  visible and policy-controlled. Cross-field tests prove a `Finding` without the
+  scenario's fixed severity, `TargetMissing` below High, or `Held` with severity
+  rejects; a panic is always Critical regardless of that mapping.
+- Provenance tests mutate the source tree, executable, lockfile, feature set,
+  command, and corpus after manifest assembly and assert signing rejects; the
+  signed result is still labeled a runner assertion, not execution proof.
+- Signed-schema tests cover registry, hash manifest,
+  `KNOWN_SIGNED_ARTIFACT_SCHEMAS`, positive fixtures, and unknown-schema
+  negatives when signed matrix artifacts are retained.
 - The workspace gate passes before any phase is declared done.
 
 ## Implementation phases
 
-1. Harness skeleton (may land in wave 2). The pure `chio-econ-sim` crate:
-   scenario, corpus, and `chio.econsim.*` artifact types with validators
-   and signing; the deterministic campaign engine (seeded ChaCha20, virtual
-   clock, integer economics); and one reference class end to end,
-   `sybil-pricing-ring` against `tier.rs:135`, whose invariant is already
-   property-tested. Advisory CI facet plus determinism gate.
-2. Suite breadth (wave 3). The remaining five classes with expected
-   fail-closed declarations, reference corpora, and `chio-conformance`
-   assertions. Any breach is filed as a finding.
-3. Promotion and evidence. Per-class promotion from advisory to blocking as
-   each stabilizes; publish the first signed economic-robustness matrix;
-   register the matrix digest as a cited evidence input on the underwriting
-   and insurance surfaces without widening a claim.
+1. Honest targets first (may land in wave 2). Extend existing owning-crate and
+   `chio-conformance` tests for the four bound assertions; record
+   `credit-exhaustion` and `fee-structuring` as `TargetMissing`; reuse arena
+   determinism helpers and add the thin internal-matrix driver plus
+   signed-schema gates. No new crate in this phase.
+2. Control-gap dependency. `AE-CREDIT-ADMISSION-1` and
+   `AE-CUMULATIVE-APPROVAL-1` land in their owning crates with atomic
+   concurrency tests; WS9 reruns both scenarios against the named production
+   functions. Until then the runner remains nonzero and no matrix is signed.
+3. Suite breadth (wave 3). Expand all six classes with seeded multi-step
+   populations, reference corpora, and `chio-conformance` assertions. Any breach
+   is filed as a finding and High or Critical findings keep the runner red.
+   Extract a pure crate only if duplication demonstrates a real boundary.
+4. Promotion and internal qualification. Promote stable bound classes from
+   advisory to blocking and publish the first internal qualification matrix.
+   Do not register it as an underwriting or insurance evidence input.
 
-## Open questions
+## Resolved implementation choices
 
-1. Placement: `crates/economy/chio-econ-sim` (recommended, invariant 4) vs
-   `crates/tooling/chio-econ-sim` (next to `chio-conformance`). Resolve at
-   Phase 1 start.
-2. `fee-structuring` reality (a brief-vs-code discrepancy):
-   `RequireApprovalAbove` (`scope.rs:300`) is a per-request threshold, yet
-   the brief describes cross-call structuring. If no cumulative-spend
-   accumulator composes the constraint across calls, the first run
-   legitimately produces a Finding routed to WS1 or WS8.
-3. Corpus signing: which classes need test-key-signed synthetic receipts
-   (the bid flow verifies signatures at `bidding.rs:313`) versus replay at
-   the post-verification surface? Decide per class in Phase 2.
-4. PROTOCOL reconciliation: the matrices are evidence artifacts, not wire
-   protocol messages, so invariant 5's PROTOCOL reconciliation is likely
-   limited to registering the `chio.econsim` schema family rather than a
-   normative wire change. Confirm with the protocol owner.
+1. Each scenario targets the earliest named production boundary that establishes
+   its assertion. The bid flow receives test-key-signed inputs because that
+   target verifies signatures; a post-verification pure validator receives
+   already-normalized synthetic state only when the scenario manifest names and
+   limits that boundary. The manifest records which verification occurred.
+2. `spec/PROTOCOL.md` gains the `chio.econsim` artifact-family registry and
+   internal-qualification semantics, while explicitly stating that these
+   artifacts are not runtime wire messages or underwriting evidence. Every
+   schema still enters the registry, hash manifest, fixtures, and unknown-version
+   negatives required by program invariant 5.

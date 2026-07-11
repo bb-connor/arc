@@ -1,325 +1,445 @@
 # WS3 Design: Verified-outcome pricing
 
 - Date: 2026-07-10
-- Program: agent-economy program, wave 2 (see 2026-07-10-agent-economy-program-design.md)
-- Depends on: WS1 for escrow-bound release execution; WS8 (soft) for penalty parameters
-- Claim track: implementation
-- Branch: chio/ws3-outcome-pricing off main
+- Program: agent-economy program, wave 2 (see `2026-07-10-agent-economy-program-design.md`)
+- Depends on: `chio_credit::obligation`, WS1 durable money movement, and a
+  genuine hold/capture/release rail before activation
+- Claim track: implementation (artifact and evaluator only until rail
+  qualification)
+- Branch: `chio/ws3-outcome-pricing` off `main`
 
 ## Goal
 
-Let a listing price a tool call on a machine-checkable outcome rather than on
-an invocation or a metered unit. The kernel evaluates a declared predicate over
-the tool output it actually observed, attests the verdict into the signed
-receipt, and settles the charge against that verdict: full price when the
-predicate passes, zero or a declared attempt-fee floor when it fails or cannot
-be evaluated. The verdict is kernel-observed and receipt-signed; it never rests
-on a tool-server self-report, and an unevaluable predicate is a failed outcome,
-never a silent full charge.
+When activation prerequisites are met, price one tool call on a deterministic
+predicate over the exact output delivered to the caller. The kernel evaluates
+the predicate, binds every pricing input and the delivered output digest into
+the signed receipt, and either captures the full held price on pass or releases
+the full hold on failure or evaluation error. Until a real reversible rail is
+qualified, WS3 ships only artifacts, pre-dispatch binding, and the pure
+evaluator. V1 has no prepayment, attempt fee, partial capture, or subjective
+adjudication.
 
-## Context
+## Ground truth and prerequisites
 
-Pricing today is per-invocation or per-metered-unit. A governed intent may
-carry a `MeteredBillingContext` (`crates/core/chio-core-types/src/capability/governance.rs:93-103`)
-whose `MeteredBillingQuote` (`.../governance.rs:65-90`) fixes a `billing_unit`
-string, `quoted_units`, and a `quoted_cost` `MonetaryAmount`, under a
-`MeteredSettlementMode` of `MustPrepay`, `HoldCapture`, or `AllowThenSettle`
-(`.../governance.rs:53-62`). The quote is validated pre-execution by
-`validate_metered_billing_context` (`crates/kernel/chio-kernel/src/kernel/governed_validation.rs:276-351`),
-and PROTOCOL 5.2 (`spec/PROTOCOL.md:501-536`) frames the settlement mode as
-evidence and operator context, not the hard enforcement boundary.
+The existing budgeted finalize path can capture an authorized amount or release
+an authorization, but no current in-tree `PaymentAdapter` implements a proven
+reversible hold. `X402PaymentAdapter` performs prepaid authorization, while both
+`X402PaymentAdapter` and `AcpPaymentAdapter` treat later `capture` and `release`
+as local bookkeeping. Neither can refund or release remote funds merely because
+its local `release` returned success.
 
-Post-execution reconciliation already exists. In
-`finalize_budgeted_tool_output_with_cost_and_metadata`
-(`crates/kernel/chio-kernel/src/kernel/validation.rs:927`), the kernel computes
-an `actual_cost`, reconciles the hold (`validation.rs:1025`), and settles
-through the `PaymentAdapter` (`crates/kernel/chio-kernel/src/payment.rs:150-181`):
-`actual_cost == 0` calls `release`, otherwise `capture(actual_cost)`
-(`validation.rs:1037-1046`); a reported cost above the hold is refused as a
-`SettlementStatus::Failed` overrun (`validation.rs:1007-1017`;
-`crates/core/chio-core-types/src/receipt/economics.rs:113-124`). This
-release-or-capture fork is exactly the money movement WS3 needs, so it computes
-a `reported_cost` from the verdict and lets the existing path settle it.
+WS3 production wiring therefore requires a verified rail capability contract:
 
-The guard substrate can inspect output. The post-invocation pipeline
-(`crates/guards/chio-guards/src/post_invocation.rs`) runs `PostInvocationHook`s
-returning `Allow`, `Block`, `Redact`, or `Escalate` and emits `GuardEvidence`
-(`crates/core/chio-core-types/src/receipt/metadata.rs:182-190`) into the
-receipt. A WASM guard runtime exists (`crates/guards/chio-wasm-guards/src/lib.rs`)
-with a Component Model interface `chio:guard@0.1.0` and fail-closed fuel
-metering, but its `GuardRequest` (`.../chio-wasm-guards/src/abi.rs:29`) is
-input-shaped and its `GuardVerdict` is `Allow` or `Deny` (`abi.rs:62-66`).
+- `authorize` reserves funds without settling them;
+- `capture` can settle the full reserved amount exactly once;
+- `release` actually removes the reservation without charging;
+- the authorization remains valid through execution and finalization; and
+- idempotency and reconciliation are covered by WS1's durable journal.
 
-Listings advertise price and SLA through an operator-signed `ListingPricingHint`
-(`crates/economy/chio-listing/src/discovery.rs:48-109`, schema
-`chio.marketplace.listing-pricing-hint.v1` at `discovery.rs:30`) carrying a
-`price_per_call` `MonetaryAmount` and a `ListingSla` (`discovery.rs:116-135`).
-SLA breach routes through governance-adjudicated open-market penalties:
-`OpenMarketAbuseClass` (`crates/economy/chio-open-market/src/penalty.rs:19-26`)
-drives an `OpenMarketPenaltyArtifact` (`penalty.rs:55-85`) requiring signed
-charter, case, and fee schedule whose signers match trusted authority keys
-(`crates/economy/chio-open-market/src/authority.rs:76-95`), backed by bonds in
-`OpenMarketBondRequirement` (`crates/economy/chio-open-market/src/fee_schedule.rs:54-67`).
-On-chain release binds to receipt bytes: `prepare_merkle_release`
-(`crates/economy/chio-settle/src/evm/prepare.rs:248-296`) hashes the receipt
-body into the escrow call, with `prepare_escrow_refund` (`prepare.rs:1182`) the
-refund counterpart.
+A rail that reports the authorization as already settled, cannot prove release,
+or cannot bind payer, payee, amount, currency, and expiry is ineligible.
+Therefore the schemas, pure evaluator, receipt binding, and SLA verifier may
+land first, but the output-stage hook and all production money movement remain
+disabled until a real rail implementation passes the capability and end-to-end
+qualification contract below. A mock endpoint or self-declared adapter flag does
+not satisfy this gate.
 
 ## In scope
 
-1. A new pure contract crate `crates/economy/chio-outcome` defining the outcome
-   predicate and outcome pricing artifacts, following the economy-crate pattern
-   (`#![forbid(unsafe_code)]`, no I/O, serde types plus deterministic
-   validation).
-2. `chio.outcome.predicate.v1`: a declarative predicate over tool output with an
-   extensible `form` vocabulary. Two forms ship in v1: a JSON-shape / JSONPath
-   assertion, and a guard-verdict-class assertion (named output guards must
-   pass). A `wasm_component` form is reserved and rejected at load in v1.
-3. `chio.outcome.pricing.v1`: the outcome price (`MonetaryAmount`), the
-   referenced predicate digest, and the failure mode (`ZeroCharge` or
-   `AttemptFee { floor: MonetaryAmount }`). `ListingPricingHint` gains an
-   optional digest reference to a signed pricing artifact.
-4. `OutcomeVerdictReceiptMetadata` (schema `chio.outcome.verdict.v1`) in
-   `crates/core/chio-core-types/src/receipt/`, carried as an optional field on
-   `GovernedTransactionReceiptMetadata` alongside `metered_billing`.
-5. An `OutcomeVerificationHook` kernel slot (a trait installed by control-plane
-   wiring, mirroring the payment-adapter and price-oracle slots) that the
-   budgeted finalize path consults to convert observed output plus verdict into
-   a `reported_cost`, so the existing capture/release fork settles it unchanged.
-6. Pre-execution validation extending `validate_metered_billing_context`: when a
-   quote names a verified outcome, the referenced predicate and pricing
-   artifacts must verify and be live, fail-closed.
-7. `chio.outcome.sla-breach.v1`: an evidence artifact aggregating outcome-failed
-   receipts against a declared SLA, consumable as an evidence reference in an
-   `OpenMarketPenaltyIssueRequest`, plus an additive `OutcomeSlaBreach`
-   abuse-class variant.
-8. JSON schemas under `spec/schemas/chio-outcome/`, conformance coverage, and a
-   PROTOCOL 5.2 reconciliation for the verified-outcome quote encoding.
+1. A pure `chio_listing::outcome` module for the listing-owned predicate,
+   pricing validation, evaluator, and SLA arithmetic. Receipt metadata remains
+   in `chio-core-types` and penalty admission remains in `chio-open-market`;
+   v1 adds no crate.
+2. RFC 6901 JSON Pointer selectors with a small deterministic comparator set.
+3. One pricing rule: full `outcome_price` on `Passed` and `ZeroCharge` on
+   `Failed` or `Unevaluable`.
+4. Activation-gated `HoldCapture` requests over an adapter proven to support
+   genuine hold, capture, and release.
+5. Receipt metadata that binds listing, provider, pricing, predicate, quote,
+   delivered output, verdict, and charged amount.
+6. An SLA breach artifact whose numerator and denominator are both proven from
+   a complete receipt-log range.
+7. Schema registration, public verifier coverage, unknown-schema negatives, and
+   PROTOCOL reconciliation in the same phase.
 
 ## Out of scope
 
-- New Solidity. Escrow release and refund reuse `prepare_merkle_release`,
-  `prepare_dual_sign_release` (`prepare.rs:1027`), and `prepare_escrow_refund`
-  unchanged; any new contract surface is a family-v2 proposal.
-- A `wasm_component` predicate form and an output-carrying WASM guard ABI
-  (deferred; see Alternatives).
-- New receipt kinds. The verdict rides an existing `MediatedDecision` receipt
-  (`crates/core/chio-core-types/src/receipt/kinds.rs:43-49`) as a metadata block.
-- Subjective or model-judged outcomes. v1 predicates are deterministic over the
-  observed output; panel adjudication of outcomes belongs to WS7.
-- Production money movement ahead of WS1. The artifact family and its offline
-  verification land independently; kernel settlement wiring is gated on WS1.
+- `MustPrepay`, `AllowThenSettle`, prepaid x402, attempt fees, escrow attempt
+  fees, partial capture, and any adapter whose unused balance is only local
+  bookkeeping.
+- JSONPath, guard-verdict predicates, user code, regex, WASM predicates,
+  floating-point comparisons, or model-judged outcomes.
+- New Solidity, mainnet or public-testnet deployment, and production money
+  movement ahead of WS1.
+- Automatic SLA slashing. A breach artifact is complete evidence submitted to
+  the existing governance path, not authority to move funds.
 
 ## Design
 
-### Outcome predicates
+### Predicate vocabulary
 
-A predicate is a signed `chio.outcome.predicate.v1` artifact with a `form`
-discriminator so the vocabulary can grow without a schema break. v1 evaluates
-two forms natively and deterministically:
+`chio.outcome.predicate.v1` contains a non-empty AND-list of assertions. Each
+assertion has an RFC 6901 `pointer` and one comparator:
 
-- `json_assertion`: a list of JSONPath selectors with expected shape, presence,
-  or comparison assertions over the tool output value. Passes when every
-  assertion holds.
-- `guard_verdict_class`: a set of named output guards that must return `Allow`
-  from the post-invocation pipeline. This reuses `GuardEvidence` already
-  produced for the receipt.
+- `exists`;
+- `eq` or `ne` against an attached JSON value, compared by RFC 8785 canonical
+  bytes; or
+- `lt`, `lte`, `gt`, or `gte` against an attached JSON integer, with both
+  operands parsed by checked integer conversion.
 
-`wasm_component` is a reserved form value that rejects at load in v1.
-Evaluation is total and side-effect free and produces `Passed`,
-`Failed { reason }`, or `Unevaluable { reason }`, where `Unevaluable` covers
-malformed output, a guard error, a missing or expired predicate, or an unknown
-form. `Failed` and `Unevaluable` charge identically (the failure-mode floor) but
-are recorded distinctly for audit.
+The empty pointer selects the whole document. Invalid escape sequences,
+duplicate assertions, non-integer ordered operands, numeric overflow, missing
+targets, invalid JSON, and unknown comparators are deterministic errors.
+`exists` passes on any selected value. All other missing targets fail. The
+predicate has no extension or reserved execution form in v1.
 
-The verdict authority is the kernel's own evaluation over the observed output
-bytes, then the receipt signature. A tool may include a `"success": true` field,
-but that is at most an input to a `json_assertion`, never the verdict, which
-preserves the evidence-class discipline of PROTOCOL 5.2 (`spec/PROTOCOL.md:545-553`)
-and 6.3.4 (`spec/PROTOCOL.md:1115`, subordinate evidence, not ambient authority).
+Evaluation returns `Passed`, `Failed { reason }`, or
+`Unevaluable { reason }`. `Failed` and `Unevaluable` both produce zero charge.
+The distinction is receipt evidence only.
 
-### Artifacts and types (schema ids chio.outcome.<artifact>.v1)
+### Artifacts and receipt binding
 
-- `chio.outcome.predicate.v1` (`chio-outcome`): `predicate_id`, `form`,
-  form-specific body, `issued_at`, `expires_at`. Signed via
-  `SignedExportEnvelope`.
-- `chio.outcome.pricing.v1` (`chio-outcome`): `pricing_id`, `predicate_ref`
-  (id plus sha256), `outcome_price: MonetaryAmount`, `failure_mode`
-  (`ZeroCharge` or `AttemptFee { floor: MonetaryAmount }`), `issued_at`,
-  `expires_at`. Validation requires `floor.currency == outcome_price.currency`
-  and `floor.units <= outcome_price.units`.
-- `OutcomeVerdictReceiptMetadata` (schema `chio.outcome.verdict.v1`,
-  `crates/core/chio-core-types/src/receipt/`): `predicate_id`, `predicate_hash`,
-  `form`, `verdict` (`passed` / `failed` / `unevaluable`), `evidence_class`
-  reusing `GovernedProvenanceEvidenceClass` (`.../capability/governance.rs:472-482`,
-  set to `observed`, never `verified` unless bound to further signed evidence),
-  `charged_mode` (`outcome_price` / `zero` / `attempt_fee`), `charged_amount:
-  MonetaryAmount`, and optional guard-evidence references. Added as an optional
-  `outcome` field on `GovernedTransactionReceiptMetadata`
-  (`.../receipt/governance.rs:101-139`), serialized under the existing
-  `governed_transaction` metadata key
-  (`crates/kernel/chio-kernel/src/receipt_support/receipt_metadata.rs:433`).
-- `chio.outcome.sla-breach.v1` (`chio-outcome`): `listing_id`, `predicate_ref`,
-  declared SLA reference, an evidence set of outcome-failed receipt references,
-  a breach window, and a computed failure ratio in basis points. It is evidence,
-  not authority.
+All artifacts are signed RFC 8785 canonical JSON with
+`deny_unknown_fields` and versioned schema identifiers.
 
-All monetary values are `MonetaryAmount`; ratios and margins are integer basis
-points, consistent with `ListingSla` (`discovery.rs:116-135`). Artifacts are
-canonical JSON with versioned schema-id constants.
+- `chio.outcome.predicate.v1` binds `predicate_id`, assertions,
+  `provider_id`, `issued_at`, and `expires_at`.
+- `chio.outcome.pricing.v1` binds `pricing_id`, `provider_id`,
+  `predicate_id` and digest, `outcome_price: MonetaryAmount`,
+  `failure_mode: zero_charge`, optional `sla_digest`, `issued_at`, and
+  `expires_at`.
+- `chio.outcome.sla.v1` binds provider and listing digests,
+  `max_failure_bps <= 10_000`, `minimum_sample_count > 0`,
+  `window_seconds > 0`, a fixed window anchor, `effective_at`, and
+  `expires_at`. The provider signs the SLA commitment referenced by the listing
+  and pricing artifacts.
+- `chio.outcome.eligibility.v1` is a pre-dispatch kernel-signed record. Its
+  canonical body binds `schema: "chio.outcome.eligibility.v1"`,
+  `eligibility_id`, `request_id`, capability id, tool server and tool name,
+  provider id, listing id and digest, provider-binding digest, pricing id and
+  digest, predicate id and digest, quote digest, optional SLA digest, exact
+  `outcome_price`, `HoldCapture`, pre-action authority digest, `issued_at`, and
+  `expires_at`. The kernel signs the RFC 8785 body only after validating every
+  referenced artifact and before dispatch. The signed artifact envelope contains
+  that body and its detached signature; `eligibility_digest` is SHA-256 over the
+  RFC 8785 canonical envelope. `eligibility_id` is SHA-256 over the
+  domain-separated canonical body excluding `eligibility_id`; the verifier
+  recomputes it before accepting the envelope. The record is evidence of the selected pricing
+  contract, not a replacement for capability, policy, or guard authority.
+- `chio.outcome.dispatch-acceptance.v1` is a provider-signed durable-queue
+  acknowledgement binding `schema`, domain-separated `acceptance_id`, request
+  id, eligibility digest, parameter hash, provider/listing binding, server queue
+  id, idempotency key, and provider key id/epoch. The provider key resolves from
+  the trusted listing binding. It is valid only when the qualified server has
+  durably assumed responsibility to execute exactly once or expose a terminal
+  signed outcome through its restart-safe status query. Socket acceptance,
+  in-memory enqueue, or synchronous function entry does not qualify.
+- `chio.outcome.verdict.v1` receipt metadata binds:
+  `listing_id`, `listing_digest`, `provider_id`,
+  `provider_binding_digest`, `pricing_id`, `pricing_digest`,
+  `predicate_id`, `predicate_digest`, `quote_digest`, `eligibility_digest`,
+  `dispatch_acceptance_digest`,
+  optional `delivered_output_digest`, `verdict`, `reason_code`,
+  `charged_amount`, and `rail_authorization_ref`.
 
-### Data flow
+The provider binding identifies the trusted key that must sign the listing,
+predicate, and pricing artifacts. The request quote digest covers the entire
+canonical `MeteredBillingQuote` and its verified-outcome references. A matching
+identifier without a matching digest rejects. Receipt metadata is part of the
+kernel-signed receipt and cannot be filled from a tool-server self-report.
 
-1. Publish. The operator signs a `chio.outcome.predicate.v1` and a
-   `chio.outcome.pricing.v1`, and references the pricing digest from the
-   `ListingPricingHint`; buyers discover it through existing marketplace search.
-2. Request. The buyer attaches `metered_billing` with a `HoldCapture` or
-   `MustPrepay` mode, `quote.billing_unit = "verified_outcome"`,
-   `quoted_units = 1`, `quoted_cost = outcome_price`, and the predicate and
-   pricing references.
-3. Pre-execution and hold. `validate_metered_billing_context` runs its existing
-   checks and additionally verifies the referenced artifacts and their validity
-   windows, fail-closed; the payment adapter `authorize`s the worst-case hold
-   (the outcome price).
-4. Execute the tool.
-5. Verify. The budgeted finalize path invokes the `OutcomeVerificationHook` over
-   the observed output, which returns a verdict and the resulting
-   `reported_cost`: `outcome_price` on `Passed`; `0` or the attempt-fee floor on
-   `Failed` / `Unevaluable`, per the declared failure mode.
-6. Settle. The existing reconcile plus capture/release path
-   (`validation.rs:1019-1046`) settles it: `reported_cost == 0` releases the
-   hold, otherwise it captures the reported cost and the rail voids the
-   remainder.
-7. Attest. The receipt carries the `financial` block (`cost_charged` equals the
-   settled amount) and the `governed_transaction.outcome`
-   `OutcomeVerdictReceiptMetadata`.
-8. Escrow (optional, WS1). A `Passed` receipt drives `prepare_merkle_release`,
-   which binds the receipt bytes; a `Failed` receipt drives
-   `prepare_escrow_refund`. A breach aggregator assembles
-   `chio.outcome.sla-breach.v1` from failed receipts and submits it as evidence
-   to an `OpenMarketPenaltyIssueRequest` under the unchanged authority path.
+For an outcome-priced request, the same receipt-store transaction that creates
+the RFC-0003 dispatch intent also persists the canonical signed eligibility
+record and writes its digest into a nullable
+`outcome_eligibility_digest` intent extension. The digest is mandatory for this
+request class and null for unrelated calls. A duplicate request id with
+different eligibility bytes, a missing record, a digest mismatch, an unknown
+schema or version, or an untrusted kernel signer denies before dispatch. The
+intent and record commit together, so a crash can leave both or neither, never
+an unattributed outcome-pricing intent. The RFC-0003 eligibility record starts
+`prepared`. After authorization and every pre-tool check succeeds, the kernel
+must durably compare-and-swap it to `dispatch_started` immediately before the
+qualified transport handoff. This is platform state, not provider SLA evidence.
+Only a verified durable acknowledgement may transition the row to
+`dispatch_accepted`, recording its digest and a trusted local acceptance time.
+Receipt commit must supply its digest in the typed
+`DispatchIntentKey`, match the same digest in signed
+`chio.outcome.verdict.v1` metadata, and atomically move the record to
+`receipt_bound` with the receipt id while consuming the intent, and the signed
+verdict must bind the same acceptance digest. Terminal crash reconciliation from
+`dispatch_accepted` becomes a provider incident; `dispatch_started` without a
+recoverable acknowledgement creates a platform incident but remains unresolved
+and makes SLA proof incomplete. Only an authenticated server `NotAccepted`
+result may terminate it as `not_dispatched`. A pre-tool abort or recovery moves `prepared` to
+`not_dispatched`; that proof is retained but excluded from provider SLA math.
+The resolved record's lack of an open intent is expected, not an integrity
+error.
 
-### Integration points
+### Exact output-stage ordering
 
-- Kernel: an `OutcomeVerificationHook` trait plus an optional kernel field and a
-  control-plane installer, consulted inside
-  `finalize_budgeted_tool_output_with_cost_and_metadata` (`validation.rs:927`)
-  before `actual_cost` is computed. The kernel core stays thin; predicate logic
-  lives in `chio-outcome` behind the trait, honoring the invariant that kernel
-  integration goes through hook slots, not new kernel-side business logic. The
-  guard-verdict-class form also needs the output guard pipeline to run in the
-  budgeted path, which today runs only in the non-budgeted
-  `finalize_tool_output_with_metadata`
-  (`crates/kernel/chio-kernel/src/kernel/responses/finalization.rs:18-143`); see
-  Open questions.
-- Settlement: the post-dispatch settlement observer
-  (`crates/kernel/chio-kernel/src/kernel/settlement_observer.rs:81-125`) already
-  skips zero-priced receipts, so a released `Failed` outcome needs no special
-  handling; a captured `Passed` or attempt-fee receipt flows to the WS1
-  `SettlementHook` unchanged.
-- Open market: the breach artifact enters through the existing evidence-ref
-  field on `OpenMarketPenaltyIssueRequest` (`penalty.rs:132-181`); penalty
-  issuance authority (`authority.rs:76-95`) and bond backing
-  (`fee_schedule.rs:54-67`) are unchanged.
+The only valid order is:
 
-### Error handling (fail-closed)
+1. Verify the listing, provider binding, predicate, pricing, and quote digests
+   and validity windows.
+2. Build and verify `chio.outcome.eligibility.v1`. Atomically persist it with
+   WS1's RFC-0003 pre-movement intent and bind its digest into the intent
+   extension. Require `MeteredSettlementMode::HoldCapture` and a qualifying
+   rail, authorize an unsettled hold for exactly
+   `outcome_price`, and durably record that authorization before dispatch.
+3. After every pre-tool check succeeds, durably compare-and-swap the eligibility
+   record from `prepared` to `dispatch_started`, append its immutable lifecycle
+   event, then invoke only the qualified durable-acceptance transport. If that
+   commit fails, do not invoke transport; reconcile the hold and terminate as
+   `not_dispatched`.
+4. Verify the provider-bound `chio.outcome.dispatch-acceptance.v1` returned only
+   after durable server enqueue. Persist its bytes and digest, assign the trusted
+   local acceptance time, and compare-and-swap `dispatch_started` to
+   `dispatch_accepted`. If the acknowledgement is lost, recovery queries the
+   server by exact idempotency key and eligibility digest. Until acceptance is
+   proven, any terminal incident is platform-owned and excluded from provider
+   SLA math.
+5. Await the accepted execution's terminal output and retain the raw bytes.
+6. Run the complete post-invocation guard pipeline. A block or escalation sets
+   `delivered_output_digest = None` and
+   `Unevaluable { reason: output_blocked }`, then proceeds to zero-charge
+   release. A redaction produces the final output bytes.
+7. For an allowed output, freeze those final bytes as `delivered_output`. Compute
+   `delivered_output_digest` and evaluate the predicate over the JSON parsed
+   from those same bytes.
+8. Run no output mutation after predicate evaluation. Any component that would
+   transform the output after this point is an ordering violation and the hold
+   is released.
+9. Set `reported_cost` to the full outcome price only for `Passed`; otherwise
+   set it to zero. Capture or release through the WS1 durable path, recording
+   the exact rail operation and lifecycle transition atomically.
+10. Build and sign one receipt whose financial charge, all bound digests,
+   output digest, verdict, and rail reference agree, then persist it before
+   delivery completes. In that same writer transaction, verify the eligibility
+   envelope and verdict digest again, transition its record from
+   `dispatch_accepted` to
+   `receipt_bound`, consume the exact digest-bound intent, and append the
+   receipt. Any mismatch rolls back all three changes.
 
-- An unevaluable predicate is a failed outcome. The charge is the declared
-  failure-mode floor (zero or attempt fee), never the outcome price, and never a
-  silent full charge.
-- A missing, expired, signature-invalid, or unknown-`form` predicate or pricing
-  artifact denies pre-execution through `KernelError::GovernedTransactionDenied`,
-  the same class `validate_metered_billing_context` already returns.
-- If the `OutcomeVerificationHook` is absent while a verified-outcome quote is
-  present, the request is denied rather than charged at face value.
-- A reported cost above the hold remains the existing `SettlementStatus::Failed`
-  overrun; the outcome path never widens the hold. Mixed-currency floor or price
-  fails validation at load, matching the money invariant.
+The bytes hashed for predicate evaluation are byte-for-byte the bytes returned to the caller.
+The predicate never evaluates a pre-redaction output while charging for a
+different delivered result.
+
+### Request and disposition contract
+
+A verified-outcome request has `billing_unit = "verified_outcome"`,
+`quoted_units = 1`, `quoted_cost == outcome_price`, and
+`settlement_mode = HoldCapture`. `MustPrepay` and `AllowThenSettle` reject
+before tool execution.
+
+The hold capture is the per-call settlement attempt, not a precursor to a
+second observer dispatch. Zero charge creates no atom. A rail result already
+proven `Settled` creates no live atom; if an immutable audit atom is retained,
+its separate settlement lifecycle is initialized as `satisfied` in the same
+durable transaction. A `Pending` capture may create one immutable
+`chio_credit::obligation::ObligationAtom` with an authenticated
+`chio_credit::obligation::ObligationDisposition` record set to `per_call`, but
+its lifecycle is `settlement_in_flight` and binds the existing capture
+idempotency key. Observers may only reconcile that exact operation and must not
+start another dispatch. `assigned`, `channelized`, or `clearing_reserved` is a
+conflict and prevents the WS3 capture path from running.
+
+### SLA completeness proof
+
+`chio.outcome.sla-breach.v1` binds a provider, listing, pricing, predicate,
+declared SLA digest and terms, and the exact closed interval derived from that
+SLA's anchor and window cadence. A submitter cannot choose a favorable subrange.
+It contains:
+
+- the configured trusted receipt-checkpoint authority key and epoch;
+- signed start and end checkpoint digests under that authority;
+- the first and last log positions;
+- a complete range proof covering every receipt position in the interval;
+- the signed RFC-0003 dispatch/recovery checkpoint for the same cutoff, its
+  append-only lifecycle-event consistency proof, and the complete global
+  provider-acceptance-time range for the declared interval with boundary
+  leaves. The proof includes each signed `chio.outcome.eligibility.v1` envelope,
+  signed dispatch-acceptance envelope, stable eligibility sequence, every
+  required lifecycle version and incident class, and bound
+  receipt or incident id, plus corresponding open or dead-letter intent state,
+  so a crash after dispatch cannot vanish from the denominator merely because no
+  normal receipt was appended. The verifier, not the submitter, applies the
+  provider selector to this complete range;
+- the checkpoint's global unresolved-`dispatch_started` root and count, which
+  must be zero in v1 before any SLA breach proof is accepted. This conservative
+  gate prevents a lost or unavailable acknowledgement outside a chosen range
+  from hiding a provider-accepted request;
+- the fixed eligibility selector
+  (`provider_binding_digest`, `listing_digest`, `pricing_digest`, and
+  `predicate_digest`);
+- the complete eligibility-record root and count, `eligible_count`,
+  `failed_or_unevaluable_count`, and the references for every eligible receipt
+  or terminal incident; and
+- `failure_bps`.
+
+The verifier pins the checkpoint signer and epoch from trusted configuration,
+checks checkpoint signatures, authority epochs, append-only event-prefix
+consistency, state-root replay, time-range boundaries, and counts. It verifies
+that both receipt and eligibility ranges have no missing position, verifies
+every eligibility and acceptance signature plus authenticated lifecycle
+version, and enforces exactly one terminal binding per record. `prepared`,
+`not_dispatched`, `dispatch_started`, and platform-incident records have no
+provider-acceptance-time leaf. Terminal `not_dispatched` records are excluded;
+an unresolved `dispatch_started` record makes any potentially overlapping proof
+incomplete; v1 enforces this as a global zero-count gate. They remain visible in the record/event roots so exclusion cannot
+hide an accepted request. A
+`dispatch_accepted` record must have its exact digest-bound open intent and makes
+the corpus incomplete until terminal. A
+`receipt_bound` record must resolve its recorded receipt id and
+the receipt's signed verdict metadata must carry the same eligibility and
+acceptance digests. A provider-class `incident_bound` record must resolve its
+recorded terminal incident, signed acceptance, and matching dead-letter intent.
+A platform-class incident cannot enter the acceptance index. It joins by request
+id and digest without double counting,
+then replays the selector from the eligibility bodies and
+recomputes both counts. A missing, tampered,
+unknown-schema, expired-at-dispatch, or
+selector-mismatched eligibility record makes the corpus incomplete and rejects
+the breach artifact; it is never silently excluded. The denominator is
+every matching request the provider durably accepted in the declared window, including
+passed, failed, unevaluable, output-blocked, and recovered outcome-unknown
+incidents. An unresolved open intent makes the corpus incomplete; a terminal
+outcome-unknown incident counts as failed rather than disappearing. Failure
+receipts alone are never a valid denominator. An unavailable range proof,
+untrusted checkpoint authority, gap, duplicate request or position, zero or
+below-minimum denominator, SLA/window mismatch, or ineligible receipt rejects
+the artifact.
+
+`failure_bps = failed_or_unevaluable_count * 10_000 / eligible_count` uses
+checked `u128` arithmetic and must be at most 10,000. It is a display value and
+never saturates. Breach authority uses the exact checked cross-product, not the
+floored display value:
+
+```text
+failed_or_unevaluable_count * 10_000 > max_failure_bps * eligible_count
+```
+
+The artifact is a breach only when that inequality holds and
+`eligible_count >= minimum_sample_count`. Thus one failure in three requests
+breaches a 3,333 bps maximum, while one in four does not breach an exact 2,500
+bps maximum.
+
+### Fail-closed errors
+
+Missing or expired artifacts, missing or tampered outcome eligibility, untrusted
+eligibility signer, intent/eligibility mismatch, untrusted or mismatched provider
+signatures, identifier/digest mismatch, quote mismatch, non-`HoldCapture` mode,
+prepaid or unproven rail semantics, authorization mismatch, unknown comparator,
+invalid pointer, invalid JSON, output-stage reordering, charge above the hold,
+mixed currency, arithmetic failure, a second dispatch for an in-flight capture,
+incomplete SLA range, untrusted checkpoint authority, insufficient sample,
+threshold mismatch, and disposition conflict all reject. A runtime predicate
+evaluation error after dispatch requests release through the durable path and
+records `Unevaluable`; until release is proven, reconciliation stays Pending or
+Failed. It never records a full charge.
 
 ## Alternatives considered
 
-1. Verdict authority: kernel-observed versus tool-server self-report. A tool
-   returning `{"success": true}` that the kernel trusts would collapse the
-   evidence classes and let a seller price its own success. Rejected. The kernel
-   evaluates the predicate over the observed output and signs the verdict;
-   self-report is at most a predicate input. Recommended.
-2. Predicate form for v1: native declarative plus guard-verdict-class versus a
-   WASM predicate component. The WASM runtime exists but its ABI is input-shaped
-   (`abi.rs:29`), so an output predicate needs a new output-carrying request and
-   a wider signed-module trust surface over priced outcomes. Recommended: ship
-   `json_assertion` and `guard_verdict_class` natively, reserve `wasm_component`,
-   keep the `form` enum open.
-3. Charge integration: reuse capture/release via a computed `reported_cost`
-   versus a bespoke outcome-settlement path that would fork the money path and
-   undercut RFC-0013 durability. Recommended: reuse. `validation.rs:1037-1046`
-   already maps zero to release and a positive cost to capture, so no new
-   money-movement code and no new Solidity are required.
+1. A new `chio-outcome` crate was rejected for v1. `chio-listing` already owns
+   provider-signed listing pricing; `chio-core-types` and `chio-open-market`
+   retain their existing receipt and penalty boundaries. Extract only if a real
+   dependency or release boundary appears.
+2. Prepayment was rejected because a later local `release` is not a refund.
+   Add it only after a configured rail proves outcome-contingent refund
+   semantics and WS1 journals that refund.
+3. Attempt fees were rejected because they require proven partial capture and
+   release of the remainder on every rail. Zero or full capture is the only
+   portable v1 contract.
+4. JSONPath, output guards, and WASM were deferred. RFC 6901 plus deterministic
+   comparators covers the first useful case without a second evaluator or ABI.
+5. Failure-only SLA evidence was rejected because a provider can omit
+   successful or failed receipts and change the rate. A complete checkpointed
+   range is required.
 
-## Claim and release framing
+## Claim framing
 
-WS3 is implementation within the bounded release posture. A `Passed` verdict
-means the kernel-observed output satisfied a declared, machine-checkable
-predicate; it does not assert the outcome is objectively correct or valuable.
-The verdict evidence class is `observed`, never silently upgraded to `verified`,
-and no custody, finality, or insurer-of-record claim attaches. The off-chain
-capture/release path is the default; on-chain escrow binding stays devnet-only
-under the contract freeze, and the breach artifact is evidence a
-governance-adjudicated authority weighs, not an automatic slash.
+A `Passed` verdict means only that the exact delivered JSON satisfied the
+declared deterministic predicate. It does not prove objective value or factual
+correctness. The verdict is kernel-observed receipt evidence. Escrow and payment
+payloads remain subordinate rail evidence. No production outcome-priced payment
+claim exists until a real reversible rail passes the activation qualification;
+the current in-tree adapters do not.
 
 ## Testing strategy
 
-- `chio-outcome` unit tests: predicate and pricing validation, unknown-form
-  rejection, failure-mode currency and floor bounds, canonical-JSON stability,
-  schema-id constants, and breach-ratio basis-point arithmetic with saturating
-  `MonetaryAmount` math; plus conformance snapshots for `spec/schemas/chio-outcome/`.
-- Kernel finalize tests: `Passed` captures the outcome price; `Failed` under
-  `ZeroCharge` releases with `actual_cost == 0`; `Failed` under `AttemptFee`
-  captures the floor; `Unevaluable` settles at the floor. Proptest over verdict
-  times failure mode times settlement mode asserting the charge never exceeds
-  the floor on a non-pass.
-- Evidence-class test: a self-reported success field does not yield `Passed`
-  unless the kernel predicate independently passes.
-- Escrow selection (devnet): `Passed` routes to `prepare_merkle_release`,
-  `Failed` to `prepare_escrow_refund`. Penalty path: a breach artifact is
-  accepted as an evidence ref while issuance still requires the governance
-  authority signers.
-- Fail-closed tests: missing or expired predicate denies pre-execution; absent
-  verification hook with a verified-outcome quote denies.
+- Predicate table tests for pointer escaping, root selection, missing paths,
+  canonical equality, checked integer ordering, invalid numbers, and unknown
+  comparators.
+- Eligibility: signed canonical positive; mutate each provider/listing/pricing/
+  predicate/quote/authority digest independently; reject unknown
+  family/schema/version, untrusted signer, duplicate request with different
+  bytes, missing intent digest, missing record, and a record committed separately
+  from its intent. Creation assigns stable record/event sequences and a
+  version-zero `prepared` event. Tool dispatch cannot run before the durable
+  `dispatch_started` CAS, but that state alone is platform-owned. Only a signed,
+  provider-bound, restart-queryable durable acknowledgement produces
+  `dispatch_accepted`. Receipt commit with the right eligibility and acceptance
+  digests atomically produces `receipt_bound` and deletes the intent; a missing or wrong
+  verdict/key digest, stale version/lifecycle, or changed envelope rolls back
+  both plus the receipt append. Pre-tool failures produce retained
+  `not_dispatched` evidence and never enter the SLA numerator or denominator;
+  terminal reconciliation after acceptance atomically produces a provider-class
+  `incident_bound`; pre-acceptance handoff failures produce platform incidents,
+  and ambiguous acceptance remains unresolved until a trusted query resolves it.
+  Resolved records remain queryable without open intents; only creation of a
+  `prepared` record without its intent rejects.
+- Rail matrix: no current in-tree adapter activates WS3. A future genuine
+  unsettled hold passes only after networked authorize/capture/release,
+  idempotent replay/query, expiry, amount, payer, payee, currency, and durable
+  reconciliation qualification. Already-settled `X402PaymentAdapter`,
+  `AcpPaymentAdapter` local bookkeeping, missing release proof, expired
+  authorization, and binding mismatch reject before dispatch.
+- Provider transport matrix: no generic in-tree tool server activates WS3. A
+  future server passes only after durable enqueue before acknowledgement,
+  exact-once/idempotency-key enforcement, provider-key binding, restart-safe
+  status query, acknowledgement-loss recovery, and terminal outcome
+  qualification. In-memory enqueue, socket acceptance, unsigned acknowledgement,
+  wrong provider/eligibility/parameter digest, and status-query outage cannot
+  create provider SLA evidence.
+- Ordering: predicates see redacted delivered bytes; a post-predicate mutation
+  releases and rejects; the receipt output digest equals the returned bytes.
+- Pricing: pass captures exactly the quoted price; fail and unevaluable release
+  the entire hold; no code path emits an attempt fee. A settled capture creates
+  no outstanding atom, and a pending capture can only reconcile its original
+  idempotency key.
+- Binding: mutate each of listing, provider, pricing, predicate, or quote digest
+  independently and assert denial.
+- SLA: omit, duplicate, or reorder one receipt or eligibility position and
+  assert rejection; prove numerator and denominator recomputation and the 0 and
+  10,000 basis-point boundaries. Wrong checkpoint signer/epoch, cherry-picked window, insufficient
+  sample, and an exact rate at or below the declared maximum are not breaches.
+  Fractional boundaries prove the cross-product rule: 1/3 breaches 3,333 bps,
+  and 1/4 equals but does not breach 2,500 bps. Lifecycle tests mutate or omit an
+  event version, state-root leaf, acceptance-time-index boundary,
+  prior-checkpoint digest,
+  unresolved-started root/count, or sequence and reject. Any nonzero unresolved
+  count rejects the SLA proof. A pre-authorization failure, authorization denial,
+  and confirmed release before `dispatch_started` remain visible as
+  `not_dispatched` but do not change the denominator. A crash immediately after
+  `dispatch_started` becomes a platform incident and blocks SLA proof until an
+  authenticated acceptance or `NotAccepted` query resolves it; a crash
+  after verified durable `dispatch_accepted` is incomplete until terminally
+  reconciled, then counts as a provider failure. A request prepared in one SLA
+  window and accepted in the next belongs only to the latter.
+- Exclusive routing, schema registry parity, public verifier positives,
+  unknown-schema negatives, and the workspace gate.
 
 ## Implementation phases
 
-1. Offline family. Stand up `chio-outcome` with the predicate, pricing, and
-   breach artifacts; add `OutcomeVerdictReceiptMetadata` to `chio-core-types`;
-   native evaluator for both v1 forms; schemas and conformance. No kernel
-   wiring. Lands independently of WS1.
-2. Kernel verification hook. Add the `OutcomeVerificationHook` slot and thread
-   it into the budgeted finalize path; extend
-   `validate_metered_billing_context`; emit the receipt block; off-chain
-   capture/release only. Gated on WS1 for production money movement.
-3. Escrow binding and breach economics. Verdict-driven selection between
-   `prepare_merkle_release` and `prepare_escrow_refund` (devnet); ship
-   `chio.outcome.sla-breach.v1` and the `OutcomeSlaBreach` abuse class; wire
-   breach evidence into the governance-adjudicated penalty path.
-
-## Open questions
-
-1. The budgeted finalize path does not run the post-invocation guard pipeline
-   today (`validation.rs:1153-1179` builds the allow response directly). The
-   `guard_verdict_class` form requires running output guards there. Confirm the
-   cleanest way to share that evaluation with the non-budgeted path.
-2. Predicate reference transport on the request: a typed field on
-   `MeteredBillingContext` (a PROTOCOL 5.2 wire change) versus the untyped
-   `governed_intent.context` value. A typed field is cleaner but wider.
-3. `billing_unit` encoding: a reserved sentinel string `verified_outcome`
-   (additive, matches the free-string treatment in `spec/METERING.md:52-61`)
-   versus a structured billing-unit enum.
-4. Abuse-class growth: an additive `OutcomeSlaBreach` variant versus reusing the
-   existing `UnverifiableListingBehavior` (`penalty.rs:19-26`).
-5. Brief-versus-code discrepancies to carry: the kernel is at
-   `crates/kernel/chio-kernel/` (not `kernel/chio-kernel/`), and `ListingSla` /
-   `SignedListingPricingHint` live in `chio-listing`'s `discovery.rs` (not a
-   `listing.rs` type). The design follows the verified paths.
-6. Attempt-fee capture voids the hold remainder through standard rail
-   auth-capture semantics; confirm each configured adapter voids rather than
-   holds the uncaptured balance, since the kernel path issues a single
-   `capture` and no explicit partial release (`validation.rs:1037-1046`).
+1. Land the pure `chio_listing::outcome` predicate, pricing, eligibility,
+   dispatch-acceptance, verdict, and SLA validators with schemas, runtime/CLI registry parity,
+   signed/tampered fixtures, and unknown-schema negatives.
+2. Add the atomic RFC-0003 intent/eligibility binding and pure exact-output
+   evaluator. Keep the output-stage payment hook disabled.
+3. Only after a real rail passes genuine reversible-rail qualification and a
+   provider transport passes durable enqueue, signed acceptance, exact
+   idempotency/status-query, restart, and lost-ack qualification, enable the
+   hook. Wire full-capture/zero-release through WS1's durable journal plus the
+   RFC-0003 acceptance lifecycle, and add the always-on
+   receipt/output/rail/acceptance proof. No current in-tree adapter or generic
+   tool server satisfies this phase entry.
+4. Add SLA aggregation only after complete checkpoint range proofs exist.
