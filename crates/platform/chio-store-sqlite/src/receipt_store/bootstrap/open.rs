@@ -128,6 +128,7 @@ impl SqliteReceiptStore {
         if !create_if_missing {
             require_existing_receipt_schema(path, &connection)?;
             configure_sqlite_connection(&mut connection)?;
+            crate::aggregate_family_root::ensure_aggregate_family_root_schema(&mut connection)?;
             super::support::ensure_transparency_projection_guards(&connection)?;
             drop(connection);
 
@@ -1063,6 +1064,7 @@ impl SqliteReceiptStore {
             "#,
         )?;
         connection.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
+        crate::aggregate_family_root::ensure_aggregate_family_root_schema(&mut connection)?;
         ensure_tool_receipt_attribution_columns(&connection)?;
         super::support::ensure_receipt_lineage_statement_columns(&connection)?;
         super::support::drop_transparency_projection_guards(&connection)?;

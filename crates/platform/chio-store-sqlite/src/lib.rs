@@ -24,6 +24,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod aggregate_family_root;
 pub mod approval_store;
 pub mod authority;
 pub mod batch_approval_store;
@@ -92,6 +93,7 @@ impl Default for SqliteStoreOptions {
     }
 }
 
+pub use aggregate_family_root::{AggregateFamilyRootRecordStatus, AggregateFamilyRootStoreError};
 pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use batch_approval_store::SqliteBatchApprovalStore;
