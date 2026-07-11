@@ -1387,3 +1387,125 @@ mod tests {
         assert_eq!(view.benefit.segregated_outstanding_units, 2);
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod property_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Currencies drawn distinct per case; every non-parity one gets a rate.
+    const CURRENCY_POOL: [&str; 5] = ["USDC", "USD", "EUR", "GBP", "JPY"];
+
+    fn arb_position(currency: String) -> impl Strategy<Value = ExposureLedgerCurrencyPosition> {
+        // Channel units stay far below u64::MAX so the collapse exercises the
+        // conservation property, not the (separately tested) overflow denies.
+        let unit = 0_u64..1_000_000;
+        (
+            unit.clone(),
+            unit.clone(),
+            unit.clone(),
+            unit.clone(),
+            unit.clone(),
+            unit.clone(),
+            unit.clone(),
+            unit.clone(),
+            unit,
+        )
+            .prop_map(
+                move |(
+                    governed_max_exposure_units,
+                    reserved_units,
+                    settled_units,
+                    pending_units,
+                    failed_units,
+                    provisional_loss_units,
+                    recovered_units,
+                    quoted_premium_units,
+                    active_quoted_premium_units,
+                )| ExposureLedgerCurrencyPosition {
+                    currency: currency.clone(),
+                    governed_max_exposure_units,
+                    reserved_units,
+                    settled_units,
+                    pending_units,
+                    failed_units,
+                    provisional_loss_units,
+                    recovered_units,
+                    quoted_premium_units,
+                    active_quoted_premium_units,
+                },
+            )
+    }
+
+    fn arb_book() -> impl Strategy<Value = (Vec<ExposureLedgerCurrencyPosition>, ExposureLedgerNettingRates)>
+    {
+        proptest::sample::subsequence(CURRENCY_POOL.to_vec(), 1..=CURRENCY_POOL.len()).prop_flat_map(
+            |currencies| {
+                let positions = currencies
+                    .iter()
+                    .map(|currency| arb_position((*currency).to_string()))
+                    .collect::<Vec<_>>();
+                // USDC and USD are pinned to parity (rate_for rejects any
+                // non-parity override for them), so only the non-pinned
+                // currencies draw random rates; the pinned ones resolve to the
+                // built-in identity.
+                let rates = currencies
+                    .iter()
+                    .filter(|currency| **currency != "USDC" && **currency != "USD")
+                    .map(|currency| {
+                        let currency = (*currency).to_string();
+                        (1_u64..1_000, 1_u64..1_000).prop_map(move |(numerator, denominator)| {
+                            CanonicalConversionRate {
+                                currency: currency.clone(),
+                                numerator,
+                                denominator,
+                            }
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                (positions, rates).prop_map(|(positions, rates)| {
+                    (positions, ExposureLedgerNettingRates::new(rates))
+                })
+            },
+        )
+    }
+
+    proptest! {
+        /// Conservation: collapsing can only free capital, never manufacture a
+        /// requirement above the segregated per-currency baseline, and the
+        /// reported benefit is the exact difference (the saturating_sub in the
+        /// collapse never actually saturates).
+        #[test]
+        fn netting_collapse_conserves_outstanding_exposure((positions, rates) in arb_book()) {
+            let view = collapse_positions_to_canonical(&positions, &rates)
+                .expect("bounded random books collapse");
+            let benefit = &view.benefit;
+            prop_assert!(
+                benefit.netted_outstanding_units <= benefit.segregated_outstanding_units,
+                "netted {} exceeds segregated {}",
+                benefit.netted_outstanding_units,
+                benefit.segregated_outstanding_units,
+            );
+            prop_assert_eq!(
+                benefit.capital_freed_units,
+                benefit.segregated_outstanding_units - benefit.netted_outstanding_units,
+            );
+            prop_assert_eq!(
+                view.mixed_currency_book,
+                positions.len() > 1,
+            );
+        }
+
+        /// Determinism: the collapse is a pure projection, so the same book and
+        /// rates produce the identical view.
+        #[test]
+        fn netting_collapse_is_deterministic((positions, rates) in arb_book()) {
+            let first = collapse_positions_to_canonical(&positions, &rates)
+                .expect("bounded random books collapse");
+            let second = collapse_positions_to_canonical(&positions, &rates)
+                .expect("bounded random books collapse");
+            prop_assert_eq!(first, second);
+        }
+    }
+}
