@@ -80,7 +80,7 @@ pub(crate) use self::scope_subset::*;
 pub(crate) use self::sidecar::*;
 pub(crate) use self::state::*;
 
-pub use self::config::ProtectConfig;
+pub use self::config::{ProtectConfig, DEFAULT_UPSTREAM_REQUEST_TIMEOUT};
 pub use self::state::ProtectProxy;
 
 #[cfg(test)]
