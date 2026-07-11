@@ -15,6 +15,7 @@ mod evm;
 mod hook;
 mod observe;
 mod ops;
+mod outcome_store;
 mod payments;
 mod retry;
 mod solana;
@@ -52,7 +53,8 @@ pub use evm::{
     SettlementAnchorContentBinding,
 };
 pub use hook::{
-    SettlementHook, SettlementHookError, SettlementObservation, SettlementOutcome,
+    SettlementFailureClass, SettlementFailureCode, SettlementFailureReason, SettlementHook,
+    SettlementHookError, SettlementObservation, SettlementOutcome, SettlementSkipReason,
     SETTLEMENT_OBSERVATION_SCHEMA, SETTLEMENT_OUTCOME_SCHEMA,
 };
 pub use observe::{
@@ -69,6 +71,10 @@ pub use ops::{
     SettlementLaneRuntimeStatusInput, SettlementOperationKind, SettlementRecoveryRecord,
     SettlementRuntimeReport, SettlementRuntimeStatus, CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
 };
+pub use outcome_store::{
+    SettlementAttemptClaim, SettlementOutcomeStore, SettlementRoute, SettlementRouteError,
+    SettlementRouteErrorClass, SettlementRoutingInput,
+};
 pub use payments::{
     build_x402_payment_requirements, evaluate_circle_nanopayment, prepare_paymaster_compatibility,
     prepare_transfer_with_authorization, ApprovalBinding, CircleNanopaymentPolicy, Eip3009Domain,
@@ -78,9 +84,9 @@ pub use payments::{
     DEFAULT_MAX_EIP3009_NONCE_ENTRIES,
 };
 pub use retry::{
-    classify_attempt, DeadLetterRecord, RetryDecision, RetryPolicy, DEFAULT_BACKOFF_CAP_MS,
-    DEFAULT_BACKOFF_MULTIPLIER, DEFAULT_INITIAL_BACKOFF_MS, DEFAULT_MAX_RETRIES,
-    SETTLE_DEAD_LETTER_SCHEMA,
+    classify_attempt, DeadLetterRecord, RetryDecision, RetryPolicy, RetryPolicyError,
+    DEFAULT_BACKOFF_CAP_MS, DEFAULT_BACKOFF_MULTIPLIER, DEFAULT_INITIAL_BACKOFF_MS,
+    DEFAULT_MAX_RETRIES, SETTLE_DEAD_LETTER_SCHEMA,
 };
 pub use solana::{
     compare_commitments, prepare_solana_settlement, verify_solana_binding_and_receipt,

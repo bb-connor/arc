@@ -17,12 +17,13 @@
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
-use crate::hook::SettlementOutcome;
-use crate::SettlementError;
+use crate::hook::{SettlementFailureReason, SettlementSkipReason};
+use crate::outcome_store::SettlementRoutingInput;
 
 /// Schema string emitted on the wire for [`DeadLetterRecord`] frames.
-pub const SETTLE_DEAD_LETTER_SCHEMA: &str = "chio.settle.dead-letter.v1";
+pub const SETTLE_DEAD_LETTER_SCHEMA: &str = "chio.settle.dead-letter.v2";
 
 /// Bound on the number of retries before a transient failure is
 /// downgraded to a permanent dead-letter row. The total attempt count
@@ -38,12 +39,31 @@ pub const DEFAULT_BACKOFF_MULTIPLIER: u32 = 2;
 /// Hard cap on a single backoff interval (avoids unbounded growth).
 pub const DEFAULT_BACKOFF_CAP_MS: u64 = 60_000;
 
-/// Documented retry envelope for the settlement observer slot.
-///
-/// All fields are policy inputs; the runtime evaluation is a pure
-/// function. The defaults match the bounds documented in the settlement
-/// audit doc and are wired into [`crate::hook::SettlementHook`]
-/// callers via [`classify_attempt`].
+const MAX_RETRIES: u32 = 32;
+const MAX_BACKOFF_CAP_MS: u64 = 86_400_000;
+const MAX_BACKOFF_MULTIPLIER: u32 = 16;
+
+/// Invalid bounded retry policy.
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+pub enum RetryPolicyError {
+    #[error("max_retries exceeds 32: {max_retries}")]
+    MaxRetriesTooHigh { max_retries: u32 },
+    #[error("initial_backoff_ms must be nonzero")]
+    InitialBackoffZero,
+    #[error("backoff_cap_ms must be nonzero")]
+    BackoffCapZero,
+    #[error("initial_backoff_ms {initial_backoff_ms} exceeds backoff_cap_ms {backoff_cap_ms}")]
+    InitialBackoffExceedsCap {
+        initial_backoff_ms: u64,
+        backoff_cap_ms: u64,
+    },
+    #[error("backoff_cap_ms exceeds 86400000: {backoff_cap_ms}")]
+    BackoffCapTooHigh { backoff_cap_ms: u64 },
+    #[error("backoff_multiplier must be in 1..=16: {backoff_multiplier}")]
+    BackoffMultiplierOutOfRange { backoff_multiplier: u32 },
+}
+
+/// Bounded retry envelope for settlement routing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RetryPolicy {
@@ -70,43 +90,78 @@ impl Default for RetryPolicy {
 }
 
 impl RetryPolicy {
+    /// Validate the bounded retry envelope.
+    pub const fn validate(&self) -> Result<(), RetryPolicyError> {
+        if self.max_retries > MAX_RETRIES {
+            return Err(RetryPolicyError::MaxRetriesTooHigh {
+                max_retries: self.max_retries,
+            });
+        }
+        if self.initial_backoff_ms == 0 {
+            return Err(RetryPolicyError::InitialBackoffZero);
+        }
+        if self.backoff_cap_ms == 0 {
+            return Err(RetryPolicyError::BackoffCapZero);
+        }
+        if self.backoff_cap_ms > MAX_BACKOFF_CAP_MS {
+            return Err(RetryPolicyError::BackoffCapTooHigh {
+                backoff_cap_ms: self.backoff_cap_ms,
+            });
+        }
+        if self.initial_backoff_ms > self.backoff_cap_ms {
+            return Err(RetryPolicyError::InitialBackoffExceedsCap {
+                initial_backoff_ms: self.initial_backoff_ms,
+                backoff_cap_ms: self.backoff_cap_ms,
+            });
+        }
+        if self.backoff_multiplier == 0 || self.backoff_multiplier > MAX_BACKOFF_MULTIPLIER {
+            return Err(RetryPolicyError::BackoffMultiplierOutOfRange {
+                backoff_multiplier: self.backoff_multiplier,
+            });
+        }
+        Ok(())
+    }
+
     /// Compute the backoff applied before the `attempt`-th retry.
     /// `attempt = 0` returns the configured initial backoff.
     /// Caps at [`Self::backoff_cap_ms`].
     #[must_use]
     pub fn backoff_for(&self, attempt: u32) -> Duration {
-        let multiplier = u64::from(self.backoff_multiplier).max(1);
-        // Saturating arithmetic: very large attempt counts must not
-        // panic; they land on the cap.
-        let mut delay = self.initial_backoff_ms;
-        for _ in 0..attempt {
-            delay = delay.saturating_mul(multiplier);
-            if delay >= self.backoff_cap_ms {
-                delay = self.backoff_cap_ms;
-                break;
-            }
-        }
-        Duration::from_millis(delay.min(self.backoff_cap_ms))
+        let factor = u64::from(self.backoff_multiplier)
+            .max(1)
+            .saturating_pow(attempt);
+        Duration::from_millis(
+            self.initial_backoff_ms
+                .saturating_mul(factor)
+                .min(self.backoff_cap_ms),
+        )
     }
 }
 
-/// Decision returned by [`classify_attempt`] for one observed failure.
-///
-/// Variants:
-///
-/// - `Retry`: the caller MUST sleep [`backoff`] and replay the hook.
-///   `attempt` records the retry index that the next call represents
-///   (0 means the first retry, i.e. the second total attempt).
-/// - `DeadLetter`: the caller MUST persist a [`DeadLetterRecord`] and
-///   MUST NOT retry again. This is the only sink for permanent
-///   failures and for transients that exhaust the envelope.
-/// - `Skip`: the failure was actually a [`SettlementOutcome::Skipped`]
-///   passthrough; nothing to do.
+/// Decision returned by [`classify_attempt`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RetryDecision {
-    Retry { attempt: u32, backoff: Duration },
-    DeadLetter { reason: String },
-    Skip { reason: String },
+    /// The accepted outcome requires no retry work.
+    Accepted,
+    /// The skipped outcome requires no retry work.
+    Skip {
+        /// Closed skip reason from the routing input.
+        reason: SettlementSkipReason,
+    },
+    /// Replay the hook after the bounded backoff.
+    Retry {
+        /// Persisted attempt number for the next invocation.
+        attempt: u32,
+        /// Delay before the next invocation.
+        backoff: Duration,
+        /// Bounded failure reason preserved for the retry row.
+        reason: SettlementFailureReason,
+    },
+    /// Persist a terminal dead letter without further retries.
+    DeadLetter {
+        /// Bounded terminal failure reason.
+        reason: SettlementFailureReason,
+    },
 }
 
 /// Classify one attempt's outcome under the supplied policy.
@@ -116,37 +171,29 @@ pub enum RetryDecision {
 /// pass `1`, etc. The returned [`RetryDecision`] tells the caller
 /// whether to sleep and replay or to land a dead-letter row.
 ///
-/// Permanent outcomes short-circuit: no retry envelope is consumed,
-/// and the call returns `DeadLetter` immediately with the carried
-/// reason string. Skipped outcomes are passed through verbatim.
+/// Permanent outcomes short-circuit and typed reasons are preserved.
 #[must_use]
 pub fn classify_attempt(
     policy: &RetryPolicy,
     attempt: u32,
-    outcome: &SettlementOutcome,
+    outcome: &SettlementRoutingInput,
 ) -> RetryDecision {
     match outcome {
-        SettlementOutcome::Accepted { .. } => RetryDecision::Skip {
-            reason: "accepted outcomes do not consume the retry envelope".to_string(),
-        },
-        SettlementOutcome::Skipped { reason, .. } => RetryDecision::Skip {
+        SettlementRoutingInput::Accepted => RetryDecision::Accepted,
+        SettlementRoutingInput::Skipped { reason } => RetryDecision::Skip { reason: *reason },
+        SettlementRoutingInput::Permanent { reason } => RetryDecision::DeadLetter {
             reason: reason.clone(),
         },
-        SettlementOutcome::Permanent { reason, .. } => RetryDecision::DeadLetter {
-            reason: reason.clone(),
-        },
-        SettlementOutcome::Retryable { reason, .. } => {
+        SettlementRoutingInput::Retryable { reason } => {
             if attempt >= policy.max_retries {
                 RetryDecision::DeadLetter {
-                    reason: format!(
-                        "retry envelope exhausted after {attempts} attempts: {reason}",
-                        attempts = attempt + 1,
-                    ),
+                    reason: reason.clone(),
                 }
             } else {
                 RetryDecision::Retry {
                     attempt: attempt + 1,
                     backoff: policy.backoff_for(attempt),
+                    reason: reason.clone(),
                 }
             }
         }
@@ -162,7 +209,7 @@ pub fn classify_attempt(
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DeadLetterRecord {
-    /// Schema tag (`chio.settle.dead-letter.v1`).
+    /// Schema tag (`chio.settle.dead-letter.v2`).
     pub schema: String,
     /// `id` of the originating receipt.
     pub receipt_id: String,
@@ -171,13 +218,8 @@ pub struct DeadLetterRecord {
     /// Number of attempts that ran before the failure was sealed in.
     /// Always at least one (the original call).
     pub attempts: u32,
-    /// Operator-visible reason, lifted verbatim from the outcome.
-    pub reason: String,
-    /// Optional structured error string from the underlying pipeline.
-    /// Populated when the dead letter was triggered by a
-    /// [`SettlementError`]; otherwise `None`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pipeline_error: Option<String>,
+    /// Bounded terminal failure reason.
+    pub reason: SettlementFailureReason,
 }
 
 impl DeadLetterRecord {
@@ -187,39 +229,37 @@ impl DeadLetterRecord {
         receipt_id: impl Into<String>,
         finalized_at: u64,
         attempts: u32,
-        reason: impl Into<String>,
+        reason: SettlementFailureReason,
     ) -> Self {
         Self {
             schema: SETTLE_DEAD_LETTER_SCHEMA.to_string(),
             receipt_id: receipt_id.into(),
             finalized_at,
             attempts: attempts.max(1),
-            reason: reason.into(),
-            pipeline_error: None,
+            reason,
         }
-    }
-
-    /// Attach a structured pipeline error string. Useful when the
-    /// dead letter is triggered by a [`SettlementError`] surfaced from
-    /// `chio-settle/ops.rs`.
-    #[must_use]
-    pub fn with_pipeline_error(mut self, error: &SettlementError) -> Self {
-        self.pipeline_error = Some(error.to_string());
-        self
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hook::SettlementFailureCode;
 
-    fn require_some<T>(value: Option<T>, context: &'static str) -> T {
-        value.unwrap_or_else(|| panic!("{context}"))
+    fn failure(detail: &str) -> SettlementFailureReason {
+        SettlementFailureReason::from_detail(SettlementFailureCode::Rpc, detail)
+    }
+
+    fn serialize<T: Serialize>(value: &T) -> String {
+        match serde_json::to_string(value) {
+            Ok(encoded) => encoded,
+            Err(error) => panic!("value must serialize: {error}"),
+        }
     }
 
     #[test]
     fn schema_is_stable() {
-        assert_eq!(SETTLE_DEAD_LETTER_SCHEMA, "chio.settle.dead-letter.v1");
+        assert_eq!(SETTLE_DEAD_LETTER_SCHEMA, "chio.settle.dead-letter.v2");
     }
 
     #[test]
@@ -243,7 +283,6 @@ mod tests {
         assert_eq!(policy.backoff_for(1), Duration::from_millis(200));
         assert_eq!(policy.backoff_for(2), Duration::from_millis(400));
         assert_eq!(policy.backoff_for(3), Duration::from_millis(800));
-        // After the cap engages further attempts saturate at the cap.
         assert_eq!(policy.backoff_for(4), Duration::from_millis(1000));
         assert_eq!(policy.backoff_for(50), Duration::from_millis(1000));
     }
@@ -251,9 +290,12 @@ mod tests {
     #[test]
     fn permanent_outcomes_skip_the_retry_envelope() {
         let policy = RetryPolicy::default();
-        let outcome = SettlementOutcome::permanent("policy denied");
+        let reason = failure("policy denied");
+        let outcome = SettlementRoutingInput::Permanent {
+            reason: reason.clone(),
+        };
         match classify_attempt(&policy, 0, &outcome) {
-            RetryDecision::DeadLetter { reason } => assert_eq!(reason, "policy denied"),
+            RetryDecision::DeadLetter { reason: actual } => assert_eq!(actual, reason),
             other => panic!("expected dead letter, got {other:?}"),
         }
     }
@@ -261,21 +303,24 @@ mod tests {
     #[test]
     fn skipped_outcomes_pass_through() {
         let policy = RetryPolicy::default();
-        let outcome = SettlementOutcome::skipped("zero amount");
-        assert!(matches!(
+        let outcome = SettlementRoutingInput::Skipped {
+            reason: SettlementSkipReason::ZeroCharge,
+        };
+        assert_eq!(
             classify_attempt(&policy, 0, &outcome),
-            RetryDecision::Skip { .. }
-        ));
+            RetryDecision::Skip {
+                reason: SettlementSkipReason::ZeroCharge,
+            }
+        );
     }
 
     #[test]
     fn accepted_outcomes_pass_through() {
         let policy = RetryPolicy::default();
-        let outcome = SettlementOutcome::accepted("ts-1");
-        assert!(matches!(
-            classify_attempt(&policy, 0, &outcome),
-            RetryDecision::Skip { .. }
-        ));
+        assert_eq!(
+            classify_attempt(&policy, 0, &SettlementRoutingInput::Accepted),
+            RetryDecision::Accepted
+        );
     }
 
     #[test]
@@ -286,9 +331,20 @@ mod tests {
             backoff_multiplier: 2,
             backoff_cap_ms: 100,
         };
-        let outcome = SettlementOutcome::retryable("rpc lag");
+        let reason = failure("rpc lag");
+        let outcome = SettlementRoutingInput::Retryable {
+            reason: reason.clone(),
+        };
         match classify_attempt(&policy, 0, &outcome) {
-            RetryDecision::Retry { attempt, .. } => assert_eq!(attempt, 1),
+            RetryDecision::Retry {
+                attempt,
+                backoff,
+                reason: actual,
+            } => {
+                assert_eq!(attempt, 1);
+                assert_eq!(backoff, Duration::from_millis(10));
+                assert_eq!(actual, reason);
+            }
             other => panic!("expected retry, got {other:?}"),
         }
         match classify_attempt(&policy, 1, &outcome) {
@@ -296,26 +352,165 @@ mod tests {
             other => panic!("expected retry, got {other:?}"),
         }
         match classify_attempt(&policy, 2, &outcome) {
-            RetryDecision::DeadLetter { reason } => {
-                assert!(reason.contains("retry envelope exhausted"));
-            }
+            RetryDecision::DeadLetter { reason: actual } => assert_eq!(actual, reason),
             other => panic!("expected dead letter, got {other:?}"),
         }
     }
 
     #[test]
-    fn dead_letter_record_with_pipeline_error_carries_error_string() {
-        let record = DeadLetterRecord::new("rcpt-1", 100, 3, "policy denied")
-            .with_pipeline_error(&SettlementError::Rpc("connection refused".to_string()));
+    fn dead_letter_record_contains_only_bounded_failure_detail() {
+        let record = DeadLetterRecord::new("rcpt-1", 100, 3, failure("connection refused"));
+        let encoded = serialize(&record);
+
         assert_eq!(record.attempts, 3);
         assert_eq!(record.schema, SETTLE_DEAD_LETTER_SCHEMA);
-        let pipeline = require_some(record.pipeline_error.as_deref(), "pipeline error attached");
-        assert!(pipeline.contains("connection refused"));
+        assert_eq!(record.reason.code(), SettlementFailureCode::Rpc);
+        assert!(!encoded.contains("connection refused"));
+        assert!(!encoded.contains("pipeline_error"));
     }
 
     #[test]
     fn dead_letter_record_attempts_floor_is_one() {
-        let record = DeadLetterRecord::new("rcpt-x", 0, 0, "permanent");
+        let record = DeadLetterRecord::new("rcpt-x", 0, 0, failure("permanent"));
         assert_eq!(record.attempts, 1);
+    }
+
+    #[test]
+    fn retry_policy_accepts_every_boundary() {
+        let default = RetryPolicy::default();
+        let valid = [
+            RetryPolicy {
+                max_retries: 0,
+                ..default
+            },
+            RetryPolicy {
+                max_retries: 32,
+                ..default
+            },
+            RetryPolicy {
+                initial_backoff_ms: 1,
+                ..default
+            },
+            RetryPolicy {
+                initial_backoff_ms: 1,
+                backoff_cap_ms: 1,
+                ..default
+            },
+            RetryPolicy {
+                backoff_cap_ms: 86_400_000,
+                ..default
+            },
+            RetryPolicy {
+                backoff_multiplier: 1,
+                ..default
+            },
+            RetryPolicy {
+                backoff_multiplier: 16,
+                ..default
+            },
+        ];
+
+        for policy in valid {
+            assert_eq!(policy.validate(), Ok(()));
+        }
+    }
+
+    #[test]
+    fn retry_policy_rejects_every_out_of_bounds_value() {
+        let default = RetryPolicy::default();
+        let invalid = [
+            (
+                RetryPolicy {
+                    max_retries: 33,
+                    ..default
+                },
+                RetryPolicyError::MaxRetriesTooHigh { max_retries: 33 },
+            ),
+            (
+                RetryPolicy {
+                    initial_backoff_ms: 0,
+                    ..default
+                },
+                RetryPolicyError::InitialBackoffZero,
+            ),
+            (
+                RetryPolicy {
+                    backoff_cap_ms: 0,
+                    ..default
+                },
+                RetryPolicyError::BackoffCapZero,
+            ),
+            (
+                RetryPolicy {
+                    initial_backoff_ms: default.backoff_cap_ms + 1,
+                    ..default
+                },
+                RetryPolicyError::InitialBackoffExceedsCap {
+                    initial_backoff_ms: default.backoff_cap_ms + 1,
+                    backoff_cap_ms: default.backoff_cap_ms,
+                },
+            ),
+            (
+                RetryPolicy {
+                    backoff_cap_ms: 86_400_001,
+                    ..default
+                },
+                RetryPolicyError::BackoffCapTooHigh {
+                    backoff_cap_ms: 86_400_001,
+                },
+            ),
+            (
+                RetryPolicy {
+                    backoff_multiplier: 0,
+                    ..default
+                },
+                RetryPolicyError::BackoffMultiplierOutOfRange {
+                    backoff_multiplier: 0,
+                },
+            ),
+            (
+                RetryPolicy {
+                    backoff_multiplier: 17,
+                    ..default
+                },
+                RetryPolicyError::BackoffMultiplierOutOfRange {
+                    backoff_multiplier: 17,
+                },
+            ),
+        ];
+
+        for (policy, expected) in invalid {
+            assert_eq!(policy.validate(), Err(expected));
+        }
+    }
+
+    #[test]
+    fn typed_retry_reason_survives_exhaustion() {
+        let reason = failure("upstream unavailable");
+        let input = SettlementRoutingInput::Retryable {
+            reason: reason.clone(),
+        };
+        let policy = RetryPolicy {
+            max_retries: 0,
+            ..RetryPolicy::default()
+        };
+
+        assert!(matches!(
+            classify_attempt(&policy, 0, &input),
+            RetryDecision::DeadLetter { reason: actual } if actual == reason
+        ));
+    }
+
+    #[test]
+    fn backoff_with_unit_multiplier_is_constant_for_any_attempt() {
+        let policy = RetryPolicy {
+            backoff_multiplier: 1,
+            ..RetryPolicy::default()
+        };
+
+        assert_eq!(
+            policy.backoff_for(u32::MAX),
+            Duration::from_millis(policy.initial_backoff_ms)
+        );
     }
 }
