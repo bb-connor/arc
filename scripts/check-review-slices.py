@@ -152,6 +152,7 @@ SLICES: tuple[ReviewSlice, ...] = (
             "crates/trust/chio-credentials/**",
             "crates/trust/chio-federation/**",
             "crates/trust/chio-federation-authority/**",
+            "crates/trust/chio-federation-transport-*/**",
             "crates/trust/chio-governance/**",
             "crates/trust/chio-reputation/**",
             "crates/economy/chio-web3/**",
