@@ -14,7 +14,7 @@
 //! non-economic, and zero-charge receipts may be skipped. The dispatch
 //! path is never rolled back by a settlement failure.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
 use chio_core::{capability::scope::MonetaryAmount, hashing::sha256};
@@ -26,6 +26,44 @@ pub const SETTLEMENT_OBSERVATION_SCHEMA: &str = "chio.settle.observation.v1";
 
 /// Schema string emitted on the wire for [`SettlementOutcome`] frames.
 pub const SETTLEMENT_OUTCOME_SCHEMA: &str = "chio.settle.outcome.v2";
+
+fn deserialize_schema<'de, D>(
+    deserializer: D,
+    expected: &'static str,
+    error: &'static str,
+) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let schema = String::deserialize(deserializer)?;
+    if schema == expected {
+        Ok(schema)
+    } else {
+        Err(serde::de::Error::custom(error))
+    }
+}
+
+fn deserialize_observation_schema<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserialize_schema(
+        deserializer,
+        SETTLEMENT_OBSERVATION_SCHEMA,
+        "unsupported settlement observation schema",
+    )
+}
+
+fn deserialize_outcome_schema<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserialize_schema(
+        deserializer,
+        SETTLEMENT_OUTCOME_SCHEMA,
+        "unsupported settlement outcome schema",
+    )
+}
 
 /// Observation handed to a [`SettlementHook`] by the kernel observer
 /// slot once a receipt has been signed and persisted. The structure is
@@ -40,6 +78,7 @@ pub const SETTLEMENT_OUTCOME_SCHEMA: &str = "chio.settle.outcome.v2";
 #[serde(deny_unknown_fields)]
 pub struct SettlementObservation {
     /// Schema tag (`chio.settle.observation.v1`).
+    #[serde(deserialize_with = "deserialize_observation_schema")]
     pub schema: String,
     /// `id` of the finalized [`chio_core::receipt::body::ChioReceipt`].
     pub receipt_id: String,
@@ -153,6 +192,33 @@ pub enum SettlementFailureCode {
     Backend,
 }
 
+impl SettlementFailureCode {
+    /// Return the stable snake-case label used by durable stores.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::InvalidReceiptSignature => "invalid_receipt_signature",
+            Self::InvalidActionHash => "invalid_action_hash",
+            Self::UntrustedReceiptSigner => "untrusted_receipt_signer",
+            Self::MalformedFinancialMetadata => "malformed_financial_metadata",
+            Self::InvalidObservation => "invalid_observation",
+            Self::Rpc => "rpc",
+            Self::InvalidInput => "invalid_input",
+            Self::InvalidDispatch => "invalid_dispatch",
+            Self::InvalidBinding => "invalid_binding",
+            Self::Unsupported => "unsupported",
+            Self::Serialization => "serialization",
+            Self::Signature => "signature",
+            Self::Verification => "verification",
+            Self::Backend => "backend",
+        }
+    }
+
+    const fn allows_retry(self) -> bool {
+        matches!(self, Self::Rpc | Self::Backend)
+    }
+}
+
 /// Bounded failure reason safe for durable storage and telemetry labels.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -188,6 +254,22 @@ impl SettlementFailureReason {
     pub const fn detail_sha256(&self) -> &[u8; 32] {
         &self.detail_sha256
     }
+
+    /// Enforce the retry disposition permitted by this failure code.
+    #[must_use]
+    pub const fn effective_class(
+        &self,
+        requested: SettlementFailureClass,
+    ) -> SettlementFailureClass {
+        match requested {
+            SettlementFailureClass::Retryable if self.code.allows_retry() => {
+                SettlementFailureClass::Retryable
+            }
+            SettlementFailureClass::Retryable | SettlementFailureClass::Permanent => {
+                SettlementFailureClass::Permanent
+            }
+        }
+    }
 }
 
 /// Outcome returned by a settlement hook.
@@ -200,6 +282,7 @@ pub enum SettlementOutcome {
     /// the downstream settlement record.
     Accepted {
         /// Schema tag (`chio.settle.outcome.v2`).
+        #[serde(deserialize_with = "deserialize_outcome_schema")]
         schema: String,
         /// Stable transcript identifier produced by the ops pipeline.
         transcript_id: String,
@@ -207,6 +290,7 @@ pub enum SettlementOutcome {
     /// The receipt requires no settlement work.
     Skipped {
         /// Schema tag (`chio.settle.outcome.v2`).
+        #[serde(deserialize_with = "deserialize_outcome_schema")]
         schema: String,
         /// Closed reason for skipping settlement.
         reason: SettlementSkipReason,
@@ -214,6 +298,7 @@ pub enum SettlementOutcome {
     /// The hook rejected the observation with a recoverable failure.
     Retryable {
         /// Schema tag (`chio.settle.outcome.v2`).
+        #[serde(deserialize_with = "deserialize_outcome_schema")]
         schema: String,
         /// Bounded failure reason carried across retries.
         reason: SettlementFailureReason,
@@ -221,6 +306,7 @@ pub enum SettlementOutcome {
     /// The hook rejected the observation permanently.
     Permanent {
         /// Schema tag (`chio.settle.outcome.v2`).
+        #[serde(deserialize_with = "deserialize_outcome_schema")]
         schema: String,
         /// Bounded failure reason carried into the dead letter.
         reason: SettlementFailureReason,
@@ -228,6 +314,18 @@ pub enum SettlementOutcome {
 }
 
 impl SettlementOutcome {
+    /// Return whether this outcome uses the schema understood by this build.
+    #[must_use]
+    pub fn has_supported_schema(&self) -> bool {
+        let schema = match self {
+            Self::Accepted { schema, .. }
+            | Self::Skipped { schema, .. }
+            | Self::Retryable { schema, .. }
+            | Self::Permanent { schema, .. } => schema,
+        };
+        schema == SETTLEMENT_OUTCOME_SCHEMA
+    }
+
     /// Construct an `Accepted` outcome with the canonical schema tag.
     #[must_use]
     pub fn accepted(transcript_id: impl Into<String>) -> Self {
@@ -246,12 +344,17 @@ impl SettlementOutcome {
         }
     }
 
-    /// Construct a `Retryable` outcome with the canonical schema tag.
+    /// Construct a retryable outcome with the canonical schema tag.
+    ///
+    /// Deterministic failure codes are coerced to [`Self::Permanent`].
     #[must_use]
     pub fn retryable(reason: SettlementFailureReason) -> Self {
-        Self::Retryable {
-            schema: SETTLEMENT_OUTCOME_SCHEMA.to_string(),
-            reason,
+        match reason.effective_class(SettlementFailureClass::Retryable) {
+            SettlementFailureClass::Retryable => Self::Retryable {
+                schema: SETTLEMENT_OUTCOME_SCHEMA.to_string(),
+                reason,
+            },
+            SettlementFailureClass::Permanent => Self::permanent(reason),
         }
     }
 
@@ -267,21 +370,32 @@ impl SettlementOutcome {
     /// Return `true` for outcomes that the retry policy must replay.
     #[must_use]
     pub fn is_retryable(&self) -> bool {
-        matches!(self, Self::Retryable { .. })
+        matches!(
+            self,
+            Self::Retryable { reason, .. }
+                if reason.effective_class(SettlementFailureClass::Retryable)
+                    == SettlementFailureClass::Retryable
+        )
     }
 
     /// Return `true` for outcomes that land directly in the dead-letter
     /// table without further retries.
     #[must_use]
     pub fn is_permanent(&self) -> bool {
-        matches!(self, Self::Permanent { .. })
+        match self {
+            Self::Permanent { .. } => true,
+            Self::Retryable { reason, .. } => {
+                reason.effective_class(SettlementFailureClass::Retryable)
+                    == SettlementFailureClass::Permanent
+            }
+            Self::Accepted { .. } | Self::Skipped { .. } => false,
+        }
     }
 }
 
 /// Errors that may surface from a [`SettlementHook`]. All variants are
-/// fail-closed: the kernel observer slot logs the error and routes it
-/// through the retry/dead-letter pipeline; the dispatch path is never
-/// rolled back.
+/// fail-closed: the paired observer runtime preserves their typed disposition
+/// for durable routing, while the dispatch path is never rolled back.
 #[derive(Debug, Error)]
 pub enum SettlementHookError {
     /// The supplied observation was malformed.
@@ -431,6 +545,17 @@ mod tests {
     }
 
     #[test]
+    fn outcome_deserialization_rejects_an_unsupported_schema() {
+        let result = serde_json::from_value::<SettlementOutcome>(serde_json::json!({
+            "kind": "accepted",
+            "schema": "chio.settle.outcome.v99",
+            "transcript_id": "transcript-1",
+        }));
+
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn ordering_key_sorts_by_finalized_at_then_receipt_id() {
         let a = SettlementObservation::new(
             "rcpt-b",
@@ -489,6 +614,34 @@ mod tests {
         let ok = SettlementOutcome::accepted("ts-1");
         assert!(!ok.is_retryable());
         assert!(!ok.is_permanent());
+    }
+
+    #[test]
+    fn retryable_constructor_rejects_a_known_permanent_code() {
+        let outcome = SettlementOutcome::retryable(failure(
+            SettlementFailureCode::InvalidReceiptSignature,
+            "invalid signature",
+        ));
+
+        assert!(matches!(outcome, SettlementOutcome::Permanent { .. }));
+    }
+
+    #[test]
+    fn outcome_predicates_reject_a_forged_retryable_shape() {
+        let outcome = match serde_json::from_value::<SettlementOutcome>(serde_json::json!({
+            "kind": "retryable",
+            "schema": SETTLEMENT_OUTCOME_SCHEMA,
+            "reason": {
+                "code": "invalid_receipt_signature",
+                "detail_sha256": vec![0_u8; 32],
+            },
+        })) {
+            Ok(outcome) => outcome,
+            Err(error) => panic!("test outcome deserialization failed: {error}"),
+        };
+
+        assert!(!outcome.is_retryable());
+        assert!(outcome.is_permanent());
     }
 
     /// `&dyn SettlementHook` must remain object-safe so kernel observer
@@ -613,5 +766,36 @@ mod tests {
             chio_core::hashing::sha256(b"sensitive detail").as_bytes()
         );
         assert!(!serialize(&reason).contains("sensitive detail"));
+    }
+
+    #[test]
+    fn failure_code_labels_match_the_serialized_contract() {
+        let cases = [
+            SettlementFailureCode::InvalidReceiptSignature,
+            SettlementFailureCode::InvalidActionHash,
+            SettlementFailureCode::UntrustedReceiptSigner,
+            SettlementFailureCode::MalformedFinancialMetadata,
+            SettlementFailureCode::InvalidObservation,
+            SettlementFailureCode::Rpc,
+            SettlementFailureCode::InvalidInput,
+            SettlementFailureCode::InvalidDispatch,
+            SettlementFailureCode::InvalidBinding,
+            SettlementFailureCode::Unsupported,
+            SettlementFailureCode::Serialization,
+            SettlementFailureCode::Signature,
+            SettlementFailureCode::Verification,
+            SettlementFailureCode::Backend,
+        ];
+
+        for code in cases {
+            let serialized = match serde_json::to_value(code) {
+                Ok(serialized) => serialized,
+                Err(error) => panic!("failure code serialization failed: {error}"),
+            };
+            assert_eq!(
+                serialized,
+                serde_json::Value::String(code.as_str().to_string())
+            );
+        }
     }
 }

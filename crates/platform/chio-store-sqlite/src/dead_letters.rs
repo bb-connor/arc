@@ -126,8 +126,8 @@ impl SqliteDeadLetterStore {
                 record.receipt_id.as_str(),
                 finalized_at,
                 attempts,
-                record.reason.as_str(),
-                record.pipeline_error.as_deref(),
+                record.reason.code().as_str(),
+                Option::<&str>::None,
                 canonical_str.as_str(),
             ],
         )
@@ -208,7 +208,7 @@ impl SqliteDeadLetterStore {
 mod tests {
     use super::*;
 
-    use chio_settle::{DeadLetterRecord, SettlementError};
+    use chio_settle::{DeadLetterRecord, SettlementFailureCode, SettlementFailureReason};
     use r2d2::Pool;
     use r2d2_sqlite::SqliteConnectionManager;
 
@@ -223,8 +223,12 @@ mod tests {
     }
 
     fn sample_record(receipt_id: &str, attempts: u32) -> DeadLetterRecord {
-        DeadLetterRecord::new(receipt_id, 100, attempts, "rpc failure")
-            .with_pipeline_error(&SettlementError::Rpc("connection refused".to_string()))
+        DeadLetterRecord::new(
+            receipt_id,
+            100,
+            attempts,
+            SettlementFailureReason::from_detail(SettlementFailureCode::Rpc, "connection refused"),
+        )
     }
 
     #[test]
@@ -264,7 +268,8 @@ mod tests {
         let record = sample_record("rcpt-3", 2);
         store.insert(&record).test_expect("first insert");
         let mut conflicting = record.clone();
-        conflicting.reason = "different reason".to_string();
+        conflicting.reason =
+            SettlementFailureReason::from_detail(SettlementFailureCode::Rpc, "different reason");
         let err = store
             .insert(&conflicting)
             .test_expect_err("byte-different second insert errors");

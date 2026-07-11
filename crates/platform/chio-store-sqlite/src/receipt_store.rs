@@ -1761,6 +1761,7 @@ fn receipt_store_error_snapshot(error: &ReceiptStoreError) -> ReceiptStoreError 
         }
         ReceiptStoreError::Conflict(message) => ReceiptStoreError::Conflict(message.clone()),
         ReceiptStoreError::NotFound(message) => ReceiptStoreError::NotFound(message.clone()),
+        ReceiptStoreError::Unsupported(message) => ReceiptStoreError::Unsupported(message.clone()),
     }
 }
 

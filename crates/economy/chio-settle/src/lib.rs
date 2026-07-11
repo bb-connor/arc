@@ -73,7 +73,7 @@ pub use ops::{
 };
 pub use outcome_store::{
     SettlementAttemptClaim, SettlementOutcomeStore, SettlementRoute, SettlementRouteError,
-    SettlementRouteErrorClass, SettlementRoutingInput,
+    SettlementRouteErrorClass, SettlementRoutingInput, SettlementStoreBinding,
 };
 pub use payments::{
     build_x402_payment_requirements, evaluate_circle_nanopayment, prepare_paymaster_compatibility,

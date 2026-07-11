@@ -16,14 +16,28 @@
 
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
-use crate::hook::{SettlementFailureReason, SettlementSkipReason};
+use crate::hook::{SettlementFailureClass, SettlementFailureReason, SettlementSkipReason};
 use crate::outcome_store::SettlementRoutingInput;
 
 /// Schema string emitted on the wire for [`DeadLetterRecord`] frames.
 pub const SETTLE_DEAD_LETTER_SCHEMA: &str = "chio.settle.dead-letter.v2";
+
+fn deserialize_dead_letter_schema<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let schema = String::deserialize(deserializer)?;
+    if schema == SETTLE_DEAD_LETTER_SCHEMA {
+        Ok(schema)
+    } else {
+        Err(serde::de::Error::custom(
+            "unsupported settlement dead-letter schema",
+        ))
+    }
+}
 
 /// Bound on the number of retries before a transient failure is
 /// downgraded to a permanent dead-letter row. The total attempt count
@@ -185,7 +199,10 @@ pub fn classify_attempt(
             reason: reason.clone(),
         },
         SettlementRoutingInput::Retryable { reason } => {
-            if attempt >= policy.max_retries {
+            if reason.effective_class(SettlementFailureClass::Retryable)
+                == SettlementFailureClass::Permanent
+                || attempt >= policy.max_retries
+            {
                 RetryDecision::DeadLetter {
                     reason: reason.clone(),
                 }
@@ -210,6 +227,7 @@ pub fn classify_attempt(
 #[serde(deny_unknown_fields)]
 pub struct DeadLetterRecord {
     /// Schema tag (`chio.settle.dead-letter.v2`).
+    #[serde(deserialize_with = "deserialize_dead_letter_schema")]
     pub schema: String,
     /// `id` of the originating receipt.
     pub receipt_id: String,
@@ -223,6 +241,12 @@ pub struct DeadLetterRecord {
 }
 
 impl DeadLetterRecord {
+    /// Return whether this record uses the schema understood by this build.
+    #[must_use]
+    pub fn has_supported_schema(&self) -> bool {
+        self.schema == SETTLE_DEAD_LETTER_SCHEMA
+    }
+
     /// Build a new dead-letter record stamped with the canonical schema.
     #[must_use]
     pub fn new(
@@ -260,6 +284,22 @@ mod tests {
     #[test]
     fn schema_is_stable() {
         assert_eq!(SETTLE_DEAD_LETTER_SCHEMA, "chio.settle.dead-letter.v2");
+    }
+
+    #[test]
+    fn dead_letter_deserialization_rejects_an_unsupported_schema() {
+        let result = serde_json::from_value::<DeadLetterRecord>(serde_json::json!({
+            "schema": "chio.settle.dead-letter.v99",
+            "receipt_id": "receipt-1",
+            "finalized_at": 1,
+            "attempts": 1,
+            "reason": {
+                "code": "backend",
+                "detail_sha256": vec![0_u8; 32],
+            },
+        }));
+
+        assert!(result.is_err());
     }
 
     #[test]
@@ -499,6 +539,22 @@ mod tests {
             classify_attempt(&policy, 0, &input),
             RetryDecision::DeadLetter { reason: actual } if actual == reason
         ));
+    }
+
+    #[test]
+    fn known_permanent_code_never_enters_the_retry_envelope() {
+        let reason = SettlementFailureReason::from_detail(
+            SettlementFailureCode::InvalidReceiptSignature,
+            "invalid signature",
+        );
+        let input = SettlementRoutingInput::Retryable {
+            reason: reason.clone(),
+        };
+
+        assert_eq!(
+            classify_attempt(&RetryPolicy::default(), 0, &input),
+            RetryDecision::DeadLetter { reason }
+        );
     }
 
     #[test]

@@ -3,6 +3,27 @@ use thiserror::Error;
 use crate::hook::{SettlementFailureReason, SettlementSkipReason};
 use crate::retry::RetryPolicy;
 
+/// Opaque identity shared by receipt and outcome views of one durable writer.
+///
+/// Backends generate one value per writer instance and copy it into every
+/// handle that participates in the same atomic settlement ledger.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SettlementStoreBinding([u8; 32]);
+
+impl SettlementStoreBinding {
+    /// Construct a binding from a backend-generated digest.
+    #[must_use]
+    pub const fn from_digest(digest: [u8; 32]) -> Self {
+        Self(digest)
+    }
+
+    /// Return the backend-generated digest.
+    #[must_use]
+    pub const fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
 /// Normalized outcome accepted by durable settlement routing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SettlementRoutingInput {
@@ -84,6 +105,9 @@ impl SettlementRouteError {
 
 /// Atomic leased store for settlement outcomes.
 pub trait SettlementOutcomeStore: Send + Sync {
+    /// Identify the durable writer that owns this outcome store.
+    fn settlement_store_binding(&self) -> SettlementStoreBinding;
+
     /// Claim one due row by receipt id, or return `None` when a live lease owns it.
     fn claim_receipt(
         &self,
@@ -103,6 +127,9 @@ pub trait SettlementOutcomeStore: Send + Sync {
     ) -> Result<Vec<SettlementAttemptClaim>, SettlementRouteError>;
 
     /// Atomically commit an outcome for an exact, unexpired claim.
+    ///
+    /// `observed_at_ms` is both the lease-validity check time and the base for
+    /// any retry visibility deadline.
     fn record_claimed_outcome(
         &self,
         claim: &SettlementAttemptClaim,

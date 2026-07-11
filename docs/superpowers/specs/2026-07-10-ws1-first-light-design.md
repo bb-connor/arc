@@ -159,7 +159,9 @@ constructs a deliberately isolated kernel.
   `chio-settle` (`ops.rs`) that `configure_settlement` installs through
   the paired `set_settlement_observer_runtime(hook, outcome_store, retry_policy)`
   API. Its `observe` classifies the observation and returns
-  `Accepted`/`Retryable`/`Permanent`/`Skipped`, doing only bounded local work. It
+  `Accepted`/`Retryable`/`Permanent`, doing only bounded local work. A hook-level
+  `Skipped` is invalid because the kernel invokes it only for a positive
+  economic observation and routes that shape as permanent failure. It
   returns `Accepted` only after atomically inserting or verifying an idempotent
   open `settlement_reconciliations` work row; it performs no network I/O, never
   re-reads a receipt, and never mints an IOU on the post-persist path, because the
@@ -179,8 +181,9 @@ constructs a deliberately isolated kernel.
   re-invokes the hook, and atomically records the next retry or terminal dead
   letter through `chio_settle::SettlementOutcomeStore`. `Accepted` has already
   created the open reconciliation work row and atomically deletes the claimed
-  outbox/attempt row; `Skipped` deletes it only for a legitimate closed skip
-  reason. A
+  outbox/attempt row; pre-hook `Skipped` deletes it only for a legitimate closed
+  skip reason. Receipt and outcome store handles must carry the same fixed-size
+  writer binding before the runtime can be installed. A
   separate settlement worker claims leased open reconciliation rows, performs
   optional remote delivery, and records the immutable outcome sidecar. The
   credit worker independently scans only canonical obligations whose signed
@@ -236,8 +239,8 @@ constructs a deliberately isolated kernel.
   already-settled value appends the receipt, consumes the intent, and inserts the
   observer-outbox row in that transaction but creates no live obligation.
   Denied, non-economic, and zero-charge receipts still receive attempt-zero work
-  when an observer is installed so the hook can durably classify their legitimate
-  skip; they add no obligation sidecar. A journaled request consumes its intent,
+  when an observer is installed so the router can durably commit their legitimate
+  pre-hook skip; they add no obligation sidecar. A journaled request consumes its intent,
   while a read-only request has no intent to consume. If any required insert,
   verification, or intent-consumption step fails, all writes roll back and the
   dispatch intent remains open for recovery.
@@ -296,8 +299,9 @@ constructs a deliberately isolated kernel.
    `Retryable`, `Permanent`, and hook-failed statuses produce a warning and metric
    plus an atomic `settle_attempts` or `settle_dead_letters` transition.
    `Accepted` means a local open reconciliation work row is durable and deletes
-   the outbox row; a legitimate `Skipped` also deletes it. Integrity/trust or
-   cleanup-store failure is unresolved and never collapses to `Skipped`. A crash
+   the outbox row; a legitimate pre-hook `Skipped` also deletes it. A
+   hook-returned `Skipped`, integrity/trust failure, or cleanup-store failure is
+   unresolved and never collapses to successful cleanup. A crash
    before claim or routing leaves a lease-recoverable due row for the worker.
 7. Async processing. The settlement worker drains leased reconciliation work and
    due observer retries. Independently, the credit worker reads the persisted

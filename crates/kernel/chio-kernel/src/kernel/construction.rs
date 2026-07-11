@@ -462,6 +462,9 @@ impl ChioKernel {
         &mut self,
         receipt_store: Arc<dyn ReceiptStore>,
     ) -> Result<(), KernelError> {
+        if self.settlement_observer.is_some() {
+            return Err(crate::SettlementRuntimeConfigError::ReceiptStoreReplacement.into());
+        }
         match receipt_store.load_latest_checkpoint() {
             Ok(Some(checkpoint)) => {
                 self.checkpoint_seq_counter
@@ -564,26 +567,47 @@ impl ChioKernel {
         self.post_invocation_pipeline.add(hook);
     }
 
-    /// Install a settlement hook that runs after each receipt is signed
-    /// and persisted. Settlement is strictly an observer relative to
-    /// receipt bytes; the hook MUST NOT mutate the receipt store and
-    /// MUST NOT block the dispatch path on its own latency. Hook
-    /// failures are surfaced through
-    /// [`Self::run_settlement_observer`]'s return value and are routed
-    /// through the retry/dead-letter machinery.
-    pub fn set_settlement_observer(
+    /// Install a settlement hook with its durable outcome store and retry policy.
+    ///
+    /// Installation requires a receipt store that can atomically seed pending
+    /// settlement work. Invalid retry policies and unsupported stores fail
+    /// without changing the active runtime.
+    pub fn set_settlement_observer_runtime(
         &mut self,
-        hook: std::sync::Arc<dyn chio_settle::SettlementHook>,
-    ) {
-        self.settlement_observer = Some(hook);
+        hook: Arc<dyn chio_settle::SettlementHook>,
+        outcome_store: Arc<dyn chio_settle::SettlementOutcomeStore>,
+        retry_policy: chio_settle::RetryPolicy,
+    ) -> Result<(), KernelError> {
+        let runtime = crate::settlement_routing::SettlementObserverRuntime::new(
+            hook,
+            outcome_store,
+            retry_policy,
+        )
+        .map_err(crate::SettlementRuntimeConfigError::from)?;
+        let Some(receipt_store) = self.receipt_store.as_ref() else {
+            return Err(crate::SettlementRuntimeConfigError::MissingReceiptStore.into());
+        };
+        if receipt_store.atomic_receipt_projection()
+            != crate::receipt_store::AtomicReceiptProjection::SettlementObservationV1
+        {
+            return Err(crate::SettlementRuntimeConfigError::UnsupportedAtomicProjection.into());
+        }
+        let Some(receipt_binding) = receipt_store.settlement_store_binding() else {
+            return Err(crate::SettlementRuntimeConfigError::MissingStoreBinding.into());
+        };
+        if receipt_binding != runtime.store_binding() {
+            return Err(crate::SettlementRuntimeConfigError::StoreBindingMismatch.into());
+        }
+        self.settlement_observer = Some(runtime);
+        Ok(())
     }
 
-    /// Return a clone of the active settlement observer, or `None` when
-    /// no hook has been installed. Useful for integration tests that
-    /// want to assert observer state directly.
+    /// Return the active settlement hook without exposing routing internals.
     #[must_use]
-    pub fn settlement_observer(&self) -> Option<std::sync::Arc<dyn chio_settle::SettlementHook>> {
-        self.settlement_observer.clone()
+    pub fn settlement_observer(&self) -> Option<Arc<dyn chio_settle::SettlementHook>> {
+        self.settlement_observer
+            .as_ref()
+            .map(crate::settlement_routing::SettlementObserverRuntime::hook)
     }
 
     /// Invoke the registered settlement hook against a
@@ -597,7 +621,9 @@ impl ChioKernel {
         receipt: &chio_core::receipt::body::ChioReceipt,
     ) -> settlement_observer::SettlementObserverStatus {
         settlement_observer::run_observer(
-            self.settlement_observer.as_ref(),
+            self.settlement_observer
+                .as_ref()
+                .map(crate::settlement_routing::SettlementObserverRuntime::hook_ref),
             receipt,
             &[self.public_key()],
         )

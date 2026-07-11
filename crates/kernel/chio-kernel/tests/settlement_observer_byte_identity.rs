@@ -190,7 +190,7 @@ fn ten_receipts_produce_ten_settlements_with_byte_identical_receipts() {
     // reaches a downstream subscriber.
     assert_eq!(
         SETTLEMENT_OBSERVER_STATUS_SCHEMA,
-        "chio.settle.observer-status.v1"
+        "chio.settle.observer-status.v2"
     );
 }
 

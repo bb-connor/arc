@@ -39,6 +39,36 @@ pub enum OverloadResource {
     Allocation,
 }
 
+/// Invalid settlement-runtime installation or mutation.
+#[derive(Debug, thiserror::Error, Clone, Copy, PartialEq, Eq)]
+pub enum SettlementRuntimeConfigError {
+    #[error("invalid settlement retry policy: {0}")]
+    InvalidRetryPolicy(#[from] chio_settle::RetryPolicyError),
+    #[error("settlement observer runtime requires a receipt store")]
+    MissingReceiptStore,
+    #[error("receipt store lacks atomic settlement observation projection")]
+    UnsupportedAtomicProjection,
+    #[error("receipt store lacks a settlement backend binding")]
+    MissingStoreBinding,
+    #[error("receipt store and outcome store use different settlement backend bindings")]
+    StoreBindingMismatch,
+    #[error("receipt store cannot be replaced while a settlement observer runtime is installed")]
+    ReceiptStoreReplacement,
+}
+
+impl SettlementRuntimeConfigError {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::InvalidRetryPolicy(_) => "invalid_retry_policy",
+            Self::MissingReceiptStore => "missing_receipt_store",
+            Self::UnsupportedAtomicProjection => "unsupported_atomic_projection",
+            Self::MissingStoreBinding => "missing_store_binding",
+            Self::StoreBindingMismatch => "store_binding_mismatch",
+            Self::ReceiptStoreReplacement => "receipt_store_replacement",
+        }
+    }
+}
+
 /// Errors that can occur during kernel operations.
 #[derive(Debug, thiserror::Error)]
 pub enum KernelError {
@@ -187,6 +217,9 @@ pub enum KernelError {
 
     #[error("web3 evidence prerequisites unavailable: {0}")]
     Web3EvidenceUnavailable(String),
+
+    #[error("settlement runtime configuration failed: {0}")]
+    SettlementConfiguration(#[from] SettlementRuntimeConfigError),
 
     #[error("internal error: {0}")]
     Internal(String),
@@ -477,6 +510,11 @@ impl KernelError {
                 serde_json::json!({ "reason": reason }),
                 "Enable the required receipt-store, checkpoint, and oracle prerequisites before running the web3 evidence path.",
             ),
+            Self::SettlementConfiguration(error) => self.report_with_context(
+                "CHIO-KERNEL-SETTLEMENT-CONFIGURATION",
+                serde_json::json!({ "kind": error.as_str() }),
+                "Install a receipt store and outcome store backed by the same atomic settlement writer, then correct the retry policy or backend capability before startup.",
+            ),
             Self::Internal(reason) => self.report_with_context(
                 "CHIO-KERNEL-INTERNAL",
                 serde_json::json!({ "reason": reason }),
@@ -521,5 +559,23 @@ mod overload_tests {
             report.context.get("resource").and_then(|v| v.as_str()),
             Some("AdmissionKeys")
         );
+    }
+
+    #[test]
+    fn settlement_configuration_has_operator_guidance() {
+        let error = KernelError::SettlementConfiguration(
+            SettlementRuntimeConfigError::StoreBindingMismatch,
+        );
+        let report = error.report();
+
+        assert_eq!(report.code, "CHIO-KERNEL-SETTLEMENT-CONFIGURATION");
+        assert_eq!(
+            report
+                .context
+                .get("kind")
+                .and_then(serde_json::Value::as_str),
+            Some("store_binding_mismatch")
+        );
+        assert!(!report.suggested_fix.contains("kernel bug"));
     }
 }

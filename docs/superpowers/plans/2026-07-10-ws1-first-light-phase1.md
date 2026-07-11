@@ -20,9 +20,10 @@ currency or a different currency. The kernel replaces the discarded
 `SettlementObserverStatus` with a router. The router treats registered
 observer outcomes as follows:
 
-- `Accepted`, `Skipped`, and `NotRegistered` do not create unresolved work when
-  their required cleanup succeeds; an accepted/skipped cleanup-store failure is
-  unresolved and counted.
+- `Accepted`, pre-hook `Skipped`, and `NotRegistered` do not create unresolved
+  work when their required cleanup succeeds; an accepted/skipped cleanup-store
+  failure is unresolved and counted. A hook-returned `Skipped` is an invalid
+  outcome for a positive economic observation and dead-letters fail closed.
 - `Retryable` and transient hook failures atomically advance a durable retry
   row under the existing `chio_settle::RetryPolicy`.
 - `Permanent` and permanent hook failures atomically create a dead letter.
@@ -220,6 +221,10 @@ a permanent `SettlementFailureReason`. Preserve the original detail only long
 enough to compute its digest and pass it through the repository redaction
 boundary for bounded logs; never persist or label the raw string.
 
+These changes alter the public observer-status wire shape. Bump
+`SETTLEMENT_OBSERVER_STATUS_SCHEMA` to `chio.settle.observer-status.v2`; do not
+emit the typed status under the v1 tag.
+
 Map `SettlementHookError::InvalidObservation` and
 `SettlementHookError::Permanent` to `Permanent`, and
 `SettlementHookError::Transient` to `Retryable`. For
@@ -300,6 +305,14 @@ attempt-zero row through its single writer and one transaction. This keeps the
 outcome-store trait independent of a SQLite transaction type while making the
 atomic boundary enforceable for every backend.
 
+Both store traits also expose a fixed-size `SettlementStoreBinding` generated
+once by the durable writer. The receipt-store view returns the binding only when
+it can seed the atomic projection, and every outcome-store view returns the
+binding of the writer it uses. Installation requires exact equality. A
+standalone outcome store receives a distinct binding and cannot satisfy the
+paired installer; `open_alongside` copies the receipt writer's binding. The
+binding contains no database path or credential material.
+
 Use bounded result variants:
 
 ```rust
@@ -373,15 +386,18 @@ The interface contract requires:
   worker drain due rows; neither scans receipts as a substitute.
 
 In the kernel router, map `SettlementObserverStatus` to the settle-owned input:
-`Observed::Accepted`/`Skipped`/`Retryable`/`Permanent` map directly;
-`HookFailed` maps by its typed failure class; `NotRegistered` returns before
-mapping. Never parse display strings to make this decision.
+`Observed::Accepted`/`Retryable`/`Permanent` map directly; a hook-returned
+`Observed::Skipped` is a contract violation mapped to permanent
+`InvalidObservation`; pre-hook `Skipped` maps directly; `HookFailed` maps by its
+typed failure class; `NotRegistered` returns before mapping. Never parse display
+strings to make this decision.
 
 Replace the independent observer field and setter with one optional internal
 `SettlementObserverRuntime` holding the hook, `Arc<dyn
 SettlementOutcomeStore>`, and `RetryPolicy`. Its public installer requires all
 three arguments in one call, so a registered observer cannot exist without
-durable routing. The no-observer default remains `None`. Keep the observer
+durable routing, validates the retry policy, and requires matching receipt and
+outcome store bindings. The no-observer default remains `None`. Keep the observer
 accessor limited to its public hook handle; do not expose keys or persistence
   internals. In Phase 3, the production assembler must use this paired installer,
   and startup validation must reject any `driver = ops` configuration that cannot
@@ -413,7 +429,7 @@ are already accessible.
 Run:
 
 ```bash
-cargo test -p chio-settle outcome_store
+cargo test -p chio-settle
 cargo test -p chio-kernel settlement_routing
 cargo test -p chio-kernel settlement_observer
 ```
@@ -637,9 +653,12 @@ or persistence accessor. Cover:
 - No observer preserves current behavior and produces no routing call.
 - A registered observer receives no hook call unless receipt and attempt zero
   committed together; a seed failure leaves neither row.
+- Installation rejects a missing or mismatched settlement writer binding even
+  when both store handles otherwise report supported capabilities.
 - A crash immediately after commit, after claim, and after hook return is
   recovered through the same leased claim path without losing the receipt.
-- Accepted and skipped statuses clear stale attempts.
+- Accepted and pre-hook skipped statuses clear stale attempts; hook-returned
+  skipped is permanent invalid observation.
 - Accepted/skipped cleanup-store errors are warning-visible, counted once, and
   leave the stale row intact.
 - Retryable, permanent, and hook-failed statuses reach the store.

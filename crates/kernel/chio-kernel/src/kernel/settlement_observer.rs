@@ -1,10 +1,8 @@
 //! Settlement observer slot wired into the kernel evaluator.
 //!
 //! Plugs `chio-settle::SettlementHook` into the kernel's post-dispatch
-//! observer surface. The observer is consulted only after a receipt has
-//! been fully signed and durably stored: settlement is observer-only
-//! relative to the receipt bytes, and a hook failure NEVER blocks the
-//! dispatch path.
+//! observer surface. A hook produces a typed outcome. Durable retry and
+//! dead-letter routing is provided by the paired kernel observer runtime.
 //!
 //! The kernel field [`ChioKernel::settlement_observer`] holds an
 //! optional handle; deployments that do not wire a settlement runtime
@@ -15,13 +13,16 @@ use std::sync::Arc;
 
 use chio_core::crypto::PublicKey;
 use chio_core::receipt::body::ChioReceipt;
-use chio_settle::{SettlementHook, SettlementHookError, SettlementObservation, SettlementOutcome};
+use chio_settle::{
+    SettlementFailureClass, SettlementFailureCode, SettlementFailureReason, SettlementHook,
+    SettlementHookError, SettlementObservation, SettlementOutcome, SettlementSkipReason,
+};
 
 /// Schema string emitted on the wire for settlement-observer status frames.
 /// Public so external observers can pin against the same identifier the
 /// kernel records.
 #[allow(dead_code)]
-pub const SETTLEMENT_OBSERVER_STATUS_SCHEMA: &str = "chio.settle.observer-status.v1";
+pub const SETTLEMENT_OBSERVER_STATUS_SCHEMA: &str = "chio.settle.observer-status.v2";
 
 /// Status the kernel records for each settlement observer invocation.
 ///
@@ -34,76 +35,140 @@ pub enum SettlementObserverStatus {
     /// No settlement hook is registered on this kernel; the observation
     /// was not produced.
     NotRegistered,
-    /// The receipt was either zero-priced or otherwise outside the
-    /// marketplace surface; the kernel produced no observation. This
-    /// is the steady-state for non-economic deployments.
-    Skipped { reason: String },
+    /// The receipt requires no settlement work.
+    Skipped { reason: SettlementSkipReason },
     /// The hook accepted the observation and returned an outcome
     /// classification. The downstream lifecycle is then driven by the
     /// retry policy and dead-letter machinery.
     Observed { outcome: SettlementOutcome },
-    /// The hook surfaced an error. Settlement runs on the post-dispatch
-    /// task, so this is recorded but never propagated back to the
-    /// dispatch path. The error is routed through retry/dead-letter
-    /// classification.
-    HookFailed { error: String },
+    /// Observation construction or the hook returned a typed failure.
+    HookFailed {
+        class: SettlementFailureClass,
+        reason: SettlementFailureReason,
+    },
 }
 
 impl SettlementObserverStatus {
-    /// Construct a `Skipped` status with a documented reason string.
     #[must_use]
-    pub fn skipped(reason: impl Into<String>) -> Self {
-        Self::Skipped {
-            reason: reason.into(),
-        }
+    pub const fn skipped(reason: SettlementSkipReason) -> Self {
+        Self::Skipped { reason }
     }
 
-    /// Construct a `HookFailed` status from a [`SettlementHookError`].
     #[must_use]
     pub fn hook_failed(err: &SettlementHookError) -> Self {
-        Self::HookFailed {
-            error: err.to_string(),
-        }
+        let (class, reason) = err.classification();
+        Self::HookFailed { class, reason }
     }
 }
 
-/// Build a [`SettlementObservation`] for a freshly signed receipt.
-///
-/// Returns `None` when the receipt does not warrant an observation
-/// (currently: missing manifest pricing context, zero-priced
-/// invocations, or non-allow decisions). The kernel observer slot
-/// invokes a registered hook only when this returns `Some`.
-///
-/// The receipt's financial metadata is the `FinancialReceiptMetadata`
-/// shape (`cost_charged`, `currency`, `attempted_cost`) under
-/// `metadata.financial.*`.
+/// Result of validating and interpreting a finalized receipt for settlement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SettlementObservationBuild {
+    /// A valid positive-charge receipt produced an observation.
+    Observation(SettlementObservation),
+    /// The receipt legitimately requires no settlement work.
+    Skipped(SettlementSkipReason),
+    /// The receipt failed integrity or economic-metadata validation.
+    Permanent(SettlementFailureReason),
+}
+
+fn permanent(code: SettlementFailureCode, detail: impl AsRef<[u8]>) -> SettlementObservationBuild {
+    SettlementObservationBuild::Permanent(SettlementFailureReason::from_detail(code, detail))
+}
+
 #[must_use]
-fn build_observation_unchecked(receipt: &ChioReceipt) -> Option<SettlementObservation> {
-    if !receipt.verify_signature().ok()? {
-        return None;
+pub fn build_observation(
+    receipt: &ChioReceipt,
+    trusted_kernel_keys: &[PublicKey],
+) -> SettlementObservationBuild {
+    match receipt.verify_signature() {
+        Ok(true) => {}
+        Ok(false) => {
+            return permanent(
+                SettlementFailureCode::InvalidReceiptSignature,
+                "receipt signature did not verify",
+            );
+        }
+        Err(error) => {
+            return permanent(
+                SettlementFailureCode::InvalidReceiptSignature,
+                error.to_string(),
+            );
+        }
     }
-    if !receipt.action.verify_hash().ok()? {
-        return None;
+    match receipt.action.verify_hash() {
+        Ok(true) => {}
+        Ok(false) => {
+            return permanent(
+                SettlementFailureCode::InvalidActionHash,
+                "receipt action hash did not verify",
+            );
+        }
+        Err(error) => {
+            return permanent(SettlementFailureCode::InvalidActionHash, error.to_string());
+        }
+    }
+    if trusted_kernel_keys.is_empty()
+        || !trusted_kernel_keys
+            .iter()
+            .any(|trusted| trusted == &receipt.kernel_key)
+    {
+        return permanent(
+            SettlementFailureCode::UntrustedReceiptSigner,
+            "receipt signer is not trusted",
+        );
+    }
+    if receipt.is_denied() {
+        return SettlementObservationBuild::Skipped(SettlementSkipReason::Denied);
     }
     if !receipt.is_allowed() {
-        return None;
+        return permanent(
+            SettlementFailureCode::InvalidObservation,
+            "receipt does not contain an authorized terminal decision",
+        );
     }
 
-    let financial = receipt.metadata.as_ref().and_then(|metadata| {
-        metadata
-            .get("financial")
-            .and_then(|value| value.as_object())
-    })?;
-
-    // Financial metadata uses the `FinancialReceiptMetadata` shape.
-    let monetary = financial.get("cost_charged").and_then(|cc| {
-        let units = cc.as_u64()?;
-        let currency = financial.get("currency")?.as_str()?.to_string();
-        Some(chio_core::capability::scope::MonetaryAmount { currency, units })
-    })?;
-
-    if monetary.units == 0 {
-        return None;
+    let Some(metadata) = receipt.metadata.as_ref() else {
+        return SettlementObservationBuild::Skipped(SettlementSkipReason::NoEconomicIntent);
+    };
+    let Some(financial_value) = metadata.get("financial") else {
+        return SettlementObservationBuild::Skipped(SettlementSkipReason::NoEconomicIntent);
+    };
+    let Some(financial) = financial_value.as_object() else {
+        return permanent(
+            SettlementFailureCode::MalformedFinancialMetadata,
+            "financial metadata is not an object",
+        );
+    };
+    let Some(charged_value) = financial.get("cost_charged") else {
+        return permanent(
+            SettlementFailureCode::MalformedFinancialMetadata,
+            "financial metadata is missing cost_charged",
+        );
+    };
+    let Some(units) = charged_value.as_u64() else {
+        return permanent(
+            SettlementFailureCode::MalformedFinancialMetadata,
+            "cost_charged is not an unsigned integer",
+        );
+    };
+    if units == 0 {
+        return SettlementObservationBuild::Skipped(SettlementSkipReason::ZeroCharge);
+    }
+    let Some(currency) = financial
+        .get("currency")
+        .and_then(serde_json::Value::as_str)
+    else {
+        return permanent(
+            SettlementFailureCode::MalformedFinancialMetadata,
+            "positive cost_charged requires a currency",
+        );
+    };
+    if currency.len() != 3 || !currency.bytes().all(|byte| byte.is_ascii_uppercase()) {
+        return permanent(
+            SettlementFailureCode::MalformedFinancialMetadata,
+            "positive cost_charged requires a three-letter uppercase currency",
+        );
     }
 
     let observation = SettlementObservation::new(
@@ -112,41 +177,19 @@ fn build_observation_unchecked(receipt: &ChioReceipt) -> Option<SettlementObserv
         receipt.tool_server.clone(),
         receipt.tool_name.clone(),
         receipt.capability_id.clone(),
-        monetary,
+        chio_core::capability::scope::MonetaryAmount {
+            currency: currency.to_string(),
+            units,
+        },
         receipt.content_hash.clone(),
         receipt.policy_hash.clone(),
     );
 
-    Some(if let Some(tenant_id) = receipt.tenant_id.clone() {
+    SettlementObservationBuild::Observation(if let Some(tenant_id) = receipt.tenant_id.clone() {
         observation.with_tenant(tenant_id)
     } else {
         observation
     })
-}
-
-/// Build an observation only when the receipt signer is explicitly trusted.
-#[must_use]
-pub fn build_observation(
-    receipt: &ChioReceipt,
-    trusted_kernel_keys: &[PublicKey],
-) -> Option<SettlementObservation> {
-    if trusted_kernel_keys.is_empty()
-        || !trusted_kernel_keys
-            .iter()
-            .any(|trusted| trusted == &receipt.kernel_key)
-    {
-        return None;
-    }
-    build_observation_unchecked(receipt)
-}
-
-/// Build an observation only when the receipt signer is explicitly trusted.
-#[must_use]
-pub fn build_observation_with_trusted_signers(
-    receipt: &ChioReceipt,
-    trusted_kernel_keys: &[PublicKey],
-) -> Option<SettlementObservation> {
-    build_observation(receipt, trusted_kernel_keys)
 }
 
 /// Run the registered settlement hook against a freshly signed receipt.
@@ -167,9 +210,17 @@ pub fn run_observer(
         return SettlementObserverStatus::NotRegistered;
     };
 
-    let Some(observation) = build_observation_with_trusted_signers(receipt, trusted_kernel_keys)
-    else {
-        return SettlementObserverStatus::skipped("receipt outside marketplace surface");
+    let observation = match build_observation(receipt, trusted_kernel_keys) {
+        SettlementObservationBuild::Observation(observation) => observation,
+        SettlementObservationBuild::Skipped(reason) => {
+            return SettlementObserverStatus::skipped(reason);
+        }
+        SettlementObservationBuild::Permanent(reason) => {
+            return SettlementObserverStatus::HookFailed {
+                class: SettlementFailureClass::Permanent,
+                reason,
+            };
+        }
     };
 
     match hook.observe(&observation) {
@@ -255,7 +306,7 @@ mod tests {
     }
 
     #[test]
-    fn build_observation_skips_non_allow_decisions() {
+    fn build_observation_skips_explicit_deny() {
         let receipt = sign_with(
             serde_json::json!({
                 "financial": {"cost_charged": 100, "currency": "USD"}
@@ -265,7 +316,36 @@ mod tests {
                 guard: "G".to_string(),
             },
         );
-        assert!(build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)).is_none());
+        assert!(matches!(
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+            SettlementObservationBuild::Skipped(SettlementSkipReason::Denied)
+        ));
+    }
+
+    #[test]
+    fn build_observation_rejects_nonterminal_decisions() {
+        let cases = [
+            Decision::Cancelled {
+                reason: "cancelled".to_string(),
+            },
+            Decision::Incomplete {
+                reason: "incomplete".to_string(),
+            },
+        ];
+
+        for decision in cases {
+            let receipt = sign_with(
+                serde_json::json!({
+                    "financial": {"cost_charged": 100, "currency": "USD"}
+                }),
+                decision,
+            );
+            assert!(matches!(
+                build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+                SettlementObservationBuild::Permanent(ref reason)
+                    if reason.code() == SettlementFailureCode::InvalidObservation
+            ));
+        }
     }
 
     #[test]
@@ -276,17 +356,23 @@ mod tests {
             }),
             Decision::Allow,
         );
-        assert!(build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)).is_none());
+        assert!(matches!(
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+            SettlementObservationBuild::Skipped(SettlementSkipReason::ZeroCharge)
+        ));
     }
 
     #[test]
     fn build_observation_skips_when_metadata_missing_financial_section() {
         let receipt = sign_with(serde_json::json!({}), Decision::Allow);
-        assert!(build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)).is_none());
+        assert!(matches!(
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+            SettlementObservationBuild::Skipped(SettlementSkipReason::NoEconomicIntent)
+        ));
     }
 
     #[test]
-    fn build_observation_skips_invalid_signature() {
+    fn build_observation_rejects_invalid_signature() {
         let mut receipt = sign_with(
             serde_json::json!({
                 "financial": {"cost_charged": 250, "currency": "USD"}
@@ -294,11 +380,15 @@ mod tests {
             Decision::Allow,
         );
         receipt.tool_name = "tampered".to_string();
-        assert!(build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)).is_none());
+        assert!(matches!(
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+            SettlementObservationBuild::Permanent(ref reason)
+                if reason.code() == SettlementFailureCode::InvalidReceiptSignature
+        ));
     }
 
     #[test]
-    fn build_observation_skips_mismatched_action_hash() {
+    fn build_observation_rejects_mismatched_action_hash() {
         let mut action = ToolCallAction::from_parameters(serde_json::json!({"path": "/tmp/a"}))
             .expect("test tool-call action constructs");
         action.parameters = serde_json::json!({"path": "/tmp/b"});
@@ -309,7 +399,11 @@ mod tests {
             Decision::Allow,
             action,
         );
-        assert!(build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)).is_none());
+        assert!(matches!(
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+            SettlementObservationBuild::Permanent(ref reason)
+                if reason.code() == SettlementFailureCode::InvalidActionHash
+        ));
     }
 
     #[test]
@@ -320,8 +414,11 @@ mod tests {
             }),
             Decision::Allow,
         );
-        let observation = build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key))
-            .expect("priced receipt yields observation");
+        let SettlementObservationBuild::Observation(observation) =
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key))
+        else {
+            panic!("priced receipt did not yield an observation");
+        };
         assert_eq!(observation.receipt_id, receipt.id);
         assert_eq!(observation.finalized_at, 100);
         assert_eq!(
@@ -342,7 +439,11 @@ mod tests {
             }),
             Decision::Allow,
         );
-        assert!(build_observation(&receipt, &[]).is_none());
+        assert!(matches!(
+            build_observation(&receipt, &[]),
+            SettlementObservationBuild::Permanent(ref reason)
+                if reason.code() == SettlementFailureCode::UntrustedReceiptSigner
+        ));
     }
 
     #[test]
@@ -393,7 +494,12 @@ mod tests {
             &receipt,
             std::slice::from_ref(&receipt.kernel_key),
         );
-        assert!(matches!(status, SettlementObserverStatus::Skipped { .. }));
+        assert!(matches!(
+            status,
+            SettlementObserverStatus::Skipped {
+                reason: SettlementSkipReason::ZeroCharge,
+            }
+        ));
     }
 
     #[test]
@@ -418,8 +524,11 @@ mod tests {
             }),
             Decision::Allow,
         );
-        let observation = build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key))
-            .expect("canonical FinancialReceiptMetadata shape yields observation");
+        let SettlementObservationBuild::Observation(observation) =
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key))
+        else {
+            panic!("canonical financial metadata did not yield an observation");
+        };
         assert_eq!(observation.amount.units, 250);
         assert_eq!(observation.amount.currency, "USD");
     }
@@ -435,7 +544,10 @@ mod tests {
             }),
             Decision::Allow,
         );
-        assert!(build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)).is_none());
+        assert!(matches!(
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+            SettlementObservationBuild::Skipped(SettlementSkipReason::ZeroCharge)
+        ));
     }
 
     #[test]
@@ -454,7 +566,31 @@ mod tests {
         );
         assert!(matches!(
             status,
-            SettlementObserverStatus::HookFailed { .. }
+            SettlementObserverStatus::HookFailed {
+                class: SettlementFailureClass::Retryable,
+                reason,
+            } if reason.code() == SettlementFailureCode::Backend
         ));
+    }
+
+    #[test]
+    fn build_observation_rejects_malformed_positive_financial_metadata() {
+        let cases = [
+            serde_json::json!({"financial": {"currency": "USD"}}),
+            serde_json::json!({"financial": {"cost_charged": "250", "currency": "USD"}}),
+            serde_json::json!({"financial": {"cost_charged": 250}}),
+            serde_json::json!({"financial": {"cost_charged": 250, "currency": "usd"}}),
+            serde_json::json!({"financial": {"cost_charged": 250, "currency": "US D"}}),
+            serde_json::json!({"financial": "invalid"}),
+        ];
+
+        for metadata in cases {
+            let receipt = sign_with(metadata, Decision::Allow);
+            assert!(matches!(
+                build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+                SettlementObservationBuild::Permanent(ref reason)
+                    if reason.code() == SettlementFailureCode::MalformedFinancialMetadata
+            ));
+        }
     }
 }

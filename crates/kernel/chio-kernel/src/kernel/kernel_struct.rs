@@ -417,12 +417,7 @@ pub struct ChioKernel {
     /// handles can pass the signing handle to in-flight evaluators without
     /// cloning the whole kernel.
     pub(super) signing_task: std::sync::Arc<signing_task::SigningTaskHandle>,
-    /// Settlement observer slot. When `Some`, the kernel invokes the
-    /// hook against every finalized receipt that carries a non-zero
-    /// manifest price. Settlement runs strictly post-signing and never
-    /// blocks dispatch; failures are surfaced through the retry/dead-
-    /// letter machinery, not through this option.
-    pub(super) settlement_observer: Option<std::sync::Arc<dyn chio_settle::SettlementHook>>,
+    pub(super) settlement_observer: Option<crate::settlement_routing::SettlementObserverRuntime>,
     /// Recursive-delegation oracle handle. When `Some`, the verifier consults this
     /// arc-swap-backed snapshot on every delegated dispatch and denies
     /// the capability if any link in the chain (or the leaf) is in the

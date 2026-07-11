@@ -182,10 +182,49 @@ pub enum ReceiptStoreError {
 
     #[error("not found: {0}")]
     NotFound(String),
+
+    #[error("unsupported receipt-store operation: {0}")]
+    Unsupported(String),
+}
+
+/// Atomic sidecar projections supported by a receipt store.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AtomicReceiptProjection {
+    /// The store cannot atomically append a receipt and settlement observation.
+    Unsupported,
+    /// The store supports the first settlement-observation projection.
+    SettlementObservationV1,
+}
+
+/// Initial settlement work committed with a receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PendingSettlementObservation {
+    /// Earliest time at which a worker may claim the observation.
+    pub next_visible_at_ms: u64,
 }
 
 pub trait ReceiptStore: Send + Sync {
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError>;
+    /// Identify the durable writer shared with a settlement outcome store.
+    fn settlement_store_binding(&self) -> Option<chio_settle::SettlementStoreBinding> {
+        None
+    }
+    /// Report the atomic receipt-sidecar projection implemented by this store.
+    fn atomic_receipt_projection(&self) -> AtomicReceiptProjection {
+        AtomicReceiptProjection::Unsupported
+    }
+    /// Atomically append a receipt and its initial settlement observation.
+    ///
+    /// The default fails without appending either record.
+    fn append_chio_receipt_with_pending_observation(
+        &self,
+        _receipt: &ChioReceipt,
+        _pending: &PendingSettlementObservation,
+    ) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Unsupported(
+            "atomic settlement observation projection".to_string(),
+        ))
+    }
     /// Load a chio receipt by id. The provided default returns `None`; a store
     /// backing a store-authoritative deployment MUST override this (and
     /// `load_child_receipt`) with a real point lookup.
@@ -471,6 +510,12 @@ pub trait ReceiptStore: Send + Sync {
 mod tests {
     use super::*;
 
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use chio_core::receipt::{
+        body::ChioReceiptBody, decision::Decision, decision::ToolCallAction, kinds::TrustLevel,
+    };
+
     struct AppendOnlyStore;
 
     impl ReceiptStore for AppendOnlyStore {
@@ -484,6 +529,83 @@ mod tests {
         ) -> Result<(), ReceiptStoreError> {
             Ok(())
         }
+    }
+
+    struct CountingAppendStore {
+        append_calls: AtomicUsize,
+    }
+
+    impl ReceiptStore for CountingAppendStore {
+        fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+            self.append_calls.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+
+        fn append_child_receipt(
+            &self,
+            _receipt: &ChildRequestReceipt,
+        ) -> Result<(), ReceiptStoreError> {
+            Ok(())
+        }
+    }
+
+    fn signed_receipt() -> ChioReceipt {
+        let keypair = Keypair::generate();
+        let action = match ToolCallAction::from_parameters(serde_json::json!({})) {
+            Ok(action) => action,
+            Err(error) => panic!("test action construction failed: {error}"),
+        };
+        let body = ChioReceiptBody {
+            id: "receipt-1".to_string(),
+            timestamp: 1,
+            capability_id: "capability-1".to_string(),
+            tool_server: "server".to_string(),
+            tool_name: "tool".to_string(),
+            action,
+            decision: Some(Decision::Allow),
+            receipt_kind: Default::default(),
+            boundary_class: Default::default(),
+            observation_outcome: None,
+            tool_origin: Default::default(),
+            redaction_mode: Default::default(),
+            actor_chain: Vec::new(),
+            content_hash: "content".to_string(),
+            policy_hash: "policy".to_string(),
+            evidence: Vec::new(),
+            metadata: None,
+            trust_level: TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: keypair.public_key(),
+            bbs_projection_version: None,
+        };
+        match ChioReceipt::sign(body, &keypair) {
+            Ok(receipt) => receipt,
+            Err(error) => panic!("test receipt signing failed: {error}"),
+        }
+    }
+
+    #[test]
+    fn unsupported_atomic_projection_never_falls_back_to_receipt_only_append() {
+        let store = CountingAppendStore {
+            append_calls: AtomicUsize::new(0),
+        };
+        let receipt = signed_receipt();
+
+        assert_eq!(
+            store.atomic_receipt_projection(),
+            AtomicReceiptProjection::Unsupported
+        );
+        assert_eq!(store.settlement_store_binding(), None);
+        assert!(matches!(
+            store.append_chio_receipt_with_pending_observation(
+                &receipt,
+                &PendingSettlementObservation {
+                    next_visible_at_ms: 1,
+                },
+            ),
+            Err(ReceiptStoreError::Unsupported(_))
+        ));
+        assert_eq!(store.append_calls.load(Ordering::SeqCst), 0);
     }
 
     #[test]

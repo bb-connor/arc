@@ -53,6 +53,7 @@ pub mod revocation_runtime;
 pub mod revocation_store;
 pub mod runtime;
 pub mod session;
+mod settlement_routing;
 pub mod transport;
 pub mod weights_binding;
 
@@ -413,11 +414,11 @@ pub use receipt_query::{
     ReceiptReadContext, ReceiptReadContextSource, MAX_QUERY_LIMIT,
 };
 pub use receipt_store::{
-    AuthorizationReceiptConsumption, FederatedEvidenceShareImport, FederatedEvidenceShareSummary,
-    ReceiptCheckpointCreateReport, ReceiptCheckpointRange, ReceiptCheckpointStatusReport,
-    ReceiptFlushReport, ReceiptStore, ReceiptStoreError, ReceiptStoreHealthReport,
-    ReceiptWalCheckpointReport, ReceiptWriterCounters, RetentionConfig, StoredChildReceipt,
-    StoredToolReceipt,
+    AtomicReceiptProjection, AuthorizationReceiptConsumption, FederatedEvidenceShareImport,
+    FederatedEvidenceShareSummary, PendingSettlementObservation, ReceiptCheckpointCreateReport,
+    ReceiptCheckpointRange, ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore,
+    ReceiptStoreError, ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
+    RetentionConfig, StoredChildReceipt, StoredToolReceipt,
 };
 pub use revocation_runtime::{InMemoryRevocationStore, RevocationStore};
 pub use revocation_store::{RevocationRecord, RevocationStoreError};
@@ -443,9 +444,10 @@ pub use kernel::{
     AgentId, CapabilityId, ChildReceiptLog, ChioKernel, Guard, GuardContext, GuardDecision,
     HybridSigningConfig, KernelConfig, KernelError, MemoryBudgetConfig, OverloadResource,
     PromptProvider, ReceiptLog, ResourceProvider, RuntimeAdmissionContext,
-    RuntimeAdmissionDecision, RuntimeAdmissionHook, ServerId, StructuredErrorReport,
-    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS, EMERGENCY_STOP_DENY_REASON,
+    RuntimeAdmissionDecision, RuntimeAdmissionHook, ServerId, SettlementRuntimeConfigError,
+    StructuredErrorReport, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES,
+    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS,
+    EMERGENCY_STOP_DENY_REASON,
 };
 
 pub use kernel::evaluator::ToolEvaluator;
@@ -455,7 +457,7 @@ pub use kernel::evaluator::ToolEvaluator;
 /// without reaching into crate-private module paths.
 pub mod settlement_observer {
     pub use crate::kernel::settlement_observer::{
-        build_observation, run_observer, SettlementObserverStatus,
+        build_observation, run_observer, SettlementObservationBuild, SettlementObserverStatus,
         SETTLEMENT_OBSERVER_STATUS_SCHEMA,
     };
 }

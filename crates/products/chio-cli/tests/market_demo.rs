@@ -33,7 +33,10 @@ use chio_credit::receipt::{
 use chio_credit::{CreditEvaluatorHook, LocalCreditAccount};
 use chio_guard_registry::GuardPrice;
 use chio_reputation::ReputationTier;
-use chio_settle::{SettlementHook, SettlementHookError, SettlementObservation, SettlementOutcome};
+use chio_settle::{
+    SettlementHook, SettlementHookError, SettlementObservation, SettlementOutcome,
+    SettlementSkipReason,
+};
 use serde::{Deserialize, Serialize};
 
 // The marketplace surface is private to the binary; copy the catalog
@@ -61,7 +64,7 @@ impl SettlementHook for CountingSettlementHook {
         observation: &SettlementObservation,
     ) -> Result<SettlementOutcome, SettlementHookError> {
         if observation.amount.units == 0 {
-            return Ok(SettlementOutcome::skipped("zero amount"));
+            return Ok(SettlementOutcome::skipped(SettlementSkipReason::ZeroCharge));
         }
         self.accepted.fetch_add(1, Ordering::SeqCst);
         Ok(SettlementOutcome::accepted(format!(

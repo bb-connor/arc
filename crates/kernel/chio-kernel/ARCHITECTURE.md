@@ -40,4 +40,6 @@ crates such as `chio-store-sqlite`.
 - Approval tokens, runtime-attestation records, call-chain proofs, autonomy
   bonds, and receipt evidence must preserve canonical bytes and verification
   semantics.
-- Public kernel and receipt-store APIs should remain unchanged.
+- Public kernel and receipt-store APIs must preserve explicit security
+  invariants. Settlement observers install only as paired runtimes, and
+  unsupported atomic projections fail closed.

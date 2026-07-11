@@ -12,7 +12,9 @@ mod kernel_drop_guard;
 mod kernel_scopes;
 mod kernel_struct;
 
-pub use error::{KernelError, OverloadResource, StructuredErrorReport};
+pub use error::{
+    KernelError, OverloadResource, SettlementRuntimeConfigError, StructuredErrorReport,
+};
 pub use kernel_struct::{
     ChioKernel, HybridSigningConfig, KernelConfig, MemoryBudgetConfig,
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,

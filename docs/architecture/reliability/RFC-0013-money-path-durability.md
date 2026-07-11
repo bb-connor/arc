@@ -138,19 +138,18 @@ There is a `created_at` but no TTL/expiry column and no sweep query. `HoldDispos
 AuthorizeExposure, ReverseExposure, ReleaseExposure, ReconcileSpend }`. No sweeper, no
 open-hold listing, no CLI command exist across `chio-store-sqlite` and `chio-cli`.
 
-The settlement machinery is fully built but unwired. `run_observer`
-(`crates/kernel/chio-kernel/src/kernel/settlement_observer.rs:161-179`) returns
-`SettlementObserverStatus { NotRegistered, Skipped { reason }, Observed { outcome },
-HookFailed { error } }`. `classify_attempt`
-(`crates/economy/chio-settle/src/retry.rs:123-154`) returns `RetryDecision { Retry {
-attempt, backoff }, DeadLetter { reason }, Skip { reason } }` under `RetryPolicy`
+The settlement machinery exposes a typed routing contract but is not yet wired to
+the SQLite outbox. `run_observer` returns `SettlementObserverStatus {
+NotRegistered, Skipped { reason }, Observed { outcome }, HookFailed { class,
+reason } }`. `classify_attempt` returns `RetryDecision { Accepted, Retry { attempt,
+backoff, reason }, DeadLetter { reason }, Skip { reason } }` under `RetryPolicy`
 (defaults `max_retries=5`, `initial_backoff_ms=250`, `backoff_multiplier=2`,
-`backoff_cap_ms=60_000`). `SqliteDeadLetterStore`
-(`crates/platform/chio-store-sqlite/src/dead_letters.rs:55-205`) has
-`insert`/`get`/`list`/`clear` over `settle_dead_letters` but zero callers outside its
-own tests. The kernel doc at `construction.rs:483` and the crate doc at
-`crates/economy/chio-settle/src/hook.rs:7-9` both claim the observer slot "routes it
-to the retry/dead-letter machinery"; nothing does. The CLI reads
+`backoff_cap_ms=60_000`). The paired kernel installer requires a receipt store that
+reports atomic settlement-observation projection support, verifies that both store
+views carry the same fixed-size writer binding, and prevents later store replacement.
+`SqliteDeadLetterStore` has `insert`/`get`/`list`/`clear` over
+`settle_dead_letters`, but the receipt-side attempt-zero projection and leased
+outcome store are not connected yet. The CLI reads
 `settle_dead_letters`/`iou_envelope`/`settlement_reconciliations`
 (`crates/products/chio-cli/src/settle.rs:89-99`, `181-196`, `260-283`) but only its
 own tests populate those tables (the INSERTs at `settle.rs:339-360`).
@@ -837,7 +836,7 @@ adopter persist and restore counters instead of silently losing them.
   EXISTS`). The existing `settle_dead_letters`, `iou_envelope`, and
   `settlement_reconciliations` tables are now populated by production code
   (F68/F69), not only tests.
-- `PaymentJournalRecord`, `DeadLetterRecord` (existing, schema `chio.settle.dead-letter.v1`),
+- `PaymentJournalRecord`, `DeadLetterRecord` (existing, schema `chio.settle.dead-letter.v2`),
   and any reconciliation report serialize as RFC 8785 canonical JSON, consistent with
   the canonical-JSON `parameter_hash` and dead-letter row bytes already in use.
 - `BudgetDenyReason` gains a `CurrencyMismatch` variant. It is config-as-data JSON
