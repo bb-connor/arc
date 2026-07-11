@@ -12,6 +12,33 @@
 //! wrappers consume the slot at settlement-artifact issuance, so the first
 //! issued artifact wins across every lane sharing the store and a second
 //! settlement attempt from the same approval is rejected.
+//!
+//! # Integration contract (settlement executors)
+//!
+//! `chio-settle` is prepare-only: no production component executes a
+//! settlement today. The kernel validates approval tokens on its own
+//! admission path (`chio-kernel`'s governed validation) and observes
+//! settlement outcomes through the `SettlementHook` seam; it does not route
+//! through this witness API. A settlement executor that DOES drive these
+//! lanes owns the following obligations:
+//!
+//! - Route EVERY value lane through the exported
+//!   `*_with_verified_approval` wrappers
+//!   ([`crate::payments::verify_governed_approval`] to mint the witness,
+//!   then the x402 / EIP-3009 / Circle wrapper to issue). The raw builders
+//!   behind them are `pub(crate)` and cannot be reached downstream, so the
+//!   wrappers are the only artifact-producing path.
+//! - Share ONE durable [`ApprovalReplayStore`] across ALL workers and ALL
+//!   lanes: the SQLite implementation in
+//!   `chio-store-sqlite::approval_replay_store`, opened on one database.
+//!   Single-use holds only under a shared store; with per-process stores
+//!   (including [`InMemoryApprovalReplayStore`]) the same approval can
+//!   issue once per worker and once per restart.
+//! - Decide environment / chain gating for live lanes as executor policy.
+//!   This layer asserts approval-binding congruence, not which chains may
+//!   be live; the public settlement-proof attestation surface in
+//!   `chio-web3` carries its own mainnet-blocking verifier policy,
+//!   independent of this boundary.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
