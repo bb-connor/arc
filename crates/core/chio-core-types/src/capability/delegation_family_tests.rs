@@ -258,6 +258,7 @@ fn delegation_family_direct_root_and_descendants_share_owner_digest_and_maximum(
     let direct = verify_aggregate_invocation_authority(
         &fixture.root_token,
         &[fixture.root_issuer.public_key()],
+        &[],
         &direct_resolver,
     )
     .expect("verify direct root")
@@ -268,6 +269,7 @@ fn delegation_family_direct_root_and_descendants_share_owner_digest_and_maximum(
     let descendant_resolver = CountingResolver::family(&fixture);
     let descendant = verify_aggregate_invocation_authority(
         &descendant_token,
+        &[],
         &[fixture.root_subject.public_key()],
         &descendant_resolver,
     )
@@ -287,6 +289,66 @@ fn delegation_family_direct_root_and_descendants_share_owner_digest_and_maximum(
     );
     assert_eq!(direct.max_invocations(), descendant.max_invocations());
     assert_eq!(descendant.max_invocations(), 7);
+}
+
+#[test]
+fn delegation_family_direct_root_rejects_descendant_leaf_only_trusted_issuer() {
+    let attacker = FamilyFixture::new("leaf-only-self-issued-root", 3);
+    let descendant_leaf_issuers = [attacker.root_issuer.public_key()];
+    let resolver = CountingResolver::family(&attacker);
+
+    let error = verify_aggregate_invocation_authority(
+        &attacker.root_token,
+        &[],
+        &descendant_leaf_issuers,
+        &resolver,
+    )
+    .expect_err("leaf-only trust must not authorize an empty-chain root");
+
+    match error {
+        AggregateInvocationAuthorityError::Verification(Error::InvalidPublicKey(reason)) => {
+            assert_eq!(
+                reason,
+                "aggregate direct capability issuer is not trusted as a root authority"
+            );
+        }
+        other => panic!("expected direct-root trust rejection, got {other:?}"),
+    }
+
+    let accepted = verify_aggregate_invocation_authority(
+        &attacker.root_token,
+        &[attacker.root_issuer.public_key()],
+        &[],
+        &resolver,
+    )
+    .expect("independently trusted direct root must verify")
+    .expect("direct family authority");
+    assert_eq!(accepted.scope(), AggregateInvocationScope::DelegationFamily);
+    assert_eq!(resolver.calls(), 0);
+}
+
+#[test]
+fn delegation_family_descendant_rejects_direct_root_only_trusted_issuer() {
+    let fixture = FamilyFixture::new("direct-root-only-descendant", 3);
+    let descendant = fixture.one_hop_descendant("direct-root-only-child");
+    let direct_root_issuers = [fixture.root_subject.public_key()];
+    let resolver = CountingResolver::family(&fixture);
+
+    let error =
+        verify_aggregate_invocation_authority(&descendant, &direct_root_issuers, &[], &resolver)
+            .expect_err("direct-root-only trust must not authorize a descendant");
+
+    match error {
+        AggregateInvocationAuthorityError::Verification(Error::InvalidPublicKey(reason)) => {
+            assert_eq!(
+                reason,
+                "aggregate descendant capability issuer is not trusted as a leaf authority"
+            );
+        }
+        other => panic!("expected descendant-leaf trust rejection, got {other:?}"),
+    }
+
+    assert_eq!(resolver.calls(), 0);
 }
 
 #[test]
@@ -319,7 +381,7 @@ fn delegation_family_multi_hop_descendant_is_accepted() {
     let resolver = CountingResolver::family(&fixture);
 
     let authority =
-        verify_aggregate_invocation_authority(&leaf, &[intermediate.public_key()], &resolver)
+        verify_aggregate_invocation_authority(&leaf, &[], &[intermediate.public_key()], &resolver)
             .expect("verify multi-hop")
             .expect("family authority");
 
@@ -348,7 +410,7 @@ fn delegation_family_direct_capability_aggregate_and_no_aggregate_remain_support
     )
     .expect("sign direct capability aggregate");
     let authority =
-        verify_aggregate_invocation_authority(&capability, &[issuer.public_key()], &resolver)
+        verify_aggregate_invocation_authority(&capability, &[issuer.public_key()], &[], &resolver)
             .expect("verify capability aggregate")
             .expect("capability authority");
     assert_eq!(authority.scope(), AggregateInvocationScope::Capability);
@@ -369,7 +431,7 @@ fn delegation_family_direct_capability_aggregate_and_no_aggregate_remain_support
     )
     .expect("sign direct plain token");
     assert!(
-        verify_aggregate_invocation_authority(&plain, &[issuer.public_key()], &resolver)
+        verify_aggregate_invocation_authority(&plain, &[issuer.public_key()], &[], &resolver,)
             .expect("verify direct plain token")
             .is_none()
     );
@@ -391,8 +453,9 @@ fn delegation_family_trusted_unrelated_leaf_issuer_denies_before_resolution() {
     );
     let resolver = CountingResolver::family(&fixture);
 
-    let error = verify_aggregate_invocation_authority(&leaf, &[unrelated.public_key()], &resolver)
-        .unwrap_err();
+    let error =
+        verify_aggregate_invocation_authority(&leaf, &[], &[unrelated.public_key()], &resolver)
+            .unwrap_err();
 
     assert_authority_reason(
         error,
@@ -418,6 +481,7 @@ fn delegation_family_final_subject_mismatch_denies_before_resolution() {
 
     let error = verify_aggregate_invocation_authority(
         &leaf,
+        &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )
@@ -446,6 +510,7 @@ fn delegation_family_missing_unavailable_and_corrupt_resolution_fail_closed() {
         );
         let error = verify_aggregate_invocation_authority(
             &leaf,
+            &[],
             &[fixture.root_subject.public_key()],
             &resolver,
         )
@@ -471,6 +536,7 @@ fn delegation_family_authenticated_legacy_accepts_none_and_capability_scope() {
     let resolver = CountingResolver::legacy(&fixture);
     assert!(verify_aggregate_invocation_authority(
         &no_aggregate,
+        &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )
@@ -487,6 +553,7 @@ fn delegation_family_authenticated_legacy_accepts_none_and_capability_scope() {
     );
     let authority = verify_aggregate_invocation_authority(
         &capability,
+        &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )
@@ -506,6 +573,7 @@ fn delegation_family_authenticated_legacy_rejects_new_family_creation() {
 
     let error = verify_aggregate_invocation_authority(
         &leaf,
+        &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )
@@ -533,6 +601,7 @@ fn delegation_family_bound_root_rejects_omission_and_capability_downgrade() {
     );
     let omission_error = verify_aggregate_invocation_authority(
         &omitted,
+        &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )
@@ -552,6 +621,7 @@ fn delegation_family_bound_root_rejects_omission_and_capability_downgrade() {
     );
     let downgrade_error = verify_aggregate_invocation_authority(
         &downgraded,
+        &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )
@@ -581,6 +651,7 @@ fn delegation_family_bound_root_rejects_maximum_lowering_and_raising() {
         );
         let error = verify_aggregate_invocation_authority(
             &leaf,
+            &[],
             &[fixture.root_subject.public_key()],
             &resolver,
         )
@@ -614,6 +685,7 @@ fn delegation_family_bound_root_rejects_validly_resigned_binding_mutation() {
 
     let error = verify_aggregate_invocation_authority(
         &leaf,
+        &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )
@@ -642,6 +714,7 @@ fn delegation_family_bound_root_rejects_unrelated_chain_graft() {
 
     let error = verify_aggregate_invocation_authority(
         &grafted,
+        &[],
         &[unrelated.root_subject.public_key()],
         &resolver,
     )
@@ -681,6 +754,7 @@ fn delegation_family_first_link_id_mismatch_is_corrupt_resolution() {
 
     let error = verify_aggregate_invocation_authority(
         &leaf,
+        &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )
@@ -717,6 +791,7 @@ fn delegation_family_first_link_delegator_mismatch_is_rejected() {
 
     let error = verify_aggregate_invocation_authority(
         &leaf,
+        &[],
         &[unrelated_delegator.public_key()],
         &resolver,
     )
@@ -750,6 +825,7 @@ fn delegation_family_first_link_scope_hash_mismatch_is_rejected() {
 
     let error = verify_aggregate_invocation_authority(
         &leaf,
+        &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )
@@ -777,6 +853,7 @@ fn delegation_family_descendant_cannot_outlive_resolved_root() {
 
     let error = verify_aggregate_invocation_authority(
         &leaf,
+        &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )
@@ -802,6 +879,7 @@ fn delegation_family_resolver_root_record_id_mismatch_is_corrupt() {
 
     let error = verify_aggregate_invocation_authority(
         &leaf,
+        &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )
@@ -839,6 +917,7 @@ fn delegation_family_legacy_record_still_binds_first_hop_and_expiry() {
     );
     let delegator_error = verify_aggregate_invocation_authority(
         &wrong_leaf,
+        &[],
         &[wrong_delegator.public_key()],
         &resolver,
     )
@@ -858,6 +937,7 @@ fn delegation_family_legacy_record_still_binds_first_hop_and_expiry() {
     );
     let expiry_error = verify_aggregate_invocation_authority(
         &expired_leaf,
+        &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )
@@ -876,6 +956,7 @@ fn delegation_family_tampered_leaf_and_link_deny_before_resolution() {
     let resolver = CountingResolver::family(&fixture);
     let leaf_error = verify_aggregate_invocation_authority(
         &tampered_leaf,
+        &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )
@@ -899,6 +980,7 @@ fn delegation_family_tampered_leaf_and_link_deny_before_resolution() {
     );
     let link_error = verify_aggregate_invocation_authority(
         &leaf_with_tampered_link,
+        &[],
         &[fixture.root_subject.public_key()],
         &resolver,
     )

@@ -723,9 +723,12 @@ pub fn verify_direct_aggregate_family_root(
 /// descendant first authenticates the leaf and complete delegation chain, then
 /// resolves the first link's root capability ID through the trusted resolver.
 /// The resolver is never called for direct tokens or unauthenticated chains.
+/// Direct tokens require an independently trusted root issuer; descendant-leaf
+/// trust never authorizes empty-chain issuance.
 pub fn verify_aggregate_invocation_authority(
     token: &CapabilityToken,
-    trusted_leaf_issuers: &[PublicKey],
+    trusted_direct_root_issuers: &[PublicKey],
+    trusted_descendant_leaf_issuers: &[PublicKey],
     resolver: &dyn AggregateFamilyRootResolver,
 ) -> core::result::Result<
     Option<VerifiedAggregateInvocationAuthority>,
@@ -743,17 +746,24 @@ pub fn verify_aggregate_invocation_authority(
         )
         .into());
     }
-    if !trusted_leaf_issuers.contains(&token.issuer) {
+
+    if token.delegation_chain.is_empty() {
+        if !trusted_direct_root_issuers.contains(&token.issuer) {
+            return Err(Error::InvalidPublicKey(
+                "aggregate direct capability issuer is not trusted as a root authority".to_string(),
+            )
+            .into());
+        }
+        return verify_direct_aggregate_authority(token, trusted_direct_root_issuers);
+    }
+
+    if !trusted_descendant_leaf_issuers.contains(&token.issuer) {
         return Err(Error::InvalidPublicKey(
-            "aggregate authority capability issuer is not trusted".to_string(),
+            "aggregate descendant capability issuer is not trusted as a leaf authority".to_string(),
         )
         .into());
     }
     validate_capability_delegation_chain(token, None)?;
-
-    if token.delegation_chain.is_empty() {
-        return verify_direct_aggregate_authority(token, trusted_leaf_issuers);
-    }
 
     let first_link =
         token
