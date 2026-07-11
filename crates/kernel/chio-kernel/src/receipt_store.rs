@@ -497,6 +497,17 @@ pub trait ReceiptStore: Send + Sync {
         false
     }
 
+    /// Whether this store can honor a TENANT-SCOPED retention config
+    /// (`RetentionConfig.tenant_id` set). Default `false`: prefix-watermark
+    /// retention archives a contiguous checkpointed prefix of the WHOLE log and
+    /// cannot carve out a single tenant, so a tenant-scoped `rotate_receipts`
+    /// fails closed. A kernel configured with a tenant-scoped retention policy
+    /// uses this to refuse attaching a store that could never archive under it,
+    /// rather than spawning a worker that only logs "unsupported" every interval.
+    fn supports_tenant_scoped_retention(&self) -> bool {
+        false
+    }
+
     /// Archive receipts that have aged out under `config` (day/size
     /// threshold, or an explicit cutoff). Returns the number of archived
     /// tool-receipt rows. Default: unsupported (fail-closed) for stores that

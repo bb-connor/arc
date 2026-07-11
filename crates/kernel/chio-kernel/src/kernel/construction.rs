@@ -528,6 +528,20 @@ impl ChioKernel {
                         .to_string(),
                 ));
             }
+            // Fail-closed: a tenant-scoped retention policy cannot be honored by a
+            // prefix-watermark store (rotation archives a contiguous checkpointed
+            // prefix of the whole log, not one tenant's rows), so its rotate call
+            // fails closed and the worker would only log "tenant scope
+            // unsupported" every interval and never archive. Reject the attach
+            // rather than serve traffic under a policy the store cannot honor.
+            if config.tenant_id.is_some() && !receipt_store.supports_tenant_scoped_retention() {
+                return Err(KernelError::Internal(
+                    "KernelConfig.retention_config sets a tenant scope but the receipt store does \
+                     not support tenant-scoped retention; refusing to attach a store that cannot \
+                     honor the configured retention policy"
+                        .to_string(),
+                ));
+            }
             self.retention_maintenance =
                 Some(crate::receipt_store::RetentionMaintenanceHandle::spawn(
                     Arc::clone(&receipt_store),

@@ -60,6 +60,29 @@ fn attach_rejects_configured_retention_on_unsupported_store() {
     );
 }
 
+/// A tenant-scoped retention policy cannot be honored by a prefix-watermark
+/// store: rotation archives a contiguous checkpointed prefix of the whole log,
+/// not one tenant's rows, so `rotate_receipts` fails closed. Attaching a store
+/// that supports retention but not tenant scope under such a policy must fail
+/// closed at attach time, not spawn a worker that logs "unsupported" every
+/// interval while the kernel serves traffic the policy can never cover.
+#[test]
+fn attach_rejects_tenant_scoped_retention() {
+    let mut config = make_config();
+    config.retention_config = Some(crate::RetentionConfig {
+        tenant_id: Some("tenant-a".to_string()),
+        ..crate::RetentionConfig::default()
+    });
+    let mut kernel = make_kernel(config);
+    let error = kernel
+        .set_receipt_store(Box::new(RetentionCapableReceiptStore))
+        .expect_err("attach must reject a tenant-scoped retention policy the store cannot honor");
+    assert!(
+        matches!(&error, KernelError::Internal(message) if message.contains("tenant-scoped retention")),
+        "unexpected error: {error:?}"
+    );
+}
+
 #[test]
 fn all_calls_produce_verified_receipts() {
     let mut kernel = make_kernel(make_config());
