@@ -6,6 +6,14 @@ use super::super::cluster::{
     handle_internal_tool_receipts_delta,
 };
 use super::super::*;
+use axum::extract::DefaultBodyLimit;
+
+/// Body-size ceiling for evidence import, overriding the service-wide 1 MiB cap
+/// on this one route. An exported evidence bundle legitimately embeds many
+/// receipts plus its manifest and transparency data, so a whole-bundle import
+/// routinely exceeds the general request cap; it still needs a bound so the
+/// buffered `Json` decode cannot grow without limit.
+const EVIDENCE_IMPORT_MAX_BODY_BYTES: usize = 64 * 1024 * 1024;
 
 pub(crate) fn build_router(state: TrustServiceState) -> Router {
     // Seed the fixed alert-pack label sets at zero before this serve process can
@@ -303,7 +311,11 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         .route(RECEIPT_QUERY_PATH, get(handle_query_receipts))
         .route(RECEIPT_ANALYTICS_PATH, get(handle_receipt_analytics))
         .route(EVIDENCE_EXPORT_PATH, post(handle_evidence_export))
-        .route(EVIDENCE_IMPORT_PATH, post(handle_evidence_import))
+        .route(
+            EVIDENCE_IMPORT_PATH,
+            post(handle_evidence_import)
+                .layer(DefaultBodyLimit::max(EVIDENCE_IMPORT_MAX_BODY_BYTES)),
+        )
         .route(
             FEDERATION_EVIDENCE_SHARES_PATH,
             get(handle_shared_evidence_report),
