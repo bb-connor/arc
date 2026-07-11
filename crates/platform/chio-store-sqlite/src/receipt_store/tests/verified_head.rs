@@ -768,11 +768,7 @@ fn stale_head_validates_adopted_delta_before_trusting() -> Result<(), Box<dyn st
         ensure_lineage: false,
         response,
     }];
-    let results = append_receipt_batch(&store.pool, &mut stale_head, true, &requests);
-    let error = results
-        .into_iter()
-        .next()
-        .ok_or("expected one append result")?
+    let error = append_receipt_batch(&store.pool, &mut stale_head, true, &requests)
         .err()
         .ok_or("stale-head append over an out-of-band orphan row must be denied")?;
     match &error {
@@ -802,7 +798,7 @@ fn stale_head_validates_adopted_delta_before_trusting() -> Result<(), Box<dyn st
         ensure_lineage: false,
         response,
     }];
-    let results = append_receipt_batch(&store.pool, &mut fresh_head, true, &requests);
+    let results = append_receipt_batch(&store.pool, &mut fresh_head, true, &requests)?;
     assert!(
         results.iter().all(|result| result.is_ok()),
         "empty-delta append must add no validation and succeed: {results:?}"
@@ -1515,6 +1511,80 @@ fn seq_unchanged_recheck_catches_projection_tamper() -> Result<(), Box<dyn std::
     );
 
     drop(connection);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+/// A store-wide append fault (a stale head that adopts an out-of-band orphan
+/// row, a disk-full commit, a transaction that will not open) rejects the
+/// ENTIRE batch and will reject every future append until an operator reseeds.
+/// Recording the error alone leaves the pre-dispatch gate reading serving, so
+/// tools keep executing while no receipt can be persisted. The batch must
+/// poison the head so `writer_serving_closed` fails closed.
+#[test]
+fn store_wide_append_failure_poisons_the_head() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-store-wide-poison");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    // Three real receipts -> claim-log entries 1..=3.
+    for i in 0..3 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-poison-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+
+    // An out-of-band ORPHAN claim-log row at entry_seq 4 (no source receipt). A
+    // stale head (max_seq = 3) adopts it as baseline; the delta validator then
+    // rejects the whole batch closed, which is a store-wide fault.
+    {
+        let connection = store.connection()?;
+        connection.execute(
+            r#"
+            INSERT INTO claim_receipt_log_entries (
+                entry_seq, receipt_id, receipt_kind, source_seq, timestamp,
+                capability_id, tool_server, tool_name, raw_json
+            ) VALUES (4, 'orphan-poison-4', 'tool_receipt', 999, 1, 'cap-oob', 'shell', 'bash', '{}')
+            "#,
+            [],
+        )?;
+    }
+
+    let health = ReceiptCommitWriterHealth::default();
+    // Start from a serving-open writer so the store-wide append below is the
+    // only thing that can close the gate.
+    health.set_head_poisoned(false);
+    let mut head_state = WriterHeadState::Verified(Box::new(VerifiedHead {
+        latest_checkpoint: None,
+        claim_log_count: 3,
+        claim_log_max_seq: 3,
+    }));
+
+    let receipt = sample_receipt_with_keypair("rcpt-poison-append", 10, &keypair);
+    let raw_json = serde_json::to_string(&receipt)?;
+    let (response, _rx) = std::sync::mpsc::sync_channel(1);
+    let requests = vec![ReceiptCommitRequest {
+        receipt,
+        raw_json,
+        ensure_lineage: false,
+        response,
+    }];
+
+    let flush_error = commit_receipt_batch(&store.pool, &mut head_state, true, requests, &health);
+
+    assert!(
+        flush_error.is_some(),
+        "a store-wide append failure must surface a flush error"
+    );
+    assert!(
+        health.head_poisoned.load(Ordering::SeqCst),
+        "a store-wide append failure must poison the head so the pre-dispatch gate fails closed"
+    );
+    assert!(
+        matches!(head_state, WriterHeadState::Poisoned(_)),
+        "a store-wide append failure must transition the head to Poisoned"
+    );
+
     let _ = fs::remove_file(path);
     Ok(())
 }

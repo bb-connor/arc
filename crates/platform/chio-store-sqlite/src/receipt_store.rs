@@ -1246,14 +1246,35 @@ fn commit_receipt_batch(
     requests: Vec<ReceiptCommitRequest>,
     health: &ReceiptCommitWriterHealth,
 ) -> Option<ReceiptStoreError> {
-    let results = match head_state {
+    let batch_outcome = match head_state {
         WriterHeadState::Verified(head) => {
-            let results = append_receipt_batch(pool, head, incremental_verification, &requests);
-            health.store_head_snapshot(head);
-            results
+            match append_receipt_batch(pool, head, incremental_verification, &requests) {
+                Ok(results) => {
+                    health.store_head_snapshot(head);
+                    Ok(results)
+                }
+                Err(error) => Err(error),
+            }
         }
-        WriterHeadState::Poisoned(message) => {
-            receipt_batch_error_results(requests.len(), poisoned_head_error(message))
+        WriterHeadState::Poisoned(message) => Ok(receipt_batch_error_results(
+            requests.len(),
+            poisoned_head_error(message),
+        )),
+    };
+    let results = match batch_outcome {
+        Ok(results) => results,
+        Err(error) => {
+            // A store-wide append fault (a failed checkpoint or predecessor
+            // verification, a transaction that will not open, a disk-full commit)
+            // rejects every receipt in this batch and will reject every future
+            // append until an operator reseeds. Poison the head so the
+            // pre-dispatch gate fails closed rather than letting tools run against
+            // a store that can no longer persist their receipts.
+            let message = error.to_string();
+            let results = receipt_batch_error_results(requests.len(), error);
+            health.set_head_poisoned(true);
+            *head_state = WriterHeadState::Poisoned(message);
+            results
         }
     };
     let flush_error = results
@@ -1640,51 +1661,40 @@ fn append_single_receipt_record(
     Ok(seq)
 }
 
+/// Append a coalesced group-commit batch.
+///
+/// `Err` is a STORE-WIDE fault (pool acquisition, checkpoint or predecessor
+/// verification, transaction open/commit, projection drift, a disk-full commit)
+/// that rejected the whole batch and will reject every future append until an
+/// operator reseeds: the caller poisons the head. `Ok` carries one result per
+/// request; a single malformed receipt fails only its own slot via its
+/// per-record savepoint and leaves the head intact.
 fn append_receipt_batch(
     pool: &Pool<SqliteConnectionManager>,
     head: &mut VerifiedHead,
     incremental_verification: bool,
     requests: &[ReceiptCommitRequest],
-) -> Vec<Result<u64, ReceiptStoreError>> {
-    let mut connection = match pool.get() {
-        Ok(connection) => connection,
-        Err(error) => {
-            return receipt_batch_error_results(
-                requests.len(),
-                ReceiptStoreError::Pool(error.to_string()),
-            );
-        }
-    };
-    if let Err(error) = ensure_checkpoint_transparency_guards(&connection) {
-        return receipt_batch_error_results(requests.len(), error);
-    }
+) -> Result<Vec<Result<u64, ReceiptStoreError>>, ReceiptStoreError> {
+    let mut connection = pool
+        .get()
+        .map_err(|error| ReceiptStoreError::Pool(error.to_string()))?;
+    ensure_checkpoint_transparency_guards(&connection)?;
     if incremental_verification {
         // O(1) predecessor check (+ bounded catch-up), not a chain rebuild.
-        if let Err(error) = verify_head_against_latest_checkpoint(&connection, head) {
-            return receipt_batch_error_results(requests.len(), error);
-        }
-    } else if let Err(error) = validate_claim_receipt_log_entries(&connection) {
-        return receipt_batch_error_results(requests.len(), error);
+        verify_head_against_latest_checkpoint(&connection, head)?;
+    } else {
+        validate_claim_receipt_log_entries(&connection)?;
     }
-    let tx = match connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate) {
-        Ok(tx) => tx,
-        Err(error) => {
-            return receipt_batch_error_results(requests.len(), ReceiptStoreError::Sqlite(error));
-        }
-    };
+    let tx = connection
+        .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+        .map_err(ReceiptStoreError::Sqlite)?;
     if !incremental_verification {
-        if let Err(error) = verify_latest_checkpoint_integrity(&tx) {
-            return receipt_batch_error_results(requests.len(), error);
-        }
+        verify_latest_checkpoint_integrity(&tx)?;
     }
     // Baseline inside the IMMEDIATE tx: rows another store instance committed
     // since our last look are adopted as pre-existing, so the cross-check
     // below measures exactly what THIS batch inserted.
-    let (pre_delta, baseline_max) =
-        match claim_log_delta_count_and_max_seq(&tx, head.claim_log_max_seq) {
-            Ok(pair) => pair,
-            Err(error) => return receipt_batch_error_results(requests.len(), error),
-        };
+    let (pre_delta, baseline_max) = claim_log_delta_count_and_max_seq(&tx, head.claim_log_max_seq)?;
     // Validate the ADOPTED baseline delta before trusting it. Rows another
     // store instance committed since our last look
     // (head.claim_log_max_seq + 1 ..= baseline_max) are absorbed as
@@ -1695,11 +1705,7 @@ fn append_receipt_batch(
     // single-writer hot path the head is never stale, so pre_delta is 0 and
     // this is a no-op (zero added cost).
     if pre_delta > 0 {
-        if let Err(error) =
-            validate_adopted_claim_log_delta(&tx, head.claim_log_max_seq, baseline_max)
-        {
-            return receipt_batch_error_results(requests.len(), error);
-        }
+        validate_adopted_claim_log_delta(&tx, head.claim_log_max_seq, baseline_max)?;
     }
     let mut results = Vec::with_capacity(requests.len());
     for request in requests {
@@ -1718,17 +1724,12 @@ fn append_receipt_batch(
         // contiguous - and the loop continues with the others. Two extra SQL
         // statements per record: O(1) per record, O(b) per batch, never a
         // full-history scan, so the flat per-append cost holds.
-        if let Err(error) = tx.execute_batch("SAVEPOINT chio_append_record") {
-            return receipt_batch_error_results(requests.len(), ReceiptStoreError::Sqlite(error));
-        }
+        tx.execute_batch("SAVEPOINT chio_append_record")
+            .map_err(ReceiptStoreError::Sqlite)?;
         match append_single_receipt_record(&tx, request) {
             Ok(seq) => {
-                if let Err(error) = tx.execute_batch("RELEASE chio_append_record") {
-                    return receipt_batch_error_results(
-                        requests.len(),
-                        ReceiptStoreError::Sqlite(error),
-                    );
-                }
+                tx.execute_batch("RELEASE chio_append_record")
+                    .map_err(ReceiptStoreError::Sqlite)?;
                 results.push(Ok(seq));
             }
             Err(error) => {
@@ -1736,14 +1737,8 @@ fn append_receipt_batch(
                 // for the others. A savepoint that will not unwind is a
                 // transaction-integrity fault, so fail the whole batch closed in
                 // that (unexpected) case.
-                if let Err(rollback) =
-                    tx.execute_batch("ROLLBACK TO chio_append_record; RELEASE chio_append_record")
-                {
-                    return receipt_batch_error_results(
-                        requests.len(),
-                        ReceiptStoreError::Sqlite(rollback),
-                    );
-                }
+                tx.execute_batch("ROLLBACK TO chio_append_record; RELEASE chio_append_record")
+                    .map_err(ReceiptStoreError::Sqlite)?;
                 results.push(Err(error));
             }
         }
@@ -1768,18 +1763,11 @@ fn append_receipt_batch(
     // O(b) projection cross-check over the delta only: the claim-log
     // projection triggers (bootstrap/open.rs:676 tool, :711 child) must have
     // advanced the projection by exactly the rows this batch inserted.
-    let (delta_count, post_max) = match claim_log_delta_count_and_max_seq(&tx, baseline_max) {
-        Ok(pair) => pair,
-        Err(error) => return receipt_batch_error_results(requests.len(), error),
-    };
+    let (delta_count, post_max) = claim_log_delta_count_and_max_seq(&tx, baseline_max)?;
     if delta_count != inserted || post_max < baseline_max {
-        return receipt_batch_error_results(
-            requests.len(),
-            ReceiptStoreError::Conflict(
-                "claim receipt log projection drift on append; run `chio receipt audit`"
-                    .to_string(),
-            ),
-        );
+        return Err(ReceiptStoreError::Conflict(
+            "claim receipt log projection drift on append; run `chio receipt audit`".to_string(),
+        ));
     }
     // Validate the NEWLY-projected rows before advancing the head. The
     // count/MAX cross-check above only proves the projection
@@ -1797,21 +1785,15 @@ fn append_receipt_batch(
     // batch projects nothing, so this is a no-op). Fail-closed: a divergent row
     // returns the Conflict before `tx.commit()`, so the head never advances.
     if delta_count > 0 {
-        if let Err(error) = validate_adopted_claim_log_delta(&tx, baseline_max, post_max) {
-            return receipt_batch_error_results(requests.len(), error);
-        }
+        validate_adopted_claim_log_delta(&tx, baseline_max, post_max)?;
     }
-    match tx.commit() {
-        Ok(()) => {
-            head.claim_log_count = head
-                .claim_log_count
-                .saturating_add(pre_delta)
-                .saturating_add(delta_count);
-            head.claim_log_max_seq = post_max.max(baseline_max);
-            results
-        }
-        Err(error) => receipt_batch_error_results(requests.len(), ReceiptStoreError::Sqlite(error)),
-    }
+    tx.commit().map_err(ReceiptStoreError::Sqlite)?;
+    head.claim_log_count = head
+        .claim_log_count
+        .saturating_add(pre_delta)
+        .saturating_add(delta_count);
+    head.claim_log_max_seq = post_max.max(baseline_max);
+    Ok(results)
 }
 
 fn receipt_batch_error_results(
