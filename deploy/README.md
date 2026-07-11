@@ -126,8 +126,7 @@ az deployment group create \
       managedEnvironmentId=/subscriptions/.../managedEnvironments/my-env \
       userAssignedIdentityId=/subscriptions/.../userAssignedIdentities/chio-mi \
       chioAuthoritySeedSecretUri=https://my-kv.vault.azure.net/secrets/chio-authority-seed \
-      specStorageName=chio-openapi-spec \
-      receiptStorageName=chio-receipts
+      specStorageName=chio-openapi-spec
 ```
 
 ### Sidecar image

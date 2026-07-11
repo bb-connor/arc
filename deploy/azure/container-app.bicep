@@ -5,10 +5,12 @@
 //   ghcr.io/backbay-labs/chio-sidecar    -- replace with the sidecar image you pushed
 //   Key Vault secrets must be created before deploy; the Container Apps
 //   environment's managed identity needs GET on those secrets.
-//   AzureFile-backed environment storages (specStorageName, receiptStorageName)
-//   must be registered on the managed environment before deploy. The receipt
-//   store is a single-writer SQLite database; this template runs one replica so
-//   only it opens the receipt share (see the maxReplicas and volume notes).
+//   The AzureFile-backed spec storage (specStorageName) must be registered on
+//   the managed environment before deploy. The receipt store is a single-writer
+//   SQLite database in WAL mode, which needs a local filesystem, so it runs on a
+//   per-replica local volume rather than an Azure Files share; this template
+//   runs one replica for one coherent audit stream (see the maxReplicas and
+//   volume notes).
 //
 // Deploy:
 //   az deployment group create \
@@ -45,9 +47,6 @@ param userAssignedIdentityId string
 
 @description('Container Apps environment storage name backing the read-only OpenAPI spec share.')
 param specStorageName string
-
-@description('Container Apps environment storage name backing the durable receipt audit share.')
-param receiptStorageName string
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
@@ -216,29 +215,26 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
           ]
         }
-        // Durable audit store for a SINGLE writer. The receipt log is a SQLite
-        // database in WAL mode: WAL coordinates connections through a shared-memory
-        // index that requires every connection on the same host and a local
-        // filesystem, so it is not safe over a network filesystem (Azure Files)
-        // and two replicas writing the same file corrupt it. This app pins
-        // maxReplicas to 1 so exactly one replica opens the share; if the mounted
-        // filesystem cannot support WAL the sidecar refuses to start rather than
-        // run without durability. Container Apps has no per-replica persistent
-        // disk, so durability here depends on the Azure Files mount; horizontally
-        // scaled or multi-writer deployments belong on a platform with a
-        // per-instance disk or behind a client-server audit store. An emptyDir
-        // volume is ephemeral and would break audit continuity.
+        // Audit store for a SINGLE writer. The receipt log is a SQLite database
+        // in WAL mode: WAL coordinates connections through a shared-memory index
+        // that requires every connection on the same host and a local
+        // (non-network) filesystem, so it cannot run on an Azure Files share. The
+        // sidecar refuses to start if the mounted filesystem cannot support WAL.
+        // Container Apps has no per-replica persistent disk, so this template runs
+        // the log on a per-replica local volume: WAL works, but the log is lost on
+        // every revision recycle. For a durable audit trail, front a client-server
+        // audit store or move to a per-instance disk platform (a StatefulSet PVC,
+        // or an ECS task with an attached block volume).
         {
           name: 'chio-receipts'
-          storageType: 'AzureFile'
-          storageName: receiptStorageName
+          storageType: 'EmptyDir'
         }
       ]
-      // The receipt store is a single-writer SQLite database, so maxReplicas is
-      // pinned to 1: exactly one replica ever opens the receipt share. Fanning
-      // out to multiple replicas that share one receipt file would corrupt it.
-      // Scale horizontally with a per-instance disk or a client-server audit
-      // store instead of a shared SQLite file.
+      // The receipt store is a single-writer SQLite database on a per-replica
+      // local volume, so maxReplicas is pinned to 1: one replica keeps one
+      // coherent audit stream. Fanning out gives each replica its own separate
+      // log; for a single durable audit trail across scale, front a client-server
+      // audit store.
       scale: {
         minReplicas: 1
         maxReplicas: 1
