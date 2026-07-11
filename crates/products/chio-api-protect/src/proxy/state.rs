@@ -4,6 +4,17 @@ use chio_http_serve::{
     apply_server_hygiene, run_until_drained, ServeError, ServeHygieneConfig, ShutdownController,
 };
 
+/// Wall-clock ceiling on a single upstream proxy hop.
+///
+/// The proxy records its receipt inside the request handler, after the upstream
+/// call returns (success or failure). Bounding the upstream call here means a
+/// stalled upstream surfaces as a recorded bad-gateway receipt rather than an
+/// unbounded handler, and it stays below the drain window so an in-flight hop is
+/// resolved and receipted before a shutdown force-closes the connection. The
+/// proxy serve site therefore runs with no generic request timeout: that outer
+/// layer would drop the handler mid-hop and skip the receipt entirely.
+const UPSTREAM_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+
 /// Stored receipts for inspection and querying.
 pub(crate) struct ReceiptLog {
     pub(crate) receipts: Vec<HttpReceipt>,
@@ -288,7 +299,9 @@ impl ProtectProxy {
             };
 
         let egress_contract = default_upstream_egress_contract(&self.config.upstream)?;
-        let http_client = client_builder_with_contract(&egress_contract).build()?;
+        let http_client = client_builder_with_contract(&egress_contract)
+            .timeout(UPSTREAM_REQUEST_TIMEOUT)
+            .build()?;
         let state = Arc::new(ProxyState {
             evaluator,
             signer_keypair: keypair,
@@ -324,15 +337,27 @@ impl ProtectProxy {
 
         observer(local_addr);
 
-        let hygiene = ServeHygieneConfig::default();
+        // No generic request timeout: every proxied call writes its receipt
+        // synchronously in the handler after the upstream hop returns, and that
+        // hop is already bounded by the client's `UPSTREAM_REQUEST_TIMEOUT`. An
+        // outer timeout layer would drop the handler while it awaits the upstream,
+        // skipping receipt finalization for a call that may already have reached
+        // the upstream. Body size, concurrency, and the connection cap still apply.
+        let hygiene = ServeHygieneConfig {
+            request_timeout: None,
+            ..ServeHygieneConfig::default()
+        };
         let app = apply_server_hygiene(app, &hygiene);
         let controller = ShutdownController::install();
-        // This site serves with per-connection `ConnectInfo<SocketAddr>`, which
-        // is bound to the concrete listener, so the accept ceiling comes from
-        // the request concurrency limit rather than a listener connection cap.
+        // Cap simultaneously accepted connections at the accept loop so a slow or
+        // idle connection flood cannot exhaust file descriptors before any request
+        // reaches the concurrency limit. The peer address stays available to the
+        // sidecar-control loopback/bearer checks via `CappedPeerAddr`.
+        let listener =
+            MaxConnListener::new(listener, hygiene.max_connections.unwrap_or(usize::MAX));
         let server = axum::serve(
             listener,
-            app.into_make_service_with_connect_info::<SocketAddr>(),
+            app.into_make_service_with_connect_info::<CappedPeerAddr>(),
         )
         .with_graceful_shutdown(controller.signalled());
 
