@@ -183,6 +183,12 @@ fn test_state_with_receipt_db(
         } else {
             (None, Vec::new(), Vec::new(), HashSet::new())
         };
+    let revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>> = receipt_db.map(|path| {
+        Arc::new(
+            chio_store_sqlite::SqliteRevocationStore::open(format!("{path}.revocations"))
+                .test_unwrap(),
+        ) as Arc<dyn chio_kernel::RevocationStore>
+    });
     let signer_public_key = keypair.public_key();
     let trusted_capability_issuers = vec![signer_public_key.clone()];
     let trusted_receipt_signers = vec![signer_public_key];
@@ -208,6 +214,7 @@ fn test_state_with_receipt_db(
             receipts: tool_receipts,
         }),
         receipt_store,
+        revocation_store,
         revoked_capability_ids: Mutex::new(revoked_capability_ids),
         trusted_capability_issuers,
         trusted_receipt_signers,
@@ -1657,7 +1664,65 @@ async fn sidecar_release_persists_revocation_and_blocks_reuse() {
     let json: serde_json::Value = serde_json::from_slice(&body).test_unwrap();
     assert_eq!(json["message"], "capability token has been revoked");
 
-    let _ = std::fs::remove_file(receipt_db);
+    let _ = std::fs::remove_file(&receipt_db);
+    let _ = std::fs::remove_file(format!("{receipt_db}.revocations"));
+}
+
+#[tokio::test]
+async fn sidecar_release_reaches_a_replica_booted_before_the_revocation() {
+    // A sibling replica that started before the revocation keeps a stale, empty
+    // in-memory set. It must still deny the released capability by reading the
+    // shared durable revocation store the release path writes to.
+    let receipt_db = temp_receipt_db_path();
+    let routes = || {
+        vec![RouteEntry {
+            pattern: "/pets".to_string(),
+            method: HttpMethod::Post,
+            operation_id: Some("createPet".to_string()),
+            policy: PolicyDecision::DenyByDefault,
+        }]
+    };
+
+    // Replica B boots first, before any capability has been revoked.
+    let replica_b = test_state_with_receipt_db(
+        routes(),
+        "http://127.0.0.1:1".to_string(),
+        Some(&receipt_db),
+    );
+
+    // Replica A handles the release while replica B is already serving.
+    let replica_a = test_state_with_receipt_db(
+        routes(),
+        "http://127.0.0.1:1".to_string(),
+        Some(&receipt_db),
+    );
+    let release_request = with_loopback_peer(
+        Request::builder()
+            .method("POST")
+            .uri("/v1/capabilities/release")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_vec(&serde_json::json!({
+                    "capability_id": "cap-revoked",
+                    "job_uid": "job-uid-1",
+                    "reason": "completed",
+                }))
+                .test_unwrap(),
+            ))
+            .test_unwrap(),
+    );
+    let release_response =
+        sidecar_release_handler(State(Arc::clone(&replica_a)), release_request).await;
+    assert_eq!(release_response.status(), StatusCode::OK);
+
+    // Replica B never reloaded its in-memory set...
+    assert!(replica_b.revoked_capability_ids.lock().await.is_empty());
+    // ...yet the shared durable store makes the revocation visible to it.
+    let found = find_revoked_capability_id(&replica_b, None, Some("cap-revoked")).await;
+    assert_eq!(found, Some("cap-revoked".to_string()));
+
+    let _ = std::fs::remove_file(&receipt_db);
+    let _ = std::fs::remove_file(format!("{receipt_db}.revocations"));
 }
 
 #[tokio::test]

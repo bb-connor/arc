@@ -321,10 +321,28 @@ pub(crate) async fn sidecar_release_handler(
             "persistent receipt_db must be configured for capability release",
         );
     };
-    let mut store = store.lock().await;
-    if let Err(error) = store.revoke_capability(&capability_id) {
-        warn!("failed to persist capability revocation: {error}");
-        return internal_json_error_response("chio_capability_release_failed", &error.to_string());
+    {
+        let mut store = store.lock().await;
+        if let Err(error) = store.revoke_capability(&capability_id) {
+            warn!("failed to persist capability revocation: {error}");
+            return internal_json_error_response(
+                "chio_capability_release_failed",
+                &error.to_string(),
+            );
+        }
+    }
+    // Persist to the durable revocation store the health endpoint advertises so a
+    // sibling replica sharing the volume sees the revocation without waiting for a
+    // restart to reload its in-memory set. Fail closed: a release that cannot be
+    // recorded durably must not report success.
+    if let Some(revocation_store) = &state.revocation_store {
+        if let Err(error) = revocation_store.revoke(&capability_id) {
+            warn!("failed to persist durable capability revocation: {error}");
+            return internal_json_error_response(
+                "chio_capability_release_failed",
+                &error.to_string(),
+            );
+        }
     }
     state
         .revoked_capability_ids

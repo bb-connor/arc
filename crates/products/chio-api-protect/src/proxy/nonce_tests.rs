@@ -43,6 +43,7 @@ fn strict_nonce_state_with_upstream(routes: Vec<RouteEntry>, upstream: String) -
             receipts: Vec::new(),
         }),
         receipt_store: None,
+        revocation_store: None,
         revoked_capability_ids: Mutex::new(HashSet::new()),
         trusted_capability_issuers,
         trusted_receipt_signers,

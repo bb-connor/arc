@@ -145,6 +145,11 @@ pub(crate) struct ProxyState {
     pub(crate) receipt_log: Mutex<ReceiptLog>,
     pub(crate) tool_receipt_log: Mutex<ToolReceiptLog>,
     pub(crate) receipt_store: Option<Mutex<SqliteReceiptStore>>,
+    /// Durable revocation store shared with the embedded kernel. When a receipt
+    /// database is configured, releases persist here so a sibling replica on the
+    /// same volume observes the revocation even though its in-memory set was
+    /// loaded once at boot and is never reloaded.
+    pub(crate) revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>>,
     pub(crate) revoked_capability_ids: Mutex<HashSet<String>>,
     pub(crate) trusted_capability_issuers: Vec<PublicKey>,
     pub(crate) trusted_receipt_signers: Vec<PublicKey>,
@@ -278,7 +283,7 @@ impl ProtectProxy {
             Arc::clone(&approval_store),
             self.config.trusted_capability_issuers.clone(),
             durable_receipt_store,
-            durable_revocation_store,
+            durable_revocation_store.clone(),
         )
         .map_err(|error| ProtectError::Config(error.to_string()))?;
         let receipt_backend = evaluator.receipt_backend();
@@ -323,6 +328,7 @@ impl ProtectProxy {
             receipt_log: Mutex::new(receipt_log),
             tool_receipt_log: Mutex::new(tool_receipt_log),
             receipt_store,
+            revocation_store: durable_revocation_store,
             revoked_capability_ids: Mutex::new(revoked_capability_ids),
             trusted_capability_issuers,
             trusted_receipt_signers,
