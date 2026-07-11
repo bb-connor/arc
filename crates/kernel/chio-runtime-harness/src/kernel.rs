@@ -359,6 +359,18 @@ pub(crate) fn execute_runtime_loopback_step(
                 "Chio runtime loopback receipt store install: {error}"
             ))
         })?;
+    // The kernel dispatches fail-closed against ephemeral revocation state, so
+    // this isolated proof-regeneration kernel needs a durable revocation store
+    // of its own. Give it a temp sibling of the receipt store; the revocation
+    // set is empty and never survives the run.
+    let revocation_store_path = receipt_store_path.with_extension("revocations.sqlite3");
+    let revocation_store = chio_store_sqlite::SqliteRevocationStore::open(&revocation_store_path)
+        .map_err(|error| {
+        RuntimeLoopbackError::message(format!(
+            "Chio runtime loopback revocation store open: {error}"
+        ))
+    })?;
+    kernel.set_revocation_store(Box::new(revocation_store));
     let peer_pin_now_unix_ms = now_unix_ms;
     if let Some(origin_kernel_id) = step.request.origin_kernel_id.as_deref() {
         let origin_key = chio_attest_loopback::runtime_buyer_keypair();
