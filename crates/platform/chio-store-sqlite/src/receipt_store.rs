@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -148,9 +148,23 @@ struct ReceiptCommitWriterHealth {
     head_checkpointed_entry_seq: AtomicU64,
     head_claim_log_count: AtomicU64,
     head_claim_log_max_seq: AtomicU64,
+    // Mirror of the actor thread's `WriterHeadState` poison bit. The head lives
+    // only on the actor thread, so a poisoned head (every append rejected with a
+    // Conflict) is invisible to the supervised thread flag: the writer thread is
+    // still alive. Publishing it here lets `writer_serving_closed` deny at the
+    // pre-dispatch gate, so a tool is never executed against a store that cannot
+    // persist its receipt.
+    head_poisoned: AtomicBool,
 }
 
 impl ReceiptCommitWriterHealth {
+    /// Publish whether the writer head is poisoned. Written only by the actor
+    /// thread at every head-state transition (seed, post-write resync, reseed)
+    /// and read by `writer_serving_closed` from other threads.
+    fn set_head_poisoned(&self, poisoned: bool) {
+        self.head_poisoned.store(poisoned, Ordering::SeqCst);
+    }
+
     fn store_head_snapshot(&self, head: &VerifiedHead) {
         self.head_checkpoint_seq
             .store(head.checkpoint_seq(), Ordering::SeqCst);
@@ -272,10 +286,13 @@ impl ReceiptCommitActor {
         }
     }
 
-    /// True when the supervised writer has left the healthy state, so the kernel
-    /// pre-dispatch gate must fail closed.
+    /// True when durable persistence can no longer be trusted, so the kernel
+    /// pre-dispatch gate must fail closed. This is either the supervised writer
+    /// thread leaving the healthy state, or a poisoned verified head: the thread
+    /// is alive but every append is rejected with a Conflict until an operator
+    /// reseeds, which the thread flag alone cannot see.
     fn writer_serving_closed(&self) -> bool {
-        self.writer.health().is_serving_closed()
+        self.writer.health().is_serving_closed() || self.health.head_poisoned.load(Ordering::SeqCst)
     }
 
     /// The supervised writer's severity and cumulative restart count, for the
@@ -577,12 +594,16 @@ fn receipt_commit_actor_loop(
         }) {
         Ok(head) => {
             health.store_head_snapshot(&head);
+            // Seeding is authoritative: clear any poison a prior thread run (a
+            // panic-then-restart of the supervised writer) may have published.
+            health.set_head_poisoned(false);
             WriterHeadState::Verified(Box::new(head))
         }
         Err(error) => {
             if let Ok(mut last_error) = health.last_error.lock() {
                 *last_error = Some(error.to_string());
             }
+            health.set_head_poisoned(true);
             WriterHeadState::Poisoned(error.to_string())
         }
     };
@@ -899,6 +920,7 @@ fn handle_non_append_command(
                             // reaches the caller.
                             drop(inflight_guard);
                             record_write_job_outcome(health, respond(Err(error)));
+                            health.set_head_poisoned(true);
                             *head_state = WriterHeadState::Poisoned(poison_message);
                         }
                     }
@@ -977,6 +999,7 @@ fn handle_non_append_command(
                     // though the store recovered. Fail-closed is unaffected: a
                     // real later batch failure re-sets `pending_flush_error`.
                     *pending_flush_error = None;
+                    health.set_head_poisoned(false);
                     *head_state = WriterHeadState::Verified(Box::new(head));
                     // Build owed checkpoints after a successful reseed. If the
                     // background signer was installed
@@ -1002,6 +1025,7 @@ fn handle_non_append_command(
                     if let Ok(mut last_error) = health.last_error.lock() {
                         *last_error = Some(error.to_string());
                     }
+                    health.set_head_poisoned(true);
                     *head_state = WriterHeadState::Poisoned(error.to_string());
                     Err(error)
                 }
@@ -2222,8 +2246,11 @@ impl SqliteReceiptStore {
         })
     }
 
-    /// Whether the supervised commit writer has left the healthy state, so the
-    /// kernel pre-dispatch gate must deny before a tool executes.
+    /// Whether the commit writer can no longer be trusted to persist receipts, so
+    /// the kernel pre-dispatch gate must deny before a tool executes. True when the
+    /// supervised writer thread has left the healthy state, and also when the
+    /// writer's verified head is poisoned: the thread is alive but every append is
+    /// rejected until an operator reseeds.
     pub fn writer_serving_closed(&self) -> bool {
         self.receipt_commit_actor.writer_serving_closed()
     }

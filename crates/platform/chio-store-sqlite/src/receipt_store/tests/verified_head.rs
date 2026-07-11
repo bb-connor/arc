@@ -432,6 +432,82 @@ fn reseed_on_still_corrupt_store_stays_poisoned() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
+/// A poisoned verified head must report the writer as serving-closed even though
+/// the supervised writer thread is still alive. The kernel pre-dispatch gate
+/// reads `writer_serving_closed`; if a poisoned head read healthy there, a tool
+/// would execute and only then fail to persist its receipt, the exact
+/// evidence-less side effect the gate exists to prevent. Recovery clears it.
+#[test]
+fn poisoned_head_reports_writer_serving_closed() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-head-poison-serving");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    for i in 0..3 {
+        let receipt = sample_receipt_with_keypair(
+            &format!("rcpt-poison-serving-{i}"),
+            (i + 1) as u64,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    store.create_next_receipt_checkpoint(3, &keypair)?;
+
+    // A healthy writer with a verified head serves.
+    assert!(
+        !store.writer_serving_closed(),
+        "a healthy writer with a verified head must serve"
+    );
+
+    // Tamper the latest checkpoint so the writer's predecessor check diverges,
+    // surface the divergence with a denied append, then run a reseed over the
+    // still-corrupt log: it fails closed and leaves the head Poisoned. The
+    // writer thread never dies through any of this.
+    let connection = store.connection()?;
+    let original: String = connection.query_row(
+        "SELECT statement_json FROM kernel_checkpoints WHERE checkpoint_seq = 1",
+        [],
+        |row| row.get(0),
+    )?;
+    connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+    connection.execute(
+        "UPDATE kernel_checkpoints SET statement_json = replace(statement_json, '\"batch_end_seq\":3', '\"batch_end_seq\":2')",
+        [],
+    )?;
+    drop(connection);
+    let denied = sample_receipt_with_keypair("rcpt-poison-serving-denied", 50, &keypair);
+    assert!(store.append_chio_receipt_returning_seq(&denied).is_err());
+    assert!(
+        store.reseed_verified_head().is_err(),
+        "a reseed over a corrupt log must fail closed and poison the head"
+    );
+
+    // The poisoned head reads serving-closed even though the supervised writer
+    // thread is still alive, so the pre-dispatch gate denies before dispatch.
+    assert!(
+        store.writer_serving_closed(),
+        "a poisoned head must report the writer serving-closed"
+    );
+
+    // Repair the data out of band and reseed: the head is verified again, so the
+    // store serves once more (the poison signal is cleared, not sticky).
+    let connection = store.connection()?;
+    connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+    connection.execute(
+        "UPDATE kernel_checkpoints SET statement_json = ?1 WHERE checkpoint_seq = 1",
+        rusqlite::params![original],
+    )?;
+    drop(connection);
+    store.reseed_verified_head()?;
+    assert!(
+        !store.writer_serving_closed(),
+        "a reseeded, verified head must serve again"
+    );
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
 /// `reseed_verified_head()` success clears `last_error` and replaces the head,
 /// and must ALSO clear the actor loop's separate `pending_flush_error` (set by
 /// an earlier poisoned append). Otherwise a subsequent STANDALONE
