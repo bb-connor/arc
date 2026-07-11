@@ -1050,6 +1050,23 @@ impl InMemoryBudgetStoreInner {
         Ok(())
     }
 
+    fn list_open_delegated_reserved_hold_ids(&self) -> Vec<String> {
+        // A delegated reserve-for-caller hold is open, was marked reserved
+        // (reserved_until is set), and carries a delegation depth of at least
+        // one, so it holds its child's sibling-sum share admitted against the
+        // parent until it closes.
+        self.holds
+            .iter()
+            .filter(|(_, hold)| hold.disposition == BudgetHoldDisposition::Open)
+            .filter(|(_, hold)| hold.reserved_until.is_some())
+            .filter(|(_, hold)| {
+                hold.reserved_delegation_depth
+                    .is_some_and(|depth| depth >= 1)
+            })
+            .map(|(hold_id, _)| hold_id.clone())
+            .collect()
+    }
+
     fn reap_expired_reserved_holds(
         &mut self,
         now_unix_secs: i64,
@@ -1556,6 +1573,14 @@ impl BudgetStore for InMemoryBudgetStore {
     fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
         self.lock_inner()?
             .reap_expired_reserved_holds(now_unix_secs)
+    }
+
+    fn list_open_delegated_reserved_hold_ids(
+        &self,
+    ) -> Result<Option<Vec<String>>, BudgetStoreError> {
+        Ok(Some(
+            self.lock_inner()?.list_open_delegated_reserved_hold_ids(),
+        ))
     }
 }
 

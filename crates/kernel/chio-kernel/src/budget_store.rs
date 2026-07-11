@@ -775,6 +775,29 @@ pub trait BudgetStore: Send + Sync {
         Ok(0)
     }
 
+    /// Ids of holds that are still `open` and were stamped as a delegated
+    /// reserve-for-caller reservation: marked reserved (via
+    /// [`Self::mark_hold_reserved`] or [`Self::reserve_invocation_hold`]) with a
+    /// delegation depth of at least one. Such a hold keeps its delegated child's
+    /// sibling-sum share admitted against the parent for as long as it stays
+    /// open. A freshly built mediation kernel consults this after a restart: the
+    /// in-memory sibling-sum reservations were lost, and the durable hold record
+    /// carries neither the immediate parent capability id nor the child and
+    /// parent shares needed to rebuild them, so mediation denies delegated
+    /// admission fail-closed while any such hold from a prior process is still
+    /// open.
+    ///
+    /// `Ok(Some(ids))` enumerates those holds precisely. `Ok(None)` marks a store
+    /// that cannot enumerate them; the caller then falls back to
+    /// [`Self::count_open_holds`] and gates on the presence of any open hold. The
+    /// default is `Ok(None)` so a store that does not persist hold state is
+    /// treated as unable to enumerate rather than as having none.
+    fn list_open_delegated_reserved_hold_ids(
+        &self,
+    ) -> Result<Option<Vec<String>>, BudgetStoreError> {
+        Ok(None)
+    }
+
     /// Project a single hold by id, or `None` when it is unknown. Stores that
     /// do not persist hold state return `Ok(None)` (the default). Used by the
     /// reconcile-by-nonce entry point to resolve the exact reserved hold a

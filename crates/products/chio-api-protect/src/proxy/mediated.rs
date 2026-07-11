@@ -206,6 +206,20 @@ pub(crate) fn build_mediation_kernel(
     for server in tool_servers {
         kernel.register_tool_server(server);
     }
+    // Rebuild the delegated reserve-for-caller accounting from the durable budget
+    // store. A delegated reservation keeps its child's sibling-sum share admitted
+    // against the parent while its hold stays open, but that admission is
+    // in-memory only, so a kernel built fresh over a populated store (a restart)
+    // would otherwise admit a sibling against the parent as if the still-open
+    // reservation consumed nothing. Since the durable hold record does not carry
+    // the parent capability id or the shares needed to rebuild the reservation,
+    // this arms a fail-closed gate that denies delegated admission while any such
+    // hold from a prior process remains open. Fail-closed: a store read error here
+    // aborts startup so the sidecar refuses to mediate over a store it could not
+    // inspect.
+    kernel
+        .arm_restart_reserved_hold_gate()
+        .map_err(|error| ProtectError::Config(error.to_string()))?;
     Ok(kernel)
 }
 

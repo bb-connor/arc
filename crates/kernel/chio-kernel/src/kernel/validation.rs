@@ -338,6 +338,13 @@ impl ChioKernel {
     pub(crate) fn admit_capability_budget(&self, cap: &CapabilityToken) -> Result<bool, String> {
         if let Some(parent_link) = cap.delegation_chain.last() {
             use chio_kernel_core::BudgetRegistry;
+            // A delegated reserve-for-caller hold left open by a prior process
+            // still consumes its parent's sibling-sum share, but that admission
+            // was lost when this kernel rebuilt its in-memory registry. Deny this
+            // delegated admission fail-closed until every such hold has closed, so
+            // a sibling is never admitted against the parent as if the still-open
+            // reservation consumed nothing.
+            self.enforce_restart_reserved_hold_gate()?;
             let proposed_share = cap
                 .budget_share_bps
                 .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS);
@@ -449,6 +456,119 @@ impl ChioKernel {
                 reason = %redacted!(&error),
                 "failed to release reserved sibling share for a closed hold"
             );
+        }
+    }
+
+    fn lock_restart_reserved_hold_gate(
+        &self,
+    ) -> std::sync::MutexGuard<'_, crate::kernel::RestartReservedHoldGate> {
+        match self.restart_reserved_hold_gate.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+
+    /// Rebuild the delegated reserve-for-caller accounting from the durable
+    /// budget store after a restart, arming the fail-closed gate consulted on
+    /// every delegated admission.
+    ///
+    /// A delegated reservation keeps its child's sibling-sum share admitted
+    /// against the parent while its durable hold stays open, but that admission
+    /// lives only in this process's in-memory registry. A mediation kernel built
+    /// fresh over a populated budget store therefore starts with an empty
+    /// sibling-sum map even though open delegated reservations from the prior
+    /// process are still consuming their parents' budget. The durable hold record
+    /// carries neither the immediate parent capability id nor the child and
+    /// parent shares, so the in-memory reservation cannot be reconstructed. Rather
+    /// than admit a sibling against an unaccounted reservation, the kernel gates
+    /// delegated admission fail-closed until every such open hold has closed.
+    ///
+    /// Fail-closed: a store read error aborts here so kernel startup can refuse to
+    /// serve mediation over a store it could not inspect. When the store reports
+    /// no open holds the gate stays clear; when it can enumerate its reserved
+    /// holds the gate tracks exactly those still open; when it cannot enumerate
+    /// them yet reports open holds the gate denies until the open-hold count
+    /// drains to zero.
+    pub fn arm_restart_reserved_hold_gate(&self) -> Result<(), KernelError> {
+        let gate = match self
+            .with_budget_store(|store| Ok(store.list_open_delegated_reserved_hold_ids()?))?
+        {
+            Some(hold_ids) => {
+                let pending: std::collections::HashSet<String> = hold_ids.into_iter().collect();
+                if pending.is_empty() {
+                    crate::kernel::RestartReservedHoldGate::Clear
+                } else {
+                    crate::kernel::RestartReservedHoldGate::PendingHolds(pending)
+                }
+            }
+            None => {
+                let open = self.with_budget_store(|store| Ok(store.count_open_holds()?))?;
+                if open == 0 {
+                    crate::kernel::RestartReservedHoldGate::Clear
+                } else {
+                    crate::kernel::RestartReservedHoldGate::PendingOpaqueCount
+                }
+            }
+        };
+        *self.lock_restart_reserved_hold_gate() = gate;
+        Ok(())
+    }
+
+    /// Deny a delegated admission fail-closed while a delegated reserve-for-caller
+    /// hold from a prior process is still open and unaccounted (see
+    /// [`Self::arm_restart_reserved_hold_gate`]). Returns `Ok(())` once the gate is
+    /// clear so the admission proceeds. Idempotently drains holds that have since
+    /// closed, clearing the gate exactly when the last one settles so mediation
+    /// resumes without a restart. Fail-closed on a store read error and on any
+    /// hold that stays open.
+    fn enforce_restart_reserved_hold_gate(&self) -> Result<(), String> {
+        let mut gate = self.lock_restart_reserved_hold_gate();
+        match &*gate {
+            crate::kernel::RestartReservedHoldGate::Clear => Ok(()),
+            crate::kernel::RestartReservedHoldGate::PendingHolds(pending) => {
+                let mut still_open = std::collections::HashSet::new();
+                for hold_id in pending {
+                    let open = self
+                        .with_budget_store(|store| {
+                            Ok(match store.get_budget_hold(hold_id)? {
+                                Some(hold) => hold.disposition.is_open(),
+                                None => false,
+                            })
+                        })
+                        .map_err(|error| error.to_string())?;
+                    if open {
+                        still_open.insert(hold_id.clone());
+                    }
+                }
+                if still_open.is_empty() {
+                    *gate = crate::kernel::RestartReservedHoldGate::Clear;
+                    Ok(())
+                } else {
+                    let count = still_open.len();
+                    *gate = crate::kernel::RestartReservedHoldGate::PendingHolds(still_open);
+                    Err(format!(
+                        "delegated reserve-for-caller hold(s) from a prior process remain open \
+                         ({count}); a sibling cannot be admitted until they are reconciled or \
+                         reaped, because their sibling-sum share cannot be rebuilt from the \
+                         durable record"
+                    ))
+                }
+            }
+            crate::kernel::RestartReservedHoldGate::PendingOpaqueCount => {
+                let open = self
+                    .with_budget_store(|store| Ok(store.count_open_holds()?))
+                    .map_err(|error| error.to_string())?;
+                if open == 0 {
+                    *gate = crate::kernel::RestartReservedHoldGate::Clear;
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "open budget hold(s) from a prior process remain ({open}) and the store \
+                         cannot enumerate reserved holds; a delegated sibling cannot be admitted \
+                         until they are reconciled or reaped"
+                    ))
+                }
+            }
         }
     }
 

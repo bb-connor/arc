@@ -268,6 +268,7 @@ impl ChioKernel {
             revocation_view: None,
             budget_registry: Mutex::new(chio_kernel_core::InMemoryBudgetRegistry::new()),
             reserved_sibling_shares: Mutex::new(HashMap::new()),
+            restart_reserved_hold_gate: Mutex::new(kernel_struct::RestartReservedHoldGate::Clear),
             rss_shed: Arc::new(AtomicBool::new(false)),
             rss_sampler: None,
         };

@@ -30,7 +30,7 @@ pub(crate) use kernel_scopes::{
     ScopedKernelReceiptTenantId,
 };
 pub(crate) use kernel_struct::{
-    capability_crypto_floor, receipt_crypto_floor, ReservedSiblingShare,
+    capability_crypto_floor, receipt_crypto_floor, ReservedSiblingShare, RestartReservedHoldGate,
 };
 
 pub type AgentId = String;
