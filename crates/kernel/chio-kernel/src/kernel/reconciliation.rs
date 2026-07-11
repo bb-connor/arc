@@ -20,7 +20,9 @@ use chio_log_redact::redacted;
 use super::*;
 
 use crate::budget_store::{BudgetHoldSnapshot, BudgetReconcileHoldRequest};
-use crate::execution_nonce::{verify_execution_nonce, SignedExecutionNonce};
+use crate::execution_nonce::{
+    consume_execution_nonce, verify_execution_nonce_without_consume, SignedExecutionNonce,
+};
 
 /// Canonical inert currency stamped onto the signed receipt for a zero-exposure
 /// invocation reconcile. Such a reserve carries no reserved currency, so its
@@ -66,11 +68,34 @@ impl ChioKernel {
             }
             Ok(expiring)
         })?;
-        let settled =
-            self.with_budget_store(|store| Ok(store.reap_expired_reserved_holds(now_unix_secs)?))?;
-        for hold_id in expiring {
-            self.release_reserved_sibling_share_for_hold(&hold_id);
+        // Run the store reap but do NOT propagate its error yet. If the store
+        // settled some holds before failing partway through the sweep, those
+        // closed holds' sibling shares must still be released, or a closed hold's
+        // admitted share leaks (the next sweep no longer sees it as open) and
+        // wrongly denies valid sibling reservations until restart.
+        let reap_result =
+            self.with_budget_store(|store| Ok(store.reap_expired_reserved_holds(now_unix_secs)?));
+
+        // Release the sibling share for exactly those expiring holds the store
+        // actually closed. Re-query each hold's disposition: a hold now closed or
+        // missing was forfeited, so its share is freed; a hold still open was not
+        // settled by the store, so its share is retained. Fail-closed on the
+        // re-query itself: a hold whose disposition cannot be read keeps its share
+        // held, so a read error never frees a share for a still-open hold.
+        for hold_id in &expiring {
+            let closed = match self.with_budget_store(|store| Ok(store.get_budget_hold(hold_id)?)) {
+                Ok(Some(hold)) => !hold.disposition.is_open(),
+                Ok(None) => true,
+                Err(_) => false,
+            };
+            if closed {
+                self.release_reserved_sibling_share_for_hold(hold_id);
+            }
         }
+
+        // Propagate any store reap error only after the settled holds' shares are
+        // released.
+        let settled = reap_result?;
         Ok(settled)
     }
 
@@ -86,17 +111,26 @@ impl ChioKernel {
     ///    authorized in. This is checked BEFORE the nonce is consumed, so a
     ///    mismatch is rejected fail-closed without burning the nonce or settling,
     ///    and an unchecked caller-supplied currency never reaches a signed receipt.
-    /// 4. The nonce is verified (schema, expiry, signature under the kernel key,
-    ///    single-use replay) and CONSUMED. A second reconcile of the same nonce
-    ///    is rejected as a replay; a forged or tampered nonce fails the signature
-    ///    check and is never consumed.
+    /// 4. The nonce is VERIFIED (schema, expiry, signature under the kernel key,
+    ///    and that it has not already been consumed) but is NOT yet marked
+    ///    consumed. A forged or tampered nonce fails the signature check; an
+    ///    already-settled nonce fails the replay check; neither is ever marked.
     /// 5. The named hold must still be open. A missing or already-closed hold is
-    ///    rejected.
+    ///    rejected. This open-to-closed settle is the mutual-exclusion point: two
+    ///    concurrent presentations of the same nonce cannot both settle because
+    ///    the store closes the hold atomically (the second finds it closed and is
+    ///    rejected here), so deferring the nonce mark opens no double-settle window.
     /// 6. The hold is settled at `min(realized_cost, reserved)` -- realized cost
     ///    is CLAMPED to the reserved worst-case, since the payer never authorized
     ///    more than the reserved envelope. A realized cost of zero settles the
     ///    hold at zero, releasing the entire reserved amount back to the grant.
-    /// 7. A completed allow receipt is signed with the reconciled hold lineage
+    /// 7. The nonce is marked consumed (single-use replay) ONLY after the settle
+    ///    succeeds. A transient store error at step 6 therefore leaves the nonce
+    ///    unconsumed, so the caller can re-present the same signed nonce and settle
+    ///    at realized cost instead of forfeiting the reservation. Once the hold is
+    ///    closed a replay is already rejected at step 5, so marking after
+    ///    settlement is safe.
+    /// 8. A completed allow receipt is signed with the reconciled hold lineage
     ///    and the nonce id, so `is_authoritative_spend_receipt` accepts it.
     pub fn reconcile_reserved_authorization_by_nonce(
         &self,
@@ -160,10 +194,12 @@ impl ChioKernel {
             }
         })?;
 
-        // (4) Verify and CONSUME the nonce. Verifying against the nonce's own
-        // binding makes the binding self-check trivially pass while the signature
-        // check (over the full body including reserved_hold_id) still rejects any
-        // forgery or tamper, and the store reservation enforces single-use.
+        // (4) Verify the nonce but do NOT consume it yet. Verifying against the
+        // nonce's own binding makes the binding self-check trivially pass while
+        // the signature check (over the full body including reserved_hold_id)
+        // still rejects any forgery or tamper, and the replay peek rejects an
+        // already-consumed nonce. The single-use mark is deferred to step 7 so a
+        // transient settle error below leaves the nonce replayable for a retry.
         let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
             KernelError::Internal(
                 "execution nonce store is not installed; cannot reconcile by nonce".to_string(),
@@ -171,7 +207,7 @@ impl ChioKernel {
         })?;
         let now_unix = current_unix_timestamp();
         let now = i64::try_from(now_unix).unwrap_or(i64::MAX);
-        verify_execution_nonce(
+        verify_execution_nonce_without_consume(
             presented_nonce,
             &self.config.keypair.public_key(),
             &presented_nonce.nonce.bound_to,
@@ -230,6 +266,28 @@ impl ChioKernel {
                     store.budget_metering_profile(),
                 ))
             })?;
+
+        // (7) The hold settled successfully and is now closed, so take the
+        // single-use nonce mark. Deferring it to here means a transient store
+        // error at the settle above left the nonce unconsumed, so the caller can
+        // re-present the same signed nonce and settle at realized cost rather than
+        // forfeiting the reservation. A consume failure now is non-fatal: the
+        // settle is already irreversible and the closed hold alone rejects any
+        // replay (a second presentation fails the open-hold check at step 5), so
+        // log it and continue rather than deny a spend that truly committed.
+        if let Err(error) = consume_execution_nonce(
+            store,
+            presented_nonce.nonce_id(),
+            presented_nonce.expires_at(),
+        ) {
+            warn!(
+                nonce_id = %presented_nonce.nonce_id(),
+                hold_id = %hold.hold_id,
+                reason = %error,
+                "failed to mark the reconcile nonce consumed after an irreversible settlement; \
+                 the closed hold still rejects any replay"
+            );
+        }
 
         // The reserved hold is now settled (closed), so release the sibling-sum
         // share it kept admitted, freeing the parent's headroom for a sibling.

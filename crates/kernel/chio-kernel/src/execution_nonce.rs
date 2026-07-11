@@ -248,6 +248,20 @@ pub trait ExecutionNonceStore: Send + Sync {
     fn reserve_until(&self, nonce_id: &str, _nonce_expires_at: i64) -> Result<bool, KernelError> {
         self.reserve(nonce_id)
     }
+
+    /// Report whether `nonce_id` has already been consumed, WITHOUT consuming
+    /// it. The two-phase reconcile path uses this to reject an already-settled
+    /// nonce during verification while deferring the single-use mark until after
+    /// the bound hold settles. Fail-closed: a store error propagates as `Err`.
+    ///
+    /// The default returns `Ok(false)` for best-effort stores that cannot peek
+    /// without consuming. Those stores still enforce single-use through the
+    /// atomic `reserve`/`reserve_until` mark taken after settlement, and the
+    /// bound hold's atomic open-to-closed settle independently rejects a replay
+    /// (a second presentation finds the hold already closed).
+    fn is_consumed(&self, _nonce_id: &str) -> Result<bool, KernelError> {
+        Ok(false)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -310,6 +324,20 @@ impl ExecutionNonceStore for InMemoryExecutionNonceStore {
         let retention = duration_until_unix_secs(nonce_expires_at)
             .map_or(self.ttl, |remaining| remaining.max(self.ttl));
         self.reserve_with_retention(nonce_id, retention)
+    }
+
+    fn is_consumed(&self, nonce_id: &str) -> Result<bool, KernelError> {
+        let cache = self.inner.lock().map_err(|_| {
+            error!("execution nonce store mutex poisoned; denying fail-closed");
+            KernelError::Internal("execution nonce store mutex poisoned; fail-closed".to_string())
+        })?;
+        let now = Instant::now();
+        // A retained, unexpired marker means the nonce was already consumed. A
+        // marker past its retention is treated as absent, mirroring
+        // reserve_with_retention, which drops a stale entry before re-reserving.
+        Ok(cache
+            .peek(nonce_id)
+            .is_some_and(|retain_until| *retain_until > now))
     }
 }
 
@@ -462,20 +490,23 @@ impl From<ExecutionNonceError> for KernelError {
     }
 }
 
-/// Verify a signed execution nonce against the expected binding.
+/// Verify a nonce's schema, expiry, binding, and signature WITHOUT touching the
+/// replay store.
 ///
 /// Steps, in order:
 /// 1. Schema check.
 /// 2. Expiry check -- `now < nonce.expires_at`.
 /// 3. Binding check -- subject, capability, server, tool, parameter_hash.
 /// 4. Signature check -- canonical JSON under the kernel's pubkey.
-/// 5. Replay check -- `nonce_store.reserve(nonce_id)` must return `true`.
-pub fn verify_execution_nonce(
+///
+/// Shared by the single-phase verify-and-consume path and the two-phase
+/// verify-then-consume reconcile path so both apply identical cryptographic and
+/// binding checks; only the replay handling differs between them.
+fn verify_execution_nonce_shape(
     presented: &SignedExecutionNonce,
     kernel_pubkey: &PublicKey,
     expected: &NonceBinding,
     now: i64,
-    nonce_store: &dyn ExecutionNonceStore,
 ) -> Result<(), ExecutionNonceError> {
     if !is_supported_execution_nonce_schema(&presented.nonce.schema) {
         warn!(
@@ -535,6 +566,32 @@ pub fn verify_execution_nonce(
         return Err(ExecutionNonceError::InvalidSignature);
     }
 
+    Ok(())
+}
+
+/// Verify a signed execution nonce against the expected binding and CONSUME it
+/// in one step (single-phase dispatch gate).
+///
+/// Steps, in order:
+/// 1. Schema check.
+/// 2. Expiry check -- `now < nonce.expires_at`.
+/// 3. Binding check -- subject, capability, server, tool, parameter_hash.
+/// 4. Signature check -- canonical JSON under the kernel's pubkey.
+/// 5. Replay check -- `nonce_store.reserve_until(nonce_id, ...)` must return
+///    `true`, which also marks the nonce consumed.
+///
+/// A caller that must defer the single-use mark until an authorized action has
+/// committed uses [`verify_execution_nonce_without_consume`] plus
+/// [`consume_execution_nonce`] instead.
+pub fn verify_execution_nonce(
+    presented: &SignedExecutionNonce,
+    kernel_pubkey: &PublicKey,
+    expected: &NonceBinding,
+    now: i64,
+    nonce_store: &dyn ExecutionNonceStore,
+) -> Result<(), ExecutionNonceError> {
+    verify_execution_nonce_shape(presented, kernel_pubkey, expected, now)?;
+
     // Pass the nonce's signed expiry so durable stores retain the
     // consumed marker for the full validity window - otherwise the row
     // can be pruned while the nonce is still cryptographically valid,
@@ -548,6 +605,60 @@ pub fn verify_execution_nonce(
             );
             Err(ExecutionNonceError::Replayed)
         }
+        Err(e) => Err(ExecutionNonceError::Store(e.to_string())),
+    }
+}
+
+/// Verify a signed execution nonce (schema, expiry, binding, signature, AND that
+/// it has not already been consumed) WITHOUT marking it consumed.
+///
+/// The single-use mark is deferred to [`consume_execution_nonce`], which the
+/// caller invokes only after the action the nonce authorizes has irreversibly
+/// committed. This lets a caller that hit a transient error after verification
+/// but before commit retry the same signed nonce instead of forfeiting it. A
+/// forged, tampered, expired, or already-consumed nonce is still rejected here,
+/// and no store mark is taken on any path.
+pub fn verify_execution_nonce_without_consume(
+    presented: &SignedExecutionNonce,
+    kernel_pubkey: &PublicKey,
+    expected: &NonceBinding,
+    now: i64,
+    nonce_store: &dyn ExecutionNonceStore,
+) -> Result<(), ExecutionNonceError> {
+    verify_execution_nonce_shape(presented, kernel_pubkey, expected, now)?;
+
+    // Replay peek only: reject an already-consumed nonce, but do NOT mark it.
+    if nonce_store
+        .is_consumed(&presented.nonce.nonce_id)
+        .map_err(|e| ExecutionNonceError::Store(e.to_string()))?
+    {
+        warn!(
+            nonce_id = %presented.nonce.nonce_id,
+            "rejecting already-consumed execution nonce"
+        );
+        return Err(ExecutionNonceError::Replayed);
+    }
+
+    Ok(())
+}
+
+/// Mark a verified nonce consumed (single-use).
+///
+/// Call ONLY after the settlement the nonce authorizes has succeeded, so a
+/// failure before settlement leaves the nonce replayable for a legitimate
+/// retry. Pairs with [`verify_execution_nonce_without_consume`]. Returns
+/// [`ExecutionNonceError::Replayed`] if a concurrent consumer already claimed
+/// it, and fails closed on any store error.
+pub fn consume_execution_nonce(
+    nonce_store: &dyn ExecutionNonceStore,
+    nonce_id: &str,
+    nonce_expires_at: i64,
+) -> Result<(), ExecutionNonceError> {
+    // Pass the nonce's signed expiry so durable stores retain the consumed
+    // marker for the full validity window.
+    match nonce_store.reserve_until(nonce_id, nonce_expires_at) {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(ExecutionNonceError::Replayed),
         Err(e) => Err(ExecutionNonceError::Store(e.to_string())),
     }
 }

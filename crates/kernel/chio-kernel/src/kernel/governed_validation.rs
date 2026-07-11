@@ -330,9 +330,16 @@ impl ChioKernel {
                 "metered billing quote expires_at must be after issued_at".to_string(),
             ));
         }
-        if quote.expires_at.is_some() && !quote.is_valid_at(now) {
+        // Enforce the quote's validity window regardless of whether an expiry is
+        // present. `is_valid_at` gates on `now >= issued_at` as well as the
+        // optional expiry, so an open-ended (no-expiry) quote whose `issued_at`
+        // is in the future is rejected here rather than authorizing a prepay
+        // before the quote is valid. Fail-closed on the money path.
+        if !quote.is_valid_at(now) {
             return Err(KernelError::GovernedTransactionDenied(
-                "metered billing quote is missing or expired".to_string(),
+                "metered billing quote is not valid at the current time (issued in the future \
+                 or expired)"
+                    .to_string(),
             ));
         }
         if metered.max_billed_units == Some(0) {
@@ -1270,5 +1277,37 @@ mod mustprepay_gate_tests {
         }
         ChioKernel::validate_metered_billing_context(&intent, None, false, 1_500)
             .expect("non-prepay mode without an adapter must not be gated");
+    }
+
+    #[test]
+    fn future_dated_open_ended_quote_is_rejected() {
+        // An open-ended quote (no expires_at) whose issued_at is in the future
+        // must not authorize a prepay before the quote is valid. The validity
+        // check applies even without an expiry, so a future-dated reserve fails
+        // closed instead of settling early.
+        let mut intent = must_prepay_intent();
+        if let Some(metered) = intent.metered_billing.as_mut() {
+            metered.quote.issued_at = 2_000;
+            metered.quote.expires_at = None;
+        }
+        let result = ChioKernel::validate_metered_billing_context(&intent, None, true, 1_500);
+        let error = result.expect_err("a future-dated open-ended quote must be rejected");
+        assert!(matches!(error, KernelError::GovernedTransactionDenied(_)));
+        assert!(
+            error.to_string().contains("not valid"),
+            "denial must cite the quote validity window: {error}"
+        );
+    }
+
+    #[test]
+    fn open_ended_quote_issued_in_the_past_is_accepted() {
+        // A normal open-ended quote (issued_at <= now, no expiry) still passes.
+        let mut intent = must_prepay_intent();
+        if let Some(metered) = intent.metered_billing.as_mut() {
+            metered.quote.issued_at = 1_000;
+            metered.quote.expires_at = None;
+        }
+        ChioKernel::validate_metered_billing_context(&intent, None, true, 1_500)
+            .expect("an open-ended quote issued in the past must be accepted");
     }
 }

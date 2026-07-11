@@ -2578,3 +2578,417 @@ fn reconcile_by_nonce_receipt_persist_failure_still_returns_authoritative_receip
         "a second reconcile of the settled nonce must fail closed as replay: {replay}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The TTL reaper must release the sibling-sum share for holds the store closed
+// before it errored partway through the sweep, then propagate the store error.
+// A closed hold that keeps its share admitted would leak headroom and wrongly
+// deny valid sibling reservations until restart; a still-open hold keeps its
+// share because the store did not settle it.
+// ---------------------------------------------------------------------------
+
+/// A budget store whose reaper closes exactly one named hold and then fails, so
+/// the sweep settles some holds before erroring. `get_budget_hold` reflects the
+/// post-reap disposition so the reaper can re-query which holds actually closed.
+struct PartialReapBudgetStore {
+    holds: std::sync::Mutex<
+        std::collections::HashMap<String, crate::budget_store::BudgetHoldDispositionView>,
+    >,
+    close_on_reap: String,
+}
+
+impl PartialReapBudgetStore {
+    fn new(close_on_reap: &str) -> Self {
+        let mut holds = std::collections::HashMap::new();
+        holds.insert(
+            "h1".to_string(),
+            crate::budget_store::BudgetHoldDispositionView::Open,
+        );
+        holds.insert(
+            "h2".to_string(),
+            crate::budget_store::BudgetHoldDispositionView::Open,
+        );
+        Self {
+            holds: std::sync::Mutex::new(holds),
+            close_on_reap: close_on_reap.to_string(),
+        }
+    }
+
+    fn lock(
+        &self,
+    ) -> std::sync::MutexGuard<
+        '_,
+        std::collections::HashMap<String, crate::budget_store::BudgetHoldDispositionView>,
+    > {
+        match self.holds.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+}
+
+impl BudgetStore for PartialReapBudgetStore {
+    fn try_increment(
+        &self,
+        _capability_id: &str,
+        _grant_index: usize,
+        _max_invocations: Option<u32>,
+    ) -> Result<bool, BudgetStoreError> {
+        Ok(true)
+    }
+
+    fn try_charge_cost(
+        &self,
+        _capability_id: &str,
+        _grant_index: usize,
+        _max_invocations: Option<u32>,
+        _cost_units: u64,
+        _max_cost_per_invocation: Option<u64>,
+        _max_total_cost_units: Option<u64>,
+    ) -> Result<bool, BudgetStoreError> {
+        Ok(true)
+    }
+
+    fn reverse_charge_cost(
+        &self,
+        _capability_id: &str,
+        _grant_index: usize,
+        _cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        Ok(())
+    }
+
+    fn reduce_charge_cost(
+        &self,
+        _capability_id: &str,
+        _grant_index: usize,
+        _cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        Ok(())
+    }
+
+    fn settle_charge_cost(
+        &self,
+        _capability_id: &str,
+        _grant_index: usize,
+        _exposed_cost_units: u64,
+        _realized_cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        Ok(())
+    }
+
+    fn list_usages(
+        &self,
+        _limit: usize,
+        _capability_id: Option<&str>,
+    ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
+        Ok(Vec::new())
+    }
+
+    fn get_usage(
+        &self,
+        _capability_id: &str,
+        _grant_index: usize,
+    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
+        Ok(None)
+    }
+
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<Option<crate::budget_store::BudgetHoldSnapshot>, BudgetStoreError> {
+        Ok(self
+            .lock()
+            .get(hold_id)
+            .map(|disposition| crate::budget_store::BudgetHoldSnapshot {
+                hold_id: hold_id.to_string(),
+                capability_id: "cap".to_string(),
+                grant_index: 0,
+                authorized_exposure_units: 100,
+                remaining_exposure_units: 100,
+                disposition: *disposition,
+                reserved_until: Some(0),
+                reserved_currency: Some("USD".to_string()),
+                reserved_payment_reference: None,
+                reserved_budget_total: Some(100),
+                reserved_delegation_depth: Some(1),
+                reserved_root_budget_holder: Some("root".to_string()),
+                authority: None,
+            }))
+    }
+
+    fn reap_expired_reserved_holds(&self, _now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
+        // Close exactly one hold, then fail: models a store that settled some
+        // holds before erroring partway through the sweep.
+        if let Some(disposition) = self.lock().get_mut(&self.close_on_reap) {
+            *disposition = crate::budget_store::BudgetHoldDispositionView::Reconciled;
+        }
+        Err(BudgetStoreError::Invariant(
+            "reap failed after settling one hold (test double)".to_string(),
+        ))
+    }
+}
+
+#[test]
+fn reaper_releases_shares_for_holds_closed_before_a_store_error() {
+    let mut kernel = make_kernel(make_config());
+    kernel.set_budget_store(Box::new(PartialReapBudgetStore::new("h1")));
+    {
+        let mut shares = match kernel.reserved_sibling_shares.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        shares.insert(
+            "h1".to_string(),
+            ReservedSiblingShare {
+                parent_token_id: "parent".to_string(),
+                child_token_id: "child-1".to_string(),
+                share_bps: 4000,
+            },
+        );
+        shares.insert(
+            "h2".to_string(),
+            ReservedSiblingShare {
+                parent_token_id: "parent".to_string(),
+                child_token_id: "child-2".to_string(),
+                share_bps: 4000,
+            },
+        );
+    }
+
+    // The store closes h1 then errors on the rest of the sweep. h1's sibling
+    // share must be released (its hold is now closed) while h2's is retained
+    // (its hold is still open), and the store error must still propagate.
+    let result = kernel.reap_expired_reserved_budget_holds(1_000);
+    assert!(result.is_err(), "the store reap error must still propagate");
+
+    let mut remaining = kernel.tracked_reserved_sibling_hold_ids();
+    remaining.sort();
+    assert_eq!(
+        remaining,
+        vec!["h2".to_string()],
+        "only the still-open hold retains its share; the closed hold's share is released"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// A transient store error while settling a reconcile must NOT consume the
+// nonce. The single-use mark lands only after settlement, so a trusted caller
+// that hit a transient error can re-present the same signed nonce and settle at
+// realized cost instead of forfeiting the reservation.
+// ---------------------------------------------------------------------------
+
+/// A budget store that fails `reconcile_budget_hold` while a flag is armed,
+/// simulating a transient settle error, and otherwise delegates to a real store.
+struct TransientReconcileFailBudgetStore {
+    inner: InMemoryBudgetStore,
+    fail_reconcile: std::sync::Arc<AtomicBool>,
+}
+
+impl BudgetStore for TransientReconcileFailBudgetStore {
+    fn try_increment(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.inner
+            .try_increment(capability_id, grant_index, max_invocations)
+    }
+
+    fn try_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.inner.try_charge_cost(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+        )
+    }
+
+    fn reverse_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner
+            .reverse_charge_cost(capability_id, grant_index, cost_units)
+    }
+
+    fn reduce_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner
+            .reduce_charge_cost(capability_id, grant_index, cost_units)
+    }
+
+    fn settle_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        exposed_cost_units: u64,
+        realized_cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.settle_charge_cost(
+            capability_id,
+            grant_index,
+            exposed_cost_units,
+            realized_cost_units,
+        )
+    }
+
+    fn list_usages(
+        &self,
+        limit: usize,
+        capability_id: Option<&str>,
+    ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
+        self.inner.list_usages(limit, capability_id)
+    }
+
+    fn get_usage(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
+        self.inner.get_usage(capability_id, grant_index)
+    }
+
+    fn authorize_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetAuthorizeHoldRequest,
+    ) -> Result<crate::budget_store::BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        self.inner.authorize_budget_hold(request)
+    }
+
+    fn reverse_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetReverseHoldRequest,
+    ) -> Result<crate::budget_store::BudgetReverseHoldDecision, BudgetStoreError> {
+        self.inner.reverse_budget_hold(request)
+    }
+
+    fn reconcile_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetReconcileHoldRequest,
+    ) -> Result<crate::budget_store::BudgetReconcileHoldDecision, BudgetStoreError> {
+        // A transient settle failure: the nonce must survive it so the caller can
+        // retry the same reconcile once the store recovers.
+        if self.fail_reconcile.load(Ordering::SeqCst) {
+            return Err(BudgetStoreError::Invariant(
+                "reconcile settle failed (test double)".to_string(),
+            ));
+        }
+        self.inner.reconcile_budget_hold(request)
+    }
+
+    fn release_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetReleaseHoldRequest,
+    ) -> Result<crate::budget_store::BudgetReleaseHoldDecision, BudgetStoreError> {
+        self.inner.release_budget_hold(request)
+    }
+
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<Option<crate::budget_store::BudgetHoldSnapshot>, BudgetStoreError> {
+        self.inner.get_budget_hold(hold_id)
+    }
+
+    fn mark_hold_reserved(
+        &self,
+        hold_id: &str,
+        reserved_until_unix_secs: i64,
+        currency: &str,
+        payment_reference: Option<&str>,
+        envelope: &crate::budget_store::ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.mark_hold_reserved(
+            hold_id,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+            envelope,
+        )
+    }
+
+    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
+        self.inner.reap_expired_reserved_holds(now_unix_secs)
+    }
+}
+
+#[test]
+fn reconcile_by_nonce_transient_settle_error_preserves_nonce_for_retry() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+    let fail_reconcile = std::sync::Arc::new(AtomicBool::new(false));
+    kernel.set_budget_store(Box::new(TransientReconcileFailBudgetStore {
+        inner: InMemoryBudgetStore::new(),
+        fail_reconcile: std::sync::Arc::clone(&fail_reconcile),
+    }));
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let first = reserve_request("req-recon-transient", &cap, &agent_kp);
+    let authorized = kernel
+        .authorize_tool_call_reserving_blocking_with_metadata(&first, None)
+        .unwrap();
+    let nonce = *authorized
+        .execution_nonce
+        .clone()
+        .expect("reserving authorization mints a nonce");
+    let realized = ToolInvocationCost {
+        units: 30,
+        currency: "USD".to_string(),
+        breakdown: None,
+    };
+
+    // Arm a transient settle failure: the nonce is verified but the hold settle
+    // errors, so the nonce must NOT be consumed and the reserved hold stays open.
+    fail_reconcile.store(true, Ordering::SeqCst);
+    let err = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &realized)
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("test double"),
+        "the transient settle error must surface: {err}"
+    );
+
+    // Clear the failure and re-present the SAME signed nonce: it settles now,
+    // proving the failed attempt did not burn the nonce.
+    fail_reconcile.store(false, Ordering::SeqCst);
+    let reconciled = kernel
+        .reconcile_reserved_authorization_by_nonce(&nonce, &first.arguments, &realized)
+        .expect("the same nonce must reconcile after the transient error clears");
+    assert_eq!(reconciled.verdict, Verdict::Allow);
+    let meta = reconciled.receipt.metadata.as_ref().unwrap();
+    assert_eq!(
+        meta["budget_authority"]["terminal"]["realized_spend_units"], 30,
+        "the retry settles at the realized cost"
+    );
+}
