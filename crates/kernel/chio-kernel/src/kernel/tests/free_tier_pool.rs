@@ -495,6 +495,145 @@ fn gate_1_pool_exhaustion_fails_closed_treasury_never_overspends() {
     assert_eq!(remaining, 0, "the pool budget_remaining is 0");
 }
 
+#[test]
+fn gate_1_pipeline_renders_pool_exhaustion_as_verdict_deny() {
+    // Full-pipeline form of the Gate-1 ceiling proof: three canonical Passes
+    // fill the pool through evaluate_tool_call_blocking, then the fourth
+    // distinct holder's charge renders as Verdict::Deny with the pool row
+    // unchanged at the ceiling and nothing stuck to the denied Pass.
+    use chio_core::capability::scope::{MonetaryAmount, Operation};
+    use chio_core::capability::token::{window_scoped_capability_id, AttestationWindowId};
+    use chrono::{DateTime, Datelike, Months, TimeZone, Utc};
+
+    const ALLOT: u64 = 100;
+    const POOL: u64 = 3 * ALLOT;
+
+    // Current calendar-month window, computed dynamically so the test is not a
+    // wall-clock time bomb.
+    let now = current_unix_timestamp();
+    let dt = DateTime::from_timestamp(now as i64, 0).expect("representable timestamp");
+    let month_start_naive = dt
+        .date_naive()
+        .with_day(1)
+        .and_then(|day| day.and_hms_opt(0, 0, 0))
+        .expect("month start");
+    let month_start = Utc.from_utc_datetime(&month_start_naive);
+    let next_month = month_start
+        .checked_add_months(Months::new(1))
+        .expect("next month");
+    let window = AttestationWindowId {
+        window_ym: month_start.format("%Y-%m").to_string(),
+        since: month_start.timestamp() as u64,
+        until: next_month.timestamp() as u64,
+    };
+    let term = FreeTierPoolConfig::window_ym_from_issued_at(window.since).expect("window term");
+
+    let pool = FreeTierPoolConfig {
+        monthly_pool_units: POOL,
+        allotment_unit: FT_UNIT.to_string(),
+        board_approval_ref: FT_BOARD_REF.to_string(),
+    };
+    let mut kernel = make_kernel(make_monetary_config())
+        .with_free_tier_pool(pool)
+        .expect("pool installs");
+    kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost(FT_SERVER)));
+
+    let mint_pass = |kernel: &ChioKernel, tag: &str| {
+        let subject = make_keypair();
+        let subject_did = format!("did:chio:{}", subject.public_key().to_hex());
+        let metered = ToolGrant {
+            server_id: FT_SERVER.to_string(),
+            tool_name: "*".to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![],
+            max_invocations: None,
+            max_cost_per_invocation: Some(MonetaryAmount {
+                units: ALLOT,
+                currency: FT_UNIT.to_string(),
+            }),
+            max_total_cost: Some(MonetaryAmount {
+                units: ALLOT,
+                currency: FT_UNIT.to_string(),
+            }),
+            dpop_required: None,
+        };
+        let scope = ChioScope {
+            grants: vec![metered],
+            resource_grants: crate::pass_gating::pass_baseline_resource_grants(&subject_did)
+                .expect("baseline resource grants"),
+            prompt_grants: vec![],
+        };
+        let id = window_scoped_capability_id(&subject_did, &window).expect("window-scoped id");
+        let cap = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id,
+                issuer: kernel.config.keypair.public_key(),
+                subject: subject.public_key(),
+                scope,
+                issued_at: window.since,
+                expires_at: window.until,
+                delegation_chain: vec![],
+            },
+            &kernel.config.keypair,
+        )
+        .unwrap_or_else(|error| panic!("sign pass capability {tag}: {error}"));
+        (subject, cap)
+    };
+
+    for i in 0..3 {
+        let (_subject, cap) = mint_pass(&kernel, &format!("holder-{i}"));
+        let resp = kernel
+            .evaluate_tool_call_blocking(&make_request_with_arguments(
+                &format!("pipeline-gate1-{i}"),
+                &cap,
+                "compute",
+                FT_SERVER,
+                serde_json::json!({}),
+            ))
+            .expect("pipeline evaluates");
+        assert_eq!(
+            resp.verdict,
+            Verdict::Allow,
+            "holder {i} fits inside the pool"
+        );
+    }
+    assert_eq!(
+        committed_units(&kernel, &term),
+        POOL,
+        "three allotments fill the pool exactly"
+    );
+
+    // The fourth distinct holder: the gift is insolvent for this window and the
+    // FULL pipeline must render the exhaustion as a deny.
+    let (_subject4, cap4) = mint_pass(&kernel, "holder-3");
+    let resp = kernel
+        .evaluate_tool_call_blocking(&make_request_with_arguments(
+            "pipeline-gate1-3",
+            &cap4,
+            "compute",
+            FT_SERVER,
+            serde_json::json!({}),
+        ))
+        .expect("pipeline evaluates the denied charge");
+    assert_eq!(
+        resp.verdict,
+        Verdict::Deny,
+        "the fourth Pass must render as Verdict::Deny"
+    );
+    let metadata = resp.receipt.metadata.as_ref().expect("deny receipt metadata");
+    let financial = metadata.get("financial").expect("financial metadata");
+    assert_eq!(financial["settlement_status"], "not_applicable");
+
+    // Nothing stuck: the denied Pass keeps a zero committed row and the pool is
+    // unchanged at exactly the ceiling.
+    assert_eq!(committed_units(&kernel, &cap4.id), 0);
+    assert_eq!(
+        committed_units(&kernel, &term),
+        POOL,
+        "the pool never overspends through the pipeline"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Code-review C1 + PR957 codex P2: post-execution pool reconciliation (worst-
 // case hold down to realized cost) and the no-pool admission boundary that keeps

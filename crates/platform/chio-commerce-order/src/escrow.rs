@@ -699,6 +699,16 @@ pub struct CommerceEscrowRelease {
 /// broadcast intent (no value moves on-chain at M1), and returns the order
 /// context advanced to `settlement_packet_assembled` with the escrow digest
 /// pinned.
+///
+/// Authentication boundary: `order_context.buyer_subject` and
+/// `merchant_subject` are structurally validated at this boundary, not
+/// authenticated; the signed reservation witness binds order id, offer token,
+/// and amount, not the party identities. Custody integrity still closes
+/// because the escrow ledger binds the exact leg endpoints and its digest is
+/// pinned into the signed passport, which `verify_commerce_order` recomputes.
+/// Before any caller moves real value through this path, the order context
+/// itself must be authenticated, or the buyer/merchant identities bound into
+/// the reservation witness.
 pub fn accept(
     request: CommerceEscrowAcceptRequest<'_>,
 ) -> Result<CommerceEscrowAcceptance, CommerceOrderError> {
