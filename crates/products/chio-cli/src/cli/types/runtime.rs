@@ -845,5 +845,11 @@ pub(crate) enum ApiCommands {
         /// Optional SQLite receipt store path.
         #[arg(long = "receipt-store")]
         receipt_store: Option<PathBuf>,
+
+        /// Permit in-memory receipts, whose audit evidence is lost on every
+        /// restart. Required to boot without `--receipt-store`. For local
+        /// development only.
+        #[arg(long, default_value_t = false)]
+        allow_ephemeral_receipts: bool,
     },
 }

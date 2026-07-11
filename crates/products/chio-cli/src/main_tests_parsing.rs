@@ -59,12 +59,14 @@ fn api_protect_subcommand_parses() {
                     spec,
                     listen,
                     receipt_store,
+                    allow_ephemeral_receipts,
                 },
         } => {
             assert_eq!(upstream, "http://127.0.0.1:8080");
             assert!(spec.is_none());
             assert_eq!(listen, "127.0.0.1:9090");
             assert!(receipt_store.is_none());
+            assert!(!allow_ephemeral_receipts);
         }
         _ => panic!("expected api protect subcommand"),
     }

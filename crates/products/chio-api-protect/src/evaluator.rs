@@ -10,9 +10,14 @@ use chio_http_core::{
     HttpAuthorityEvaluation, HttpAuthorityInput, HttpAuthorityPolicy, HttpMethod, HttpReceipt,
     Verdict,
 };
-use chio_kernel::{ApprovalStore, SignedExecutionNonce};
+use chio_kernel::{ApprovalStore, ReceiptStore, RevocationStore, SignedExecutionNonce};
 use chio_openapi::PolicyDecision;
 use serde_json::Value;
+
+/// Backend label reported through the sidecar health endpoint. A durable store
+/// survives restart; an ephemeral one does not.
+const BACKEND_DURABLE: &str = "durable";
+const BACKEND_EPHEMERAL: &str = "ephemeral";
 
 /// Evaluated result for a single HTTP request.
 pub struct EvaluationResult {
@@ -35,6 +40,8 @@ pub struct RouteEntry {
 pub struct RequestEvaluator {
     routes: Vec<RouteEntry>,
     authority: HttpAuthority,
+    receipt_backend: &'static str,
+    revocation_backend: &'static str,
 }
 
 impl RequestEvaluator {
@@ -56,6 +63,8 @@ impl RequestEvaluator {
                 Arc::new(chio_kernel::InMemoryApprovalStore::new()),
                 trusted_capability_issuers,
             ),
+            receipt_backend: BACKEND_EPHEMERAL,
+            revocation_backend: BACKEND_EPHEMERAL,
         }
     }
 
@@ -89,7 +98,65 @@ impl RequestEvaluator {
                 approval_store,
                 trusted_capability_issuers,
             ),
+            receipt_backend: BACKEND_EPHEMERAL,
+            revocation_backend: BACKEND_EPHEMERAL,
         }
+    }
+
+    /// Build an evaluator whose embedded kernel is backed by durable stores when
+    /// provided. A `None` store falls back to the in-memory backend and opts the
+    /// kernel into ephemeral operation for that backend; a `Some` store is
+    /// attached and the kernel runs fail-closed against it.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_durable_stores(
+        routes: Vec<RouteEntry>,
+        keypair: Keypair,
+        policy_hash: String,
+        approval_store: Arc<dyn ApprovalStore>,
+        trusted_capability_issuers: Vec<PublicKey>,
+        receipt_store: Option<Arc<dyn ReceiptStore>>,
+        revocation_store: Option<Arc<dyn RevocationStore>>,
+    ) -> Result<Self, HttpAuthorityError> {
+        let receipt_backend = if receipt_store.is_some() {
+            BACKEND_DURABLE
+        } else {
+            BACKEND_EPHEMERAL
+        };
+        let revocation_backend = if revocation_store.is_some() {
+            BACKEND_DURABLE
+        } else {
+            BACKEND_EPHEMERAL
+        };
+
+        let mut builder = HttpAuthority::builder()
+            .approval_store(approval_store)
+            .trusted_capability_issuers(trusted_capability_issuers)
+            .allow_ephemeral_receipt_log(receipt_store.is_none())
+            .allow_ephemeral_revocation_store(revocation_store.is_none());
+        if let Some(store) = receipt_store {
+            builder = builder.receipt_store(store);
+        }
+        if let Some(store) = revocation_store {
+            builder = builder.revocation_store(store);
+        }
+        let authority = builder.build(keypair, policy_hash)?;
+
+        Ok(Self {
+            routes,
+            authority,
+            receipt_backend,
+            revocation_backend,
+        })
+    }
+
+    /// Health label for the embedded kernel's receipt backend.
+    pub fn receipt_backend(&self) -> &'static str {
+        self.receipt_backend
+    }
+
+    /// Health label for the embedded kernel's revocation backend.
+    pub fn revocation_backend(&self) -> &'static str {
+        self.revocation_backend
     }
 
     #[cfg(test)]
@@ -394,6 +461,46 @@ mod tests {
     };
 
     use chio_test_support::prelude::*;
+
+    #[test]
+    fn durable_evaluator_reports_durable_backends() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = Arc::new(
+            chio_store_sqlite::SqliteReceiptStore::open(dir.path().join("receipts.db"))?,
+        );
+        let revocation_store: Arc<dyn chio_kernel::RevocationStore> = Arc::new(
+            chio_store_sqlite::SqliteRevocationStore::open(dir.path().join("revocations.db"))?,
+        );
+        let evaluator = RequestEvaluator::new_with_durable_stores(
+            Vec::new(),
+            Keypair::generate(),
+            "test-policy".to_string(),
+            Arc::new(chio_kernel::InMemoryApprovalStore::new()),
+            Vec::new(),
+            Some(receipt_store),
+            Some(revocation_store),
+        )?;
+        assert_eq!(evaluator.receipt_backend(), "durable");
+        assert_eq!(evaluator.revocation_backend(), "durable");
+        Ok(())
+    }
+
+    #[test]
+    fn evaluator_without_durable_stores_reports_ephemeral_backends(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let evaluator = RequestEvaluator::new_with_durable_stores(
+            Vec::new(),
+            Keypair::generate(),
+            "test-policy".to_string(),
+            Arc::new(chio_kernel::InMemoryApprovalStore::new()),
+            Vec::new(),
+            None,
+            None,
+        )?;
+        assert_eq!(evaluator.receipt_backend(), "ephemeral");
+        assert_eq!(evaluator.revocation_backend(), "ephemeral");
+        Ok(())
+    }
 
     fn signed_capability_token_json(issuer: &Keypair, id: &str) -> String {
         signed_capability_token_json_with_scope(

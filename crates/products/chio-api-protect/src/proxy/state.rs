@@ -149,6 +149,8 @@ pub(crate) struct ProxyState {
     pub(crate) trusted_capability_issuers: Vec<PublicKey>,
     pub(crate) trusted_receipt_signers: Vec<PublicKey>,
     pub(crate) sidecar_control_token: Option<String>,
+    pub(crate) receipt_backend: &'static str,
+    pub(crate) revocation_backend: &'static str,
 }
 
 /// The protect proxy.
@@ -248,13 +250,39 @@ impl ProtectProxy {
         }
         let trusted_receipt_signers = vec![signer_public_key];
 
-        let evaluator = RequestEvaluator::new_with_approval_store_and_trusted_capability_issuers(
+        // Attach durable stores to the embedded kernel when the operator points
+        // at a receipt database. The Merkle receipt store shares that file (the
+        // approval store has already stamped it), and the revocation store lives
+        // in a sibling file so a revoked capability survives a restart.
+        let durable_receipt_store: Option<Arc<dyn chio_kernel::ReceiptStore>> =
+            match &self.config.receipt_db {
+                Some(path) => Some(Arc::new(
+                    chio_store_sqlite::SqliteReceiptStore::open(path)
+                        .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
+                )),
+                None => None,
+            };
+        let durable_revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>> =
+            match &self.config.receipt_db {
+                Some(path) => Some(Arc::new(
+                    chio_store_sqlite::SqliteRevocationStore::open(format!("{path}.revocations"))
+                        .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
+                )),
+                None => None,
+            };
+
+        let evaluator = RequestEvaluator::new_with_durable_stores(
             routes,
             keypair.clone(),
             policy_hash,
             Arc::clone(&approval_store),
             self.config.trusted_capability_issuers.clone(),
-        );
+            durable_receipt_store,
+            durable_revocation_store,
+        )
+        .map_err(|error| ProtectError::Config(error.to_string()))?;
+        let receipt_backend = evaluator.receipt_backend();
+        let revocation_backend = evaluator.revocation_backend();
 
         let (receipt_log, tool_receipt_log, receipt_store, revoked_capability_ids) =
             if let Some(path) = &self.config.receipt_db {
@@ -299,6 +327,8 @@ impl ProtectProxy {
             trusted_capability_issuers,
             trusted_receipt_signers,
             sidecar_control_token: self.config.sidecar_control_token.clone(),
+            receipt_backend,
+            revocation_backend,
         });
 
         let app = build_app(Arc::clone(&state));

@@ -144,13 +144,48 @@ pub(crate) fn cmd_run(
     }
 }
 
+/// Refuse to boot without a durable receipt store unless the operator has
+/// explicitly opted into ephemeral receipts, and warn when the sidecar cannot
+/// deliver its audit guarantee. A durable audit log is the product's core
+/// promise; a manifest that forgets `--receipt-store` should fail loudly at
+/// startup rather than run and silently lose every receipt on restart.
+fn require_durable_or_ephemeral_optin(
+    receipt_store: Option<&Path>,
+    allow_ephemeral_receipts: bool,
+    authority_seed_path: Option<&Path>,
+) -> Result<(), CliError> {
+    if receipt_store.is_none() && !allow_ephemeral_receipts {
+        return Err(CliError::cli_other_error(
+            "refusing to start without durable receipts: pass --receipt-store <path> for a \
+             durable audit log, or --allow-ephemeral-receipts to run with in-memory receipts \
+             that are lost on every restart"
+                .to_string(),
+        ));
+    }
+    if receipt_store.is_none() {
+        tracing::warn!(
+            target: "chio::sidecar",
+            "running with in-memory receipts (--allow-ephemeral-receipts): audit evidence is lost on every restart"
+        );
+    }
+    if authority_seed_path.is_none() {
+        tracing::warn!(
+            target: "chio::sidecar",
+            "no --authority-seed-file: a fresh signer is generated per boot, so receipts signed before a restart are unverifiable"
+        );
+    }
+    Ok(())
+}
+
 pub(crate) fn cmd_api_protect(
     upstream: &str,
     spec_path: Option<&Path>,
     listen_addr: &str,
     receipt_store: Option<&Path>,
     authority_seed_path: Option<&Path>,
+    allow_ephemeral_receipts: bool,
 ) -> Result<(), CliError> {
+    require_durable_or_ephemeral_optin(receipt_store, allow_ephemeral_receipts, authority_seed_path)?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -205,8 +240,10 @@ pub(crate) fn cmd_start(
     listen_addr: &str,
     receipt_store: Option<&Path>,
     authority_seed_path: Option<&Path>,
+    allow_ephemeral_receipts: bool,
     print_config: bool,
 ) -> Result<(), CliError> {
+    require_durable_or_ephemeral_optin(receipt_store, allow_ephemeral_receipts, authority_seed_path)?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()

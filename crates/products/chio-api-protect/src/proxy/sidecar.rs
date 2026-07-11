@@ -119,12 +119,14 @@ pub(crate) async fn sidecar_verify_handler(
     (StatusCode::OK, axum::Json(verification)).into_response()
 }
 
-pub(crate) async fn sidecar_health_handler(State(_state): State<Arc<ProxyState>>) -> Response {
+pub(crate) async fn sidecar_health_handler(State(state): State<Arc<ProxyState>>) -> Response {
     (
         StatusCode::OK,
         axum::Json(HealthResponse {
             status: SidecarStatus::Healthy,
             version: env!("CARGO_PKG_VERSION").to_string(),
+            receipt_backend: state.receipt_backend.to_string(),
+            revocation_backend: state.revocation_backend.to_string(),
         }),
     )
         .into_response()
