@@ -1,181 +1,310 @@
-# Design: `crates/security/` active-defense arc
+# Design: Chio active defense and information-flow security
 
-- Status: DRAFT (awaiting review)
+- Status: REVIEWED DESIGN, implementation not started
 - Date: 2026-07-09
-- Scope: three new crates under a new `crates/security/` folder, plus protocol-type additions in `chio-core-types` and `chio-manifest`.
-- Related normative docs: `spec/PROTOCOL.md`, `spec/SECURITY.md`, `spec/GUARDS.md`, `docs/security/threat-coverage.md`.
+- Revised: 2026-07-10 after comparison with Clawdstrike
+- Scope: information-flow control, deception, temporal detection, and reversible containment
+- Normative companions: `spec/PROTOCOL.md`, `spec/SECURITY.md`, `spec/GUARDS.md`, and `docs/security/threat-coverage.md`
 
-## 1. Summary
+## 1. Decision
 
-Chio today is almost entirely a preventive system. Guards deny at the call boundary, capabilities scope what an agent may reach, and receipts attest every decision. It has advisory and anomaly signals but no response limb, and it has no deception layer. This design adds an active-defense arc that closes that loop: detect leak paths, bait intruders into revealing themselves, and respond with attested, reversible containment.
+Chio will add active defense without creating a dependency cycle or a second security runtime inside the kernel. Pure domain types and store ports will live below the kernel. A small adapter crate will implement the existing `chio_kernel::Guard` and `chio_kernel::PostInvocationHook` traits. Concrete SQLite store implementations live in `chio-store-sqlite`; the platform bootstrap constructs a `SecurityRuntime` and installs it through a shared kernel-construction helper. `chio-control-plane::build_kernel` is one production caller, not the only constructor in the repository. Every alternate constructor must use the same helper or reject manifests that require active-defense enforcement. `chio-guards` and `chio-kernel` do not depend on any active-defense engine.
 
-Three crates:
+The implementation consists of five crates under `crates/security/`:
 
-- `chio-flow` (detect): information-flow control. Lattice labels propagate along the data path; egress is denied unless the destination clearance dominates the join of everything tainting the agent context. Declassification is an explicit, capability-gated, receipt-logged event.
-- `chio-decoy` (deceive): canary capabilities and honey-tools that no legitimate agent path touches, plus per-session honeytoken watermarks. Any interaction is malicious by construction.
-- `chio-quarantine` (respond): a declarative response engine that composes existing revocation, velocity, and issuance primitives into tiered, reversible, signed containment actions.
+| Crate | Responsibility | May depend on `chio-kernel` | TCB status |
+|---|---|---:|---|
+| `chio-security-types` | Portable wire/domain types and port traits | No | Types only |
+| `chio-flow` | DLM algebra, taint transitions, declassification verification | No | Pure decision engine |
+| `chio-security-kernel` | Flow, deception, and containment adapters for existing kernel hooks | Yes | Enforcement adapter |
+| `chio-decoy` | Signed watermarks, private decoy registry, lifecycle, matching | No | Detection engine |
+| `chio-quarantine` | Temporal correlation and durable response state machine | No | Planner and executor, not prevention TCB |
 
-The arc forms one loop: `chio-flow` and `chio-decoy` detect, `chio-quarantine` responds, and every step is a signed receipt.
+Concrete implementations of the persistence ports belong in `chio-store-sqlite`. Lineage, issuance, velocity, receipt, and SIEM adapters belong in `chio-control-plane`, which constructs and composes all implementations. This keeps trust and observability crates from depending upward on security engines and keeps persistence logic out of the composition root.
 
-## 2. Goals and non-goals
+## 2. Corrected baseline
 
-Goals:
+The design builds on these current facts:
 
-- Add information-flow control with a full Decentralized Label Model (DLM) label algebra, seeded from existing sources so no hand-authoring is required to adopt it.
-- Add a deception primitive (the canary capability) that produces zero-false-positive detections.
-- Add attested, tiered, reversible incident response that reuses existing containment primitives rather than inventing new ones.
-- Keep the trusted computing base (TCB) unchanged in posture: prevention stays fail-closed and independent; response is best-effort and fully attested.
-- Provide the mechanisms that make five currently-uncovered threat rows closable, without claiming closure.
+- `chio-kernel` owns `Guard`, `PostInvocationHook`, `PostInvocationContext`, and `PostInvocationPipeline`.
+- `chio-guards` depends on `chio-kernel` and reexports post-invocation types. The kernel intentionally does not depend on `chio-guards`.
+- `chio-control-plane::build_kernel` registers the default guard profile, configured guard pipeline, and post-invocation pipeline, but `chio-runtime-harness`, `chio-http-core`, and CLI paths also construct kernels directly. Active-defense enforcement must centralize construction or make those paths reject `flow_v1`.
+- Session-backed evaluation already threads an authoritative `SessionId` and resolves tenant identity from session authentication, but `GuardContext` and `PostInvocationContext` do not expose them. Both are public literal-constructed structs, so adding fields is a breaking API migration. The implementation must use a versioned nested context or enumerate and migrate every constructor. It must never trust a session or tenant supplied inside `ToolCallRequest`.
+- Chio has two public `ToolDefinition` structs: the protocol type in `chio-core-types`, which is embedded in signed manifests, and an operational type in `chio-manifest`. Security metadata cannot be added independently to both.
+- `chio-lineage` queries are bounded and explicitly report truncation. A truncated graph is not an exact blast radius.
+- `chio-revocation-oracle` is insert-only. It cannot implement reversible quarantine. Temporary containment therefore uses a separate deny-overlay store rather than pretending revocation can be lifted.
+- Existing `GovernedApprovalToken` binds a signed approval to a subject, request, intent hash, decision, and validity window. Active response consumes the shared protocol-primitives threshold governed-approval set once available rather than extending approvals privately inside `chio-quarantine`.
 
-Non-goals:
+## 3. Security properties
 
-- This design does not itself close any threat-model row. A row moves to `Covered` only with the conformance test plus caught-mutant evidence that `docs/security/threat-coverage.md` gates on.
-- No ML-based anomaly scoring (advisory and embedding-anomaly guards already exist in `crates/guards/`).
-- No new attestation verifier or signature scheme (those live in `crates/trust/`).
-- No OS-level sandbox compilation (that is a separate candidate, `chio-cage`, deferred out of this arc).
+The release must establish all of the following properties:
 
-## 3. Background: what already exists
+1. **No dependency cycle.** Neither `chio-kernel` nor `chio-guards` depends on `chio-flow`, `chio-decoy`, or `chio-quarantine`.
+2. **Flow failures deny.** Unknown labels, missing egress clearance, classifier errors, taint-store errors, malformed label declarations, and declassification-store errors deny the affected invocation or block the affected output.
+3. **No implicit downgrade.** A label can become less restrictive only through a valid, one-shot, destination-bound and purpose-bound declassification grant.
+4. **Tripwire before execution.** A recognized canary capability or honey-tool call is denied before tool-server dispatch. Failure to persist the detection never turns the denial into an allow.
+5. **Private deception state.** Public bait may be visible by design, but registry membership, raw marker values, honey credentials, materialization payloads, private artifact ids, and lifecycle internals are not exposed through ordinary tool discovery, receipts, logs, or operator APIs.
+6. **Policy-owned clearance.** A tool publisher may request a narrower label or declare a boundary, but only tenant or data-owner policy can authorize clearance. Runtime topology can force egress even when the manifest says otherwise.
+7. **Durable knowledge tracking.** Starting a new session does not clear knowledge held by the same agent principal or capability lineage. Reset requires a separately attested isolation boundary.
+8. **Exact containment.** A response plan binds a provisional sorted set from an authoritative lineage snapshot. Immediately before lineage-scoped effects, issuance and delegation are fenced and the exact set is recomputed; only an identical set may execute. Truncated, stale, or changed lineage cannot auto-contain.
+9. **Durable reversibility.** Temporary restrictions are effect-keyed contributions. Removing one contribution recomputes posture from all remaining effects and cannot erase an overlapping restriction.
+10. **Action-bound approval.** Every heavy action is encoded as a governed response-plan intent whose existing binding hash commits to affected-set hash, effect types, TTL, tenant, policy version, and action id.
+11. **Verified event authority.** Only events from configured internal detector keys or verified Chio receipts may trigger automatic response. Unsigned and external events remain advisory.
+12. **Deterministic correlation.** Event-time evaluation, deduplication, bounded lateness, and eviction produce the same finding for the same ordered input corpus.
+13. **Receipt truthfulness.** Signed receipts describe requested, applied, failed, and rolled-back effects separately. A partial execution cannot be represented as success.
 
-Relevant existing surfaces this design builds on rather than duplicates:
+## 4. Dependency topology
 
-- Data classification and redaction: `crates/guards/chio-data-guards` classifies secrets, PII, and PHI (including ICD-10 and MRN).
-- Cumulative flow accounting: `DataFlowGuard` in `crates/guards/chio-guards` tracks bytes read and written per session.
-- Provenance: `crates/observability/chio-lineage` maintains a signed receipt and capability-lineage DAG.
-- Capability tokens: `crates/core/chio-core-types` carries id (UUIDv7), issuer, subject, scope, TTL, delegation chain, typed caveats, scope attenuations, and budget shares.
-- Revocation: `crates/trust/chio-revocation-oracle` (epoch-based, sparse Merkle inclusion and non-inclusion proofs).
-- Issuance rate limiting: `crates/trust/chio-custody-hw` (per-subject limiter, per-credential replay nonce store, revocation cascade).
-- Velocity: `AgentVelocityGuard` token buckets in `crates/guards/chio-guards`.
-- Lineage: `crates/observability/chio-lineage` indexes signed receipts and capability lineage into a provenance DAG, from which the sub-agent set affected by a triggering session can be derived through the delegation chain. Note: there is no continuation-token task-DAG crate today, so precise blast-radius scoping beyond capability lineage is a future dependency, not an existing primitive.
-- Reputation: `crates/trust/chio-reputation` already applies incident penalties.
-- SIEM: `crates/observability/chio-siem` forwards receipt events and pages via OpsGenie and PagerDuty backends.
-- Adversarial testing: `crates/core/chio-adversarial-suite` (eight attack classes) and `crates/core/chio-arena` (coevolutionary replay arena).
+The allowed dependency graph is:
 
-## 4. Folder and boundary design
-
-New folder `crates/security/` with three members:
-
-```
-crates/security/
-  chio-flow         information-flow control
-  chio-decoy        deception / canaries
-  chio-quarantine   incident response
-```
-
-Rationale for a new folder: the existing folders are organized by primitive kind. `guards/` holds per-call evaluators; `trust/` holds attestation primitives. These three crates are stateful, session-spanning, and reactive, which is a distinct concern.
-
-Two placement rules:
-
-1. Types go in core, engines go in security. The `Label` wire type, the `declassify` capability caveat, and the manifest `sensitivity` and `clearance` fields are protocol-normative and land in `chio-core-types` and `chio-manifest`. This mirrors how `ChioScope` lives in `chio-core-types` while enforcement lives in `crates/guards/`. The information-flow engine lives in `chio-flow`.
-
-2. Prevention stays fail-closed and independent; response is best-effort and attested. `FlowGuard` runs inside the existing guard pipeline (in-TCB, like every guard). `chio-quarantine` sits above the kernel and drives containment through trait ports; it is deliberately not in the TCB. If quarantine is unavailable, prevention still holds and only automated response is lost. A compromised quarantine can fail to contain but cannot forge an allow.
-
-Dependency direction (acyclic):
-
-```
-chio-core-types (Label, declassify caveat, receipt subtypes)
-        |                         |                    |
-        v                         v                    v
-   chio-flow                 chio-decoy          chio-quarantine
-                                                  (ports -> adapters ->
-                                                   revocation-oracle,
-                                                   custody-hw,
-                                                   lineage,
-                                                   siem, guards)
+```text
+chio-security-types
+    ^          ^            ^
+    |          |            |
+chio-flow  chio-decoy  chio-quarantine
+    ^                       ^
+    |                       |
+chio-security-kernel        |
+    ^                       |
+    +----------+------------+
+               |
+       chio-control-plane
+          /      |       \             \
+ chio-kernel  chio-guards  trust adapters  chio-store-sqlite
 ```
 
-## 5. chio-flow (detect)
+`chio-security-types` is `no_std + alloc` by default and depends only on portable serialization and hashing dependencies already accepted by `chio-core-types`. Hosted store traits are behind its `std` feature. `chio-core-types` depends on it for labels, declarations, and portable signed-body shapes; Chio `PublicKey`, `Signature`, and `SigningAlgorithm` wrappers remain in `chio-core-types`, so no reverse dependency is needed. `chio-security-kernel` may depend on `chio-flow`, `chio-decoy`, and `chio-kernel`, but not on `chio-guards` or platform crates. Classification and persistence enter through typed ports. Platform bootstrap owns all cross-domain wiring.
 
-Modules:
+## 5. Canonical DLM lattice
 
-- `label`: DLM lattice operations over the `Label` type defined in `chio-core-types`. A label is a set of policies, each an (owner, readers) pair, plus orthogonal compartments (for example `pii`, `phi`, `secret`, `tenant:<id>`). Operations: `join` (least upper bound), `flows_to` (partial order). `L1 flows_to L2` holds when L2 is at least as restrictive as L1 for every owner and compartment. Restrictions may always be added; they may only be removed by declassification.
-- `env`: the per-session taint environment, persisted in the existing kernel session journal. Tracks the current label set in the agent context as the join of everything read this session.
-- `seed`: label acquisition. `from_classifier` maps `chio-data-guards` verdicts to compartments (Secret to `secret`, PII to `pii`, ICD-10 and MRN to `phi`). `from_manifest` reads the declared `sensitivity` of a tool output. These two sources seed labels so DLM adoption requires no hand-authoring; full owner and reader precision is available when wanted.
-- `guard`: `FlowGuard`, implementing the existing guard trait so it plugs into the current pipeline. On an egress-classed call it computes `context_label` joined with `payload_label`, looks up the destination `clearance` from the manifest, and denies unless the join flows to the clearance. Fail-closed: an unknown label or missing clearance resolves to the top of the lattice (most restrictive), which denies.
-- `declassify`: verifies that a `declassify` caveat on the presented capability authorizes downgrading the specific compartments requested, then emits a signed declassification receipt.
-- `receipt`: `FlowViolation` and `Declassification` receipt bodies, serialized as canonical JSON (RFC 8785) and signed through the existing `chio-core` receipt machinery.
+### 5.1 Representation
 
-Core invariant: an egress-classed call is allowed only if `context_label join payload_label` flows to the destination clearance, or an authorized and attested declassification downgrades it. Because every downgrade is a signed event, slow exfiltration (many small below-threshold releases) becomes visible instead of invisible.
+`InformationLabel` has two canonical forms:
 
-## 6. chio-decoy (deceive)
+- `Known { owners, compartments }`
+- `Top`
 
-Modules:
+`owners` is a `BTreeMap<PrincipalId, BTreeSet<PrincipalId>>`. There is exactly one reader set per owner. A missing owner means that owner imposes no restriction, equivalent to the universal reader set. Every stored reader set must contain its owner. `compartments` is a sorted set of validated, non-empty identifiers. Duplicate owner policies, blank identifiers, non-canonical identifiers, and reader sets that omit their owner are rejected at deserialization or construction.
 
-- `canary`: mints canary capabilities. A canary is a fully valid, authority-signed `CapabilityToken` whose scope points into a reserved `decoy:*` namespace. It is indistinguishable from a real grant on the wire. A registry of canary ids (their UUIDv7) lets the kernel recognize presentation.
-- `catalog`: injects honey-tools into the `list_tools` surface with realistic names, descriptions, and sensitivity labels that route to a sink.
-- `watermark`: per-session honeytokens, derived deterministically from `session_id` and a secret so they are verifiable without storage. `emit` injects a watermark into a decoy response; `detect` scans egress payloads. A watermark hit is exposed to `chio-flow` as a label source (restricted plus tripwire).
-- `tripwire`: the detection hook the kernel calls when a canary id is presented or a watermark is detected. Emits a distinguished high-severity `Tripwire` receipt and signals `chio-quarantine`.
+`Known` with empty owners and compartments is `Bottom`, the public label. `Top` is the unknown or overflow state and is maximally restrictive. It is a real lattice element, not a substitute for missing configuration.
 
-Because legitimate workflows bind real tools by manifest, they never select a `decoy:*` grant, so any presentation or use of a canary is malicious by construction and carries zero false positives. A CI gate (`check-decoy-unreachable`) enforces that no real manifest binds a `decoy:*` grant, so the deception can never trap a legitimate agent.
+### 5.2 Order
 
-## 7. chio-quarantine (respond)
+For known labels `A` and `B`, `A flows_to B` if and only if:
 
-Modules:
+- every compartment in `A` is present in `B`; and
+- for each owner constrained by `A`, `B` also constrains that owner and `readers(B, owner)` is a subset of `readers(A, owner)`.
 
-- `event`: the `SecurityEvent` stream, tapped from the receipt log. Deterministic and replayable. Sources include canary hits, flow violations, advisory-pipeline promotions, reputation incident penalties, deny storms, and velocity breaches.
-- `playbook`: declarative rules of the form `when <trigger> within <window> then <actions>`, reusing the HushSpec parser style from `chio-policy`.
-- `action`: the `ContainmentAction` enum and the tiered executor. Tier by reversibility:
+Owners present only in `B` add restrictions and do not prevent the flow. Every known label flows to `Top`; `Top` flows only to `Top`. With canonical maps this relation is reflexive, antisymmetric, and transitive.
 
-  | Tier | Actions | Execution |
-  |------|---------|-----------|
-  | Auto-reversible | `Throttle`, `RevokeSession`, `QuarantineLineage`, `Escalate` | auto-execute, signed receipt, default TTL |
-  | Heavy | `FreezeSubject`, `RevokeTenant`, `RequireCosign` | m-of-n human co-sign to apply and to extend past TTL |
+### 5.3 Join
 
-  Every action is a signed `ContainmentReceipt` carrying a TTL, with an explicit signed `LiftOrder` to reverse it. Automated response can never permanently disable a tenant without a human renewing the state past its TTL.
-- `ports`: traits over existing primitives, with thin adapters behind cargo features so the crate stays lean and unit-testable with fakes: `RevocationPort` (to `chio-revocation-oracle` epoch bump), `IssuancePort` (to `chio-custody-hw` limiter), `VelocityPort` (to `AgentVelocityGuard`), `AlertPort` (to `chio-siem`), `BlastRadiusPort` (to `chio-lineage`).
-- `blast`: given a triggering session or subject, derives the affected sub-agent subtree from the capability lineage in `chio-lineage` (via the delegation chain) and scopes actions to that subtree rather than the whole tenant. Finer continuation-token-level scoping is a future dependency, not an existing crate; until it exists, blast-radius is bounded by capability lineage.
+The join of known labels unions compartments and owner keys. For an owner present in both labels, join intersects the reader sets. For an owner present in only one label, join retains that reader set because the other label contributes the universal set. A join involving `Top` is `Top`.
 
-Posture: the response engine is best-effort and fully attested, and is not part of the TCB.
+The implementation must demonstrate that `join(A, B)` is the least upper bound: both operands flow to the join, and the join flows to every common upper bound.
 
-## 8. Protocol deltas
+### 5.4 Operational handling of `Top`
 
-Additions to normative surfaces (each needs `spec/PROTOCOL.md` and `spec/SECURITY.md` edits plus conformance vectors):
+Mathematical `Top flows_to Top` is required for a valid lattice. Runtime egress is stricter: data labeled `Top` or data whose classification is unknown is never released, even to a `Top` clearance. Missing clearance is a configuration error and denies. Declassification from `Top` is forbidden. This explicit operational rule prevents the common error where resolving unknown data and missing clearance to the same element accidentally allows egress.
 
-- `Label` wire type with canonical JSON (RFC 8785) encoding, added to `chio-core-types`.
-- `declassify` caveat variant on capabilities, added to `chio-core-types`.
-- `sensitivity` and `clearance` fields on manifest tool and resource declarations, added to `chio-manifest`.
-- Five new receipt subtypes: `FlowViolation`, `Declassification`, `Tripwire`, `Containment`, `LiftOrder`.
-- Canary recognition semantics: the kernel MUST deny and emit a `Tripwire` receipt on presentation of a capability in the `decoy:*` namespace.
+### 5.5 Principal, lineage, and session taint
 
-## 9. Threat-model mapping
+Knowledge is tracked at two levels. Durable principal taint is keyed by `(tenant_id, subject_fingerprint, isolation_epoch)` and is also indexed by capability-lineage root. Session taint is keyed by `(tenant_id, subject_fingerprint, isolation_epoch, session_id)` and begins at the join of the applicable principal and lineage labels. Closing or replacing a session does not lower either durable label.
 
-Framed as mechanisms that make rows closable, not as closures. A row moves to `Covered` only with a conformance test at `crates/tooling/chio-conformance/tests/threats/<id>.rs` and caught-mutant evidence at `audits/evidence/threats/<id>.json`, per `docs/security/threat-coverage.md`.
+An isolation epoch changes only after a trusted launcher or attestation verifier proves that the old agent process, model context, writable memory, and inherited state were destroyed and that the new subject cannot read them. Without that evidence, a new session inherits the prior principal taint. Administrative retention expiry may archive records but cannot silently reinterpret retained agent knowledge as `Bottom`.
 
-| Threat row | Current state | Mechanism this arc adds |
-|------------|---------------|--------------------------|
-| `cumulative_data_exfiltration` | Pending, zero corpus | `chio-flow` egress control plus attested declassification |
-| `pii_phi_exposure` | Pending, zero corpus | `chio-flow` label seeding strengthens existing `ResponseSanitizationGuard` |
-| `capability_token_theft` | Pending | `chio-decoy` canary capabilities give a detection path |
-| `agent_velocity_abuse` | Pending, zero corpus | `chio-quarantine` dynamic throttle response |
-| `behavioral_sequence_attack` | Pending, zero corpus | `chio-quarantine` response to `BehavioralSequenceGuard` triggers |
+The raw-output tripwire runs first, existing sanitizers and redactors produce the effective response next, and the flow adapter then classifies that effective response, joins operator and signed-manifest output floors, and atomically joins the result into session, principal, and lineage state before delivery. Removed secret bytes do not taint the delivered representation solely because they existed before redaction, but declared and policy floors still apply. Cardinality overflow transitions every affected label to `Top`.
 
-## 10. Testing and evidence
+Each state record has a monotonic generation. Pre-invocation egress obtains an admission fence over the authoritative session context generation and keeps it valid through the dispatch commitment boundary. If output delivery advances taint or context generation before dispatch, the fence fails and the kernel re-evaluates or denies. Taint advancement happens before the corresponding output becomes observable to the agent. A failed classification, read, fence, or write denies or blocks.
 
-- Adversarial corpus: new classes in `chio-adversarial-suite` (`label_downgrade` for declassification without a caveat, `canary_evasion`, `containment_rollback`), wired into `chio-arena` coevolution.
-- Conformance: tests per new receipt subtype and per invariant (flow egress dominance, canary deny-and-tripwire, containment reversibility).
-- Fuzz: targets for the lattice operations (`join`, `flows_to`) and the playbook parser.
-- Formal: a Kani or TLA property that the lattice is a partial order (reflexive, antisymmetric, transitive) with `join` as least upper bound, fitting the existing `formal/` scaffolding.
+For every pre-invocation call, the source label is the join of the classified request payload, applicable operator input floor, durable principal taint, capability-lineage taint, and current session taint. The flow decision compares that complete source label with every effective destination clearance. A payload that does not itself contain a recognizable secret is still treated as derived from everything the agent can know. A valid declassification grant replaces only this exact request's source label with its signed target for the named destination and purpose; it does not change any durable taint record.
 
-## 11. Release framing
+## 6. Manifest security contract
 
-Split per the project's roadmap-framing convention:
+The signed `chio_core_types::manifest::ToolDefinition` becomes the sole normative tool definition. `chio-manifest` will reexport and validate that type instead of maintaining a divergent public struct. Every normative nested type gains `deny_unknown_fields` before the platform duplicate is removed. The migration introduces `chio.manifest.v2`; a version-dispatched v1 parser converts the legacy shape and requires the operator to re-sign the v2 manifest. The migration removes `has_side_effects` in favor of `ToolAnnotations.read_only`. It also makes categorical `latency_hint` the sole latency authority by moving `LatencyHint` to the normative type and removing `ToolAnnotations.estimated_duration_ms`. Legacy millisecond values map through fixed, tested thresholds; v2 never carries both representations.
 
-- Release gates (CI must enforce): `check-flow-invariants` (egress dominance holds on the conformance corpus), `check-decoy-unreachable` (no real manifest binds `decoy:*`), `check-containment-reversible` (every containment action has a lift path and a TTL).
-- Implementation: the three crates plus the `chio-core-types` and `chio-manifest` type additions.
-- External evidence: caught-mutant evidence for the mapped rows, conformance vectors, and the formal lattice property.
+Each tool may carry one optional `ToolFlowDeclaration`:
 
-Claims stay bounded: this arc ships mechanisms and gates. Threat-row closure is asserted only when the coverage gate accepts the evidence.
+| Field | Meaning |
+|---|---|
+| `output_label` | Minimum label joined into every successful output |
+| `input_clearance` | Maximum restriction accepted by this destination |
+| `egress` | Whether arguments cross a trust or network boundary |
+| `declassification_purposes` | Closed set of purposes this destination accepts |
 
-## 12. Risks and open questions
+The manifest is publisher-authenticated input, not authorization for the publisher to receive data. Runtime composition derives `runtime_egress` from transport and adapter topology. Effective egress is `runtime_egress OR manifest.egress`; a publisher cannot hide a boundary. Tenant or data-owner policy supplies one or more authoritative clearances, and the complete pre-invocation source label must flow to every applicable policy clearance and to the manifest clearance. The manifest can narrow acceptance but cannot widen policy. Declassification purposes are the intersection of policy and manifest purposes. Effective output sensitivity is the join of the operator floor, manifest floor, and classifier result.
 
-- Egress classification accuracy. `FlowGuard` depends on the manifest correctly marking which tool calls are egress-classed. A mislabeled tool is a hole. Mitigation: default unmarked destinations to top clearance (deny), forcing explicit declaration.
-- Declassification ergonomics. If too many workflows need declassify caveats, operators may over-grant them. Mitigation: declassification is per-compartment and receipt-logged, so over-granting is visible in audit.
-- Playbook misfire. A bad trigger could throttle or revoke legitimately. Mitigation: tiering keeps auto actions reversible and TTL-bounded; heavy actions need co-sign.
-- Label state growth. The per-session taint environment must be bounded. Mitigation: reuse the session journal lifecycle and cap label-set cardinality with a fail-closed overflow to top.
+The kernel consults only a successfully verified v2 manifest from the manifest registry plus an authenticated policy snapshot and runtime topology record. An adapter-provided or model-provided description is never authoritative. An effective egress destination without every required policy clearance denies. A non-egress tool may omit manifest clearance, but operator policy still applies. An absent manifest `output_label` contributes `Bottom`; it does not disable classification or the operator floor.
 
-## 13. Crate manifest summary
+The migration must cover every constructor and protocol projection found by `rg "ToolDefinition \\{" crates sdks`. OpenAPI uses an `x-chio-flow` extension. MCP, A2A, ACP, OpenAI, and provider adapters retain the declaration in an internal `BridgeSecurityMetadata` sidecar when the external dialect cannot express it. Export code must never silently erase a declaration and then re-import the tool as unconstrained. The four-language wire codegen receives schemas for labels, declassification grants, security events, and response receipts, and `make codegen-check` is a required gate.
 
-| Crate | Folder | Depends on (new) | In TCB |
-|-------|--------|------------------|--------|
-| `chio-flow` | `crates/security` | `chio-core-types`, `chio-manifest`, guard trait | Yes (FlowGuard in pipeline) |
-| `chio-decoy` | `crates/security` | `chio-core-types`, `chio-manifest` | Authority-adjacent (minting) |
-| `chio-quarantine` | `crates/security` | `chio-core-types`, port traits | No (best-effort, attested) |
+## 7. Typed declassification
+
+Declassification is not encoded as a comma-separated caveat predicate. The Capability Authority issues a `SignedDeclassificationGrant` carried on the tool-call request. Its canonical body contains:
+
+- grant id and domain version;
+- capability id, tenant id, subject, agent id, and session id;
+- hash of the exact source label and the complete target label;
+- destination server id and tool name;
+- one purpose selected from the destination manifest declaration;
+- canonical request hash;
+- issued-at and expires-at times;
+- authority key id.
+
+The signature uses canonical JSON and a dedicated domain-separation context. The flow adapter verifies the signature, trusted authority, time window, every identity binding, source-label hash, target-label validity, destination, effective policy-and-manifest purpose, and request hash. It then atomically consumes the grant id in `DeclassificationUseStore`. A grant is one-shot even when downstream dispatch later fails. Consumption and outcome are separately attested so an operator can distinguish an authorized release from a consumed-but-failed attempt. Declassification authorizes only the signed request payload; it never lowers durable principal, lineage, or session taint.
+
+The target label must be demonstrably less restrictive than the source and must be exactly the signed target. In lattice terms, `target.flows_to(source)` must hold and equality is rejected as a no-op grant. Runtime callers cannot choose a different subset. No grant authorizes declassification of `Top`.
+
+## 8. Deception model
+
+### 8.1 Decoy surfaces
+
+Supported surfaces are canary capabilities, honey tools, credential-shaped artifacts, files, browser-cookie-shaped values, internal hostnames, and signed text watermarks. Each artifact has a stable private id, tenant, scope, marker digest, creation policy, current version, expiry, and lifecycle state.
+
+Deception detections are high-confidence signals, not zero-false-positive proofs. Inventory agents, backup software, scanners, operator mistakes, and test harnesses can touch a decoy. Policy may auto-contain only after the configured correlation and risk threshold. A direct canary presentation always denies before dispatch regardless of response policy.
+
+### 8.2 Lifecycle and registry
+
+The lifecycle is `planned -> materializing -> armed -> triggered -> rotating -> retired`, with `error` transitions that preserve the last known state and attempted operation. An operator may retry from `error` to the recorded prior operation or retire the artifact; no other recovery edge is legal. Materialization is idempotent and refuses to overwrite an existing path. File artifacts require safe relative paths, component-by-component containment checks, create-new semantics, restrictive permissions, and a content digest. Cleanup verifies registry ownership and digest before removal. Rotation arms the replacement before retiring the old marker.
+
+The registry is encrypted at rest and excluded from normal receipt evidence. Receipts contain artifact id hashes and version hashes, never raw markers or honey credentials. Listing or exporting raw registry entries requires a separate privileged operator capability.
+
+### 8.3 Signed watermark envelope
+
+A watermark is a signed canonical envelope, not a deterministic hex substring. It binds tenant, application, session, source receipt, tool, sequence, issued-at, expires-at, a public opaque marker reference, key id, and encoding. The public reference is distinct from the private registry id and reveals no marker material. Extraction verifies byte-for-byte canonical payload equality, a trusted active or overlapping verification key, signature, expiry, and registry status. Detection deduplicates on `(marker_ref, observation_id)`.
+
+### 8.4 Tripwire ordering
+
+`TripwireGuard` is registered before configurable pre-invocation guards. A canary or honey-tool match causes an immediate deny, records guard evidence, and attempts a durable security-event append before returning. Event-store failure remains a deny and is represented in the kernel receipt. The post-invocation detector runs before response delivery; a valid watermark hit blocks egress and emits the same event shape.
+
+## 9. Security events and temporal correlation
+
+`SecurityEventBody` is a canonical, replayable observation with event id, event time, ingest time, tenant, subject, agent, session, capability, source receipt id, event kind, severity, evidence references, lineage seed, producer id, producer key id, trust class, and policy version. Raw secrets and decoy markers are forbidden. A `SignedSecurityEvent` binds the canonical body to a configured detector key, or the event carries a verified Chio receipt whose signer and event projection establish equivalent provenance.
+
+Ingestion produces `VerifiedSecurityEvent` only after signature or receipt verification, tenant binding, producer authorization, freshness, and event-time bounds pass. Only configured internal trust classes may enter automatic-response correlation. External SIEM imports, unsigned observations, and events from untrusted tool servers may create advisory findings and alerts, but cannot authorize containment.
+
+Rules are ordered stages adapted from Clawdstrike's `hunt-correlate` semantics. Each stage has an event predicate, an optional `after` stage, a `within` duration, and a grouping key. The engine uses event time, deduplicates event ids, accepts a configured bounded-lateness interval, advances a deterministic watermark, evicts expired partial matches, and caps state per tenant and rule. Overflow or store failure emits a detector-health event and suppresses automatic heavy response for the affected partition. It does not reinterpret an incomplete sequence as a match.
+
+A correlated finding commits to the rule version, group key hash, ordered contributing event ids, evidence digests, first and last event times, and lineage seed. Replay of the same corpus and policy produces the same finding id.
+
+## 10. Causal blast radius
+
+Any plan containing a lineage-scoped effect, currently `SuspendCapabilitySet` or `FreezeIssuance`, queries an authoritative, complete capability and receipt-lineage snapshot at a committed index, sorts and deduplicates target identities, and records the graph-slice digest, query bounds, and commit index. `Exact(AffectedSet)` requires a complete authoritative snapshot, not merely a local query that did not report truncation. The planned set is approval-bound but provisional because issuance and delegation remain live while approval is collected. Incomplete results produce an escalation and dry-run plan only. Session-local throttle, egress, and suspension effects bind their exact session target and do not acquire a lineage fence.
+
+Every lineage-scoped plan includes `FreezeIssuance` as its first ordered, approval-bound effect. After approval and before that effect, the executor durably records a deterministic fence-acquisition intent, obtains a bounded issuance-and-delegation fence lease for the lineage root, and recomputes the exact set under that fence. Execution proceeds only if the commit index and affected-set hash still equal the approved plan. A mismatch releases the lease and invalidates the approvals. The acquired lease is then persisted as the already-approved `FreezeIssuance` effect and renewed under the scheduler's fencing token. A crash before effect persistence is recovered by querying the deterministic action and lease ids; otherwise the bounded lease expires. No pre-approval or pre-apply terminal plan owns a lineage fence. Lift removes lineage-scoped restrictions from the recorded set and releases the fence only after all other effects are safely removed; it never recomputes a different subtree.
+
+## 11. Response plans and effects
+
+### 11.1 Temporary actions
+
+Response actions are either observational or reversible overlay operations:
+
+| Action | Default approval class | Effect |
+|---|---|---|
+| `EscalateAlert` | none | signed alert only |
+| `ThrottleSession` | auto-reversible | composable temporary rate-limit contribution |
+| `RestrictEgress` | auto-reversible | temporary destination deny overlay |
+| `SuspendSession` | heavy | temporary session deny overlay |
+| `SuspendCapabilitySet` | heavy | temporary deny overlay over the exact affected set |
+| `FreezeIssuance` | heavy | commit-indexed issuance and delegation fence contribution |
+
+Operator policy sets bounded TTL ceilings for each class. A plan at or below its auto-reversible ceiling may apply without human approval. Any extension beyond that ceiling is heavy and requires the shared threshold approval set.
+
+Permanent revocation is not presented as reversible and is outside automatic response. A separately approved operator workflow may invoke the existing revocation oracle after containment, but no `LiftOrder` can undo it.
+
+### 11.2 Plan binding
+
+`ResponsePlan` includes action id, trigger finding id, tenant, policy version, exact affected set and hash, ordered proposed effects, TTL, creation and expiry, authorizing Chio operator-capability id, digest and expiry, executor subject, required approval policy, submitter, and reason hash. The capability subject is the response executor. Its existing tool scope must contain one grant on internal server `chio.control-plane.active-response` for every proposed effect's closed logical tool name, such as `throttle_session`, `restrict_egress`, `suspend_session`, `suspend_capability_set`, or `freeze_issuance`. This reuses current capability scope instead of inventing an unverified action-class string. Issuer trust, subject, time, scope, and revocation are checked before approval collection and again before apply. `plan_hash` is the domain-separated hash of the canonical body.
+
+The operator capability is required for every executable plan, including an auto-reversible plan that requires no human vote. Threshold approval is an additional policy condition for heavy effects, not a substitute for executor authorization.
+
+Heavy actions require the protocol-primitives threshold governed-approval set. The response plan is encoded as a canonical governed response-plan intent, and the existing `GovernedTransactionIntent::binding_hash()` is computed over that complete intent. The policy-authority-signed threshold proposal binds the operator-capability digest and has a deadline no later than both capability and plan expiry. Distinct approvals bind `governed_intent_hash` to that binding hash and `request_id` to `action_id`. Trusted approver roles, separation from the submitter, validity windows, duplicate rejection, atomic replay reservation, and consumption are mandatory. Changing any plan or capability field changes the governed intent or proposal and invalidates all approvals.
+
+The control-plane executor opens a generic `AdmissionOperation` of kind `GovernedActiveResponse` before reserving replay state. Its operation id binds executor authority, action id, operator-capability digest, and governed intent hash. Budget and execution-nonce participants are absent, but approval reservation, dispatch commitment, crash recovery, and replay tombstones use the same coordinator contract as governed tool calls. `chio-quarantine` consumes this through `ApprovalVerifierPort` and does not depend on kernel implementation types. Until the shared proposal, coordinator, and replay reservation are implemented, every approval-requiring response remains dry-run, including a one-approver policy. `chio-quarantine` does not implement a private quorum verifier.
+
+### 11.3 Durable state machine
+
+The only legal transitions are:
+
+| From | To |
+|---|---|
+| `planned` | `awaiting_approval`, `applying`, `cancelled`, `expired`, `failed` |
+| `awaiting_approval` | `applying`, `cancelled`, `expired`, `failed` |
+| `applying` | `active`, `apply_partial`, `failed` |
+| `apply_partial` | `rolling_back` |
+| `active` | `expiring`, `rolling_back` |
+| `expiring` | `rolling_back` |
+| `rolling_back` | `lifted`, `rollback_partial` |
+| `rollback_partial` | `rolling_back` |
+
+`cancelled`, `expired`, `failed`, and `lifted` are terminal. `failed` is legal only when no external effect was successfully applied; otherwise the state is `apply_partial`. Every transition is a compare-and-swap update carrying a monotonic generation and transition id. Duplicate commands return the existing result. An `applying` lease timeout moves to `apply_partial` and triggers rollback of recorded successful effects. An `active` TTL timeout moves to `expiring` and is claimed by a durable scheduler. A rollback failure remains restrictive, moves to `rollback_partial`, and pages an operator. It never reports `lifted`.
+
+### 11.4 Effects and rollback
+
+Each `ResponseEffect` has a deterministic effect id, target, operation, contribution, observed base-version digest, apply status, scheduler fencing token, timestamps, and error code. Reversible restrictions are stored as effect-ID-keyed contributions. Effective posture is the most restrictive composition of the base state and every active contribution. Lift removes only its own contribution and recomputes posture, so plans may expire out of order without erasing one another. A non-composable external effect requires per-target serialization and compare-and-swap restore against the version installed by that effect; conflict keeps the restrictive state and escalates.
+
+The executor persists intent before calling a port, passes both effect id and scheduler fencing token, and then persists the observed result. A stale worker or stale fence cannot mutate or restore external state. Partial apply, partial rollback, expiry, cancellation, overlap, and retry each produce distinct signed receipts. `EscalateAlert` is observational and has no rollback contribution.
+
+The containment overlay is consulted by an early kernel guard. When enabled, overlay-store failure denies because an active containment decision may otherwise be bypassed. Failure of the planner or correlator does not affect baseline preventive guards.
+
+## 12. Chio-native receipt mapping
+
+Active defense extends the receipt vocabulary with canonical bodies for:
+
+- flow denial;
+- declassification consumption and outcome;
+- tripwire observation;
+- correlated finding;
+- response plan;
+- effect transition;
+- response completion;
+- lift or rollback completion;
+- detector and scheduler health.
+
+Kernel-boundary denials remain mediated decision receipts with structured guard evidence. Off-boundary planning and response events use signed observation or advisory receipts as appropriate. Receipt ids and effect ids are cross-linked, and lineage ingestion records the relationships. No receipt carries a raw tainted payload, marker, credential, or rollback secret.
+
+## 13. Migration and rollout
+
+1. Land portable types, schemas, lattice tests, and manifest unification without enabling enforcement.
+2. Add SQLite stores and dual-write principal, lineage, and session taint plus verified security events while decisions remain report-only.
+3. Enable post-invocation classification in shadow mode. Any shadow-store failure is surfaced but does not yet alter responses.
+4. Enable fail-closed flow enforcement for manifests that explicitly opt into `flow_v1`.
+5. Require flow declarations for newly registered egress tools, then migrate existing signed manifests.
+6. Arm deception for test tenants, then selected production tenants. Never reuse development markers in production.
+7. Run correlation and response in dry-run until false-positive, truncation, and rollback evidence meets the release thresholds.
+8. Enable reversible automatic actions by tier. Permanent revocation remains human-operated.
+
+Rollback disables new adapter registration and leaves the durable event and response history readable. It does not delete taint, decoy, or containment records. An active containment overlay must be explicitly lifted or allowed to expire before disabling its enforcement guard.
+
+## 14. Behavioral release gates
+
+Release gates execute behavior, not source grep:
+
+- lattice property tests and a formal partial-order plus least-upper-bound model;
+- unknown label, missing clearance, classifier failure, taint-store failure, and declassification-store failure all deny;
+- signed manifest flow fields survive every supported adapter and four-language schema round trip;
+- a canary call cannot reach a fake tool server even when event persistence fails;
+- watermark tampering, untrusted keys, expiry, replay, and key overlap behave as specified;
+- temporal `after/within` rules are deterministic under duplicate and bounded out-of-order events;
+- truncated lineage never auto-applies containment;
+- crash recovery between every effect transition converges without double application;
+- TTL expiry rolls back the exact applied set;
+- forced partial apply and partial rollback produce truthful states and receipts;
+- approval replay, duplicate approvers, submitter approval, expired approval, and plan mutation all fail;
+- threat rows remain unchanged until conformance and caught-mutant evidence pass the existing coverage gate.
+
+## 15. Provenance and adaptation boundary
+
+The following Clawdstrike code at local commit `666303e5f3428f3b6e6b72f118c269a02388e0a4` informs this design:
+
+- temporal rules and engine: `crates/libs/hunt-correlate/src/rules.rs` and `engine.rs`;
+- deception types and honey lifecycle: `crates/libs/clawdstrike-policy-event/src/edr/deception.rs` and `honey.rs`;
+- response plans, effects, status, and rollback: `crates/libs/clawdstrike-policy-event/src/edr/response.rs`;
+- signed watermark envelope: `crates/libs/clawdstrike/src/watermarking.rs`;
+- tripwire-before-execution behavior: `crates/services/clawdstrike-brokerd/src/api.rs` and `crates/services/clawdstrike-brokerd/tests/e2e.rs`.
+
+The implementation adapts invariants and tests to Chio types, canonical signing, receipts, and lineage. It does not copy Clawdstrike's broker serialization, inherited-environment behavior, non-atomic execution count, or any code without verified provenance. Both repositories are Apache-2.0, but copied or materially adapted files must retain copyright attribution, identify modifications, and propagate applicable `NOTICE` text. Code marked as adapted from another upstream source requires that source's license to be verified before use.
+
+## 16. Bounded claims
+
+This work supplies mechanisms and evidence gates. It does not claim that deception has no false positives, that containment is guaranteed when response services are unavailable, or that a threat row is covered before the existing coverage process accepts conformance and caught-mutant evidence.

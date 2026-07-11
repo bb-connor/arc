@@ -1,1520 +1,764 @@
 # Enterprise Hardening Pack Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Execute this plan in order. Each phase has a narrow build target and a behavioral gate. Do not begin runtime rollout until the key, broker, and cage libraries independently pass their gates.
 
-**Goal:** Add three `crates/security/` crates that close operational-trust gaps: `chio-keyring` (authority-key rotation with an append-only Merkle transparency log), `chio-secret-broker` (ephemeral capability-bound credential leases), and `chio-cage` (OS sandbox profiles compiled from the signed manifest).
+**Goal:** Deliver transactional authority-key transparency, broker-mediated credential use, and enforced native tool-server confinement without duplicating Chio cryptographic primitives or retaining raw-secret and unconfined fallback paths.
 
-**Architecture:** All three reuse existing primitives. `chio-keyring` mirrors the `EpochRootSigner`/`SignedEpochRoot` pattern from `chio-revocation-oracle`. `chio-secret-broker` reuses `SecretLeakGuard` from `chio-guards` at the lease boundary and defines a `SecretBackend` trait with a local reference implementation. `chio-cage` compiles `chio-manifest` `RequiredPermissions` into a portable `SandboxProfile`, with a Linux reference `Sandbox` implementation (seccomp-BPF plus Landlock) gated behind a target check and fail-closed everywhere else.
+**Design contract:** `docs/superpowers/specs/2026-07-09-enterprise-hardening-design.md`
 
-**Tech Stack:** Rust (workspace, edition 2021), `serde`, `sha2`, `ed25519-dalek` via `chio_core_types::crypto` (`Keypair`, `PublicKey`, `Signature`), `rustix` (new workspace dependency, Linux sandbox syscalls), `cargo test`/`clippy`/`fmt`.
+**Verified baseline:**
 
-## Global Constraints
+- `chio_core_types::merkle` already implements RFC 6962 leaf and node hashing plus inclusion proofs. Extend it with consistency proofs. Do not add another Merkle implementation.
+- `chio_manifest::{SignedManifest, verify_manifest, RequiredPermissions}` is the cage admission surface. `chio_core_types::manifest::ToolManifest` is signed, but it is platform-incomplete and lacks registered-key admission, so it cannot be compiled by cage.
+- `canonical_json_bytes`, `Keypair::sign_canonical`, `PublicKey::verify_canonical`, and `SigningBackend` are the canonical signing surfaces.
+- `nono` 0.11.0 in the reviewed Clawdstrike checkout provides useful Landlock and Seatbelt capability code, but `CapabilitySet::new()` defaults network to `AllowAll`, Linux partial filesystem enforcement returns success, and seccomp notification covers file-open mediation rather than a default-deny syscall allowlist. Chio must correct all three assumptions.
+- Clawdstrike's broker shape, generic HTTPS checks, key rotation, Merkle proof tests, audit monitor, capability compiler, preflight, and supervised launcher are adaptation sources. Clawdstrike's non-canonical broker signing, inherited full environment, non-atomic execution counter, and historical-key fallback are not adaptation sources.
 
-Copied verbatim from the spec and house rules. Every task's requirements implicitly include this section.
+## Global constraints
 
-- No em dashes (U+2014) anywhere in code, comments, or docs. Use hyphens (`-`) or parentheses.
-- Fail-closed: a signing key absent from the transparency log is rejected; a lease past its capability is dead; a tool server with no derivable sandbox profile does not launch.
-- Clippy: `unwrap_used = "deny"` and `expect_used = "deny"` workspace-wide. No `unwrap`/`expect`/`unsafe` in new code (the Linux sandbox syscalls go through `rustix`, which is safe).
-- Serialization: canonical JSON (RFC 8785) for signed payloads.
-- Commits: conventional commits.
-- New crates use the workspace template: `version.workspace = true`, `edition.workspace = true`, `license.workspace = true`, `publish = false`, `[lints] workspace = true`, deps as `{ workspace = true }`.
-- Threat-row framing: mechanisms that make rows closable, not closures.
-- Verify each phase with: `cargo build --workspace && cargo test --workspace && cargo clippy --workspace -- -D warnings && cargo fmt --all -- --check`.
+- No em dash characters in code, comments, or documentation.
+- `unwrap_used` and `expect_used` remain denied outside narrowly annotated tests.
+- Signed payloads use versioned schemas, `#[serde(deny_unknown_fields)]`, RFC 8785 canonical JSON, and Chio signature types.
+- All counters and state transitions are checked for overflow.
+- All stateful authorization uses transactions or compare-and-swap. No check-then-act logic. Broker execution uses the protocol arc's authoritative `BudgetStore` hold and event API through an injected port, not a broker-owned counter.
+- No secret-bearing type implements `Serialize`, `Clone`, or `Debug`.
+- No agent-facing or tool-facing API returns credential bytes, a secret file, or a secret environment variable.
+- No cage launch succeeds with unsupported, partial, missing, or unconfirmed enforcement.
+- The multithreaded runtime does not apply nono or other sandbox operations in a post-fork callback. A fresh, trusted, single-threaded `chio-cage-init` process owns confinement and target exec.
+- Grep-only scripts are hygiene checks, not release evidence.
+- Every copied or substantially adapted file records provenance and Apache-2.0 attribution before merge.
+- Run `cargo fmt --all -- --check`, focused tests, `cargo clippy` for changed crates, and `git diff --check` at the end of every phase.
 
----
+## Planned file map
 
-## File Structure
+### Existing files to modify
 
-**`crates/security/chio-keyring/` (create):**
+- `Cargo.toml`, `Cargo.lock`, `NOTICE`, `deny.toml`
+- `crates/core/chio-core-types/src/merkle.rs`
+- `crates/platform/chio-manifest/src/lib.rs`
+- `crates/platform/chio-manifest/src/validation.rs`
+- `crates/platform/chio-store-sqlite/src/encrypted_blob.rs` for zeroizing reads and atomic encrypted-blob plus reference provisioning support
+- the existing runtime composition and tool-server launch path selected during Phase 0
+- `spec/PROTOCOL.md`, `spec/SECURITY.md`, `docs/security/threat-coverage.md`
+- `spec/schemas/registry.json`, `spec/schemas/MANIFEST.sha256`, `spec/schemas/chio-wire/v1/README.md`
+- `tests/bindings/vectors/MANIFEST.sha256`
+- `crates/tooling/chio-conformance/`, `scripts/check-chio-schema-registry.sh`
+- generated Rust, Python, TypeScript, and Go bindings selected by `cargo xtask codegen`
+- `crates/core/chio-adversarial-suite/cases/`
+
+### `crates/security/chio-keyring`
+
 - `Cargo.toml`, `src/lib.rs`
-- `src/epoch.rs`: `KeyEpoch` (a key's lifecycle record) and `KeyOperation`.
-- `src/log.rs`: the append-only transparency log with a Merkle root over key epochs.
-- `src/rotation.rs`: rotate to a new active key with an overlap window.
-- `src/verify.rs`: pin a log root, reject any key not proven present.
+- `src/event.rs`, `src/state.rs`, `src/store.rs`, `src/sqlite.rs`
+- `src/checkpoint.rs`, `src/sync.rs`, `src/witness.rs`, `src/verifier.rs`
+- `src/bin/chio-keylog-witness.rs`, `src/bin/chio-keylog-audit.rs`
+- `tests/rotation.rs`, `tests/transparency.rs`, `tests/split_view.rs`
 
-**`crates/security/chio-secret-broker/` (create):**
+### `crates/security/chio-secret-broker`
+
 - `Cargo.toml`, `src/lib.rs`
-- `src/lease.rs`: `Lease` (capability-bound, TTL'd credential handle).
-- `src/backend.rs`: the `SecretBackend` trait and a local reference backend.
-- `src/broker.rs`: mint, renew, revoke; per-subject rate limiting.
-- `src/boundary.rs`: run `SecretLeakGuard` over values crossing the lease boundary.
+- `src/protocol.rs`, `src/proof.rs`, `src/capability.rs`
+- `src/backend.rs`, `src/encrypted_blob_backend.rs`, `src/provision.rs`
+- `src/provider.rs`, `src/generic_https.rs`, `src/budget.rs`, `src/revocation.rs`
+- `src/store.rs`, `src/sqlite.rs`, `src/reconcile.rs`, `src/service.rs`, `src/receipt.rs`
+- `src/bin/chio-secret-brokerd.rs`
+- `tests/execution.rs`, `tests/concurrency.rs`, `tests/no_secret_crossing.rs`, `tests/network_adversarial.rs`
 
-**`crates/security/chio-cage/` (create):**
+### `crates/security/chio-cage`
+
 - `Cargo.toml`, `src/lib.rs`
-- `src/profile.rs`: `SandboxProfile` (allowed roots, network, syscall allowlist).
-- `src/compile.rs`: derive a `SandboxProfile` from `RequiredPermissions`.
-- `src/sandbox.rs`: the portable `Sandbox` trait and a fail-closed default.
-- `src/linux.rs`: the Linux reference impl (seccomp + Landlock), `#[cfg(target_os = "linux")]`.
+- `src/permissions.rs`, `src/profile.rs`, `src/compile.rs`
+- `src/enforcement.rs`, `src/seccomp.rs`, `src/fd_table.rs`, `src/init_protocol.rs`, `src/exec_observer.rs`
+- `src/launcher.rs`, `src/supervisor.rs`, `src/receipt.rs`
+- `src/bin/chio-cage-init.rs`
+- `tests/compile.rs`, `tests/bootstrap.rs`, `tests/linux_enforcement.rs`
+- `tests/probes/` for child probe binaries
 
-**Gates, evidence, spec, workspace (create/modify):**
-- `scripts/check-keyring-log-append-only.sh`, `scripts/check-broker-lease-ttl.sh`, `scripts/check-cage-fail-closed.sh`
-- `crates/core/chio-adversarial-suite/cases/key_log_omission/`, `.../lease_after_revocation/`, `.../sandbox_escape_attempt/`
-- Root `Cargo.toml` (modify): register three members; add `rustix` to `[workspace.dependencies]`.
-- `spec/PROTOCOL.md`, `spec/SECURITY.md` (modify).
+### Gates and provenance
 
----
+- `third_party/provenance/clawdstrike-enterprise-hardening.toml`
+- `spec/schemas/chio-wire/v1/security/`
+- `tests/bindings/vectors/security/`
+- `.github/workflows/enterprise-hardening.yml`
+- `scripts/check-keyring-transparency.sh`
+- `scripts/check-secret-broker-boundary.sh`
+- `scripts/check-cage-enforcement.sh`
 
-## Phase 1: chio-keyring
+Paths under the runtime composition layer are deliberately selected in Phase 0 after tracing the current native launch path. Do not guess a wiring file and create a second launcher.
 
-### Task 1: Crate scaffold and `KeyEpoch`
+## Phase 0: source, dependency, and integration audit
 
-**Files:**
-- Create: `crates/security/chio-keyring/Cargo.toml`, `src/lib.rs`, `src/epoch.rs`
-- Modify: root `Cargo.toml` (`members`)
-- Test: inline in `epoch.rs`
+### Task 0.1: Record adaptation provenance
 
-**Interfaces:**
-- Consumes: `chio_core_types::crypto::{PublicKey, SigningAlgorithm}`.
-- Produces: `KeyEpoch { seq: u64, activated_at: u64, retired_at: Option<u64>, algorithm: SigningAlgorithm, public_key: PublicKey, operation: KeyOperation }` and `KeyOperation { Issuance, Rotation, Retirement }`.
+**Sources to inspect:**
 
-- [ ] **Step 1: Write the failing test**
+- Clawdstrike `crates/libs/clawdstrike-broker-protocol/src/lib.rs`
+- Clawdstrike `crates/services/clawdstrike-brokerd/src/capability.rs`
+- Clawdstrike `crates/services/clawdstrike-brokerd/src/provider/generic_https.rs`
+- Clawdstrike `crates/libs/clawdstrike/src/pkg/merkle.rs`
+- Clawdstrike `crates/services/clawdstrike-registry/src/keys.rs`
+- Clawdstrike `crates/services/clawdstrike-registry/src/bin/audit-monitor.rs`
+- Clawdstrike `crates/libs/clawdstrike/src/sandbox/capability_builder.rs`
+- Clawdstrike `crates/libs/clawdstrike/src/sandbox/preflight.rs`
+- Clawdstrike `crates/services/hush-cli/src/sandbox_nono.rs`
+- Clawdstrike `crates/services/hush-cli/src/supervised_exec.rs`
+- Clawdstrike `infra/vendor/nono/`
 
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chio_core_types::crypto::{Keypair, SigningAlgorithm};
+- [ ] Add `third_party/provenance/clawdstrike-enterprise-hardening.toml` with the local source repository, exact source commit, source paths, destination paths, Apache-2.0 license, source NOTICE, adaptation notes, and reviewer.
+- [ ] Update Chio `NOTICE` for Backbay Industries code that is copied or substantially adapted.
+- [ ] Do not copy Spine checkpoint code. It states that it was adapted from AegisNet, and the local checkout does not establish that upstream license.
+- [ ] For nono, prefer a pinned upstream dependency whose version, checksum, source, and license are present in the lockfile. If Chio needs a patch to expose real enforcement status, document the upstream commit and patch set in a dedicated vendored directory. Do not copy Clawdstrike's vendored directory without that provenance.
+- [ ] Update `deny.toml` only after the dependency graph is known. No broad license wildcard.
 
-    #[test]
-    fn key_epoch_records_activation() {
-        let pk = Keypair::generate().public_key();
-        let epoch = KeyEpoch {
-            seq: 0,
-            activated_at: 1_000,
-            retired_at: None,
-            algorithm: SigningAlgorithm::Ed25519,
-            public_key: pk,
-            operation: KeyOperation::Issuance,
-        };
-        assert_eq!(epoch.seq, 0);
-        assert!(epoch.retired_at.is_none());
-        assert_eq!(epoch.operation, KeyOperation::Issuance);
-    }
-}
-```
+**Gate:** A reviewer can trace every adapted block to a licensed source and can distinguish copied code from behavioral reimplementation.
 
-- [ ] **Step 2: Run test to verify it fails**
+### Task 0.2: Trace the real integration paths
 
-Run: `cargo test -p chio-keyring epoch`
-Expected: FAIL (crate/type missing).
+- [ ] Trace all construction and verification of `chio_manifest::SignedManifest` and record the runtime admission point.
+- [ ] Trace every native tool-server process launch and identify the one composition owner to replace or wrap.
+- [ ] Trace capability revocation and DPoP verification APIs. Select low-level interfaces the broker can consume without introducing a kernel dependency cycle.
+- [ ] Trace `SqliteEncryptedBlobStore`, `TenantId`, `TenantKey`, and `BlobHandle` and record the production encrypted credential backend boundary.
+- [ ] Trace receipt persistence and select the existing receipt sink used by runtime composition.
+- [ ] Enumerate both Chio manifest representations and add a migration note proving which one the cage accepts.
+- [ ] Establish an explicit ordering dependency on active-defense Phase 2. Either merge its normative `chio_core_types::manifest::ToolDefinition` plus `chio-manifest` reexports first, or coordinate both arcs in one PR with one owner for the shared files.
+- [ ] Do not add enterprise fields to a second `ToolDefinition`. Cage permissions remain fields of the full platform manifest while tool security metadata uses the normative reexported core type.
+- [ ] Record the selected paths in the implementation PR description and update this plan if repository movement changed a path.
 
-- [ ] **Step 3: Write minimal implementation**
-
-`Cargo.toml`:
-
-```toml
-[package]
-name = "chio-keyring"
-description = "Chio authority-key rotation and transparency log"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-publish = false
-
-[lib]
-name = "chio_keyring"
-
-[dependencies]
-chio-core-types = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
-sha2 = { workspace = true }
-
-[lints]
-workspace = true
-```
-
-`src/lib.rs`:
-
-```rust
-//! Authority-key lifecycle: rotation with overlap windows and an append-only
-//! Merkle transparency log so verifiers can pin the set of keys that ever
-//! signed.
-
-pub mod epoch;
-pub mod log;
-pub mod rotation;
-pub mod verify;
-```
-
-`src/epoch.rs`:
-
-```rust
-//! A key epoch: one authority key's lifecycle record in the transparency log.
-
-use chio_core_types::crypto::{PublicKey, SigningAlgorithm};
-use serde::{Deserialize, Serialize};
-
-/// What lifecycle event a key epoch records.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum KeyOperation {
-    Issuance,
-    Rotation,
-    Retirement,
-}
-
-/// One authority key's lifecycle record.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct KeyEpoch {
-    pub seq: u64,
-    pub activated_at: u64,
-    pub retired_at: Option<u64>,
-    pub algorithm: SigningAlgorithm,
-    pub public_key: PublicKey,
-    pub operation: KeyOperation,
-}
-```
-
-Add `"crates/security/chio-keyring",` to the root `Cargo.toml` `members`. If `PublicKey` does not implement `Serialize`, serialize the hex form instead: read `crates/core/chio-core-types/src/crypto.rs:253` and use `to_hex()`/`from_hex()` with a `String` field.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-keyring epoch`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
+**Commands:**
 
 ```bash
-git add crates/security/chio-keyring Cargo.toml
-git commit -m "feat(keyring): scaffold with KeyEpoch lifecycle record"
+rg -n "SignedManifest|verify_manifest|Command::new|execve|fork|spawn\(" crates
+rg -n "Dpop|DPoP|RevocationStore|ReceiptStore" crates/kernel crates/platform crates/core
+rg -n "chio_core_types::manifest|chio_manifest::" crates
 ```
 
-### Task 2: Append-only transparency log
+**Gate:** There is one named owner for manifest admission, one for helper launch, one encrypted secret store, and no proposed reverse dependency from `chio-core-types` or `chio-manifest` into a security crate.
 
-**Files:**
-- Create: `crates/security/chio-keyring/src/log.rs`
-- Test: inline
+### Task 0.3: Pin the Linux enforcement stack
 
-**Interfaces:**
-- Consumes: `sha2::Sha256`, `crate::epoch::KeyEpoch`.
-- Produces: `TransparencyLog` with `pub fn new() -> Self`, `pub fn append(&mut self, epoch: KeyEpoch) -> Result<LogRoot, LogError>`, and `pub fn root(&self) -> LogRoot`. `LogRoot { size: u64, root_hash: [u8; 32] }`; `LogError::Serialization`. `append` returns `Err` without mutating the log on serialization failure, so a caller never treats a failed append as success. Each root commits to the previous root, so the log is append-only and tamper-evident.
+- [ ] Select and pin nono after confirming its source and license.
+- [ ] Select and pin a seccomp-BPF compiler capable of a default-deny allowlist. Do not use nono's `openat`/`openat2` notification support as the allowlist.
+- [ ] Define the minimum supported Linux kernel, Landlock ABI, CPU architectures, and seccomp feature set in `chio-cage` documentation and CI configuration.
+- [ ] Patch or extend nono to expose `RulesetStatus` and add Landlock rules from caller-owned FDs. `chio-cage` must observe and reject `PartiallyEnforced`, and it must not reopen a validated path.
+- [ ] Define the pinned `chio-cage-init` binary identity, sealed-memfd launch-plan format, O_PATH FD-table protocol, `execveat` or `fexecve`, and kernel-observed exec-transition requirements.
+- [ ] Provision an actual runner matching `[self-hosted, linux, x64, chio-enterprise-security]` with the required Landlock ABI, seccomp, `openat2`, `execveat`, memfd seals, O_PATH behavior, and permitted parent-child `PTRACE_TRACEME` plus `PTRACE_O_TRACEEXEC`. A planned label without an online runner is not release evidence.
+- [ ] Run `cargo deny check licenses advisories bans sources` for the proposed graph before implementation continues.
 
-- [ ] **Step 1: Write the failing test**
+**Gate:** Dependency review explicitly proves network-deny initialization, observable Landlock status, and independent seccomp enforcement.
 
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chio_core_types::crypto::{Keypair, SigningAlgorithm};
-    use crate::epoch::{KeyEpoch, KeyOperation};
+## Phase 1: generic RFC 6962 consistency proofs
 
-    fn epoch(seq: u64) -> KeyEpoch {
-        KeyEpoch {
-            seq,
-            activated_at: seq * 100,
-            retired_at: None,
-            algorithm: SigningAlgorithm::Ed25519,
-            public_key: Keypair::generate().public_key(),
-            operation: KeyOperation::Rotation,
-        }
-    }
+### Task 1.1: Add fixed failing vectors
 
-    #[test]
-    fn append_grows_and_changes_root() {
-        let mut log = TransparencyLog::new();
-        let r0 = log.root();
-        let r1 = log.append(epoch(0)).expect("append");
-        assert_eq!(r1.size, 1);
-        assert_ne!(r1.root_hash, r0.root_hash);
-    }
+**Files:** `crates/core/chio-core-types/src/merkle.rs`
 
-    #[test]
-    fn root_commits_to_previous_root() {
-        let mut a = TransparencyLog::new();
-        let mut b = TransparencyLog::new();
-        a.append(epoch(0)).expect("append");
-        let ra = a.append(epoch(1)).expect("append");
-        // A log that appended the same two epochs in order has the same root.
-        b.append(epoch_fixed(0)).expect("append");
-        let rb = b.append(epoch_fixed(1)).expect("append");
-        // Different keys -> different roots, proving order and content bind.
-        assert_ne!(ra.root_hash, rb.root_hash);
-    }
+- [ ] Add fixed leaf sets for tree sizes 1 through at least 16, including every non-power-of-two boundary.
+- [ ] Add expected roots and consistency paths derived from a separately reviewed RFC 6962 implementation or published vectors. Record the vector source.
+- [ ] Test valid updates for every `1 <= old_size <= new_size` pair.
+- [ ] Test wrong old root, wrong new root, reordered path, truncated path, extended path, zero old size, old size above new size, and index overflow.
+- [ ] Cross-check that the append-oriented representation produces the same roots and inclusion proofs as existing `MerkleTree::from_leaves`.
 
-    fn epoch_fixed(seq: u64) -> KeyEpoch {
-        KeyEpoch {
-            seq,
-            activated_at: seq * 100,
-            retired_at: None,
-            algorithm: SigningAlgorithm::Ed25519,
-            public_key: Keypair::from_seed(&[7u8; 32]).public_key(),
-            operation: KeyOperation::Rotation,
-        }
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-keyring log`
-Expected: FAIL (`TransparencyLog` missing).
-
-- [ ] **Step 3: Write minimal implementation**
-
-`src/log.rs`:
-
-```rust
-//! Append-only key-transparency log. Each root hashes (previous root ||
-//! canonical epoch), so the sequence is order-sensitive and tamper-evident.
-
-use chio_core_types::canonical::to_canonical_json;
-use sha2::{Digest, Sha256};
-
-use crate::epoch::KeyEpoch;
-
-/// A commitment to the log contents at a given size.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LogRoot {
-    pub size: u64,
-    pub root_hash: [u8; 32],
-}
-
-/// A transparency-log operation failure.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LogError {
-    /// The epoch could not be canonicalized for hashing; the log is unchanged.
-    Serialization,
-}
-
-/// An append-only log of key epochs with a rolling Merkle-style root.
-pub struct TransparencyLog {
-    size: u64,
-    root_hash: [u8; 32],
-}
-
-impl Default for TransparencyLog {
-    fn default() -> Self {
-        Self { size: 0, root_hash: [0u8; 32] }
-    }
-}
-
-impl TransparencyLog {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Append an epoch, folding it into the rolling root. Returns the new root,
-    /// or `Err` on serialization failure without mutating the log, so a caller
-    /// (rotation) never activates a key whose append did not commit.
-    pub fn append(&mut self, epoch: KeyEpoch) -> Result<LogRoot, LogError> {
-        let bytes = to_canonical_json(&epoch).map_err(|_| LogError::Serialization)?;
-        let mut hasher = Sha256::new();
-        hasher.update(self.root_hash);
-        hasher.update(bytes);
-        self.root_hash = hasher.finalize().into();
-        self.size += 1;
-        Ok(self.root())
-    }
-
-    #[must_use]
-    pub fn root(&self) -> LogRoot {
-        LogRoot { size: self.size, root_hash: self.root_hash }
-    }
-}
-```
-
-Confirm the canonical-JSON helper name: read `crates/core/chio-core-types/src/canonical.rs` and use its public `to_canonical_json` (or equivalent) function; adjust the import if the name differs.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-keyring log`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
+**First command:**
 
 ```bash
-git add crates/security/chio-keyring/src/log.rs
-git commit -m "feat(keyring): add append-only transparency log"
+cargo test -p chio-core-types merkle::tests::consistency
 ```
 
-### Task 3: Rotation with overlap window
+Expected before implementation: compile failure because consistency types and methods do not exist.
 
-**Files:**
-- Create: `crates/security/chio-keyring/src/rotation.rs`
-- Test: inline
+### Task 1.2: Implement consistency proof types and verification
 
-**Interfaces:**
-- Consumes: `crate::epoch::{KeyEpoch, KeyOperation}`, `crate::log::TransparencyLog`.
-- Produces: `Keyring` holding the log and epoch history, with `pub fn rotate(&mut self, new_key: KeyEpoch, now: u64) -> Result<(), LogError>` (appends a Retirement record for the previous key then the new key, activating the new key only after both appends commit) and `pub fn is_valid(&self, seq: u64, now: u64) -> bool` (a key is valid only at or after its activation time, and while active or within its overlap window).
-
-- [ ] **Step 1: Write the failing test**
+**Public contract:**
 
 ```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chio_core_types::crypto::{Keypair, SigningAlgorithm};
-    use crate::epoch::{KeyEpoch, KeyOperation};
-
-    fn epoch(seq: u64, now: u64) -> KeyEpoch {
-        KeyEpoch {
-            seq,
-            activated_at: now,
-            retired_at: None,
-            algorithm: SigningAlgorithm::Ed25519,
-            public_key: Keypair::generate().public_key(),
-            operation: if seq == 0 { KeyOperation::Issuance } else { KeyOperation::Rotation },
-        }
-    }
-
-    #[test]
-    fn previous_key_valid_during_overlap_then_expires() {
-        let mut kr = Keyring::new(60);
-        kr.rotate(epoch(0, 0), 0).expect("rotate");
-        kr.rotate(epoch(1, 100), 100).expect("rotate");
-        // key 0 retired at 100, overlap 60 -> valid until 160.
-        assert!(kr.is_valid(0, 150));
-        assert!(!kr.is_valid(0, 161));
-        // key 1 is active.
-        assert!(kr.is_valid(1, 200));
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-keyring rotation`
-Expected: FAIL.
-
-- [ ] **Step 3: Write minimal implementation**
-
-`src/rotation.rs`:
-
-```rust
-//! Rotation with an overlap window: the previous key stays valid for
-//! `overlap_secs` after retirement so in-flight capabilities do not break.
-
-use crate::epoch::{KeyEpoch, KeyOperation};
-use crate::log::{LogError, TransparencyLog};
-
-/// Holds the transparency log and the current active key.
-pub struct Keyring {
-    log: TransparencyLog,
-    epochs: Vec<KeyEpoch>,
-    overlap_secs: u64,
+pub struct MerkleConsistencyProof {
+    pub old_size: usize,
+    pub new_size: usize,
+    pub audit_path: Vec<Hash>,
 }
 
-impl Keyring {
-    #[must_use]
-    pub fn new(overlap_secs: u64) -> Self {
-        Self { log: TransparencyLog::new(), epochs: Vec::new(), overlap_secs }
-    }
-
-    /// Rotate to a new key. Append a Retirement record for the current active
-    /// key first, then the new key, marking state only after each append
-    /// commits. If an append fails, the rotation returns `Err` and the new key
-    /// is not activated, so the authority never signs with a key absent from
-    /// the pinned log.
-    pub fn rotate(&mut self, new_key: KeyEpoch, now: u64) -> Result<(), LogError> {
-        if let Some(prev) = self.epochs.last().cloned() {
-            if prev.retired_at.is_none() {
-                self.log.append(KeyEpoch {
-                    seq: prev.seq,
-                    activated_at: prev.activated_at,
-                    retired_at: Some(now),
-                    algorithm: prev.algorithm,
-                    public_key: prev.public_key.clone(),
-                    operation: KeyOperation::Retirement,
-                })?;
-                if let Some(entry) = self.epochs.last_mut() {
-                    entry.retired_at = Some(now);
-                }
-            }
-        }
-        self.log.append(new_key.clone())?;
-        self.epochs.push(new_key);
-        Ok(())
-    }
-
-    /// Whether the key at `seq` is valid at `now`: active (not retired) or
-    /// within its overlap window.
-    #[must_use]
-    pub fn is_valid(&self, seq: u64, now: u64) -> bool {
-        self.epochs.iter().any(|e| {
-            // A key is never valid before its activation time, whether active or
-            // retired, so a rewound clock cannot make a not-yet-activated key
-            // valid just because it carries a retirement record.
-            e.seq == seq
-                && now >= e.activated_at
-                && match e.retired_at {
-                    None => true,
-                    Some(retired) => now <= retired.saturating_add(self.overlap_secs),
-                }
-        })
-    }
-}
-```
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-keyring rotation`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-keyring/src/rotation.rs
-git commit -m "feat(keyring): add rotation with overlap window"
-```
-
-### Task 4: Verify against a pinned log root
-
-**Files:**
-- Create: `crates/security/chio-keyring/src/verify.rs`
-- Test: inline
-
-**Interfaces:**
-- Consumes: `crate::epoch::KeyEpoch`, `chio_core_types::crypto::PublicKey`.
-- Produces: `pub fn key_in_log(epochs: &[KeyEpoch], pinned: LogRoot, key: &PublicKey) -> bool`. It recomputes the log root over `epochs` and rejects (returns false) unless they reproduce `pinned`, then checks membership; a key absent from the log, or present only in a slice that does not fold to the pinned root, is rejected (the caller fails closed).
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chio_core_types::crypto::{Keypair, SigningAlgorithm};
-    use crate::epoch::{KeyEpoch, KeyOperation};
-    use crate::log::TransparencyLog;
-
-    fn epoch(seq: u64, key: chio_core_types::crypto::PublicKey) -> KeyEpoch {
-        KeyEpoch {
-            seq, activated_at: seq, retired_at: None,
-            algorithm: SigningAlgorithm::Ed25519,
-            public_key: key,
-            operation: KeyOperation::Issuance,
-        }
-    }
-
-    #[test]
-    fn key_accepted_only_when_epochs_reproduce_the_pinned_root() {
-        let kp = Keypair::generate();
-        let epochs = vec![epoch(0, kp.public_key())];
-        // Pin the root the honest log would produce for these epochs.
-        let mut log = TransparencyLog::new();
-        log.append(epochs[0].clone()).expect("append");
-        let pinned = log.root();
-
-        assert!(key_in_log(&epochs, pinned, &kp.public_key()));
-        let stranger = Keypair::from_seed(&[9u8; 32]).public_key();
-        assert!(!key_in_log(&epochs, pinned, &stranger));
-
-        // A slice with an extra, unlogged key does not reproduce the pinned
-        // root, so its key is rejected even though it is present in the slice.
-        let mut forged = epochs.clone();
-        forged.push(epoch(1, stranger.clone()));
-        assert!(!key_in_log(&forged, pinned, &stranger));
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-keyring verify`
-Expected: FAIL.
-
-- [ ] **Step 3: Write minimal implementation**
-
-`src/verify.rs`:
-
-```rust
-//! Verification: a signing key is trusted only if it appears in the epochs
-//! that reproduce the pinned transparency-log root. Recomputing the root stops
-//! a caller from smuggling an unlogged key in via an arbitrary epoch slice.
-
-use chio_core_types::crypto::PublicKey;
-
-use crate::epoch::KeyEpoch;
-use crate::log::{LogRoot, TransparencyLog};
-
-/// Whether `key` appears in `epochs` AND those epochs fold to `pinned`. If the
-/// epochs do not reproduce the pinned root (size and hash), the key is rejected
-/// regardless of membership, so an injected unlogged key cannot be accepted.
-#[must_use]
-pub fn key_in_log(epochs: &[KeyEpoch], pinned: LogRoot, key: &PublicKey) -> bool {
-    let mut log = TransparencyLog::new();
-    for epoch in epochs {
-        if log.append(epoch.clone()).is_err() {
-            return false;
-        }
-    }
-    let recomputed = log.root();
-    if recomputed.size != pinned.size || recomputed.root_hash != pinned.root_hash {
-        return false;
-    }
-    let target = key.to_hex();
-    epochs.iter().any(|e| e.public_key.to_hex() == target)
-}
-```
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-keyring verify`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-keyring/src/verify.rs
-git commit -m "feat(keyring): reject signing keys absent from the transparency log"
-```
-
----
-
-## Phase 2: chio-secret-broker
-
-### Task 5: Crate scaffold and `Lease`
-
-**Files:**
-- Create: `crates/security/chio-secret-broker/Cargo.toml`, `src/lib.rs`, `src/lease.rs`
-- Modify: root `Cargo.toml` (`members`)
-- Test: inline in `lease.rs`
-
-**Interfaces:**
-- Produces: `Lease { id: String, capability_id: String, subject: String, issued_at: u64, expires_at: u64 }` with `pub fn is_live(&self, now: u64) -> bool`. A lease is a handle bound to a capability; it never carries the raw secret.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn lease_expires_at_ttl() {
-        let lease = Lease {
-            id: "lease-1".to_string(),
-            capability_id: "cap-1".to_string(),
-            subject: "did:chio:agent".to_string(),
-            issued_at: 100,
-            expires_at: 160,
-        };
-        assert!(lease.is_live(150));
-        assert!(!lease.is_live(161));
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-secret-broker lease`
-Expected: FAIL (crate missing).
-
-- [ ] **Step 3: Write minimal implementation**
-
-`Cargo.toml`:
-
-```toml
-[package]
-name = "chio-secret-broker"
-description = "Chio ephemeral capability-bound credential leases"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-publish = false
-
-[lib]
-name = "chio_secret_broker"
-
-[dependencies]
-chio-core-types = { workspace = true }
-chio-guards = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
-
-[lints]
-workspace = true
-```
-
-`src/lib.rs`:
-
-```rust
-//! Ephemeral credential leases: tool servers receive a short-TTL, capability-
-//! bound handle, never a long-lived secret. Leases die with their capability.
-
-pub mod backend;
-pub mod boundary;
-pub mod broker;
-pub mod lease;
-```
-
-`src/lease.rs`:
-
-```rust
-//! A lease: a capability-bound, TTL'd credential handle.
-
-use serde::{Deserialize, Serialize};
-
-/// A credential lease. Carries no raw secret; the backend resolves it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Lease {
-    pub id: String,
-    pub capability_id: String,
-    pub subject: String,
-    pub issued_at: u64,
-    pub expires_at: u64,
-}
-
-impl Lease {
-    /// Whether `now` is within the lease's validity window. Requires
-    /// `issued_at <= now <= expires_at`, so a rewound clock (`now < issued_at`)
-    /// fails closed instead of reviving an expired lease.
-    #[must_use]
-    pub fn is_live(&self, now: u64) -> bool {
-        self.issued_at <= now && now <= self.expires_at
-    }
-}
-```
-
-Add the member to the root `Cargo.toml`. Confirm `chio-guards` is the correct crate name for `SecretLeakGuard` in `[workspace.dependencies]`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-secret-broker lease`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-secret-broker Cargo.toml
-git commit -m "feat(secret-broker): scaffold with capability-bound Lease"
-```
-
-### Task 6: Backend trait, local backend, and broker lifecycle
-
-**Files:**
-- Create: `crates/security/chio-secret-broker/src/backend.rs`, `src/broker.rs`
-- Test: inline in `broker.rs`
-
-**Interfaces:**
-- Produces: `SecretBackend` trait (`resolve`/`store`) and `LocalBackend`; a `RevocationView` trait (`fn is_revoked(&self, capability_id: &str) -> bool`); `Broker::new(backend, default_ttl, max_leases_per_subject)` tracking issued leases, with `pub fn mint(&mut self, capability_id: &str, subject: &str, now: u64) -> Option<Lease>` (returns `None` past the per-subject live-lease limit), `revoke`, and `pub fn resolve(&self, lease: &Lease, now: u64, revocations: &dyn RevocationView) -> Option<String>`. `resolve` yields `None` unless the lease was minted by this broker and equals its stored binding, is within TTL, is not lease-revoked, and its bound capability is not revoked. The raw-secret boundary scan is wired into `resolve` in Task 7.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::backend::LocalBackend;
-
-    struct NoRevocations;
-    impl RevocationView for NoRevocations {
-        fn is_revoked(&self, _capability_id: &str) -> bool { false }
-    }
-    struct CapabilityRevoked;
-    impl RevocationView for CapabilityRevoked {
-        fn is_revoked(&self, _capability_id: &str) -> bool { true }
-    }
-
-    fn broker_with_secret() -> Broker {
-        let mut backend = LocalBackend::new();
-        backend.store("cap-1", "s3cr3t".to_string());
-        Broker::new(Box::new(backend), 60, 8)
-    }
-
-    #[test]
-    fn minted_lease_resolves_then_revokes() {
-        let mut broker = broker_with_secret();
-        let lease = broker.mint("cap-1", "did:chio:agent", 100).expect("under limit");
-        assert_eq!(lease.expires_at, 160);
-        assert_eq!(broker.resolve(&lease, 150, &NoRevocations), Some("s3cr3t".to_string()));
-        broker.revoke(&lease.id);
-        assert!(broker.resolve(&lease, 150, &NoRevocations).is_none());
-    }
-
-    #[test]
-    fn fabricated_lease_does_not_resolve() {
-        let broker = broker_with_secret();
-        // Never minted by this broker: fresh id, far-future expiry, known cap.
-        let forged = Lease {
-            id: "lease-999".to_string(),
-            capability_id: "cap-1".to_string(),
-            subject: "attacker".to_string(),
-            issued_at: 0,
-            expires_at: u64::MAX,
-        };
-        assert!(broker.resolve(&forged, 150, &NoRevocations).is_none());
-    }
-
-    #[test]
-    fn lease_dies_when_bound_capability_is_revoked() {
-        let mut broker = broker_with_secret();
-        let lease = broker.mint("cap-1", "did:chio:agent", 100).expect("under limit");
-        assert!(broker.resolve(&lease, 150, &CapabilityRevoked).is_none());
-    }
-
-    #[test]
-    fn mint_refuses_past_the_per_subject_limit() {
-        let backend = LocalBackend::new();
-        let mut broker = Broker::new(Box::new(backend), 60, 2);
-        assert!(broker.mint("cap-1", "sub", 100).is_some());
-        assert!(broker.mint("cap-1", "sub", 100).is_some());
-        // Third live lease for the same subject is refused.
-        assert!(broker.mint("cap-1", "sub", 100).is_none());
-        // A different subject is unaffected.
-        assert!(broker.mint("cap-1", "other", 100).is_some());
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-secret-broker broker`
-Expected: FAIL.
-
-- [ ] **Step 3: Write minimal implementation**
-
-`src/backend.rs`:
-
-```rust
-//! The secret backend abstraction. The local reference backend holds secrets
-//! keyed by capability id; external KMS or Vault backends are a later,
-//! feature-gated addition behind this trait.
-
-use std::collections::HashMap;
-
-use crate::lease::Lease;
-
-/// Resolves a lease to its underlying secret. Implementations must return
-/// `None` for any lease they do not recognize (fail-closed).
-pub trait SecretBackend: Send + Sync {
-    fn resolve(&self, lease: &Lease) -> Option<String>;
-    fn store(&mut self, key: &str, secret: String);
-}
-
-/// In-process reference backend: secrets keyed by capability id.
-#[derive(Default)]
-pub struct LocalBackend {
-    secrets: HashMap<String, String>,
-}
-
-impl LocalBackend {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl SecretBackend for LocalBackend {
-    fn resolve(&self, lease: &Lease) -> Option<String> {
-        self.secrets.get(&lease.capability_id).cloned()
-    }
-
-    fn store(&mut self, key: &str, secret: String) {
-        self.secrets.insert(key.to_string(), secret);
-    }
-}
-```
-
-`src/broker.rs`:
-
-```rust
-//! The broker: mints, renews, and revokes leases. Only broker-minted leases
-//! resolve, and a lease dies with its capability (revocation) as well as its
-//! TTL.
-
-use std::collections::{HashMap, HashSet};
-
-use crate::backend::SecretBackend;
-use crate::lease::Lease;
-
-/// A view over capability revocation state (backed by chio-revocation-oracle in
-/// production). A lease dies with its bound capability.
-pub trait RevocationView {
-    fn is_revoked(&self, capability_id: &str) -> bool;
-}
-
-/// Issues and tracks leases over a secret backend.
-pub struct Broker {
-    backend: Box<dyn SecretBackend>,
-    issued: HashMap<String, Lease>,
-    revoked: HashSet<String>,
-    next_id: u64,
-    default_ttl: u64,
-    max_leases_per_subject: usize,
-}
-
-impl Broker {
-    #[must_use]
-    pub fn new(
-        backend: Box<dyn SecretBackend>,
-        default_ttl: u64,
-        max_leases_per_subject: usize,
-    ) -> Self {
-        Self {
-            backend,
-            issued: HashMap::new(),
-            revoked: HashSet::new(),
-            next_id: 0,
-            default_ttl,
-            max_leases_per_subject,
-        }
-    }
-
-    /// Mint a lease bound to a capability, expiring at `now + default_ttl`, and
-    /// record it so only broker-minted leases can later resolve. Returns `None`
-    /// when the subject already holds `max_leases_per_subject` live, unrevoked
-    /// leases, so a compromised subject cannot mint unbounded live leases.
-    pub fn mint(&mut self, capability_id: &str, subject: &str, now: u64) -> Option<Lease> {
-        let live_for_subject = self
-            .issued
-            .values()
-            .filter(|l| l.subject == subject && !self.revoked.contains(&l.id) && l.is_live(now))
-            .count();
-        if live_for_subject >= self.max_leases_per_subject {
-            return None;
-        }
-        let id = format!("lease-{}", self.next_id);
-        self.next_id += 1;
-        let lease = Lease {
-            id: id.clone(),
-            capability_id: capability_id.to_string(),
-            subject: subject.to_string(),
-            issued_at: now,
-            expires_at: now.saturating_add(self.default_ttl),
-        };
-        self.issued.insert(id, lease.clone());
-        Some(lease)
-    }
-
-    /// Revoke a lease by id.
-    pub fn revoke(&mut self, lease_id: &str) {
-        self.revoked.insert(lease_id.to_string());
-    }
-
-    /// Resolve a lease to its secret, or `None` if the lease was not minted by
-    /// this broker (unknown id, or a presented lease that does not match the
-    /// stored binding), is expired or lease-revoked, or its bound capability
-    /// has been revoked. A fabricated lease with a fresh id and far-future
-    /// expiry cannot resolve because it is absent from `issued`.
-    #[must_use]
-    pub fn resolve(
+impl MerkleTree {
+    pub fn consistency_proof(
         &self,
-        lease: &Lease,
-        now: u64,
-        revocations: &dyn RevocationView,
-    ) -> Option<String> {
-        let issued = self.issued.get(&lease.id)?;
-        if issued != lease {
-            return None;
-        }
-        if self.revoked.contains(&lease.id) || !lease.is_live(now) {
-            return None;
-        }
-        if revocations.is_revoked(&lease.capability_id) {
-            return None;
-        }
-        self.backend.resolve(lease)
-    }
+        old_size: usize,
+    ) -> Result<MerkleConsistencyProof>;
+}
+
+impl MerkleConsistencyProof {
+    pub fn verify(&self, old_root: &Hash, new_root: &Hash) -> Result<()>;
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] Keep `leaf_hash` and `node_hash` unchanged.
+- [ ] Reject malformed proofs and consume the entire audit path.
+- [ ] Use checked arithmetic for sizes and indices.
+- [ ] Add an append-oriented frontier only if benchmarks show rebuilding is material. It must be an internal optimization producing byte-identical roots.
+- [ ] Do not add key-log concepts to `chio-core-types`.
 
-Run: `cargo test -p chio-secret-broker broker`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
+**Gate:**
 
 ```bash
-git add crates/security/chio-secret-broker/src/backend.rs crates/security/chio-secret-broker/src/broker.rs
-git commit -m "feat(secret-broker): add backend trait, local backend, and broker lifecycle"
+cargo test -p chio-core-types merkle
+cargo clippy -p chio-core-types --all-targets -- -D warnings
 ```
 
-### Task 7: Lease boundary secret scan
+All fixed, property, malformed-proof, and cross-check tests pass.
 
-**Files:**
-- Create: `crates/security/chio-secret-broker/src/boundary.rs`
-- Modify: `crates/security/chio-secret-broker/src/broker.rs` (call the scan in `resolve`), `src/lib.rs` (`pub mod boundary;`)
-- Test: inline
+## Phase 2: key-log event and transactional state
 
-**Interfaces:**
-- Consumes: `chio_guards::SecretLeakGuard` (confirm the exact export path; the exploration cites `crates/guards/chio-guards/src/secret_leak.rs` with `SecretLeakGuard::new()` and `SecretMatch { pattern_name, offset, length, redacted }`).
-- Produces: `pub fn scan_for_raw_secret(value: &str) -> bool` returning true when the value looks like a raw long-lived secret. `Broker::resolve` calls it on the resolved value and returns `None` when it fires, so a lease never hands back a raw long-lived credential.
+### Task 2.1: Scaffold `chio-keyring`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] Add the workspace member using the workspace package and lint template.
+- [ ] Depend on `chio-core-types`, `serde`, `serde_json`, `sha2`, `thiserror`, and `rusqlite` through workspace dependencies. Add no alternate crypto library.
+- [ ] Define an unsigned, versioned, `deny_unknown_fields` `KeyLogEventBody` and separate `OldKeyAuthorization`, `NewKeyProofOfPossession`, and `RecoveryAuthorization` signature types.
+- [ ] Define `SignedKeyLogEvent { body, authorizations }`. Every authorization signs the same domain-separated canonical bytes of `body`; no signed input contains its own signature.
+- [ ] Define canonical Merkle leaf bytes as the complete `SignedKeyLogEvent` envelope. `previous_event_hash` hashes the previous complete canonical envelope, and `body.sequence` equals the zero-based Merkle leaf index.
+- [ ] Compute `key_id` from the complete self-describing public-key encoding and algorithm under a versioned domain, not from a truncated display string.
+- [ ] Validate that `SigningAlgorithm` matches the `PublicKey` variant.
+- [ ] Normal rotation requires valid old-key and new-key signatures over the body. Recovery requires distinct authorized recovery signatures over that body. Genesis uses the configured bootstrap authorization.
+
+**Tests:** body and envelope canonical stability, leaf hash coverage of every signature byte, no self-reference, schema rejection, sequence/index mismatch, predecessor-envelope mismatch, key/algorithm mismatch, duplicate key ID, tampered old signature, tampered new signature, and cross-algorithm substitution.
+
+### Task 2.2: Implement pure state replay
+
+**Public contract:**
 
 ```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub struct KeyLogState { /* private fields */ }
 
-    #[test]
-    fn detects_aws_style_secret() {
-        // An AKIA-prefixed key is a classic long-lived secret.
-        assert!(scan_for_raw_secret("AKIAIOSFODNN7EXAMPLE"));
-        assert!(!scan_for_raw_secret("lease-1"));
-    }
+impl KeyLogState {
+    pub fn replay<'a>(
+        events: impl IntoIterator<Item = &'a SignedKeyLogEvent>,
+        witnessed_activations: &WitnessedActivationSet,
+        policy: &KeyLogPolicy,
+    ) -> Result<Self, KeyringError>;
+
+    pub fn active_signing_key(&self) -> Result<&KeyRecord, KeyringError>;
+    pub fn verification_key_for_artifact(
+        &self,
+        key_id: &KeyId,
+        artifact_hash: &Hash,
+        time_evidence: &ArtifactTimeEvidence,
+    ) -> Result<&KeyRecord, KeyringError>;
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] Make events immutable. Rotation proposal, abort, retirement, and revocation append envelopes rather than modifying old leaves.
+- [ ] Enforce exact leaf-index sequence, complete-envelope predecessor hash, authorization, and witness-activation continuity.
+- [ ] A rotation envelope creates one pending key. It does not change the active signer until its containing checkpoint has the configured witness threshold and the local activation transaction commits.
+- [ ] Enforce exactly one active signing key and at most one pending rotation.
+- [ ] Treat an artifact's self-asserted `signed_at` as untrusted metadata. An old-key artifact requires an artifact-hash inclusion proof in a configured Chio receipt checkpoint or another trusted timestamp anchor committed before witnessed activation.
+- [ ] A deprecated key verifies only appropriately anchored artifacts inside its `verify_until`; a new key cannot verify an artifact anchored before its witnessed activation.
+- [ ] A revoked key verifies nothing after the revocation policy's effective rule, including inside a former overlap window.
+- [ ] Emergency recovery requires the configured recovery threshold and emits a distinct operation.
+- [ ] There is no fallback to a historical private key when a requested key is unavailable.
 
-Run: `cargo test -p chio-secret-broker boundary`
-Expected: FAIL.
+**Tests:** genesis, pending rotation, witnessed activation, overlap boundary, trusted artifact anchor, self-backdated old signature, new-key preactivation anchor, abort, retirement, revocation, recovery, duplicate events, sequence gaps, time reversal, unknown predecessor, multiple active keys, unavailable signer, and replay determinism.
 
-- [ ] **Step 3: Write minimal implementation**
+### Task 2.3: Implement pending-event SQLite append
 
-`src/boundary.rs`:
+**Storage contract:**
 
-```rust
-//! The lease boundary: run the existing secret detector over any value the
-//! broker is about to return, so a raw long-lived secret cannot be handed
-//! back where a lease handle was expected.
+- `key_events(sequence PRIMARY KEY, event_id UNIQUE, canonical_envelope, envelope_hash, leaf_hash, operation)`
+- `key_state(singleton, active_key_id, pending_key_id, pending_event_id, signing_epoch, last_sequence, last_event_hash, tree_size, root_hash)`
+- `key_checkpoints(checkpoint_sequence PRIMARY KEY, tree_size, root_hash, canonical_body, operator_signature, stage)`
+- `key_checkpoint_witnesses(checkpoint_hash, witness_id, signature)` with a unique pair
 
-use chio_guards::SecretLeakGuard;
+- [ ] Open transactions with write locking appropriate to SQLite so two rotations cannot both read the same head.
+- [ ] Validate the candidate event against state inside the transaction.
+- [ ] Append the complete envelope, derive the new root with `chio-core-types` Merkle primitives, record a pending key without changing the active key, and create the operator-signed pending checkpoint in the same transaction.
+- [ ] Stage the new `SigningBackend` behind a non-cloneable activation gate. No capability, receipt, checkpoint, or other artifact-signing path can request it while pending.
+- [ ] Make `KeyringSigningRouter` the only artifact-signing entry point. It acquires the authoritative `(active_key_id, signing_epoch)` shared fence, holds it through backend completion and durable artifact-hash anchoring, and includes the epoch in signed evidence. Do not expose clonable backend handles to callers.
+- [ ] Restrict a local SQLite selector to one signing process. Multi-worker signing requires a shared linearizable selector and fenced lease service; unsupported topology fails startup.
+- [ ] On serialization, signing, disk-full, uniqueness, or commit failure, leave the prior key active, no new key exposed, and the tree unchanged.
+- [ ] Rebuild and compare derived state and root at startup. A mismatch is fatal.
 
-/// Whether `value` looks like a raw long-lived secret. Uses the shared
-/// `SecretLeakGuard` detector so patterns stay consistent with the rest of
-/// Chio.
-#[must_use]
-pub fn scan_for_raw_secret(value: &str) -> bool {
-    let guard = SecretLeakGuard::new();
-    !guard.scan(value).is_empty()
-}
-```
+**Tests:** concurrent proposals, injected failure at every write boundary, crash-reopen with pending proposal, backend activation-gate denial, stale signing epoch, multi-worker configuration rejection, duplicate append, disk error, signing error, and full rebuild.
 
-Confirm the detector method: read `crates/guards/chio-guards/src/secret_leak.rs` for the public scan method that returns `Vec<SecretMatch>` (the exploration names `SecretMatch`); if the method is named differently (for example `detect` or `find_secrets`), use that name and keep the "non-empty means secret" logic.
+**Gate:** a committed proposal is visible in the log while the old backend remains the only usable signer, and no committed envelope is absent from the tree.
 
-Then wire the scan into `Broker::resolve` so a resolved raw secret is refused, and add `pub mod boundary;` to `lib.rs`. Change the tail of `resolve`:
+## Phase 3: key checkpoints, witnesses, and verifier
 
-```rust
-        let secret = self.backend.resolve(lease)?;
-        // A lease must never hand back a raw long-lived secret; refuse if the
-        // resolved value looks like one.
-        if crate::boundary::scan_for_raw_secret(&secret) {
-            return None;
-        }
-        Some(secret)
-```
+### Task 3.1: Add signed checkpoints
 
-Add a broker test proving a lease over a raw AWS-style secret refuses to resolve (it reuses the `NoRevocations` fake from Task 6's test module):
+- [ ] Define `KeyLogCheckpointBody` and `SignedKeyLogCheckpoint` exactly as the design contract.
+- [ ] Bind schema, log ID, checkpoint sequence, tree size, root, previous checkpoint hash, and issuance time.
+- [ ] Sign via Chio canonical signing backends with an operator key distinct from authority keys.
+- [ ] Reject root-size mismatch, sequence regression, clock skew beyond policy, wrong operator algorithm, and wrong log ID.
 
-```rust
-    #[test]
-    fn lease_refuses_to_return_a_raw_secret() {
-        let mut backend = LocalBackend::new();
-        backend.store("cap-raw", "AKIAIOSFODNN7EXAMPLE".to_string());
-        let mut broker = Broker::new(Box::new(backend), 60, 8);
-        let lease = broker.mint("cap-raw", "did:chio:agent", 100).expect("under limit");
-        assert!(broker.resolve(&lease, 150, &NoRevocations).is_none());
-    }
-```
+### Task 3.2: Add independent witness signatures and gossip
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] Define a domain-separated witness statement over the checkpoint body hash.
+- [ ] Implement a witness service with a durable pinned checkpoint, retained full event log or verified frontier, and a fixed roster identity.
+- [ ] Before signing, verify the operator signature and checkpoint chain, RFC 6962 consistency proof, every contiguous complete envelope since the pin, rebuilt new root, event authorizations, and full state replay.
+- [ ] In one transaction persist the candidate root and advance the witness pin before returning a signature. A restart cannot permit double signing.
+- [ ] Refuse conflicting roots for either a previously observed `(log_id, checkpoint_sequence)` or `(log_id, tree_size)` pair.
+- [ ] Verify witness IDs against a configured trust map, reject duplicates, and require `floor(n / 2) + 1` signatures for a fixed roster.
+- [ ] Emit durable equivocation evidence when two correctly signed checkpoints conflict.
+- [ ] Provide a narrow gossip import/export format containing checkpoints and witness signatures, not private state.
 
-Run: `cargo test -p chio-secret-broker boundary && cargo test -p chio-secret-broker broker`
-Expected: PASS.
+**Tests:** malicious operator fork, omitted middle leaf, invalid event authorization, wrong rebuilt root, stale consistency proof, crash after durable decision before response, restart double-sign attempt, strict-majority boundary, duplicate witness, and gossip conflict.
 
-- [ ] **Step 5: Commit**
+### Task 3.3: Activate a witnessed rotation transactionally
+
+- [ ] Collect signatures only for the exact pending checkpoint and configured roster.
+- [ ] In one activation transaction, reverify the pending event and checkpoint, strict-majority witness signatures, no intervening head change, and staged backend identity.
+- [ ] Derive activation ordering and trusted activation time from the witnessed checkpoint and activation commit. Ignore a proposal-supplied `effective_at` as authority for old-key artifact timing.
+- [ ] Acquire the exclusive signing-selector lease, wait for prior shared signing leases to finish, store the witnessed checkpoint, increment `signing_epoch`, and switch `active_key_id` from old to new atomically. Only after commit may the router expose the new `SigningBackend`; close the old route before releasing the exclusive lease.
+- [ ] A crash before commit leaves the old backend active. A crash after commit reconstructs the new active selector from durable state.
+- [ ] Retrying signature collection or activation is idempotent. A stale or conflicting checkpoint cannot activate.
+- [ ] Append a witnessed `abort_rotation` while the old key is available, or use threshold recovery when it is not. Never delete a pending proposal.
+
+**Tests:** signer request before witness threshold, threshold-minus-one, artifact-signing race with activation, stale worker after epoch change, crash before activation commit, crash after commit, stale-head activation, mismatched staged backend, idempotent retry, normal abort, and recovery abort. The signing race linearizes entirely before or after activation and never returns an old-key artifact in the new epoch.
+
+### Task 3.4: Implement contiguous synchronization, verifier, and audit monitor
+
+**Verifier update order:** fetch and validate every checkpoint envelope after the pin through the candidate, verify each operator signature, predecessor, and strict-majority witness set where activation is claimed, verify the consistency proof, fetch every event envelope in `[old_size, new_size)`, verify its index, sequence, predecessor, authorizations, and leaf hash, rebuild the new root, replay full state and witnessed activation history, then persist the new pin, checkpoints, and leaves atomically.
+
+- [ ] `PinnedKeyLogVerifier` never updates its pin after any failed step.
+- [ ] A new verifier downloads all event and checkpoint envelopes from genesis and rebuilds roots, witnessed activation history, and state. Do not ship a compact snapshot until an authenticated state-proof format is designed.
+- [ ] An inclusion proof for one key is never sufficient. `verify_key` consults the fully replayed state and trusted artifact-time evidence bound to the artifact hash.
+- [ ] `chio-keylog-audit` polls checkpoints, fetches contiguous leaves and consistency proofs, rebuilds state, gossips accepted checkpoints, and exits nonzero on omission, rollback, fork, insufficient witnesses, or malformed proof.
+- [ ] Audit state is written atomically using temp file, fsync, and rename or durable SQLite transaction.
+
+**Tests:** missing first, middle, or final new leaf; wrong sequence; wrong predecessor envelope hash; valid inclusion with later revocation omitted; consistency fork; root rollback; same-size different-root; fresh-client full sync; self-backdated old artifact; stale, duplicate, or unknown witness; checkpoint-chain break; monitor restart; and failed-update pin preservation.
+
+**Gate:**
 
 ```bash
-git add crates/security/chio-secret-broker/src/boundary.rs crates/security/chio-secret-broker/src/broker.rs crates/security/chio-secret-broker/src/lib.rs
-git commit -m "feat(secret-broker): scan lease boundary and refuse raw secrets in resolve"
+cargo test -p chio-keyring --all-targets
+cargo clippy -p chio-keyring --all-targets -- -D warnings
 ```
 
----
+A strict-majority witness set and two independent monitors accept a valid contiguous growth sequence, refuse an injected split view, and preserve pins across restart.
 
-## Phase 3: chio-cage
+## Phase 4: broker protocol and authorization
 
-### Task 8: Crate scaffold and `SandboxProfile`
+### Task 4.1: Define the broker wire contract
 
-**Files:**
-- Create: `crates/security/chio-cage/Cargo.toml`, `src/lib.rs`, `src/profile.rs`
-- Modify: root `Cargo.toml` (`members`)
-- Test: inline in `profile.rs`
+**Files:** `protocol.rs`, `capability.rs`, `proof.rs`
 
-**Interfaces:**
-- Produces: `SandboxProfile { read_roots: Vec<String>, write_roots: Vec<String>, network_dests: Vec<String>, syscall_allow: Vec<String> }` with `pub fn deny_all() -> Self` (the fail-closed default: nothing allowed).
+- [ ] Define `CredentialRef`, `BrokerDestination`, `RequestConstraints`, `ProofBinding`, `BrokerCapabilityBody`, `SignedBrokerCapability`, `BrokerRequest`, `BrokerExecuteRequest`, `BrokerExecuteResponse`, and `BrokerExecutionEvidence`.
+- [ ] Bind every field listed in the design: parent capability, subject, provider, credential ref, scheme, host, port, exact path/query, method, allowed headers, provider-owned headers, body size and hash, preview hash, redirect policy, response limit, streaming, distinct broker quota key, max executions, time bounds, revocation, and proof key.
+- [ ] Normalize hosts, ports, paths, queries, methods, and header names before capability issuance. The signed form is the comparison form.
+- [ ] Use bytes or a bounded body wrapper, not `String`, for HTTP bodies.
+- [ ] Recompute body hashes from request bytes. A supplied hash is never authoritative.
+- [ ] Use Chio canonical JSON and signing types. Do not port Clawdstrike's plain `serde_json::to_vec` signature path.
 
-- [ ] **Step 1: Write the failing test**
+**Tests:** canonical round trip, unknown fields, every single-field tamper, default-port normalization, case normalization, query mismatch, duplicate header normalization, and oversized decode.
+
+### Task 4.2: Implement proof-of-possession and replay storage
+
+- [ ] Reuse Chio DPoP semantics where dependency direction permits. Otherwise move only the generic proof body into a core type and keep verification in the broker.
+- [ ] Bind the proof to broker capability ID, normalized method and destination, recomputed body hash, a canonical digest of all normalized caller-controlled header names and values, a canonical digest of every caller-controlled execution option, nonce, and issuance time.
+- [ ] Define a closed canonical schema for caller options and reject duplicate normalized headers. There is no extension map or transport option outside the proof digest.
+- [ ] Persist nonce consumption in the same local transaction as the deterministic pending attempt intent before any remote execution reservation.
+- [ ] Bound proof clock skew and nonce lifetime.
+- [ ] Production configuration requires public-key proof. Loopback bearer binding is a dev/test-only feature and emits a degraded diagnostic that cannot satisfy production readiness.
+
+**Tests:** replay, concurrent replay, wrong key, wrong capability, wrong body, wrong path, added, removed, reordered, duplicate, or changed header, changed streaming or timeout option, unknown option, stale proof, future proof, and nonce-store failure.
+
+### Task 4.3: Validate parent capability and revocation
+
+- [ ] Define narrow `CapabilityLiveness` and `BrokerRevocations` traits in the broker crate.
+- [ ] Runtime adapters call existing Chio verification and revocation stores without making the broker library depend on `chio-kernel` internals.
+- [ ] Implement the kernel-owned `SupplementalQuotaVerifier` port in runtime composition. It accepts opaque broker-capability bytes and a kernel-built request context, invokes the enterprise verifier, and returns the request-bound supplemental claim. No wire field or broker method returns a kernel quota key directly.
+- [ ] Fail closed when either liveness source is unavailable or stale.
+- [ ] Check parent capability, subject, audience, and broker revocation before hold authorization, but treat this as preverification rather than the dispatch linearization point.
+- [ ] Immediately before dispatch, call the protocol-owned `AdmissionCaptureAuthority` with the operation-bound canonical revocation set and digest plus verified broker-artifact digest. The set must include the leaf parent capability, every verified delegation ancestor, and every broker-capability revocation id.
+- [ ] The protocol operation is `CapturePending` during the combined call. Network dispatch begins only after capture returns signed budget and revocation commit indices and the coordinator persists `DispatchCommitted`. A sequential `is_revoked` check followed by budget capture is rejected as non-authoritative.
+
+**Gate:** authorization tests prove every bound field and state source can independently deny dispatch.
+
+## Phase 5: broker service, provider, and durable execution limits
+
+### Task 5.1: Create a service-private secret backend
+
+**Contract:**
 
 ```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn deny_all_allows_nothing() {
-        let p = SandboxProfile::deny_all();
-        assert!(p.read_roots.is_empty());
-        assert!(p.write_roots.is_empty());
-        assert!(p.network_dests.is_empty());
-        assert!(p.syscall_allow.is_empty());
-    }
+pub(crate) trait SecretBackend: Send + Sync {
+    fn materialize(
+        &self,
+        credential: &CredentialRef,
+    ) -> Result<SecretMaterial, BrokerError>;
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] `SecretMaterial` wraps zeroizing bytes and has an explicitly redacted formatter. It is not public outside the service modules.
+- [ ] Implement production `EncryptedBlobSecretBackend` with `chio_store_sqlite::{SqliteEncryptedBlobStore, TenantId, TenantKey, BlobHandle}`. A broker table maps tenant, credential ID, provider, and version to an opaque blob handle and enabled state.
+- [ ] Extend the encrypted-blob store with a broker-neutral transaction boundary so the encrypted blob row and opaque versioned reference mapping commit together. A failed provisioning transaction leaves neither a usable reference nor an untracked live credential.
+- [ ] Move decrypted `Vec<u8>` directly into `SecretMaterial`, or add a zeroizing read helper to `encrypted_blob.rs` if review finds an extra plaintext allocation. Never convert it to `String`.
+- [ ] Deliver `TenantKey` through a sealed read-only inherited FD or reviewed custody-provider API. Validate seals, exact length, ownership, and single read. Environment, argv, ordinary files, constants, and zero-key fallbacks are forbidden.
+- [ ] Add an authenticated admin provisioning API authorized by an operator capability or governed approval. Provision, rotate, disable, and delete are tenant-scoped, transactional, and redacted; no response returns credential bytes.
+- [ ] Do not implement a plaintext filesystem or environment backend. A canary backend exists only under `cfg(test)`. Vault and HSM drivers can remain deferred.
+- [ ] Errors name the credential reference but never include backend values.
+- [ ] Panic hooks, tracing fields, HTTP debug logs, and receipt serialization are tested with seeded canary credentials.
 
-Run: `cargo test -p chio-cage profile`
-Expected: FAIL (crate missing).
+**Tests:** authenticated and unauthorized provisioning, tenant crossover, blob tamper, wrong key, invalid or unsealed key FD, startup without custody, credential version rotation, disabled version, redacted admin receipt, and zeroization.
 
-- [ ] **Step 3: Write minimal implementation**
+### Task 5.2: Implement crash-reconcilable multi-key reservation
 
-`Cargo.toml`:
+**Authoritative budget contract:**
 
-```toml
-[package]
-name = "chio-cage"
-description = "Chio OS sandbox profiles compiled from the signed manifest"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-publish = false
+- [ ] Define an injected `BrokerExecutionBudget` port with idempotent `query_execution_hold`, `authorize_execution_hold`, `reverse_execution_hold`, and `capture_execution_hold` operations. Requests bind invocation ID, parent capability ID, broker capability ID, the complete quota-key set, hold ID, event IDs, and authority metadata.
+- [ ] Implement the production adapter with the protocol arc's existing or extended `BudgetStore` authoritative hold and event API. Require `BudgetAuthorityProfile::AuthoritativeHoldEvent`.
+- [ ] Add a domain-separated `BudgetQuotaKey` dimension for the verified broker capability ID and its signed `max_executions`. This quota exists even when the parent has no aggregate budget.
+- [ ] Build one hold containing the existing per-grant quota, optional derived parent aggregate quota, and broker-capability quota. Deduplicate identical keys but never collapse distinct parent and broker ceilings into one counter.
+- [ ] A brokered logical invocation has one invocation ID and hold ID across kernel and broker. Runtime composition authorizes the complete key set once; the broker queries or continues that same hold rather than charging the parent aggregate a second time.
+- [ ] Atomic multi-key holds and broker quota support are production prerequisites. If unavailable, broker execution fails closed. Do not approximate with per-process, per-grant-only, or broker-local counters.
+- [ ] Unit and protocol tests may use an in-memory implementation of the same port. It must run the same conformance suite as the production adapter.
+- [ ] `capture_execution_hold` delegates to `AdmissionCaptureAuthority`, which verifies the set digest, reads latest state for the leaf parent, every delegation ancestor, and every supplemental id, and captures the hold in one transaction or consensus-log entry. Return the checked-set digest, budget and revocation commit indices, and leader epoch together.
+- [ ] Require all revocation writes for broker-dispatch capabilities to use that combined authority. Startup rejects a separate revocation writer or a budget backend that cannot prove the shared commit domain.
+- [ ] Reverse only where dispatch provably did not begin. A captured execution stays consumed if the upstream times out or the response is rejected or lost.
+- [ ] Repeated reverse or capture with the same event ID is idempotent. Conflicting reuse of a hold or event ID is an invariant violation and denial.
 
-[lib]
-name = "chio_cage"
+**Broker-local evidence storage:**
 
-[dependencies]
-chio-manifest = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
+- `broker_capabilities` stores the signed body hash, expiry, and revocation state for service validation, but not authoritative remaining uses.
+- `broker_attempts` stores deterministic request digest, invocation, hold, and event IDs and records `pending`, `held`, `reversed`, `captured`, `completed`, or `failed` for write-ahead intent, evidence, and idempotency.
+- `broker_nonces` uniquely stores proof key and nonce until expiry.
 
-[target.'cfg(target_os = "linux")'.dependencies]
-rustix = { workspace = true, features = ["process", "thread"] }
+- [ ] Derive deterministic attempt, hold, and event IDs from the broker capability ID, invocation ID, proof nonce, and canonical request digest.
+- [ ] Expose authenticated local `RegisterAttempt`. Before any remote hold call, runtime composition sends deterministic operation, attempt, hold and event IDs plus non-secret request and proof digests; the broker validates them, inserts and fsyncs the pending intent and nonce association, and returns an idempotent acknowledgement without materializing a credential. A uniqueness conflict loads and reconciles the existing intent; it does not create new IDs.
+- [ ] On retry or startup, query authoritative state by hold and event IDs. If held, reversed, or captured, reconcile local state idempotently. If unknown, retry authorization with the same IDs. If unreachable or ambiguous, remain pending and deny dispatch.
+- [ ] A recovery worker drains pending intents but never dispatches an already captured request. Operator tooling can inspect and resolve permanently ambiguous authority state without minting replacement IDs.
+- [ ] Exactly N concurrent requests capture the broker-capability quota for maximum N, and parent aggregate counts each logical invocation once.
+- [ ] A duplicate request never attaches to or reuses another attempt.
 
-[lints]
-workspace = true
+**Tests:** crash before remote call, remote hold commit before local acknowledgement, reverse commit before local acknowledgement, combined capture commit before local acknowledgement, restart reconciliation, remote timeout with later query, conflicting ID reuse, aggregate-plus-broker exhaustion permutations, quota-key deduplication, no parent double-charge, leaf and each delegation ancestor revoked after validation, revocation-set omission or mutation, revoked-first denial, captured-first consumption, and rejection of a sequential revocation-check backend.
+
+### Task 5.3: Implement generic HTTPS execution
+
+- [ ] Disable redirects in the client, including provider defaults.
+- [ ] Require HTTPS except explicit loopback tests.
+- [ ] Resolve DNS, reject restricted address classes, pin the validated address for connection, and verify TLS for the original hostname.
+- [ ] Reject caller `Authorization`, `Proxy-Authorization`, `Cookie`, `Host`, hop-by-hop, and provider-owned headers before provider injection.
+- [ ] Recompute canonical caller-header and caller-option digests after normalization and compare them with the proof immediately before request preparation.
+- [ ] Recompute and compare body hash and preview hash before materializing the credential.
+- [ ] Provider adapters inject reviewed authentication schemes only. Arbitrary caller-specified header templates are not accepted.
+- [ ] Enforce request, response, and streaming byte limits while streaming, not after buffering an unbounded payload.
+- [ ] Strip or reject response headers and bodies that contain configured credential canaries. This is defense in depth.
+- [ ] Zeroize transient credential and authorization buffers as soon as the HTTP client has consumed them.
+
+**Tests:** IPv4 and IPv6 restricted ranges, decimal and mixed IP forms, DNS rebinding, redirect to restricted host, TLS mismatch, forbidden headers, provider-header collision, body mismatch, chunked oversize, compressed oversize, timeout, and cancellation.
+
+### Task 5.4: Implement IPC and process-level no-secret tests
+
+- [ ] Expose bounded framed IPC or mTLS endpoints for issue, revoke, status, execute, and authenticated admin provisioning. Authorization is per operation and tenant.
+- [ ] Run brokerd as a separate identity where the platform supports it. The tool child receives only the IPC descriptor and opaque capability.
+- [ ] Seed a unique credential and inspect tool argv, environment, open readable files, IPC frames, stdout, stderr, structured logs, panic output, and signed receipts. The credential must appear only at the fake upstream.
+- [ ] Prove that terminating brokerd fails closed and does not trigger a direct HTTP fallback.
+
+**Gate:**
+
+```bash
+cargo test -p chio-secret-broker --all-targets
+cargo clippy -p chio-secret-broker --all-targets -- -D warnings
 ```
 
-`src/lib.rs`:
+The fake upstream observes credential injection, exactly N concurrent attempts dispatch, and no calling-process surface contains the credential.
+
+## Phase 6: typed manifest permissions and cage compiler
+
+### Task 6.1: Extend the platform manifest schema
+
+**Files:** `crates/platform/chio-manifest/src/lib.rs`, `validation.rs`
+
+- [ ] This task is blocked until active-defense Phase 2 has landed or both arcs are executing in one coordinated PR. Rebase before editing and confirm `chio-manifest` reexports the normative core `ToolDefinition`.
+- [ ] Preserve that single `ToolDefinition` truth. Do not recreate a platform-local tool shape while changing `RequiredPermissions` or the signed manifest envelope.
+- [ ] Add an explicit versioned native syscall profile to `RequiredPermissions`. Use a closed enum or versioned identifier, not an arbitrary syscall list supplied as strings.
+- [ ] Add typed network destination parsing with normalized host and explicit port. Preserve the current serialized fields only through an explicit schema migration, not ambiguous dual interpretation.
+- [ ] Keep environment permissions as names. Manifest values are never accepted.
+- [ ] Land these permission fields in the same strict `chio.manifest.v2` migration owned with active-defense Phase 2. Neither arc may freeze or ship v2 until unified tool types, flow fields, typed cage permissions, syscall profile, and strict nested parsing are all present. Never add them to v1 or defer them to an incompatible successor.
+- [ ] Add explicit v1-to-v2 migration fixtures and require operator re-signing. Cage-managed native launch denies v1 and every v2 manifest without an explicit supported syscall profile.
+
+**Tests:** relative paths, root paths, traversal, NULs, duplicates, symlink paths, missing-parent writes, invalid hosts, implicit ports, wildcard hosts, invalid env names, loader env names, absent syscall profile, unknown profile, signature tampering, and schema downgrade.
+
+### Task 6.2: Validate and normalize permissions
+
+**Public contract:**
 
 ```rust
-//! OS sandbox profiles compiled from a signed manifest's RequiredPermissions.
-//! Portable `Sandbox` trait with a Linux reference implementation; fail-closed
-//! everywhere a profile cannot be built or enforced.
-
-pub mod compile;
-pub mod profile;
-pub mod sandbox;
-
-#[cfg(target_os = "linux")]
-pub mod linux;
+pub fn admit(
+    signed: &chio_manifest::SignedManifest,
+    registered_key: &PublicKey,
+    ceilings: &OperatorCeilings,
+) -> Result<AdmittedManifest, CageError>;
 ```
 
-`src/profile.rs`:
+- [ ] Call `chio_manifest::verify_manifest` before reading permissions.
+- [ ] Hash the verified canonical manifest and include that digest in `AdmittedManifest`.
+- [ ] Open every existing path once with `O_PATH | O_CLOEXEC`, resolve it under `openat2` constraints, and retain its FD plus device, inode, mount, mode, and kind. Validation returns owned descriptors, not names to reopen later.
+- [ ] For an exact missing writable file, retain the parent directory FD and securely create it with `openat2`, `O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC`, explicit mode and ownership, then reopen or retain it as `O_PATH`. Reject missing directories, wildcard future children, and any target that cannot be created without a name-resolution race.
+- [ ] Open and hash the cage-init helper, target executable, working directory, and required runtime files. Retain all FDs. Reject grants that alias through symlinks, change identity during validation, or widen to `/`.
+- [ ] Resolve and reject the complete forbidden-path set before constructing any Landlock grant. Landlock grants are monotonic and cannot be subtracted after insertion.
+- [ ] Apply operator ceilings as set intersection and limit minimization. Any attempted widening is a programmer error and denial.
+- [ ] Reject `chio_core_types::manifest::ToolManifest` at this boundary. It has an embedded signature but lacks platform permissions and registered-key admission.
 
-```rust
-//! The sandbox profile: the confinement a tool server runs under.
+### Task 6.3: Compile from deny-all
 
-use serde::{Deserialize, Serialize};
+- [ ] Create `nono::CapabilitySet`, immediately set network mode to `Blocked`, then add validated grants by retained FD through the patched nono API.
+- [ ] Collect forbidden paths before adding any allowed Landlock path.
+- [ ] For brokered tools, pass one already-connected authenticated Unix-domain IPC FD and deny `socket`, `connect`, and `bind` in seccomp. Do not grant a loopback TCP port: Landlock's connect rule is port-scoped and would also permit remote hosts on that port. Direct egress uses a preconnected or descriptor-passed authenticated proxy channel unless a separately reviewed network namespace supplies stronger destination enforcement.
+- [ ] Assign deterministic FD slots for helper, target, working directory, runtime resources, read/write grants, broker IPC, sealed plan, and status channel. Bind each slot to its recorded identity in the canonical plan.
+- [ ] Construct the minimal environment from fixed safe keys and permitted parent values. Reject credential names and `LD_*`, `DYLD_*`, language startup hooks, and other configured injection variables.
+- [ ] Select a reviewed architecture-specific syscall profile and compute a profile hash.
+- [ ] Produce a deterministic canonical `CompiledSandboxProfile` and cage-init plan binding manifest, helper, target, FD-table, nono, seccomp, environment, and operator-ceiling digests. Compilation itself does not apply OS confinement.
 
-/// A derived confinement profile for one tool server.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SandboxProfile {
-    pub read_roots: Vec<String>,
-    pub write_roots: Vec<String>,
-    pub network_dests: Vec<String>,
-    pub syscall_allow: Vec<String>,
-}
+**Tests:** determinism, deny-all default, network explicitly blocked, preconnected broker IPC control, remote-host same-port denial, raw socket/connect/bind denial, read/write separation, forbidden-before-allowed ordering, operator narrowing, O_PATH identity retention, path swap after validation, secure exact-file creation, missing-directory rejection, system resource minimization, environment non-inheritance, FD-slot mismatch, helper and target identity, and profile-hash changes for every semantic input.
 
-impl SandboxProfile {
-    /// The fail-closed default: allow nothing.
-    #[must_use]
-    pub fn deny_all() -> Self {
-        Self::default()
-    }
-}
-```
-
-Add the member to the root `Cargo.toml`, and add `rustix = "0.38"` (or the current version) to `[workspace.dependencies]`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-cage profile`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
+**Gate:**
 
 ```bash
-git add crates/security/chio-cage Cargo.toml
-git commit -m "feat(cage): scaffold with fail-closed SandboxProfile"
+cargo test -p chio-manifest
+cargo test -p chio-cage compile
 ```
 
-### Task 9: Compile `RequiredPermissions` into a profile
+An unsigned, invalid, legacy-without-profile, or ambiguous manifest cannot produce a compiled profile.
 
-**Files:**
-- Create: `crates/security/chio-cage/src/compile.rs`
-- Test: inline
+## Phase 7: actual Linux enforcement
 
-**Interfaces:**
-- Consumes: `chio_manifest::{ToolManifest, RequiredPermissions}`, `crate::profile::SandboxProfile`.
-- Produces: `pub fn compile(manifest: &ToolManifest) -> SandboxProfile`. When `required_permissions` is `None`, returns `deny_all` (fail-closed). Otherwise maps `read_paths`/`write_paths`/`network_hosts` into the profile and sets a minimal baseline syscall allowlist.
+### Task 7.1: Make nono enforcement status observable
 
-- [ ] **Step 1: Write the failing test**
+- [ ] Add or adapt a nono API that returns the actual Landlock ABI and `RulesetStatus` for filesystem and network rules.
+- [ ] Add an API that constructs Landlock `PathBeneath` rules from caller-owned FDs without `PathFd::new(path)` or any pathname reopen. The caller retains ownership through ruleset application.
+- [ ] Treat `PartiallyEnforced` and `NotEnforced` as errors whenever the profile requires that class.
+- [ ] Hard-require network support whenever any network restriction is requested.
+- [ ] Keep network blocked when the manifest declares no network use.
+- [ ] Add tests against a mocked status adapter plus real-kernel CI. A mock cannot satisfy the release gate by itself.
 
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chio_manifest::{RequiredPermissions, ToolManifest};
+### Task 7.2: Install an independent seccomp allowlist
 
-    fn manifest(perms: Option<RequiredPermissions>) -> ToolManifest {
-        ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
-            server_id: "srv".into(),
-            name: "s".to_string(),
-            description: None,
-            version: "1".to_string(),
-            tools: Vec::new(),
-            server_tools: Vec::new(),
-            required_permissions: perms,
-            public_key: String::new(),
-        }
-    }
+- [ ] Define reviewed syscall profiles per supported architecture and runtime class.
+- [ ] Compile filters with default action `KILL_PROCESS` or an explicitly reviewed deny errno for diagnosable development mode. Production uses the fail-stop action selected by security review.
+- [ ] Validate the current architecture before filter installation.
+- [ ] Set `no_new_privs` before installing the filter.
+- [ ] Include only syscalls required for cage-init bootstrap, `execveat` or `fexecve`, runtime startup, declared I/O, signals, and clean exit. Document each broad syscall.
+- [ ] Nono seccomp user notification may be disabled or used for separate supervision, but it does not satisfy this task.
 
-    #[test]
-    fn no_permissions_is_deny_all() {
-        assert_eq!(compile(&manifest(None)), SandboxProfile::deny_all());
-    }
+**Tests:** forbidden syscall probe, architecture mismatch, filter-install failure, FD-based Landlock rule with pathname replacement, `execveat` target transition, threads where allowed, process creation where denied, and mutation disabling default-deny.
 
-    #[test]
-    fn read_paths_map_into_profile() {
-        let perms = RequiredPermissions {
-            read_paths: Some(vec!["/data".to_string()]),
-            write_paths: None,
-            network_hosts: None,
-            environment_variables: None,
-        };
-        let profile = compile(&manifest(Some(perms)));
-        assert_eq!(profile.read_roots, vec!["/data".to_string()]);
-    }
-}
-```
+### Task 7.3: Add enforcement evidence types
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] Implement `Unsupported`, `Rejected`, `BootstrapFailed`, `FullyEnforced`, and `Exited` states.
+- [ ] `FullyEnforced` requires observed Landlock full enforcement, independent seccomp installation, matching manifest, plan, FD-table, helper, target, and profile hashes, a complete `EnforcementPrepared` record, kernel `PTRACE_EVENT_EXEC`, post-exec image identity matching the retained target, and corroborating CLOEXEC EOF. Target liveness after the exec event is not required.
+- [ ] Do not expose `BestEffort`, `Partial`, or `Unconfined` as successful launch outcomes.
+- [ ] Include detected ABI and filter digest, not claims inferred from configuration.
 
-Run: `cargo test -p chio-cage compile`
-Expected: FAIL.
+**Gate:** Real Linux CI demonstrates that disabling Landlock or seccomp changes a permitted launch into a denied launch, never a degraded success.
 
-- [ ] **Step 3: Write minimal implementation**
+## Phase 8: dedicated cage-init and supervised launch
 
-`src/compile.rs`:
+### Task 8.1: Launch and authenticate fresh cage-init
 
-```rust
-//! Compile a signed manifest's RequiredPermissions into a SandboxProfile.
-//! No permissions block means no launch: fail-closed to deny_all.
+- [ ] Build `chio-cage-init` as a dedicated binary with no async runtime or background threads. Pin its content digest and executable identity in deployment configuration.
+- [ ] The multithreaded runtime uses the normal process-spawn path with no custom post-fork callback. It never invokes nono, Landlock, or seccomp itself.
+- [ ] Open and retain the expected helper identity before spawn. Before sending the plan or resource FDs, compare `/proc/<pid>/exe` device, inode, and content digest with that pin; kill and reap on mismatch.
+- [ ] Put canonical plan bytes in a memfd and apply `F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL`. Pass it read-only with the fixed O_PATH FD table over authenticated local IPC or inherited slots.
+- [ ] Create a status pipe with the helper write end `CLOEXEC` and distinct prepared and failure records. Keep a pidfd for identity and reaping. Status EOF is corroboration only and cannot prove exec.
+- [ ] Reject set-user-ID, set-group-ID, file-capability, and other privilege-changing helper or target images.
 
-use chio_manifest::ToolManifest;
+### Task 8.2: Implement single-threaded cage-init
 
-use crate::profile::SandboxProfile;
+- [ ] At process entry, assert there is exactly one task, initialize no thread pool, and receive only bounded plan and FD-table inputs.
+- [ ] Verify parent authentication, memfd seals, plan schema and digest, manifest and profile hashes, helper self-identity, FD count and slot kinds, every `fstat` identity, target digest, and environment and argument bounds.
+- [ ] After verification and before confinement, call `PTRACE_TRACEME` and stop. The parent must acknowledge the stop, set `PTRACE_O_TRACEEXEC | PTRACE_O_EXITKILL`, and continue the helper. Failure of any trace step denies launch.
+- [ ] Close all descriptors not named in the plan. Set identity, resource limits, signal mask, working-directory FD, minimal environment, and `no_new_privs`.
+- [ ] Add every Landlock rule from retained FDs through the patched nono API and require full enforcement. Install the independent seccomp filter.
+- [ ] Write `EnforcementPrepared` with manifest, plan, FD-table, helper, target, Landlock, seccomp, and trace-session digests.
+- [ ] Execute the retained target FD with `execveat(..., AT_EMPTY_PATH)` or `fexecve`. Do not resolve the target path again. Reject script targets in v1; use a retained reviewed interpreter as the target and a separately retained script FD when required.
+- [ ] Every failure writes a structured record and exits. The helper never closes the status FD to report success. Successful target exec produces CLOEXEC EOF, but only the kernel exec event establishes the transition.
+- [ ] Isolate and document the small audited unsafe surface for FD, memfd, Landlock, seccomp, and exec syscalls with `unsafe_op_in_unsafe_fn` enabled.
 
-/// Minimal syscalls every tool server needs to run at all.
-const BASELINE_SYSCALLS: &[&str] = &["read", "write", "exit", "exit_group", "rt_sigreturn"];
+### Task 8.3: Implement parent supervision
 
-/// Derive a sandbox profile from a manifest. A manifest with no declared
-/// permissions yields `deny_all`.
-#[must_use]
-pub fn compile(manifest: &ToolManifest) -> SandboxProfile {
-    let Some(perms) = &manifest.required_permissions else {
-        return SandboxProfile::deny_all();
-    };
-    SandboxProfile {
-        read_roots: perms.read_paths.clone().unwrap_or_default(),
-        write_roots: perms.write_paths.clone().unwrap_or_default(),
-        network_dests: perms.network_hosts.clone().unwrap_or_default(),
-        syscall_allow: BASELINE_SYSCALLS.iter().map(|s| (*s).to_string()).collect(),
-    }
-}
-```
+- [ ] Wait under one deadline for exactly one matching `EnforcementPrepared`, a `PTRACE_EVENT_EXEC` stop, matching post-exec `/proc/<pid>/exe` device, inode, and content digest, and EOF with no extra or failure record.
+- [ ] Record `ExecTransitionObserved` while the target is stopped, transition to `FullyEnforced`, then detach and resume it. An immediate target exit still produces the exec event first and then a subsequent `Exited` state.
+- [ ] Prepared plus EOF without an exec event, tracee death, EOF before prepared, malformed or duplicate records, prepared then failure, non-EOF, timeout, trace-session mismatch, helper or FD identity mismatch, partial enforcement, or setup failure is `BootstrapFailed`; terminate and reap any remaining process.
+- [ ] After success, forward allowed termination signals, monitor the exact pidfd, wait and reap, and record exit or signal status without PID-reuse ambiguity. A ptrace stop is never exposed to target application semantics.
+- [ ] Do not retry through the old launcher after any cage failure.
 
-Confirm the `ToolManifest` field set against `crates/platform/chio-manifest/src/lib.rs:28`; if `server_id` is a newtype, construct it with the real constructor rather than `.into()`.
+**Tests:** helper substitution, helper path swap, invalid memfd seals, plan tamper, FD count and identity mismatch, target path replacement after validation, privilege-changing target, non-single-threaded init, trace handshake failure, forged or missing exec event, helper `SIGKILL` after prepared, seccomp death after prepared, every structured failure code, truncated status, EOF before prepared, prepared plus exec-failure record, prepared without EOF, exec event with identity mismatch, successful exec event plus CLOEXEC EOF, immediate target exit, timeout, parent cancellation, signal forwarding, descriptor leak, environment leak, and reaping.
 
-- [ ] **Step 4: Run test to verify it passes**
+### Task 8.4: Run cage-init adversarial probes
 
-Run: `cargo test -p chio-cage compile`
-Expected: PASS.
+Probe binaries attempt:
 
-- [ ] **Step 5: Commit**
+- forbidden read, write, create, remove, rename, hard link, and symlink traversal;
+- path and executable replacement after validation while retained FDs stay fixed;
+- allowed read and exact precreated-file write controls;
+- forbidden TCP connect and bind, including IPv4 and IPv6;
+- forbidden syscall and process creation;
+- inherited descriptor reads;
+- parent environment reads and dynamic-loader injection;
+- execution of undeclared path and script targets.
+
+**Gate:**
 
 ```bash
-git add crates/security/chio-cage/src/compile.rs
-git commit -m "feat(cage): compile RequiredPermissions into a sandbox profile"
+cargo test -p chio-cage --all-targets
+cargo clippy -p chio-cage --all-targets -- -D warnings
 ```
 
-### Task 10: Sandbox trait, fail-closed default, Linux reference impl
+Real-kernel cage-init tests pass in `.github/workflows/enterprise-hardening.yml` on the designated labeled runner, including the parent-child exec-event observer. Other hosts assert `Unsupported` denial and do not count skipped enforcement tests as a pass.
 
-**Files:**
-- Create: `crates/security/chio-cage/src/sandbox.rs`, `src/linux.rs`
-- Test: inline in `sandbox.rs`
+## Phase 9: runtime composition and signed evidence
 
-**Interfaces:**
-- Produces: `Sandbox` trait with `fn apply(&self, profile: &SandboxProfile) -> Result<(), SandboxError>`; `DenySandbox` (the portable fail-closed default that refuses to launch when it cannot enforce a profile); and, on Linux, `LinuxSandbox` applying seccomp and Landlock via `rustix`. Non-Linux builds use `DenySandbox`.
+### Task 9.1: Wire key-log verification
 
-- [ ] **Step 1: Write the failing test**
+- [ ] Configure operator and witness trust roots and a minimum witness threshold.
+- [ ] Route every authority artifact signature through `KeyringSigningRouter`; reject direct `SigningBackend` use in runtime composition and fail startup when signing topology cannot provide the required selector guarantee.
+- [ ] Require a fixed witness roster and strict-majority threshold. Persist complete synchronized envelopes, pins, witness decisions, and equivocation evidence durably.
+- [ ] Before accepting an authority key, fetch every contiguous leaf since the pin, verify consistency and checkpoint chains, rebuild the root, and replay full state. A single key inclusion proof is insufficient.
+- [ ] Require artifact-hash-bound trusted time evidence for old-key verification. Reject self-asserted backdating and new-key artifacts anchored before witnessed activation.
+- [ ] Add shadow mode metrics before enforcement, but shadow failure never silently converts an enforced verifier back to legacy trust.
 
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::profile::SandboxProfile;
+### Task 9.2: Wire broker routing
 
-    #[test]
-    fn deny_sandbox_refuses_when_it_cannot_enforce() {
-        let sandbox = DenySandbox;
-        let err = sandbox.apply(&SandboxProfile::deny_all());
-        assert!(err.is_err());
-    }
-}
-```
+- [ ] Add broker endpoint and trust configuration to existing config structures.
+- [ ] Issue broker capabilities only after the parent Chio capability and policy have passed existing validation.
+- [ ] Before authoritative admission, build one complete quota set with per-grant, optional parent aggregate, and broker-capability keys. Kernel and broker share one invocation and hold ID; neither charges it again.
+- [ ] Call broker `RegisterAttempt` and persist its acknowledgement in `AdmissionOperation` before the first budget-authority mutation. A registration failure denies without a hold.
+- [ ] Install the enterprise `SupplementalQuotaVerifier` and pass the combined `AdmissionCaptureAuthority` plus authoritative hold ports into broker composition. Refuse a guarantee below `AuthoritativeHoldEvent` or any configuration where revocation and capture do not share a commit domain.
+- [ ] Route selected provider requests through brokerd and remove direct credential environment/file grants from their tool manifests.
+- [ ] Feed broker execution evidence into the existing receipt store.
+- [ ] A broker transport or verification failure denies the tool call. There is no direct-provider retry.
 
-- [ ] **Step 2: Run test to verify it fails**
+### Task 9.3: Replace the native launcher
 
-Run: `cargo test -p chio-cage sandbox`
-Expected: FAIL.
+- [ ] At the single launch owner found in Phase 0, require admitted manifest and `CompiledSandboxProfile` for opted-in servers.
+- [ ] Launch the pinned `chio-cage-init` helper through the normal spawn path, verify its live identity, and send only the sealed plan and retained FD table. Remove custom post-fork sandbox callbacks.
+- [ ] Pass only the preconnected authenticated broker IPC FD to brokered tools. Do not grant a reconnecting loopback socket or raw network syscalls.
+- [ ] Emit a launch receipt only after the parent derives `FullyEnforced` from matching prepared evidence, kernel `PTRACE_EVENT_EXEC`, verified stopped target identity, and corroborating CLOEXEC EOF.
+- [ ] Emit terminal evidence for rejection, bootstrap failure, and exit without falsely labeling them enforced runs.
+- [ ] After a server is marked cage-required, configuration cannot fall back to the old launcher.
 
-- [ ] **Step 3: Write minimal implementation**
+### Task 9.4: Define redacted receipts
 
-`src/sandbox.rs`:
+- [ ] Key receipt: complete-envelope hash, event stage, tree size, root, checkpoint, operator, roster, witness IDs, transaction, outcome.
+- [ ] Broker receipt: capability IDs, subject, hashed credential reference and version, destination/body/header/option digests, quota keys, complete checked revocation-set digest, attempt/hold/event IDs, combined budget and revocation commit indices and leader epoch, provider, status, byte counts, outcome.
+- [ ] Cage receipt: manifest/plan/FD-table/helper/target/profile hashes, nono/seccomp versions, observed Landlock ABI/status, bootstrap outcome, process identity, times, and exit.
+- [ ] Add seeded secret tests over serialized receipts and all logging formats.
 
-```rust
-//! The portable Sandbox trait and the fail-closed default. Where no real OS
-//! sandbox is available, `DenySandbox` refuses to launch rather than running
-//! a tool server unconfined.
+**Gate:** End-to-end invocation proves capability validation, broker execution, cage enforcement, and receipt persistence. Removing any one mechanism causes denial and a truthful failure receipt.
 
-use crate::profile::SandboxProfile;
+## Phase 10: adversarial evidence, specs, and rollout
 
-/// A failure to establish confinement. Callers must treat this as "do not
-/// launch the tool server".
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SandboxError {
-    pub detail: String,
-}
+### Task 10.1: Add adversarial cases
 
-/// Applies a sandbox profile to the current process before exec.
-pub trait Sandbox {
-    fn apply(&self, profile: &SandboxProfile) -> Result<(), SandboxError>;
-}
+Add machine-readable cases and caught-mutant tests for:
 
-/// The fail-closed default: never confirms confinement, so a caller that only
-/// has this must refuse to launch.
-pub struct DenySandbox;
+- `key_log_omission`
+- `key_log_noncontiguous_sync`
+- `key_log_inconsistent_growth`
+- `key_log_split_view`
+- `rotation_partial_commit`
+- `rotation_unwitnessed_signing`
+- `old_key_backdating`
+- `broker_secret_boundary_crossing`
+- `broker_execution_overspend`
+- `broker_parent_double_charge`
+- `broker_orphan_hold`
+- `broker_proof_replay`
+- `broker_unbound_headers`
+- `broker_destination_rebinding`
+- `broker_revocation_race`
+- `broker_plaintext_custody`
+- `sandbox_unsigned_manifest`
+- `sandbox_partial_enforcement`
+- `sandbox_symlink_escape`
+- `sandbox_path_swap`
+- `sandbox_helper_substitution`
+- `sandbox_false_exec_success`
+- `sandbox_syscall_escape`
+- `sandbox_fd_or_env_leak`
 
-impl Sandbox for DenySandbox {
-    fn apply(&self, _profile: &SandboxProfile) -> Result<(), SandboxError> {
-        Err(SandboxError {
-            detail: "no OS sandbox backend available on this platform; refusing to launch".to_string(),
-        })
-    }
-}
+- [ ] Each case has a control that succeeds and a mutant that would succeed if the relevant check were removed.
+- [ ] Wire cases into `chio-adversarial-suite`, `chio-arena`, and threat-coverage evidence using existing schemas.
+- [ ] Do not mark a threat row closed until the repository's caught-mutant and evidence requirements are met.
 
-/// The best sandbox available on this platform. On Linux this is
-/// `LinuxSandbox`; elsewhere it is `DenySandbox`.
-#[must_use]
-#[cfg(target_os = "linux")]
-pub fn platform_sandbox() -> Box<dyn Sandbox> {
-    Box::new(crate::linux::LinuxSandbox::new())
-}
+### Task 10.2: Add behavioral gate scripts
 
-#[must_use]
-#[cfg(not(target_os = "linux"))]
-pub fn platform_sandbox() -> Box<dyn Sandbox> {
-    Box::new(DenySandbox)
-}
-```
+- [ ] `check-keyring-transparency.sh` runs fixed vectors, contiguous sync, stateful witness, two-stage activation, trusted artifact-time, monitor growth, and split-view tests.
+- [ ] `check-secret-broker-boundary.sh` runs encrypted provisioning, process boundary, crash reconciliation, multi-key budget, supplemental-verifier binding, header/option proof, combined revocation-capture races, SSRF, and fake-upstream tests.
+- [ ] `check-cage-enforcement.sh` checks designated runner prerequisites, runs FD and helper identity tests, real cage-init probes, bootstrap failures, and signed evidence verification.
+- [ ] Scripts fail when required Linux capabilities are missing on the designated release runner. Local non-Linux runs may report unsupported, but cannot produce release evidence.
 
-`src/linux.rs`:
+### Task 10.3: Land schemas, codegen, conformance, and CI
 
-```rust
-//! Linux reference sandbox: applies Landlock filesystem rules and a seccomp
-//! syscall filter derived from the profile. Uses `rustix` (safe syscall
-//! bindings); no `unsafe`. Probes for support at construction and fails
-//! closed when the kernel lacks Landlock or seccomp.
+- [ ] Add closed schemas under `spec/schemas/chio-wire/v1/security/` for complete key-log events, checkpoints, witness signatures, sync responses, broker capabilities, request proofs, execute messages, execution evidence, cage-init plans, prepared records, exec-transition observations, enforcement records, and enterprise receipts.
+- [ ] Keep every unsigned signed-body schema separate from its signature envelope. Encode header and option digests, quota keys, complete capture revocation-set digest, combined commit metadata, complete-envelope hashes, witnessed stages, and FD identities explicitly.
+- [ ] Register every artifact in `spec/schemas/registry.json`, update `spec/schemas/MANIFEST.sha256`, extend `scripts/check-chio-schema-registry.sh` coverage to the security wire directory, and update `spec/schemas/chio-wire/v1/README.md`.
+- [ ] Add canonical positive and negative cases under `tests/bindings/vectors/security/` and update `tests/bindings/vectors/MANIFEST.sha256` with `cargo xtask freeze-vectors`.
+- [ ] Extend xtask discovery where required, regenerate Rust, Python, TypeScript, and Go bindings, and require `make codegen-check` with no generated diff.
+- [ ] Extend `crates/tooling/chio-conformance` native suite and fixture binary for key sync/witness, broker proof/quota/custody, and cage-plan/evidence scenarios.
+- [ ] Create `.github/workflows/enterprise-hardening.yml`. Portable jobs run schema registry, codegen, vectors, and conformance. `linux-enforcement` uses `runs-on: [self-hosted, linux, x64, chio-enterprise-security]`, verifies the parent-child `PTRACE_EVENT_EXEC` contract, and runs all cage scripts without skip-to-success behavior.
 
-use crate::profile::SandboxProfile;
-use crate::sandbox::{Sandbox, SandboxError};
+**Gate:** schema registry, MANIFEST, four-language generated bytes, vectors, native conformance, and the actual designated Linux workflow all pass.
 
-/// Linux sandbox backend.
-pub struct LinuxSandbox {
-    landlock_supported: bool,
-}
+### Task 10.4: Update normative documentation
 
-impl LinuxSandbox {
-    #[must_use]
-    pub fn new() -> Self {
-        // Probe once; a full implementation queries the Landlock ABI version.
-        Self { landlock_supported: probe_landlock() }
-    }
-}
+- [ ] `spec/PROTOCOL.md`: key-log events and checkpoints, broker capabilities and proof bodies, receipt schemas, version and canonicalization rules.
+- [ ] `spec/SECURITY.md`: broker TCB, cage enforcement boundary, witness assumptions, failure and revocation semantics.
+- [ ] `docs/security/threat-coverage.md`: mechanisms and evidence references without premature closure.
+- [ ] Crate READMEs: supported platforms, operational trust roots, key recovery, broker deployment, cage kernel requirements, and residual risks.
 
-impl Sandbox for LinuxSandbox {
-    fn apply(&self, profile: &SandboxProfile) -> Result<(), SandboxError> {
-        if !self.landlock_supported {
-            return Err(SandboxError {
-                detail: "Landlock unsupported on this kernel; refusing to launch".to_string(),
-            });
-        }
-        if profile.read_roots.is_empty() && profile.write_roots.is_empty() {
-            return Err(SandboxError {
-                detail: "empty filesystem profile; refusing to launch".to_string(),
-            });
-        }
-        if !profile.network_dests.is_empty() {
-            // seccomp and Landlock filesystem rules do not constrain network
-            // egress to the signed manifest hosts. Until a per-destination
-            // network path exists (Landlock network port rules on newer kernels,
-            // or an nftables/eBPF hook), refuse to launch a networked tool rather
-            // than allow unconstrained egress.
-            return Err(SandboxError {
-                detail: "network destinations declared but not enforceable; refusing to launch"
-                    .to_string(),
-            });
-        }
-        // Full implementation: build a Landlock ruleset from read_roots and
-        // write_roots and a seccomp filter from syscall_allow via rustix, then
-        // restrict_self before exec. Kept minimal here so the crate builds and
-        // tests portably; the enforcement body is the next increment.
-        Ok(())
-    }
-}
+### Task 10.5: Execute staged migration
 
-fn probe_landlock() -> bool {
-    // A full implementation calls the Landlock ABI-version syscall via rustix.
-    // Default false so unsupported kernels fail closed.
-    false
-}
-```
+1. Publish key-log checkpoints in shadow mode, synchronize full logs, and operate a strict-majority witness roster plus independent monitors.
+2. Complete a pending rotation, witnessed activation, and abort/recovery drill before key-log enforcement.
+3. Provision one provider credential through `EncryptedBlobSecretBackend` and run broker audit-only request comparison without returning raw credentials.
+4. Enable one-hold broker and parent quota enforcement plus crash reconciliation, then remove direct credential access for that provider.
+5. Generate sealed cage-init plans and retained FD tables and compare them with observed requirements without launching targets.
+6. Enforce cage-init for a canary tool server on the designated runner, then expand server by server.
+7. Turn on key-log pin enforcement only after witnessed checkpoint continuity and trusted artifact-time evidence are established.
+8. Remove legacy secret and launcher configuration after all dependents migrate.
 
-Read the current `rustix` Landlock and seccomp surface before fleshing out `apply`; the minimal body above compiles and preserves the fail-closed contract that the test checks. Because `probe_landlock` returns false, the Linux path also fails closed until the enforcement body lands, which is the safe default.
+Every flag is one-way per deployed tool or provider. Once enforcement is required, an operational failure denies service rather than re-enabling the legacy path.
 
-- [ ] **Step 4: Run test to verify it passes**
+## Final verification
 
-Run: `cargo test -p chio-cage sandbox`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
+Run focused gates first:
 
 ```bash
-git add crates/security/chio-cage/src/sandbox.rs crates/security/chio-cage/src/linux.rs
-git commit -m "feat(cage): add Sandbox trait, fail-closed default, and Linux backend skeleton"
+./scripts/check-keyring-transparency.sh
+./scripts/check-secret-broker-boundary.sh
+./scripts/check-cage-enforcement.sh
+./scripts/check-chio-schema-registry.sh
+make codegen-check
+cargo xtask freeze-vectors --check
+cargo test -p chio-core-types merkle
+cargo test -p chio-manifest
+cargo test -p chio-keyring --all-targets
+cargo test -p chio-secret-broker --all-targets
+cargo test -p chio-cage --all-targets
+cargo test -p chio-conformance --all-targets
+cargo clippy -p chio-core-types -p chio-manifest -p chio-keyring -p chio-secret-broker -p chio-cage --all-targets -- -D warnings
+cargo fmt --all -- --check
+cargo deny check
+git diff --check
 ```
 
----
-
-## Phase 4: Gates, evidence, spec
-
-### Task 11: Release gates and adversarial corpus
-
-**Files:**
-- Create: `scripts/check-keyring-log-append-only.sh`, `scripts/check-broker-lease-ttl.sh`, `scripts/check-cage-fail-closed.sh`
-- Create: `crates/core/chio-adversarial-suite/cases/key_log_omission/key-log-omission-001.json`, `.../lease_after_revocation/lease-after-revocation-001.json`, `.../sandbox_escape_attempt/sandbox-escape-attempt-001.json`
-- Test: run each script; run the suite loader
-
-**Interfaces:**
-- Produces: three fail-closed gates and three adversarial cases mirroring the existing case schema.
-
-- [ ] **Step 1: Write the three gate scripts**
-
-`scripts/check-keyring-log-append-only.sh`:
+Then run workspace gates:
 
 ```bash
-#!/usr/bin/env bash
-# Fail-closed gate: the transparency log must fold the previous root into each
-# append (append-only, tamper-evident).
-set -euo pipefail
-grep -q "hasher.update(self.root_hash)" crates/security/chio-keyring/src/log.rs \
-  || { echo "FAIL: log append does not chain the previous root" >&2; exit 1; }
-echo "OK: keyring log chains prior root"
+cargo build --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-`scripts/check-broker-lease-ttl.sh`:
+## Definition of done
 
-```bash
-#!/usr/bin/env bash
-# Fail-closed gate: every lease must carry an expiry and resolution must honor
-# revocation and TTL.
-set -euo pipefail
-grep -q "expires_at" crates/security/chio-secret-broker/src/lease.rs \
-  || { echo "FAIL: Lease has no expires_at" >&2; exit 1; }
-grep -q "self.revoked.contains" crates/security/chio-secret-broker/src/broker.rs \
-  || { echo "FAIL: broker.resolve does not honor revocation" >&2; exit 1; }
-echo "OK: broker leases are TTL'd and revocable"
-```
-
-`scripts/check-cage-fail-closed.sh`:
-
-```bash
-#!/usr/bin/env bash
-# Fail-closed gate: no permissions block compiles to deny_all, and the default
-# sandbox refuses to launch.
-set -euo pipefail
-grep -q "return SandboxProfile::deny_all()" crates/security/chio-cage/src/compile.rs \
-  || { echo "FAIL: compile does not fail closed on missing permissions" >&2; exit 1; }
-grep -q "refusing to launch" crates/security/chio-cage/src/sandbox.rs \
-  || { echo "FAIL: DenySandbox does not refuse to launch" >&2; exit 1; }
-echo "OK: cage fails closed"
-```
-
-- [ ] **Step 2: Run the three gates**
-
-Run: `bash scripts/check-keyring-log-append-only.sh && bash scripts/check-broker-lease-ttl.sh && bash scripts/check-cage-fail-closed.sh`
-Expected: three OK lines.
-
-- [ ] **Step 3: Read an existing adversarial case and mirror its schema**
-
-Run: `sed -n '1,40p' $(find crates/core/chio-adversarial-suite/cases -name '*.json' | head -1)`
-Then write the three new case files with the same top-level fields (`class`, `reason`, `path`, and any manifest entry), encoding: `key_log_omission` (a signature from a key absent from the log), `lease_after_revocation` (a lease resolved after revoke), `sandbox_escape_attempt` (a syscall outside the allowlist). Register them in the suite index if one exists.
-
-- [ ] **Step 4: Run the suite and gates**
-
-Run: `cargo test -p chio-adversarial-suite && bash scripts/check-cage-fail-closed.sh`
-Expected: PASS and OK.
-
-- [ ] **Step 5: Commit**
-
-```bash
-chmod +x scripts/check-keyring-log-append-only.sh scripts/check-broker-lease-ttl.sh scripts/check-cage-fail-closed.sh
-git add scripts/check-keyring-log-append-only.sh scripts/check-broker-lease-ttl.sh scripts/check-cage-fail-closed.sh crates/core/chio-adversarial-suite/cases/
-git commit -m "feat(security): add enterprise-pack release gates and adversarial cases"
-```
-
-### Task 12: Spec deltas and workspace verification
-
-**Files:**
-- Modify: `spec/PROTOCOL.md`, `spec/SECURITY.md`
-- Test: whole workspace
-
-**Interfaces:**
-- Produces: normative prose for the transparency-log semantics (append-only, key-pinning), the lease model (capability binding, TTL), and the manifest-to-sandbox compilation contract (no permissions implies no launch).
-
-- [ ] **Step 1: Add the transparency-log and sandbox sections to `spec/SECURITY.md`**
-
-Under the implementation-guidance section, document: keys must appear in the transparency log before use; rotation keeps the prior key valid through an overlap window; a tool server with no derivable sandbox profile does not launch. Use hyphens, not em dashes.
-
-- [ ] **Step 2: Add the lease model to `spec/PROTOCOL.md`**
-
-Under the capability contract, document that a lease is bound to a capability id and dies with it, and that raw long-lived secrets never cross the lease boundary.
-
-- [ ] **Step 3: Run the full workspace one-liner**
-
-Run: `cargo build --workspace && cargo test --workspace && cargo clippy --workspace -- -D warnings && cargo fmt --all -- --check`
-Expected: all green. On non-Linux hosts the `chio-cage` Linux path is compiled out; confirm `platform_sandbox` returns `DenySandbox` there.
-
-- [ ] **Step 4: Run the three gates**
-
-Run: `bash scripts/check-keyring-log-append-only.sh && bash scripts/check-broker-lease-ttl.sh && bash scripts/check-cage-fail-closed.sh`
-Expected: three OK lines.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add spec/PROTOCOL.md spec/SECURITY.md
-git commit -m "docs(spec): specify transparency log, lease model, and sandbox compilation"
-```
-
----
-
-## Self-Review
-
-**Spec coverage:** `chio-keyring` epoch/log/rotation/verify (Tasks 1-4); `chio-secret-broker` lease/backend/broker/boundary (Tasks 5-7); `chio-cage` profile/compile/sandbox/linux (Tasks 8-10); gates and adversarial corpus (Task 11); spec deltas and workspace registration (Task 12). The three threat rows in the spec (`tool_server_escape`, `pq_signature_downgrade`, `pii_phi_exposure`) map to cage, keyring, and secret-broker respectively, framed as mechanisms not closures.
-
-**Deferred items made explicit (not silent gaps):** the Linux sandbox enforcement body (Task 10 ships the fail-closed skeleton and probe; the seccomp/Landlock ruleset construction via `rustix` is the next increment, and until it lands the Linux path fails closed); external KMS/Vault backends (Task 6 ships the trait and a local backend); a real Merkle inclusion proof for the transparency log (Task 2 ships a rolling chained root; per-key inclusion proofs mirror `chio-revocation-oracle` and are a follow-up).
-
-**Placeholder scan:** no `TBD`/`TODO`/`implement later` in any step. Three tasks (1, 7, 9) instruct the implementer to confirm an exact upstream name against a cited file path, which is a verification instruction, not a placeholder.
-
-**Type consistency:** `SandboxProfile::deny_all` is used consistently in Tasks 8-10; `Lease.expires_at` and `is_live` are consistent in Tasks 5-6; `SecretBackend::resolve`/`store` match across Tasks 6-7; `KeyEpoch` fields match across Tasks 1-4. Crypto surface verified against the exploration: `Keypair::generate()`, `Keypair::from_seed(&[u8;32])`, `Keypair::public_key()`, `PublicKey::to_hex()`, `SigningAlgorithm::Ed25519`.
+- A key verifier updates a pinned checkpoint only after strict-majority witnesses, a true RFC 6962 consistency proof, every contiguous new complete envelope, rebuilt root, and full state replay. Fresh clients rebuild from genesis.
+- Rotation remains pending until witnessed activation commits. The generation-fenced signing router serializes artifact signing with activation, no new-key route opens before the transaction, no stale old-key worker can publish in the new epoch, and old-key artifact verification requires trusted preactivation anchoring rather than self-asserted time.
+- The production encrypted-blob backend is provisioned through authenticated administration, receives its master key through sealed FD or reviewed custody, and no supported caller surface contains raw credential material.
+- Proofs bind body, normalized headers, and caller options. One authoritative multi-key hold enforces per-grant, optional parent aggregate, and distinct broker-capability quotas without double charge. Pending intents and query-by-ID recovery eliminate orphan uncertainty before dispatch.
+- Revocation and capture are linearized in one combined authority commit; sequential check-then-capture implementations cannot satisfy production support.
+- Cage admission starts from a registered-key-verified platform `SignedManifest`; retained O_PATH FDs remove path reopen races; trusted single-threaded cage-init applies Landlock and seccomp and executes the retained target FD.
+- Prepared evidence plus kernel `PTRACE_EVENT_EXEC`, verified post-exec target identity, and corroborating CLOEXEC EOF establish `FullyEnforced`; an immediate target exit is then recorded as `Exited`.
+- Enterprise wire schemas are registered and hashed, four-language generated bytes and conformance vectors are current, and the designated Linux workflow passes actual enforcement tests.
+- Unsupported and partial enforcement deny launch and are reported truthfully.
+- Adapted source has traceable provenance and required Apache-2.0 attribution.
+- Adversarial cases and caught mutants produce executable evidence; no threat row is closed by documentation alone.
+- Legacy raw-secret and unconfined fallback paths are removed for migrated providers and tools.

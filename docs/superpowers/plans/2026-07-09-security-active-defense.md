@@ -1,2612 +1,971 @@
-# Security Active-Defense Arc Implementation Plan
+# Chio Active-Defense Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+**Status:** Revised implementation contract, implementation not started
 
-**Goal:** Add a new `crates/security/` folder with three crates (`chio-flow`, `chio-decoy`, `chio-quarantine`) that give Chio an active-defense loop: information-flow control detects leak paths, canary capabilities bait intruders, and a tiered response engine contains incidents with attested, reversible actions.
+**Revised:** 2026-07-10
+**Design contract:** `docs/superpowers/specs/2026-07-09-security-folder-design.md`
 
-**Architecture:** Protocol-normative types (the DLM `Label`, a `Declassify` caveat, manifest `sensitivity`/`clearance`) land in the existing `chio-core-types` and `chio-manifest` crates. The three engines live under `crates/security/`. `chio-flow` plugs a `FlowGuard` into the existing in-TCB guard pipeline and a `FlowTaintHook` into the existing post-invocation pipeline. `chio-decoy` mints canary capabilities in a reserved `decoy:` server namespace. `chio-quarantine` sits above the kernel and reaches revocation/velocity/issuance primitives through trait ports with feature-gated adapters, so it stays out of the TCB.
+## Goal
 
-**Tech Stack:** Rust (workspace, edition 2021), `serde` + canonical JSON (RFC 8785 via the existing `chio_core_types::canonical` helpers), `ed25519`/`Signature` from `chio_core_types::crypto`, the `Guard` trait from `chio_kernel`, `cargo test`/`clippy`/`fmt`, `cargo-mutants`, and the existing `chio-arena` coevolution harness.
+Ship information-flow enforcement, private deception, deterministic temporal detection, and durable reversible containment without introducing a kernel/guards dependency cycle, duplicating manifest truth, or claiming security properties that the implementation cannot prove.
 
-## Global Constraints
+## Non-negotiable constraints
 
-Copied verbatim from the spec and house rules. Every task's requirements implicitly include this section.
+- No em dash characters in code, comments, fixtures, or documentation.
+- New production code has no `unwrap`, `expect`, or `unsafe`.
+- Signed payloads use Chio canonical JSON and an explicit domain-separation context.
+- `chio-kernel` and `chio-guards` do not depend on any active-defense engine.
+- `chio-security-kernel` implements the existing `chio_kernel::Guard` and `chio_kernel::PostInvocationHook` APIs. It may depend on the pure flow and decoy engines, but it does not depend on `chio-guards` or platform crates and does not replace the hook APIs.
+- Kernel construction is centralized behind one security-installation helper. `chio-control-plane::build_kernel`, runtime harness, HTTP authority, CLI MCP wrapping, and every other direct constructor must call it or reject `chio.manifest.v2` manifests requiring `flow_v1`.
+- Heavy-action execution depends on the protocol-primitives threshold governed-approval set verifier and atomic replay reservation. Until they land, heavy plans are dry-run. `chio-quarantine` must not implement a local quorum format or verifier.
+- Every failure in label parsing, classification, flow state, manifest security lookup, or declassification consumption denies or blocks.
+- Deception signals are high confidence, not zero false positive.
+- Temporary containment uses a reversible overlay. The insert-only revocation oracle is not used for an action advertised as reversible.
+- A bounded, truncated, locally incomplete, unfenced, or stale lineage query cannot authorize automatic containment.
+- Source grep is not security verification. Release gates execute the behavior described below.
+- Threat rows stay unchanged until the existing conformance and caught-mutant evidence gate passes.
 
-- No em dashes (U+2014) anywhere in code, comments, or docs. Use hyphens (`-`) or parentheses.
-- Fail-closed: any guard error, unknown label, or missing clearance denies. Invalid inputs reject.
-- Clippy: `unwrap_used = "deny"` and `expect_used = "deny"` workspace-wide. No `unwrap`/`expect`/`unsafe` in new code.
-- Serialization: canonical JSON (RFC 8785) for all signed payloads, via `chio_core_types::canonical`.
-- Commits: conventional commits (`feat:`, `fix:`, `docs:`, `test:`).
-- Prevention stays fail-closed and independent of response. `chio-quarantine` is best-effort and never in the TCB.
-- Threat-row framing: this plan ships mechanisms and gates. It does not mark any `docs/security/threat-coverage.md` row `Covered`; that happens only when the coverage gate accepts conformance + caught-mutant evidence.
-- Verify each phase with the workspace one-liner before declaring it done: `cargo build --workspace && cargo test --workspace && cargo clippy --workspace -- -D warnings && cargo fmt --all -- --check`.
+## Target dependency graph
 
----
+| Crate | Direct Chio dependencies | Forbidden dependencies |
+|---|---|---|
+| `chio-security-types` | None | all kernel, guard, trust, platform, and observability crates |
+| `chio-core-types` | `chio-security-types` plus existing portable dependencies | security engines, kernel, guards, and platform crates |
+| `chio-flow` | `chio-security-types`, `chio-core-types` | `chio-kernel`, `chio-guards`, platform crates |
+| `chio-security-kernel` | `chio-security-types`, `chio-flow`, `chio-decoy`, `chio-core`, `chio-kernel` | `chio-guards`, trust and platform crates |
+| `chio-decoy` | `chio-security-types`, `chio-core-types` | `chio-kernel`, `chio-guards`, platform crates |
+| `chio-quarantine` | `chio-security-types`, `chio-core-types` | `chio-kernel`, `chio-guards`, concrete trust and platform crates |
+| `chio-store-sqlite` | `chio-security-types` plus existing store dependencies | security engines and `chio-security-kernel` |
+| `chio-control-plane` | all five security crates plus existing runtime dependencies | none beyond workspace policy |
 
-## File Structure
+The root `Cargo.toml` registers all five crates and workspace dependencies. Add a dependency-direction test that parses `cargo metadata --format-version 1` and fails if the forbidden edges appear.
 
-New and modified files, grouped by the crate that owns them.
+## Final file map
 
-**Foundation (existing crates, modified):**
-- `crates/core/chio-core-types/src/flow_label.rs` (create): the DLM `Label`, `FlowPolicy`, and `Compartment` data types plus serde. Pure data, no lattice algebra.
-- `crates/core/chio-core-types/src/lib.rs` (modify): register `pub mod flow_label;`.
-- `crates/core/chio-core-types/src/capability/caveat.rs` (modify): add the `Declassify` variant to `CaveatKind`.
-- `crates/platform/chio-manifest/src/lib.rs` (modify): add `sensitivity` and `clearance` to `ToolDefinition`.
+### New crates
 
-**`crates/security/chio-flow/` (create):**
-- `Cargo.toml`, `src/lib.rs`
-- `src/label.rs`: lattice algebra (`join`, `flows_to`) over `chio_core_types::flow_label::Label`.
-- `src/seed.rs`: label acquisition from classifier tags and manifest declarations.
-- `src/env.rs`: the per-session taint environment store.
-- `src/guard.rs`: `FlowGuard` (pre-invocation egress check) and `FlowTaintHook` (post-invocation labeling).
-- `src/declassify.rs`: declassification-caveat verification and the declassification event.
-- `src/event.rs`: `FlowViolation` and `Declassification` signed event records.
+- `crates/security/chio-security-types/Cargo.toml`
+- `crates/security/chio-security-types/src/lib.rs`
+- `crates/security/chio-security-types/src/flow.rs`
+- `crates/security/chio-security-types/src/declassification.rs`
+- `crates/security/chio-security-types/src/deception.rs`
+- `crates/security/chio-security-types/src/event.rs`
+- `crates/security/chio-security-types/src/response.rs`
+- `crates/security/chio-security-types/src/ports.rs`
+- `crates/security/chio-flow/Cargo.toml`
+- `crates/security/chio-flow/src/lib.rs`
+- `crates/security/chio-flow/src/lattice.rs`
+- `crates/security/chio-flow/src/engine.rs`
+- `crates/security/chio-flow/src/classification.rs`
+- `crates/security/chio-flow/src/declassification.rs`
+- `crates/security/chio-security-kernel/Cargo.toml`
+- `crates/security/chio-security-kernel/src/lib.rs`
+- `crates/security/chio-security-kernel/src/pre_invocation.rs`
+- `crates/security/chio-security-kernel/src/post_invocation.rs`
+- `crates/security/chio-security-kernel/src/tripwire.rs`
+- `crates/security/chio-security-kernel/src/containment.rs`
+- `crates/security/chio-decoy/Cargo.toml`
+- `crates/security/chio-decoy/src/lib.rs`
+- `crates/security/chio-decoy/src/registry.rs`
+- `crates/security/chio-decoy/src/lifecycle.rs`
+- `crates/security/chio-decoy/src/materialize.rs`
+- `crates/security/chio-decoy/src/watermark.rs`
+- `crates/security/chio-decoy/src/matcher.rs`
+- `crates/security/chio-quarantine/Cargo.toml`
+- `crates/security/chio-quarantine/src/lib.rs`
+- `crates/security/chio-quarantine/src/rules.rs`
+- `crates/security/chio-quarantine/src/correlation.rs`
+- `crates/security/chio-quarantine/src/blast.rs`
+- `crates/security/chio-quarantine/src/approval.rs`
+- `crates/security/chio-quarantine/src/state_machine.rs`
+- `crates/security/chio-quarantine/src/executor.rs`
+- `crates/security/chio-quarantine/src/scheduler.rs`
 
-**`crates/security/chio-decoy/` (create):**
-- `Cargo.toml`, `src/lib.rs`
-- `src/canary.rs`: canary-capability minting and the `DECOY_SERVER_PREFIX`.
-- `src/registry.rs`: canary-id registry and recognition.
-- `src/catalog.rs`: honey-tool injection into a tool catalog.
-- `src/watermark.rs`: deterministic honeytoken emit/detect.
-- `src/tripwire.rs`: tripwire hook and the `Tripwire` event.
+### Existing ownership boundaries to modify
 
-**`crates/security/chio-quarantine/` (create):**
-- `Cargo.toml`, `src/lib.rs`
-- `src/event.rs`: the `SecurityEvent` model.
-- `src/ports.rs`: `RevocationPort`, `VelocityPort`, `IssuancePort`, `AlertPort`, `TenantPort`, `BlastRadiusPort` traits (revoke and restore methods for the lift path).
-- `src/action.rs`: `ContainmentAction`, `ActionTier`, the tiered executor.
-- `src/receipt.rs`: `ContainmentReceipt` and `LiftOrder`.
-- `src/playbook.rs`: the `when/within/then` playbook parser and evaluator.
-- `src/adapters.rs` (feature-gated): thin adapters wrapping the real crates.
+- `crates/core/chio-core-types/src/manifest.rs`: sole normative `ToolDefinition`
+- `crates/core/chio-core-types/src/declassification.rs`: Chio-signed wrapper around the portable declassification body
+- `crates/core/chio-core-types/src/capability/governance.rs`: reusable approval verification extensions only
+- `crates/core/chio-core-types/src/receipt/`: active-defense receipt bodies and kinds
+- `crates/kernel/chio-kernel/src/runtime.rs`: request field for a signed declassification grant
+- `crates/platform/chio-manifest/src/lib.rs`: reexport normative tool type, retain signing and validation
+- `crates/platform/chio-manifest/src/validation.rs`: validate flow declarations
+- `crates/platform/chio-store-sqlite/src/security_state.rs`: concrete active-defense stores and additive schema
+- `crates/platform/chio-control-plane/src/security/mod.rs`: composition and lifecycle owner
+- `crates/platform/chio-control-plane/src/security/adapters.rs`: lineage, issuance, velocity, receipt, and SIEM adapters; SQLite stores remain in `chio-store-sqlite`
+- `crates/platform/chio-control-plane/src/security/scheduler.rs`: durable response worker
+- `crates/platform/chio-control-plane/src/policy.rs`: active-defense configuration
+- `crates/platform/chio-control-plane/src/lib.rs`: registration in `build_kernel`
+- `crates/kernel/chio-runtime-harness/src/kernel.rs`, `crates/platform/chio-http-core/src/authority.rs`, and `crates/products/chio-cli/src/cli/mcp/wrap.rs`: direct construction paths to centralize or make explicitly enforcement-ineligible
+- `.github/workflows/apalache-safety.yml`, `formal/proof-manifest.toml`, and the applicable formal manifests: register the new lattice model and negative case
+- protocol adapters that construct `ToolDefinition`, located with `rg "ToolDefinition \\{" crates sdks`
+- `spec/schemas/chio-wire/v1/security/`: new portable schemas
+- `spec/PROTOCOL.md`, `spec/SECURITY.md`, and `spec/GUARDS.md`: normative behavior
 
-**Gates, evidence, spec (create/modify):**
-- `scripts/check-flow-invariants.sh`, `scripts/check-decoy-unreachable.sh`, `scripts/check-containment-reversible.sh`
-- `crates/core/chio-adversarial-suite/cases/label_downgrade/`, `.../canary_evasion/`, `.../containment_rollback/`
-- `Cargo.toml` (workspace root, modify): register the three new members.
-- `spec/PROTOCOL.md`, `spec/SECURITY.md` (modify): label, caveat, manifest, receipt, and canary semantics.
+## Phase 0: Provenance and architecture guardrails
 
----
+### Task 0.1: Record the adaptation boundary
 
-## Phase 0: Foundation (protocol types)
+**Files**
 
-### Task 1: DLM `Label` type in chio-core-types
+- Create `docs/security/clawdstrike-active-defense-provenance.md`
+- Modify repository `NOTICE` only if implementation copies or materially adapts copyrightable code
 
-**Files:**
-- Create: `crates/core/chio-core-types/src/flow_label.rs`
-- Modify: `crates/core/chio-core-types/src/lib.rs`
-- Test: inline `#[cfg(test)]` in `flow_label.rs`
+**Work**
 
-**Interfaces:**
-- Produces: `Label { policies: BTreeSet<FlowPolicy>, compartments: BTreeSet<String> }`; `FlowPolicy { owner: String, readers: BTreeSet<String> }`; `Label::public() -> Label` (empty = bottom of the lattice). Serde is `camelCase`, `deny_unknown_fields`.
+- Record the reviewed Clawdstrike commit `666303e5f3428f3b6e6b72f118c269a02388e0a4`.
+- Record the exact source files used for temporal rules, deception lifecycle, response transitions, watermarks, and tripwire tests.
+- For each implementation file, classify reuse as concept, test-vector adaptation, or code adaptation.
+- Verify the license of any file that itself names another upstream source before copying it. Concept-only reuse is allowed when provenance is unresolved; verbatim or close code reuse is not.
+- Preserve Apache-2.0 headers, modification notices, and applicable Clawdstrike `NOTICE` text.
 
-- [ ] **Step 1: Write the failing test**
+**Tests and gate**
 
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
+- Add `scripts/check-security-provenance.sh` to require a provenance entry for files containing `Adapted from Clawdstrike`.
+- Add shell tests in `scripts/tests/check-security-provenance.test.sh` for missing entry, unknown source commit, and valid entry.
+- Run `bash scripts/tests/check-security-provenance.test.sh`.
 
-    #[test]
-    fn public_label_is_empty() {
-        let l = Label::public();
-        assert!(l.policies.is_empty());
-        assert!(l.compartments.is_empty());
-    }
+### Task 0.2: Enforce the dependency direction
 
-    #[test]
-    fn label_roundtrips_canonical_json() {
-        let mut readers = alloc::collections::BTreeSet::new();
-        readers.insert("did:chio:reader".to_string());
-        let mut policies = alloc::collections::BTreeSet::new();
-        policies.insert(FlowPolicy { owner: "did:chio:owner".to_string(), readers });
-        let mut compartments = alloc::collections::BTreeSet::new();
-        compartments.insert("phi".to_string());
-        let label = Label { policies, compartments };
-        let json = serde_json::to_string(&label).expect("serialize");
-        let back: Label = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(label, back);
-    }
-}
-```
+**Files**
 
-- [ ] **Step 2: Run test to verify it fails**
+- Modify root `Cargo.toml`
+- Create `scripts/check-security-dependencies.sh`
+- Create `scripts/tests/check-security-dependencies.test.sh`
 
-Run: `cargo test -p chio-core-types flow_label`
-Expected: FAIL with "cannot find type `Label`".
+**Work**
 
-- [ ] **Step 3: Write minimal implementation**
+- Register the five crates with minimal manifests.
+- Implement the metadata check against resolved package ids, not textual Cargo.toml grep.
+- Fail if `chio-kernel` or `chio-guards` reaches a security engine, if a pure engine reaches kernel or guards, or if `chio-security-kernel` reaches `chio-guards` or a platform crate.
+- Add the script to the same CI lane that runs architecture and hygiene checks.
 
-```rust
-//! Decentralized Label Model (DLM) confidentiality labels.
-//!
-//! Pure data types. The lattice algebra (join, flows_to) lives in
-//! `chio-flow`; this crate carries only the wire shape so capabilities,
-//! manifests, and receipts can reference labels without depending on the
-//! information-flow engine.
+**Tests and gate**
 
-use alloc::collections::BTreeSet;
-use alloc::string::String;
+- Test a valid fixture graph and one fixture for each forbidden edge.
+- Run `bash scripts/tests/check-security-dependencies.test.sh`.
+- Run `bash scripts/check-security-dependencies.sh`.
 
-use serde::{Deserialize, Serialize};
+## Phase 1: Portable types and the DLM lattice
 
-/// A single DLM confidentiality policy: an owner and the set of principals
-/// the owner permits to read the labeled data.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct FlowPolicy {
-    pub owner: String,
-    pub readers: BTreeSet<String>,
-}
+### Task 1.1: Implement canonical label types
 
-/// A confidentiality label: a set of DLM policies plus orthogonal
-/// compartment tags (for example `pii`, `phi`, `secret`, `tenant:acme`).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Label {
-    #[serde(default)]
-    pub policies: BTreeSet<FlowPolicy>,
-    #[serde(default)]
-    pub compartments: BTreeSet<String>,
-}
+**Files**
 
-impl Label {
-    /// The bottom of the lattice: no policies, no compartments, readable by
-    /// anyone. This is the only label that flows to every clearance.
-    #[must_use]
-    pub fn public() -> Self {
-        Self::default()
-    }
-}
-```
+- Create `chio-security-types/src/flow.rs`
+- Create `spec/schemas/chio-wire/v1/security/information-label.schema.json`
 
-Add to `lib.rs` near the other `pub mod` lines:
+**Required API and validation**
 
-```rust
-pub mod flow_label;
-```
+- `PrincipalId` and `Compartment` validated newtypes.
+- `InformationLabel::Known { owners: BTreeMap<PrincipalId, BTreeSet<PrincipalId>>, compartments }` and `InformationLabel::Top`.
+- `InformationLabel::bottom()` returns an empty known label.
+- Construction and deserialization reject blank or whitespace-padded ids, owner sets that omit the owner, duplicate JSON keys, unknown fields, and configured cardinality overflow.
+- Serialization uses one canonical tagged shape and sorted collections. `Top` has no payload fields.
+- The crate builds with `--no-default-features` for `wasm32-unknown-unknown`.
 
-- [ ] **Step 4: Run test to verify it passes**
+**Exact tests**
 
-Run: `cargo test -p chio-core-types flow_label`
-Expected: PASS (2 tests).
+- `bottom_is_unique_public_label`
+- `owner_must_be_its_own_reader`
+- `duplicate_owner_json_is_rejected`
+- `blank_principal_and_compartment_are_rejected`
+- `known_and_top_canonical_vectors_round_trip`
+- `noncanonical_input_normalizes_to_identical_canonical_bytes`
+- JSON Schema positive and negative vectors for every validation rule
 
-- [ ] **Step 5: Commit**
+**Commands**
+
+- `cargo test -p chio-security-types flow`
+- `cargo check -p chio-security-types --no-default-features --target wasm32-unknown-unknown`
+
+### Task 1.2: Implement and verify the lattice
+
+**Files**
+
+- Create `chio-flow/src/lattice.rs`
+- Create `formal/tla/InformationFlowLattice.tla`
+- Create `formal/tla/MCInformationFlowLattice.cfg`
+- Modify `formal/MAPPING.md`, `formal/theorem-inventory.json`, and the applicable formal manifest
+
+**Required behavior**
+
+- `flows_to` follows the owner-to-reader subset and compartment subset definition in the design.
+- `join` intersects same-owner reader sets, retains one-sided policies, unions compartments, and propagates `Top`.
+- Runtime egress rejects `Top` separately from the mathematical relation.
+- Functions return validation errors rather than manufacturing a permissive label.
+
+**Exact tests**
+
+- Property tests for reflexivity, antisymmetry, and transitivity.
+- Property tests that each operand flows to its join.
+- Property test that join flows to every generated common upper bound.
+- Commutativity, associativity, and idempotence of join.
+- Regression: redundant same-owner policies cannot create two unequal labels that flow both ways.
+- Regression: adding an owner restriction is upward in the order.
+- Regression: narrowing readers is upward in the order.
+- Regression: `Top` is mathematical top but is operationally denied on egress.
+- Negative formal model that reverses reader subset direction must fail.
+
+**Commands**
+
+- `cargo test -p chio-flow lattice`
+- Run the repository's Apalache/TLA gate for `MCInformationFlowLattice.cfg` and its negative model.
+- Register both models in `.github/workflows/apalache-safety.yml`, `formal/proof-manifest.toml`, and the repository's model inventory so the normal CI gate cannot omit them.
+
+## Phase 2: One manifest truth and portable wire shapes
+
+### Task 2.1: Unify `ToolDefinition`
+
+**Files**
+
+- Modify `crates/core/chio-core-types/src/manifest.rs`
+- Modify `crates/platform/chio-manifest/src/lib.rs`
+- Modify `crates/platform/chio-manifest/src/validation.rs`
+- Modify every Rust constructor returned by `rg "ToolDefinition \\{" crates sdks`
+
+**Work**
+
+- Add `ToolFlowDeclaration { output_label, input_clearance, egress, declassification_purposes }` to the normative core type.
+- Move `LatencyHint` to the normative type and make `latency_hint` the only v2 latency field. Remove `ToolAnnotations.estimated_duration_ms` so scheduling never has two authorities.
+- Add `deny_unknown_fields` and strict nested validation to the normative `ToolDefinition`, `ToolPricing`, `ToolAnnotations`, `ToolFlowDeclaration`, label, and latency types before removing any platform type. Add regression fixtures proving unknown nested fields still reject.
+- Introduce `chio.manifest.v2` for the canonical unified shape. Keep `TOOL_MANIFEST_SCHEMA` v1 parsing in an explicit version-dispatch function, convert through a private `LegacyToolDefinitionV1`, and require re-signing before v2 admission. Do not deserialize both versions into one ambiguous type.
+- Remove the public duplicate in `chio-manifest` only after the v2 parser and fixtures pass, then reexport the normative `ToolDefinition`, `ToolPricing`, `PricingModel`, `ToolAnnotations`, and `LatencyHint` types.
+- Replace `has_side_effects` call sites with `ToolAnnotations.read_only` and conservative annotation values. Do not keep two fields that can disagree.
+- Keep a private `LegacyToolDefinitionV1` only in the versioned parser. Convert `has_side_effects=true` to `read_only=false`, `destructive=true`, `idempotent=false`, and `requires_approval=true`; convert false to `read_only=true` while leaving the other flags false. Operators must re-sign the canonical migrated manifest.
+- Convert legacy `estimated_duration_ms` deterministically: `0..=1` to `instant`, `2..=999` to `fast`, `1000..=59_999` to `moderate`, and `60_000..` to `slow`. Preserve an existing platform v1 `latency_hint` exactly. Reject a legacy migration input that supplies both representations through any merged or adapter shape.
+- Treat manifest flow declarations as publisher requests. Runtime topology computes a mandatory egress bit that is ORed with manifest egress. Tenant or data-owner policy supplies authoritative clearances and output floors; manifest clearance and purposes may only narrow them.
+- Validation rejects effective egress without every required policy clearance, `Top` output declarations, `Top` destination clearance, duplicate purposes, invalid label ids, and any manifest attempt to widen operator policy.
+- Security lookup accepts only a successfully verified v2 `ToolManifest`, authenticated tenant policy, and runtime topology record, never an adapter discovery object.
+
+**Exact tests**
+
+- Existing v1 manifests parse only through the legacy parser and become enforceable only after conversion and v2 re-signing.
+- Tampering any flow declaration invalidates the signature.
+- Egress without clearance is rejected.
+- Publisher-declared `egress=false` cannot override a remote runtime boundary.
+- Publisher clearance cannot exceed tenant or data-owner policy.
+- Unknown fields in every nested normative type reject before signature admission.
+- Legacy side-effecting tools migrate to conservative annotations.
+- Latency threshold boundary fixtures map deterministically and v2 rejects any second latency representation.
+- There is one public Rust `ToolDefinition` type after migration.
+- All 62 constructor sites found at plan review compile with explicit security semantics.
+
+**Commands**
+
+- `cargo test -p chio-core-types manifest`
+- `cargo test -p chio-manifest`
+- `cargo check --workspace`
+
+### Task 2.2: Preserve flow metadata across adapters
+
+**Files**
+
+- Modify `crates/protocol/chio-openapi/src/generator.rs`
+- Modify `crates/protocol/chio-openapi-mcp-bridge/src/lib.rs`
+- Modify MCP, A2A, ACP, OpenAI, Anthropic, cross-protocol, and provider adapter projections that consume or construct `ToolDefinition`
+- Add `BridgeSecurityMetadata` to the existing internal bridge model that all applicable adapters can retain
+
+**Work**
+
+- Define and validate OpenAPI `x-chio-flow` input.
+- Keep flow metadata in an internal sidecar when the remote protocol cannot represent it.
+- Reject an export/import path that would turn a constrained egress tool into an unconstrained local manifest.
+- Do not encode security metadata in human-readable descriptions.
+
+**Exact tests**
+
+- OpenAPI extension to normative manifest to OpenAPI extension is lossless.
+- MCP, A2A, ACP, OpenAI, and Anthropic internal round trips preserve identical canonical flow bytes.
+- Removing the sidecar from a constrained tool returns an explicit adapter error.
+- Cross-protocol routing does not change clearance or purposes.
+
+**Commands**
+
+- Run the unit tests for every modified protocol crate.
+- `cargo test -p chio-cross-protocol`
+- `cargo test -p chio-provider-conformance`
+
+### Task 2.3: Add four-language schemas and vectors
+
+**Files**
+
+- Add schemas under `spec/schemas/chio-wire/v1/security/` for declassification, event, finding, response plan, effect, and transition receipt bodies
+- Add vectors under `crates/tooling/chio-conformance/vectors/security/`
+- Regenerate committed Rust, Python, TypeScript, and Go artifacts through `cargo xtask codegen`
+
+**Exact tests and commands**
+
+- Each language decodes and re-encodes the same positive vectors.
+- Each language rejects unknown fields, duplicate map keys where its parser exposes them, invalid ids, and a missing action binding.
+- `make codegen-check`
+- `cargo test -p chio-conformance vectors_schema_pair`
+
+## Phase 3: Durable security state
+
+### Task 3.1: Define neutral port contracts
+
+**Files**
+
+- Create `chio-security-types/src/ports.rs`
+
+**Required ports**
+
+| Port | Atomic contract |
+|---|---|
+| `FlowStateStore` | monotonic principal, lineage, and session joins; context generation; egress fence valid through dispatch commitment |
+| `ClassificationPort` | return typed findings plus classifier identity/version, or a typed failure; never collapse failure to no findings |
+| `TripwireDetectorPort` | match canary, honey-tool, and watermark inputs through `chio-decoy` without exposing registry material |
+| `DeclassificationUseStore` | insert grant id exactly once with request hash and outcome state |
+| `SecurityEventVerifierPort` | verify detector signature or source receipt, producer trust class, tenant, freshness, and event-time bounds |
+| `SecurityEventStore` | append verified events by unique event id and scan a bounded rule partition; advisory events remain segregated |
+| `DecoyRegistryStore` | compare-and-swap lifecycle, private lookup by id or marker digest |
+| `ResponseStore` | create plan, compare-and-swap generation, persist effects, claim due work |
+| `ContainmentOverlayStore` | effect-ID-keyed contributions, compositional effective posture, conditional removal, scheduler fence rejection |
+| `BlastRadiusPort` | return authoritative commit-indexed `Exact` or `Incomplete`; after approval acquire/query/release a bounded issuance-and-delegation fence by deterministic action id |
+| `ApprovalVerifierPort` | verify operator capability and proposal, trusted role, freshness, distinctness and intent binding; coordinate approval-only admission and replay state |
+| `EffectPort` | apply or remove one contribution with idempotency key, expected version, and monotonic scheduler fencing token |
+| `SecurityReceiptSink` | sign and append canonical transition evidence |
+| `SecurityAlertPort` | page with hashes and ids, never raw security material |
+
+Every store error is typed as unavailable, conflict, invalid data, or integrity failure. Engines must not collapse those into empty state.
+
+Port request and response types use only portable security types, canonical body bytes, hashes, ids, and opaque receipt references. They do not name kernel, trust, lineage, or Chio signature types. `chio-core-types`, `chio-flow`, and control-plane adapters perform those conversions at their existing ownership boundaries.
+
+**Exact tests**
+
+- Compile-time fake implementations cover every port.
+- A fault-injection fake can fail before or after each write.
+- Port contract tests run against both fakes and SQLite implementations.
+
+### Task 3.2: Implement the SQLite stores
+
+**Files**
+
+- Create `crates/platform/chio-store-sqlite/src/security_state.rs`
+- Modify `crates/platform/chio-store-sqlite/src/lib.rs`
+- Create `crates/platform/chio-store-sqlite/tests/security_state.rs`
+
+**Schema requirements**
+
+- Additive `CREATE TABLE IF NOT EXISTS` migrations following existing store patterns.
+- Tables for principal, lineage, and session flow state; isolation epochs; egress fences; declassification uses; verified and advisory security events; correlation partials; decoy registry; response plans; approvals; effect contributions; transitions; overlay state; lineage fences; and scheduler leases.
+- Tenant id participates in every primary or unique lookup boundary.
+- Canonical body hash is stored alongside serialized bodies and verified on read.
+- Response and overlay writes use transactions with compare-and-swap generation checks. Removing one effect recomputes posture from all remaining active contributions.
+- Scheduler claims use a lease owner, expiry, and monotonically increasing fencing token so a resumed stale worker cannot mutate an effect after takeover.
+- Marker material and rollback payloads use the existing encrypted-blob facility; raw values are absent from ordinary tables.
+
+**Exact tests**
+
+- Migration is idempotent and preserves an existing receipt database.
+- Concurrent principal, lineage, and session joins cannot lose either restriction.
+- A new session inherits principal and lineage taint unless a verified isolation-epoch transition exists.
+- A concurrent taint generation change invalidates an egress fence before dispatch.
+- Duplicate declassification consume returns already-consumed without mutation.
+- Cross-tenant reads and writes fail.
+- Corrupt canonical hash fails closed.
+- Two scheduler workers cannot own the same live lease.
+- Every stale scheduler fencing token is rejected by overlay and effect stores.
+- Process restart recovers expired leases.
+- Overlapping overlay contributions may expire in either order without removing the remaining restriction.
+
+**Commands**
+
+- `cargo test -p chio-store-sqlite --test security_state`
+- `cargo test -p chio-store-sqlite --test tenant_isolation`
+
+## Phase 4: Pure flow decisions and one-shot declassification
+
+### Task 4.1: Implement classification and session transitions
+
+**Files**
+
+- Create `chio-flow/src/classification.rs`
+- Create `chio-flow/src/engine.rs`
+- Modify `crates/guards/chio-data-guards/src/lib.rs` and add a focused structured-classification module and tests
+- Add the `ClassificationPort` adapter in `crates/platform/chio-control-plane/src/security/adapters.rs`
+
+**Work**
+
+- Add a typed, non-transforming `ClassificationFinding` API to `chio-data-guards`; the current `QueryResultGuard` redaction API is not a classifier and cannot satisfy this task. Findings bind category, confidence, byte range or field path, classifier id, and classifier version. Classification failure is distinct from an empty result.
+- Accept findings through `ClassificationPort`, not a direct `chio-flow -> chio-data-guards` dependency. Map configured categories to label restrictions. Unknown categories return an error.
+- Join classifier output with operator output floor, manifest output floor, principal taint, lineage taint, and current session label before persistence.
+- Pre-invocation decisions take a fully resolved `FlowRequest` containing request hash, authoritative principal, lineage, and session labels, context generation, payload label, runtime topology, policy clearances, manifest declaration, and optional verified declassification result.
+- Compute the pre-invocation source label as the join of classified payload, operator input floor, principal taint, lineage taint, and session taint. Compare that complete label with every effective destination clearance. Treat all outbound bytes as potentially derived from the agent's accumulated knowledge even when the bytes do not independently match a classifier.
+- A verified declassification result substitutes its exact signed target only for that request, destination, and purpose after the complete source label is recomputed. It never changes durable principal, lineage, or session state.
+- Acquire an egress fence for that generation and keep it valid through dispatch commitment. A generation change causes re-evaluation or denial.
+- Missing policy clearance, publisher-only clearance, `Top`, state overflow, classifier error, fence conflict, or any read/write error returns a deny reason suitable for structured guard evidence.
+
+**Exact tests**
+
+- PII, PHI, secret, and tenant category mappings add the expected owner and compartment restrictions.
+- Unknown classifier category denies.
+- Classifier error and malformed finding deny; an authenticated empty finding set remains distinguishable.
+- Many small outputs monotonically accumulate taint.
+- An unclassified outbound payload after sensitive knowledge acquisition retains the accumulated source label and cannot bypass clearance.
+- Concurrent joins retain both reader restrictions and compartments at principal, lineage, and session levels.
+- Starting a new session with the same subject and isolation epoch inherits taint.
+- A verified fresh isolation epoch resets only the new isolated principal instance.
+- A response that advances generation before another egress dispatch invalidates the stale fence.
+- Egress missing clearance denies.
+- Runtime remote topology overrides `manifest.egress=false`; a manifest cannot grant its own clearance.
+- Non-egress calls do not require clearance but still retain taint.
+- Classifier and store fault injection blocks output.
+
+### Task 4.2: Implement signed one-shot declassification
+
+**Files**
+
+- Create `chio-security-types/src/declassification.rs`
+- Create `crates/core/chio-core-types/src/declassification.rs`
+- Create `chio-flow/src/declassification.rs`
+- Modify `crates/kernel/chio-kernel/src/runtime.rs` and its wire-facing request conversions
+
+**Work**
+
+- Put the portable `DeclassificationGrantBody` in `chio-security-types`. Put `SignedDeclassificationGrant`, which uses Chio `PublicKey`, `Signature`, and `SigningAlgorithm`, in `chio-core-types`. This preserves the dependency direction `chio-core-types -> chio-security-types` and avoids inventing a second cryptographic envelope.
+- Add an optional grant to `ToolCallRequest` and the generated wire schema.
+- Sign and verify with Chio canonical JSON plus `chio:declassification-grant:v1` domain separation.
+- Recompute the canonical request hash and source-label hash inside the verifier.
+- Validate capability, tenant, subject, agent, session, destination, the intersection of policy and manifest purposes, times, target label, and trusted authority. A valid downgrade requires `target.flows_to(source)` and rejects an equal target as a no-op grant.
+- Consume the grant atomically only after every static binding validates and immediately before returning an allow decision.
+- Persist a consumed-but-dispatch-failed outcome separately from successful release.
+- Apply the target only to the signed request payload. Never lower principal, lineage, or session taint.
+
+**Exact tests**
+
+- Success for the exact signed request.
+- Replay, request mutation, destination mutation, purpose mutation, subject mutation, session mutation, expired grant, not-yet-valid grant, untrusted key, invalid signature, source hash mutation, target mutation, and store outage all deny.
+- `Top` cannot be declassified.
+- Two concurrent requests with one grant produce exactly one successful consumption.
+- A consumed grant remains consumed after simulated dispatch failure.
+
+**Commands**
+
+- `cargo test -p chio-flow declassification`
+- `cargo test -p chio-kernel declassification`
+
+## Phase 5: Kernel adapters and composition
+
+### Task 5.1: Implement adapters against current hook APIs
+
+**Files**
+
+- Create `chio-security-kernel/src/pre_invocation.rs`
+- Create `chio-security-kernel/src/post_invocation.rs`
+- Create `chio-security-kernel/src/tripwire.rs`
+- Create `chio-security-kernel/src/containment.rs`
+- Modify `crates/kernel/chio-kernel/src/kernel/mod.rs`
+- Modify `crates/kernel/chio-kernel/src/post_invocation.rs`
+- Modify `crates/kernel/chio-kernel/src/kernel/dispatch.rs`
+- Modify `crates/kernel/chio-kernel/src/kernel/responses.rs`
+- Modify the session-backed calls in `crates/kernel/chio-kernel/src/kernel/evaluation.rs`
+
+**Work**
+
+- `FlowPreInvocationGuard` implements `chio_kernel::Guard::name` and `evaluate`.
+- `FlowPostInvocationHook` implements the existing hook API, but evidence attribution is keyed by request id or returned atomically with the verdict through a backward-compatible pipeline extension. It must not use one shared `take_evidence()` slot that concurrent requests can interchange.
+- Add a versioned optional `SecurityInvocationContext` accessed through constructors and accessors on `GuardContext` and `PostInvocationContext`, containing authoritative tenant, session, subject, isolation epoch, lineage root, and context generation. Because these structs are public and literal-constructed, treat this as an API migration: enumerate and update every in-tree constructor, add a deprecation window for downstream literals where feasible, and never claim field addition is source-compatible. Enforce mode denies missing context rather than trusting request fields.
+- Treat `PostInvocationContext.agent_id` and `server_id` as optional typed ids. Synthetic context without a session is denied when enforcement is enabled.
+- Return existing `PostInvocationVerdict::Allow` or `Block`; do not introduce a stale `Pass` variant.
+- `TripwireGuard` and the raw-output watermark hook call `TripwireDetectorPort`, implemented with `chio-decoy`, and always deny a match before dispatch or delivery.
+- `ContainmentGuard` checks active overlays before all ordinary guards and denies on overlay-store error when enabled.
+- Adapters translate domain decisions to `GuardDecision` and `GuardEvidence`; engines never import those kernel types.
+
+**Exact tests**
+
+- Trait conformance compiles against the current kernel API.
+- Synthetic post-invocation context blocks under enforcement.
+- Every flow-domain error becomes deny or block.
+- Tripwire and containment guards never dispatch in the fake-server integration harness.
+- Event persistence failure preserves tripwire deny.
+- Overlay lookup failure preserves containment deny.
+
+### Task 5.2: Centralize installation across every kernel constructor
+
+**Files**
+
+- Create `crates/platform/chio-control-plane/src/security/mod.rs`
+- Create `crates/platform/chio-control-plane/src/security/adapters.rs`
+- Modify `crates/platform/chio-control-plane/src/policy.rs`
+- Modify `crates/platform/chio-control-plane/src/lib.rs`
+- Modify `crates/kernel/chio-runtime-harness/src/kernel.rs`
+- Modify `crates/platform/chio-http-core/src/authority.rs`
+- Modify `crates/products/chio-cli/src/cli/mcp/wrap.rs`
+- Audit every remaining non-test `ChioKernel::new` call returned by `rg "ChioKernel::new" crates`
+
+**Registration order**
+
+1. `TripwireGuard`
+2. `ContainmentGuard`
+3. `FlowPreInvocationGuard`
+4. existing default runtime guard profile
+5. configured `GuardPipeline`
+
+For post-invocation, the watermark tripwire hook sees the raw response first, existing redaction and sanitizer hooks run next, and `FlowPostInvocationHook` runs last so it classifies and persists the final representation immediately before delivery. A block at any stage prevents delivery. Add an integration test that fixes this exact order and proves that removed secret bytes do not taint the delivered representation while the signed manifest's output label still applies.
+
+**Configuration**
+
+- Add `active_defense.mode = disabled | shadow | enforce`.
+- Require a persistent security database and verified manifest registry for `enforce`.
+- Refuse startup when enforcement is configured with ephemeral flow, declassification, decoy, event, response, or overlay stores.
+- Add one shared security-installation helper that receives a fully constructed `SecurityRuntime` and installs the exact guard and hook order. `build_kernel` and every enforcement-capable constructor call it. A constructor that cannot supply persistent stores, verified v2 manifest registry, policy, and topology rejects `flow_v1` rather than returning an unprotected kernel. Disabled mode installs nothing.
+
+**Exact tests**
+
+- Disabled mode preserves the existing guard and receipt bytes.
+- Shadow mode emits decisions but does not alter calls.
+- Enforce mode refuses ephemeral stores.
+- Guard order is exact and tripwire wins over later allows.
+- Runtime harness, HTTP authority, CLI MCP wrapping, and every remaining direct constructor either install the same security runtime or reject a flow-required manifest.
+- `cargo tree -i chio-flow` shows no path from kernel or guards to flow.
+
+**Commands**
+
+- `cargo test -p chio-control-plane security`
+- `bash scripts/check-security-dependencies.sh`
+
+## Phase 6: Deception and tripwire detection
+
+### Task 6.1: Implement the private registry and lifecycle
+
+**Files**
+
+- Create `chio-security-types/src/deception.rs`
+- Create `chio-decoy/src/registry.rs`
+- Create `chio-decoy/src/lifecycle.rs`
+- Create `chio-decoy/src/materialize.rs`
+- Create `chio-decoy/src/matcher.rs`
+
+**Work**
+
+- Support canary capability, honey tool, credential-shaped file, cookie-shaped value, internal hostname, and watermark surfaces.
+- Implement the lifecycle and compare-and-swap transitions from the design.
+- Materialize files only beneath an operator-configured root using safe relative components, create-new semantics, restrictive permissions, and content digests.
+- Refuse overwrite, symlink escape, parent traversal, absolute paths, and cleanup when ownership or digest differs.
+- Arm a rotated replacement before retiring the previous version.
+- Store raw markers and materialization payloads only in encrypted blobs.
+
+**Exact tests**
+
+- Lifecycle accepts every legal edge and rejects every illegal edge.
+- Materialization is idempotent for the same operation id.
+- Existing file, symlink, parent traversal, absolute path, and changed-content cleanup all fail.
+- Rotation never leaves a window with no armed version.
+- Tenant boundaries and privileged registry export are enforced.
+- Scanner and operator-touch fixtures demonstrate that a tripwire is high confidence but not treated as mathematical proof of malice.
+
+### Task 6.2: Implement signed watermark envelopes
+
+**Files**
+
+- Create `chio-decoy/src/watermark.rs`
+- Add canonical vectors under `crates/tooling/chio-conformance/vectors/security/watermark/`
+
+**Work**
+
+- Bind every payload field listed in the design, using the public opaque `marker_ref` rather than the private registry id.
+- Verify the canonical payload bytes equal the decoded payload before signature validation.
+- Require a trusted key id with active or configured overlap status.
+- Enforce expiry and registry lifecycle.
+- Deduplicate observations without losing the first evidence reference.
+- Never include the signing seed or raw private registry entry in serialized config.
+
+**Exact tests**
+
+- Valid extraction, payload tamper, encoded-data mismatch, signature tamper, untrusted key, expired marker, retired marker, sequence replay, observation dedupe, active key, overlap key, and rejected old key.
+- Cross-language canonical vector verification.
+
+### Task 6.3: Prove tripwire-before-execution
+
+**Files**
+
+- Add `crates/kernel/chio-kernel/tests/active_defense_tripwire.rs`
+- Add adversarial fixtures under `crates/core/chio-adversarial-suite/cases/canary_evasion/`
+
+**Exact tests**
+
+- Valid canary capability is denied and fake server invocation count remains zero.
+- Honey tool name is denied and invocation count remains zero.
+- Event-store outage still leaves invocation count zero and receipt evidence records the outage.
+- Near-match and retired marker do not auto-contain, but produce configured observation behavior.
+- Marker leakage through output is blocked before response delivery.
+
+## Phase 7: Deterministic temporal detection
+
+### Task 7.1: Implement rule parsing and validation
+
+**Files**
+
+- Create `chio-security-types/src/event.rs`
+- Add the Chio-signed event envelope in `crates/core/chio-core-types/src/receipt/` or a focused sibling module
+- Create `chio-quarantine/src/rules.rs`
+- Add policy configuration to `chio-control-plane/src/policy.rs`
+
+**Work**
+
+- Adapt Clawdstrike `hunt-correlate` ordered-stage semantics to Chio event fields.
+- Define `SecurityEventBody`, `SignedSecurityEvent`, `VerifiedSecurityEvent`, producer id/key, trust class, and receipt-backed provenance. Verify signature or source receipt, tenant, producer policy, freshness, and event-time bounds before correlation.
+- Only configured internal detector trust classes can yield an automatic-response finding. External SIEM imports and unsigned observations are stored in an advisory partition that can alert but cannot execute containment.
+- Require each non-first stage to name a prior stage with `after` and a positive bounded `within` duration.
+- Require an explicit grouping key and policy version.
+- Reject cycles, unknown stages and fields, zero or excessive windows, ambiguous duplicate names, unbounded regexes, and rules whose state estimate exceeds configured tenant limits.
+
+**Exact tests**
+
+- Valid two-stage and multi-stage rules.
+- Forged, unsigned, untrusted-producer, cross-tenant, stale, future-dated, and invalid-receipt events cannot enter automatic correlation.
+- Unknown `after`, forward reference, cycle, missing window, zero window, overflow duration, invalid field, duplicate stage, and excessive-state rules reject at load time.
+- Parse then serialize then parse preserves canonical rule bytes.
+
+### Task 7.2: Implement event-time correlation
+
+**Files**
+
+- Create `chio-quarantine/src/correlation.rs`
+
+**Work**
+
+- Accept only `VerifiedSecurityEvent` for automatic-response partitions; advisory partitions have no response executor route.
+- Partition by tenant, rule, and configured group key.
+- Deduplicate event ids.
+- Track event time separately from ingest time.
+- Accept bounded lateness, advance a deterministic watermark, and evict partials only when they can no longer match.
+- Persist partial matches and watermark transactionally.
+- Compute finding ids from rule version, group hash, ordered event ids, and evidence digests.
+- On overflow or store failure emit detector-health evidence and suppress heavy automatic response for that partition.
+
+**Exact tests**
+
+- In-order match, bounded out-of-order match, too-late rejection, exact-window boundary, duplicate event, unrelated group, eviction, restart recovery, state cap, and store failure.
+- Replaying the same corpus after restart yields the identical finding id once.
+- Permuting ingest order within allowed lateness yields the same ordered contributing event ids.
+- A single event cannot satisfy two ordered stages unless the rule explicitly allows reuse.
+
+**Commands**
+
+- `cargo test -p chio-quarantine correlation`
+
+## Phase 8: Causal scope and durable response
+
+### Task 8.1: Resolve and freeze exact affected sets
+
+**Files**
+
+- Create `chio-quarantine/src/blast.rs`
+- Extend `crates/platform/chio-store-sqlite/src/capability_lineage.rs` with a bounded descendant query if the current upward-only delegation query cannot supply it
+- Reuse truncation semantics from `chio-lineage::query`
+
+**Work**
+
+- Run this task only for plans containing `SuspendCapabilitySet` or `FreezeIssuance`. Session-local throttle, egress restriction, and suspension bind an exact session and do not acquire a lineage fence.
+- Resolve descendants from an authoritative capability and receipt-lineage snapshot at a committed index without retaining a fence while approval is pending.
+- Return sorted unique targets, graph-slice digest, query bounds, source lineage version, and commit index.
+- Return `Incomplete` on any truncation, replica lag, missing completeness watermark, missing seed, corrupt edge, cross-tenant edge, or store failure.
+- Bind the exact provisional set, digest, and lineage index in the plan before approval.
+- Require `FreezeIssuance` to be the first ordered effect in every lineage-scoped plan before hashing or approval; the executor cannot inject it after approval.
+- After approval, persist deterministic fence-acquisition intent, acquire a bounded issuance-and-delegation fence lease by action id, and re-query under the fence. Require the same commit index and affected-set hash; any change releases the lease, invalidates approvals, and requires a new plan.
+- Persist the acquired lease as the first `FreezeIssuance` effect and renew it only under the response scheduler's fencing token. Recovery queries by action and lease id if acquisition may have preceded effect persistence. A bounded orphan expires automatically.
+- Keep issuance and delegation frozen until all other containment contributions lift. Do not re-query on lift. Pre-approval cancellation, expiry, or failure owns no fence.
+
+**Exact tests**
+
+- Exact chain, branch, cycle, duplicate edge, cross-tenant edge, missing seed, depth truncation, row truncation, replica lag, absent completeness watermark, corrupt edge, and concurrent new descendant.
+- Truncated results never create an executable automatic plan.
+- Delegation attempted under the application fence fails. A descendant committed before fence acquisition changes the set and invalidates the plan and all approvals.
+- Cancellation, expiry, and failure before apply leave no live fence. Crash after fence acquisition and before effect persistence is recovered by deterministic id or expires at the bounded lease deadline.
+
+### Task 8.2: Implement plan approvals
+
+**Cross-arc prerequisite**
+
+The protocol-primitives plan must first ship threshold governed-approval set verification with distinct signer enforcement, operator-capability proposal binding, a generic approval-only `AdmissionOperation`, and atomic replay reservation. Before that prerequisite passes its conformance tests, every approval-requiring response plan remains dry-run, including one-approver policy. No legacy single-token execution exception and no local threshold verifier are permitted.
+
+**Files**
+
+- Create `chio-quarantine/src/approval.rs`
+- Integrate the protocol-primitives governed approval-set API in `chio-quarantine`; do not introduce or extend a second signature envelope here
+
+**Work**
+
+- Require a Chio operator capability whose subject equals the executor and whose existing tool scope grants every proposed effect on internal server `chio.control-plane.active-response`, using the closed logical tool names `throttle_session`, `restrict_egress`, `suspend_session`, `suspend_capability_set`, and `freeze_issuance`. Put its id, canonical digest, and expiry in the complete response plan and domain `chio:response-plan:v1`.
+- Require that capability for auto-reversible plans as well as heavy plans. A zero-human-vote policy does not remove executor authorization.
+- Compute the existing `GovernedTransactionIntent::binding_hash()` over that intent. Bind each `GovernedApprovalToken.governed_intent_hash` to the resulting binding hash and `request_id` to `action_id`; do not substitute a separately computed arbitrary hash into the verifier.
+- Require the policy-authority-signed threshold proposal to bind the operator-capability digest and set its deadline no later than capability and plan expiry.
+- Before replay reservation, persist a generic `AdmissionOperation` of kind `GovernedActiveResponse` whose id binds executor authority, action id, capability digest, and governed intent hash. Budget and execution-nonce participants are absent.
+- Delegate trusted approver roles, m-of-n distinct keys, token validity, approved decision, atomic replay reservation, dispatch commitment, and crash recovery to the shared governed approval verifier and coordinator through `ApprovalVerifierPort`. Enforce submitter separation as response-plan policy before execution.
+- Recompute capability validity and the complete governed intent binding hash at execution time. For a lineage-scoped plan, also acquire and verify the application fence and approved affected-set hash before effects.
+
+**Exact tests**
+
+- Valid quorum.
+- Duplicate key, duplicate token, submitter approval, untrusted role, denied token, expired token, future token, replay, wrong action id, wrong subject, wrong or revoked operator capability, capability expiry beyond proposal deadline, and every individual plan-field mutation reject.
+- Approval remains invalid if effects are reordered.
+- Crash after approval reservation or dispatch commitment recovers the same operation id and cannot apply twice.
+
+### Task 8.3: Implement the response state machine
+
+**Files**
+
+- Create `chio-security-types/src/response.rs`
+- Create `chio-quarantine/src/state_machine.rs`
+
+**Work**
+
+- Implement only the transitions in the design diagram.
+- Require expected generation on every transition.
+- Derive stable transition ids and effect ids from canonical inputs.
+- Record requested, applied, failed, rollback, and final states separately.
+- `applying` lease timeout transitions to partial apply and rollback.
+- `active` TTL transitions to expiring and rollback.
+- Rollback failure remains restrictive and pages; it cannot transition to lifted.
+
+**Exact tests**
+
+- Table-driven test for every legal transition.
+- Every unlisted transition rejects.
+- `failed` rejects after any effect has applied; the same input transitions to `apply_partial`.
+- Duplicate transition is idempotent.
+- Stale generation conflicts.
+- Applying timeout, active expiry, cancellation before apply, partial apply, full rollback, and partial rollback.
+- Property test that `lifted` implies every applied reversible effect has a successful restore record.
+- Property test that permanent revocation never appears in a reversible plan.
+
+### Task 8.4: Implement effect execution and rollback
+
+**Files**
+
+- Create `chio-quarantine/src/executor.rs`
+- Create `chio-control-plane/src/security/adapters.rs`
+
+**Concrete adapters**
+
+- Temporary deny and egress restrictions as effect-ID-keyed `ContainmentOverlayStore` contributions.
+- Throttle overrides as composable contributions around `AgentVelocityGuard`, never as blind restoration of one prior value.
+- Issuance and delegation freeze as a commit-indexed reversible fence, not irreversible revocation.
+- Alert through `chio-siem`.
+- Exact blast resolution through `chio-lineage` and SQLite lineage.
+- Receipt signing through existing Chio receipt machinery.
+
+**Work**
+
+- Persist effect intent before external mutation.
+- For a lineage-scoped plan, persist the lineage-fence acquisition intent before calling its authority. Promote the acquired bounded lease to the first recorded effect before applying any other lineage-scoped effect. Do not add an implicit heavy fence to a session-local auto-reversible plan.
+- Pass effect id, expected target version, and current scheduler fencing token to every port call.
+- Persist the contribution and observed result after each call. Effective posture is recomputed from base policy plus all active contributions.
+- On failure, stop forward application and remove the successfully applied prefix in reverse order. Removing one contribution must retain every overlapping restriction.
+- For a non-composable external effect, serialize by target and use compare-and-swap restore only when current state still matches the version installed by that effect. Conflict retains the restrictive state and escalates.
+- Do not call the revocation oracle for temporary actions.
+
+**Exact crash matrix**
+
+For each effect type, terminate and restart at these points:
+
+1. before intent persistence;
+2. after intent persistence and before port call;
+3. after port call and before result persistence;
+4. after result persistence and before next effect;
+5. during rollback before port call;
+6. after restore and before rollback-result persistence.
+
+Every case must converge without duplicate external mutation, false success, or loss of the restrictive overlay.
+
+Add overlapping-plan tests in which two restrictions on the same target expire in both possible orders. The target remains at the most restrictive posture until the last contribution is removed.
+
+## Phase 9: Durable TTL scheduler and posture transitions
+
+### Task 9.1: Implement scheduler leasing
+
+**Files**
+
+- Create `chio-quarantine/src/scheduler.rs`
+- Create `chio-control-plane/src/security/scheduler.rs`
+
+**Work**
+
+- Persist `due_at`, lease owner, lease expiry, monotonically increasing fencing token, attempts, and last error.
+- Claim due actions transactionally in deterministic order.
+- Renew leases only while work is active.
+- Use the state-machine transition id as the retry idempotency key and pass the lease fencing token to every effect and restore call. Ports reject stale tokens after takeover.
+- Exponential backoff is bounded below the operator page threshold.
+- A failed rollback moves to `rollback_partial`, retains restrictive posture, and pages immediately.
+- On clean shutdown release leases; after crash allow lease expiry and takeover.
+
+**Exact tests**
+
+- Fake-clock tests for exact TTL boundary, early tick, delayed tick, clock rollback, and large forward jump.
+- Two-worker contention and lease takeover.
+- A paused old worker resuming after takeover cannot apply or remove an effect with its stale fencing token.
+- Restart during apply and rollback.
+- Repeated port outage never reports lifted.
+- Successful retry removes only its own contribution and recomputes exact effective posture.
+
+### Task 9.2: Verify posture enforcement
+
+**Files**
+
+- Add `crates/kernel/chio-kernel/tests/active_defense_containment.rs`
+- Add `crates/platform/chio-control-plane/tests/active_defense_recovery.rs`
+
+**Exact tests**
+
+- Normal to restricted to normal at TTL.
+- Normal to quarantined to rollback-partial remains denied.
+- Overlapping temporary actions may expire out of order; each removal preserves every remaining contribution.
+- Exact subtree effects all lift, including descendants; the root is not the only restored target.
+- Store outage while an overlay may be active denies.
+- Planner outage with no active overlay leaves existing preventive guards functional.
+
+## Phase 10: Receipts, conformance, and adversarial evidence
+
+### Task 10.1: Add truthful receipt bodies
+
+**Files**
+
+- Modify `crates/core/chio-core-types/src/receipt/kinds.rs`
+- Add bodies under `crates/core/chio-core-types/src/receipt/`
+- Modify `chio-lineage` ingestion and `chio-siem` mappings
+
+**Work**
+
+- Add the receipt bodies listed in the design.
+- Domain-separate every independently signed body.
+- Bind response receipts to plan, finding, exact affected-set hash, effects, transitions, and prior receipt ids.
+- Keep raw payloads, markers, credentials, and rollback material out of receipts.
+- Map boundary guard denies to mediated decisions and off-boundary observations to the correct existing semantic class.
+
+**Exact tests**
+
+- Canonical golden vectors.
+- Signature tamper for every body field.
+- Partial apply cannot validate as complete.
+- Partial rollback cannot validate as lifted.
+- Raw marker and fixture secret scanner finds no value in receipt JSON.
+- Lineage links every transition to its plan and trigger.
+
+### Task 10.2: Add conformance and adversarial cases
+
+**Files**
+
+- Extend existing files under `crates/tooling/chio-conformance/tests/threats/`
+- Add adversarial cases under `crates/core/chio-adversarial-suite/cases/label_downgrade/`, `canary_evasion/`, `temporal_evasion/`, and `containment_rollback/`
+- Update adversarial manifest and arena registration
+
+**Required conformance cases**
+
+- Slow cumulative exfiltration is denied after taint accumulation.
+- PII and PHI classifications survive adapter round trips and deny insufficient clearance.
+- Stolen canary is denied before execution.
+- Sequence events outside `within` do not match; inside do match deterministically.
+- One-shot declassification cannot replay.
+- Replacing a session without a verified isolation-epoch transition preserves principal and lineage taint.
+- Unsigned, externally sourced, stale, and untrusted-producer events cannot trigger automatic containment.
+- Truncated lineage cannot auto-contain.
+- Overlapping TTL effects may lift out of order without removing any remaining restrictive contribution.
+- Partial rollback stays restrictive and attested.
+
+**Mutation gate**
+
+- Seed mutants for reader subset direction, missing-clearance allow, ignored store error, grant replay, tripwire after dispatch, event-time versus ingest-time, truncation ignored, approval plan-field omission, root-only lift, and false lifted status.
+- Require each mutant to be caught before proposing a threat-row state change.
+
+**Commands**
+
+- `cargo test -p chio-conformance --test threats`
+- `cargo test -p chio-adversarial-suite`
+- `bash scripts/check-threat-coverage-mutants.sh`
+
+## Phase 11: Behavioral CI gates and rollout
+
+### Task 11.1: Add executable gates
+
+**Files**
+
+- Create `scripts/check-flow-security.sh`
+- Create `scripts/check-deception-security.sh`
+- Create `scripts/check-response-recovery.sh`
+- Add corresponding script self-tests
+- Modify the applicable CI workflow
+
+**Gate contents**
+
+- `check-flow-security`: lattice properties and registered Apalache models, no-default portable build, strict v2 manifest and adapter vectors, policy-owned clearance, principal/session inheritance, context-generation fence, fail-closed matrix, and declassification replay race.
+- `check-deception-security`: lifecycle safety, watermark trust/expiry, tripwire fake-server invocation count, registry secret scan.
+- `check-response-recovery`: authoritative application-time fenced lineage, orphan-fence expiry/recovery, operator-capability and approval mutation matrix, approval-only admission recovery, full effect crash matrix, overlapping out-of-order TTL removal, stale-worker fencing, and receipt truthfulness.
+- All scripts fail if a required test filter matches zero tests.
+
+### Task 11.2: Shadow migration
+
+**Files**
+
+- Add migration command to the existing Chio CLI surface rather than a standalone unowned binary
+- Add operator documentation under `docs/security/active-defense-rollout.md`
+
+**Work**
+
+- Inventory and migrate all signed manifests, requiring re-signing after canonical shape changes.
+- Produce a report listing every egress tool without clearance and every adapter unable to preserve a declaration.
+- Backfill principal, capability-lineage, and session state only from verified receipt and v2 manifest evidence. Unknown history becomes `Top`, not `Bottom`; closing a legacy session does not erase principal knowledge.
+- Run shadow classification and correlation with metrics for unknown labels, store errors, late events, state evictions, decoy touches, lineage truncation, proposed effects, rollback simulation, and false-positive review.
+- Define numeric promotion thresholds in the operator document before enforce mode. Do not hard-code unreviewed thresholds in this plan.
+
+### Task 11.3: Enforce and close evidence
+
+**Promotion sequence**
+
+1. Enforce flow for explicit `flow_v1` policy only on re-signed `chio.manifest.v2` tools and constructors that installed `SecurityRuntime`.
+2. Require declarations on new egress manifests.
+3. Arm production-specific decoys for selected tenants.
+4. Enable dry-run response plans.
+5. Enable `ThrottleSession` and `RestrictEgress` automatic actions.
+6. Enable suspension and issuance freeze only after crash and rollback evidence is accepted.
+7. Keep permanent revocation manual.
+
+**Rollback sequence**
+
+- Stop new planning and correlation consumption.
+- Let active actions lift or explicitly lift them using the durable scheduler.
+- Verify no active or rollback-partial overlays remain.
+- Unregister runtime adapters only after that check.
+- Retain signed receipts, taint, event, decoy, and response history.
+
+## Final verification
+
+Run from the repository root after every phase-specific gate passes:
 
 ```bash
-git add crates/core/chio-core-types/src/flow_label.rs crates/core/chio-core-types/src/lib.rs
-git commit -m "feat(core-types): add DLM flow Label type"
-```
-
-### Task 2: `Declassify` caveat variant
-
-**Files:**
-- Modify: `crates/core/chio-core-types/src/capability/caveat.rs`
-- Test: inline `#[cfg(test)]` in `caveat.rs`
-
-**Interfaces:**
-- Produces: `CaveatKind::Declassify`. The `predicate` string carries the comma-separated compartments this caveat authorizes downgrading (for example `phi,pii`).
-- Cross-arc dependency: adding the enum variant is not sufficient for a running kernel. Caveat-bearing capabilities are rejected at admission today (`crates/core/chio-core-types/src/capability/token.rs:379-384`) until the caveat-admission allowlist lands. That change is Task 2 of the protocol-primitives plan (`2026-07-09-protocol-primitives.md`), which admits `Declassify` and `RequireQuorum`. Land that task before exercising `Declassify` end-to-end; `chio-flow`'s `authorized_downgrade` (Task 10 here) is the enforcement layer the allowlist refers to for `Declassify`.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[test]
-fn declassify_caveat_serializes_snake_case() {
-    let c = Caveat {
-        kind: CaveatKind::Declassify,
-        predicate: "phi,pii".to_string(),
-        sig: None,
-    };
-    let json = serde_json::to_string(&c).expect("serialize");
-    assert!(json.contains("\"declassify\""));
-    let back: Caveat = serde_json::from_str(&json).expect("deserialize");
-    assert_eq!(back.kind, CaveatKind::Declassify);
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-core-types declassify_caveat`
-Expected: FAIL with "no variant named `Declassify`".
-
-- [ ] **Step 3: Write minimal implementation**
-
-In the `CaveatKind` enum, add the variant after `RestrictTimeWindow`:
-
-```rust
-    RestrictTimeWindow,
-    /// Authorizes downgrading the named compartments during an
-    /// information-flow declassification. The `predicate` is a
-    /// comma-separated compartment list (for example `phi,pii`).
-    Declassify,
-```
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-core-types declassify_caveat`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/core/chio-core-types/src/capability/caveat.rs
-git commit -m "feat(core-types): add Declassify caveat kind"
-```
-
-### Task 3: Manifest `sensitivity` and `clearance` fields
-
-**Files:**
-- Modify: `crates/platform/chio-manifest/src/lib.rs`
-- Test: inline `#[cfg(test)]` in `lib.rs`
-
-**Interfaces:**
-- Produces: `ToolDefinition.sensitivity: Option<Label>` (label of what this tool's output carries) and `ToolDefinition.clearance: Option<Label>` (max label this tool may receive as an egress sink). Both default to `None`. A `None` clearance on an egress-classed tool resolves to top (deny) in `chio-flow`.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[test]
-fn tool_definition_carries_optional_flow_labels() {
-    let json = r#"{
-        "name": "send_email",
-        "description": "Send an email",
-        "input_schema": {},
-        "has_side_effects": true,
-        "clearance": { "compartments": ["pii"] }
-    }"#;
-    let def: ToolDefinition = serde_json::from_str(json).expect("deserialize");
-    assert!(def.sensitivity.is_none());
-    let clearance = def.clearance.expect("clearance present");
-    assert!(clearance.compartments.contains("pii"));
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-manifest tool_definition_carries_optional_flow_labels`
-Expected: FAIL (unknown field `clearance`, since `ToolDefinition` denies unknown fields or lacks the field).
-
-- [ ] **Step 3: Write minimal implementation**
-
-Add the import at the top of `lib.rs`:
-
-```rust
-use chio_core_types::flow_label::Label;
-```
-
-Add the two fields to `ToolDefinition`, after `latency_hint`:
-
-```rust
-    pub latency_hint: Option<LatencyHint>,
-
-    /// Confidentiality label carried by this tool's output, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sensitivity: Option<Label>,
-
-    /// Maximum confidentiality label this tool may receive when it is an
-    /// egress sink. `None` on an egress-classed tool resolves to top (deny).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub clearance: Option<Label>,
-```
-
-Update any struct-literal constructions of `ToolDefinition` in this file's tests to add `sensitivity: None, clearance: None,`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-manifest`
-Expected: PASS (new test plus existing tests still green).
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/platform/chio-manifest/src/lib.rs
-git commit -m "feat(manifest): add sensitivity and clearance flow labels to ToolDefinition"
-```
-
----
-
-## Phase 1: chio-flow
-
-### Task 4: Crate scaffold and lattice `join`
-
-**Files:**
-- Create: `crates/security/chio-flow/Cargo.toml`, `crates/security/chio-flow/src/lib.rs`, `crates/security/chio-flow/src/label.rs`
-- Modify: root `Cargo.toml` (add `crates/security/chio-flow` to `members`)
-- Test: inline `#[cfg(test)]` in `label.rs`
-
-**Interfaces:**
-- Consumes: `chio_core_types::flow_label::{Label, FlowPolicy}`.
-- Produces: `pub fn join(a: &Label, b: &Label) -> Label` (least upper bound: union of policies and compartments).
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chio_core_types::flow_label::Label;
-
-    #[test]
-    fn join_unions_compartments() {
-        let mut a = Label::public();
-        a.compartments.insert("pii".to_string());
-        let mut b = Label::public();
-        b.compartments.insert("phi".to_string());
-        let j = join(&a, &b);
-        assert!(j.compartments.contains("pii"));
-        assert!(j.compartments.contains("phi"));
-    }
-
-    #[test]
-    fn join_with_public_is_identity() {
-        let mut a = Label::public();
-        a.compartments.insert("secret".to_string());
-        assert_eq!(join(&a, &Label::public()), a);
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-flow join`
-Expected: FAIL (crate or `join` does not exist).
-
-- [ ] **Step 3: Write minimal implementation**
-
-`Cargo.toml`:
-
-```toml
-[package]
-name = "chio-flow"
-version = "0.1.0"
-edition = "2021"
-license = "Apache-2.0"
-
-[dependencies]
-chio-core-types = { path = "../../core/chio-core-types" }
-chio-manifest = { path = "../../platform/chio-manifest" }
-serde = { workspace = true }
-serde_json = { workspace = true }
-
-[lints]
-workspace = true
-```
-
-`src/lib.rs`:
-
-```rust
-//! Information-flow control for Chio: DLM label algebra, per-session taint
-//! tracking, an egress FlowGuard, and attested declassification.
-
-pub mod label;
-```
-
-`src/label.rs`:
-
-```rust
-//! Lattice algebra over `chio_core_types::flow_label::Label`.
-
-use chio_core_types::flow_label::Label;
-
-/// Least upper bound of two labels: the union of their policies and
-/// compartments. The result is at least as restrictive as either input.
-#[must_use]
-pub fn join(a: &Label, b: &Label) -> Label {
-    let mut out = a.clone();
-    out.policies.extend(b.policies.iter().cloned());
-    out.compartments.extend(b.compartments.iter().cloned());
-    out
-}
-```
-
-Add to the root `Cargo.toml` `members` list (keep alphabetical within the security group):
-
-```toml
-    "crates/security/chio-flow",
-```
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-flow join`
-Expected: PASS (2 tests).
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-flow Cargo.toml
-git commit -m "feat(flow): scaffold chio-flow with lattice join"
-```
-
-### Task 5: `flows_to` partial order
-
-**Files:**
-- Modify: `crates/security/chio-flow/src/label.rs`
-- Test: inline `#[cfg(test)]` in `label.rs`
-
-**Interfaces:**
-- Produces: `pub fn flows_to(from: &Label, to: &Label) -> bool`. `from` flows to `to` iff `to` is at least as restrictive: every compartment in `from` is in `to`, and for every policy in `from` there is a policy in `to` for the same owner whose readers are a subset of `from`'s readers.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[test]
-fn flows_to_is_reflexive() {
-    let mut a = Label::public();
-    a.compartments.insert("phi".to_string());
-    assert!(flows_to(&a, &a));
-}
-
-#[test]
-fn higher_compartment_does_not_flow_to_lower() {
-    let mut restricted = Label::public();
-    restricted.compartments.insert("phi".to_string());
-    // public (no compartments) is the sink clearance.
-    assert!(!flows_to(&restricted, &Label::public()));
-    // but public flows up to phi-cleared.
-    assert!(flows_to(&Label::public(), &restricted));
-}
-
-#[test]
-fn flows_to_is_transitive() {
-    let a = Label::public();
-    let mut b = Label::public();
-    b.compartments.insert("pii".to_string());
-    let mut c = b.clone();
-    c.compartments.insert("phi".to_string());
-    assert!(flows_to(&a, &b) && flows_to(&b, &c) && flows_to(&a, &c));
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-flow flows_to`
-Expected: FAIL ("cannot find function `flows_to`").
-
-- [ ] **Step 3: Write minimal implementation**
-
-Append to `label.rs`:
-
-```rust
-/// Returns true if data labeled `from` may flow into a sink cleared to `to`.
-///
-/// `to` must be at least as restrictive as `from`:
-/// - every compartment in `from` is present in `to`, and
-/// - for every policy in `from`, `to` has a policy for the same owner whose
-///   reader set is a subset of `from`'s (fewer readers is more restrictive).
-#[must_use]
-pub fn flows_to(from: &Label, to: &Label) -> bool {
-    if !from.compartments.is_subset(&to.compartments) {
-        return false;
-    }
-    from.policies.iter().all(|fp| {
-        to.policies
-            .iter()
-            .any(|tp| tp.owner == fp.owner && tp.readers.is_subset(&fp.readers))
-    })
-}
-```
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-flow flows_to`
-Expected: PASS (3 tests).
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-flow/src/label.rs
-git commit -m "feat(flow): add flows_to partial order over labels"
-```
-
-### Task 6: Label seeding from classifier tags and manifest
-
-**Files:**
-- Create: `crates/security/chio-flow/src/seed.rs`
-- Modify: `crates/security/chio-flow/src/lib.rs` (add `pub mod seed;`)
-- Test: inline `#[cfg(test)]` in `seed.rs`
-
-**Interfaces:**
-- Consumes: `chio_core_types::flow_label::Label`, `chio_manifest::ToolDefinition`.
-- Produces: `pub fn from_tags(tags: &[String]) -> Label` (each tag becomes a compartment) and `pub fn from_tool_output(def: &ToolDefinition) -> Label` (returns the tool's declared `sensitivity`, or `Label::public()` if unset). The `from_tags` input is the adapter boundary for `chio-data-guards` classifier verdicts, which map Secret to `secret`, PII to `pii`, and ICD-10/MRN to `phi`.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chio_core_types::flow_label::Label;
-
-    #[test]
-    fn tags_become_compartments() {
-        let l = from_tags(&["phi".to_string(), "pii".to_string()]);
-        assert!(l.compartments.contains("phi"));
-        assert!(l.compartments.contains("pii"));
-    }
-
-    #[test]
-    fn tool_without_sensitivity_is_public() {
-        let def = chio_manifest::ToolDefinition {
-            name: "read_file".to_string(),
-            description: String::new(),
-            input_schema: serde_json::json!({}),
-            output_schema: None,
-            pricing: None,
-            has_side_effects: false,
-            latency_hint: None,
-            sensitivity: None,
-            clearance: None,
-        };
-        assert_eq!(from_tool_output(&def), Label::public());
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-flow seed`
-Expected: FAIL (module/functions missing).
-
-- [ ] **Step 3: Write minimal implementation**
-
-`src/seed.rs`:
-
-```rust
-//! Label acquisition. Labels are seeded from two sources so DLM adoption
-//! needs no hand-authoring: classifier verdicts (as compartment tags) and
-//! manifest sensitivity declarations.
-
-use chio_core_types::flow_label::Label;
-use chio_manifest::ToolDefinition;
-
-/// Build a label whose compartments are the given tags. This is the adapter
-/// boundary for `chio-data-guards` classifier verdicts.
-#[must_use]
-pub fn from_tags(tags: &[String]) -> Label {
-    let mut label = Label::public();
-    for tag in tags {
-        label.compartments.insert(tag.clone());
-    }
-    label
-}
-
-/// The declared output sensitivity of a tool, or public if unset.
-#[must_use]
-pub fn from_tool_output(def: &ToolDefinition) -> Label {
-    def.sensitivity.clone().unwrap_or_else(Label::public)
-}
-```
-
-Add `pub mod seed;` to `lib.rs`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-flow seed`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-flow/src/seed.rs crates/security/chio-flow/src/lib.rs
-git commit -m "feat(flow): seed labels from classifier tags and manifest sensitivity"
-```
-
-### Task 7: Per-session taint environment
-
-**Files:**
-- Create: `crates/security/chio-flow/src/env.rs`
-- Modify: `crates/security/chio-flow/src/lib.rs` (add `pub mod env;`)
-- Test: inline `#[cfg(test)]` in `env.rs`
-
-**Interfaces:**
-- Consumes: `crate::label::join`, `chio_core_types::flow_label::Label`.
-- Produces: `SessionTaintStore` with `pub fn new() -> Self`, `pub fn add(&self, session_key: &str, label: &Label)`, and `pub fn context(&self, session_key: &str) -> Label`. Keyed by an opaque `session_key`; v1 callers pass `ctx.agent_id` (which is `AgentId = String`). Thread-safe via `Mutex`. Follow-up (documented, not silent): the existing session-aware guards (`DataFlowGuard`, `BehavioralSequenceGuard` in `crates/guards/chio-guards/`) hold `Arc<SessionJournal>` and read cumulative state via `journal.snapshot()`; a later task should migrate the taint context into the session journal so labels are keyed per session rather than per agent and share the journal lifecycle.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chio_core_types::flow_label::Label;
-
-    #[test]
-    fn context_accumulates_joined_labels() {
-        let store = SessionTaintStore::new();
-        let mut phi = Label::public();
-        phi.compartments.insert("phi".to_string());
-        let mut pii = Label::public();
-        pii.compartments.insert("pii".to_string());
-        store.add("agent-1", &phi);
-        store.add("agent-1", &pii);
-        let ctx = store.context("agent-1").expect("taint readable");
-        assert!(ctx.compartments.contains("phi"));
-        assert!(ctx.compartments.contains("pii"));
-    }
-
-    #[test]
-    fn unknown_session_is_public() {
-        let store = SessionTaintStore::new();
-        assert_eq!(store.context("nobody").expect("taint readable"), Label::public());
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-flow env`
-Expected: FAIL (`SessionTaintStore` missing).
-
-- [ ] **Step 3: Write minimal implementation**
-
-`src/env.rs`:
-
-```rust
-//! Per-session taint environment: the join of every label the agent has
-//! read this session. Keyed by an opaque session key.
-
-use std::collections::HashMap;
-use std::sync::Mutex;
-
-use chio_core_types::flow_label::Label;
-
-use crate::label::join;
-
-/// Accumulates the confidentiality context per session key.
-#[derive(Default)]
-pub struct SessionTaintStore {
-    inner: Mutex<HashMap<String, Label>>,
-}
-
-impl SessionTaintStore {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Join `label` into the session's accumulated context. A poisoned lock
-    /// is treated as fail-closed by the caller reading `context`.
-    pub fn add(&self, session_key: &str, label: &Label) {
-        if let Ok(mut map) = self.inner.lock() {
-            let entry = map.entry(session_key.to_string()).or_insert_with(Label::public);
-            *entry = join(entry, label);
-        }
-    }
-
-    /// The current accumulated context for a session. A poisoned lock returns
-    /// `Err` so the caller fails closed (denies egress) rather than treating a
-    /// lost taint store as public; an unknown session is `Ok(public)` because
-    /// nothing sensitive has been read yet.
-    pub fn context(&self, session_key: &str) -> Result<Label, TaintUnavailable> {
-        match self.inner.lock() {
-            Ok(map) => Ok(map.get(session_key).cloned().unwrap_or_else(Label::public)),
-            Err(_) => Err(TaintUnavailable),
-        }
-    }
-}
-
-/// Returned when the taint store cannot be read (poisoned lock). The guard
-/// treats this as a denied egress, never as public.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TaintUnavailable;
-```
-
-Add `pub mod env;` to `lib.rs`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-flow env`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-flow/src/env.rs crates/security/chio-flow/src/lib.rs
-git commit -m "feat(flow): add per-session taint environment store"
-```
-
-### Task 8: `FlowGuard` egress dominance check
-
-**Files:**
-- Create: `crates/security/chio-flow/src/guard.rs`
-- Modify: `crates/security/chio-flow/src/lib.rs` (add `pub mod guard;`), `Cargo.toml` (add `chio-kernel` dep)
-- Test: inline `#[cfg(test)]` in `guard.rs`
-
-**Interfaces:**
-- Consumes: `chio_kernel::{Guard, GuardContext, GuardDecision, Verdict, KernelError}`, `crate::env::SessionTaintStore`, `crate::label::flows_to`, `crate::seed`, `chio_manifest::ToolManifest`.
-- Produces: `FlowGuard { manifest: Arc<ToolManifest>, taint: Arc<SessionTaintStore> }` implementing `Guard`. On an egress-classed tool call it denies unless `context join payload` flows to the tool's declared clearance. Egress-classed means the tool's clearance field is present (declared as a sink). Missing clearance on a declared sink resolves to top (deny). This is the core invariant of the arc.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::sync::Arc;
-    use chio_core_types::flow_label::Label;
-
-    fn phi() -> Label {
-        let mut l = Label::public();
-        l.compartments.insert("phi".to_string());
-        l
-    }
-
-    #[test]
-    fn denies_phi_context_to_public_sink() {
-        let taint = Arc::new(SessionTaintStore::new());
-        taint.add("agent-1", &phi());
-        // Sink tool on server "srv" declared with public clearance.
-        let guard = FlowGuard::for_test(taint.clone(), "srv", "send_email", Label::public());
-        let verdict = guard.check("agent-1", "srv", "send_email", &Label::public());
-        assert_eq!(verdict, Verdict::Deny);
-    }
-
-    #[test]
-    fn allows_phi_context_to_phi_cleared_sink() {
-        let taint = Arc::new(SessionTaintStore::new());
-        taint.add("agent-1", &phi());
-        let guard = FlowGuard::for_test(taint.clone(), "srv", "phi_store", phi());
-        let verdict = guard.check("agent-1", "srv", "phi_store", &Label::public());
-        assert_eq!(verdict, Verdict::Allow);
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-flow guard`
-Expected: FAIL (`FlowGuard` missing).
-
-- [ ] **Step 3: Write minimal implementation**
-
-Add to `Cargo.toml` dependencies:
-
-```toml
-chio-kernel = { path = "../../kernel/chio-kernel" }
-```
-
-`src/guard.rs`:
-
-```rust
-//! FlowGuard: denies an egress-classed call unless the joined session
-//! context flows to the destination tool's declared clearance.
-
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use chio_core_types::flow_label::Label;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError, Verdict};
-
-use crate::env::SessionTaintStore;
-use crate::label::{flows_to, join};
-
-/// A tool's egress clearance, keyed by `(server_id, tool_name)` because the
-/// same tool name can be exposed by different servers at different clearances.
-/// A present key is egress-capable: `Some(label)` is its maximum receivable
-/// label, and `None` marks an egress-capable tool that declared no clearance
-/// (fail closed: the guard denies rather than letting a missing manifest field
-/// bypass accumulated taint).
-type ClearanceIndex = HashMap<(String, String), Option<Label>>;
-
-/// Guard that enforces information-flow egress dominance.
-pub struct FlowGuard {
-    taint: Arc<SessionTaintStore>,
-    clearances: ClearanceIndex,
-}
-
-impl FlowGuard {
-    /// Build from an explicit clearance index (produced from a manifest by
-    /// `clearance_index`).
-    #[must_use]
-    pub fn new(taint: Arc<SessionTaintStore>, clearances: ClearanceIndex) -> Self {
-        Self { taint, clearances }
-    }
-
-    /// Test helper: a guard with a single declared sink `(server, tool)`.
-    #[must_use]
-    pub fn for_test(
-        taint: Arc<SessionTaintStore>,
-        server: &str,
-        tool: &str,
-        clearance: Label,
-    ) -> Self {
-        let mut clearances = HashMap::new();
-        clearances.insert((server.to_string(), tool.to_string()), Some(clearance));
-        Self::new(taint, clearances)
-    }
-
-    /// Core decision, factored out for direct testing. `payload` is the label
-    /// of the outbound arguments; the effective label is `context join payload`.
-    #[must_use]
-    pub fn check(&self, session_key: &str, server_id: &str, tool: &str, payload: &Label) -> Verdict {
-        let clearance = match self.clearances.get(&(server_id.to_string(), tool.to_string())) {
-            // Not an egress-capable tool: this guard does not apply.
-            None => return Verdict::Allow,
-            // Egress-capable but with no declared clearance: fail closed.
-            Some(None) => return Verdict::Deny,
-            Some(Some(clearance)) => clearance,
-        };
-        // A poisoned taint store denies rather than erasing accumulated context.
-        let Ok(context) = self.taint.context(session_key) else {
-            return Verdict::Deny;
-        };
-        // Join the outbound payload label so argument-borne sensitive data is
-        // covered even when no prior read tainted the session.
-        if flows_to(&join(&context, payload), clearance) {
-            Verdict::Allow
-        } else {
-            Verdict::Deny
-        }
-    }
-}
-
-impl Guard for FlowGuard {
-    fn name(&self) -> &str {
-        "flow-egress"
-    }
-
-    fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
-        // Classify the outbound arguments so payload-borne sensitive data (for
-        // example a user-supplied SSN sent to a public sink) is labeled even
-        // when no prior tool read tainted the session. `seed::from_value`
-        // classifies a JSON value via the shared data-guard detectors.
-        let payload = crate::seed::from_value(&ctx.request.arguments);
-        // Anything that is not Allow denies. A denial also emits a FlowViolation
-        // event into the receipt log via the kernel deny path (integration
-        // Task 20b) so chio-quarantine playbooks can react.
-        match self.check(ctx.agent_id, ctx.server_id, &ctx.request.tool_name, &payload) {
-            Verdict::Allow => Ok(GuardDecision::allow()),
-            Verdict::Deny | Verdict::PendingApproval => Ok(GuardDecision::deny(Vec::new())),
-        }
-    }
-}
-
-// `ctx.agent_id` is `&AgentId` where `AgentId = String` (a type alias, see
-// crates/kernel/chio-kernel/src/kernel/mod.rs), so it coerces to `&str` at the
-// `check` call site. `ctx.request` is the full `ToolCallRequest`, whose
-// `tool_name` is a `String`.
-```
-
-Add `pub mod guard;` to `lib.rs`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-flow guard`
-Expected: PASS (2 tests).
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-flow/src/guard.rs crates/security/chio-flow/src/lib.rs crates/security/chio-flow/Cargo.toml
-git commit -m "feat(flow): add FlowGuard egress dominance check"
-```
-
-### Task 9: Manifest clearance index and post-invocation taint hook
-
-**Files:**
-- Modify: `crates/security/chio-flow/src/guard.rs` (add `clearance_index`), `crates/security/chio-flow/src/seed.rs` or new `src/hook.rs`
-- Create: `crates/security/chio-flow/src/hook.rs`
-- Modify: `crates/security/chio-flow/src/lib.rs`
-- Test: inline `#[cfg(test)]` in the touched files
-
-**Interfaces:**
-- Produces: `pub fn clearance_index(manifest: &ToolManifest) -> HashMap<(String, String), Option<Label>>` (an entry per egress-capable tool: `Some(clearance)`, or `None` when it declared none). `FlowTaintHook { taint: Arc<SessionTaintStore>, manifest: Arc<ToolManifest> }` implementing `chio_guards::post_invocation::PostInvocationHook` (its `inspect` joins the responding tool's declared sensitivity and response classifier tags into the session context and passes the response through), plus a `pub fn record(&self, session_key: &str, def: &ToolDefinition, tags: &[String])` helper for direct testing.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod hook_tests {
-    use super::*;
-    use std::sync::Arc;
-
-    #[test]
-    fn record_adds_response_tags_to_context() {
-        let taint = Arc::new(crate::env::SessionTaintStore::new());
-        let def = chio_manifest::ToolDefinition {
-            name: "read_record".to_string(),
-            description: String::new(),
-            input_schema: serde_json::json!({}),
-            output_schema: None,
-            pricing: None,
-            has_side_effects: false,
-            latency_hint: None,
-            sensitivity: None,
-            clearance: None,
-        };
-        let manifest = Arc::new(chio_manifest::ToolManifest {
-            schema: "chio.manifest.v1".to_string(),
-            server_id: "srv".into(),
-            name: "s".to_string(),
-            description: None,
-            version: "1".to_string(),
-            tools: vec![def.clone()],
-            server_tools: Vec::new(),
-            required_permissions: None,
-            public_key: String::new(),
-        });
-        let hook = FlowTaintHook::new(taint.clone(), manifest);
-        hook.record("agent-1", &def, &["phi".to_string()]);
-        // context() now returns Result; a readable store yields the label.
-        assert!(taint.context("agent-1").expect("taint readable").compartments.contains("phi"));
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-flow hook`
-Expected: FAIL (`FlowTaintHook` missing).
-
-- [ ] **Step 3: Write minimal implementation**
-
-`src/hook.rs`:
-
-```rust
-//! Post-invocation taint hook: after a tool returns, join the tool's declared
-//! output sensitivity and any classifier tags on the response into the session
-//! context, so a later egress call sees what the agent has read. Implements the
-//! kernel's `PostInvocationHook` so it runs on every real tool response, not
-//! only in unit tests.
-
-use std::sync::Arc;
-
-use serde_json::Value;
-
-use chio_guards::post_invocation::{
-    PostInvocationContext, PostInvocationHook, PostInvocationVerdict,
-};
-use chio_manifest::{ToolDefinition, ToolManifest};
-
-use crate::env::SessionTaintStore;
-use crate::label::join;
-use crate::seed::{from_tags, from_tool_output, tags_from_value};
-
-/// Joins read-payload labels into the per-session taint context.
-pub struct FlowTaintHook {
-    taint: Arc<SessionTaintStore>,
-    manifest: Arc<ToolManifest>,
-}
-
-impl FlowTaintHook {
-    #[must_use]
-    pub fn new(taint: Arc<SessionTaintStore>, manifest: Arc<ToolManifest>) -> Self {
-        Self { taint, manifest }
-    }
-
-    /// Join a read tool's declared output sensitivity and response classifier
-    /// tags into the session taint context. Public for direct unit testing.
-    pub fn record(&self, session_key: &str, def: &ToolDefinition, tags: &[String]) {
-        let label = join(&from_tool_output(def), &from_tags(tags));
-        self.taint.add(session_key, &label);
-    }
-}
-
-impl PostInvocationHook for FlowTaintHook {
-    /// Look up the responding tool in the manifest, then join its declared
-    /// output sensitivity and the response classifier tags into the session
-    /// taint context; the response passes through unchanged (observe only).
-    fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict {
-        if let Some(def) = self.manifest.tools.iter().find(|d| d.name == ctx.tool_name) {
-            self.record(ctx.agent_id, def, &tags_from_value(response));
-        }
-        PostInvocationVerdict::Pass
-    }
-}
-```
-
-Confirm the `PostInvocationContext` field names (`agent_id`, `tool_name`), the pass variant of `PostInvocationVerdict`, and the trait path against `crates/guards/chio-guards/src/post_invocation.rs`; adjust the unit test to drive `inspect` with a constructed `PostInvocationContext`. Implement `seed::from_value(&Value) -> Label` and `seed::tags_from_value(&Value) -> Vec<String>` in `src/seed.rs` (classify a JSON value via the same data-guard detectors `from_tags` consumes). Registration of this hook in the kernel post-invocation pipeline is integration Task 20b.
-
-Add to `src/guard.rs`:
-
-```rust
-use chio_manifest::ToolManifest;
-
-/// Build the egress clearance index from a manifest, keyed by
-/// `(server_id, tool_name)`. Every egress-capable tool (one with side effects
-/// or whose server declares network hosts) becomes an entry: `Some(clearance)`
-/// when the tool declares one, or `None` when it does not, so an unclassified
-/// egress-capable tool fails closed. Non-egress tools are omitted.
-#[must_use]
-pub fn clearance_index(manifest: &ToolManifest) -> HashMap<(String, String), Option<Label>> {
-    let server = manifest.server_id.to_string();
-    let networked = manifest
-        .required_permissions
-        .as_ref()
-        .and_then(|p| p.network_hosts.as_ref())
-        .is_some_and(|hosts| !hosts.is_empty());
-    let mut index = HashMap::new();
-    for tool in &manifest.tools {
-        if tool.has_side_effects || networked {
-            index.insert((server.clone(), tool.name.clone()), tool.clearance.clone());
-        }
-    }
-    index
-}
-```
-
-Add `pub mod hook;` to `lib.rs`. Confirm the `ToolManifest` tool-list field (`tools`), the `server_id` `Display`/`as_str` conversion, and `has_side_effects` against `crates/platform/chio-manifest/src/lib.rs:30`. Keying by `(server_id, tool_name)` matters because two servers can expose the same tool name at different clearances.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-flow`
-Expected: PASS (all flow tests).
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-flow/src/hook.rs crates/security/chio-flow/src/guard.rs crates/security/chio-flow/src/lib.rs
-git commit -m "feat(flow): add clearance index and post-invocation taint hook"
-```
-
-### Task 10: Declassification verification and events
-
-**Files:**
-- Create: `crates/security/chio-flow/src/declassify.rs`, `crates/security/chio-flow/src/event.rs`
-- Modify: `crates/security/chio-flow/src/lib.rs`
-- Test: inline `#[cfg(test)]` in both files
-
-**Interfaces:**
-- Consumes: `chio_core_types::capability::caveat::{Caveat, CaveatKind}`, `chio_core_types::flow_label::Label`.
-- Produces: `pub fn authorized_downgrade(caveats: &[Caveat], source: &Label, requested: &BTreeSet<String>) -> Result<Label, DeclassifyError>` (returns `source` with the requested compartments removed, preserving all other compartments plus the level and any owner policy, or an error if any requested compartment is not authorized by a `Declassify` caveat). `FlowViolation { session_key, tool, context, clearance }` and `Declassification { session_key, removed_compartments }` as canonical-JSON serializable event bodies for receipt emission.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use alloc::collections::BTreeSet;
-    use chio_core_types::capability::caveat::{Caveat, CaveatKind};
-
-    fn declassify_caveat(predicate: &str) -> Caveat {
-        Caveat { kind: CaveatKind::Declassify, predicate: predicate.to_string(), sig: None }
-    }
-
-    fn label_with(compartments: &[&str]) -> Label {
-        let mut l = Label::public();
-        for c in compartments {
-            l.compartments.insert((*c).to_string());
-        }
-        l
-    }
-
-    #[test]
-    fn authorized_downgrade_removes_only_requested_compartment() {
-        let mut requested = BTreeSet::new();
-        requested.insert("phi".to_string());
-        let source = label_with(&["phi", "secret"]);
-        let residual = authorized_downgrade(&[declassify_caveat("phi,pii")], &source, &requested)
-            .expect("authorized");
-        // phi is removed; secret is preserved, not silently dropped to public.
-        assert!(!residual.compartments.contains("phi"));
-        assert!(residual.compartments.contains("secret"));
-    }
-
-    #[test]
-    fn rejected_when_compartment_not_listed() {
-        let mut requested = BTreeSet::new();
-        requested.insert("secret".to_string());
-        let source = label_with(&["secret"]);
-        let err = authorized_downgrade(&[declassify_caveat("phi")], &source, &requested);
-        assert!(err.is_err());
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-flow declassify`
-Expected: FAIL (`authorized_downgrade` missing).
-
-- [ ] **Step 3: Write minimal implementation**
-
-`src/declassify.rs`:
-
-```rust
-//! Declassification: downgrading compartments is allowed only when a
-//! Declassify caveat on the presented capability authorizes each compartment.
-//! Every downgrade is meant to be emitted as a signed Declassification event.
-
-use alloc::collections::BTreeSet;
-
-use chio_core_types::capability::caveat::{Caveat, CaveatKind};
-use chio_core_types::flow_label::Label;
-
-/// Error when a requested downgrade is not authorized.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DeclassifyError {
-    pub unauthorized: BTreeSet<String>,
-}
-
-/// Compute the residual label after removing the requested compartments,
-/// provided every requested compartment is authorized by a Declassify caveat.
-pub fn authorized_downgrade(
-    caveats: &[Caveat],
-    requested: &BTreeSet<String>,
-) -> Result<Label, DeclassifyError> {
-    let mut authorized: BTreeSet<String> = BTreeSet::new();
-    for caveat in caveats {
-        if caveat.kind == CaveatKind::Declassify {
-            for compartment in caveat.predicate.split(',') {
-                let trimmed = compartment.trim();
-                if !trimmed.is_empty() {
-                    authorized.insert(trimmed.to_string());
-                }
-            }
-        }
-    }
-    let unauthorized: BTreeSet<String> =
-        requested.difference(&authorized).cloned().collect();
-    if !unauthorized.is_empty() {
-        return Err(DeclassifyError { unauthorized });
-    }
-    // Remove only the requested compartments; keep everything else. A
-    // Declassify(phi) on {phi, secret} yields {secret}, never public.
-    let mut residual = source.clone();
-    residual.compartments = source.compartments.difference(requested).cloned().collect();
-    Ok(residual)
-}
-```
-
-Note: `authorized_downgrade` takes the `source` label and removes only the requested compartments, preserving all others, the level, and any owner policy. Task 11 passes the labeled source (the accumulated context being declassified) when the guard calls this, so a single-compartment Declassify never collapses a multi-compartment label to public.
-
-`src/event.rs`:
-
-```rust
-//! Signed event bodies for flow decisions. Serialized as canonical JSON and
-//! signed through the kernel receipt machinery at emission time.
-
-use alloc::collections::BTreeSet;
-use alloc::string::String;
-
-use serde::{Deserialize, Serialize};
-
-use chio_core_types::flow_label::Label;
-
-/// Emitted when FlowGuard denies an egress-classed call.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct FlowViolation {
-    pub session_key: String,
-    pub tool: String,
-    pub context: Label,
-    pub clearance: Label,
-}
-
-/// Emitted when an authorized declassification downgrades compartments.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Declassification {
-    pub session_key: String,
-    pub removed_compartments: BTreeSet<String>,
-}
-```
-
-Add `pub mod declassify;` and `pub mod event;` to `lib.rs`. Confirm `chio-core-types` exposes `alloc` usage the same way in a std crate; if `alloc::collections::BTreeSet` does not resolve in this crate, use `std::collections::BTreeSet` instead (chio-flow is a std crate).
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-flow declassify`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-flow/src/declassify.rs crates/security/chio-flow/src/event.rs crates/security/chio-flow/src/lib.rs
-git commit -m "feat(flow): add declassification authorization and flow event bodies"
-```
-
-### Task 11: Phase 1 verification
-
-**Files:**
-- Test: whole `chio-flow` crate
-
-- [ ] **Step 1: Run the workspace one-liner scoped to touched crates**
-
-Run: `cargo build -p chio-flow -p chio-core-types -p chio-manifest && cargo test -p chio-flow -p chio-core-types -p chio-manifest && cargo clippy -p chio-flow -- -D warnings && cargo fmt --all -- --check`
-Expected: all green.
-
-- [ ] **Step 2: Fix any clippy or fmt findings, then re-run.**
-
-- [ ] **Step 3: Commit any fixes**
-
-```bash
-git add -A
-git commit -m "test(flow): green phase 1 build, test, clippy, fmt"
-```
-
----
-
-## Phase 2: chio-decoy
-
-### Task 12: Crate scaffold and canary capability minting
-
-**Files:**
-- Create: `crates/security/chio-decoy/Cargo.toml`, `src/lib.rs`, `src/canary.rs`
-- Modify: root `Cargo.toml` (add member)
-- Test: inline `#[cfg(test)]` in `canary.rs`
-
-**Interfaces:**
-- Consumes: `chio_core_types::capability::scope::{ChioScope, ToolGrant}`.
-- Produces: `pub const DECOY_SERVER_PREFIX: &str = "decoy:";`, `pub fn is_decoy_server(server_id: &str) -> bool`, and `pub fn canary_scope(tool: &str) -> ChioScope` (a scope whose single grant targets a `decoy:` server). Minting reuses the real capability signer at the authority; this task builds the scope only.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn canary_scope_targets_decoy_namespace() {
-        let scope = canary_scope("payments_transfer");
-        assert_eq!(scope.grants.len(), 1);
-        let server = scope.grants[0].server_id.clone().unwrap_or_default();
-        assert!(is_decoy_server(&server));
-    }
-
-    #[test]
-    fn real_server_is_not_decoy() {
-        assert!(!is_decoy_server("payments"));
-        assert!(is_decoy_server("decoy:payments"));
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-decoy canary`
-Expected: FAIL (crate missing).
-
-- [ ] **Step 3: Write minimal implementation**
-
-`Cargo.toml`:
-
-```toml
-[package]
-name = "chio-decoy"
-version = "0.1.0"
-edition = "2021"
-license = "Apache-2.0"
-
-[dependencies]
-chio-core-types = { path = "../../core/chio-core-types" }
-serde = { workspace = true }
-serde_json = { workspace = true }
-sha2 = { workspace = true }
-
-[lints]
-workspace = true
-```
-
-`src/lib.rs`:
-
-```rust
-//! Deception primitives: canary capabilities, honey-tools, and honeytoken
-//! watermarks. No legitimate agent path touches a decoy, so any interaction
-//! is malicious by construction.
-
-pub mod canary;
-```
-
-`src/canary.rs`:
-
-```rust
-//! Canary capabilities: valid, authority-signed tokens whose scope targets a
-//! reserved `decoy:` server namespace.
-
-use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
-
-/// Reserved server-id prefix for decoy tool servers.
-pub const DECOY_SERVER_PREFIX: &str = "decoy:";
-
-/// Whether a server id is in the decoy namespace.
-#[must_use]
-pub fn is_decoy_server(server_id: &str) -> bool {
-    server_id.starts_with(DECOY_SERVER_PREFIX)
-}
-
-/// A scope with a single grant that targets a decoy server for `tool`. The
-/// grant carries `Operation::Invoke` so it matches an invocation exactly like a
-/// real grant: a canary must be usable bait, not an invalid grant that the
-/// kernel rejects during ordinary grant matching. Presentation or use is caught
-/// by the tripwire check (integration Task 20b), not by a matching failure.
-#[must_use]
-pub fn canary_scope(tool: &str) -> ChioScope {
-    let grant = ToolGrant {
-        server_id: Some(format!("{DECOY_SERVER_PREFIX}{tool}")),
-        operations: vec![Operation::Invoke],
-        ..ToolGrant::default()
-    };
-    ChioScope { grants: vec![grant] }
-}
-
-/// Stateless canary recognition: a capability is a canary if any grant targets
-/// the reserved `decoy:` server namespace. Because that namespace is signed into
-/// the capability scope, this recognition survives a kernel restart and works
-/// across processes with no shared state, unlike the id registry (which is only
-/// a fast-path index of locally minted ids).
-#[must_use]
-pub fn scope_is_canary(scope: &ChioScope) -> bool {
-    scope
-        .grants
-        .iter()
-        .any(|g| g.server_id.as_deref().is_some_and(is_decoy_server))
-}
-```
-
-Read `crates/core/chio-core-types/src/capability/scope.rs:63` for the exact `ToolGrant` fields; if it does not derive `Default` or `server_id` is not `Option<String>`, construct the grant with the real field set and adjust the test's `server_id` access accordingly.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-decoy canary`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-decoy Cargo.toml
-git commit -m "feat(decoy): scaffold chio-decoy with canary capability scopes"
-```
-
-### Task 13: Canary registry and recognition
-
-**Files:**
-- Create: `crates/security/chio-decoy/src/registry.rs`
-- Modify: `src/lib.rs`
-- Test: inline
-
-**Interfaces:**
-- Produces: `CanaryRegistry` with `pub fn new() -> Self`, `pub fn register(&mut self, capability_id: String)`, `pub fn is_canary(&self, capability_id: &str) -> bool` (a fast-path index of locally minted ids). Authoritative, restart-safe recognition is the stateless `scope_is_canary` (a grant in the reserved `decoy:` namespace, signed into the capability), which the kernel checks during capability validation before ordinary grant matching; a hit is a tripwire. Because the registry is in-memory, the kernel must not rely on it alone (it is empty after a restart or in another process); `scope_is_canary` is the source of truth. That kernel wiring is integration Task 20b.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn registered_id_is_recognized() {
-        let mut reg = CanaryRegistry::new();
-        reg.register("018f-canary".to_string());
-        assert!(reg.is_canary("018f-canary"));
-        assert!(!reg.is_canary("018f-real"));
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-decoy registry`
-Expected: FAIL.
-
-- [ ] **Step 3: Write minimal implementation**
-
-`src/registry.rs`:
-
-```rust
-//! Registry of minted canary capability ids for recognition on presentation.
-
-use std::collections::HashSet;
-
-/// The set of capability ids known to be canaries.
-#[derive(Default)]
-pub struct CanaryRegistry {
-    ids: HashSet<String>,
-}
-
-impl CanaryRegistry {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn register(&mut self, capability_id: String) {
-        self.ids.insert(capability_id);
-    }
-
-    #[must_use]
-    pub fn is_canary(&self, capability_id: &str) -> bool {
-        self.ids.contains(capability_id)
-    }
-}
-```
-
-Add `pub mod registry;` to `lib.rs`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-decoy registry`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-decoy/src/registry.rs crates/security/chio-decoy/src/lib.rs
-git commit -m "feat(decoy): add canary registry and recognition"
-```
-
-### Task 14: Deterministic honeytoken watermarks
-
-**Files:**
-- Create: `crates/security/chio-decoy/src/watermark.rs`
-- Modify: `src/lib.rs`
-- Test: inline
-
-**Interfaces:**
-- Consumes: `sha2::Sha256`.
-- Produces: `pub fn emit(session_id: &str, secret: &[u8]) -> String` (a deterministic hex watermark) and `pub fn detect(payload: &str, session_id: &str, secret: &[u8]) -> bool` (whether the payload contains this session's watermark). Deterministic so detection needs no storage.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn watermark_is_deterministic() {
-        let a = emit("sess-1", b"secret");
-        let b = emit("sess-1", b"secret");
-        assert_eq!(a, b);
-        assert_ne!(emit("sess-2", b"secret"), a);
-    }
-
-    #[test]
-    fn detect_finds_embedded_watermark() {
-        let wm = emit("sess-1", b"secret");
-        let payload = format!("here is some data {wm} trailing");
-        assert!(detect(&payload, "sess-1", b"secret"));
-        assert!(!detect("clean payload", "sess-1", b"secret"));
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-decoy watermark`
-Expected: FAIL.
-
-- [ ] **Step 3: Write minimal implementation**
-
-`src/watermark.rs`:
-
-```rust
-//! Deterministic per-session honeytokens. A watermark is a hex digest of
-//! (secret, session id), so detection at egress needs no stored state.
-
-use sha2::{Digest, Sha256};
-
-/// The watermark string for a session.
-#[must_use]
-pub fn emit(session_id: &str, secret: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(secret);
-    hasher.update(b"|");
-    hasher.update(session_id.as_bytes());
-    let digest = hasher.finalize();
-    format!("chio-wm-{}", hex_encode(&digest[..8]))
-}
-
-/// Whether `payload` contains this session's watermark.
-#[must_use]
-pub fn detect(payload: &str, session_id: &str, secret: &[u8]) -> bool {
-    payload.contains(&emit(session_id, secret))
-}
-
-fn hex_encode(bytes: &[u8]) -> String {
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        out.push_str(&format!("{b:02x}"));
-    }
-    out
-}
-```
-
-Add `pub mod watermark;` to `lib.rs`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-decoy watermark`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-decoy/src/watermark.rs crates/security/chio-decoy/src/lib.rs
-git commit -m "feat(decoy): add deterministic honeytoken watermarks"
-```
-
-### Task 15: Honey-tool catalog and tripwire event
-
-**Files:**
-- Create: `crates/security/chio-decoy/src/catalog.rs`, `src/tripwire.rs`
-- Modify: `src/lib.rs`
-- Test: inline in both
-
-**Interfaces:**
-- Produces: `pub fn honey_tools() -> Vec<DecoyTool>` where `DecoyTool { name: String, description: String }` describes realistic-looking bait; and `Tripwire { kind: TripwireKind, session_key: String, detail: String }` with `TripwireKind { CanaryPresented, CanaryUsed, WatermarkAtEgress }` as a canonical-JSON event signaling `chio-quarantine`.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-// catalog.rs
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn honey_tools_are_nonempty_and_named() {
-        let tools = honey_tools();
-        assert!(!tools.is_empty());
-        assert!(tools.iter().all(|t| !t.name.is_empty()));
-    }
-}
-```
-
-```rust
-// tripwire.rs
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn tripwire_serializes_kind() {
-        let t = Tripwire {
-            kind: TripwireKind::CanaryUsed,
-            session_key: "agent-1".to_string(),
-            detail: "presented decoy:payments".to_string(),
-        };
-        let json = serde_json::to_string(&t).expect("serialize");
-        assert!(json.contains("canary_used"));
-    }
-}
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `cargo test -p chio-decoy catalog` then `cargo test -p chio-decoy tripwire`
-Expected: FAIL (types missing).
-
-- [ ] **Step 3: Write minimal implementation**
-
-`src/catalog.rs`:
-
-```rust
-//! Honey-tools: realistic-looking bait entries injected into a tool catalog.
-//! A compromised agent probing for lateral movement selects them; legitimate
-//! workflows never do, because they bind real tools by manifest.
-
-/// A single decoy tool advertised in the catalog.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DecoyTool {
-    pub name: String,
-    pub description: String,
-}
-
-/// The built-in set of honey-tools.
-#[must_use]
-pub fn honey_tools() -> Vec<DecoyTool> {
-    vec![
-        DecoyTool {
-            name: "admin_export_all_users".to_string(),
-            description: "Export the full user table as CSV.".to_string(),
-        },
-        DecoyTool {
-            name: "rotate_root_credentials".to_string(),
-            description: "Rotate and reveal root credentials.".to_string(),
-        },
-    ]
-}
-```
-
-`src/tripwire.rs`:
-
-```rust
-//! Tripwire events: emitted when a canary is presented or used, or a
-//! watermark is seen at egress. Signals chio-quarantine.
-
-use serde::{Deserialize, Serialize};
-
-/// What kind of decoy interaction fired the tripwire.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TripwireKind {
-    CanaryPresented,
-    CanaryUsed,
-    WatermarkAtEgress,
-}
-
-/// A signed-at-emission tripwire event.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Tripwire {
-    pub kind: TripwireKind,
-    pub session_key: String,
-    pub detail: String,
-}
-```
-
-Add `pub mod catalog;` and `pub mod tripwire;` to `lib.rs`.
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `cargo test -p chio-decoy`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-decoy/src/catalog.rs crates/security/chio-decoy/src/tripwire.rs crates/security/chio-decoy/src/lib.rs
-git commit -m "feat(decoy): add honey-tool catalog and tripwire events"
-```
-
----
-
-## Phase 3: chio-quarantine
-
-### Task 16: Crate scaffold, SecurityEvent model, and ports
-
-**Files:**
-- Create: `crates/security/chio-quarantine/Cargo.toml`, `src/lib.rs`, `src/event.rs`, `src/ports.rs`
-- Modify: root `Cargo.toml` (add member)
-- Test: inline in `event.rs`
-
-**Interfaces:**
-- Produces: `SecurityEvent { source: EventSource, subject: String, session_key: String }` with `EventSource { CanaryHit, FlowViolation, AdvisoryPromotion, ReputationIncident, DenyStorm, VelocityBreach }`; and the port traits `RevocationPort` (revoke/restore session), `VelocityPort` (throttle/restore), `IssuancePort` (freeze/unfreeze), `AlertPort`, `TenantPort` (revoke/restore tenant), `BlastRadiusPort` (object-safe, `Send + Sync`). The restore methods back the lift path; `TenantPort` keeps tenant-scope containment off the session-scoped port.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn event_source_serializes_snake_case() {
-        let e = SecurityEvent {
-            source: EventSource::CanaryHit,
-            subject: "did:chio:agent".to_string(),
-            session_key: "agent-1".to_string(),
-        };
-        let json = serde_json::to_string(&e).expect("serialize");
-        assert!(json.contains("canary_hit"));
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-quarantine event`
-Expected: FAIL (crate missing).
-
-- [ ] **Step 3: Write minimal implementation**
-
-`Cargo.toml`:
-
-```toml
-[package]
-name = "chio-quarantine"
-version = "0.1.0"
-edition = "2021"
-license = "Apache-2.0"
-
-[dependencies]
-serde = { workspace = true }
-serde_json = { workspace = true }
-# The executor verifies heavy-action co-signatures with chio-quorum.
-chio-quorum = { workspace = true }
-
-[features]
-# Real adapters are opt-in so the core engine stays lean and out of the TCB.
-adapters = []
-
-[lints]
-workspace = true
-```
-
-`src/lib.rs`:
-
-```rust
-//! Incident response: a best-effort, fully attested engine (never in the TCB)
-//! that composes existing revocation, velocity, and issuance primitives into
-//! tiered, reversible containment actions.
-
-pub mod event;
-pub mod ports;
-```
-
-`src/event.rs`:
-
-```rust
-//! The security-event stream that drives playbooks.
-
-use serde::{Deserialize, Serialize};
-
-/// Where a security event originated.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EventSource {
-    CanaryHit,
-    FlowViolation,
-    AdvisoryPromotion,
-    ReputationIncident,
-    DenyStorm,
-    VelocityBreach,
-}
-
-/// A single security event tapped from the receipt log.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct SecurityEvent {
-    pub source: EventSource,
-    pub subject: String,
-    pub session_key: String,
-}
-```
-
-`src/ports.rs`:
-
-```rust
-//! Trait ports over existing primitives. Real adapters live behind the
-//! `adapters` feature so the engine is unit-testable with fakes and carries
-//! no heavy dependency graph by default.
-
-/// Bump a revocation epoch for a session's capability chain, or restore it.
-pub trait RevocationPort: Send + Sync {
-    fn revoke_session(&self, session_key: &str) -> Result<(), PortError>;
-    /// Reverse a session revocation when a lift order is applied.
-    fn restore_session(&self, session_key: &str) -> Result<(), PortError>;
-}
-
-/// Tighten or restore a subject's velocity token bucket.
-pub trait VelocityPort: Send + Sync {
-    fn throttle(&self, subject: &str, factor: u32) -> Result<(), PortError>;
-    /// Reverse a throttle when a lift order is applied.
-    fn restore(&self, subject: &str) -> Result<(), PortError>;
-}
-
-/// Freeze or unfreeze a subject's issuance rate.
-pub trait IssuancePort: Send + Sync {
-    fn freeze_subject(&self, subject: &str) -> Result<(), PortError>;
-    /// Reverse a freeze when a lift order is applied.
-    fn unfreeze_subject(&self, subject: &str) -> Result<(), PortError>;
-}
-
-/// Page an external alerting backend.
-pub trait AlertPort: Send + Sync {
-    fn escalate(&self, summary: &str) -> Result<(), PortError>;
-}
-
-/// Revoke or restore an entire tenant's capabilities. Distinct from the
-/// session-scoped `RevocationPort`: a tenant action touches every session and
-/// capability under the tenant, not a single session key.
-pub trait TenantPort: Send + Sync {
-    fn revoke_tenant(&self, tenant: &str) -> Result<(), PortError>;
-    /// Reverse a tenant revocation when a lift order is applied.
-    fn restore_tenant(&self, tenant: &str) -> Result<(), PortError>;
-}
-
-/// Resolve the continuation-token subtree affected by a triggering session.
-pub trait BlastRadiusPort: Send + Sync {
-    fn affected_sessions(&self, session_key: &str) -> Vec<String>;
-}
-
-/// Uniform port error. Containment is best-effort; a port failure is logged
-/// via a ContainmentReceipt with an error outcome, never a panic.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PortError {
-    pub detail: String,
-}
-```
-
-Add the member to root `Cargo.toml`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-quarantine event`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-quarantine Cargo.toml
-git commit -m "feat(quarantine): scaffold with SecurityEvent model and ports"
-```
-
-### Task 17: ContainmentAction, tiering, and receipts
-
-**Files:**
-- Create: `crates/security/chio-quarantine/src/action.rs`, `src/receipt.rs`
-- Modify: `src/lib.rs`
-- Test: inline in both
-
-**Interfaces:**
-- Produces: `ContainmentAction { Throttle{subject,factor}, RevokeSession{session_key}, Escalate{summary}, FreezeSubject{subject}, RevokeTenant{tenant} }`; `pub fn tier(action: &ContainmentAction) -> ActionTier` with `ActionTier { AutoReversible, Heavy }`; `ContainmentReceipt { action, tier, ttl_secs, requires_cosign }` and `LiftOrder { receipt_ref }` as canonical-JSON bodies. Auto-reversible actions carry a default TTL; heavy actions set `requires_cosign = true`. A `LiftOrder` is executed by `Executor::apply_lift` (Task 18), which resolves the referenced receipt's action and reverses it through the ports' restore methods, so the reversible model is enforced, not merely recorded.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn throttle_is_auto_reversible() {
-        let a = ContainmentAction::Throttle { subject: "s".to_string(), factor: 4 };
-        assert_eq!(tier(&a), ActionTier::AutoReversible);
-    }
-
-    #[test]
-    fn freeze_is_heavy_and_requires_cosign() {
-        let a = ContainmentAction::FreezeSubject { subject: "s".to_string() };
-        assert_eq!(tier(&a), ActionTier::Heavy);
-        let receipt = ContainmentReceipt::for_action(a);
-        assert!(receipt.requires_cosign);
-    }
-
-    #[test]
-    fn auto_action_has_ttl_and_no_cosign() {
-        let a = ContainmentAction::RevokeSession { session_key: "agent-1".to_string() };
-        let receipt = ContainmentReceipt::for_action(a);
-        assert!(!receipt.requires_cosign);
-        assert!(receipt.ttl_secs > 0);
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-quarantine action`
-Expected: FAIL.
-
-- [ ] **Step 3: Write minimal implementation**
-
-`src/action.rs`:
-
-```rust
-//! Containment actions and their reversibility tier.
-
-use serde::{Deserialize, Serialize};
-
-/// A containment action the engine may take.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case", tag = "action")]
-pub enum ContainmentAction {
-    Throttle { subject: String, factor: u32 },
-    RevokeSession { session_key: String },
-    Escalate { summary: String },
-    FreezeSubject { subject: String },
-    RevokeTenant { tenant: String },
-}
-
-/// Reversibility tier: cheap reversible actions auto-execute; heavy actions
-/// require m-of-n human co-sign to apply and to extend past TTL.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ActionTier {
-    AutoReversible,
-    Heavy,
-}
-
-/// Classify an action by reversibility.
-#[must_use]
-pub fn tier(action: &ContainmentAction) -> ActionTier {
-    match action {
-        ContainmentAction::Throttle { .. }
-        | ContainmentAction::RevokeSession { .. }
-        | ContainmentAction::Escalate { .. } => ActionTier::AutoReversible,
-        ContainmentAction::FreezeSubject { .. }
-        | ContainmentAction::RevokeTenant { .. } => ActionTier::Heavy,
-    }
-}
-```
-
-`src/receipt.rs`:
-
-```rust
-//! Signed containment receipts and their lift orders. Every action is
-//! attested, TTL-bounded, and reversible via an explicit LiftOrder.
-
-use serde::{Deserialize, Serialize};
-
-use crate::action::{tier, ActionTier, ContainmentAction};
-
-/// Default lifetime for an auto-reversible containment action.
-const DEFAULT_TTL_SECS: u64 = 3600;
-
-/// A signed-at-emission record of a containment action.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ContainmentReceipt {
-    pub action: ContainmentAction,
-    pub tier: ActionTier,
-    pub ttl_secs: u64,
-    pub requires_cosign: bool,
-}
-
-impl ContainmentReceipt {
-    /// Build the receipt for an action, setting tier, TTL, and co-sign
-    /// requirement from the action's reversibility.
-    #[must_use]
-    pub fn for_action(action: ContainmentAction) -> Self {
-        let action_tier = tier(&action);
-        let requires_cosign = matches!(action_tier, ActionTier::Heavy);
-        Self { action, tier: action_tier, ttl_secs: DEFAULT_TTL_SECS, requires_cosign }
-    }
-}
-
-/// An explicit reversal of a prior containment action, referenced by receipt.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct LiftOrder {
-    pub receipt_ref: String,
-}
-```
-
-Add `pub mod action;` and `pub mod receipt;` to `lib.rs`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-quarantine action`
-Expected: PASS (3 tests).
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-quarantine/src/action.rs crates/security/chio-quarantine/src/receipt.rs crates/security/chio-quarantine/src/lib.rs
-git commit -m "feat(quarantine): add tiered containment actions and reversible receipts"
-```
-
-### Task 18: Tiered executor with fakes
-
-**Files:**
-- Create: `crates/security/chio-quarantine/src/executor.rs`
-- Modify: `src/lib.rs`
-- Test: inline
-
-**Interfaces:**
-- Consumes: `crate::action::{ContainmentAction, ActionTier, tier}`, `crate::ports::*`, `crate::receipt::ContainmentReceipt`.
-- Produces: `Executor<'a>` holding references to all ports (including `TenantPort` and `BlastRadiusPort`), with `pub fn execute(&self, action) -> ExecOutcome`, `pub fn apply_cosigned(&self, action, req: &QuorumRequirement, request_hash: &str, approvals: &[SignedApproval]) -> ExecOutcome`, and `pub fn apply_lift(&self, action: &ContainmentAction) -> ExecOutcome`. `ExecOutcome { Applied, Pending, Failed(_, PortError) }`. `execute` runs auto-reversible actions (expanding `RevokeSession` to the blast-radius subtree) and stages heavy ones as `Pending`; `apply_cosigned` applies a heavy action only when `quorum_satisfied` holds, routing `RevokeTenant` through the `TenantPort`; `apply_lift` reverses an action via the ports' restore methods. A port failure yields `Failed`.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ports::*;
-    use std::sync::Mutex;
-
-    use chio_core_types::crypto::Keypair;
-    use chio_quorum::envelope::SignedApproval;
-    use chio_quorum::requirement::QuorumRequirement;
-
-    #[derive(Default)]
-    struct FakeRevocation { calls: Mutex<Vec<String>> }
-    impl RevocationPort for FakeRevocation {
-        fn revoke_session(&self, session_key: &str) -> Result<(), PortError> {
-            self.calls.lock().map_err(|_| PortError { detail: "poisoned".into() })?
-                .push(session_key.to_string());
-            Ok(())
-        }
-        fn restore_session(&self, _: &str) -> Result<(), PortError> { Ok(()) }
-    }
-    struct NoVelocity;
-    impl VelocityPort for NoVelocity {
-        fn throttle(&self, _: &str, _: u32) -> Result<(), PortError> { Ok(()) }
-        fn restore(&self, _: &str) -> Result<(), PortError> { Ok(()) }
-    }
-    struct NoIssuance;
-    impl IssuancePort for NoIssuance {
-        fn freeze_subject(&self, _: &str) -> Result<(), PortError> { Ok(()) }
-        fn unfreeze_subject(&self, _: &str) -> Result<(), PortError> { Ok(()) }
-    }
-    #[derive(Default)]
-    struct FakeIssuance { freezes: Mutex<Vec<String>> }
-    impl IssuancePort for FakeIssuance {
-        fn freeze_subject(&self, subject: &str) -> Result<(), PortError> {
-            self.freezes.lock().map_err(|_| PortError { detail: "poisoned".into() })?
-                .push(subject.to_string());
-            Ok(())
-        }
-        fn unfreeze_subject(&self, _: &str) -> Result<(), PortError> { Ok(()) }
-    }
-    struct NoAlert;
-    impl AlertPort for NoAlert {
-        fn escalate(&self, _: &str) -> Result<(), PortError> { Ok(()) }
-    }
-    struct NoTenant;
-    impl TenantPort for NoTenant {
-        fn revoke_tenant(&self, _: &str) -> Result<(), PortError> { Ok(()) }
-        fn restore_tenant(&self, _: &str) -> Result<(), PortError> { Ok(()) }
-    }
-    struct NoBlast;
-    impl BlastRadiusPort for NoBlast {
-        fn affected_sessions(&self, _: &str) -> Vec<String> { Vec::new() }
-    }
-
-    fn approval(kp: &Keypair, hash: &str) -> SignedApproval {
-        SignedApproval {
-            signer_id: kp.public_key().to_hex(),
-            request_hash: hash.to_string(),
-            signature_hex: kp.sign(hash.as_bytes()).to_hex(),
-        }
-    }
-
-    #[test]
-    fn auto_action_applies_via_port() {
-        let rev = FakeRevocation::default();
-        let exec = Executor {
-            revocation: &rev, velocity: &NoVelocity, issuance: &NoIssuance,
-            alert: &NoAlert, tenant: &NoTenant, blast: &NoBlast,
-        };
-        let outcome = exec.execute(ContainmentAction::RevokeSession { session_key: "agent-1".to_string() });
-        assert!(matches!(outcome, ExecOutcome::Applied(_)));
-        assert_eq!(rev.calls.lock().expect("lock").len(), 1);
-    }
-
-    #[test]
-    fn heavy_action_is_pending_without_port_call() {
-        let rev = FakeRevocation::default();
-        let exec = Executor {
-            revocation: &rev, velocity: &NoVelocity, issuance: &NoIssuance,
-            alert: &NoAlert, tenant: &NoTenant, blast: &NoBlast,
-        };
-        let outcome = exec.execute(ContainmentAction::FreezeSubject { subject: "s".to_string() });
-        assert!(matches!(outcome, ExecOutcome::Pending(_)));
-        assert_eq!(rev.calls.lock().expect("lock").len(), 0);
-    }
-
-    #[test]
-    fn heavy_action_needs_quorum_to_apply() {
-        let iss = FakeIssuance::default();
-        let exec = Executor {
-            revocation: &FakeRevocation::default(), velocity: &NoVelocity, issuance: &iss,
-            alert: &NoAlert, tenant: &NoTenant, blast: &NoBlast,
-        };
-        let a = Keypair::from_seed(&[1u8; 32]);
-        let b = Keypair::from_seed(&[2u8; 32]);
-        let req = QuorumRequirement {
-            m: 2, n: 2,
-            signers: vec![a.public_key().to_hex(), b.public_key().to_hex()],
-        };
-        let action = ContainmentAction::FreezeSubject { subject: "s".to_string() };
-        // No approvals: stays Pending and the issuance port is not touched.
-        let pending = exec.apply_cosigned(action.clone(), &req, "h1", &[]);
-        assert!(matches!(pending, ExecOutcome::Pending(_)));
-        assert_eq!(iss.freezes.lock().expect("lock").len(), 0);
-        // Two valid approvals over the request: applied.
-        let approvals = [approval(&a, "h1"), approval(&b, "h1")];
-        let applied = exec.apply_cosigned(action, &req, "h1", &approvals);
-        assert!(matches!(applied, ExecOutcome::Applied(_)));
-        assert_eq!(iss.freezes.lock().expect("lock").len(), 1);
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-quarantine executor`
-Expected: FAIL.
-
-- [ ] **Step 3: Write minimal implementation**
-
-`src/executor.rs`:
-
-```rust
-//! The tiered executor: auto-reversible actions apply through a port and
-//! return an Applied receipt; heavy actions apply only under a verified m-of-n
-//! co-signature; every applied action is reversible via a lift.
-
-use chio_quorum::envelope::SignedApproval;
-use chio_quorum::requirement::QuorumRequirement;
-use chio_quorum::verify::quorum_satisfied;
-
-use crate::action::{tier, ActionTier, ContainmentAction};
-use crate::ports::{
-    AlertPort, BlastRadiusPort, IssuancePort, PortError, RevocationPort, TenantPort, VelocityPort,
-};
-use crate::receipt::ContainmentReceipt;
-
-/// The result of attempting an action.
-pub enum ExecOutcome {
-    /// Applied and the underlying port call succeeded.
-    Applied(ContainmentReceipt),
-    /// A heavy action staged, awaiting m-of-n co-sign before it is applied.
-    Pending(ContainmentReceipt),
-    /// Attempted but the port call failed. The receipt carries the failure so
-    /// the log never attests containment that did not actually happen.
-    Failed(ContainmentReceipt, PortError),
-}
-
-/// Holds borrowed ports for the duration of a response cycle.
-pub struct Executor<'a> {
-    pub revocation: &'a dyn RevocationPort,
-    pub velocity: &'a dyn VelocityPort,
-    pub issuance: &'a dyn IssuancePort,
-    pub alert: &'a dyn AlertPort,
-    pub tenant: &'a dyn TenantPort,
-    pub blast: &'a dyn BlastRadiusPort,
-}
-
-impl Executor<'_> {
-    /// Execute an auto-reversible action now, or stage a heavy one. A port
-    /// failure yields `Failed` (never a silent `Applied`). `RevokeSession`
-    /// expands to the lineage-bounded affected subtree, so a delegated child
-    /// session is contained too, not just the triggering session.
-    #[must_use]
-    pub fn execute(&self, action: ContainmentAction) -> ExecOutcome {
-        let receipt = ContainmentReceipt::for_action(action.clone());
-        if matches!(tier(&action), ActionTier::Heavy) {
-            return ExecOutcome::Pending(receipt);
-        }
-        let result = match &action {
-            ContainmentAction::RevokeSession { session_key } => self.revoke_subtree(session_key),
-            ContainmentAction::Throttle { subject, factor } => {
-                self.velocity.throttle(subject, *factor)
-            }
-            ContainmentAction::Escalate { summary } => self.alert.escalate(summary),
-            // Heavy actions are staged above; if one reaches here, fail closed.
-            ContainmentAction::FreezeSubject { .. } | ContainmentAction::RevokeTenant { .. } => {
-                return ExecOutcome::Pending(receipt);
-            }
-        };
-        match result {
-            Ok(()) => ExecOutcome::Applied(receipt),
-            Err(err) => ExecOutcome::Failed(receipt, err),
-        }
-    }
-
-    /// Revoke a session and every affected sub-agent session in its lineage
-    /// subtree. Returns the first port error, if any.
-    fn revoke_subtree(&self, session_key: &str) -> Result<(), PortError> {
-        let mut sessions = self.blast.affected_sessions(session_key);
-        if !sessions.iter().any(|s| s == session_key) {
-            sessions.push(session_key.to_string());
-        }
-        let mut outcome = Ok(());
-        for s in &sessions {
-            if let Err(err) = self.revocation.revoke_session(s) {
-                outcome = Err(err);
-            }
-        }
-        outcome
-    }
-
-    /// Apply a heavy action, but only after verifying the m-of-n co-signature
-    /// over the request. Without a satisfied quorum the action stays `Pending`,
-    /// so no path can freeze a subject or revoke a tenant without the required
-    /// human co-sign. A port failure yields `Failed`.
-    #[must_use]
-    pub fn apply_cosigned(
-        &self,
-        action: ContainmentAction,
-        req: &QuorumRequirement,
-        request_hash: &str,
-        approvals: &[SignedApproval],
-    ) -> ExecOutcome {
-        let receipt = ContainmentReceipt::for_action(action.clone());
-        if !quorum_satisfied(req, request_hash, approvals) {
-            return ExecOutcome::Pending(receipt);
-        }
-        let result = match &action {
-            ContainmentAction::FreezeSubject { subject } => self.issuance.freeze_subject(subject),
-            ContainmentAction::RevokeTenant { tenant } => self.tenant.revoke_tenant(tenant),
-            // Auto-reversible actions do not need co-sign; apply directly.
-            other => return self.execute(other.clone()),
-        };
-        match result {
-            Ok(()) => ExecOutcome::Applied(receipt),
-            Err(err) => ExecOutcome::Failed(receipt, err),
-        }
-    }
-
-    /// Reverse a previously applied action (the one a signed LiftOrder
-    /// references) when its TTL expires or an operator lifts it. Every tier has
-    /// a reverse, so the reversible-containment model is real, not advisory.
-    #[must_use]
-    pub fn apply_lift(&self, action: &ContainmentAction) -> ExecOutcome {
-        let receipt = ContainmentReceipt::for_action(action.clone());
-        let result = match action {
-            ContainmentAction::RevokeSession { session_key } => {
-                self.revocation.restore_session(session_key)
-            }
-            ContainmentAction::Throttle { subject, .. } => self.velocity.restore(subject),
-            ContainmentAction::FreezeSubject { subject } => self.issuance.unfreeze_subject(subject),
-            ContainmentAction::RevokeTenant { tenant } => self.tenant.restore_tenant(tenant),
-            ContainmentAction::Escalate { .. } => Ok(()),
-        };
-        match result {
-            Ok(()) => ExecOutcome::Applied(receipt),
-            Err(err) => ExecOutcome::Failed(receipt, err),
-        }
-    }
-}
-```
-
-Add `pub mod executor;` to `lib.rs`, and add `chio-quorum = { workspace = true }` to `crates/security/chio-quarantine/Cargo.toml` (the executor verifies co-signatures with it).
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-quarantine executor`
-Expected: PASS (3 tests).
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-quarantine/src/executor.rs crates/security/chio-quarantine/src/lib.rs
-git commit -m "feat(quarantine): add tiered executor over ports"
-```
-
-### Task 19: Playbook parser and evaluator
-
-**Files:**
-- Create: `crates/security/chio-quarantine/src/playbook.rs`
-- Modify: `src/lib.rs`
-- Test: inline
-
-**Interfaces:**
-- Consumes: `crate::event::{SecurityEvent, EventSource}`, `crate::action::ContainmentAction`.
-- Produces: `Playbook { rules: Vec<Rule> }` with `pub fn evaluate(&self, event: &SecurityEvent) -> Vec<ContainmentAction>`; `Rule { on: EventSource, actions: Vec<ContainmentAction> }`. A minimal builder API (not a string DSL) for v1; the HushSpec-style textual parser is a documented follow-up so the engine ships testable now.
-
-- [ ] **Step 1: Write the failing test**
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::action::ContainmentAction;
-    use crate::event::{EventSource, SecurityEvent};
-
-    #[test]
-    fn matching_rule_yields_actions() {
-        let playbook = Playbook {
-            rules: vec![Rule {
-                on: EventSource::CanaryHit,
-                actions: vec![ContainmentAction::RevokeSession { session_key: String::new() }],
-            }],
-        };
-        let event = SecurityEvent {
-            source: EventSource::CanaryHit,
-            subject: "did:chio:agent".to_string(),
-            session_key: "agent-1".to_string(),
-        };
-        let actions = playbook.evaluate(&event);
-        assert_eq!(actions.len(), 1);
-        // The engine binds the event's session_key into session-scoped actions.
-        assert!(matches!(&actions[0], ContainmentAction::RevokeSession { session_key } if session_key == "agent-1"));
-    }
-
-    #[test]
-    fn non_matching_rule_is_silent() {
-        let playbook = Playbook {
-            rules: vec![Rule { on: EventSource::VelocityBreach, actions: vec![] }],
-        };
-        let event = SecurityEvent {
-            source: EventSource::CanaryHit,
-            subject: "x".to_string(),
-            session_key: "agent-1".to_string(),
-        };
-        assert!(playbook.evaluate(&event).is_empty());
-    }
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cargo test -p chio-quarantine playbook`
-Expected: FAIL.
-
-- [ ] **Step 3: Write minimal implementation**
-
-`src/playbook.rs`:
-
-```rust
-//! Declarative response rules. v1 exposes a builder API; a HushSpec-style
-//! textual `when/within/then` parser is a documented follow-up.
-
-use crate::action::ContainmentAction;
-use crate::event::{EventSource, SecurityEvent};
-
-/// A single response rule: on an event source, take these actions.
-pub struct Rule {
-    pub on: EventSource,
-    pub actions: Vec<ContainmentAction>,
-}
-
-/// An ordered set of response rules.
-pub struct Playbook {
-    pub rules: Vec<Rule>,
-}
-
-impl Playbook {
-    /// Return the actions triggered by an event, with the event's session key
-    /// and subject bound into session- and subject-scoped action templates.
-    #[must_use]
-    pub fn evaluate(&self, event: &SecurityEvent) -> Vec<ContainmentAction> {
-        let mut out = Vec::new();
-        for rule in &self.rules {
-            if rule.on == event.source {
-                for action in &rule.actions {
-                    out.push(bind_event(action, event));
-                }
-            }
-        }
-        out
-    }
-}
-
-/// Fill a session- or subject-scoped action's target from the triggering event
-/// so a blank template (for example `Throttle { subject: String::new(), .. }`)
-/// acts on the event's real subject, not the empty string.
-fn bind_event(action: &ContainmentAction, event: &SecurityEvent) -> ContainmentAction {
-    match action {
-        // Only fill a blank template target from the event. A rule that names an
-        // explicit session or subject (a fixed quarantine session, a service
-        // account) is preserved and acts on that target, not the event's.
-        ContainmentAction::RevokeSession { session_key } if session_key.is_empty() => {
-            ContainmentAction::RevokeSession { session_key: event.session_key.clone() }
-        }
-        ContainmentAction::Throttle { subject, factor } if subject.is_empty() => {
-            ContainmentAction::Throttle { subject: event.subject.clone(), factor: *factor }
-        }
-        ContainmentAction::FreezeSubject { subject } if subject.is_empty() => {
-            ContainmentAction::FreezeSubject { subject: event.subject.clone() }
-        }
-        other => other.clone(),
-    }
-}
-```
-
-Add `pub mod playbook;` to `lib.rs`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cargo test -p chio-quarantine playbook`
-Expected: PASS (2 tests).
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/security/chio-quarantine/src/playbook.rs crates/security/chio-quarantine/src/lib.rs
-git commit -m "feat(quarantine): add playbook builder and evaluator"
-```
-
-### Task 20: Phase 3 verification
-
-- [ ] **Step 1: Run scoped checks**
-
-Run: `cargo build -p chio-quarantine && cargo test -p chio-quarantine && cargo clippy -p chio-quarantine -- -D warnings && cargo fmt --all -- --check`
-Expected: all green.
-
-- [ ] **Step 2: Fix findings and re-run.**
-
-- [ ] **Step 3: Commit fixes**
-
-```bash
-git add -A
-git commit -m "test(quarantine): green phase 3 checks"
-```
-
-### Task 20b: Kernel integration wiring (deployment gate)
-
-The three crates are inert until wired into the kernel, and the gaps are not
-fail-closed: un-wired, `FlowGuard` never runs so egress is unchecked (fail-open),
-`FlowTaintHook` never observes real reads so the taint store stays public, a
-presented canary looks like an ordinary capability failure, an egressed
-watermark is plain text, and a FlowGuard deny produces no event for quarantine.
-This task performs that wiring and is a deployment gate: the controls are not
-active until it lands.
-
-**Files:**
-- Modify: the default guard-pipeline builder (`crates/guards/chio-guards/src/pipeline.rs`) and kernel boot wiring (`crates/kernel/chio-kernel/src/kernel/mod.rs`) to register `FlowGuard`.
-- Modify: the post-invocation pipeline registration to add `FlowTaintHook` (implements `PostInvocationHook`), mirroring `SanitizerHook`.
-- Modify: capability validation (`crates/kernel/chio-kernel-core/src/capability_verify.rs`) to treat a capability as a canary when `chio_decoy::scope_is_canary(&cap.scope)` (stateless, restart-safe) or the in-memory `CanaryRegistry::is_canary(&cap.id)` matches, before grant matching, and on a hit deny and emit a `CanaryPresented`/`CanaryUsed` tripwire receipt.
-- Modify: the FlowGuard egress path to call `chio_decoy::watermark::detect` on outbound payloads (emit `WatermarkAtEgress`) and to emit a `FlowViolation` event into the deny receipt for quarantine.
-- Test: `crates/kernel/chio-kernel/tests/flow_integration.rs`, `.../canary_integration.rs`.
-
-- [ ] **Step 1: Write the failing integration test**
-
-```rust
-// crates/kernel/chio-kernel/tests/flow_integration.rs
-#[test]
-fn default_pipeline_registers_flow_guard() {
-    let pipeline = chio_kernel::default_guard_pipeline();
-    assert!(pipeline.guard_names().iter().any(|n| n == "flow-egress"));
-}
-```
-
-- [ ] **Step 2: Run it to verify it fails**
-
-Run: `cargo test -p chio-kernel flow_integration`
-Expected: FAIL (`flow-egress` not registered). Adjust the builder and accessor names to the real ones in `pipeline.rs`.
-
-- [ ] **Step 3: Wire each control**
-
-1. Register `FlowGuard` in the default pipeline builder (confirm the builder fn and a `guard_names` accessor against `crates/guards/chio-guards/src/pipeline.rs`; add the accessor if absent).
-2. Register `FlowTaintHook` in the post-invocation pipeline, mirroring `SanitizerHook` in `crates/guards/chio-guards/src/post_invocation.rs`.
-3. In capability validation, before ordinary grant matching, treat the capability as a canary when `scope_is_canary(&cap.scope)` (stateless, restart-safe) or `registry.is_canary(&cap.id)` matches; on a hit, take the deny path and emit a `CanaryPresented`/`CanaryUsed` tripwire receipt so a canary never reads as an ordinary matching failure.
-4. In the FlowGuard egress path, call `watermark::detect` on the outbound payload (emit `WatermarkAtEgress` on a hit), and on any deny emit a `FlowViolation` event into the deny receipt.
-
-- [ ] **Step 4: Run the integration tests**
-
-Run: `cargo test -p chio-kernel flow_integration && cargo test -p chio-kernel canary_integration`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add crates/guards crates/kernel
-git commit -m "feat(kernel): wire flow guard, taint hook, canary tripwire, and watermark detection"
-```
-
----
-
-## Phase 4: Release gates, evidence, and spec
-
-### Task 21: Release-gate scripts
-
-**Files:**
-- Create: `scripts/check-decoy-unreachable.sh`, `scripts/check-containment-reversible.sh`, `scripts/check-flow-invariants.sh`
-- Test: run each script
-
-**Interfaces:**
-- Produces: three fail-closed shell gates. `check-decoy-unreachable` greps every non-decoy manifest and fixture under `crates/` (never prose docs) for a `decoy:` server binding and fails if found. `check-containment-reversible` asserts every `ContainmentAction` variant is covered by `tier`. `check-flow-invariants` runs the full `chio-flow` suite (lattice, FlowGuard egress dominance, and clearance-index tests), not just the pure lattice helper.
-
-- [ ] **Step 1: Write `check-decoy-unreachable.sh`**
-
-```bash
-#!/usr/bin/env bash
-# Fail-closed gate: no real manifest may bind a decoy: server namespace.
-set -euo pipefail
-# Scan real manifests and fixtures only, never prose docs (spec/ and docs/
-# document the reserved namespace on purpose). Exclude the decoy crate and the
-# adversarial corpus, which legitimately reference it.
-hits=$(grep -rn "decoy:" --include="*.json" --include="*.yaml" crates/ \
-  | grep -v "crates/security/chio-decoy" \
-  | grep -v "crates/core/chio-adversarial-suite" || true)
-if [ -n "$hits" ]; then
-  echo "FAIL: decoy namespace referenced outside chio-decoy:" >&2
-  echo "$hits" >&2
-  exit 1
-fi
-echo "OK: no real manifest binds a decoy: server"
-```
-
-- [ ] **Step 2: Run it to verify it passes on a clean tree**
-
-Run: `bash scripts/check-decoy-unreachable.sh`
-Expected: prints `OK: no real manifest binds a decoy: server`, exit 0.
-
-- [ ] **Step 3: Write the other two gates**
-
-`scripts/check-containment-reversible.sh`:
-
-```bash
-#!/usr/bin/env bash
-# Fail-closed gate: every ContainmentAction variant must be tiered, and every
-# receipt must expose ttl_secs (reversibility invariant).
-set -euo pipefail
-action_file="crates/security/chio-quarantine/src/action.rs"
-receipt_file="crates/security/chio-quarantine/src/receipt.rs"
-grep -q "pub fn tier" "$action_file" || { echo "FAIL: tier() missing" >&2; exit 1; }
-grep -q "ttl_secs" "$receipt_file" || { echo "FAIL: ttl_secs missing" >&2; exit 1; }
-echo "OK: containment tiering and TTL present"
-```
-
-`scripts/check-flow-invariants.sh`:
-
-```bash
-#!/usr/bin/env bash
-# Fail-closed gate: the full flow suite must pass, including the FlowGuard
-# egress-dominance and clearance-index tests, not just the pure lattice helper.
-# A regression in guard wiring, clearance lookup, or taint propagation must fail
-# this gate rather than slip through because the lattice helpers still pass.
-set -euo pipefail
-cargo test -p chio-flow
-# Assert the egress-dominance guard test exists so the gate cannot pass on the
-# lattice helper alone.
-grep -rq "denies_phi_context_to_public_sink" crates/security/chio-flow/src/guard.rs \
-  || { echo "FAIL: FlowGuard egress-dominance test missing" >&2; exit 1; }
-echo "OK: flow lattice and egress-dominance invariants pass"
-```
-
-- [ ] **Step 4: Run all three**
-
-Run: `bash scripts/check-containment-reversible.sh && bash scripts/check-flow-invariants.sh && bash scripts/check-decoy-unreachable.sh`
-Expected: three OK lines, exit 0.
-
-- [ ] **Step 5: Commit**
-
-```bash
-chmod +x scripts/check-decoy-unreachable.sh scripts/check-containment-reversible.sh scripts/check-flow-invariants.sh
-git add scripts/check-decoy-unreachable.sh scripts/check-containment-reversible.sh scripts/check-flow-invariants.sh
-git commit -m "feat(security): add fail-closed release gates for flow, decoy, containment"
-```
-
-### Task 22: Adversarial corpus classes
-
-**Files:**
-- Create: `crates/core/chio-adversarial-suite/cases/label_downgrade/label-downgrade-001.json`, `.../canary_evasion/canary-evasion-001.json`, `.../containment_rollback/containment-rollback-001.json`
-- Test: the adversarial-suite loader
-
-**Interfaces:**
-- Consumes: the existing case schema in `crates/core/chio-adversarial-suite/`. Read one existing case file first to copy the exact schema (fields `class`, `reason`, `path`, and any manifest entry).
-
-- [ ] **Step 1: Read an existing case and its manifest**
-
-Run: `ls crates/core/chio-adversarial-suite/cases/ && sed -n '1,40p' $(find crates/core/chio-adversarial-suite/cases -name '*.json' | head -1)`
-Expected: shows the JSON shape to mirror (for example a `clock_rewound` case).
-
-- [ ] **Step 2: Write the three case files mirroring that schema**
-
-Use the same top-level fields as the existing case. For `label_downgrade`, encode a declassification attempt with no `Declassify` caveat; for `canary_evasion`, a presentation of a `decoy:` capability; for `containment_rollback`, a `LiftOrder` referencing a heavy action without co-sign. Register each in the suite manifest if the existing cases are listed in one (check for a `manifest.json` or index under `cases/`).
-
-- [ ] **Step 3: Run the suite loader**
-
-Run: `cargo test -p chio-adversarial-suite`
-Expected: PASS, including schema validation of the three new cases.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add crates/core/chio-adversarial-suite/cases/
-git commit -m "test(adversarial): add label_downgrade, canary_evasion, containment_rollback cases"
-```
-
-### Task 23: Spec deltas and workspace verification
-
-**Files:**
-- Modify: `spec/PROTOCOL.md`, `spec/SECURITY.md`
-- Test: whole workspace
-
-**Interfaces:**
-- Produces: normative prose for the `Label` wire type, the `Declassify` caveat, manifest `sensitivity`/`clearance`, the flow/tripwire/containment event bodies, and the canary-recognition rule (the kernel MUST deny and emit a tripwire on presentation of a `decoy:` capability).
-
-- [ ] **Step 1: Add the label and caveat sections to `spec/PROTOCOL.md`**
-
-Under the capability section, document the `Label` shape (policies + compartments), `flows_to` semantics (sink clearance must dominate context), and the `Declassify` caveat (predicate = comma-separated compartments). Under the manifest section, document `sensitivity` and `clearance`. Use hyphens, not em dashes.
-
-- [ ] **Step 2: Add the canary and containment sections to `spec/SECURITY.md`**
-
-Document the `decoy:` namespace, the recognition-and-tripwire rule, and the tiered/reversible containment model. Cross-reference the five event bodies.
-
-- [ ] **Step 3: Run the full workspace one-liner**
-
-Run: `cargo build --workspace && cargo test --workspace && cargo clippy --workspace -- -D warnings && cargo fmt --all -- --check`
-Expected: all green.
-
-- [ ] **Step 4: Run the three release gates**
-
-Run: `bash scripts/check-flow-invariants.sh && bash scripts/check-decoy-unreachable.sh && bash scripts/check-containment-reversible.sh`
-Expected: three OK lines.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add spec/PROTOCOL.md spec/SECURITY.md
-git commit -m "docs(spec): specify flow labels, declassify caveat, canary and containment semantics"
-```
-
----
-
-## Self-Review
-
-**Spec coverage** (each spec section maps to a task):
-- chio-flow (labels, seeding, taint env, FlowGuard, declassification, events): Tasks 1, 4, 5, 6, 7, 8, 9, 10.
-- chio-decoy (canary caps, registry, honey-tools, watermarks, tripwire): Tasks 12, 13, 14, 15.
-- chio-quarantine (events, ports, actions/tiering, receipts, executor, playbook): Tasks 16, 17, 18, 19.
-- Protocol deltas (Label, Declassify caveat, manifest fields, event bodies, canary semantics): Tasks 1, 2, 3, 10, 15, 17, 23.
-- Testing/evidence (adversarial corpus, arena, gates, formal): Tasks 21, 22. Formal lattice property is covered by the `flows_to` order tests in Task 5 and gated by Task 21; a Kani harness is out of scope for v1 and is called out here as deferred rather than left as a silent gap.
-- Release framing (gates, bounded claims): Task 21 plus the Global Constraints note.
-
-**Kernel integration is required, not deferred:** Task 20b wires `FlowGuard`, `FlowTaintHook`, the canary tripwire, watermark detection at egress, and `FlowViolation` emission into the kernel. Until it lands the controls do not run, so it is a deployment gate, not an optional follow-up.
-
-**Deferred items made explicit (not silent gaps):** session-granular taint keying (v1 keys by agent id, Task 7), the HushSpec textual playbook parser (v1 uses a builder API, Task 19), feature-gated real adapters wrapping revocation-oracle/custody-hw/lineage/siem (trait ports and fakes ship in Tasks 16 and 18; concrete adapters are a follow-up behind the `adapters` feature), a dedicated `TenantPort` for tenant-scope revocation (v1 routes `RevokeTenant` through the revocation port), and a Kani proof of the lattice order (Task 5 tests the properties; a formal harness is deferred).
-
-**Placeholder scan:** no `TBD`/`TODO`/`implement later` in any step; every code step carries complete code. Two tasks (9 and 12) instruct the implementer to confirm an exact upstream field name against a cited file path before use, which is a verification instruction, not a placeholder.
-
-**Type consistency:** `Label`/`FlowPolicy` names are consistent across Tasks 1, 4-10; `SessionTaintStore` methods `add`/`context` are used consistently in Tasks 7-9; `ContainmentAction` variants match across Tasks 17-19; port trait names match across Tasks 16 and 18. Guard surface verified against the real definitions: `Guard::evaluate` returns `Result<GuardDecision, KernelError>`; `Verdict` has three variants (`Allow`, `Deny`, `PendingApproval`) so Task 8's `evaluate` match is exhaustive and fails closed on non-`Allow`; `GuardContext.agent_id` is `&AgentId` where `AgentId = String` (coerces to `&str`); `GuardDecision::allow()` / `deny(Vec::new())` are the real constructors.
+bash scripts/check-security-provenance.sh
+bash scripts/check-security-dependencies.sh
+bash scripts/check-flow-security.sh
+bash scripts/check-deception-security.sh
+bash scripts/check-response-recovery.sh
+make codegen-check
+cargo build --workspace
+cargo test --workspace
+cargo clippy --workspace -- -D warnings
+cargo fmt --all -- --check
+./scripts/check-formal-proofs.sh
+git diff --check
+```
+
+Before marking the arc complete, re-run `rg "ToolDefinition \\{" crates sdks`, verify every constructor sets or deliberately omits `flow`, audit every non-test `ChioKernel::new`, inspect `cargo metadata` for forbidden dependency paths, confirm the lattice models are in the normal Apalache workflow, and confirm the working tree contains no generated drift.
+
+## Completion criteria
+
+This plan is complete only when all of these statements are supported by executable evidence:
+
+- the DLM is a canonical partial order with a verified least-upper-bound join;
+- unknown security state cannot authorize egress;
+- publisher metadata cannot widen operator clearance or hide runtime egress, and strict v2 metadata survives supported bridges;
+- principal and lineage taint survive session replacement unless an attested isolation epoch proves destruction;
+- egress admission is fenced against concurrent taint generation changes through dispatch commitment;
+- declassification is typed, one-shot, exact-request, exact-destination, and exact-purpose bound;
+- canary and watermark matches deny before dispatch or response delivery;
+- temporal findings are deterministic under bounded out-of-order delivery and only verified internal events can trigger automatic response;
+- lineage-scoped automatic containment uses a complete, commit-indexed affected set under an issuance and delegation fence, while session-local actions acquire no implicit heavy fence;
+- approvals bind a verified operator capability, canonical governed response-plan intent containing every executable action field, and the shared approval-only admission operation;
+- crashes, retries, stale workers, overlapping TTL expiry, and partial failures preserve truthful state and every remaining restrictive contribution;
+- no temporary action is implemented with irreversible revocation;
+- every receipt says what actually happened;
+- threat-coverage claims remain gated by conformance and caught-mutant evidence.
