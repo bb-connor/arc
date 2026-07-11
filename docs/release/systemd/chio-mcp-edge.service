@@ -34,6 +34,14 @@ RestartSec=5s
 # receipt-flush margin can finish. The drain deadline is 25s; the platform grace
 # period must be at least TimeoutStopSec.
 KillSignal=SIGTERM
+# Signal only the edge (the unit's main process) on stop, not the whole control
+# group. The upstream tool server after `--` lives in the same cgroup; with the
+# default control-group kill mode systemd would SIGTERM it at the same instant the
+# edge begins its drain, tearing down the upstream out from under in-flight MCP
+# calls. `mixed` sends the stop signal to the main process first and only
+# escalates to the rest of the group (SIGKILL) after TimeoutStopSec, so the edge
+# can drain against a live upstream.
+KillMode=mixed
 TimeoutStopSec=35s
 NoNewPrivileges=true
 PrivateTmp=true
