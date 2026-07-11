@@ -1069,6 +1069,70 @@ fn adopted_delta_rejects_interior_gap() -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
+/// The watermark ledger's DB triggers enforce monotonicity but not archival, so
+/// a raw INSERT can plant a high but bogus watermark while the covered rows stay
+/// live. `validate_adopted_claim_log_delta` must raise its contiguity floor only
+/// to the TRUSTED watermark; trusting the raw value would let a delta at or below
+/// the bogus mark short-circuit before the contiguity and projection checks,
+/// silently adopting corrupted claim-log rows. Here rows {1,2,4} are live (an
+/// interior hole at 3) and a bogus watermark of 4 is planted without archiving;
+/// the validator must still fail closed on the gap because the watermark is not
+/// trustworthy.
+#[test]
+fn adopted_delta_ignores_untrusted_watermark() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-adopted-delta-bogus-watermark");
+    let keypair = receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    for i in 0..4 {
+        let receipt =
+            sample_receipt_with_keypair(&format!("rcpt-bogus-wm-{i}"), (i + 1) as u64, &keypair);
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+
+    let connection = store.connection()?;
+
+    // Punch an interior hole: delete entry_seq 3, leaving a non-contiguous
+    // {1,2,4}. The three survivors still project cleanly, so only the contiguity
+    // scan can reject the delta.
+    connection.execute_batch("DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete;")?;
+    let deleted = connection.execute(
+        "DELETE FROM claim_receipt_log_entries WHERE entry_seq = 3",
+        [],
+    )?;
+    assert_eq!(deleted, 1, "expected to remove exactly one claim-log row");
+
+    // Plant a bogus watermark of 4 without archiving anything: the rows covered
+    // by it are still live. The monotonicity trigger accepts it as the first
+    // mark. A raw watermark floor would lift the effective floor to 4 and, since
+    // the delta max (4) equals it, return early before validating the range.
+    connection.execute(
+        "INSERT INTO receipt_retention_watermark \
+         (archived_through_entry_seq, archived_through_timestamp, archive_path, rotated_at) \
+         VALUES (4, 0, '', 0)",
+        [],
+    )?;
+
+    // Because the covered prefix is still live, the watermark is untrusted, so
+    // the floor stays at 0 and the contiguity scan detects the hole at entry_seq
+    // 3, failing closed.
+    let error = validate_adopted_claim_log_delta(&connection, 0, 4)
+        .err()
+        .ok_or("an untrusted watermark must not let a non-contiguous delta pass")?;
+    match &error {
+        ReceiptStoreError::Conflict(message) => {
+            assert!(
+                message.contains("not contiguous") && message.contains('3'),
+                "Conflict should identify the interior gap, got: {message}"
+            );
+        }
+        other => return Err(format!("expected Conflict, got {other}").into()),
+    }
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
 /// `verify_head_against_latest_checkpoint` compares the RFC 8785 body digest for
 /// a same-seq checkpoint (keeping the Ed25519 verify off the per-append hot
 /// path). A persisted `signature` COLUMN corrupted out of band while

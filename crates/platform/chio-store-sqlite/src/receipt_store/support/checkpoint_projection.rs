@@ -526,12 +526,23 @@ pub(crate) fn load_child_claim_receipt_projection_row_by_id(
 /// their absence is expected rather than a gap. The contiguity floor is raised
 /// to the watermark; the surviving range above it must still be contiguous, so
 /// a real hole in the live log is still rejected.
+///
+/// Only a TRUSTED watermark raises the floor. The watermark ledger's DB triggers
+/// enforce monotonicity alone, not that the covered prefix was ever archived, so
+/// a raw INSERT could plant a high but bogus watermark while the covered rows are
+/// still live. Trusting the raw value would let a stale writer skip the
+/// contiguity and source-row projection checks for a delta at or below that
+/// watermark, silently adopting corrupted or orphaned claim-log rows. Deferring
+/// to `trusted_retention_watermark` (which additionally requires the value to
+/// land on a checkpoint boundary and no live prefix row to survive) makes an
+/// unarchived watermark fall back to 0, so the full delta is still validated and
+/// the append fails closed.
 pub(crate) fn validate_adopted_claim_log_delta(
     connection: &Connection,
     floor_entry_seq: u64,
     max_entry_seq: u64,
 ) -> Result<(), ReceiptStoreError> {
-    let effective_floor = floor_entry_seq.max(retention_watermark(connection)?.unwrap_or(0));
+    let effective_floor = floor_entry_seq.max(trusted_retention_watermark(connection)?);
     if max_entry_seq <= effective_floor {
         return Ok(());
     }
