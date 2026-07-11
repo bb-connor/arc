@@ -40,7 +40,7 @@ use crate::canonical::CanonicalBytes;
 use crate::capability::aggregate_budget::{
     AggregateFamilyPreservationEvidence, VerifiedAggregateFamilyRoot,
 };
-use crate::capability::attenuation::{Attenuation, DelegationLink};
+use crate::capability::attenuation::{validate_delegation_chain, Attenuation, DelegationLink};
 use crate::error::{Error, Result};
 
 /// Structured attenuation applied during a `delegate` mint.
@@ -158,6 +158,36 @@ impl DelegationReceipt {
     ) -> Result<()> {
         if !self.link.verify_signature()? {
             return Err(Error::SignatureVerificationFailed);
+        }
+        let chain = self.complete_chain();
+        validate_delegation_chain(&chain, None)?;
+        let first = chain.first().ok_or_else(|| Error::DelegationChainBroken {
+            reason: "delegation receipt complete chain is empty".into(),
+        })?;
+        if first.capability_id != verified_root.root_capability_id() {
+            return Err(Error::AttenuationViolation {
+                reason:
+                    "delegation receipt root capability ID does not match aggregate family root"
+                        .into(),
+            });
+        }
+        if &first.delegator != verified_root.root_subject() {
+            return Err(Error::AttenuationViolation {
+                reason:
+                    "delegation receipt root delegator does not match aggregate family root subject"
+                        .into(),
+            });
+        }
+        if first.scope_hash.as_deref() != Some(verified_root.root_scope_hash()) {
+            return Err(Error::AttenuationViolation {
+                reason: "delegation receipt root scope hash does not match aggregate family root"
+                    .into(),
+            });
+        }
+        for link in &chain {
+            if let Some(evidence) = link.aggregate_family_preservation.as_ref() {
+                evidence.validate_against_verified_root(verified_root)?;
+            }
         }
         let evidence =
             self.aggregate_family_preservation()

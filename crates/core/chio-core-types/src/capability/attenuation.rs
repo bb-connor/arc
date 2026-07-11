@@ -1087,21 +1087,25 @@ fn validate_parent_family_authority(
     parent: &CapabilityToken,
     verified_root: &VerifiedAggregateFamilyRoot,
 ) -> Result<()> {
-    let matches = parent
+    let budget = parent
         .aggregate_invocation_budget
         .as_ref()
         .filter(|budget| budget.scope == AggregateInvocationScope::DelegationFamily)
-        .and_then(|budget| {
-            budget
-                .root_binding
-                .as_ref()
-                .map(|binding| (budget, binding))
-        })
-        .is_some_and(|(budget, binding)| {
-            budget.max_invocations == verified_root.max_invocations()
-                && binding == verified_root.root_binding()
+        .ok_or_else(|| Error::AttenuationViolation {
+            reason: "verified aggregate family authority does not match the parent root binding"
+                .to_string(),
         });
-    if !matches {
+    let budget = budget?;
+    let binding = budget
+        .root_binding
+        .as_ref()
+        .ok_or_else(|| Error::AttenuationViolation {
+            reason: "verified aggregate family authority does not match the parent root binding"
+                .to_string(),
+        })?;
+    if budget.max_invocations != verified_root.max_invocations()
+        || binding.preservation_digest()? != verified_root.root_binding_digest()
+    {
         return Err(Error::AttenuationViolation {
             reason: "verified aggregate family authority does not match the parent root binding"
                 .to_string(),
@@ -1129,6 +1133,18 @@ fn validate_parent_family_authority(
             reason: "verified aggregate family authority does not match the parent root lineage"
                 .to_string(),
         });
+    }
+    if let Some(evidence) = parent
+        .attenuation_proof
+        .as_ref()
+        .and_then(|proof| proof.aggregate_family_preservation.as_ref())
+    {
+        evidence.validate_against_verified_root(verified_root)?;
+    }
+    for link in &parent.delegation_chain {
+        if let Some(evidence) = link.aggregate_family_preservation.as_ref() {
+            evidence.validate_against_verified_root(verified_root)?;
+        }
     }
     Ok(())
 }

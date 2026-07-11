@@ -20,8 +20,8 @@ use crate::capability::scope::{ChioScope, Operation, ToolGrant};
 use crate::capability::token::{
     CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTokenBody,
 };
-use crate::crypto::Keypair;
-use crate::delegation_receipt::ScopeAttenuation;
+use crate::crypto::{Keypair, SigningAlgorithm};
+use crate::delegation_receipt::{DelegationReceipt, ScopeAttenuation};
 use crate::error::Error;
 
 struct FamilyFixture {
@@ -689,6 +689,78 @@ fn aggregate_invocation_attenuation_verified_delegate_supports_family_descendant
 }
 
 #[test]
+fn aggregate_invocation_attenuation_verified_delegate_rejects_wrong_parent_link_evidence() {
+    let fixture = FamilyFixture::new("wrong-parent-evidence-root", 7);
+    let wrong_evidence = AggregateFamilyPreservationEvidence {
+        root_binding_digest: "wrong-parent-digest".to_string(),
+        max_invocations: 7,
+    };
+    let parent = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "wrong-evidence-intermediate".to_string(),
+            issuer: fixture.root_subject.public_key(),
+            subject: fixture.child_subject.public_key(),
+            scope: family_root_scope(),
+            issued_at: 1_100,
+            expires_at: 1_900,
+            delegation_chain: vec![fixture.link(Some(wrong_evidence))],
+            aggregate_invocation_budget: Some(fixture.family_budget()),
+        },
+        &fixture.root_subject,
+    )
+    .unwrap();
+    let grandchild = Keypair::from_seed(&[45; 32]);
+
+    let error = delegate_with_aggregate_family_authority(
+        &parent,
+        &fixture.verified_root,
+        &fixture.child_scope(),
+        &fixture.child_subject,
+        &grandchild.public_key(),
+        ScopeAttenuation::empty(),
+        1_200,
+        [13; 16],
+    )
+    .unwrap_err();
+
+    assert_attenuation_reason(
+        error,
+        "aggregate family preservation digest does not match the root binding",
+    );
+}
+
+#[test]
+fn aggregate_invocation_attenuation_verified_delegate_uses_canonical_binding_identity() {
+    let fixture = FamilyFixture::new("canonical-binding-root", 7);
+    let mut parent = fixture.root_token.clone();
+    parent
+        .aggregate_invocation_budget
+        .as_mut()
+        .unwrap()
+        .root_binding
+        .as_mut()
+        .unwrap()
+        .algorithm = Some(SigningAlgorithm::Ed25519);
+    assert!(parent.verify_signature().unwrap());
+
+    let receipt = delegate_with_aggregate_family_authority(
+        &parent,
+        &fixture.verified_root,
+        &fixture.child_scope(),
+        &fixture.root_subject,
+        &fixture.child_subject.public_key(),
+        ScopeAttenuation::empty(),
+        1_100,
+        [14; 16],
+    )
+    .unwrap();
+
+    receipt
+        .verify_aggregate_family_preservation(&fixture.verified_root)
+        .unwrap();
+}
+
+#[test]
 fn aggregate_invocation_attenuation_verified_delegate_rejects_unrelated_authority() {
     let fixture = FamilyFixture::new("delegate-authority-root", 7);
     let unrelated = FamilyFixture::new("unrelated-authority-root", 7);
@@ -708,6 +780,43 @@ fn aggregate_invocation_attenuation_verified_delegate_rejects_unrelated_authorit
     assert_attenuation_reason(
         error,
         "verified aggregate family authority does not match the parent root binding",
+    );
+}
+
+#[test]
+fn aggregate_invocation_attenuation_receipt_rejects_unrelated_signed_lineage() {
+    let fixture = FamilyFixture::new("receipt-lineage-root", 7);
+    let attacker = Keypair::from_seed(&[61; 32]);
+    let attacker_delegatee = Keypair::from_seed(&[62; 32]);
+    let link = DelegationLink::sign(
+        DelegationLinkBody {
+            capability_id: fixture.root_token.id.clone(),
+            delegator: attacker.public_key(),
+            delegatee: attacker_delegatee.public_key(),
+            attenuations: Vec::new(),
+            timestamp: 1_100,
+            scope_hash: Some(scope_hash(&fixture.root_token.scope).unwrap()),
+            aggregate_family_preservation: Some(fixture.evidence()),
+        },
+        &attacker,
+    )
+    .unwrap();
+    let receipt = DelegationReceipt {
+        parent_chain: Vec::new(),
+        attenuation: ScopeAttenuation::empty(),
+        signed_at: 1_100,
+        nonce: [15; 16],
+        link,
+        parent_capability_id: fixture.root_token.id.clone(),
+    };
+
+    let error = receipt
+        .verify_aggregate_family_preservation(&fixture.verified_root)
+        .unwrap_err();
+
+    assert_attenuation_reason(
+        error,
+        "delegation receipt root delegator does not match aggregate family root subject",
     );
 }
 
