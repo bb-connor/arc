@@ -10,9 +10,23 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Arc, Mutex};
 use tokio::task::{AbortHandle, JoinHandle};
 
-/// Shared slot holding the abort handle for the iteration child that is currently
-/// running, so the supervisor can cancel it on shutdown.
-type ActiveChild = Arc<Mutex<Option<AbortHandle>>>;
+/// Shutdown coordination shared between the supervisor loop and
+/// [`SupervisedTask::abort`]. The loop publishes each running iteration child's
+/// abort handle into `active`; `abort()` trips `shutdown` and cancels whatever
+/// child is published. `shutdown` closes the window where `abort()` runs after a
+/// child has been spawned but before its handle is published: without it
+/// `abort()` sees an empty slot, the supervisor is then cancelled at its next
+/// await and drops (and thereby detaches) the child, leaving a worker running
+/// after its health flag is gone.
+#[derive(Default)]
+struct ChildControl {
+    shutdown: bool,
+    active: Option<AbortHandle>,
+}
+
+/// Shared slot holding the shutdown flag and the abort handle for the iteration
+/// child that is currently running, so the supervisor can cancel it on shutdown.
+type ActiveChild = Arc<Mutex<ChildControl>>;
 
 /// A supervised tokio task that owns its join handle and a [`HealthFlag`]. Retaining
 /// the handle is the fix for the historical pattern of spawning a long-lived loop and
@@ -20,10 +34,10 @@ type ActiveChild = Arc<Mutex<Option<AbortHandle>>>;
 pub struct SupervisedTask {
     handle: JoinHandle<()>,
     health: HealthFlag,
-    /// Abort handle for the iteration child that is currently running. Each
-    /// iteration runs in its own child task, so aborting only the supervisor loop
-    /// drops (and thereby detaches) that child, leaving a worker running after its
-    /// health handle is gone. Cancelling this on shutdown stops it too.
+    /// Shutdown coordination for the iteration child that is currently running.
+    /// Each iteration runs in its own child task, so aborting only the supervisor
+    /// loop drops (and thereby detaches) that child, leaving a worker running
+    /// after its health handle is gone. Cancelling this on shutdown stops it too.
     active_child: ActiveChild,
 }
 
@@ -38,7 +52,7 @@ impl SupervisedTask {
         Fut: Future<Output = SupervisedOutcome> + Send + 'static,
     {
         let health = HealthFlag::new(config.tcb_critical);
-        let active_child: ActiveChild = Arc::new(Mutex::new(None));
+        let active_child: ActiveChild = Arc::new(Mutex::new(ChildControl::default()));
         let handle = supervise_task_tracking_child(
             config,
             health.clone(),
@@ -71,10 +85,17 @@ impl SupervisedTask {
     /// its join handle and detach the child, leaving a worker running unsupervised.
     pub fn abort(&self) {
         self.handle.abort();
-        if let Ok(mut slot) = self.active_child.lock() {
-            if let Some(child) = slot.take() {
-                child.abort();
-            }
+        // Trip shutdown under the same lock the loop publishes under, then cancel
+        // whatever child is published. Setting the flag closes the race where the
+        // loop has spawned a child but not yet published it: the loop observes the
+        // flag and cancels the child itself.
+        let mut control = self
+            .active_child
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        control.shutdown = true;
+        if let Some(child) = control.active.take() {
+            child.abort();
         }
     }
 }
@@ -96,7 +117,12 @@ where
 {
     // The standalone primitive exposes no shutdown handle, so it tracks the active
     // child in a private slot it never reads back.
-    supervise_task_tracking_child(config, health, Arc::new(Mutex::new(None)), iteration)
+    supervise_task_tracking_child(
+        config,
+        health,
+        Arc::new(Mutex::new(ChildControl::default())),
+        iteration,
+    )
 }
 
 /// Supervise `iteration` in a loop, publishing each running child's abort handle
@@ -124,11 +150,29 @@ where
             let spawned = catch_unwind(AssertUnwindSafe(&mut iteration)).map(tokio::spawn);
             let outcome = match spawned {
                 Ok(handle) => {
-                    // Publish the child's abort handle before awaiting it, so a
+                    // Publish the child's abort handle before awaiting it so a
                     // concurrent shutdown cancels this iteration instead of
-                    // detaching it.
-                    if let Ok(mut slot) = active_child.lock() {
-                        *slot = Some(handle.abort_handle());
+                    // detaching it. Publishing and shutdown are serialized by the
+                    // same lock: if shutdown was tripped in the window between
+                    // spawning this child and here, `abort()` saw an empty slot and
+                    // could not cancel it, so cancel it here. Otherwise the child
+                    // would outlive the aborted supervisor, running unsupervised
+                    // after its health flag is gone.
+                    let child_abort = handle.abort_handle();
+                    let shutting_down = {
+                        let mut control = active_child
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner);
+                        if control.shutdown {
+                            true
+                        } else {
+                            control.active = Some(child_abort);
+                            false
+                        }
+                    };
+                    if shutting_down {
+                        handle.abort();
+                        return;
                     }
                     match handle.await {
                         Ok(outcome) => outcome,
@@ -348,6 +392,62 @@ mod tests {
         assert!(
             !completed.load(Ordering::SeqCst),
             "abort must cancel the in-flight child iteration, not detach it to run to completion"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn abort_racing_the_publish_window_still_cancels_the_child() {
+        // The shutdown race the active-child slot exists to prevent: abort() runs
+        // after an iteration child has been spawned but before its abort handle is
+        // published. A gate holds the supervisor inside the synchronous
+        // future-building step so the test can land abort() in exactly that
+        // window - the child is about to be spawned, yet the published slot is
+        // still empty. A supervisor that only cancels the published child would
+        // detach this one and let it run to completion after the task is aborted.
+        let (gate_tx, gate_rx) = std::sync::mpsc::channel::<()>();
+        let entered = Arc::new(AtomicBool::new(false));
+        let completed = Arc::new(AtomicBool::new(false));
+        let worker_entered = Arc::clone(&entered);
+        let worker_completed = Arc::clone(&completed);
+        let task = SupervisedTask::spawn(fast_config("publish-race", false, 5), move || {
+            // Announce arrival, then block the supervisor synchronously - before
+            // any child is spawned - until the test has fired abort().
+            worker_entered.store(true, Ordering::SeqCst);
+            let _ = gate_rx.recv();
+            let worker_completed = Arc::clone(&worker_completed);
+            async move {
+                // A cancelled child never reaches this line.
+                tokio::time::sleep(Duration::from_millis(300)).await;
+                worker_completed.store(true, Ordering::SeqCst);
+                SupervisedOutcome::Continue
+            }
+        });
+
+        // Wait until the supervisor is parked in future-building: the child is not
+        // yet spawned, so the published slot is empty.
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while !entered.load(Ordering::SeqCst) {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .unwrap_or(());
+
+        // Land the abort in the publish window, then release the supervisor: it
+        // now spawns the child and must cancel it rather than detaching it.
+        task.abort();
+        let _ = gate_tx.send(());
+
+        // Well past the child's sleep: a detached child finishes and sets
+        // completed; a cancelled one never does.
+        tokio::time::sleep(Duration::from_millis(800)).await;
+        assert!(
+            entered.load(Ordering::SeqCst),
+            "the iteration closure should have started building its future"
+        );
+        assert!(
+            !completed.load(Ordering::SeqCst),
+            "abort racing the publish window must cancel the spawned child, not detach it to run to completion"
         );
     }
 }
