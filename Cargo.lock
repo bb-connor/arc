@@ -2972,6 +2972,7 @@ name = "chio-config"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
+ "chio-kernel",
  "regex",
  "serde",
  "serde_yml",

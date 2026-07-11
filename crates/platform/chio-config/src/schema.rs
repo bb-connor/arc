@@ -80,6 +80,34 @@ pub struct KernelDeadlinesFileConfig {
     pub receipt_writer_stall_ms: Option<u64>,
 }
 
+impl KernelDeadlinesFileConfig {
+    /// Overlay the file-configured scalar budgets onto the kernel defaults to
+    /// produce the runtime deadline config. Each `Some` replaces the matching
+    /// field; each `None` keeps the default. This is the bridge that lets an
+    /// operator's `[kernel.deadlines]` table actually govern kernel behavior; the
+    /// per-guard and per-server override maps are set programmatically, not from
+    /// the file, so they retain their defaults.
+    pub fn to_hot_path_deadline_config(&self) -> chio_kernel::HotPathDeadlineConfig {
+        let mut config = chio_kernel::HotPathDeadlineConfig::default();
+        if let Some(ms) = self.guard_pipeline_budget_ms {
+            config.guard_pipeline_budget_ms = ms;
+        }
+        if let Some(ms) = self.dispatch_budget_ms {
+            config.dispatch_budget_ms = ms;
+        }
+        if let Some(ms) = self.receipt_append_budget_ms {
+            config.receipt_append_budget_ms = ms;
+        }
+        if let Some(ms) = self.receipt_writer_poll_ms {
+            config.receipt_writer_poll_ms = ms;
+        }
+        if let Some(ms) = self.receipt_writer_stall_ms {
+            config.receipt_writer_stall_ms = ms;
+        }
+        config
+    }
+}
+
 /// A single adapter entry that connects to an upstream API.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -361,6 +389,46 @@ mod tests {
         assert_eq!(
             auth.header.unwrap_or_else(|| panic!("header missing")),
             "Authorization"
+        );
+    }
+
+    #[test]
+    fn deadline_scalars_convert_into_kernel_config() {
+        let file = KernelDeadlinesFileConfig {
+            guard_pipeline_budget_ms: Some(1_500),
+            dispatch_budget_ms: Some(2_500),
+            receipt_append_budget_ms: Some(750),
+            receipt_writer_poll_ms: Some(250),
+            receipt_writer_stall_ms: Some(30_000),
+        };
+        let config = file.to_hot_path_deadline_config();
+        assert_eq!(config.guard_pipeline_budget_ms, 1_500);
+        assert_eq!(config.dispatch_budget_ms, 2_500);
+        assert_eq!(config.receipt_append_budget_ms, 750);
+        assert_eq!(config.receipt_writer_poll_ms, 250);
+        assert_eq!(config.receipt_writer_stall_ms, 30_000);
+    }
+
+    #[test]
+    fn absent_deadline_scalars_keep_kernel_defaults() {
+        let config = KernelDeadlinesFileConfig::default().to_hot_path_deadline_config();
+        let defaults = chio_kernel::HotPathDeadlineConfig::default();
+        assert_eq!(
+            config.guard_pipeline_budget_ms,
+            defaults.guard_pipeline_budget_ms
+        );
+        assert_eq!(config.dispatch_budget_ms, defaults.dispatch_budget_ms);
+        assert_eq!(
+            config.receipt_append_budget_ms,
+            defaults.receipt_append_budget_ms
+        );
+        assert_eq!(
+            config.receipt_writer_poll_ms,
+            defaults.receipt_writer_poll_ms
+        );
+        assert_eq!(
+            config.receipt_writer_stall_ms,
+            defaults.receipt_writer_stall_ms
         );
     }
 }
