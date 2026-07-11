@@ -154,6 +154,40 @@ pub(crate) fn offline_repair_notice() -> &'static str {
      then restart the kernel to seed a clean verified head from the validated on-disk state."
 }
 
+/// `chio receipt retention repair --archive <path>`: the operator recovery
+/// path for a store whose claim-log projection rows survived a source-row
+/// delete. Opens via `local_receipt_store` (which uses `open_existing`,
+/// skipping backfill), so the recovery tool itself never bricks trying to
+/// diagnose a bricked store.
+pub(crate) fn cmd_receipt_retention_repair(
+    archive: &Path,
+    backend: QueryBackend<'_>,
+) -> Result<(), CliError> {
+    let archive = archive
+        .to_str()
+        .ok_or_else(|| CliError::cli_other_error("archive path is not valid utf-8".to_string()))?;
+    let store = local_receipt_store(&backend, "receipt retention repair")?;
+    let removed = store.retention_repair(archive)?;
+    if backend.json_output {
+        // The removed count is the accurate JSON contract regardless of
+        // whether the reseed cleared the head: the rows were removed.
+        print_receipt_operator_json(
+            CHIO_CLI_RECEIPT_RETENTION_REPAIR_SCHEMA,
+            &serde_json::json!({ "removed_extra_claim_log_rows": removed }),
+        )?;
+    } else {
+        // `retention_repair` returns Ok as soon as the extra rows are removed,
+        // but on a mixed-drift store the follow-up head reseed leaves the head
+        // poisoned (the next append is still rejected). Ask the store for its
+        // real post-repair state and only claim it is writable when a health
+        // check confirms it, fail-closed: an unhealthy report or a health error
+        // both mean the drift survived the extra-shape repair.
+        let writable = matches!(store.receipt_store_health(), Ok(report) if report.healthy);
+        print!("{}", render_receipt_retention_repair_human(removed, writable));
+    }
+    Ok(())
+}
+
 fn receipt_audit_with_schema(
     repair: bool,
     schema: &'static str,
@@ -299,6 +333,23 @@ mod receipt_operator_tests {
         Ok(())
     }
 
+    /// The retention-repair human output must reflect the ACTUAL post-repair
+    /// writability: only the writable branch may claim the store is writable; a
+    /// mixed-drift store (extras removed, head still poisoned) must report the
+    /// surviving drift fail-closed. The removed count stays accurate either way.
+    #[test]
+    fn retention_repair_human_output_reflects_actual_writability() {
+        let writable = render_receipt_retention_repair_human(3, true);
+        assert!(writable.contains("removed 3 extra claim-log row(s)"));
+        assert!(writable.contains("store is writable"));
+        assert!(!writable.contains("not writable"));
+
+        let not_writable = render_receipt_retention_repair_human(3, false);
+        assert!(not_writable.contains("removed 3 extra claim-log row(s)"));
+        assert!(not_writable.contains("not writable"));
+        assert!(not_writable.contains("further recovery is required"));
+    }
+
     #[test]
     fn receipt_operator_human_output_includes_operational_fields() {
         let counters = chio_kernel::ReceiptWriterCounters {
@@ -320,6 +371,7 @@ mod receipt_operator_tests {
             uncheckpointed_end_seq: Some(12),
             checkpoint_error: Some("projection drift".to_string()),
             db_size_bytes: Some(4096),
+            retention_watermark_entry_seq: Some(6),
         };
         let health_output = render_receipt_health_human(&health);
         assert!(health_output.contains("checkpoint_seq: 2"));

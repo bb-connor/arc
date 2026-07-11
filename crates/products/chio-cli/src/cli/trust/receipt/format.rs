@@ -9,6 +9,8 @@ pub(crate) const CHIO_CLI_RECEIPT_CHECKPOINT_CREATE_SCHEMA: &str =
 pub(crate) const CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA: &str =
     "chio.cli.receipt.checkpoint_verify.v1";
 pub(crate) const CHIO_CLI_RECEIPT_AUDIT_SCHEMA: &str = "chio.cli.receipt.audit.v1";
+pub(crate) const CHIO_CLI_RECEIPT_RETENTION_REPAIR_SCHEMA: &str =
+    "chio.cli.receipt.retention.repair.v1";
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -193,4 +195,22 @@ pub(crate) fn render_receipt_checkpoint_create_human(
         report.latest_checkpointed_entry_seq
     ));
     lines.join("\n") + "\n"
+}
+
+/// Human output for `chio receipt retention repair`. `writable` reflects the
+/// ACTUAL post-repair state (a post-repair health check): removing the orphaned
+/// claim-log rows fully clears an extra-only brick, but a store with mixed drift
+/// keeps a poisoned head after the reseed, so the next append is still rejected.
+/// Report that honestly (fail-closed) rather than always claiming the store is
+/// writable. `removed` (the extra claim-log rows removed) stays accurate in
+/// both branches, matching the JSON envelope.
+pub(crate) fn render_receipt_retention_repair_human(removed: u64, writable: bool) -> String {
+    if writable {
+        format!("retention repair removed {removed} extra claim-log row(s); store is writable\n")
+    } else {
+        format!(
+            "retention repair removed {removed} extra claim-log row(s), but the store still has \
+             drift and is not writable; further recovery is required\n"
+        )
+    }
 }
