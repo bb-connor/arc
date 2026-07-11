@@ -463,8 +463,17 @@ fn resolve_rotation_cutoff(
                 |row| row.get(0),
             )
             .optional()?;
-        if let Some(cutoff) = median {
-            return Ok(Some(cutoff.max(0) as u64));
+        if let Some(median_ts) = median {
+            // `compute_archival_watermark` archives a checkpoint only when its
+            // entire prefix is strictly older than the cutoff (a row with
+            // `timestamp >= cutoff` blocks its batch). When many receipts share
+            // the median timestamp (second-resolution or bursty traffic), a
+            // cutoff equal to that timestamp blocks every batch containing one,
+            // so size rotation would archive nothing and never converge below
+            // `max_size_bytes`. Advance the cutoff one second past the median so
+            // receipts at the median become eligible and a checkpointed prefix
+            // can actually age out.
+            return Ok(Some((median_ts.max(0) as u64).saturating_add(1)));
         }
     }
     Ok(None)

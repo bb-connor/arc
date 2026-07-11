@@ -485,6 +485,49 @@ fn size_rotation_converges_below_threshold() -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
+/// Size-driven rotation must still make progress when many receipts share the
+/// median timestamp (second-resolution or bursty traffic). A cutoff exactly at
+/// the shared median blocks every checkpoint batch that contains a row at the
+/// median, so the median cutoff must clear the shared timestamp; otherwise the
+/// size trigger archives nothing and the DB never shrinks below the threshold.
+#[test]
+fn size_rotation_archives_when_median_timestamp_is_shared() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("size-shared-median");
+    let keypair = super::support::receipt_test_keypair();
+    let archive = unique_db_path("size-shared-median-archive");
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 4))?;
+    // Every receipt carries the SAME timestamp, so the median equals it too.
+    for i in 0..64u64 {
+        let receipt = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("sm-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+
+    let before = store.live_db_size_bytes()?;
+    let config = RetentionConfig {
+        retention_days: u64::MAX, // disable the time branch
+        max_size_bytes: before.saturating_sub(1),
+        archive_path: archive.to_str().ok_or("archive path invalid")?.to_string(),
+        ..RetentionConfig::default()
+    };
+    let archived = store.rotate_if_needed(&config)?;
+    assert!(
+        archived > 0,
+        "size rotation must archive a checkpointed prefix even when the median timestamp is shared"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// A rotation is an in-flight writer, so `dispatch_rotate` increments
 /// `writer.inflight` before sending the Rotate
 /// command and the actor's Rotate arm must decrement it on dequeue. Without the
