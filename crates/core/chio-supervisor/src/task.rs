@@ -75,7 +75,14 @@ where
             };
             match outcome {
                 SupervisedOutcome::Shutdown => return,
-                SupervisedOutcome::Continue => continue,
+                SupervisedOutcome::Continue => {
+                    // A completed iteration resets the consecutive-failure
+                    // counter and stamps liveness, so isolated faults separated
+                    // by healthy iterations never accumulate into a false trip.
+                    // A tripped level is never lowered here.
+                    health.record_ok(now_unix_ms());
+                    continue;
+                }
                 SupervisedOutcome::Restart => {
                     let now = now_unix_ms();
                     let count = health.record_failure(
@@ -172,6 +179,40 @@ mod tests {
         .await
         .unwrap_or(());
         assert_eq!(health.level(), HealthLevel::Degraded);
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn interleaved_restart_and_continue_never_trips() {
+        // The async supervisor obeys the same honesty rule as the synchronous
+        // one: a failed iteration followed by a successful one must reset the
+        // consecutive-failure counter, so non-consecutive faults never
+        // accumulate into a false trip. Without the reset on Continue, the second
+        // Restart alone would trip this worker to Degraded.
+        let phase = Arc::new(AtomicU32::new(0));
+        let worker_phase = Arc::clone(&phase);
+        let task = SupervisedTask::spawn(fast_config("interleave", false, 1000), move || {
+            let worker_phase = Arc::clone(&worker_phase);
+            async move {
+                match worker_phase.fetch_add(1, Ordering::SeqCst) {
+                    0 | 2 | 4 => SupervisedOutcome::Restart,
+                    1 | 3 => SupervisedOutcome::Continue,
+                    _ => {
+                        tokio::time::sleep(Duration::from_millis(1)).await;
+                        SupervisedOutcome::Continue
+                    }
+                }
+            }
+        });
+        let health = task.health();
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while phase.load(Ordering::SeqCst) < 6 {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .unwrap_or(());
+        assert_eq!(health.level(), HealthLevel::Healthy);
         task.abort();
     }
 }

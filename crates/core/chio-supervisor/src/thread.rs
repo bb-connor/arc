@@ -99,7 +99,15 @@ fn supervise_loop<F>(
         let outcome = catch_unwind(AssertUnwindSafe(|| worker(&shutdown)));
         match outcome {
             Ok(SupervisedOutcome::Shutdown) => return,
-            Ok(SupervisedOutcome::Continue) => continue,
+            Ok(SupervisedOutcome::Continue) => {
+                // A completed tick resets the consecutive-failure counter and
+                // stamps liveness. Without this, isolated faults separated by
+                // healthy work accumulate and eventually trip (or escalate) a
+                // worker that is in fact recovering between them. A tripped level
+                // is never lowered here; only an operator clear recovers that.
+                health.record_ok(now_unix_ms());
+                continue;
+            }
             Ok(SupervisedOutcome::Restart) | Err(_) => {
                 if shutdown.load(Ordering::SeqCst) {
                     return;
@@ -182,6 +190,38 @@ mod tests {
             std::thread::sleep(Duration::from_millis(2));
         }
         assert_eq!(health.level(), HealthLevel::Degraded);
+        thread.shutdown();
+    }
+
+    #[test]
+    fn interleaved_restart_and_continue_never_trips() {
+        // A worker that fails, recovers, fails, recovers must stay healthy: each
+        // successful tick resets the consecutive-failure counter, so trip_after
+        // (2 here) is never reached across non-consecutive faults. Without the
+        // reset on Continue, the second Restart alone would trip to Degraded even
+        // though the worker keeps succeeding between faults.
+        let phase = Arc::new(AtomicU32::new(0));
+        let worker_phase = Arc::clone(&phase);
+        let done = Arc::new(AtomicBool::new(false));
+        let worker_done = Arc::clone(&done);
+        let thread = SupervisedThread::spawn(fast_config("interleave", false, 1000), move |_s| {
+            let n = worker_phase.fetch_add(1, Ordering::SeqCst);
+            match n {
+                0 | 2 | 4 => SupervisedOutcome::Restart,
+                1 | 3 => SupervisedOutcome::Continue,
+                _ => {
+                    worker_done.store(true, Ordering::SeqCst);
+                    std::thread::sleep(Duration::from_millis(1));
+                    SupervisedOutcome::Continue
+                }
+            }
+        });
+        let health = thread.health();
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !done.load(Ordering::SeqCst) && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(health.level(), HealthLevel::Healthy);
         thread.shutdown();
     }
 
