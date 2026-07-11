@@ -1238,6 +1238,28 @@ pub(super) fn retention_repair_on_writer(
                     .to_string(),
             ));
         }
+        // The watermark this repair is about to stamp trusts the ENTIRE
+        // [1, rounded] prefix as archived and permanently skips its Merkle
+        // rebuild (`trusted_retention_watermark`). The per-extra identity check
+        // above only covers claim-log rows that SURVIVED in the live projection;
+        // a botched rotation may also have deleted some projection rows in that
+        // prefix outright, leaving no live row to compare. Require the archive to
+        // hold a row for every entry_seq in the checkpoint-aligned prefix (the
+        // projection's entry_seq is a gapless sequence from 1, so a faithful
+        // archive of [1, rounded] has exactly `rounded` rows) so a partial or
+        // missing archive can never be sealed behind a trusted watermark.
+        let archived_prefix: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM archive.claim_receipt_log_entries WHERE entry_seq <= ?1",
+            params![rounded],
+            |row| row.get(0),
+        )?;
+        if archived_prefix < rounded {
+            return Err(ReceiptStoreError::RetentionArchiveIncomplete {
+                table: "claim_receipt_log_entries",
+                live: sqlite_u64(rounded, "repair rounded prefix width")?,
+                archived: sqlite_u64(archived_prefix.max(0), "repair archived prefix count")?,
+            });
+        }
         sqlite_u64(rounded, "repair rounded watermark")
     })();
     let detach = connection.execute_batch("DETACH DATABASE archive");

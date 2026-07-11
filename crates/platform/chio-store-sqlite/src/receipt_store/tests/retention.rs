@@ -1803,6 +1803,112 @@ fn repair_refuses_partial_checkpoint_batch() -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
+/// Retention repair stamps a checkpoint-aligned watermark that trusts the whole
+/// [1, rounded] prefix as archived and skips its Merkle rebuild. Verifying only
+/// the surviving orphaned rows is not enough: a botched rotation may also have
+/// deleted some projection rows in that prefix outright, and if the archive
+/// never held them the repair would seal an incomplete archive behind a trusted
+/// watermark. Repair must verify a faithful archive row for every entry in the
+/// prefix and refuse otherwise.
+#[test]
+fn repair_refuses_incomplete_prefix_archive() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("repair-incomplete-prefix");
+    let archive = unique_db_path("repair-incomplete-prefix-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    {
+        // One checkpoint covers the whole batch [1,4] (max_batch 4), so the
+        // repair rounds up to boundary 4.
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 4))?;
+        for i in 0..4u64 {
+            let r = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("ip-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store.append_chio_receipt_returning_seq(&r)?;
+        }
+        store.flush_receipt_writes()?;
+        assert!(store.load_checkpoint_by_seq(1)?.is_some());
+        // Fabricate a damaged store: archive ONLY the claim-log rows [3,4]
+        // faithfully and orphan them (delete their source rows), while rows [1,2]
+        // are deleted OUTRIGHT from both source AND projection and never archived.
+        // The surviving orphans [3,4] pass the per-extra identity check, but the
+        // prefix [1,4] the boundary would seal is missing [1,2] in the archive.
+        store.writer_handle().run_write({
+            let archive_path = archive_path.to_string();
+            move |connection| {
+                let escaped = archive_path.replace('\'', "''");
+                connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
+                connection.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries \
+                       (entry_seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, receipt_kind TEXT NOT NULL, \
+                        source_seq INTEGER NOT NULL, timestamp INTEGER NOT NULL, capability_id TEXT, session_id TEXT, \
+                        parent_request_id TEXT, request_id TEXT, subject_key TEXT, issuer_key TEXT, tool_server TEXT, \
+                        tool_name TEXT, raw_json TEXT NOT NULL); \
+                     INSERT OR IGNORE INTO archive.claim_receipt_log_entries \
+                       SELECT * FROM main.claim_receipt_log_entries WHERE entry_seq IN (3, 4); \
+                     DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
+                     DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete; \
+                     DELETE FROM main.chio_tool_receipts WHERE seq <= 4; \
+                     DELETE FROM main.claim_receipt_log_entries WHERE entry_seq <= 2; \
+                     CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
+                       BEFORE DELETE ON chio_tool_receipts \
+                       BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END; \
+                     CREATE TRIGGER IF NOT EXISTS claim_receipt_log_entries_reject_delete \
+                       BEFORE DELETE ON claim_receipt_log_entries \
+                       BEGIN SELECT RAISE(ABORT, 'claim_receipt_log_entries is append-only'); END;",
+                )?;
+                connection.execute_batch("DETACH DATABASE archive")?;
+                Ok(())
+            }
+        })?;
+    }
+
+    let store = SqliteReceiptStore::open_existing(&path)?;
+    let result = store.retention_repair(archive_path);
+    let message = result
+        .err()
+        .ok_or("expected an incomplete-archive refusal; repair sealed a partial archive")?
+        .to_string();
+    assert!(
+        message.contains("co-archival incomplete"),
+        "unexpected error: {message}"
+    );
+    assert!(
+        message.contains("claim_receipt_log_entries"),
+        "the missing prefix rows must fail the claim-log completeness check: {message}"
+    );
+
+    // Fail-closed: no watermark was recorded and the surviving orphans remain.
+    let live = store.reader_connection_for_test()?;
+    let orphans: i64 = live.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq IN (3, 4)",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        orphans, 2,
+        "surviving orphan rows must remain after the refusal"
+    );
+    let watermark: Option<i64> = live.query_row(
+        "SELECT MAX(archived_through_entry_seq) FROM receipt_retention_watermark",
+        [],
+        |row| row.get::<_, Option<i64>>(0),
+    )?;
+    assert_eq!(
+        watermark, None,
+        "no watermark may be stamped over an incomplete archive"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// A store whose entire checkpointed history was archived has legitimately empty
 /// source tables AND an empty projection. The next writable `open()` must NOT
 /// brick it on the empty-projection backfill guard just because a checkpoint or
