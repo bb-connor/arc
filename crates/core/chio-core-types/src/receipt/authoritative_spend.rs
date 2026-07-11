@@ -127,6 +127,13 @@ pub enum NotAuthoritativeReason {
     UnknownGuaranteeFloor {
         minimum: String,
     },
+    /// The receipt's own guarantee level is not a recognized level, so its
+    /// truthfulness claim cannot be ranked. An unrecognized level ranks as the
+    /// weakest, which would silently clear the weakest valid floor; fail-closed
+    /// instead so a typoed or forged level never passes as authoritative.
+    UnknownGuaranteeLevel {
+        actual: String,
+    },
 }
 
 /// Project the raw `budget_authority.mediated_spend.profile` string from a
@@ -283,6 +290,16 @@ pub fn receipt_meets_guarantee_floor(
     }
     let budget = BudgetAuthorityReceiptRef::from_receipt(receipt)
         .ok_or(NotAuthoritativeReason::MissingBudgetAuthority)?;
+    // The receipt's own guarantee level must be a recognized level before it can
+    // be ranked. An unrecognized level ranks 0 (weakest), so against the weakest
+    // valid floor (`advisory_posthoc`, also rank 0) the rank comparison below is
+    // `0 < 0 == false` and a typoed or forged claim would pass. Reject it here so
+    // the verifier fails closed on a malformed truthfulness claim.
+    if !is_recognized_guarantee_level(&budget.guarantee_level) {
+        return Err(NotAuthoritativeReason::UnknownGuaranteeLevel {
+            actual: budget.guarantee_level.clone(),
+        });
+    }
     if guarantee_level_rank(&budget.guarantee_level) < guarantee_level_rank(minimum_level) {
         return Err(NotAuthoritativeReason::GuaranteeLevelBelowFloor {
             minimum: minimum_level.to_string(),
@@ -631,6 +648,45 @@ mod tests {
             Err(NotAuthoritativeReason::UnknownGuaranteeFloor {
                 minimum: "linearizable".to_string(),
             })
+        );
+    }
+
+    #[test]
+    fn receipt_with_unrecognized_guarantee_level_is_rejected() {
+        // A receipt whose own guarantee level is an unrecognized string must
+        // fail closed, even against the weakest valid floor. Without an explicit
+        // recognized-level check the unrecognized level ranks 0 and the
+        // `advisory_posthoc` floor also ranks 0, so `0 < 0 == false` would let
+        // the malformed truthfulness claim pass as authoritative.
+        let kp = Keypair::generate();
+        let mut receipt = authoritative_receipt(&kp);
+        if let Some(obj) = receipt
+            .metadata
+            .as_mut()
+            .and_then(|m| m.get_mut("budget_authority"))
+            .and_then(|b| b.as_object_mut())
+        {
+            obj.insert(
+                "guarantee_level".to_string(),
+                serde_json::json!("single_node_atmoic"),
+            );
+        }
+        let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
+        assert_eq!(
+            receipt_meets_guarantee_floor(&receipt, "advisory_posthoc"),
+            Err(NotAuthoritativeReason::UnknownGuaranteeLevel {
+                actual: "single_node_atmoic".to_string(),
+            })
+        );
+        // A recognized level at or above the floor still passes.
+        let recognized = authoritative_receipt(&kp);
+        assert_eq!(
+            receipt_meets_guarantee_floor(&recognized, "advisory_posthoc"),
+            Ok(())
+        );
+        assert_eq!(
+            receipt_meets_guarantee_floor(&recognized, "single_node_atomic"),
+            Ok(())
         );
     }
 
