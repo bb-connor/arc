@@ -33,8 +33,17 @@ pub struct SqliteApprovalStore {
 /// Approval-store schema revision. Bump on every schema-affecting change.
 const APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
 /// Tables shipped before schema stamping existed, used to adopt a pre-stamping
-/// approval database rather than reject it as foreign.
-const APPROVAL_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["chio_hitl_pending"];
+/// approval database rather than reject it as foreign. `chio api protect` keeps
+/// the approval store in the same file as its receipt and revocation sidecar
+/// tables, and the approval store opens that file first on boot, so a legacy
+/// sidecar-only database must be recognized as ours through its sidecar tables
+/// rather than rejected before the receipt store can adopt it.
+const APPROVAL_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
+    "chio_hitl_pending",
+    "http_receipts",
+    "tool_receipts",
+    "revoked_capabilities",
+];
 
 impl SqliteApprovalStore {
     /// Open the store at the given path. Creates the parent directory
@@ -517,5 +526,39 @@ mod tests {
 
         let fetched = store.get_pending("dup-1").unwrap().unwrap();
         assert_eq!(fetched.parameter_hash, "hash-a");
+    }
+
+    #[test]
+    fn adopts_legacy_sidecar_database_that_predates_schema_stamping() {
+        // `chio api protect` keeps the approval store in the same file as its
+        // receipt and revocation sidecar tables, and opens the approval store
+        // first on boot. A database written before schema stamping carries only
+        // the sidecar tables, so opening the approval store on it must adopt the
+        // file rather than reject it as foreign.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sidecar.sqlite3");
+        {
+            let conn = rusqlite::Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE http_receipts (id TEXT PRIMARY KEY, receipt_json TEXT NOT NULL);
+                 CREATE TABLE tool_receipts (id TEXT PRIMARY KEY, receipt_json TEXT NOT NULL);
+                 CREATE TABLE revoked_capabilities (capability_id TEXT PRIMARY KEY);",
+            )
+            .unwrap();
+            let app_id: i32 = conn
+                .query_row("PRAGMA application_id", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(
+                app_id, 0,
+                "fixture must be unstamped like a legacy database"
+            );
+        }
+
+        let store =
+            SqliteApprovalStore::open(&path).expect("legacy sidecar database must be adopted");
+        store
+            .store_pending(&sample_request("adopt-1", "hash-adopt"))
+            .unwrap();
+        assert!(store.get_pending("adopt-1").unwrap().is_some());
     }
 }
