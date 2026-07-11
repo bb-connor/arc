@@ -826,8 +826,15 @@ impl ChioKernel {
             let receipt_store_write = self.receipt_store_write_lock.lock().map_err(|_| {
                 KernelError::Internal("receipt store write lock poisoned".to_string())
             })?;
+            // Bound the commit round trip under the same append budget as
+            // top-level receipts. Child receipts hold the kernel-wide receipt
+            // write lock, so an unbounded wait here would let a wedged writer pin
+            // every subsequent receipt write. On timeout this fails closed.
             self.with_receipt_store(|store| {
-                Ok(store.append_child_receipt_returning_seq(&receipt)?)
+                Ok(store.append_child_receipt_with_timeout(
+                    &receipt,
+                    self.config.deadlines.receipt_append_budget(),
+                )?)
             })?;
             drop(receipt_store_write);
             self.append_child_receipt_to_local_log(receipt);

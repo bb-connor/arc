@@ -350,10 +350,13 @@ impl ChioKernel {
     /// the pre-dispatch gate can be exercised deterministically.
     #[cfg(test)]
     pub(crate) fn refresh_receipt_writer_liveness_for_test(&self) {
-        let verdict = match self.with_receipt_store(|store| Ok(store.writer_liveness())) {
-            Ok(Some(verdict)) => verdict,
-            _ => crate::receipt_store::ReceiptWriterLiveness::Unknown,
-        };
+        let stall_threshold =
+            std::time::Duration::from_millis(self.config.deadlines.receipt_writer_stall_ms);
+        let verdict =
+            match self.with_receipt_store(|store| Ok(store.writer_liveness(stall_threshold))) {
+                Ok(Some(verdict)) => verdict,
+                _ => crate::receipt_store::ReceiptWriterLiveness::Unknown,
+            };
         self.receipt_writer_watchdog.publish(verdict);
     }
 
@@ -363,12 +366,16 @@ impl ChioKernel {
     pub fn spawn_receipt_writer_watchdog(self: &std::sync::Arc<Self>) {
         let poll =
             std::time::Duration::from_millis(self.config.deadlines.receipt_writer_poll_ms.max(1));
+        let stall_threshold =
+            std::time::Duration::from_millis(self.config.deadlines.receipt_writer_stall_ms);
         let kernel = std::sync::Arc::clone(self);
         let handle = tokio::spawn(async move {
             let mut ticker = tokio::time::interval(poll);
             loop {
                 ticker.tick().await;
-                let verdict = match kernel.with_receipt_store(|store| Ok(store.writer_liveness())) {
+                let verdict = match kernel
+                    .with_receipt_store(|store| Ok(store.writer_liveness(stall_threshold)))
+                {
                     Ok(Some(verdict)) => verdict,
                     _ => crate::receipt_store::ReceiptWriterLiveness::Unknown,
                 };

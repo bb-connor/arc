@@ -85,7 +85,7 @@ impl ReceiptStore for WedgedLivenessStore {
     ) -> Result<(), ReceiptStoreError> {
         Ok(())
     }
-    fn writer_liveness(&self) -> ReceiptWriterLiveness {
+    fn writer_liveness(&self, _stall_threshold: std::time::Duration) -> ReceiptWriterLiveness {
         ReceiptWriterLiveness::Wedged
     }
 }

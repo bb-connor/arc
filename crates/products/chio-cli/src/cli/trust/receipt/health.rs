@@ -308,6 +308,7 @@ mod receipt_operator_tests {
             saturated_total: 2,
             inflight: 3,
             last_commit_unix_ms: Some(1234),
+            first_accept_unix_ms: Some(1000),
             last_error: Some("writer lag".to_string()),
         };
         let health = chio_kernel::ReceiptStoreHealthReport {

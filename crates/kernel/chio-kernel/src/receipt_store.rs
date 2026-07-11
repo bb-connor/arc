@@ -46,6 +46,12 @@ pub struct ReceiptWriterCounters {
     pub inflight: u64,
     #[serde(default)]
     pub last_commit_unix_ms: Option<u64>,
+    /// Wall-clock (unix-ms) of the first append this writer ever accepted, set
+    /// once. It anchors the stall clock before the first successful commit, so a
+    /// writer that wedges before ever committing is still measured against the
+    /// stall threshold instead of appearing to make progress forever.
+    #[serde(default)]
+    pub first_accept_unix_ms: Option<u64>,
     #[serde(default)]
     pub last_error: Option<String>,
 }
@@ -283,9 +289,11 @@ pub trait ReceiptStore: Send + Sync {
     ) -> Result<Option<u64>, ReceiptStoreError> {
         self.append_chio_receipt_returning_seq(receipt)
     }
-    /// Point-in-time writer liveness. Default `Unknown` keeps stores with no
-    /// async writer, or no watchdog wired, permissive at the pre-dispatch gate.
-    fn writer_liveness(&self) -> ReceiptWriterLiveness {
+    /// Point-in-time writer liveness, assessed against the operator-configured
+    /// stall threshold. Default `Unknown` keeps stores with no async writer, or
+    /// no watchdog wired, permissive at the pre-dispatch gate; such stores
+    /// ignore the threshold.
+    fn writer_liveness(&self, _stall_threshold: std::time::Duration) -> ReceiptWriterLiveness {
         ReceiptWriterLiveness::Unknown
     }
     fn append_chio_receipt_consuming_authorization(
@@ -305,6 +313,18 @@ pub trait ReceiptStore: Send + Sync {
     ) -> Result<Option<u64>, ReceiptStoreError> {
         self.append_child_receipt(receipt)?;
         Ok(None)
+    }
+    /// Append a child receipt, failing closed with `ReceiptStoreError::Timeout`
+    /// if the commit round trip exceeds `budget`. The default ignores the budget
+    /// and keeps the unbounded behavior for stores without an async writer; a
+    /// store with a commit actor overrides this so a wedged writer cannot pin the
+    /// kernel-wide receipt write lock while nested-flow child receipts drain.
+    fn append_child_receipt_with_timeout(
+        &self,
+        receipt: &ChildRequestReceipt,
+        _budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        self.append_child_receipt_returning_seq(receipt)
     }
 
     fn receipts_canonical_bytes_range(

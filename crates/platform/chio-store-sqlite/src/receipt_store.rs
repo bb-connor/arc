@@ -137,6 +137,9 @@ struct ReceiptCommitWriterHealth {
     saturated_total: AtomicU64,
     inflight: AtomicU64,
     last_commit_unix_ms: AtomicU64,
+    /// Wall-clock (unix-ms) of the first accepted append, set once (0 = unset).
+    /// Anchors the wedged-writer stall clock before the first commit lands.
+    first_accept_unix_ms: AtomicU64,
     last_error: Mutex<Option<String>>,
     // Verified-head snapshot, written only by the actor thread; read by
     // flush_report / receipt_store_health / kernel counters.
@@ -147,6 +150,19 @@ struct ReceiptCommitWriterHealth {
 }
 
 impl ReceiptCommitWriterHealth {
+    /// Record the wall-clock time of the first accepted append, exactly once.
+    /// Later accepts leave it untouched so it stays anchored to the oldest
+    /// pre-first-commit work, which is the reference the stall clock needs to
+    /// catch a writer that wedges before it ever commits.
+    fn note_first_accept(&self) {
+        let _ = self.first_accept_unix_ms.compare_exchange(
+            0,
+            current_unix_ms(),
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        );
+    }
+
     fn store_head_snapshot(&self, head: &VerifiedHead) {
         self.head_checkpoint_seq
             .store(head.checkpoint_seq(), Ordering::SeqCst);
@@ -255,6 +271,7 @@ impl ReceiptCommitActor {
         match self.sender.try_send(command) {
             Ok(()) => {
                 self.health.accepted_total.fetch_add(1, Ordering::SeqCst);
+                self.health.note_first_accept();
             }
             Err(mpsc::TrySendError::Full(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
@@ -304,6 +321,7 @@ impl ReceiptCommitActor {
         match self.sender.try_send(command) {
             Ok(()) => {
                 self.health.accepted_total.fetch_add(1, Ordering::SeqCst);
+                self.health.note_first_accept();
             }
             Err(mpsc::TrySendError::Full(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
@@ -376,6 +394,10 @@ impl ReceiptCommitActor {
             0 => None,
             value => Some(value),
         };
+        let first_accept_unix_ms = match self.health.first_accept_unix_ms.load(Ordering::SeqCst) {
+            0 => None,
+            value => Some(value),
+        };
         let last_error = self
             .health
             .last_error
@@ -389,6 +411,7 @@ impl ReceiptCommitActor {
             saturated_total: self.health.saturated_total.load(Ordering::SeqCst),
             inflight: self.health.inflight.load(Ordering::SeqCst),
             last_commit_unix_ms,
+            first_accept_unix_ms,
             last_error,
         }
     }
@@ -428,7 +451,77 @@ impl WriterHandle {
         self.run_write_kind(job, true)
     }
 
+    /// Bounded variant of [`run_write_receipt`]: identical up to the response
+    /// wait, which is capped at `timeout`. On expiry it fails this caller loudly
+    /// without decrementing `inflight` (the actor still owns the queued job and
+    /// decrements it exactly once when it drains). A genuinely wedged writer
+    /// therefore keeps `inflight` elevated, which is the signal the liveness
+    /// probe reads, and this caller does not pin the kernel-wide receipt write
+    /// lock waiting on it.
+    pub(crate) fn run_write_receipt_with_timeout<T, F>(
+        &self,
+        job: F,
+        timeout: Duration,
+    ) -> Result<T, ReceiptStoreError>
+    where
+        F: FnOnce(&mut SqliteStoreConnection) -> Result<T, ReceiptStoreError> + Send + 'static,
+        T: Send + 'static,
+    {
+        let result = self.enqueue_write_job(job, true)?;
+        match result.recv_timeout(timeout) {
+            Ok(outcome) => outcome,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                self.health.failed_total.fetch_add(1, Ordering::SeqCst);
+                if let Ok(mut last_error) = self.health.last_error.lock() {
+                    *last_error = Some("sqlite receipt commit write timed out".to_string());
+                }
+                Err(receipt_actor_write_timeout_error(timeout))
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.failed_total.fetch_add(1, Ordering::SeqCst);
+                Err(receipt_actor_unavailable_error())
+            }
+        }
+    }
+
     fn run_write_kind<T, F>(&self, job: F, appends_receipts: bool) -> Result<T, ReceiptStoreError>
+    where
+        F: FnOnce(&mut SqliteStoreConnection) -> Result<T, ReceiptStoreError> + Send + 'static,
+        T: Send + 'static,
+    {
+        let result = self.enqueue_write_job(job, appends_receipts)?;
+        match result.recv() {
+            Ok(outcome) => outcome,
+            Err(_) => {
+                // Accepted-then-lost: the actor took the command but exited
+                // before delivering a response (actor death; job panics are
+                // caught and answered above). The job-completion decrement (the
+                // `WriterInflightGuard` in the actor's `Write` arm) may never
+                // have run - the command could have been
+                // lost while still queued, before the arm was entered - so undo
+                // the speculative pre-send increment and record the failure,
+                // mirroring the append path's recv-Err handling, so
+                // writer.inflight does not report a permanently-stuck write. If
+                // the actor instead died mid-arm and the guard already fired,
+                // `atomic_saturating_sub` keeps this compensating release from
+                // underflowing.
+                atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.failed_total.fetch_add(1, Ordering::SeqCst);
+                Err(receipt_actor_unavailable_error())
+            }
+        }
+    }
+
+    /// Box a write job, speculatively account it as in-flight, and enqueue it on
+    /// the commit actor. Returns the response receiver on a successful enqueue;
+    /// the caller decides how long to wait. A `Full`/`Disconnected` send undoes
+    /// the speculative `inflight` increment before returning (fail-closed).
+    fn enqueue_write_job<T, F>(
+        &self,
+        job: F,
+        appends_receipts: bool,
+    ) -> Result<mpsc::Receiver<Result<T, ReceiptStoreError>>, ReceiptStoreError>
     where
         F: FnOnce(&mut SqliteStoreConnection) -> Result<T, ReceiptStoreError> + Send + 'static,
         T: Send + 'static,
@@ -491,6 +584,7 @@ impl WriterHandle {
                 // O(1), fail-closed unchanged (a Full/Disconnected send still
                 // returns before counting).
                 self.health.accepted_total.fetch_add(1, Ordering::SeqCst);
+                self.health.note_first_accept();
             }
             Err(mpsc::TrySendError::Full(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
@@ -502,26 +596,7 @@ impl WriterHandle {
                 return Err(receipt_actor_unavailable_error());
             }
         }
-        match result.recv() {
-            Ok(outcome) => outcome,
-            Err(_) => {
-                // Accepted-then-lost: the actor took the command but exited
-                // before delivering a response (actor death; job panics are
-                // caught and answered above). The job-completion decrement (the
-                // `WriterInflightGuard` in the actor's `Write` arm) may never
-                // have run - the command could have been
-                // lost while still queued, before the arm was entered - so undo
-                // the speculative pre-send increment and record the failure,
-                // mirroring the append path's recv-Err handling, so
-                // writer.inflight does not report a permanently-stuck write. If
-                // the actor instead died mid-arm and the guard already fired,
-                // `atomic_saturating_sub` keeps this compensating release from
-                // underflowing.
-                atomic_saturating_sub(&self.health.inflight, 1);
-                self.health.failed_total.fetch_add(1, Ordering::SeqCst);
-                Err(receipt_actor_unavailable_error())
-            }
-        }
+        Ok(result)
     }
 }
 
@@ -550,6 +625,13 @@ fn receipt_actor_flush_timeout_error(timeout: Duration) -> ReceiptStoreError {
 fn receipt_actor_append_timeout_error(timeout: Duration) -> ReceiptStoreError {
     ReceiptStoreError::Timeout {
         operation: "sqlite receipt commit append".to_string(),
+        timeout_ms: timeout.as_millis().min(u128::from(u64::MAX)) as u64,
+    }
+}
+
+fn receipt_actor_write_timeout_error(timeout: Duration) -> ReceiptStoreError {
+    ReceiptStoreError::Timeout {
+        operation: "sqlite receipt commit write".to_string(),
         timeout_ms: timeout.as_millis().min(u128::from(u64::MAX)) as u64,
     }
 }
@@ -1266,6 +1348,173 @@ fn atomic_saturating_sub(value: &AtomicU64, amount: u64) {
             Ok(_) => return,
             Err(observed) => current = observed,
         }
+    }
+}
+
+/// Classify commit-writer liveness from a counter snapshot. Kept pure so the
+/// wedged / saturated / dead transitions are unit-testable without a live actor.
+///
+/// - `Dead`: the actor channel has disconnected (its last error reports the
+///   writer unavailable). Nothing can drain, so admission must stop.
+/// - `Wedged`: work is still queued or running (`inflight > 0`, or more appends
+///   were accepted than have completed) and no commit has landed within
+///   `stall_threshold_ms`. The stall clock is anchored to the last commit, or,
+///   before any commit exists, to the first-ever accept, so a writer that
+///   wedges before its first commit is caught rather than reported healthy
+///   forever. A timed-out append leaves `inflight` elevated without advancing
+///   `failed_total` past `accepted_total`, which is exactly the `inflight`
+///   signal this reads.
+/// - `Saturated`: the commit queue is full right now (`inflight` has reached the
+///   channel capacity), so the next append would be rejected. Deny admission
+///   rather than run a side effect whose receipt cannot be enqueued.
+/// - `Healthy`: none of the above.
+fn classify_writer_liveness(
+    counters: &ReceiptWriterCounters,
+    stall_threshold_ms: u64,
+    channel_capacity: u64,
+    now_unix_ms: u64,
+) -> chio_kernel::ReceiptWriterLiveness {
+    use chio_kernel::ReceiptWriterLiveness as Liveness;
+    if counters
+        .last_error
+        .as_deref()
+        .is_some_and(|error| error.contains("unavailable"))
+    {
+        return Liveness::Dead;
+    }
+    let backlogged = counters.inflight > 0
+        || counters.accepted_total
+            > counters
+                .committed_total
+                .saturating_add(counters.failed_total);
+    let progress_reference = counters
+        .last_commit_unix_ms
+        .or(counters.first_accept_unix_ms);
+    let stalled = match progress_reference {
+        Some(reference) => now_unix_ms.saturating_sub(reference) >= stall_threshold_ms,
+        None => false,
+    };
+    if backlogged && stalled {
+        return Liveness::Wedged;
+    }
+    if counters.inflight >= channel_capacity {
+        return Liveness::Saturated;
+    }
+    Liveness::Healthy
+}
+
+#[cfg(test)]
+mod writer_liveness_classifier_tests {
+    use super::*;
+    use chio_kernel::ReceiptWriterLiveness as Liveness;
+
+    const CAPACITY: u64 = RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY as u64;
+    const NOW: u64 = 1_000_000;
+    const STALL_MS: u64 = 10_000;
+
+    #[test]
+    fn timed_out_inflight_append_reports_wedged() {
+        // A caller-timed-out append bumps `failed_total` and leaves `inflight`
+        // elevated (the actor still owns the queued command), so `accepted_total`
+        // equals `failed_total`. The naive `accepted > committed + failed`
+        // backlog test misses this; the `inflight` signal must catch it.
+        let counters = ReceiptWriterCounters {
+            accepted_total: 1,
+            failed_total: 1,
+            inflight: 1,
+            first_accept_unix_ms: Some(NOW - 20_000),
+            ..ReceiptWriterCounters::default()
+        };
+        assert_eq!(
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, NOW),
+            Liveness::Wedged
+        );
+    }
+
+    #[test]
+    fn never_committed_backlog_reports_wedged() {
+        // Wedged before the first commit: `last_commit_unix_ms` is `None`, so the
+        // stall clock must fall back to the first-accept timestamp.
+        let counters = ReceiptWriterCounters {
+            accepted_total: 1,
+            inflight: 1,
+            last_commit_unix_ms: None,
+            first_accept_unix_ms: Some(NOW - 20_000),
+            ..ReceiptWriterCounters::default()
+        };
+        assert_eq!(
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, NOW),
+            Liveness::Wedged
+        );
+    }
+
+    #[test]
+    fn honors_configured_stall_threshold() {
+        // Same backlog with a commit 600ms ago: wedged under a fail-fast 500ms
+        // threshold, healthy under a lenient 10s threshold. Proves the threshold
+        // is a parameter, not a hardcoded constant.
+        let counters = ReceiptWriterCounters {
+            accepted_total: 2,
+            committed_total: 1,
+            inflight: 1,
+            last_commit_unix_ms: Some(NOW - 600),
+            ..ReceiptWriterCounters::default()
+        };
+        assert_eq!(
+            classify_writer_liveness(&counters, 500, CAPACITY, NOW),
+            Liveness::Wedged
+        );
+        assert_eq!(
+            classify_writer_liveness(&counters, 10_000, CAPACITY, NOW),
+            Liveness::Healthy
+        );
+    }
+
+    #[test]
+    fn full_commit_queue_reports_saturated() {
+        // Queue full right now but still committing (recent commit): a new append
+        // would be rejected, so admission must be denied even though the writer
+        // is not wedged.
+        let counters = ReceiptWriterCounters {
+            accepted_total: CAPACITY + 5,
+            committed_total: 4,
+            inflight: CAPACITY,
+            last_commit_unix_ms: Some(NOW - 100),
+            ..ReceiptWriterCounters::default()
+        };
+        assert_eq!(
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, NOW),
+            Liveness::Saturated
+        );
+        assert!(!Liveness::Saturated.healthy());
+    }
+
+    #[test]
+    fn unavailable_writer_reports_dead() {
+        let counters = ReceiptWriterCounters {
+            last_error: Some("sqlite receipt commit actor is unavailable".to_string()),
+            ..ReceiptWriterCounters::default()
+        };
+        assert_eq!(
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, NOW),
+            Liveness::Dead
+        );
+    }
+
+    #[test]
+    fn drained_writer_reports_healthy() {
+        let counters = ReceiptWriterCounters {
+            accepted_total: 10,
+            committed_total: 10,
+            inflight: 0,
+            last_commit_unix_ms: Some(NOW - 50),
+            first_accept_unix_ms: Some(NOW - 5_000),
+            ..ReceiptWriterCounters::default()
+        };
+        assert_eq!(
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, NOW),
+            Liveness::Healthy
+        );
     }
 }
 
@@ -2109,36 +2358,16 @@ impl SqliteReceiptStore {
         )
     }
 
-    /// Best-effort writer liveness derived from the commit-actor counters. Dead
-    /// when the actor channel has disconnected; Wedged when an un-drained
-    /// backlog has made no commit progress for longer than the stall threshold;
-    /// otherwise Healthy. The stall threshold is a conservative fixed default so
-    /// the store needs no runtime config.
-    pub fn writer_liveness(&self) -> chio_kernel::ReceiptWriterLiveness {
-        use chio_kernel::ReceiptWriterLiveness as Liveness;
-        const WRITER_STALL_THRESHOLD_MS: u64 = 10_000;
-        let counters = self.receipt_commit_actor.writer_counters();
-        if counters
-            .last_error
-            .as_deref()
-            .is_some_and(|error| error.contains("unavailable"))
-        {
-            return Liveness::Dead;
-        }
-        let backlogged = counters.accepted_total
-            > counters
-                .committed_total
-                .saturating_add(counters.failed_total);
-        let stalled = match counters.last_commit_unix_ms {
-            Some(last_commit) => {
-                current_unix_ms().saturating_sub(last_commit) >= WRITER_STALL_THRESHOLD_MS
-            }
-            None => false,
-        };
-        if backlogged && stalled {
-            return Liveness::Wedged;
-        }
-        Liveness::Healthy
+    /// Best-effort writer liveness derived from the commit-actor counters,
+    /// assessed against the operator-configured `stall_threshold`. See
+    /// [`classify_writer_liveness`] for the transition rules.
+    pub fn writer_liveness(&self, stall_threshold: Duration) -> chio_kernel::ReceiptWriterLiveness {
+        classify_writer_liveness(
+            &self.receipt_commit_actor.writer_counters(),
+            u64::try_from(stall_threshold.as_millis()).unwrap_or(u64::MAX),
+            RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY as u64,
+            current_unix_ms(),
+        )
     }
 
     pub fn append_chio_receipt_consuming_authorization(
@@ -2258,7 +2487,16 @@ impl SqliteReceiptStore {
         Ok(ReceiptStoreHealthReport {
             healthy,
             writer: self.receipt_commit_actor.writer_counters(),
-            writer_liveness: self.writer_liveness().as_label().to_string(),
+            // Informational label for the operator health surface. The
+            // authoritative pre-dispatch gate reads the watchdog verdict, which
+            // uses the operator-configured stall threshold; this report has no
+            // config in scope, so it labels against the shipped default.
+            writer_liveness: self
+                .writer_liveness(std::time::Duration::from_millis(
+                    chio_kernel::DEFAULT_RECEIPT_WRITER_STALL_MS,
+                ))
+                .as_label()
+                .to_string(),
             latest_committed_entry_seq: status.latest_committed_entry_seq,
             latest_checkpoint_seq: status.latest_checkpoint_seq,
             latest_checkpointed_entry_seq: status.latest_checkpointed_entry_seq,
@@ -3041,6 +3279,42 @@ mod receipt_commit_actor_tests {
             inflight_before + 1
         );
         assert!(actor.health.failed_total.load(Ordering::SeqCst) >= 1);
+        Ok(())
+    }
+
+    #[test]
+    fn run_write_receipt_with_timeout_fails_closed_when_writer_never_drains(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Child receipts persist through `run_write_receipt`. Its bounded variant
+        // must fail closed on a wedged writer instead of blocking the caller (and
+        // the kernel-wide receipt write lock it holds) forever.
+        let (sender, _receiver) = receipt_commit_channel();
+        let health = Arc::new(ReceiptCommitWriterHealth::default());
+        let handle = WriterHandle {
+            sender,
+            health: Arc::clone(&health),
+        };
+        let inflight_before = health.inflight.load(Ordering::SeqCst);
+
+        let start = std::time::Instant::now();
+        let error =
+            handle.run_write_receipt_with_timeout(|_connection| Ok(()), Duration::from_millis(250));
+        assert!(start.elapsed() < Duration::from_secs(2));
+
+        match error.err().ok_or("expected write timeout error")? {
+            ReceiptStoreError::Timeout { operation, .. } => {
+                assert_eq!(operation, "sqlite receipt commit write");
+            }
+            other => {
+                return Err(
+                    std::io::Error::other(format!("expected timeout error, got {other}")).into(),
+                );
+            }
+        }
+        // Ownership of the queued job stays with the actor, so the timeout side
+        // must leave inflight elevated (the honest wedged-writer signal).
+        assert_eq!(health.inflight.load(Ordering::SeqCst), inflight_before + 1);
+        assert!(health.failed_total.load(Ordering::SeqCst) >= 1);
         Ok(())
     }
 
