@@ -38,6 +38,16 @@ impl SqliteReceiptStore {
         Ok(Self { connection })
     }
 
+    /// Cheap reachability check of the receipt database, for the readiness probe.
+    /// A trivial query confirms the connection is still usable; a failure means the
+    /// database was rotated out or otherwise broken, so receipts can no longer be
+    /// persisted and the sidecar can only deny fail closed.
+    pub(crate) fn is_reachable(&self) -> bool {
+        self.connection
+            .query_row("SELECT 1", [], |_| Ok(()))
+            .is_ok()
+    }
+
     pub(crate) fn load_receipts(&self) -> Result<Vec<HttpReceipt>, ProtectError> {
         let mut statement = self
             .connection
@@ -149,6 +159,25 @@ pub(crate) struct ProxyState {
     pub(crate) trusted_capability_issuers: Vec<PublicKey>,
     pub(crate) trusted_receipt_signers: Vec<PublicKey>,
     pub(crate) sidecar_control_token: Option<String>,
+}
+
+impl ProxyState {
+    /// Dependency-aware readiness for the `/chio/health` probe.
+    ///
+    /// Unlike liveness, this reports the state of the runtime dependencies the
+    /// sidecar needs to serve honestly. When the durable receipt store's supervised
+    /// commit writer has stopped serving, every mediated call would be denied fail
+    /// closed, so readiness reports unhealthy and a platform probe pulls the instance
+    /// from rotation rather than routing traffic to a sidecar that can only deny.
+    pub(crate) async fn readiness_status(&self) -> SidecarStatus {
+        if let Some(store) = &self.receipt_store {
+            let store = store.lock().await;
+            if !store.is_reachable() {
+                return SidecarStatus::Unhealthy;
+            }
+        }
+        SidecarStatus::Healthy
+    }
 }
 
 /// The protect proxy.

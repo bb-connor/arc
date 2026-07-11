@@ -89,7 +89,7 @@
         }
       ],
       "healthCheck": {
-        "command": ["CMD", "/usr/bin/curl", "-fsS", "http://localhost:9090/chio/health"],
+        "command": ["CMD", "/usr/bin/curl", "-fsS", "http://localhost:9090/chio/live"],
         "interval": 10,
         "timeout": 5,
         "retries": 3,
