@@ -591,6 +591,51 @@ fn always_offload_moves_guards_off_the_async_worker_without_a_timer(
 }
 
 #[test]
+fn always_offload_runs_guards_inline_without_a_tokio_runtime(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // A synchronous host bridges dispatch through `futures::executor::block_on`,
+    // so no Tokio runtime is entered. `always_offload_guards` must degrade to
+    // running the guards inline: `spawn_blocking` panics without a runtime, so
+    // taking the offload path here would abort the whole dispatch.
+    let ran = Arc::new(AtomicU64::new(0));
+    let mut config = make_config();
+    config.deadlines.always_offload_guards = true;
+    let mut kernel = make_kernel(config);
+    kernel.add_guard(Box::new(RecordingGuard {
+        label: "recording".to_string(),
+        ran: Arc::clone(&ran),
+    }));
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-offload", "noop")]),
+        300,
+    );
+    let request = make_request("req-offload-no-runtime", &cap, "noop", "srv-offload");
+    let scope = make_scope(vec![make_grant("srv-offload", "noop")]);
+
+    // Drive the future with the futures executor: no Tokio runtime is entered.
+    let outcome = futures::executor::block_on(kernel.run_guards_within_budget(
+        &request,
+        &scope,
+        None,
+        None,
+    ));
+
+    assert!(
+        outcome.is_ok(),
+        "guards must run inline without a runtime instead of panicking in spawn_blocking"
+    );
+    assert_eq!(
+        ran.load(Ordering::SeqCst),
+        1,
+        "the guard must still execute on the inline fallback"
+    );
+    Ok(())
+}
+
+#[test]
 fn watchdog_does_not_start_without_a_timer() -> Result<(), Box<dyn std::error::Error>> {
     // Starting the watchdog in a runtime with no time driver would panic when its
     // poll interval is constructed. It must degrade to not starting instead, and

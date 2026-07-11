@@ -166,6 +166,14 @@ pub(crate) fn dispatch_timer_available() -> bool {
     })
 }
 
+/// Whether a Tokio runtime is entered in the current context. `spawn_blocking`,
+/// used to offload a blocking guard, requires one; a synchronous host driving
+/// dispatch through `futures::executor::block_on` has none, so the offload must
+/// degrade to running the guards inline rather than panicking.
+pub(crate) fn dispatch_runtime_available() -> bool {
+    tokio::runtime::Handle::try_current().is_ok()
+}
+
 impl ChioKernel {
     pub(crate) fn validate_parent_request_continuation(
         &self,
@@ -500,13 +508,19 @@ impl ChioKernel {
         let pipeline_budget = self.config.deadlines.guard_pipeline_budget();
         // A pipeline or per-guard budget is only enforceable with a Tokio time
         // driver: the timeout wrapper panics without one, so those degrade to
-        // inline. Offload itself needs no timer, so `always_offload_guards` still
-        // moves a blocking guard onto `spawn_blocking` even in a timerless
-        // runtime; only the (absent) timeout is skipped.
+        // inline. Offloading itself needs no timer but does need an entered Tokio
+        // runtime, since `spawn_blocking` panics without one; a synchronous host
+        // bridging dispatch through `futures::executor::block_on` has no runtime,
+        // so the offload degrades to inline there too. In a timerless but present
+        // runtime `always_offload_guards` still moves a blocking guard onto
+        // `spawn_blocking`; only the (absent) timeout is skipped.
         let needs_timer = pipeline_budget.is_some() || has_per_guard;
         let want_offload = needs_timer || self.config.deadlines.always_offload_guards;
 
-        if !want_offload || (needs_timer && !dispatch_timer_available()) {
+        if !want_offload
+            || !dispatch_runtime_available()
+            || (needs_timer && !dispatch_timer_available())
+        {
             return self.run_guards(
                 request,
                 scope,
