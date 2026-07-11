@@ -18,6 +18,22 @@ impl SqliteReceiptStore {
     pub(crate) fn open(path: &str) -> Result<Self, ProtectError> {
         let connection = Connection::open(path)
             .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+        // `chio api protect` co-locates the approval store, the kernel receipt
+        // store, and this HTTP receipt table in one SQLite file. The kernel
+        // receipt store runs that file in WAL mode with a busy timeout; a writer
+        // on the same file without a busy timeout turns a lock another writer
+        // holds for a moment into an immediate SQLITE_BUSY error, so this
+        // connection matches the same durability and timeout pragmas.
+        connection
+            .execute_batch(
+                "
+                PRAGMA journal_mode = WAL;
+                PRAGMA synchronous = FULL;
+                PRAGMA busy_timeout = 5000;
+                PRAGMA foreign_keys = ON;
+                ",
+            )
+            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
         connection
             .execute_batch(
                 "
@@ -369,5 +385,40 @@ impl ProtectProxy {
     /// Build routes from spec content for testing.
     pub fn routes_from_spec(spec_content: &str) -> Result<Vec<RouteEntry>, ProtectError> {
         Self::build_routes(spec_content)
+    }
+}
+
+#[cfg(test)]
+mod durability_tests {
+    use super::SqliteReceiptStore;
+    use chio_test_support::prelude::*;
+
+    #[test]
+    fn http_receipt_store_open_configures_wal_and_a_busy_timeout() {
+        let mut path = std::env::temp_dir();
+        path.push(format!("chio-http-receipts-{}.db", uuid::Uuid::now_v7()));
+        let path_str = path.to_string_lossy().into_owned();
+
+        let store = SqliteReceiptStore::open(&path_str).test_unwrap();
+
+        let busy_timeout: i64 = store
+            .connection
+            .query_row("PRAGMA busy_timeout", [], |row| row.get(0))
+            .test_unwrap();
+        assert!(
+            busy_timeout >= 5000,
+            "the http receipt writer must share the receipt store busy timeout, got {busy_timeout}"
+        );
+
+        let journal_mode: String = store
+            .connection
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+            .test_unwrap();
+        assert!(
+            journal_mode.eq_ignore_ascii_case("wal"),
+            "the http receipt writer must run in WAL mode, got {journal_mode}"
+        );
+
+        let _ = std::fs::remove_file(&path);
     }
 }
