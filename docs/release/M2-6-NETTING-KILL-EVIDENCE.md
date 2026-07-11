@@ -26,12 +26,14 @@ contract is constructed for netting. The off-chain collapse is the sole realizat
 Commit `d89d6b75b` `feat(chio-credit): off-chain ExposureLedger single-denomination
 netting collapse (M2-1)` (merge `acef4d340`), all in `crates/economy/chio-credit/`:
 
-- `src/netting.rs` (698 lines, new) - the read-only collapse.
-- `src/lib.rs` (+97) - module wiring, re-exports, and the DO-NOT-WEAKEN regression
+- `src/netting.rs` (1,389 lines, new) - the read-only collapse, including the
+  duplicate-currency, truncated-source, and aggregate-overflow fail-closed guards
+  and the conservation/determinism property suite added in later review batches.
+- `src/lib.rs` (+149) - module wiring, re-exports, and the DO-NOT-WEAKEN regression
   extension that freezes the kill-evidence.
 
 The entry point is [`collapse_positions_to_canonical`]
-(`crates/economy/chio-credit/src/netting.rs:312`). It takes the already-signed
+(`crates/economy/chio-credit/src/netting.rs:501`). It takes the already-signed
 per-currency [`ExposureLedgerCurrencyPosition`] entries and a table of rational
 conversion rates, and produces an [`ExposureLedgerNettedView`] projected into the
 canonical `USDC` denomination (`CANONICAL_NETTING_CURRENCY`,
@@ -39,31 +41,31 @@ canonical `USDC` denomination (`CANONICAL_NETTING_CURRENCY`,
 `div_ceil` so exposure is never understated), summed component-wise into one netted
 position, and the single-denomination netting benefit is computed as the difference
 between the segregated (per-currency) and netted (single-denomination) outstanding
-capital requirements (`netting.rs:324-332`).
+capital requirements (`netting.rs:526-537`).
 
 Key types:
 
-- [`SingleDenominationNettingBenefit`] (`netting.rs:165`) - `segregated_outstanding_units`,
+- [`SingleDenominationNettingBenefit`] (`netting.rs:315`) - `segregated_outstanding_units`,
   `netted_outstanding_units`, `capital_freed_units` (always non-negative; strictly
   positive only when a mixed-currency book lets the channels offset).
-- [`ExposureLedgerNettedSupportBoundary`] (`netting.rs:186`) - carries the three
+- [`ExposureLedgerNettedSupportBoundary`] (`netting.rs:336`) - carries the three
   prudential netting flags straight off their fail-closed defaults, plus the projection
   markers `read_only_projection` and `prudential_book_unchanged` (both `true`) and
   `on_chain_instrument_required` / `new_contract_required` (both `false`).
-- [`ExposureLedgerNettedView`] (`netting.rs:220`) - schema
+- [`ExposureLedgerNettedView`] (`netting.rs:370`) - schema
   `chio.credit.exposure-ledger-netted-view.v1` (`EXPOSURE_LEDGER_NETTED_VIEW_SCHEMA`,
   `netting.rs:44`).
 
 Fail-closed behavior: a missing conversion rate for a non-parity currency returns
 [`ExposureLedgerNettingError::MissingRate`]; a zero-denominator rate returns
-[`ExposureLedgerNettingError::ZeroDenominator`] (`netting.rs:48-70`). USD and USDC
+[`ExposureLedgerNettingError::ZeroDenominator`] (`netting.rs:48-157`). USD and USDC
 resolve to one-to-one parity by default (the USD/USDC pin); every other currency must be
-supplied explicitly or the collapse refuses to guess (`netting.rs:144-157`).
+supplied explicitly or the collapse refuses to guess (`netting.rs:285-308`).
 
 ## 2. The kill-evidence (the benefit is real, off-chain)
 
 The projection is pure: it does not mutate the input, mint any IOU, write any ledger, or
-flip any support-boundary flag (`netting.rs:305-306`). Yet it realizes the
+flip any support-boundary flag (`netting.rs:494-495`). Yet it realizes the
 single-denomination benefit the token theses claimed required an on-chain instrument.
 
 Worked example (test `single_denomination_benefit_frees_capital_on_mixed_book`,
