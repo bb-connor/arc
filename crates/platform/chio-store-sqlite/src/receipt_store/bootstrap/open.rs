@@ -45,6 +45,71 @@ fn assert_sqlite_durability_pragmas(connection: &Connection) -> Result<(), Recei
     Ok(())
 }
 
+fn settlement_store_binding_if_ready(
+    connection: &Connection,
+) -> Result<Option<chio_settle::SettlementStoreBinding>, ReceiptStoreError> {
+    if !settlement_projection_schema_is_installed(connection)? {
+        return Ok(None);
+    }
+    let mut digest = [0u8; 32];
+    OsRng.try_fill_bytes(&mut digest).map_err(|error| {
+        ReceiptStoreError::Io(std::io::Error::other(format!(
+            "failed to generate settlement store binding: {error}"
+        )))
+    })?;
+    Ok(Some(chio_settle::SettlementStoreBinding::from_digest(
+        digest,
+    )))
+}
+
+fn settlement_projection_schema_is_installed(
+    connection: &Connection,
+) -> Result<bool, ReceiptStoreError> {
+    let reference = Connection::open_in_memory()?;
+    reference.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
+    reference.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
+    Ok(settlement_schema_manifest(connection)? == settlement_schema_manifest(&reference)?)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct SettlementSchemaObject {
+    object_type: String,
+    name: String,
+    table_name: String,
+    sql: String,
+}
+
+fn settlement_schema_manifest(
+    connection: &Connection,
+) -> Result<Vec<SettlementSchemaObject>, ReceiptStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT type, name, tbl_name, sql FROM sqlite_master \
+         WHERE name IN (\
+             'settle_attempts', \
+             'idx_settle_attempts_visible', \
+             'settle_dead_letters', \
+             'idx_settle_dead_letters_finalized_at', \
+             'trg_settle_attempts_reject_terminal_insert', \
+             'trg_settle_dead_letters_reject_attempt_insert'\
+         ) OR (\
+             type = 'trigger' AND \
+             tbl_name IN ('settle_attempts', 'settle_dead_letters')\
+         ) ORDER BY type ASC, name ASC",
+    )?;
+    let manifest = statement
+        .query_map([], |row| {
+            Ok(SettlementSchemaObject {
+                object_type: row.get(0)?,
+                name: row.get(1)?,
+                table_name: row.get(2)?,
+                sql: row.get(3)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(ReceiptStoreError::from)?;
+    Ok(manifest)
+}
+
 impl SqliteReceiptStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, ReceiptStoreError> {
         Self::open_with_pool_config(path, crate::SqlitePoolConfig::default())
@@ -129,6 +194,7 @@ impl SqliteReceiptStore {
             require_existing_receipt_schema(path, &connection)?;
             configure_sqlite_connection(&mut connection)?;
             super::support::ensure_transparency_projection_guards(&connection)?;
+            let settlement_store_binding = settlement_store_binding_if_ready(&connection)?;
             drop(connection);
 
             let reader_pool = build_receipt_pool(
@@ -150,6 +216,7 @@ impl SqliteReceiptStore {
                     options.incremental_verification,
                 ),
                 pool: reader_pool,
+                settlement_store_binding,
                 strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
                 incremental_verification: options.incremental_verification,
             });
@@ -1063,6 +1130,8 @@ impl SqliteReceiptStore {
             "#,
         )?;
         connection.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
+        connection.execute_batch(crate::dead_letters::SETTLE_DEAD_LETTERS_MIGRATION)?;
+        connection.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_MIGRATION)?;
         ensure_tool_receipt_attribution_columns(&connection)?;
         super::support::ensure_receipt_lineage_statement_columns(&connection)?;
         super::support::drop_transparency_projection_guards(&connection)?;
@@ -1085,6 +1154,8 @@ impl SqliteReceiptStore {
             }
         }
 
+        let settlement_store_binding = settlement_store_binding_if_ready(&connection)?;
+
         drop(connection);
 
         let reader_pool = build_receipt_pool(
@@ -1106,6 +1177,7 @@ impl SqliteReceiptStore {
                 options.incremental_verification,
             ),
             pool: reader_pool,
+            settlement_store_binding,
             strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
             incremental_verification: options.incremental_verification,
         })

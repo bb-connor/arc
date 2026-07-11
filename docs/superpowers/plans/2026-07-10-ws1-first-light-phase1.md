@@ -253,7 +253,10 @@ pub enum SettlementRoutingInput {
 
 pub struct SettlementAttemptClaim {
     pub receipt_id: String,
+    pub finalized_at: u64,
+    pub attempts: u32,
     pub row_version: u64,
+    pub lease_owner: String,
     pub lease_token: String,
     pub lease_until_ms: u64,
 }
@@ -265,6 +268,8 @@ public `load` plus `upsert` methods:
 
 ```rust
 pub trait SettlementOutcomeStore: Send + Sync {
+    fn settlement_store_binding(&self) -> SettlementStoreBinding;
+
     /// Claim one due row by receipt id for the inline observer. Returns None if
     /// another live lease owns it.
     fn claim_receipt(
@@ -287,7 +292,6 @@ pub trait SettlementOutcomeStore: Send + Sync {
     fn record_claimed_outcome(
         &self,
         claim: &SettlementAttemptClaim,
-        finalized_at: u64,
         outcome: &SettlementRoutingInput,
         policy: RetryPolicy,
         observed_at_ms: u64,
@@ -353,18 +357,22 @@ fields to the same bounded representation.
 
 The interface contract requires:
 
-- Receipt persistence seeds exactly one `pending_observation` row with attempt
-  zero, version zero, no lease, and an immediately due visibility time in the
-  same writer transaction as the receipt. Replaying an identical append verifies
-  the same row; conflicting work is an invariant error that aborts the receipt
-  transaction.
+- A newly inserted receipt seeds exactly one `pending_observation` row with
+  attempt zero, version zero, no lease, and an immediately due visibility time
+  in the same writer transaction. A byte-identical duplicate receipt append is a
+  no-op and never recreates work that an accepted or skipped transition already
+  removed. The paired append path does not retrofit receipts written before the
+  observer runtime was installed. Any sidecar conflict while inserting a new
+  receipt aborts the entire transaction.
 - `claim_receipt` and `claim_due` update only an unleased or expired due row,
   increment its version with checked arithmetic, and attach a fresh unpredictable
-  lease token and bounded lease deadline. A worker runs the hook only after this
-  claim transaction commits.
-- `record_claimed_outcome` requires the exact receipt id, row version, lease
-  token, and unexpired lease. Its delete, retry update, or retry-to-dead-letter
-  transition uses a `WHERE` clause over all claim fields. Zero affected rows is
+  lease token and bounded lease deadline. The returned claim also carries the
+  persisted finalization time, attempt count, and lease owner. A worker runs the
+  hook only after this claim transaction commits.
+- `record_claimed_outcome` requires the exact receipt id, finalization time,
+  attempt count, row version, lease owner, lease token, lease deadline, and an
+  unexpired lease. Its delete, retry update, or retry-to-dead-letter transition
+  uses a `WHERE` clause over all persisted claim fields. Zero affected rows is
   `Conflict`; a stale worker can never commit over a newer lease.
 - `Skipped` and `Accepted` return `NoAction` and remove the claimed row if
   the caller holds its lease, but never silently remove a dead letter.
@@ -379,7 +387,10 @@ The interface contract requires:
 - An existing dead letter is terminal for every later input until an operator
   explicitly clears it. A retryable input cannot recreate an attempt row;
   accepted or skipped input cannot clear it; a byte-identical terminal input is
-  idempotent; a different terminal record is a conflict.
+  idempotent; a different terminal record is a conflict. Exact terminal replay
+  is the only path that may inspect terminal state without a live attempt row: it
+  reconstructs the canonical v2 record from the persisted claim values and
+  supplied typed outcome, compares bytes, and performs no mutation.
 - A backend error or process crash before claim leaves attempt zero due. A crash
   after claim, including after the hook returns but before the outcome CAS,
   leaves the row recoverable when the lease expires. Startup and the periodic
@@ -413,6 +424,12 @@ entrypoint. `max_retries = 0` remains a valid no-retry policy, but values above
 error, not a zero-delay loop. Visibility-deadline addition is checked; overflow
 returns `InvalidRecord` instead of saturating.
 
+Claim inputs are bounded at the store boundary before a transaction starts:
+worker ids are nonempty and at most 128 bytes, lease duration is in
+`1..=86_400_000` milliseconds, and due-batch limits are in `1..=1024`. The
+runtime supplies the clock values at this trusted boundary. Invalid bounds or
+overflow return `InvalidRecord` without changing durable state.
+
 Correct the current comments in `chio-settle/src/hook.rs` and
 `kernel/construction.rs`: a hook returns an outcome, while retry/dead-letter
 routing is durable only when invoked through the paired kernel observer runtime.
@@ -441,6 +458,7 @@ cargo test -p chio-kernel settlement_observer
 - Add `crates/platform/chio-store-sqlite/src/settle_attempts.rs`
 - Modify `crates/platform/chio-store-sqlite/src/dead_letters.rs`
 - Modify `crates/platform/chio-store-sqlite/src/receipt_store.rs`
+- Modify `crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/open.rs`
 - Modify `crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs`
 - Modify `crates/platform/chio-store-sqlite/src/lib.rs`
 
@@ -484,12 +502,18 @@ reject negative or out-of-range persisted integers.
 
 Keep the `settle_dead_letters` primary key, but introduce the versioned bounded
 dead-letter body that stores only `reason_code` and the 32-byte detail digest.
-Legacy v1 rows remain readable and are never rewritten; new writes use v2. Add
-database guards preventing an attempt insert while the same receipt is
-dead-lettered and preventing an independent dead-letter insert while an attempt
-exists. The atomic transition deletes the attempt before inserting the terminal
-row inside one transaction. Run both additive migrations from the same store
-constructor.
+Legacy v1 rows remain readable through a store-local versioned read enum and are
+never rewritten or synthesized as v2; new writes accept only exact v2 and use RFC
+8785 canonical JSON. Unknown schema tags fail closed. Add database guards
+preventing an attempt insert while the same receipt is dead-lettered and
+preventing an independent dead-letter insert while an attempt exists. The atomic
+transition deletes the attempt before inserting the terminal row inside one
+transaction. Run both additive migrations from the same store constructor.
+Advertise `SettlementObservationV1` only when the live `sqlite_master` manifest
+matches the reference tables, indexes, and every trigger on both settlement
+tables. Missing, rewritten, or extra triggers disable the capability. After a
+new attempt-zero insert, read back and compare the complete projected row before
+committing the receipt transaction.
 
 ### 3.2 Implement `SettlementOutcomeStore`
 
@@ -501,15 +525,20 @@ standalone constructor may transact directly on its owned connection, but is
 test/tooling-only and cannot satisfy the paired runtime's atomic receipt
 projection capability. Within one transaction:
 
-1. For claims, select a due row and update `row_version`, lease fields, and
+1. Validate the retry policy, worker/lease/batch bounds, and checked integer
+   conversions before mutation.
+2. For claims, select a due row and update `row_version`, lease fields, and
    `updated_at_ms` using one guarded statement; return only the newly committed
    claim values.
-2. For a claimed outcome, verify the exact row version, lease token, receipt id,
-   and unexpired lease before reading terminal or attempt state.
-3. Read any terminal dead letter and the current attempt count by `receipt_id`.
-4. If a terminal row exists, apply the terminal idempotency/conflict rules and
-   never create a retry row.
-5. Classify the normalized outcome using `chio_settle::classify_attempt`.
+3. For claimed completion, read terminal state first only to support an exact
+   idempotent terminal replay after the attempt row was removed. Reconstruct the
+   expected v2 bytes from the claim and outcome; exact equality returns the
+   existing terminal result without mutation, and every other case is
+   `Conflict`.
+4. When no terminal row exists, verify the complete claim and its unexpired
+   lease against the current attempt row before reading or mutating work state.
+5. Classify the normalized outcome using `chio_settle::classify_attempt` and the
+   attempt count carried by the verified claim.
 6. For retry, increment the attempt count, set
    `work_kind = 'retry_scheduled'`, clear the lease, and write the millisecond
    visibility deadline.
@@ -534,8 +563,11 @@ reintroduces lost updates and duplicate terminal transitions.
 Add tests using the existing `chio_test_support::prelude::*` conventions:
 
 - Migration is idempotent.
-- Attempt-zero seeding is atomic with receipt append and byte-identical replay;
-  a forced failure leaves neither receipt nor attempt row.
+- Attempt-zero seeding is atomic with a new receipt append; byte-identical receipt
+  replay never resurrects completed work, and a forced failure leaves neither
+  receipt nor attempt row.
+- A legacy v1 dead letter remains readable through the versioned API without any
+  byte rewrite; unknown schema tags fail closed.
 - Claiming writes a unique token and increments the version; a concurrent or
   stale claim cannot commit an outcome.
 - Crashes before the hook, after the hook but before outcome CAS, and after a

@@ -3,6 +3,47 @@ use thiserror::Error;
 use crate::hook::{SettlementFailureReason, SettlementSkipReason};
 use crate::retry::RetryPolicy;
 
+/// Maximum UTF-8 byte length of a settlement worker identifier.
+pub const MAX_SETTLEMENT_WORKER_ID_BYTES: usize = 128;
+
+/// Maximum settlement claim lease duration in milliseconds.
+pub const MAX_SETTLEMENT_LEASE_MS: u64 = 86_400_000;
+
+/// Maximum number of rows returned by one settlement claim.
+pub const MAX_SETTLEMENT_CLAIM_BATCH: usize = 1024;
+
+/// Invalid settlement claim parameters.
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+pub enum SettlementClaimValidationError {
+    /// Worker identifier is empty or exceeds its UTF-8 byte bound.
+    #[error("settlement worker id length is out of bounds")]
+    WorkerIdLength,
+    /// Lease duration is zero or exceeds the one-day bound.
+    #[error("settlement lease duration is out of bounds")]
+    LeaseDuration,
+    /// Claim batch is zero or exceeds the row-count bound.
+    #[error("settlement claim batch size is out of bounds")]
+    ClaimBatch,
+}
+
+/// Validate parameters shared by settlement claim operations.
+pub fn validate_settlement_claim(
+    worker_id: &str,
+    lease_ms: u64,
+    limit: usize,
+) -> Result<(), SettlementClaimValidationError> {
+    if worker_id.is_empty() || worker_id.len() > MAX_SETTLEMENT_WORKER_ID_BYTES {
+        return Err(SettlementClaimValidationError::WorkerIdLength);
+    }
+    if lease_ms == 0 || lease_ms > MAX_SETTLEMENT_LEASE_MS {
+        return Err(SettlementClaimValidationError::LeaseDuration);
+    }
+    if limit == 0 || limit > MAX_SETTLEMENT_CLAIM_BATCH {
+        return Err(SettlementClaimValidationError::ClaimBatch);
+    }
+    Ok(())
+}
+
 /// Opaque identity shared by receipt and outcome views of one durable writer.
 ///
 /// Backends generate one value per writer instance and copy it into every
@@ -37,13 +78,19 @@ pub enum SettlementRoutingInput {
     Permanent { reason: SettlementFailureReason },
 }
 
-/// Lease and row version required to commit a settlement transition.
+/// Persisted row and lease state required to commit a settlement transition.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SettlementAttemptClaim {
     /// Receipt bound to the claimed row.
     pub receipt_id: String,
+    /// Receipt finalization timestamp persisted with the row.
+    pub finalized_at: u64,
+    /// Completed hook invocations persisted before this claim.
+    pub attempts: u32,
     /// Version incremented when the claim was acquired.
     pub row_version: u64,
+    /// Worker that owns the lease.
+    pub lease_owner: String,
     /// Unpredictable token required by the outcome CAS.
     pub lease_token: String,
     /// Exclusive lease deadline in milliseconds.
@@ -128,12 +175,14 @@ pub trait SettlementOutcomeStore: Send + Sync {
 
     /// Atomically commit an outcome for an exact, unexpired claim.
     ///
+    /// Terminal timestamps and attempt counts come from the persisted claim,
+    /// not from caller-supplied duplicates.
+    ///
     /// `observed_at_ms` is both the lease-validity check time and the base for
     /// any retry visibility deadline.
     fn record_claimed_outcome(
         &self,
         claim: &SettlementAttemptClaim,
-        finalized_at: u64,
         outcome: &SettlementRoutingInput,
         policy: RetryPolicy,
         observed_at_ms: u64,
@@ -143,6 +192,70 @@ pub trait SettlementOutcomeStore: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn attempt_claim_carries_the_persisted_cas_state() {
+        let claim = SettlementAttemptClaim {
+            receipt_id: "receipt-1".to_string(),
+            finalized_at: 41,
+            attempts: 2,
+            row_version: 3,
+            lease_owner: "worker-1".to_string(),
+            lease_token: "token-1".to_string(),
+            lease_until_ms: 50,
+        };
+
+        assert_eq!(claim.finalized_at, 41);
+        assert_eq!(claim.attempts, 2);
+        assert_eq!(claim.lease_owner, "worker-1");
+    }
+
+    #[test]
+    fn claim_parameters_are_bounded() {
+        assert!(validate_settlement_claim("worker", 1, 1).is_ok());
+        assert!(validate_settlement_claim(
+            &"w".repeat(MAX_SETTLEMENT_WORKER_ID_BYTES),
+            MAX_SETTLEMENT_LEASE_MS,
+            MAX_SETTLEMENT_CLAIM_BATCH,
+        )
+        .is_ok());
+        assert!(validate_settlement_claim(&"\u{e9}".repeat(64), 1, 1).is_ok());
+
+        let invalid = [
+            (
+                validate_settlement_claim("", 1, 1),
+                SettlementClaimValidationError::WorkerIdLength,
+            ),
+            (
+                validate_settlement_claim(&"w".repeat(MAX_SETTLEMENT_WORKER_ID_BYTES + 1), 1, 1),
+                SettlementClaimValidationError::WorkerIdLength,
+            ),
+            (
+                validate_settlement_claim(&"\u{e9}".repeat(65), 1, 1),
+                SettlementClaimValidationError::WorkerIdLength,
+            ),
+            (
+                validate_settlement_claim("worker", 0, 1),
+                SettlementClaimValidationError::LeaseDuration,
+            ),
+            (
+                validate_settlement_claim("worker", MAX_SETTLEMENT_LEASE_MS + 1, 1),
+                SettlementClaimValidationError::LeaseDuration,
+            ),
+            (
+                validate_settlement_claim("worker", 1, 0),
+                SettlementClaimValidationError::ClaimBatch,
+            ),
+            (
+                validate_settlement_claim("worker", 1, MAX_SETTLEMENT_CLAIM_BATCH + 1),
+                SettlementClaimValidationError::ClaimBatch,
+            ),
+        ];
+
+        for (result, expected) in invalid {
+            assert_eq!(result, Err(expected));
+        }
+    }
 
     #[test]
     fn outcome_store_error_classes_are_bounded() {

@@ -587,17 +587,24 @@ bypasses the recovery proof.
 
 Replace the discard at `receipt_persistence.rs:185` with a durable observer
 outbox. When a paired observer runtime is installed, the receipt-store append
-transaction also inserts a due `pending_observation` attempt-zero row. The
+transaction also inserts a due `pending_observation` attempt-zero row for every
+new receipt. A byte-identical duplicate append never recreates work removed by a
+completed accepted or legitimate skip transition, and append replay does not
+retrofit historical receipts written before observer installation. The
 kernel-owned `ReceiptStore` contract exposes this as one atomic append
 capability; its default returns `Unsupported`, and installation rejects a
 backend that cannot provide it. The observer still runs only after commit and
-outside the receipt-store lock.
+outside the receipt-store lock. Capability detection compares the live SQLite
+tables, indexes, and complete trigger set with a reference manifest; drift or an
+extra trigger disables the projection. A new attempt-zero insert is read back and
+verified before the receipt transaction commits.
 
 Both inline routing and F69 claim work through
 `chio_settle::SettlementOutcomeStore`. A claim atomically increments a checked
 row version and writes a fresh lease owner, opaque token, and deadline.
-Completion requires an unexpired exact `(receipt_id, row_version, lease_token)`
-match. Accepted or legitimately skipped work deletes the claimed row; retryable
+Completion requires an unexpired exact match over the receipt id, finalization
+time, attempt count, row version, lease owner, token, and deadline. Accepted or
+legitimately skipped work deletes the claimed row; retryable
 work increments the bounded attempt count, clears the lease, and writes a checked
 millisecond visibility deadline; permanent or exhausted work atomically replaces
 the row with one canonical dead letter. A stale claimant affects zero rows and
@@ -617,7 +624,11 @@ in `docs/superpowers/plans/2026-07-10-ws1-first-light-phase1.md`. The same
 `Immediate` transaction owns claim, retry update, and retry-to-dead-letter
 transitions. `RetryPolicy` is validated at installation and at the store
 boundary, all time arithmetic is checked in milliseconds, and a dead letter is
-terminal until an explicit operator action.
+terminal until an explicit operator action. A byte-identical terminal replay may
+compare reconstructed v2 canonical bytes after the live attempt was removed, but
+performs no mutation; any difference is a conflict. Legacy v1 dead letters remain
+available through a versioned read shape and are never rewritten or synthesized
+as v2. Unknown schema tags fail closed.
 
 Every unresolved registered-observer outcome, including failed cleanup or
 persistence, emits one bounded warning and increments the shared
@@ -854,6 +865,9 @@ adopter persist and restore counters instead of silently losing them.
   trustworthy `request_id` and terminal recovery proof, so they are never
   auto-expired merely because they predate the migration. They appear in the
   review command and require an explicit reconciled resolution.
+- Existing `chio.settle.dead-letter.v1` rows remain readable through the SQLite
+  store's versioned compatibility API. New writes are exact v2 only, and migration
+  never rewrites legacy canonical bytes.
 - Staged rollout. The payment journal is the money-path specialization of RFC-0003's
   `DispatchIntentJournalMode`; enable it with the `Monetary` class first (highest
   consequence), gated behind the same config. The F68 routing consumer ships enabled

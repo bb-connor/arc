@@ -192,6 +192,11 @@ pub enum SettlementFailureCode {
     Backend,
 }
 
+/// Unknown durable settlement failure code.
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[error("unknown settlement failure code")]
+pub struct SettlementFailureCodeParseError;
+
 impl SettlementFailureCode {
     /// Return the stable snake-case label used by durable stores.
     #[must_use]
@@ -216,6 +221,30 @@ impl SettlementFailureCode {
 
     const fn allows_retry(self) -> bool {
         matches!(self, Self::Rpc | Self::Backend)
+    }
+}
+
+impl TryFrom<&str> for SettlementFailureCode {
+    type Error = SettlementFailureCodeParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "invalid_receipt_signature" => Ok(Self::InvalidReceiptSignature),
+            "invalid_action_hash" => Ok(Self::InvalidActionHash),
+            "untrusted_receipt_signer" => Ok(Self::UntrustedReceiptSigner),
+            "malformed_financial_metadata" => Ok(Self::MalformedFinancialMetadata),
+            "invalid_observation" => Ok(Self::InvalidObservation),
+            "rpc" => Ok(Self::Rpc),
+            "invalid_input" => Ok(Self::InvalidInput),
+            "invalid_dispatch" => Ok(Self::InvalidDispatch),
+            "invalid_binding" => Ok(Self::InvalidBinding),
+            "unsupported" => Ok(Self::Unsupported),
+            "serialization" => Ok(Self::Serialization),
+            "signature" => Ok(Self::Signature),
+            "verification" => Ok(Self::Verification),
+            "backend" => Ok(Self::Backend),
+            _ => Err(SettlementFailureCodeParseError),
+        }
     }
 }
 
@@ -796,6 +825,21 @@ mod tests {
                 serialized,
                 serde_json::Value::String(code.as_str().to_string())
             );
+            assert_eq!(SettlementFailureCode::try_from(code.as_str()), Ok(code));
         }
+    }
+
+    #[test]
+    fn failure_code_parser_rejects_unknown_labels() {
+        for label in ["", "RPC", "rpc ", "unknown"] {
+            assert_eq!(
+                SettlementFailureCode::try_from(label),
+                Err(SettlementFailureCodeParseError)
+            );
+        }
+        assert_eq!(
+            SettlementFailureCodeParseError.to_string(),
+            "unknown settlement failure code"
+        );
     }
 }

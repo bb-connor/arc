@@ -178,7 +178,6 @@ mod tests {
         fn record_claimed_outcome(
             &self,
             _claim: &SettlementAttemptClaim,
-            _finalized_at: u64,
             _outcome: &SettlementRoutingInput,
             _policy: RetryPolicy,
             _observed_at_ms: u64,

@@ -53,9 +53,10 @@ pub use evm::{
     SettlementAnchorContentBinding,
 };
 pub use hook::{
-    SettlementFailureClass, SettlementFailureCode, SettlementFailureReason, SettlementHook,
-    SettlementHookError, SettlementObservation, SettlementOutcome, SettlementSkipReason,
-    SETTLEMENT_OBSERVATION_SCHEMA, SETTLEMENT_OUTCOME_SCHEMA,
+    SettlementFailureClass, SettlementFailureCode, SettlementFailureCodeParseError,
+    SettlementFailureReason, SettlementHook, SettlementHookError, SettlementObservation,
+    SettlementOutcome, SettlementSkipReason, SETTLEMENT_OBSERVATION_SCHEMA,
+    SETTLEMENT_OUTCOME_SCHEMA,
 };
 pub use observe::{
     inspect_finality, inspect_finality_for_receipt, observe_bond, project_escrow_execution_receipt,
@@ -72,8 +73,10 @@ pub use ops::{
     SettlementRuntimeReport, SettlementRuntimeStatus, CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
 };
 pub use outcome_store::{
-    SettlementAttemptClaim, SettlementOutcomeStore, SettlementRoute, SettlementRouteError,
-    SettlementRouteErrorClass, SettlementRoutingInput, SettlementStoreBinding,
+    validate_settlement_claim, SettlementAttemptClaim, SettlementClaimValidationError,
+    SettlementOutcomeStore, SettlementRoute, SettlementRouteError, SettlementRouteErrorClass,
+    SettlementRoutingInput, SettlementStoreBinding, MAX_SETTLEMENT_CLAIM_BATCH,
+    MAX_SETTLEMENT_LEASE_MS, MAX_SETTLEMENT_WORKER_ID_BYTES,
 };
 pub use payments::{
     build_x402_payment_requirements, evaluate_circle_nanopayment, prepare_paymaster_compatibility,

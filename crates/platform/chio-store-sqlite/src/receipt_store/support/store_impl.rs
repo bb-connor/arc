@@ -231,6 +231,57 @@ impl ReceiptStore for SqliteReceiptStore {
         self.append_chio_receipt_returning_seq(receipt).map(|_| ())
     }
 
+    fn settlement_store_binding(&self) -> Option<chio_settle::SettlementStoreBinding> {
+        self.settlement_store_binding
+    }
+
+    fn atomic_receipt_projection(&self) -> AtomicReceiptProjection {
+        if self.settlement_store_binding.is_some() {
+            AtomicReceiptProjection::SettlementObservationV1
+        } else {
+            AtomicReceiptProjection::Unsupported
+        }
+    }
+
+    fn append_chio_receipt_with_pending_observation(
+        &self,
+        receipt: &ChioReceipt,
+        pending: &PendingSettlementObservation,
+    ) -> Result<(), ReceiptStoreError> {
+        if self.settlement_store_binding.is_none() {
+            return Err(ReceiptStoreError::Unsupported(
+                "atomic settlement observation projection".to_string(),
+            ));
+        }
+        ensure_chio_receipt_verified(receipt)?;
+        sqlite_i64(receipt.timestamp, "receipt timestamp")?;
+        sqlite_i64(
+            pending.next_visible_at_ms,
+            "settlement attempt visibility deadline",
+        )?;
+        let raw_json = serde_json::to_string(receipt)?;
+        let receipt = receipt.clone();
+        let next_visible_at_ms = pending.next_visible_at_ms;
+        self.writer_handle().run_write_receipt(move |connection| {
+            ensure_checkpoint_transparency_guards(connection)?;
+            let tx =
+                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            let (_, inserted) =
+                append_chio_receipt_tx_with_insert_status(&tx, &receipt, &raw_json)?;
+            ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
+            if inserted {
+                crate::settle_attempts::insert_attempt_zero_tx(
+                    &tx,
+                    &receipt.id,
+                    receipt.timestamp,
+                    next_visible_at_ms,
+                )?;
+            }
+            tx.commit()?;
+            Ok(())
+        })
+    }
+
     fn load_chio_receipt(
         &self,
         receipt_id: &str,

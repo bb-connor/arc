@@ -172,7 +172,8 @@ constructs a deliberately isolated kernel.
   receipts. The Phase 1 F68 foundation makes `settle_attempts` the observer
   outbox; Phase 3 installs its production drain. Whenever the paired observer
   runtime is installed, the receipt-writer transaction seeds a due
-  `pending_observation` row with attempt zero for every receipt before commit.
+  `pending_observation` row with attempt zero for every newly inserted receipt
+  before commit.
   The inline observer and
   recovery worker both claim that row by lease and expected version, so a crash
   after receipt commit but before inline routing cannot lose work. Its
@@ -182,8 +183,11 @@ constructs a deliberately isolated kernel.
   letter through `chio_settle::SettlementOutcomeStore`. `Accepted` has already
   created the open reconciliation work row and atomically deletes the claimed
   outbox/attempt row; pre-hook `Skipped` deletes it only for a legitimate closed
-  skip reason. Receipt and outcome store handles must carry the same fixed-size
-  writer binding before the runtime can be installed. A
+  skip reason. The paired append seeds work only when it inserts a new receipt;
+  byte-identical receipt replay never recreates work after either cleanup path.
+  Receipts written before observer installation are not retrofitted by append
+  replay. Receipt and outcome store handles must carry the same fixed-size writer
+  binding before the runtime can be installed. A
   separate settlement worker claims leased open reconciliation rows, performs
   optional remote delivery, and records the immutable outcome sidecar. The
   credit worker independently scans only canonical obligations whose signed
@@ -218,7 +222,12 @@ constructs a deliberately isolated kernel.
   implementation),
   the F72 currency-mismatch deny, the F73 nonce store, and the F74 snapshot seam.
   These follow RFC-0013's normative invariants; the illustrative F68
-  read-then-upsert sequence is tightened into one atomic transaction.
+  read-then-upsert sequence is tightened into one atomic transaction. Legacy v1
+  dead letters remain exact, read-only compatibility records; new writes are
+  canonical v2 and unknown schema tags fail closed. The receipt store advertises
+  the atomic projection only when its live SQLite schema and complete trigger set
+  match the reference manifest, and verifies the inserted attempt-zero row before
+  committing a new receipt.
 - Economic obligation and disposition: `chio_credit::obligation` owns the atom,
   disposition, authenticated transition event, and store trait;
   `chio-store-sqlite` owns the durable implementation. The projector verifies
@@ -293,6 +302,8 @@ constructs a deliberately isolated kernel.
    A projection failure leaves the receipt, obligation sidecars, and outbox row
    absent and the RFC-0003 dispatch intent open; recovery resolves that intent to
    a receipt or incident.
+   A byte-identical duplicate receipt append is a no-op and does not recreate an
+   outbox row already removed by a completed observer transition.
 6. Settlement observation. After commit, `record_chio_receipt` claims the seeded
    row by lease and expected version, runs the observer outside the receipt-store
    write lock (`receipt_persistence.rs:179`), and routes its outcome (F68).

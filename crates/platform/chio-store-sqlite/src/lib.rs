@@ -40,6 +40,7 @@ pub mod memory_provenance_store;
 pub mod receipt_query;
 pub mod receipt_store;
 pub mod revocation_store;
+pub mod settle_attempts;
 
 pub use chio_core::crypto::SharedCanonicalBytes;
 pub use chio_core::{CanonicalBytes, CanonicalJsonWitness};
@@ -105,3 +106,4 @@ pub use iou_store::{SqliteIouEnvelopeStore, IOU_ENVELOPE_MIGRATION};
 pub use memory_provenance_store::{SqliteMemoryProvenanceStore, SqliteMemoryProvenanceStoreError};
 pub use receipt_store::{BackgroundCheckpointSigner, SqliteReceiptStore};
 pub use revocation_store::SqliteRevocationStore;
+pub use settle_attempts::{SqliteSettlementOutcomeStore, SETTLE_ATTEMPTS_MIGRATION};

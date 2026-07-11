@@ -9,6 +9,7 @@ use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use chacha20poly1305::aead::rand_core::{OsRng, RngCore};
 use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
 use chio_core::capability::{scope::ChioScope, token::CapabilityToken};
 use chio_core::crypto::{sha256_hex, Keypair, Signature};
@@ -62,9 +63,9 @@ use chio_kernel::receipt_query::{
 };
 use chio_kernel::receipt_store::{ReceiptLineageStatementLink, ReceiptLineageVerification};
 use chio_kernel::{
-    AuthorizationReceiptConsumption, CapabilitySnapshot, CreditBondDisposition,
-    CreditBondLifecycleState, CreditBondListQuery, CreditBondListReport, CreditBondListSummary,
-    CreditBondRow, CreditFacilityDisposition, CreditFacilityLifecycleState,
+    AtomicReceiptProjection, AuthorizationReceiptConsumption, CapabilitySnapshot,
+    CreditBondDisposition, CreditBondLifecycleState, CreditBondListQuery, CreditBondListReport,
+    CreditBondListSummary, CreditBondRow, CreditFacilityDisposition, CreditFacilityLifecycleState,
     CreditFacilityListQuery, CreditFacilityListReport, CreditFacilityListSummary,
     CreditFacilityRow, CreditLossLifecycleEventKind, CreditLossLifecycleListQuery,
     CreditLossLifecycleListReport, CreditLossLifecycleListSummary, CreditLossLifecycleRow,
@@ -77,19 +78,20 @@ use chio_kernel::{
     LiabilityMarketWorkflowSummary, LiabilityProviderLifecycleState, LiabilityProviderListQuery,
     LiabilityProviderListReport, LiabilityProviderListSummary, LiabilityProviderResolutionQuery,
     LiabilityProviderResolutionReport, LiabilityProviderRow, LiabilityQuoteDisposition,
-    ReceiptCheckpointCreateReport, ReceiptCheckpointRange, ReceiptCheckpointStatusReport,
-    ReceiptFlushReport, ReceiptStore, ReceiptStoreError, ReceiptStoreHealthReport,
-    ReceiptWalCheckpointReport, ReceiptWriterCounters, RetentionConfig, SignedCreditBond,
-    SignedCreditFacility, SignedCreditLossLifecycle, SignedLiabilityAutoBindDecision,
-    SignedLiabilityBoundCoverage, SignedLiabilityClaimAdjudication, SignedLiabilityClaimDispute,
-    SignedLiabilityClaimPackage, SignedLiabilityClaimPayoutInstruction,
-    SignedLiabilityClaimPayoutReceipt, SignedLiabilityClaimResponse,
-    SignedLiabilityClaimSettlementInstruction, SignedLiabilityClaimSettlementReceipt,
-    SignedLiabilityPlacement, SignedLiabilityPricingAuthority, SignedLiabilityProvider,
-    SignedLiabilityQuoteRequest, SignedLiabilityQuoteResponse, SignedUnderwritingDecision,
-    StoredChildReceipt, StoredToolReceipt, UnderwritingAppealCreateRequest,
-    UnderwritingAppealRecord, UnderwritingAppealResolution, UnderwritingAppealResolveRequest,
-    UnderwritingAppealStatus, UnderwritingDecisionLifecycleState, UnderwritingDecisionListReport,
+    PendingSettlementObservation, ReceiptCheckpointCreateReport, ReceiptCheckpointRange,
+    ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore, ReceiptStoreError,
+    ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters, RetentionConfig,
+    SignedCreditBond, SignedCreditFacility, SignedCreditLossLifecycle,
+    SignedLiabilityAutoBindDecision, SignedLiabilityBoundCoverage,
+    SignedLiabilityClaimAdjudication, SignedLiabilityClaimDispute, SignedLiabilityClaimPackage,
+    SignedLiabilityClaimPayoutInstruction, SignedLiabilityClaimPayoutReceipt,
+    SignedLiabilityClaimResponse, SignedLiabilityClaimSettlementInstruction,
+    SignedLiabilityClaimSettlementReceipt, SignedLiabilityPlacement,
+    SignedLiabilityPricingAuthority, SignedLiabilityProvider, SignedLiabilityQuoteRequest,
+    SignedLiabilityQuoteResponse, SignedUnderwritingDecision, StoredChildReceipt,
+    StoredToolReceipt, UnderwritingAppealCreateRequest, UnderwritingAppealRecord,
+    UnderwritingAppealResolution, UnderwritingAppealResolveRequest, UnderwritingAppealStatus,
+    UnderwritingDecisionLifecycleState, UnderwritingDecisionListReport,
     UnderwritingDecisionOutcome, UnderwritingDecisionQuery, UnderwritingDecisionRow,
     UnderwritingDecisionSummary, CREDIT_BOND_LIST_REPORT_SCHEMA,
     CREDIT_FACILITY_LIST_REPORT_SCHEMA, CREDIT_LOSS_LIFECYCLE_LIST_REPORT_SCHEMA,
@@ -103,6 +105,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 pub struct SqliteReceiptStore {
     pub(crate) pool: Pool<SqliteConnectionManager>,
     receipt_commit_actor: ReceiptCommitActor,
+    settlement_store_binding: Option<chio_settle::SettlementStoreBinding>,
     /// Multi-tenant receipt isolation: when true, tenant-
     /// scoped queries exclude the pre-multitenant NULL-tagged set. When
     /// false, queries with `tenant_filter = Some(id)` return rows where
@@ -342,9 +345,16 @@ impl ReceiptCommitActor {
 pub(crate) struct WriterHandle {
     sender: mpsc::SyncSender<ReceiptCommitCommand>,
     health: Arc<ReceiptCommitWriterHealth>,
+    settlement_store_binding: Option<chio_settle::SettlementStoreBinding>,
 }
 
 impl WriterHandle {
+    pub(crate) const fn settlement_store_binding(
+        &self,
+    ) -> Option<chio_settle::SettlementStoreBinding> {
+        self.settlement_store_binding
+    }
+
     /// Run one write job on the single writer connection and return its
     /// typed result. Fail-closed on saturation or a dead writer. Use for
     /// metadata-only writes (capability, liability, underwriting, IOU,
@@ -1916,6 +1926,7 @@ impl SqliteReceiptStore {
         WriterHandle {
             sender: self.receipt_commit_actor.sender.clone(),
             health: Arc::clone(&self.receipt_commit_actor.health),
+            settlement_store_binding: self.settlement_store_binding,
         }
     }
 
@@ -2602,6 +2613,14 @@ fn append_chio_receipt_tx(
     receipt: &ChioReceipt,
     raw_json: &str,
 ) -> Result<u64, ReceiptStoreError> {
+    append_chio_receipt_tx_with_insert_status(tx, receipt, raw_json).map(|(seq, _)| seq)
+}
+
+fn append_chio_receipt_tx_with_insert_status(
+    tx: &rusqlite::Transaction<'_>,
+    receipt: &ChioReceipt,
+    raw_json: &str,
+) -> Result<(u64, bool), ReceiptStoreError> {
     let attribution = extract_receipt_attribution(receipt);
     let mut subject_key = attribution.subject_key;
     let mut issuer_key = attribution.issuer_key;
@@ -2669,10 +2688,11 @@ fn append_chio_receipt_tx(
             "persisted duplicate tool receipt",
             Some(existing_source_seq),
         )?;
-        return claim_log_entry_seq_for_source_tx(tx, "tool_receipt", existing_source_seq);
+        return claim_log_entry_seq_for_source_tx(tx, "tool_receipt", existing_source_seq)
+            .map(|seq| (seq, false));
     };
     let source_seq = sqlite_positive_u64(source_seq, "tool receipt source_seq")?;
-    claim_log_entry_seq_for_source_tx(tx, "tool_receipt", source_seq)
+    claim_log_entry_seq_for_source_tx(tx, "tool_receipt", source_seq).map(|seq| (seq, true))
 }
 
 fn consume_authorization_receipt_tx(
@@ -2942,6 +2962,7 @@ mod receipt_commit_actor_tests {
         let handle = WriterHandle {
             sender,
             health: Arc::clone(&health),
+            settlement_store_binding: None,
         };
 
         let error = handle.run_write(|_connection| Ok(()));

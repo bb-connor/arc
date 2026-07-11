@@ -18,6 +18,8 @@ mod lineage;
 mod query;
 #[path = "tests/scale_proof.rs"]
 mod scale_proof;
+#[path = "tests/settlement.rs"]
+mod settlement;
 #[path = "tests/single_writer.rs"]
 mod single_writer;
 #[path = "tests/support.rs"]
