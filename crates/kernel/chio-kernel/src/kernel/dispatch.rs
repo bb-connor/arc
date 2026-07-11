@@ -20,6 +20,91 @@ impl GuardRunError {
     }
 }
 
+/// Owned copy of a guard invocation, so the sequential guard core can run inside
+/// `spawn_blocking` (which requires a `'static` closure) without borrowing from
+/// the async evaluate future.
+struct OwnedGuardInvocation {
+    request: ToolCallRequest,
+    scope: ChioScope,
+    session_filesystem_roots: Option<Vec<String>>,
+    matched_grant_index: Option<usize>,
+}
+
+/// Synchronous fail-closed guard loop. Shared by the inline path and the
+/// offloaded (`spawn_blocking`) path so the two can never diverge. Any deny,
+/// unsupported approval verdict, or guard error short-circuits fail-closed.
+fn evaluate_guards_sequential(
+    guards: &[Arc<dyn Guard>],
+    ctx: &GuardContext,
+) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
+    let mut evidence = Vec::new();
+    for guard in guards {
+        match guard.evaluate(ctx) {
+            Ok(decision) => {
+                evidence.extend(decision.evidence);
+                match decision.verdict {
+                    Verdict::Allow => {
+                        debug!(guard = guard.name(), "guard passed");
+                    }
+                    Verdict::Deny => {
+                        return Err(GuardRunError::new(
+                            KernelError::GuardDenied(format!(
+                                "guard \"{}\" denied the request",
+                                guard.name()
+                            )),
+                            evidence,
+                        ));
+                    }
+                    Verdict::PendingApproval => {
+                        // The `Guard` trait does not carry the HITL approval flow; that runs via
+                        // `ApprovalGuard::evaluate`. A `Guard` returning `PendingApproval` is an
+                        // unsupported state, so fail closed.
+                        return Err(GuardRunError::new(
+                            KernelError::GuardDenied(format!(
+                                "guard \"{}\" returned an unsupported approval verdict",
+                                guard.name()
+                            )),
+                            evidence,
+                        ));
+                    }
+                }
+            }
+            Err(e) => {
+                // Fail closed: guard errors are treated as denials.
+                return Err(GuardRunError::new(
+                    KernelError::GuardDenied(format!(
+                        "guard \"{}\" error (fail-closed): {e}",
+                        guard.name()
+                    )),
+                    evidence,
+                ));
+            }
+        }
+    }
+    Ok(evidence)
+}
+
+/// Run the guard loop over an owned invocation, rebuilding the borrowed
+/// `GuardContext` from the owned fields. Used by the blocking offload.
+fn run_guards_owned(
+    guards: &[Arc<dyn Guard>],
+    owned: &OwnedGuardInvocation,
+) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
+    let ctx = GuardContext {
+        request: &owned.request,
+        scope: &owned.scope,
+        agent_id: &owned.request.agent_id,
+        server_id: &owned.request.server_id,
+        session_filesystem_roots: owned.session_filesystem_roots.as_deref(),
+        matched_grant_index: owned.matched_grant_index,
+    };
+    evaluate_guards_sequential(guards, &ctx)
+}
+
+fn budget_ms_saturating(budget: std::time::Duration) -> u64 {
+    budget.as_millis().min(u128::from(u64::MAX)) as u64
+}
+
 impl ChioKernel {
     pub(crate) fn validate_parent_request_continuation(
         &self,
@@ -318,52 +403,129 @@ impl ChioKernel {
             session_filesystem_roots,
             matched_grant_index,
         };
+        evaluate_guards_sequential(self.guards.as_slice(), &ctx)
+    }
 
+    /// Async wrapper deciding how to run the synchronous guard pipeline. When a
+    /// pipeline budget, a per-guard override, or `always_offload_guards`
+    /// applies (and a Tokio runtime is present), the sync core runs under
+    /// `spawn_blocking` wrapped in `tokio::time::timeout`, so a blocking guard
+    /// can no longer pin an async worker and a hung guard fails closed as
+    /// `HotPathDeadlineExceeded`. Otherwise, or with no runtime, it keeps the
+    /// inline behavior.
+    ///
+    /// `tokio::time::timeout` drops the `JoinHandle` on expiry, which detaches
+    /// (does not kill) the blocking thread: a runaway guard runs to completion
+    /// on the blocking pool with its result discarded, while the async worker is
+    /// freed and the request fails fast. The blast radius is contained in the
+    /// blocking pool instead of starving the async worker pool.
+    pub(crate) async fn run_guards_within_budget(
+        &self,
+        request: &ToolCallRequest,
+        scope: &ChioScope,
+        session_filesystem_roots: Option<&[String]>,
+        matched_grant_index: Option<usize>,
+    ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
+        let has_per_guard = !self.config.deadlines.per_guard_budget_ms.is_empty();
+        let pipeline_budget = self.config.deadlines.guard_pipeline_budget();
+        let want_offload = pipeline_budget.is_some()
+            || has_per_guard
+            || self.config.deadlines.always_offload_guards;
+
+        if !want_offload || tokio::runtime::Handle::try_current().is_err() {
+            return self.run_guards(
+                request,
+                scope,
+                session_filesystem_roots,
+                matched_grant_index,
+            );
+        }
+
+        let owned = Arc::new(OwnedGuardInvocation {
+            request: request.clone(),
+            scope: scope.clone(),
+            session_filesystem_roots: session_filesystem_roots.map(<[String]>::to_vec),
+            matched_grant_index,
+        });
+
+        if has_per_guard {
+            return self.run_guards_per_guard_offloaded(&owned).await;
+        }
+
+        let guards = Arc::clone(&self.guards);
+        let owned_for_task = Arc::clone(&owned);
+        let join = tokio::task::spawn_blocking(move || run_guards_owned(&guards, &owned_for_task));
+        match pipeline_budget {
+            Some(budget) => match tokio::time::timeout(budget, join).await {
+                Ok(Ok(result)) => result,
+                Ok(Err(join_err)) => Err(GuardRunError::new(
+                    KernelError::Internal(format!("guard task join failed: {join_err}")),
+                    Vec::new(),
+                )),
+                Err(_elapsed) => Err(GuardRunError::new(
+                    KernelError::HotPathDeadlineExceeded {
+                        stage: HotPathStage::GuardPipeline,
+                        budget_ms: budget_ms_saturating(budget),
+                    },
+                    Vec::new(),
+                )),
+            },
+            None => match join.await {
+                Ok(result) => result,
+                Err(join_err) => Err(GuardRunError::new(
+                    KernelError::Internal(format!("guard task join failed: {join_err}")),
+                    Vec::new(),
+                )),
+            },
+        }
+    }
+
+    /// Enforce each guard against its own effective budget, so one wedged guard
+    /// is bounded to its own budget while the rest still run. One blocking
+    /// handoff per guard; used only when per-guard budgets are configured.
+    async fn run_guards_per_guard_offloaded(
+        &self,
+        owned: &Arc<OwnedGuardInvocation>,
+    ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
         let mut evidence = Vec::new();
-        for guard in &self.guards {
-            match guard.evaluate(&ctx) {
-                Ok(decision) => {
-                    evidence.extend(decision.evidence);
-                    match decision.verdict {
-                        Verdict::Allow => {
-                            debug!(guard = guard.name(), "guard passed");
-                        }
-                        Verdict::Deny => {
-                            return Err(GuardRunError::new(
-                                KernelError::GuardDenied(format!(
-                                    "guard \"{}\" denied the request",
-                                    guard.name()
-                                )),
-                                evidence,
-                            ));
-                        }
-                        Verdict::PendingApproval => {
-                            // The `Guard` trait does not carry the HITL approval flow; that runs via
-                            // `ApprovalGuard::evaluate`. A `Guard` returning `PendingApproval` is an
-                            // unsupported state, so fail closed.
-                            return Err(GuardRunError::new(
-                                KernelError::GuardDenied(format!(
-                                    "guard \"{}\" returned an unsupported approval verdict",
-                                    guard.name()
-                                )),
-                                evidence,
-                            ));
-                        }
+        for guard in self.guards.iter() {
+            let budget = self.config.deadlines.guard_budget_for(guard.name());
+            let guard = Arc::clone(guard);
+            let owned = Arc::clone(owned);
+            let run_one = tokio::task::spawn_blocking(move || {
+                run_guards_owned(std::slice::from_ref(&guard), &owned)
+            });
+            let outcome = match budget {
+                Some(budget) => match tokio::time::timeout(budget, run_one).await {
+                    Ok(joined) => joined,
+                    Err(_elapsed) => {
+                        return Err(GuardRunError::new(
+                            KernelError::HotPathDeadlineExceeded {
+                                stage: HotPathStage::GuardPipeline,
+                                budget_ms: budget_ms_saturating(budget),
+                            },
+                            std::mem::take(&mut evidence),
+                        ));
                     }
+                },
+                None => run_one.await,
+            };
+            match outcome {
+                Ok(Ok(mut guard_evidence)) => evidence.append(&mut guard_evidence),
+                Ok(Err(mut guard_error)) => {
+                    // Preserve the evidence accumulated from earlier guards ahead
+                    // of the failing guard's own evidence.
+                    guard_error.evidence.splice(0..0, evidence);
+                    return Err(guard_error);
                 }
-                Err(e) => {
-                    // Fail closed: guard errors are treated as denials.
+                Err(join_err) => {
                     return Err(GuardRunError::new(
-                        KernelError::GuardDenied(format!(
-                            "guard \"{}\" error (fail-closed): {e}",
-                            guard.name()
-                        )),
-                        evidence,
+                        KernelError::Internal(format!("guard task join failed: {join_err}")),
+                        std::mem::take(&mut evidence),
                     ));
                 }
             }
         }
-
         Ok(evidence)
     }
 
@@ -554,6 +716,35 @@ impl ChioKernel {
         self.require_presented_execution_nonce(request, &request.capability)?;
         self.dispatch_tool_call_with_cost_after_nonce_check(request, has_monetary_grant)
             .await
+    }
+
+    /// Bound the tool-server call by the per-server (or default) dispatch
+    /// budget. On expiry the call fails closed with `HotPathDeadlineExceeded`,
+    /// which the evaluate core unwinds like a cancellation. With no budget, or
+    /// on the no-runtime fallback where no Tokio timer driver exists (wrapping
+    /// would panic rather than degrade), the call runs inline; the no-runtime
+    /// path has no async transport to hang on.
+    pub(crate) async fn dispatch_within_budget(
+        &self,
+        request: &ToolCallRequest,
+        has_monetary_grant: bool,
+    ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
+        let call = self.dispatch_tool_call_with_cost_after_nonce_check(request, has_monetary_grant);
+        match self
+            .config
+            .deadlines
+            .dispatch_budget_for(&request.server_id)
+        {
+            None => call.await,
+            Some(_) if tokio::runtime::Handle::try_current().is_err() => call.await,
+            Some(budget) => match tokio::time::timeout(budget, call).await {
+                Ok(result) => result,
+                Err(_elapsed) => Err(KernelError::HotPathDeadlineExceeded {
+                    stage: HotPathStage::Dispatch,
+                    budget_ms: budget_ms_saturating(budget),
+                }),
+            },
+        }
     }
 
     pub(crate) async fn dispatch_tool_call_with_cost_after_nonce_check(

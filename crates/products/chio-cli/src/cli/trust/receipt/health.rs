@@ -313,6 +313,7 @@ mod receipt_operator_tests {
         let health = chio_kernel::ReceiptStoreHealthReport {
             healthy: false,
             writer: counters.clone(),
+            writer_liveness: "wedged".to_string(),
             latest_committed_entry_seq: 12,
             latest_checkpoint_seq: Some(2),
             latest_checkpointed_entry_seq: 8,

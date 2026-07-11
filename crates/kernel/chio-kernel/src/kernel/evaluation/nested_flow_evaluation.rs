@@ -372,12 +372,15 @@ impl ChioKernel {
             }
         };
 
-        let pre_invocation_guard_evidence = match self.run_guards(
-            request,
-            &cap.scope,
-            Some(session_roots.as_slice()),
-            Some(matched_grant_index),
-        ) {
+        let pre_invocation_guard_evidence = match self
+            .run_guards_within_budget(
+                request,
+                &cap.scope,
+                Some(session_roots.as_slice()),
+                Some(matched_grant_index),
+            )
+            .await
+        {
             Ok(evidence) => evidence,
             Err(e) => {
                 let msg = e.error.to_string();
@@ -600,7 +603,7 @@ impl ChioKernel {
         // the `&mut self` call must happen first. There is no await between here
         // and the invoke below, so the future cannot be dropped in this window.
         post_admission_drop_guard.mark_dispatch_started();
-        let tool_output_result = {
+        let dispatch_call = async {
             let mut bridge = SessionNestedFlowBridge {
                 sessions: &self.sessions,
                 child_receipts: post_admission_drop_guard.child_receipts_mut(),
@@ -632,6 +635,25 @@ impl ChioKernel {
                     .map(ToolServerOutput::Value),
                 Err(error) => Err(error),
             }
+        };
+        // Bound the nested tool-server call by the dispatch budget. On expiry the
+        // buffered child receipts recorded so far are still persisted below, and
+        // the abort arm unwinds like a cancellation.
+        let tool_output_result = match self
+            .config
+            .deadlines
+            .dispatch_budget_for(&request.server_id)
+        {
+            Some(budget) if tokio::runtime::Handle::try_current().is_ok() => {
+                match tokio::time::timeout(budget, dispatch_call).await {
+                    Ok(result) => result,
+                    Err(_elapsed) => Err(KernelError::HotPathDeadlineExceeded {
+                        stage: HotPathStage::Dispatch,
+                        budget_ms: budget.as_millis().min(u128::from(u64::MAX)) as u64,
+                    }),
+                }
+            }
+            _ => dispatch_call.await,
         };
         post_admission_drop_guard.disarm();
         // Take the buffered child receipts out of the guard before dropping it.
@@ -768,6 +790,47 @@ impl ChioKernel {
                     reason = %redacted!(&reason),
                     "tool call cancelled"
                 );
+                return self.with_pre_invocation_guard_evidence(
+                    &pre_invocation_guard_evidence,
+                    || {
+                        self.build_cancelled_response_with_metadata(
+                            request,
+                            &reason,
+                            now,
+                            Some(matched_grant_index),
+                            self.mark_runtime_admission_reservations_retained_fail_closed(
+                                match (budget_mutation.charge_result(), unwind.as_ref()) {
+                                    (Some(charge), Some(reverse)) => self
+                                        .merge_budget_receipt_metadata(
+                                            runtime_admission_metadata.clone(),
+                                            self.budget_execution_receipt_metadata(
+                                                charge,
+                                                Some(("reversed", reverse)),
+                                            ),
+                                        ),
+                                    _ => runtime_admission_metadata.clone(),
+                                },
+                            ),
+                        )
+                    },
+                );
+            }
+            Err(KernelError::HotPathDeadlineExceeded { stage, budget_ms }) => {
+                let reason = format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms");
+                let unwind = self.unwind_aborted_monetary_invocation(
+                    request,
+                    cap,
+                    budget_mutation.charge_result(),
+                    payment_authorization.as_ref(),
+                )?;
+                warn!(
+                    request_id = %request.request_id,
+                    reason = %redacted!(&reason),
+                    "tool call deadline expired"
+                );
+                // A timed-out dispatch may already have applied its side effect,
+                // so the runtime-admission reservation is retained and marked
+                // auditable rather than released.
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {

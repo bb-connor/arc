@@ -102,6 +102,11 @@ pub struct ReceiptCheckpointStatusReport {
 pub struct ReceiptStoreHealthReport {
     pub healthy: bool,
     pub writer: ReceiptWriterCounters,
+    /// Current writer-liveness label ("healthy", "wedged", "dead", ...).
+    /// Serialized so an operator health surface can distinguish a slow-but-live
+    /// writer from a wedged one. Optional for backward compatibility.
+    #[serde(default = "receipt_writer_liveness_unknown_label")]
+    pub writer_liveness: String,
     pub latest_committed_entry_seq: u64,
     #[serde(default)]
     pub latest_checkpoint_seq: Option<u64>,
@@ -184,6 +189,42 @@ pub enum ReceiptStoreError {
     NotFound(String),
 }
 
+/// Point-in-time liveness of a receipt store's commit writer. `Unknown` keeps
+/// stores with no async writer (or no watchdog wired) behaving exactly as they
+/// did before liveness existed: the pre-dispatch readiness gate treats it as
+/// permissive.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReceiptWriterLiveness {
+    Healthy,
+    Saturated,
+    Wedged,
+    Dead,
+    Unknown,
+}
+
+impl ReceiptWriterLiveness {
+    /// Whether the pre-dispatch gate may admit while the writer is in this
+    /// state. Only a proven-healthy or not-yet-probed writer is permissive; a
+    /// saturated, wedged, or dead writer denies.
+    pub fn healthy(self) -> bool {
+        matches!(self, Self::Healthy | Self::Unknown)
+    }
+
+    pub fn as_label(self) -> &'static str {
+        match self {
+            Self::Healthy => "healthy",
+            Self::Saturated => "saturated",
+            Self::Wedged => "wedged",
+            Self::Dead => "dead",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+fn receipt_writer_liveness_unknown_label() -> String {
+    ReceiptWriterLiveness::Unknown.as_label().to_string()
+}
+
 pub trait ReceiptStore: Send + Sync {
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError>;
     /// Load a chio receipt by id. The provided default returns `None`; a store
@@ -229,6 +270,23 @@ pub trait ReceiptStore: Send + Sync {
     ) -> Result<Option<u64>, ReceiptStoreError> {
         self.append_chio_receipt(receipt)?;
         Ok(None)
+    }
+    /// Append a receipt, failing closed with `ReceiptStoreError::Timeout` if the
+    /// commit round trip exceeds `budget`. The default ignores the budget and
+    /// keeps the unbounded behavior for stores without an async writer; a store
+    /// with a commit actor overrides this so a wedged writer cannot pin the
+    /// kernel-wide receipt write lock indefinitely.
+    fn append_chio_receipt_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        _budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        self.append_chio_receipt_returning_seq(receipt)
+    }
+    /// Point-in-time writer liveness. Default `Unknown` keeps stores with no
+    /// async writer, or no watchdog wired, permissive at the pre-dispatch gate.
+    fn writer_liveness(&self) -> ReceiptWriterLiveness {
+        ReceiptWriterLiveness::Unknown
     }
     fn append_chio_receipt_consuming_authorization(
         &self,
