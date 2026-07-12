@@ -173,6 +173,14 @@ pub enum AggregateFamilyRootRecordStatus {
     AlreadyPresent,
 }
 
+/// Full authenticated root record carried by snapshot and delta replication.
+#[derive(Clone, Debug)]
+pub struct StoredAggregateFamilyRoot {
+    pub seq: u64,
+    pub canonical_token_json: String,
+    pub token_digest: String,
+}
+
 /// Typed failures from aggregate family-root registration.
 #[derive(Debug, thiserror::Error)]
 pub enum AggregateFamilyRootStoreError {
@@ -358,6 +366,108 @@ impl SqliteReceiptStore {
             })
             .map_err(receipt_store_unavailable)?
     }
+
+    /// Highest local aggregate family-root sequence, or zero when empty.
+    pub fn max_aggregate_family_root_seq(&self) -> Result<u64, AggregateFamilyRootStoreError> {
+        let mut connection = self.connection().map_err(receipt_store_unavailable)?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .map_err(sqlite_to_store_error)?;
+        validate_schema_integrity(&transaction).map_err(schema_integrity_to_store_error)?;
+        let seq = transaction
+            .query_row(
+                "SELECT COALESCE(MAX(seq), 0) FROM chio_aggregate_family_roots",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(sqlite_to_store_error)?;
+        transaction.commit().map_err(sqlite_to_store_error)?;
+        stored_sequence_u64(seq, "aggregate family-root head")
+    }
+
+    /// List authenticated full root tokens after a local sequence.
+    pub fn list_aggregate_family_roots_after_seq(
+        &self,
+        after_seq: u64,
+        limit: usize,
+    ) -> Result<Vec<StoredAggregateFamilyRoot>, AggregateFamilyRootStoreError> {
+        let limit = i64::try_from(limit).map_err(|_| {
+            AggregateFamilyRootStoreError::InvalidRecord(
+                "aggregate family-root list limit exceeds the SQLite INTEGER range".to_string(),
+            )
+        })?;
+        let after_seq = i64::try_from(after_seq).map_err(|_| {
+            AggregateFamilyRootStoreError::InvalidRecord(
+                "aggregate family-root cursor exceeds the SQLite INTEGER range".to_string(),
+            )
+        })?;
+        let mut connection = self.connection().map_err(receipt_store_unavailable)?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .map_err(sqlite_to_store_error)?;
+        validate_schema_integrity(&transaction).map_err(schema_integrity_to_store_error)?;
+        let mut statement = transaction
+            .prepare(
+                "SELECT seq, root_capability_id \
+                 FROM chio_aggregate_family_roots \
+                 WHERE seq > ?1 ORDER BY seq ASC LIMIT ?2",
+            )
+            .map_err(sqlite_to_store_error)?;
+        let indexed_roots = statement
+            .query_map(params![after_seq, limit], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(sqlite_to_store_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(sqlite_to_store_error)?;
+        drop(statement);
+
+        let mut records = Vec::with_capacity(indexed_roots.len());
+        for (seq, root_capability_id) in indexed_roots {
+            let stored = load_root_record(&transaction, &root_capability_id)
+                .map_err(sqlite_to_store_error)?
+                .ok_or_else(|| {
+                    AggregateFamilyRootStoreError::Corrupt(format!(
+                        "aggregate family-root sequence {seq} has no record"
+                    ))
+                })?;
+            let authenticated = validate_stored_root(stored)?;
+            records.push(StoredAggregateFamilyRoot {
+                seq: stored_sequence_u64(seq, "aggregate family-root sequence")?,
+                canonical_token_json: authenticated.record.canonical_token_json,
+                token_digest: authenticated.record.token_digest,
+            });
+        }
+        transaction.commit().map_err(sqlite_to_store_error)?;
+        Ok(records)
+    }
+
+    /// Reauthenticate and atomically import one ordered root page.
+    pub fn import_aggregate_family_roots(
+        &self,
+        records: &[StoredAggregateFamilyRoot],
+        trusted_issuers: &[PublicKey],
+        recorded_at: u64,
+    ) -> Result<Vec<AggregateFamilyRootRecordStatus>, AggregateFamilyRootStoreError> {
+        let mut previous_seq = None;
+        let authenticated = records
+            .iter()
+            .map(|record| {
+                if record.seq == 0 || previous_seq.is_some_and(|previous| record.seq <= previous) {
+                    return Err(AggregateFamilyRootStoreError::InvalidRecord(
+                        "aggregate family-root replication sequence is not strictly increasing"
+                            .to_string(),
+                    ));
+                }
+                previous_seq = Some(record.seq);
+                authenticate_replication_root(record, trusted_issuers, recorded_at)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        self.writer_handle()
+            .run_write(move |connection| Ok(record_authenticated_roots(connection, &authenticated)))
+            .map_err(receipt_store_unavailable)?
+    }
 }
 
 impl AggregateFamilyRootResolver for SqliteReceiptStore {
@@ -488,6 +598,50 @@ fn authenticate_root(
         },
         resolution,
     })
+}
+
+fn stored_sequence_u64(value: i64, field: &str) -> Result<u64, AggregateFamilyRootStoreError> {
+    u64::try_from(value)
+        .map_err(|_| AggregateFamilyRootStoreError::Corrupt(format!("{field} is negative")))
+}
+
+fn authenticate_replication_root(
+    record: &StoredAggregateFamilyRoot,
+    trusted_issuers: &[PublicKey],
+    recorded_at: u64,
+) -> Result<AuthenticatedRoot, AggregateFamilyRootStoreError> {
+    let strict_canonical =
+        canonical_json_bytes_from_str(&record.canonical_token_json).map_err(|error| {
+            AggregateFamilyRootStoreError::InvalidRecord(format!(
+                "replicated root token is not strict I-JSON: {error}"
+            ))
+        })?;
+    if strict_canonical.as_slice() != record.canonical_token_json.as_bytes() {
+        return Err(AggregateFamilyRootStoreError::InvalidRecord(
+            "replicated root token JSON is not canonical".to_string(),
+        ));
+    }
+    if aggregate_family_root_token_digest(&strict_canonical) != record.token_digest {
+        return Err(AggregateFamilyRootStoreError::InvalidRecord(
+            "replicated root token digest mismatch".to_string(),
+        ));
+    }
+    let token: CapabilityToken = serde_json::from_slice(&strict_canonical).map_err(|error| {
+        AggregateFamilyRootStoreError::InvalidRecord(format!(
+            "replicated root token cannot be decoded: {error}"
+        ))
+    })?;
+    let typed_canonical = canonical_json_bytes(&token).map_err(|error| {
+        AggregateFamilyRootStoreError::InvalidRecord(format!(
+            "replicated root token cannot be recanonicalized: {error}"
+        ))
+    })?;
+    if typed_canonical != strict_canonical {
+        return Err(AggregateFamilyRootStoreError::InvalidRecord(
+            "replicated root token contains non-schema or non-canonical fields".to_string(),
+        ));
+    }
+    authenticate_root(&token, trusted_issuers, recorded_at)
 }
 
 fn authenticate_token_signature(
@@ -1422,6 +1576,222 @@ mod tests {
             None => panic!("conflicting lineage was removed"),
         };
         assert_eq!(lineage.subject_key, conflicting.subject.to_hex());
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_family_root_replication_round_trips_full_tokens_in_order() -> TestResult {
+        let source_directory = tempdir()?;
+        let source_path = source_directory.path().join("source.db");
+        let source = SqliteReceiptStore::open(&source_path)?;
+        let (family_issuer, _family_subject, family) = family_root("replicated-family-root", 5)?;
+        let (legacy_issuer, _legacy_subject, legacy) = legacy_root("replicated-legacy-root")?;
+        let trusted = [family_issuer.public_key(), legacy_issuer.public_key()];
+        source.record_aggregate_family_root(&family, &trusted, 1_100)?;
+        source.record_aggregate_family_root(&legacy, &trusted, 1_200)?;
+
+        assert_eq!(source.max_aggregate_family_root_seq()?, 2);
+        let first = source.list_aggregate_family_roots_after_seq(0, 1)?;
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0].seq, 1);
+        assert_eq!(
+            serde_json::from_str::<CapabilityToken>(&first[0].canonical_token_json)?.id,
+            family.id
+        );
+        let second = source.list_aggregate_family_roots_after_seq(first[0].seq, 8)?;
+        assert_eq!(second.len(), 1);
+        assert_eq!(second[0].seq, 2);
+        assert_eq!(
+            serde_json::from_str::<CapabilityToken>(&second[0].canonical_token_json)?.id,
+            legacy.id
+        );
+
+        let mut records = first;
+        records.extend(second);
+        let target_directory = tempdir()?;
+        let target_path = target_directory.path().join("target.db");
+        {
+            let target = SqliteReceiptStore::open(&target_path)?;
+            assert_eq!(
+                target.import_aggregate_family_roots(&records, &trusted, 1_300)?,
+                vec![
+                    super::AggregateFamilyRootRecordStatus::Inserted,
+                    super::AggregateFamilyRootRecordStatus::Inserted,
+                ]
+            );
+        }
+
+        let reopened = SqliteReceiptStore::open(&target_path)?;
+        assert!(matches!(
+            reopened.resolve_aggregate_family_root(&family.id),
+            Ok(AggregateFamilyRootResolution::FamilyBound(root))
+                if root.max_invocations() == 5
+        ));
+        assert!(matches!(
+            reopened.resolve_aggregate_family_root(&legacy.id),
+            Ok(AggregateFamilyRootResolution::LegacyUnbound(_))
+        ));
+        let reopened_ids = reopened
+            .list_aggregate_family_roots_after_seq(0, 8)?
+            .into_iter()
+            .map(|record| {
+                serde_json::from_str::<CapabilityToken>(&record.canonical_token_json)
+                    .map(|token| token.id)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(reopened_ids, vec![family.id, legacy.id]);
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_family_root_replication_preserves_the_exact_canonical_artifact() -> TestResult {
+        let source_directory = tempdir()?;
+        let source = SqliteReceiptStore::open(source_directory.path().join("source.db"))?;
+        let (issuer, _subject, token) = family_root("replication-canonical-root", 5)?;
+        source.record_aggregate_family_root(&token, &[issuer.public_key()], 1_100)?;
+        let exported = source.list_aggregate_family_roots_after_seq(0, 1)?;
+        let original = match exported.first() {
+            Some(record) => record,
+            None => panic!("source root must be exported"),
+        };
+
+        let mut value = serde_json::to_value(&token)?;
+        let object = match value.as_object_mut() {
+            Some(object) => object,
+            None => panic!("capability token must serialize as an object"),
+        };
+        object.insert("unknownRootField".to_string(), serde_json::json!(true));
+        let canonical_with_unknown = chio_core::canonicalize(&value)?;
+        let noncanonical = serde_json::to_string_pretty(&token)?;
+        let duplicate_id = format!(
+            "{{\"id\":\"duplicate\",{}",
+            original
+                .canonical_token_json
+                .strip_prefix('{')
+                .unwrap_or(&original.canonical_token_json)
+        );
+        let cases = [
+            super::StoredAggregateFamilyRoot {
+                seq: 1,
+                token_digest: super::aggregate_family_root_token_digest(noncanonical.as_bytes()),
+                canonical_token_json: noncanonical,
+            },
+            super::StoredAggregateFamilyRoot {
+                seq: 1,
+                token_digest: super::aggregate_family_root_token_digest(
+                    canonical_with_unknown.as_bytes(),
+                ),
+                canonical_token_json: canonical_with_unknown,
+            },
+            super::StoredAggregateFamilyRoot {
+                seq: 1,
+                token_digest: super::aggregate_family_root_token_digest(duplicate_id.as_bytes()),
+                canonical_token_json: duplicate_id,
+            },
+            super::StoredAggregateFamilyRoot {
+                seq: 1,
+                token_digest: "0".repeat(64),
+                canonical_token_json: original.canonical_token_json.clone(),
+            },
+        ];
+
+        let target_directory = tempdir()?;
+        let target_path = target_directory.path().join("target.db");
+        let target = SqliteReceiptStore::open(&target_path)?;
+        for record in cases {
+            assert!(matches!(
+                target.import_aggregate_family_roots(&[record], &[issuer.public_key()], 1_200),
+                Err(super::AggregateFamilyRootStoreError::InvalidRecord(_))
+            ));
+            assert_eq!(row_count(&target_path)?, 0);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_family_root_replication_rejects_unrepresentable_pagination() -> TestResult {
+        let directory = tempdir()?;
+        let store = SqliteReceiptStore::open(directory.path().join("roots.db"))?;
+
+        assert!(matches!(
+            store.list_aggregate_family_roots_after_seq(u64::MAX, 1),
+            Err(super::AggregateFamilyRootStoreError::InvalidRecord(_))
+        ));
+        assert!(matches!(
+            store.list_aggregate_family_roots_after_seq(0, usize::MAX),
+            Err(super::AggregateFamilyRootStoreError::InvalidRecord(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_family_root_replication_authenticates_batch_before_mutation() -> TestResult {
+        let source_directory = tempdir()?;
+        let source = SqliteReceiptStore::open(source_directory.path().join("source.db"))?;
+        let (trusted_issuer, _trusted_subject, trusted_root) =
+            family_root("replication-trusted-root", 5)?;
+        let (untrusted_issuer, _untrusted_subject, untrusted_root) =
+            family_root("replication-untrusted-root", 6)?;
+        source.record_aggregate_family_root(
+            &trusted_root,
+            &[trusted_issuer.public_key()],
+            1_100,
+        )?;
+        source.record_aggregate_family_root(
+            &untrusted_root,
+            &[untrusted_issuer.public_key()],
+            1_200,
+        )?;
+        let records = source.list_aggregate_family_roots_after_seq(0, 8)?;
+
+        let target_directory = tempdir()?;
+        let target_path = target_directory.path().join("target.db");
+        let target = SqliteReceiptStore::open(&target_path)?;
+        let error = match target.import_aggregate_family_roots(
+            &records,
+            &[trusted_issuer.public_key()],
+            1_300,
+        ) {
+            Err(error) => error,
+            Ok(_) => panic!("untrusted replicated root must fail the complete batch"),
+        };
+        assert!(matches!(
+            error,
+            super::AggregateFamilyRootStoreError::Authentication(_)
+        ));
+        assert_eq!(row_count(&target_path)?, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_family_root_replication_conflict_retains_follower_state() -> TestResult {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let original = family_root_with_keys("replication-conflict", 5, &issuer, &subject)?;
+        let conflict = family_root_with_keys("replication-conflict", 6, &issuer, &subject)?;
+
+        let source_directory = tempdir()?;
+        let source = SqliteReceiptStore::open(source_directory.path().join("source.db"))?;
+        source.record_aggregate_family_root(&conflict, &[issuer.public_key()], 1_200)?;
+        let records = source.list_aggregate_family_roots_after_seq(0, 8)?;
+
+        let target_directory = tempdir()?;
+        let target = SqliteReceiptStore::open(target_directory.path().join("target.db"))?;
+        target.record_aggregate_family_root(&original, &[issuer.public_key()], 1_100)?;
+        let error =
+            match target.import_aggregate_family_roots(&records, &[issuer.public_key()], 1_300) {
+                Err(error) => error,
+                Ok(_) => panic!("conflicting replicated root must fail"),
+            };
+        assert!(matches!(
+            error,
+            super::AggregateFamilyRootStoreError::Conflict { .. }
+        ));
+        assert!(matches!(
+            target.resolve_aggregate_family_root(&original.id),
+            Ok(AggregateFamilyRootResolution::FamilyBound(root))
+                if root.max_invocations() == 5
+        ));
         Ok(())
     }
 

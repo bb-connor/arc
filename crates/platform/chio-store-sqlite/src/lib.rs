@@ -93,7 +93,9 @@ impl Default for SqliteStoreOptions {
     }
 }
 
-pub use aggregate_family_root::{AggregateFamilyRootRecordStatus, AggregateFamilyRootStoreError};
+pub use aggregate_family_root::{
+    AggregateFamilyRootRecordStatus, AggregateFamilyRootStoreError, StoredAggregateFamilyRoot,
+};
 pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use batch_approval_store::SqliteBatchApprovalStore;
