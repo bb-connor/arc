@@ -3101,7 +3101,11 @@ impl SqliteReceiptStore {
     /// is also ABANDONED: the caller denies before dispatch on timeout, so
     /// the job still queued on a slow-but-alive writer must not land a stale
     /// row that would dead-letter at the next boot as a false orphan for a
-    /// call that never executed.
+    /// call that never executed. Because the marker cannot stop an insert
+    /// that has already passed its final check and is inside its commit when
+    /// the deadline expires, the timeout path also enqueues a guarded clear
+    /// behind the insert, so even a commit that outruns the marker leaves no
+    /// row behind.
     pub fn record_dispatch_intent_with_timeout(
         &self,
         intent: &chio_kernel::receipt_store::DispatchIntentRecord,
@@ -3109,8 +3113,33 @@ impl SqliteReceiptStore {
     ) -> Result<(), ReceiptStoreError> {
         let abandoned = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let job = dispatch_intent_insert_job_unless_abandoned(intent, Arc::clone(&abandoned));
-        self.writer_handle()
-            .run_write_abandoning_on_timeout(job, budget, abandoned)
+        let result = self
+            .writer_handle()
+            .run_write_abandoning_on_timeout(job, budget, abandoned);
+        if matches!(result, Err(ReceiptStoreError::Timeout { .. })) {
+            // The caller is about to deny before dispatch, yet an insert that
+            // was inside its commit when the marker landed may still have
+            // committed. Enqueue an open-state-guarded clear on the same
+            // single-writer queue: FIFO order runs it strictly after the
+            // insert job, so it deletes the row when the straddling commit
+            // landed and reports NotFound when the insert refused. Even when
+            // this bounded confirmation wait expires as well, the queued
+            // clear still drains with the writer, so a slow-but-alive writer
+            // cannot leave a row that would dead-letter as a false orphan for
+            // a call that never dispatched. NotFound is the common outcome
+            // (the insert refused via the marker); any other failure is
+            // already recorded in the writer health counters by the bounded
+            // write path, and the row is left for boot reconciliation, which
+            // at worst surfaces an extra operator-visible dead letter rather
+            // than losing a real orphan.
+            let key = chio_kernel::receipt_store::DispatchIntentKey {
+                request_id: intent.request_id.clone(),
+                parameter_hash: intent.parameter_hash.clone(),
+                tenant_id: intent.tenant_id.clone(),
+            };
+            let _ = self.clear_dispatch_intent_with_timeout(&key, budget);
+        }
+        result
     }
 
     /// Append a receipt and, in the SAME immediate transaction, consume the

@@ -231,6 +231,74 @@ fn timed_out_intent_write_does_not_land_after_the_writer_drains(
     Ok(())
 }
 
+#[test]
+fn straddling_intent_commit_is_cleared_after_a_timeout_deny(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // A slow-but-successful insert can pass its final abandoned check and be
+    // inside its commit when the caller's deadline expires: the abandoned
+    // marker can no longer stop the row from landing, the caller reports a
+    // timeout, and the evaluator denies before dispatch. The landed row must
+    // then be swept by the guarded clear the timeout path enqueues behind the
+    // insert on the single writer; otherwise it would dead-letter at the next
+    // boot as a false orphan for a call that never executed.
+    let path = unique_db_path("chio-intents-straddle-clear");
+    let store = SqliteReceiptStore::open(&path)?;
+
+    // Model the straddling commit deterministically: the writer-occupying job
+    // lands the caller's intent row through the production insert job and then
+    // parks past the caller's budget, so the caller times out while the row is
+    // already durable (exactly the state a commit that outruns the abandoned
+    // marker leaves behind).
+    let intent = sample_intent("req-straddle-clear");
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    let blocker_handle = store.writer_handle();
+    let landed_insert = super::super::support::dispatch_intent_insert_job(&intent);
+    let blocker = std::thread::spawn(move || {
+        blocker_handle.run_write(move |connection| {
+            landed_insert(connection)?;
+            let _ = started_tx.send(());
+            let _ = release_rx.recv_timeout(std::time::Duration::from_secs(30));
+            Ok(())
+        })
+    });
+    started_rx.recv_timeout(std::time::Duration::from_secs(5))?;
+    assert_eq!(
+        open_intent_row_count(&store)?,
+        1,
+        "the straddling insert must be durable before the caller times out"
+    );
+
+    // The caller's own insert job is queued behind the parked writer; its
+    // bounded wait expires and the evaluator will deny before dispatch.
+    let error = store.record_dispatch_intent_with_timeout(
+        &intent,
+        std::time::Duration::from_millis(100),
+    );
+    assert!(
+        matches!(
+            error,
+            Err(chio_kernel::receipt_store::ReceiptStoreError::Timeout { .. })
+        ),
+        "the bounded intent write must still fail closed on expiry"
+    );
+
+    // Unblock the writer and drain the queue past the abandoned insert and
+    // the compensating clear.
+    release_tx.send(())?;
+    blocker.join().map_err(|_| "blocker thread panicked")??;
+    store.writer_handle().run_write(|_connection| Ok(()))?;
+
+    assert_eq!(
+        open_intent_row_count(&store)?,
+        0,
+        "a landed intent row must not survive a timeout deny as a false orphan"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 struct RecordingReconciler;
 
 impl chio_kernel::receipt_store::DispatchIntentReconciler for RecordingReconciler {

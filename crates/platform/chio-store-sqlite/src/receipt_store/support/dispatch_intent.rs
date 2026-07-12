@@ -74,8 +74,11 @@ pub(crate) fn dispatch_intent_insert_job(
 /// dispatch, and the stale row would dead-letter at the next boot as a false
 /// orphan for a call that never executed. The marker is checked both before
 /// the transaction (cheap skip) and again immediately before commit, so the
-/// unguarded window is only the commit itself; a write racing that window is
-/// honored by the caller instead of reported as a timeout.
+/// unguarded window is only the commit itself. A write racing that window
+/// either answers in the instant between the deadline and the marker (and is
+/// honored by the caller instead of reported as a timeout) or lands anyway;
+/// the timeout path sweeps a landed row with a guarded clear enqueued behind
+/// this job on the single writer (see `record_dispatch_intent_with_timeout`).
 pub(crate) fn dispatch_intent_insert_job_unless_abandoned(
     intent: &DispatchIntentRecord,
     abandoned: std::sync::Arc<std::sync::atomic::AtomicBool>,
