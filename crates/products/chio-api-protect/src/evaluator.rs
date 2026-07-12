@@ -45,11 +45,23 @@ pub struct RequestEvaluator {
 }
 
 impl RequestEvaluator {
-    pub fn new(routes: Vec<RouteEntry>, keypair: Keypair, policy_hash: String) -> Self {
-        Self::new_with_trusted_capability_issuers(routes, keypair, policy_hash, Vec::new())
+    /// Build an evaluator whose embedded kernel keeps its receipt log and
+    /// revocation state in memory; both are lost on restart. Ephemerality is
+    /// opted into through the constructor name so an embedder never gets
+    /// in-memory audit state by mistake. Durable-by-default construction goes
+    /// through [`RequestEvaluator::new_with_durable_stores`].
+    pub fn new_ephemeral(routes: Vec<RouteEntry>, keypair: Keypair, policy_hash: String) -> Self {
+        Self::new_ephemeral_with_trusted_capability_issuers(
+            routes,
+            keypair,
+            policy_hash,
+            Vec::new(),
+        )
     }
 
-    pub fn new_with_trusted_capability_issuers(
+    /// Ephemeral evaluator with additional trusted capability issuers; see
+    /// [`RequestEvaluator::new_ephemeral`].
+    pub fn new_ephemeral_with_trusted_capability_issuers(
         routes: Vec<RouteEntry>,
         keypair: Keypair,
         policy_hash: String,
@@ -68,13 +80,15 @@ impl RequestEvaluator {
         }
     }
 
-    pub fn new_with_approval_store(
+    /// Ephemeral evaluator with a caller-provided approval store; see
+    /// [`RequestEvaluator::new_ephemeral`].
+    pub fn new_ephemeral_with_approval_store(
         routes: Vec<RouteEntry>,
         keypair: Keypair,
         policy_hash: String,
         approval_store: Arc<dyn ApprovalStore>,
     ) -> Self {
-        Self::new_with_approval_store_and_trusted_capability_issuers(
+        Self::new_ephemeral_with_approval_store_and_trusted_capability_issuers(
             routes,
             keypair,
             policy_hash,
@@ -83,7 +97,9 @@ impl RequestEvaluator {
         )
     }
 
-    pub fn new_with_approval_store_and_trusted_capability_issuers(
+    /// Ephemeral evaluator with a caller-provided approval store and additional
+    /// trusted capability issuers; see [`RequestEvaluator::new_ephemeral`].
+    pub fn new_ephemeral_with_approval_store_and_trusted_capability_issuers(
         routes: Vec<RouteEntry>,
         keypair: Keypair,
         policy_hash: String,
@@ -588,7 +604,8 @@ mod tests {
             operation_id: Some("listPets".to_string()),
             policy: PolicyDecision::SessionAllow,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
+        let evaluator =
+            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string());
 
         let result = evaluator
             .evaluate(
@@ -617,7 +634,8 @@ mod tests {
             operation_id: Some("createPet".to_string()),
             policy: PolicyDecision::DenyByDefault,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
+        let evaluator =
+            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string());
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-math-only",
@@ -666,7 +684,7 @@ mod tests {
     #[test]
     fn evaluate_denies_get_reserved_tools_path_without_capability() {
         let keypair = Keypair::generate();
-        let evaluator = RequestEvaluator::new(vec![], keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(vec![], keypair, "test-policy".to_string());
 
         let result = evaluator
             .evaluate(
@@ -690,7 +708,8 @@ mod tests {
     #[test]
     fn evaluate_chio_request_allows_reserved_tools_path_context() {
         let keypair = Keypair::generate();
-        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let evaluator =
+            RequestEvaluator::new_ephemeral(vec![], keypair.clone(), "test-policy".to_string());
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-matrix-read",
@@ -736,7 +755,8 @@ mod tests {
     #[test]
     fn evaluate_chio_request_denies_unmatched_http_path_with_spoofed_synthetic_pattern() {
         let keypair = Keypair::generate();
-        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let evaluator =
+            RequestEvaluator::new_ephemeral(vec![], keypair.clone(), "test-policy".to_string());
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-matrix-admin-delete",
@@ -786,7 +806,8 @@ mod tests {
     #[test]
     fn evaluate_chio_request_denies_capability_for_different_tool_identity() {
         let keypair = Keypair::generate();
-        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let evaluator =
+            RequestEvaluator::new_ephemeral(vec![], keypair.clone(), "test-policy".to_string());
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-tool-scope",
@@ -832,7 +853,8 @@ mod tests {
     #[test]
     fn evaluate_chio_request_allows_model_constrained_capability_when_metadata_matches() {
         let keypair = Keypair::generate();
-        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let evaluator =
+            RequestEvaluator::new_ephemeral(vec![], keypair.clone(), "test-policy".to_string());
         let capability = signed_capability_token_json_with_scope(
             &keypair,
             "cap-model-scope",
@@ -888,7 +910,7 @@ mod tests {
     fn evaluate_chio_request_allows_capability_from_configured_external_issuer() {
         let signer = Keypair::generate();
         let external_issuer = Keypair::generate();
-        let evaluator = RequestEvaluator::new_with_trusted_capability_issuers(
+        let evaluator = RequestEvaluator::new_ephemeral_with_trusted_capability_issuers(
             vec![],
             signer,
             "test-policy".to_string(),
@@ -926,7 +948,8 @@ mod tests {
             operation_id: Some("createPet".to_string()),
             policy: PolicyDecision::DenyByDefault,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
+        let evaluator =
+            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string());
 
         let result = evaluator
             .evaluate(
@@ -956,7 +979,8 @@ mod tests {
             operation_id: Some("createPet".to_string()),
             policy: PolicyDecision::DenyByDefault,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
+        let evaluator =
+            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string());
 
         let mut headers = HashMap::new();
         headers.insert(
@@ -991,7 +1015,8 @@ mod tests {
             operation_id: Some("createPet".to_string()),
             policy: PolicyDecision::DenyByDefault,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
+        let evaluator =
+            RequestEvaluator::new_ephemeral(routes, keypair.clone(), "test-policy".to_string());
 
         let mut headers = HashMap::new();
         headers.insert(
@@ -1025,7 +1050,7 @@ mod tests {
             operation_id: Some("listPets".to_string()),
             policy: PolicyDecision::SessionAllow,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string());
 
         let decision = evaluator
             .evaluate(
@@ -1113,7 +1138,7 @@ mod tests {
             operation_id: Some("getData".to_string()),
             policy: PolicyDecision::SessionAllow,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string());
 
         let result = evaluator
             .evaluate(
@@ -1132,7 +1157,7 @@ mod tests {
     #[test]
     fn fallback_policy_for_unmatched_route() {
         let keypair = Keypair::generate();
-        let evaluator = RequestEvaluator::new(vec![], keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(vec![], keypair, "test-policy".to_string());
 
         // GET to unknown route should still be allowed (safe method)
         let result = evaluator
@@ -1170,7 +1195,7 @@ mod tests {
             operation_id: Some("createPet".to_string()),
             policy: PolicyDecision::DenyByDefault,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string());
         let mut headers = HashMap::new();
         headers.insert("X-Chio-Capability".to_string(), "not-json".to_string());
 
@@ -1198,7 +1223,7 @@ mod tests {
             operation_id: Some("search".to_string()),
             policy: PolicyDecision::SessionAllow,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string());
         let mut query_a = HashMap::new();
         query_a.insert("q".to_string(), "cats".to_string());
         let mut query_b = HashMap::new();

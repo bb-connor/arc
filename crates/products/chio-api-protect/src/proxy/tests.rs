@@ -192,7 +192,7 @@ fn test_state_with_receipt_db(
     let signer_public_key = keypair.public_key();
     let trusted_capability_issuers = vec![signer_public_key.clone()];
     let trusted_receipt_signers = vec![signer_public_key];
-    let evaluator = RequestEvaluator::new_with_approval_store(
+    let evaluator = RequestEvaluator::new_ephemeral_with_approval_store(
         routes,
         keypair.clone(),
         "test-policy".to_string(),
