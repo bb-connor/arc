@@ -196,14 +196,20 @@ fn require_durable_or_ephemeral_optin(
     Ok(())
 }
 
-/// A local `chio run` / `chio check` / MCP-edge session keeps its revocation
-/// set in an in-memory store unless the operator wires a durable
-/// `--revocation-db` or a remote control plane. Without a durable backend the
-/// kernel's revocation-durability gate denies every dispatch, so a local
-/// interactive runtime explicitly accepts the ephemeral store. A configured
+/// A one-shot `chio run` or `chio check` invocation issues fresh capabilities,
+/// evaluates within a single process lifetime, and exits, so revocation state
+/// never needs to survive a restart. Such a session keeps its revocation set in
+/// an in-memory store unless the operator wires a durable `--revocation-db` or a
+/// remote control plane, and this explicitly accepts that ephemeral store so the
+/// kernel's revocation-durability gate does not deny dispatch. A configured
 /// durable backend satisfies the gate on its own, so this only ever relaxes the
 /// genuinely in-memory case (an in-memory SQLite path counts as no durable
 /// backend, mirroring the receipt-store durability check).
+///
+/// Long-running servers must NOT use this: a persistent edge accepts requests
+/// across capability releases and restarts, so it requires a durable revocation
+/// backend or an explicit `allow_ephemeral_revocation_store` opt-in in policy
+/// (see [`build_mcp_edge_kernel`]).
 pub(crate) fn opt_in_ephemeral_revocation_for_local_session(
     kernel: &mut ChioKernel,
     revocation_db_path: Option<&Path>,
@@ -214,6 +220,69 @@ pub(crate) fn opt_in_ephemeral_revocation_for_local_session(
     if !durable_backend {
         kernel.opt_in_ephemeral_revocation_store();
     }
+}
+
+/// Durable store and authority paths for the long-running MCP edge kernel.
+pub(crate) struct McpEdgeStores<'a> {
+    pub receipt_db_path: Option<&'a Path>,
+    pub revocation_db_path: Option<&'a Path>,
+    pub authority_seed_path: Option<&'a Path>,
+    pub authority_db_path: Option<&'a Path>,
+    pub budget_db_path: Option<&'a Path>,
+    pub control_url: Option<&'a str>,
+    pub control_token: Option<&'a str>,
+}
+
+/// Build the kernel that backs the long-running `chio mcp serve` edge.
+///
+/// Unlike the one-shot `chio run` / `chio check` sessions, the MCP edge outlives
+/// many capability releases and is expected to survive restarts (operators wire
+/// it with a durable `--receipt-db`). It therefore never auto-opts into an
+/// ephemeral revocation store: revocation durability must come from a
+/// `--revocation-db`, a control plane, or an explicit
+/// `allow_ephemeral_revocation_store` in policy. When none is present the
+/// kernel's revocation-durability gate denies dispatch, which is the intended
+/// fail-closed behavior for a server that would otherwise keep accepting a token
+/// it had already revoked before a restart.
+pub(crate) fn build_mcp_edge_kernel(
+    loaded_policy: policy::LoadedPolicy,
+    kernel_kp: &Keypair,
+    stores: &McpEdgeStores<'_>,
+) -> Result<ChioKernel, CliError> {
+    let issuance_policy = loaded_policy.issuance_policy.clone();
+    let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
+    let mut kernel = build_kernel(loaded_policy, kernel_kp);
+    configure_receipt_store(
+        &mut kernel,
+        stores.receipt_db_path,
+        stores.control_url,
+        stores.control_token,
+    )?;
+    configure_revocation_store(
+        &mut kernel,
+        stores.revocation_db_path,
+        stores.control_url,
+        stores.control_token,
+    )?;
+    configure_capability_authority(
+        &mut kernel,
+        kernel_kp,
+        stores.authority_seed_path,
+        stores.authority_db_path,
+        stores.receipt_db_path,
+        stores.budget_db_path,
+        stores.control_url,
+        stores.control_token,
+        issuance_policy,
+        runtime_assurance_policy,
+    )?;
+    configure_budget_store(
+        &mut kernel,
+        stores.budget_db_path,
+        stores.control_url,
+        stores.control_token,
+    )?;
+    Ok(kernel)
 }
 
 /// The receipt-store path to hand the proxy as a durable backend, or `None` when
@@ -692,8 +761,6 @@ pub(crate) fn cmd_mcp_serve(
     let loaded_policy = load_policy(resolved_policy_path)?;
     let policy_identity = loaded_policy.identity.clone();
     let default_capabilities = loaded_policy.default_capabilities.clone();
-    let issuance_policy = loaded_policy.issuance_policy.clone();
-    let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
 
     info!(
         policy_path = %resolved_policy_path.display(),
@@ -706,23 +773,19 @@ pub(crate) fn cmd_mcp_serve(
     );
 
     let kernel_kp = Keypair::generate();
-    let mut kernel = build_kernel(loaded_policy, &kernel_kp);
-    configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
-    configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
-    opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
-    configure_capability_authority(
-        &mut kernel,
+    let mut kernel = build_mcp_edge_kernel(
+        loaded_policy,
         &kernel_kp,
-        authority_seed_path,
-        authority_db_path,
-        receipt_db_path,
-        budget_db_path,
-        control_url,
-        control_token,
-        issuance_policy,
-        runtime_assurance_policy,
+        &McpEdgeStores {
+            receipt_db_path,
+            revocation_db_path,
+            authority_seed_path,
+            authority_db_path,
+            budget_db_path,
+            control_url,
+            control_token,
+        },
     )?;
-    configure_budget_store(&mut kernel, budget_db_path, control_url, control_token)?;
 
     let (wrapped_cmd, wrapped_args) = command
         .split_first()
