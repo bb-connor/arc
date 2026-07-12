@@ -100,6 +100,17 @@ impl SupervisedTask {
     }
 }
 
+impl Drop for SupervisedTask {
+    /// Never leak a running supervisor: dropping the owner aborts the supervisor
+    /// loop and cancels its in-flight iteration child. Without this, Tokio detaches
+    /// the dropped join handle and both the loop and any child keep running after
+    /// the owner (and its health handle) are gone, exactly the invisible-orphan
+    /// failure this wrapper exists to prevent.
+    fn drop(&mut self) {
+        self.abort();
+    }
+}
+
 /// Supervise `iteration` in a loop and return the retained [`JoinHandle`]. Each
 /// iteration runs inside a child task so that a panic - which can occur across an
 /// `.await` point where `catch_unwind` cannot cleanly capture it - surfaces as a
@@ -392,6 +403,53 @@ mod tests {
         assert!(
             !completed.load(Ordering::SeqCst),
             "abort must cancel the in-flight child iteration, not detach it to run to completion"
+        );
+    }
+
+    #[tokio::test]
+    async fn dropping_the_task_cancels_the_in_flight_child() {
+        // Dropping the owner without an explicit abort must still stop the work.
+        // Without a Drop impl, Tokio detaches the dropped join handle and both the
+        // supervisor loop and its in-flight child keep running after the owner (and
+        // its health handle) are gone; a detached child runs to completion and sets
+        // `completed`, the invisible-orphan failure this wrapper exists to prevent.
+        let started = Arc::new(AtomicBool::new(false));
+        let completed = Arc::new(AtomicBool::new(false));
+        let worker_started = Arc::clone(&started);
+        let worker_completed = Arc::clone(&completed);
+        let task = SupervisedTask::spawn(fast_config("drop-child", false, 5), move || {
+            let worker_started = Arc::clone(&worker_started);
+            let worker_completed = Arc::clone(&worker_completed);
+            async move {
+                worker_started.store(true, Ordering::SeqCst);
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                // Only reached if the child ran to completion instead of being
+                // cancelled by the drop below.
+                worker_completed.store(true, Ordering::SeqCst);
+                SupervisedOutcome::Continue
+            }
+        });
+
+        // Drop the owner while the child is mid-sleep.
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while !started.load(Ordering::SeqCst) {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .unwrap_or(());
+        drop(task);
+
+        // Wait well past the child's remaining sleep: a detached child would
+        // finish and set `completed`, a cancelled one never does.
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+        assert!(
+            started.load(Ordering::SeqCst),
+            "the iteration should have started"
+        );
+        assert!(
+            !completed.load(Ordering::SeqCst),
+            "dropping the task must cancel the in-flight child, not detach it to run to completion"
         );
     }
 
