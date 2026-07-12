@@ -315,6 +315,21 @@ impl ProtectProxy {
     where
         F: FnOnce(SocketAddr),
     {
+        // Durable-by-default: a missing receipt store means in-memory receipts
+        // and revocations that are lost on every restart, so refuse to start
+        // unless the embedder explicitly opted into ephemeral operation. This
+        // mirrors the CLI boot gate for library callers that construct
+        // `ProtectConfig` directly and would otherwise silently lose audit
+        // evidence.
+        if self.config.receipt_db.is_none() && !self.config.allow_ephemeral_receipts {
+            return Err(ProtectError::Config(
+                "refusing to start without a durable receipt store: set receipt_db to a durable \
+                 SQLite path, or set allow_ephemeral_receipts to run with in-memory receipts that \
+                 are lost on every restart"
+                    .to_string(),
+            ));
+        }
+
         let spec_content = self.load_spec_content().await?;
         let routes = Self::build_routes(&spec_content)?;
         let route_count = routes.len();

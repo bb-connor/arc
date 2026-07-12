@@ -278,6 +278,10 @@ pub(crate) fn cmd_api_protect(
             spec_path: spec_path.map(|path| path.display().to_string()),
             listen_addr: listen_addr.to_string(),
             receipt_db: durable_receipt_db_path(receipt_store).map(|path| path.display().to_string()),
+            // The boot gate above already required an explicit opt-in when the
+            // receipt store is missing or in-memory, so mirror the operator's
+            // choice into the proxy's own durable-by-default gate.
+            allow_ephemeral_receipts,
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
@@ -345,6 +349,10 @@ pub(crate) fn cmd_start(
             spec_path: None,
             listen_addr: listen_addr.to_string(),
             receipt_db: durable_receipt_db_path(receipt_store).map(|path| path.display().to_string()),
+            // The boot gate above already required an explicit opt-in when the
+            // receipt store is missing or in-memory, so mirror the operator's
+            // choice into the proxy's own durable-by-default gate.
+            allow_ephemeral_receipts,
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,

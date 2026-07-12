@@ -1986,6 +1986,33 @@ async fn sidecar_evaluate_tool_call_honors_a_durable_only_revocation() {
     let _ = std::fs::remove_file(format!("{receipt_db}.revocations"));
 }
 
+/// Durable-by-default for embedders: constructing `ProtectConfig` with no
+/// receipt store and no explicit ephemeral opt-in must refuse to start, so a
+/// library user cannot silently run with in-memory receipts. The gate runs
+/// before any listener bind, so the durable-store error surfaces regardless of
+/// the listen address.
+#[tokio::test]
+async fn run_refuses_to_start_without_durable_receipts_unless_opted_in() {
+    let config = ProtectConfig {
+        upstream: "http://127.0.0.1:1".to_string(),
+        spec_content: Some(PETSTORE_YAML.to_string()),
+        spec_path: None,
+        listen_addr: "127.0.0.1:1".to_string(),
+        receipt_db: None,
+        allow_ephemeral_receipts: false,
+        sidecar_control_token: None,
+        signer_seed_hex: None,
+        trusted_capability_issuers: Vec::new(),
+        upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
+    };
+    let error = ProtectProxy::new(config).run().await.test_unwrap_err();
+    let message = error.to_string();
+    assert!(
+        message.contains("durable receipt store"),
+        "an embedded proxy without a durable store must refuse to start, got: {message}"
+    );
+}
+
 #[tokio::test]
 async fn sidecar_release_requires_persistent_receipt_store() {
     let state = test_state(
