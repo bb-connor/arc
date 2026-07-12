@@ -30,3 +30,5 @@ mod underwriting_credit;
 mod verified_head;
 #[path = "tests/dispatch_intent.rs"]
 mod dispatch_intent;
+#[path = "tests/dispatch_intent_property.rs"]
+mod dispatch_intent_property;
