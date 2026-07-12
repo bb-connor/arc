@@ -238,6 +238,7 @@ impl SqliteReceiptStore {
                 connection_flags,
             )?;
 
+            let writer_lifetime_lock = acquire_writer_lifetime_lock(path)?;
             return Ok(Self {
                 receipt_commit_actor: ReceiptCommitActor::start(
                     writer_pool,
@@ -246,6 +247,7 @@ impl SqliteReceiptStore {
                 pool: reader_pool,
                 strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
                 incremental_verification: options.incremental_verification,
+                writer_lifetime_lock,
             });
         }
 
@@ -1227,6 +1229,7 @@ impl SqliteReceiptStore {
             connection_flags,
         )?;
 
+        let writer_lifetime_lock = acquire_writer_lifetime_lock(path)?;
         Ok(Self {
             receipt_commit_actor: ReceiptCommitActor::start(
                 writer_pool,
@@ -1235,6 +1238,7 @@ impl SqliteReceiptStore {
             pool: reader_pool,
             strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
             incremental_verification: options.incremental_verification,
+            writer_lifetime_lock,
         })
     }
 
@@ -1251,6 +1255,30 @@ impl SqliteReceiptStore {
             },
         )
     }
+}
+
+/// Mark this instance as a live writer on the database file: a shared
+/// advisory lock on a sidecar file, held for the store's lifetime and
+/// released by the OS when the process exits, cleanly or not. Boot
+/// reconciliation upgrades the lock to exclusive to prove no sibling writer
+/// instance is live before claiming open dispatch intents as restart
+/// orphans; without the shared mark, one instance attaching to a shared
+/// database would dead-letter a sibling's in-flight intents. Blocks only
+/// while a sibling holds the exclusive upgrade for the duration of its
+/// bounded reconcile pass. In-memory databases have no on-disk file to
+/// coordinate on and take no lock.
+fn acquire_writer_lifetime_lock(path: &Path) -> Result<Option<std::fs::File>, ReceiptStoreError> {
+    let Some(lock_path) = crate::sqlite_writer_lock_path(path) else {
+        return Ok(None);
+    };
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&lock_path)?;
+    file.lock_shared()?;
+    Ok(Some(file))
 }
 
 fn build_receipt_pool(

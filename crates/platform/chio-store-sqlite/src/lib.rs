@@ -146,6 +146,30 @@ pub(crate) fn sqlite_parent_dir_to_create(path: &Path) -> Option<PathBuf> {
     non_empty_parent(&sqlite_uri_filesystem_path(text))
 }
 
+/// The sidecar path a receipt store locks to mark itself a live writer on
+/// `path`, or `None` for an in-memory database (which has no on-disk file for
+/// sibling instances to coordinate on). Derived from the resolved filesystem
+/// path so a `file:` URI and its plain-path spelling coordinate on the same
+/// lock.
+pub(crate) fn sqlite_writer_lock_path(path: &Path) -> Option<PathBuf> {
+    let Some(text) = path.to_str() else {
+        // A non-UTF8 path cannot be a `file:` URI, so use it verbatim.
+        return Some(append_writer_lock_extension(path.to_path_buf()));
+    };
+    if is_in_memory_sqlite_path(text) {
+        return None;
+    }
+    Some(append_writer_lock_extension(sqlite_uri_filesystem_path(
+        text,
+    )))
+}
+
+fn append_writer_lock_extension(path: PathBuf) -> PathBuf {
+    let mut path = path.into_os_string();
+    path.push(".writer-lock");
+    PathBuf::from(path)
+}
+
 /// The parent of `path`, unless it is empty (a bare filename with no directory
 /// component), in which case there is nothing to create.
 fn non_empty_parent(path: &Path) -> Option<PathBuf> {

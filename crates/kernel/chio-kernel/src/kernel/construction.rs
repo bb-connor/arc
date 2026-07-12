@@ -712,7 +712,9 @@ impl ChioKernel {
         // leaving a store serving with unresolved open intents. The default
         // posture dead-letters orphans into durable, health-flipping
         // incidents (a side effect is never blindly replayed); a store
-        // without the journal reports an empty pass.
+        // without the journal reports an empty pass, and a store shared
+        // with a live sibling writer defers that sibling's in-flight
+        // intents to their owner rather than claiming them as orphans.
         let report =
             receipt_store.reconcile_dispatch_intents(&crate::DefaultDispatchIntentReconciler)?;
         if report.dead_lettered > 0 || report.monetary_reconciled > 0 {
@@ -721,6 +723,13 @@ impl ChioKernel {
                 dead_lettered = report.dead_lettered,
                 monetary_reconciled = report.monetary_reconciled,
                 "dispatch intents survived a restart; incidents recorded for operator review"
+            );
+        }
+        if report.deferred_to_live_writer > 0 {
+            tracing::warn!(
+                deferred = report.deferred_to_live_writer,
+                "receipt store is shared with a live sibling writer; leaving its open dispatch \
+                 intents for their owner (a later exclusive attach reconciles any true orphans)"
             );
         }
         match receipt_store.load_latest_checkpoint() {

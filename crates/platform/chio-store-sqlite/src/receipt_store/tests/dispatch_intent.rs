@@ -419,6 +419,56 @@ fn reconcile_dead_letters_orphans_and_reports_counts() -> Result<(), Box<dyn std
     Ok(())
 }
 
+#[test]
+fn attach_defers_reconciliation_while_a_sibling_writer_is_live(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // The store supports sibling writer instances on one database file. An
+    // open intent then proves only that ITS writer has not consumed it yet:
+    // while that writer is alive the call may still be in flight, and
+    // claiming the row as a restart orphan would erase a live crash marker,
+    // reject the owner's terminal receipt, and flip health for work that is
+    // not an incident. Reconciliation must claim open rows only when this
+    // instance holds the file exclusively.
+    let path = unique_db_path("chio-intents-live-sibling");
+    let owner = SqliteReceiptStore::open(&path)?;
+    owner.record_dispatch_intent(&sample_intent("req-live-sibling"))?;
+
+    // A second instance attaching to the shared file observes the owner's
+    // in-flight intent but must leave it to its owner.
+    let sibling = SqliteReceiptStore::open(&path)?;
+    let report = sibling.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(report.open, 1);
+    assert_eq!(
+        report.dead_lettered, 0,
+        "a live sibling's open intent must not dead-letter"
+    );
+    assert_eq!(
+        report.deferred_to_live_writer, 1,
+        "the deferral must be reported, never silent"
+    );
+    assert_eq!(
+        open_intent_row_count(&sibling)?,
+        1,
+        "the owner's crash marker must survive the sibling's attach"
+    );
+
+    // Once both instances are gone the same row is a true restart orphan: a
+    // fresh attach holds the file exclusively and still reconciles it.
+    drop(owner);
+    drop(sibling);
+    let restarted = SqliteReceiptStore::open(&path)?;
+    let report = restarted.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(
+        report.dead_lettered, 1,
+        "a true restart must still dead-letter its orphans"
+    );
+    assert_eq!(report.deferred_to_live_writer, 0);
+    assert_eq!(open_intent_row_count(&restarted)?, 0);
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 /// Rail-aware reconciler: proves the outcome of monetary orphans against the
 /// rail and dead-letters everything else.
 struct RailProvingReconciler;

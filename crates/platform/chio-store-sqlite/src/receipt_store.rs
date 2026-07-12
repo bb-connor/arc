@@ -111,6 +111,14 @@ pub struct SqliteReceiptStore {
     pub(crate) strict_tenant_isolation: std::sync::atomic::AtomicBool,
     /// Staged-rollout flag: read-only after open.
     pub(crate) incremental_verification: bool,
+    /// Sidecar advisory lock marking this instance as a live writer on the
+    /// database file, held shared for the store's lifetime and released by
+    /// the OS when the process exits (cleanly or not). Boot reconciliation
+    /// upgrades it to exclusive to prove no sibling writer instance is live
+    /// before claiming open dispatch intents as restart orphans. `None` only
+    /// for an in-memory database, which has no on-disk file for siblings to
+    /// coordinate on.
+    writer_lifetime_lock: Option<std::fs::File>,
 }
 
 type FederatedShareSubjectCorpus = (
@@ -3295,6 +3303,16 @@ impl SqliteReceiptStore {
     /// reader pool and the reconciler runs on the calling thread (so a
     /// rail-querying reconciler never blocks the single writer); the
     /// resulting annotations are applied in one writer transaction.
+    ///
+    /// Claiming an open row asserts its writer is gone, but the database
+    /// file may be shared with a live sibling instance whose in-flight calls
+    /// own some of these rows. The pass therefore proves exclusivity first
+    /// by upgrading this instance's lifetime lock: a refused upgrade means a
+    /// live sibling holds its shared mark, so every row is deferred to its
+    /// owner (reported, never silent) instead of claimed, and a later
+    /// exclusive attach still reconciles any true orphans among them. A
+    /// single-instance restart holds the file exclusively and reconciles
+    /// exactly as before.
     pub fn reconcile_dispatch_intents(
         &self,
         reconciler: &dyn chio_kernel::receipt_store::DispatchIntentReconciler,
@@ -3311,45 +3329,75 @@ impl SqliteReceiptStore {
         if open.is_empty() {
             return Ok(report);
         }
-        let mut dead_letters: Vec<(String, String)> = Vec::new();
-        let mut reconciled: Vec<(String, String)> = Vec::new();
-        for intent in &open {
-            match reconciler.resolve(intent)? {
-                DispatchIntentResolution::DeadLetter { detail } => {
-                    report.dead_lettered += 1;
-                    dead_letters.push((intent.request_id.clone(), detail));
+        if let Some(lock) = &self.writer_lifetime_lock {
+            match lock.try_lock() {
+                Ok(()) => {}
+                Err(std::fs::TryLockError::WouldBlock) => {
+                    // A refused flock upgrade may have dropped the shared
+                    // mark (lock conversions are not atomic); re-mark before
+                    // deferring so this instance stays visible as a live
+                    // writer to its siblings' own reconcile passes.
+                    lock.lock_shared()?;
+                    report.deferred_to_live_writer = report.open;
+                    return Ok(report);
                 }
-                DispatchIntentResolution::MonetaryReconciled { rail_reference } => {
-                    // A rail-proven outcome gets its own terminal state: it
-                    // is resolved work, not an outcome-unknown incident, so
-                    // it must not dead-letter (which flips health until an
-                    // operator intervenes).
-                    report.monetary_reconciled += 1;
-                    reconciled.push((
-                        intent.request_id.clone(),
-                        format!("monetary reconciled; rail_reference={rail_reference}"),
-                    ));
-                }
-                DispatchIntentResolution::SafeToReplay => {
-                    // A reconciler that proves replay safety leaves the row
-                    // open for its replay driver; it is counted but not
-                    // annotated here.
-                    report.replayed += 1;
-                }
+                // An errored exclusivity check must neither claim possibly
+                // live rows nor silently skip: fail closed, refusing the
+                // attach.
+                Err(std::fs::TryLockError::Error(error)) => return Err(error.into()),
             }
         }
-        self.writer_handle().run_write(move |connection| {
-            let tx =
-                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-            for (request_id, detail) in &dead_letters {
-                dead_letter_dispatch_intent_tx(&tx, request_id, detail)?;
+        let claim = (|| {
+            let mut dead_letters: Vec<(String, String)> = Vec::new();
+            let mut reconciled: Vec<(String, String)> = Vec::new();
+            for intent in &open {
+                match reconciler.resolve(intent)? {
+                    DispatchIntentResolution::DeadLetter { detail } => {
+                        report.dead_lettered += 1;
+                        dead_letters.push((intent.request_id.clone(), detail));
+                    }
+                    DispatchIntentResolution::MonetaryReconciled { rail_reference } => {
+                        // A rail-proven outcome gets its own terminal state:
+                        // it is resolved work, not an outcome-unknown
+                        // incident, so it must not dead-letter (which flips
+                        // health until an operator intervenes).
+                        report.monetary_reconciled += 1;
+                        reconciled.push((
+                            intent.request_id.clone(),
+                            format!("monetary reconciled; rail_reference={rail_reference}"),
+                        ));
+                    }
+                    DispatchIntentResolution::SafeToReplay => {
+                        // A reconciler that proves replay safety leaves the
+                        // row open for its replay driver; it is counted but
+                        // not annotated here.
+                        report.replayed += 1;
+                    }
+                }
             }
-            for (request_id, detail) in &reconciled {
-                reconcile_dispatch_intent_tx(&tx, request_id, detail)?;
-            }
-            tx.commit()?;
-            Ok(())
-        })?;
+            self.writer_handle().run_write(move |connection| {
+                let tx = connection
+                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+                for (request_id, detail) in &dead_letters {
+                    dead_letter_dispatch_intent_tx(&tx, request_id, detail)?;
+                }
+                for (request_id, detail) in &reconciled {
+                    reconcile_dispatch_intent_tx(&tx, request_id, detail)?;
+                }
+                tx.commit()?;
+                Ok(())
+            })
+        })();
+        // Return to the shared mark even when the claim failed: holding the
+        // exclusive lock past this pass would block sibling opens for the
+        // store's whole lifetime. The claim error outranks a downgrade error
+        // (both refuse the attach).
+        let downgrade = match &self.writer_lifetime_lock {
+            Some(lock) => lock.lock_shared().map_err(ReceiptStoreError::from),
+            None => Ok(()),
+        };
+        claim?;
+        downgrade?;
         Ok(report)
     }
 

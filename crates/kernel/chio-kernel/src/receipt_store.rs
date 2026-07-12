@@ -402,6 +402,12 @@ pub struct DispatchIntentReconcileReport {
     pub dead_lettered: u64,
     pub replayed: u64,
     pub monetary_reconciled: u64,
+    /// Open intents left unclaimed because a live sibling writer instance
+    /// shares the store: they mark that writer's in-flight calls, not
+    /// restart orphans, and only their owner (or a later attach that holds
+    /// the store exclusively) may resolve them.
+    #[serde(default)]
+    pub deferred_to_live_writer: u64,
 }
 
 #[derive(Debug, thiserror::Error)]
