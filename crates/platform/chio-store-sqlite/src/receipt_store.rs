@@ -3159,6 +3159,60 @@ impl SqliteReceiptStore {
         })
     }
 
+    /// Resolve every open intent that survived a restart. Reads run on the
+    /// reader pool and the reconciler runs on the calling thread (so a
+    /// rail-querying reconciler never blocks the single writer); the
+    /// resulting annotations are applied in one writer transaction.
+    pub fn reconcile_dispatch_intents(
+        &self,
+        reconciler: &dyn chio_kernel::receipt_store::DispatchIntentReconciler,
+    ) -> Result<chio_kernel::receipt_store::DispatchIntentReconcileReport, ReceiptStoreError> {
+        use chio_kernel::receipt_store::{DispatchIntentReconcileReport, DispatchIntentResolution};
+        let open = {
+            let connection = self.connection()?;
+            select_open_dispatch_intents(&connection)?
+        };
+        let mut report = DispatchIntentReconcileReport {
+            open: open.len() as u64,
+            ..DispatchIntentReconcileReport::default()
+        };
+        if open.is_empty() {
+            return Ok(report);
+        }
+        let mut annotations: Vec<(String, String)> = Vec::with_capacity(open.len());
+        for intent in &open {
+            match reconciler.resolve(intent)? {
+                DispatchIntentResolution::DeadLetter { detail } => {
+                    report.dead_lettered += 1;
+                    annotations.push((intent.request_id.clone(), detail));
+                }
+                DispatchIntentResolution::MonetaryReconciled { rail_reference } => {
+                    report.monetary_reconciled += 1;
+                    annotations.push((
+                        intent.request_id.clone(),
+                        format!("monetary reconciled; rail_reference={rail_reference}"),
+                    ));
+                }
+                DispatchIntentResolution::SafeToReplay => {
+                    // A reconciler that proves replay safety leaves the row
+                    // open for its replay driver; it is counted but not
+                    // annotated here.
+                    report.replayed += 1;
+                }
+            }
+        }
+        self.writer_handle().run_write(move |connection| {
+            let tx =
+                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            for (request_id, detail) in &annotations {
+                dead_letter_dispatch_intent_tx(&tx, request_id, detail)?;
+            }
+            tx.commit()?;
+            Ok(())
+        })?;
+        Ok(report)
+    }
+
     pub fn flush_receipt_writes(&self) -> Result<ReceiptFlushReport, ReceiptStoreError> {
         self.receipt_commit_actor.flush()?;
         let wal_checkpoint = Some(self.wal_checkpoint_passive()?);

@@ -406,6 +406,13 @@ impl ReceiptStore for SqliteReceiptStore {
         )
     }
 
+    fn reconcile_dispatch_intents(
+        &self,
+        reconciler: &dyn chio_kernel::receipt_store::DispatchIntentReconciler,
+    ) -> Result<chio_kernel::receipt_store::DispatchIntentReconcileReport, ReceiptStoreError> {
+        SqliteReceiptStore::reconcile_dispatch_intents(self, reconciler)
+    }
+
     fn receipts_canonical_bytes_range(
         &self,
         start_seq: u64,

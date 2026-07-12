@@ -114,6 +114,65 @@ pub(crate) fn finalize_dispatch_intent_tx(
     Ok(())
 }
 
+/// Load every open intent for boot reconciliation, oldest first. A missing
+/// table (pre-journal database opened without DDL) reports no open intents.
+pub(crate) fn select_open_dispatch_intents(
+    connection: &rusqlite::Connection,
+) -> Result<Vec<DispatchIntentRecord>, ReceiptStoreError> {
+    if !dispatch_intents_table_exists(connection)? {
+        return Ok(Vec::new());
+    }
+    let mut statement = connection.prepare(
+        "SELECT request_id, capability_id, tool_server, tool_name, parameter_hash, \
+                side_effect_class, monetary, rail, rail_authorization_id, tenant_id, \
+                created_at_unix_ms \
+         FROM chio_dispatch_intents WHERE state = 'open' ORDER BY created_at_unix_ms",
+    )?;
+    let rows = statement.query_map([], |row| {
+        let class_raw: String = row.get(5)?;
+        let side_effect_class = match class_raw.as_str() {
+            "read_only" => SideEffectClass::ReadOnly,
+            "monetary" => SideEffectClass::Monetary,
+            // Fail-safe: an unrecognized class string is treated as
+            // side-effecting, never demoted to read-only.
+            _ => SideEffectClass::SideEffecting,
+        };
+        Ok(DispatchIntentRecord {
+            request_id: row.get(0)?,
+            capability_id: row.get(1)?,
+            tool_server: row.get(2)?,
+            tool_name: row.get(3)?,
+            parameter_hash: row.get(4)?,
+            side_effect_class,
+            monetary: row.get::<_, i64>(6)? != 0,
+            rail: row.get(7)?,
+            rail_authorization_id: row.get(8)?,
+            tenant_id: row.get(9)?,
+            created_at_unix_ms: row.get::<_, i64>(10)?.max(0) as u64,
+        })
+    })?;
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row?);
+    }
+    Ok(out)
+}
+
+/// Mark an orphaned intent as a durable, operator-visible dead-letter
+/// incident, recording the reconciler's outcome annotation.
+pub(crate) fn dead_letter_dispatch_intent_tx(
+    tx: &rusqlite::Transaction<'_>,
+    request_id: &str,
+    detail: &str,
+) -> Result<(), ReceiptStoreError> {
+    tx.execute(
+        "UPDATE chio_dispatch_intents SET state = 'dead_letter', resolution_detail = ?2 \
+         WHERE request_id = ?1 AND state = 'open'",
+        rusqlite::params![request_id, detail],
+    )?;
+    Ok(())
+}
+
 /// True if the non-audit `chio_dispatch_intents` journal table exists. A store
 /// opened via `open_existing` on a pre-journal database runs no DDL, so a
 /// missing table is reported as `false`; callers treat that as zero

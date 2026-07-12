@@ -180,6 +180,74 @@ fn consume_intent_parameter_hash_mismatch_aborts_and_keeps_intent(
     Ok(())
 }
 
+struct RecordingReconciler;
+
+impl chio_kernel::receipt_store::DispatchIntentReconciler for RecordingReconciler {
+    fn resolve(
+        &self,
+        intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+    ) -> Result<
+        chio_kernel::receipt_store::DispatchIntentResolution,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        // Default posture: dead-letter every orphan; a monetary orphan records
+        // its rail so an operator can reconcile against the rail.
+        let detail = match (&intent.rail, &intent.rail_authorization_id) {
+            (Some(rail), Some(auth)) => {
+                format!("outcome unknown; rail={rail}; rail_authorization_id={auth}")
+            }
+            (Some(rail), None) => format!("outcome unknown; rail={rail}"),
+            _ => "outcome unknown".to_string(),
+        };
+        Ok(chio_kernel::receipt_store::DispatchIntentResolution::DeadLetter { detail })
+    }
+}
+
+#[test]
+fn reconcile_dead_letters_orphans_and_reports_counts() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-intents-reconcile");
+    let store = SqliteReceiptStore::open(&path)?;
+
+    // A clean run: no open intents means nothing to reconcile.
+    let clean = store.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(clean.open, 0);
+    assert_eq!(clean.dead_lettered, 0);
+
+    // Two orphans: one side-effecting, one monetary with a rail attached.
+    store.record_dispatch_intent(&sample_intent("orphan-se"))?;
+    let mut monetary = sample_intent("orphan-mon");
+    monetary.side_effect_class = chio_kernel::receipt_store::SideEffectClass::Monetary;
+    monetary.monetary = true;
+    monetary.rail = Some("x402".to_string());
+    monetary.rail_authorization_id = Some("auth-9".to_string());
+    store.record_dispatch_intent(&monetary)?;
+
+    let report = store.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(report.open, 2);
+    assert_eq!(report.dead_lettered, 2);
+
+    // Both are now dead_letter; the monetary detail names the rail reference.
+    let connection = store.reader_connection_for_test()?;
+    let dead: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM chio_dispatch_intents WHERE state = 'dead_letter'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(dead, 2);
+    let detail: String = connection.query_row(
+        "SELECT resolution_detail FROM chio_dispatch_intents WHERE request_id = 'orphan-mon'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert!(
+        detail.contains("x402") && detail.contains("auth-9"),
+        "monetary detail names the rail reference: {detail}"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 #[test]
 fn open_creates_dispatch_intents_table_and_open_existing_tolerates_absence(
 ) -> Result<(), Box<dyn std::error::Error>> {
