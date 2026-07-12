@@ -9,6 +9,7 @@ pub(crate) const ADMISSION_AUTHORITY_META_TABLE: &str = "admission_authority_met
 
 pub struct SqliteRevocationStore {
     connection: Mutex<Connection>,
+    admission_authority_mode: Option<String>,
 }
 
 impl SqliteRevocationStore {
@@ -19,12 +20,13 @@ impl SqliteRevocationStore {
         }
 
         let connection = Connection::open(path)?;
-        reject_combined_managed_database(&connection)?;
         configure_revocation_connection(&connection)?;
         ensure_revocation_schema(&connection)?;
+        let admission_authority_mode = combined_managed_mode(&connection)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
+            admission_authority_mode,
         })
     }
 
@@ -32,6 +34,19 @@ impl SqliteRevocationStore {
         self.connection.lock().map_err(|_| {
             RevocationStoreError::Sync("sqlite revocation store lock poisoned".to_string())
         })
+    }
+
+    pub fn is_admission_authority_managed(&self) -> bool {
+        self.admission_authority_mode.is_some()
+    }
+
+    fn require_direct_write(&self) -> Result<(), RevocationStoreError> {
+        match self.admission_authority_mode.as_deref() {
+            Some(mode) => Err(RevocationStoreError::Sync(format!(
+                "revocation database is managed by the `{mode}` admission capture authority"
+            ))),
+            None => Ok(()),
+        }
     }
 
     pub fn list_revocations(
@@ -91,6 +106,7 @@ impl SqliteRevocationStore {
     }
 
     pub fn upsert_revocation(&self, record: &RevocationRecord) -> Result<(), RevocationStoreError> {
+        self.require_direct_write()?;
         self.connection()?.execute(
             r#"
             INSERT INTO revoked_capabilities (capability_id, revoked_at)
@@ -151,14 +167,14 @@ pub(crate) fn ensure_revocation_schema(
     Ok(())
 }
 
-fn reject_combined_managed_database(connection: &Connection) -> Result<(), RevocationStoreError> {
+fn combined_managed_mode(connection: &Connection) -> Result<Option<String>, RevocationStoreError> {
     let marker_exists = connection.query_row(
         "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
         params![ADMISSION_AUTHORITY_META_TABLE],
         |row| row.get::<_, i64>(0),
     )? != 0;
     if !marker_exists {
-        return Ok(());
+        return Ok(None);
     }
     let mode = connection
         .query_row(
@@ -167,12 +183,11 @@ fn reject_combined_managed_database(connection: &Connection) -> Result<(), Revoc
             |row| row.get::<_, String>(0),
         )
         .optional()?;
-    Err(RevocationStoreError::Sync(match mode {
-        Some(mode) => {
-            format!("revocation database is managed by the `{mode}` admission capture authority")
-        }
-        None => "revocation database has incomplete admission authority metadata".to_string(),
-    }))
+    mode.map(Some).ok_or_else(|| {
+        RevocationStoreError::Sync(
+            "revocation database has incomplete admission authority metadata".to_string(),
+        )
+    })
 }
 
 impl RevocationStore for SqliteRevocationStore {
@@ -186,6 +201,7 @@ impl RevocationStore for SqliteRevocationStore {
     }
 
     fn revoke(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
+        self.require_direct_write()?;
         let revoked_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|duration| duration.as_secs() as i64)
@@ -210,6 +226,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
+    use crate::SqliteAdmissionCaptureAuthority;
 
     fn unique_db_path(prefix: &str) -> std::path::PathBuf {
         let nonce = SystemTime::now()
@@ -270,6 +287,33 @@ mod tests {
         let filtered = store.list_revocations(10, Some("cap-1")).unwrap();
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].capability_id, "cap-1");
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn admission_managed_store_allows_reads_but_rejects_direct_writes() {
+        let path = unique_db_path("chio-managed-revocations");
+        let authority = SqliteAdmissionCaptureAuthority::open(&path).expect("open authority");
+        authority.revoke("cap-managed").expect("managed revoke");
+
+        let store = SqliteRevocationStore::open(&path).expect("open managed reader");
+        assert!(store.is_admission_authority_managed());
+        assert!(store.is_revoked("cap-managed").expect("managed read"));
+        assert_eq!(
+            store
+                .list_revocations(10, None)
+                .expect("managed revocation list")
+                .len(),
+            1
+        );
+        assert!(store.revoke("cap-direct").is_err());
+        assert!(store
+            .upsert_revocation(&RevocationRecord {
+                capability_id: "cap-import".to_string(),
+                revoked_at: 1,
+            })
+            .is_err());
 
         let _ = fs::remove_file(path);
     }

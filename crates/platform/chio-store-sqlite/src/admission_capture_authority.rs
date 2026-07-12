@@ -17,7 +17,7 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBe
 use crate::budget_store::SqliteBudgetStore;
 use crate::revocation_store::{configure_revocation_connection, ensure_revocation_schema};
 
-const COMBINED_AUTHORITY_MODE: &str = "combined-admission-capture-v1";
+pub(crate) const COMBINED_AUTHORITY_MODE: &str = "combined-admission-capture-v1";
 const MAX_ADMISSION_IDENTIFIER_BYTES: usize = 512;
 
 const INSTALL_REVOCATION_WRITE_GUARDS: &str = r#"
@@ -396,6 +396,57 @@ impl SqliteAdmissionCaptureAuthority {
         let connection = self.revocation_connection()?;
         let (authority_head, _) = load_authority_heads(&connection)?;
         Ok(authority_head)
+    }
+
+    pub fn validate_capture_request(
+        &self,
+        request: &AdmissionCaptureRequest,
+    ) -> Result<(), AdmissionCaptureError> {
+        let mut connection = self.capture_connection()?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .map_err(BudgetStoreError::from)?;
+        if let Some(stored) = load_admission_event(&transaction, request.operation_id())? {
+            if !stored.matches(request)? {
+                return Err(AdmissionCaptureError::InvalidRequest(format!(
+                    "operation_id `{}` was reused for a different admission capture",
+                    request.operation_id()
+                )));
+            }
+            restore_admission_decision(&transaction, request, &stored)?;
+            transaction.rollback().map_err(BudgetStoreError::from)?;
+            return Ok(());
+        }
+        let capture_event_id = request.budget().event_id.as_deref().ok_or_else(|| {
+            AdmissionCaptureError::InvalidRequest(
+                "admission capture event_id is required".to_string(),
+            )
+        })?;
+        if let Some(existing_operation) = transaction
+            .query_row(
+                "SELECT operation_id FROM admission_capture_events WHERE capture_event_id = ?1",
+                params![capture_event_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(BudgetStoreError::from)?
+        {
+            return Err(AdmissionCaptureError::InvalidRequest(format!(
+                "capture event `{capture_event_id}` is already owned by operation `{existing_operation}`"
+            )));
+        }
+        validate_authorization_bindings(&transaction, request)?;
+        let (_, revocation_head) = load_authority_heads(&transaction)?;
+        if request
+            .last_observed_revocation_index()
+            .is_some_and(|observed| observed > revocation_head)
+        {
+            return Err(AdmissionCaptureError::InvalidRequest(format!(
+                "last-observed revocation index exceeds authority head {revocation_head}"
+            )));
+        }
+        transaction.rollback().map_err(BudgetStoreError::from)?;
+        Ok(())
     }
 }
 
@@ -1720,7 +1771,7 @@ mod tests {
     use chio_kernel::supplemental_quota::CanonicalRevocationSet;
     use chio_kernel::{
         AdmissionCaptureAuthority, AdmissionCaptureDecision, AdmissionCaptureError,
-        AdmissionCaptureRequest, RevocationRecord, RevocationStore, RevocationStoreError,
+        AdmissionCaptureRequest, RevocationRecord, RevocationStore,
     };
     use rusqlite::{params, Connection};
 
@@ -2017,10 +2068,11 @@ mod tests {
             ]
         );
 
-        assert!(matches!(
-            SqliteRevocationStore::open(&path),
-            Err(RevocationStoreError::Sync(_))
-        ));
+        let managed = SqliteRevocationStore::open(&path).expect("open managed reader");
+        assert!(managed
+            .is_revoked("cap-a")
+            .expect("read managed revocation"));
+        assert!(managed.revoke("managed-write").is_err());
         assert!(ordinary.revoke("ordinary-write").is_err());
         assert!(ordinary
             .upsert_revocation(&RevocationRecord {

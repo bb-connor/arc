@@ -259,6 +259,51 @@ impl SqliteBudgetStore {
         })
     }
 
+    pub fn is_admission_authority_managed(&self) -> Result<bool, BudgetStoreError> {
+        let connection = self.connection()?;
+        Ok(Self::admission_authority_mode(&connection)?.is_some())
+    }
+
+    fn admission_authority_mode(
+        connection: &Connection,
+    ) -> Result<Option<String>, BudgetStoreError> {
+        let marker_exists = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
+            params![crate::revocation_store::ADMISSION_AUTHORITY_META_TABLE],
+            |row| row.get::<_, i64>(0),
+        )? != 0;
+        if !marker_exists {
+            return Ok(None);
+        }
+        let mode = connection
+            .query_row(
+                "SELECT mode FROM admission_authority_meta WHERE singleton = 1",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or_else(|| {
+                BudgetStoreError::Invariant(
+                    "budget database has incomplete admission authority metadata".to_string(),
+                )
+            })?;
+        if mode != crate::admission_capture_authority::COMBINED_AUTHORITY_MODE {
+            return Err(BudgetStoreError::Invariant(format!(
+                "unsupported admission authority database mode `{mode}`"
+            )));
+        }
+        Ok(Some(mode))
+    }
+
+    fn require_legacy_replication_write(connection: &Connection) -> Result<(), BudgetStoreError> {
+        if let Some(mode) = Self::admission_authority_mode(connection)? {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget database is managed by the `{mode}` admission authority"
+            )));
+        }
+        Ok(())
+    }
+
     /// Highest budget mutation event_seq, or 0 when empty. Mirrors the private
     /// max_budget_mutation_event_seq helper (replication.rs) but is a public
     /// head read for the status path.
@@ -823,6 +868,8 @@ impl SqliteBudgetStore {
     /// write, so it cannot inflate any origin's ack head), and it resets the
     /// watermark so the next `budget_ack_heads` recomputes with the new slots.
     pub fn record_abandoned_event_seqs(&self, seqs: &[u64]) -> Result<(), BudgetStoreError> {
+        let mut connection = self.connection()?;
+        Self::require_legacy_replication_write(&connection)?;
         let sqlite_seqs = seqs
             .iter()
             .copied()
@@ -832,7 +879,6 @@ impl SqliteBudgetStore {
         if sqlite_seqs.is_empty() {
             return Ok(());
         }
-        let mut connection = self.connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         for seq in sqlite_seqs {
             transaction.execute(
@@ -859,6 +905,8 @@ impl SqliteBudgetStore {
         &self,
         ranges: &[(u64, u64)],
     ) -> Result<(), BudgetStoreError> {
+        let mut connection = self.connection()?;
+        Self::require_legacy_replication_write(&connection)?;
         let mut sqlite_ranges = Vec::with_capacity(ranges.len());
         let mut previous_end = None;
         for &(start, end) in ranges {
@@ -892,7 +940,6 @@ impl SqliteBudgetStore {
         if sqlite_ranges.is_empty() {
             return Ok(());
         }
-        let mut connection = self.connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let replication_floor = transaction.query_row(
             "SELECT next_seq FROM budget_replication_meta WHERE singleton = 1",
@@ -994,6 +1041,8 @@ impl SqliteBudgetStore {
         &self,
         events: &[BudgetMutationRecord],
     ) -> Result<(), BudgetStoreError> {
+        let mut connection = self.connection()?;
+        Self::require_legacy_replication_write(&connection)?;
         use std::collections::BTreeMap;
         let mut min_by_origin: BTreeMap<&str, u64> = BTreeMap::new();
         for event in events {
@@ -1020,7 +1069,6 @@ impl SqliteBudgetStore {
         if floors.is_empty() {
             return Ok(());
         }
-        let mut connection = self.connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         for (origin, floor) in floors {
             transaction.execute(
@@ -1035,6 +1083,7 @@ impl SqliteBudgetStore {
 
     pub fn upsert_usage(&self, record: &BudgetUsageRecord) -> Result<(), BudgetStoreError> {
         let mut connection = self.connection()?;
+        Self::require_legacy_replication_write(&connection)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         Self::upsert_usage_in_transaction(&transaction, record)?;
         transaction.commit()?;
@@ -1047,6 +1096,7 @@ impl SqliteBudgetStore {
         events: &[BudgetMutationRecord],
     ) -> Result<(), BudgetStoreError> {
         let mut connection = self.connection()?;
+        Self::require_legacy_replication_write(&connection)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         for usage in usages {
             Self::upsert_usage_in_transaction(&transaction, usage)?;
@@ -1322,6 +1372,7 @@ impl SqliteBudgetStore {
         record: &BudgetMutationRecord,
     ) -> Result<(), BudgetStoreError> {
         let mut connection = self.connection()?;
+        Self::require_legacy_replication_write(&connection)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         Self::import_mutation_record_in_transaction(&transaction, record)?;
         transaction.commit()?;
@@ -2322,15 +2373,15 @@ impl SqliteBudgetStore {
         grant_index: usize,
     ) -> Result<SqliteBudgetHold, BudgetStoreError> {
         let hold = Self::load_hold(transaction, hold_id)?.ok_or_else(|| {
-            BudgetStoreError::Invariant(format!("missing budget hold `{hold_id}`"))
+            BudgetStoreError::Conflict(format!("missing budget hold `{hold_id}`"))
         })?;
         if hold.capability_id != capability_id || hold.grant_index != grant_index {
-            return Err(BudgetStoreError::Invariant(format!(
+            return Err(BudgetStoreError::Conflict(format!(
                 "budget hold `{hold_id}` does not match capability/grant"
             )));
         }
         if hold.disposition != HoldDisposition::Open {
-            return Err(BudgetStoreError::Invariant(format!(
+            return Err(BudgetStoreError::Conflict(format!(
                 "budget hold `{hold_id}` is no longer open"
             )));
         }
@@ -2344,30 +2395,30 @@ impl SqliteBudgetStore {
     ) -> Result<Option<BudgetEventAuthority>, BudgetStoreError> {
         match (current, requested) {
             (None, None) => Ok(None),
-            (None, Some(_)) => Err(BudgetStoreError::Invariant(format!(
+            (None, Some(_)) => Err(BudgetStoreError::Conflict(format!(
                 "budget hold `{hold_id}` was created without authority lease metadata"
             ))),
-            (Some(_), None) => Err(BudgetStoreError::Invariant(format!(
+            (Some(_), None) => Err(BudgetStoreError::Conflict(format!(
                 "budget hold `{hold_id}` requires authority lease metadata"
             ))),
             (Some(current), Some(requested)) => {
                 if current.authority_id != requested.authority_id {
-                    return Err(BudgetStoreError::Invariant(format!(
+                    return Err(BudgetStoreError::Conflict(format!(
                         "budget hold `{hold_id}` authority_id does not match the open lease"
                     )));
                 }
                 if requested.lease_id != current.lease_id {
-                    return Err(BudgetStoreError::Invariant(format!(
+                    return Err(BudgetStoreError::Conflict(format!(
                         "budget hold `{hold_id}` lease_id does not match the open lease epoch"
                     )));
                 }
                 if requested.lease_epoch < current.lease_epoch {
-                    return Err(BudgetStoreError::Invariant(format!(
+                    return Err(BudgetStoreError::Conflict(format!(
                         "budget hold `{hold_id}` authority lease epoch regressed"
                     )));
                 }
                 if requested.lease_epoch > current.lease_epoch {
-                    return Err(BudgetStoreError::Invariant(format!(
+                    return Err(BudgetStoreError::Conflict(format!(
                         "budget hold `{hold_id}` authority lease epoch advanced beyond the open lease"
                     )));
                 }
@@ -2420,7 +2471,7 @@ impl SqliteBudgetStore {
             && existing_kind == BudgetMutationKind::IncrementInvocation.as_str()
             && existing_max_invocations == max_invocations;
         if !mutation_matches {
-            return Err(BudgetStoreError::Invariant(format!(
+            return Err(BudgetStoreError::Conflict(format!(
                 "budget event_id `{event_id}` was reused for a different mutation"
             )));
         }

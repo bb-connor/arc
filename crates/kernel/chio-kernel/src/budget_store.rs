@@ -15,6 +15,9 @@ pub enum BudgetStoreError {
     #[error("budget arithmetic overflow: {0}")]
     Overflow(String),
 
+    #[error("budget state conflict: {0}")]
+    Conflict(String),
+
     #[error("budget state invariant violated: {0}")]
     Invariant(String),
 }
