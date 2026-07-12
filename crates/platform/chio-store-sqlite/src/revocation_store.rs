@@ -56,10 +56,12 @@ impl SqliteRevocationStore {
         let path = path.as_ref();
         let ephemeral = path_opens_in_memory(path);
         if !ephemeral {
-            if let Some(parent) = path.parent() {
-                if !parent.as_os_str().is_empty() {
-                    fs::create_dir_all(parent)?;
-                }
+            // Derive the directory from the resolved filesystem path: a `file:`
+            // URI sibling (`file:/var/lib/chio/receipts.db.revocations?mode=rwc`)
+            // has a query and scheme that a raw `parent()` would fold into a
+            // bogus directory, leaving the real one uncreated.
+            if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
+                fs::create_dir_all(&parent)?;
             }
         }
 
@@ -297,6 +299,38 @@ mod tests {
                 "in-memory revocation store {path} must report ephemeral so the durability gate refuses it"
             );
         }
+    }
+
+    #[test]
+    fn open_creates_parent_dirs_for_a_file_uri_with_query() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time before epoch")
+            .as_nanos();
+        let base = std::env::temp_dir().join(format!("chio-rev-uri-{nonce}"));
+        let db = base.join("nested").join("receipts.db.revocations");
+        let parent = db.parent().expect("db path has a parent");
+        assert!(
+            !parent.exists(),
+            "precondition: the parent dir must not exist yet"
+        );
+
+        // A `file:` URI sibling path carrying a query. A raw `parent()` would
+        // resolve to `file:.../nested`, create a bogus relative directory, and
+        // leave the real parent uncreated, so SQLite would fail to open it.
+        let uri = format!("file:{}?mode=rwc", db.display());
+        let store = SqliteRevocationStore::open(uri.as_str()).unwrap();
+
+        assert!(
+            !store.is_ephemeral(),
+            "a file: URI to a real filesystem path is durable"
+        );
+        assert!(
+            parent.exists(),
+            "the real parent directory must be created before SQLite opens the URI"
+        );
+
+        let _ = fs::remove_dir_all(&base);
     }
 
     #[test]

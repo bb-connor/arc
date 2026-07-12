@@ -133,8 +133,11 @@ impl SqliteReceiptStore {
         };
 
         if create_if_missing {
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
+            // Resolve `file:` URIs to their on-disk path before deriving the
+            // parent: a raw `parent()` on `file:/dir/db?mode=rwc` folds the
+            // scheme and query into a bogus directory and skips the real one.
+            if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
+                fs::create_dir_all(&parent)?;
             }
         }
 
