@@ -323,7 +323,20 @@ impl ProtectProxy {
         // mirrors the CLI boot gate for library callers that construct
         // `ProtectConfig` directly and would otherwise silently lose audit
         // evidence.
-        if self.config.receipt_db.is_none() && !self.config.allow_ephemeral_receipts {
+        //
+        // An in-memory SQLite path (`:memory:` or a `file:...?mode=memory` URI)
+        // opens a database that vanishes on restart just like a missing path, so
+        // it is filtered out here. The gate and every store opened below key off
+        // this durable path; treating an in-memory path as durable would open
+        // in-memory stores yet advertise a durable receipt backend and silently
+        // lose audit evidence.
+        let durable_receipt_db: Option<&str> = self
+            .config
+            .receipt_db
+            .as_deref()
+            .filter(|path| !chio_store_sqlite::is_in_memory_sqlite_path(path));
+
+        if durable_receipt_db.is_none() && !self.config.allow_ephemeral_receipts {
             return Err(ProtectError::Config(
                 "refusing to start without a durable receipt store: set receipt_db to a durable \
                  SQLite path, or set allow_ephemeral_receipts to run with in-memory receipts that \
@@ -350,7 +363,7 @@ impl ProtectProxy {
         // store refuses it here instead of adopting it and commingling receipt
         // tables into another store's file.
         let durable_receipt_store: Option<Arc<dyn chio_kernel::ReceiptStore>> =
-            match &self.config.receipt_db {
+            match durable_receipt_db {
                 Some(path) => Some(Arc::new(
                     chio_store_sqlite::SqliteReceiptStore::open(path)
                         .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
@@ -358,7 +371,7 @@ impl ProtectProxy {
                 None => None,
             };
 
-        let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = &self.config.receipt_db {
+        let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = durable_receipt_db {
             Arc::new(
                 SqliteApprovalStore::open_colocated_with_receipt_store(path)
                     .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
@@ -381,7 +394,7 @@ impl ProtectProxy {
         // and the sidecar's release endpoint, so a token can be revoked in-process
         // rather than staying live until it expires.
         let revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>> =
-            match &self.config.receipt_db {
+            match durable_receipt_db {
                 Some(path) => Some(Arc::new(
                     chio_store_sqlite::SqliteRevocationStore::open(revocation_sibling_path(path))
                         .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,

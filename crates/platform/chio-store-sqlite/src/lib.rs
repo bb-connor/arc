@@ -93,6 +93,34 @@ impl Default for SqliteStoreOptions {
     }
 }
 
+/// Whether a SQLite path opens a database that lives only in memory for the life
+/// of the process. rusqlite enables URI filenames, so the bare `:memory:`
+/// sentinel, `file::memory:`, and any `file:...?mode=memory` URI all open a
+/// non-durable database that loses its contents on restart and must not be
+/// mistaken for a durable store. Durability gates use this to refuse an in-memory
+/// path where they would otherwise advertise durable persistence.
+#[must_use]
+pub fn is_in_memory_sqlite_path(path: &str) -> bool {
+    if path.eq_ignore_ascii_case(":memory:") {
+        return true;
+    }
+    let Some(rest) = path.strip_prefix("file:") else {
+        return false;
+    };
+    let (name, query) = match rest.split_once('?') {
+        Some((name, query)) => (name, Some(query)),
+        None => (rest, None),
+    };
+    if name.eq_ignore_ascii_case(":memory:") {
+        return true;
+    }
+    query.is_some_and(|query| {
+        query
+            .split('&')
+            .any(|param| param.eq_ignore_ascii_case("mode=memory"))
+    })
+}
+
 pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use batch_approval_store::SqliteBatchApprovalStore;
@@ -109,3 +137,40 @@ pub use revocation_store::SqliteRevocationStore;
 pub use schema_version::{
     check_schema_version, stamp_schema_version, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID,
 };
+
+#[cfg(test)]
+mod tests {
+    use super::is_in_memory_sqlite_path;
+
+    #[test]
+    fn classifies_in_memory_sqlite_paths() {
+        for path in [
+            ":memory:",
+            ":MEMORY:",
+            "file::memory:",
+            "file:receipts.db?mode=memory",
+            "file:receipts.db?cache=shared&mode=memory",
+        ] {
+            assert!(
+                is_in_memory_sqlite_path(path),
+                "{path} must classify as in-memory"
+            );
+        }
+    }
+
+    #[test]
+    fn classifies_durable_sqlite_paths() {
+        for path in [
+            "receipts.db",
+            "/var/lib/chio/receipts.db",
+            "file:/var/lib/chio/receipts.db?mode=rwc",
+            "file:receipts.db",
+            "memory-notes.db",
+        ] {
+            assert!(
+                !is_in_memory_sqlite_path(path),
+                "{path} must classify as durable"
+            );
+        }
+    }
+}

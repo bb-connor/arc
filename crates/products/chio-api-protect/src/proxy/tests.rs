@@ -2017,6 +2017,36 @@ async fn run_refuses_to_start_without_durable_receipts_unless_opted_in() {
     );
 }
 
+/// Durable-by-default for embedders: an in-memory receipt path (`:memory:` or a
+/// `file:...?mode=memory` URI) opens a SQLite database that vanishes on restart,
+/// so the boot gate must treat it like a missing store and refuse to start
+/// without the explicit ephemeral opt-in. Otherwise the proxy would open
+/// in-memory stores yet advertise a durable receipt backend and silently lose
+/// audit evidence.
+#[tokio::test]
+async fn run_refuses_to_start_with_an_in_memory_receipt_path_unless_opted_in() {
+    for receipt_db in [":memory:", "file:receipts.db?mode=memory"] {
+        let config = ProtectConfig {
+            upstream: "http://127.0.0.1:1".to_string(),
+            spec_content: Some(PETSTORE_YAML.to_string()),
+            spec_path: None,
+            listen_addr: "127.0.0.1:1".to_string(),
+            receipt_db: Some(receipt_db.to_string()),
+            allow_ephemeral_receipts: false,
+            sidecar_control_token: None,
+            signer_seed_hex: None,
+            trusted_capability_issuers: Vec::new(),
+            upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
+        };
+        let error = ProtectProxy::new(config).run().await.test_unwrap_err();
+        let message = error.to_string();
+        assert!(
+            message.contains("durable receipt store"),
+            "an in-memory receipt path ({receipt_db}) must refuse to start without an opt-in, got: {message}"
+        );
+    }
+}
+
 /// In ephemeral mode there is no durable receipt database, but the sidecar
 /// still shares an in-memory revocation store with the embedded kernel, so a
 /// release must succeed and revoke the capability in-process rather than fail
