@@ -264,35 +264,45 @@ impl ChioEvaluator {
         self.receipt_sink.is_some() || self.allow_ephemeral
     }
 
+    /// Whether outer HTTP receipts are appended to a durable store. When this is
+    /// false there is no durable audit trail to guarantee, so the service keeps
+    /// its receipts best-effort in the response extensions and skips the
+    /// pre-forward decision-receipt persist that would otherwise fail an allowed
+    /// request closed on a store error.
+    pub(crate) fn has_durable_receipt_sink(&self) -> bool {
+        self.receipt_sink.is_some()
+    }
+
     /// Append an outer HTTP receipt to the durable receipt store when one is
     /// configured. [`crate::ChioService`] signs decision, final-response, and
     /// transport-deny receipts at the HTTP edge; without this they would live
     /// only in the response extensions and vanish on restart, so a configured
-    /// durable store must receive them. A conversion or append failure is logged
-    /// rather than propagated: the receipt is still returned to the caller, and
-    /// the request outcome is never blocked by an audit-write error.
-    pub(crate) fn persist_http_receipt(&self, receipt: &HttpReceipt) {
+    /// durable store must receive them.
+    ///
+    /// With no durable sink attached the append is a no-op: an ephemeral or
+    /// store-less evaluator keeps its receipts best-effort. When a durable store
+    /// IS attached a conversion or append failure is propagated so the caller
+    /// can fail the request closed, matching durable-by-default: a protected
+    /// effect must not complete while its audit record is silently dropped.
+    pub(crate) fn persist_http_receipt(&self, receipt: &HttpReceipt) -> Result<(), ChioTowerError> {
         let Some(sink) = &self.receipt_sink else {
-            return;
+            return Ok(());
         };
-        let chio_receipt = match receipt.to_chio_receipt_with_keypair(&sink.keypair) {
-            Ok(chio_receipt) => chio_receipt,
-            Err(error) => {
-                tracing::error!(
-                    target: "chio::tower",
-                    %error,
-                    "failed to convert HTTP receipt for durable storage"
-                );
-                return;
-            }
-        };
-        if let Err(error) = sink.store.append_chio_receipt(&chio_receipt) {
-            tracing::error!(
-                target: "chio::tower",
-                %error,
-                "failed to append HTTP receipt to durable receipt store"
-            );
-        }
+        let chio_receipt = receipt
+            .to_chio_receipt_with_keypair(&sink.keypair)
+            .map_err(|error| {
+                ChioTowerError::ReceiptPersist(format!(
+                    "failed to convert HTTP receipt for durable storage: {error}"
+                ))
+            })?;
+        sink.store
+            .append_chio_receipt(&chio_receipt)
+            .map_err(|error| {
+                ChioTowerError::ReceiptPersist(format!(
+                    "failed to append HTTP receipt to durable receipt store: {error}"
+                ))
+            })?;
+        Ok(())
     }
 }
 
