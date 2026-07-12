@@ -397,15 +397,30 @@ mod tests {
     }
 
     #[test]
-    fn receipt_store_adopts_a_file_already_holding_approval_tables(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        // `chio api protect` opens the approval store first, then the receipt
-        // store, on one shared file. The receipt store must adopt the file the
-        // approval store stamped rather than reject it as a foreign store.
+    fn approval_store_adopts_a_receipt_first_sidecar_file() -> Result<(), Box<dyn std::error::Error>>
+    {
+        // `chio api protect` opens the receipt store first on one shared sidecar
+        // file, then co-locates the approval store onto it. The approval store's
+        // co-located open must adopt the receipt-anchored file rather than reject
+        // it as another store's database.
         let dir = tempfile::tempdir()?;
         let path = dir.path().join("sidecar.db");
-        crate::SqliteApprovalStore::open(&path)?;
         crate::SqliteReceiptStore::open(&path)?;
+        crate::SqliteApprovalStore::open_colocated_with_receipt_store(&path)?;
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_store_refuses_a_standalone_approval_database(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // A `--receipt-db` mistargeted at a standalone approval database must
+        // fail closed. The receipt store carries no approval table among its
+        // anchors, so it refuses the file rather than adopting it and commingling
+        // receipt tables into an approval store's database.
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("approval.db");
+        crate::SqliteApprovalStore::open(&path)?;
+        assert!(crate::SqliteReceiptStore::open(&path).is_err());
         Ok(())
     }
 

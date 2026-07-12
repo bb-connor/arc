@@ -36,23 +36,60 @@ const APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
 /// keyed metadata table. Distinct from the co-located receipt store's key so the
 /// two track their revisions independently in the one sidecar file.
 const APPROVAL_STORE_SCHEMA_KEY: &str = "approval";
-/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
-/// approval database rather than reject it as foreign. `chio api protect`
-/// co-locates the approval store and the receipt store in one sidecar file and
-/// opens the approval store first on boot, so that file may already carry the
-/// receipt tables; recognizing them as a sibling sidecar store lets the approval
-/// store adopt the shared file instead of rejecting it before the receipt store
-/// can. The revocation store lives in a separate file, so `revoked_capabilities`
-/// is deliberately not an anchor: a path mistargeted at a standalone revocation
-/// database must fail closed here rather than have approval tables written into
-/// it (after which the receipt store would accept the commingled file too).
+/// Tables that identify a database this approval store may open, all of them the
+/// store's own: `chio_hitl_pending` is the current anchor and `http_receipts` /
+/// `tool_receipts` are legacy names it may still encounter on disk. A populated
+/// database carrying none of these is refused rather than adopted, so a path
+/// mistargeted at another store's file (a receipt, revocation, budget, or
+/// authority database) never has approval tables written into it. The revocation
+/// store in particular lives in a separate file, and `revoked_capabilities` is
+/// deliberately absent so a standalone revocation database fails closed here.
 const APPROVAL_STORE_LEGACY_ANCHOR_TABLES: &[&str] =
     &["chio_hitl_pending", "http_receipts", "tool_receipts"];
+
+/// Anchor tables accepted when co-locating behind a receipt store that created
+/// the shared sidecar file first. `chio api protect` keeps the receipt and
+/// approval stores in one SQLite file and opens the receipt store first, so on a
+/// fresh file the shared database already carries the receipt store's
+/// `chio_tool_receipts` anchor and no approval table yet. Recognizing that anchor
+/// lets the approval store adopt the receipt-anchored file as its sibling instead
+/// of refusing it. This wider set is used only through
+/// [`SqliteApprovalStore::open_colocated_with_receipt_store`]; the default
+/// [`SqliteApprovalStore::open`] keeps the strict own-anchor set so a standalone
+/// receipt database is never adopted as an approval store outside the sidecar.
+const APPROVAL_STORE_COLOCATED_ANCHOR_TABLES: &[&str] = &[
+    "chio_hitl_pending",
+    "http_receipts",
+    "tool_receipts",
+    "chio_tool_receipts",
+];
 
 impl SqliteApprovalStore {
     /// Open the store at the given path. Creates the parent directory
     /// if needed.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, ApprovalStoreError> {
+        Self::open_with_anchor_tables(path, APPROVAL_STORE_LEGACY_ANCHOR_TABLES)
+    }
+
+    /// Open the store co-located behind a receipt store that created the shared
+    /// sidecar file first. `chio api protect` keeps both stores in one SQLite
+    /// file and opens the receipt store first, so the file already carries the
+    /// receipt store's provenance anchor and no approval table yet; this variant
+    /// adopts that receipt-anchored file as its sibling. The default [`open`]
+    /// stays strict so a standalone receipt database is never mistaken for an
+    /// approval store outside the sidecar.
+    ///
+    /// [`open`]: SqliteApprovalStore::open
+    pub fn open_colocated_with_receipt_store(
+        path: impl AsRef<Path>,
+    ) -> Result<Self, ApprovalStoreError> {
+        Self::open_with_anchor_tables(path, APPROVAL_STORE_COLOCATED_ANCHOR_TABLES)
+    }
+
+    fn open_with_anchor_tables(
+        path: impl AsRef<Path>,
+        anchor_tables: &[&str],
+    ) -> Result<Self, ApprovalStoreError> {
         let path = path.as_ref();
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
@@ -66,7 +103,7 @@ impl SqliteApprovalStore {
             .build(manager)
             .map_err(|e| ApprovalStoreError::Backend(format!("pool build: {e}")))?;
         let store = Self { pool };
-        store.run_migrations()?;
+        store.run_migrations(anchor_tables)?;
         Ok(store)
     }
 
@@ -78,11 +115,11 @@ impl SqliteApprovalStore {
             .build(manager)
             .map_err(|e| ApprovalStoreError::Backend(format!("pool build: {e}")))?;
         let store = Self { pool };
-        store.run_migrations()?;
+        store.run_migrations(APPROVAL_STORE_LEGACY_ANCHOR_TABLES)?;
         Ok(store)
     }
 
-    fn run_migrations(&self) -> Result<(), ApprovalStoreError> {
+    fn run_migrations(&self, anchor_tables: &[&str]) -> Result<(), ApprovalStoreError> {
         let conn = self
             .pool
             .get()
@@ -91,7 +128,7 @@ impl SqliteApprovalStore {
             &conn,
             APPROVAL_STORE_SCHEMA_KEY,
             APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION,
-            APPROVAL_STORE_LEGACY_ANCHOR_TABLES,
+            anchor_tables,
         )
         .map_err(|error| ApprovalStoreError::Backend(error.to_string()))?;
         conn.execute_batch(

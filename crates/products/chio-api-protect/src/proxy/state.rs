@@ -284,9 +284,24 @@ impl ProtectProxy {
         };
         let policy_hash = chio_core_types::sha256_hex(spec_content.as_bytes());
 
+        // Open the durable receipt store first so it owns the shared sidecar
+        // file's provenance anchor; the approval store then co-locates onto that
+        // file. Opening receipt-first fails closed on a path mistargeted at a
+        // foreign approval database: it carries no receipt anchor, so the receipt
+        // store refuses it here instead of adopting it and commingling receipt
+        // tables into another store's file.
+        let durable_receipt_store: Option<Arc<dyn chio_kernel::ReceiptStore>> =
+            match &self.config.receipt_db {
+                Some(path) => Some(Arc::new(
+                    chio_store_sqlite::SqliteReceiptStore::open(path)
+                        .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
+                )),
+                None => None,
+            };
+
         let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = &self.config.receipt_db {
             Arc::new(
-                SqliteApprovalStore::open(path)
+                SqliteApprovalStore::open_colocated_with_receipt_store(path)
                     .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
             )
         } else {
@@ -300,18 +315,8 @@ impl ProtectProxy {
         }
         let trusted_receipt_signers = vec![signer_public_key];
 
-        // Attach durable stores to the embedded kernel when the operator points
-        // at a receipt database. The Merkle receipt store shares that file (the
-        // approval store has already stamped it), and the revocation store lives
-        // in a sibling file so a revoked capability survives a restart.
-        let durable_receipt_store: Option<Arc<dyn chio_kernel::ReceiptStore>> =
-            match &self.config.receipt_db {
-                Some(path) => Some(Arc::new(
-                    chio_store_sqlite::SqliteReceiptStore::open(path)
-                        .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
-                )),
-                None => None,
-            };
+        // The revocation store lives in a sibling file so a revoked capability
+        // survives a restart.
         let durable_revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>> =
             match &self.config.receipt_db {
                 Some(path) => Some(Arc::new(

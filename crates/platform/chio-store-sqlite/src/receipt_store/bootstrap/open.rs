@@ -9,22 +9,22 @@ const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
 /// two track their revisions independently in the one sidecar file.
 const RECEIPT_STORE_SCHEMA_KEY: &str = "receipt";
 
-/// Tables that identify a database this receipt store may open. `chio_tool_receipts`
-/// is the store's own anchor (also the table it shipped before schema stamping
-/// existed). The remaining tables belong to the approval store, which
-/// `chio api protect` co-locates with this store in one SQLite file: the approval
-/// store opens and stamps that file first, so the receipt store must recognize its
-/// neighbor tables to adopt the shared sidecar database rather than refuse it. The
-/// revocation store lives in a separate file, so `revoked_capabilities` is
-/// deliberately not an anchor: a path mistargeted at a standalone revocation
-/// database is refused rather than adopted. A sibling store of a different kind (a
-/// budget or authority database) carries none of these and is still refused.
-const RECEIPT_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
-    "chio_tool_receipts",
-    "chio_hitl_pending",
-    "http_receipts",
-    "tool_receipts",
-];
+/// Tables that identify a database this receipt store may open, all of them the
+/// store's own: `chio_tool_receipts` is the current anchor (also the table the
+/// store shipped before schema stamping existed) and `http_receipts` /
+/// `tool_receipts` are legacy names it may still encounter on disk. A populated
+/// database carrying none of these is refused rather than adopted, so a path
+/// mistargeted at another store's file (an approval, revocation, budget, or
+/// authority database) never has receipt tables written into it.
+///
+/// `chio api protect` co-locates the receipt and approval stores in one SQLite
+/// file and opens the receipt store first, so this store owns the shared file's
+/// provenance anchor. The approval store, opened second, adopts the
+/// receipt-anchored file through its own co-located open; the receipt store never
+/// needs to recognize a neighbor's table to bootstrap the shared file, so a
+/// standalone approval database is refused here.
+const RECEIPT_STORE_LEGACY_ANCHOR_TABLES: &[&str] =
+    &["chio_tool_receipts", "http_receipts", "tool_receipts"];
 
 fn configure_sqlite_connection(connection: &mut Connection) -> Result<(), ReceiptStoreError> {
     connection.execute_batch(
