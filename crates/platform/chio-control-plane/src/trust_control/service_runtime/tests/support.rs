@@ -7,16 +7,113 @@ use std::thread;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct CapturedRequest {
-    method: String,
-    target: String,
-    headers: BTreeMap<String, String>,
-    body: String,
+    pub(super) method: String,
+    pub(super) target: String,
+    pub(super) headers: BTreeMap<String, String>,
+    pub(super) body: String,
 }
 
 pub(super) struct StaticResponseServer {
     pub(super) url: String,
     captured: Arc<Mutex<Vec<CapturedRequest>>>,
     join: Option<thread::JoinHandle<()>>,
+}
+
+pub(super) struct ScriptedResponse {
+    pub(super) status: u16,
+    pub(super) body: String,
+    pub(super) content_type: &'static str,
+}
+
+pub(super) struct ScriptedResponseServer {
+    pub(super) url: String,
+    captured: Arc<Mutex<Vec<CapturedRequest>>>,
+    join: Option<thread::JoinHandle<()>>,
+}
+
+impl ScriptedResponseServer {
+    pub(super) fn spawn(responses: Vec<ScriptedResponse>) -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").test_expect("bind scripted server");
+        let addr = listener.local_addr().test_expect("scripted server address");
+        let captured = Arc::new(Mutex::new(Vec::new()));
+        let captured_requests = Arc::clone(&captured);
+        let join = thread::spawn(move || {
+            for response in responses {
+                let (mut stream, _) = listener.accept().test_expect("accept scripted request");
+                let request = read_http_request(&mut stream);
+                captured_requests
+                    .lock()
+                    .test_expect("capture scripted request")
+                    .push(request);
+                write!(
+                    stream,
+                    "HTTP/1.1 {} test\r\nContent-Length: {}\r\nContent-Type: {}\r\nConnection: close\r\n\r\n{}",
+                    response.status,
+                    response.body.len(),
+                    response.content_type,
+                    response.body
+                )
+                .test_expect("write scripted response");
+                stream.flush().test_expect("flush scripted response");
+            }
+        });
+        Self {
+            url: format!("http://{addr}"),
+            captured,
+            join: Some(join),
+        }
+    }
+
+    pub(super) fn spawn_dynamic<F>(expected_requests: usize, handler: F) -> Self
+    where
+        F: Fn(&CapturedRequest) -> ScriptedResponse + Send + 'static,
+    {
+        let listener = TcpListener::bind("127.0.0.1:0").test_expect("bind scripted server");
+        let addr = listener.local_addr().test_expect("scripted server address");
+        let captured = Arc::new(Mutex::new(Vec::new()));
+        let captured_requests = Arc::clone(&captured);
+        let join = thread::spawn(move || {
+            for _ in 0..expected_requests {
+                let (mut stream, _) = listener.accept().test_expect("accept scripted request");
+                let request = read_http_request(&mut stream);
+                let response = handler(&request);
+                captured_requests
+                    .lock()
+                    .test_expect("capture scripted request")
+                    .push(request);
+                write!(
+                    stream,
+                    "HTTP/1.1 {} test\r\nContent-Length: {}\r\nContent-Type: {}\r\nConnection: close\r\n\r\n{}",
+                    response.status,
+                    response.body.len(),
+                    response.content_type,
+                    response.body
+                )
+                .test_expect("write scripted response");
+                stream.flush().test_expect("flush scripted response");
+            }
+        });
+        Self {
+            url: format!("http://{addr}"),
+            captured,
+            join: Some(join),
+        }
+    }
+
+    pub(super) fn requests(&self) -> Vec<CapturedRequest> {
+        self.captured
+            .lock()
+            .test_expect("scripted requests")
+            .clone()
+    }
+}
+
+impl Drop for ScriptedResponseServer {
+    fn drop(&mut self) {
+        if let Some(join) = self.join.take() {
+            join.join().test_expect("join scripted server");
+        }
+    }
 }
 
 impl StaticResponseServer {

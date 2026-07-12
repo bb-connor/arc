@@ -42,6 +42,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             get(handle_authority_status).post(handle_rotate_authority),
         )
         .route(ISSUE_CAPABILITY_PATH, post(handle_issue_capability))
+        .route(
+            AGGREGATE_FAMILY_ROOT_LOOKUP_PATH,
+            get(handle_lookup_aggregate_family_root),
+        )
         .route(FEDERATED_ISSUE_PATH, post(handle_federated_issue))
         .route(SCIM_USERS_PATH, post(handle_scim_create_user))
         .route(SCIM_USER_PATH, delete(handle_scim_delete_user))

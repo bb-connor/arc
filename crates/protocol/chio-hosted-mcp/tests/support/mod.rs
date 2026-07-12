@@ -542,6 +542,8 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
         admin_token: None,
         control_url: None,
         control_token: None,
+        control_authority_public_key: None,
+        control_authority_trusted_public_keys: Vec::new(),
         public_base_url: None,
         auth_servers: vec![],
         auth_authorization_endpoint: None,

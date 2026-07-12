@@ -101,6 +101,30 @@ pub(crate) struct Cli {
         hide_env_values = true
     )]
     pub(crate) control_token: Option<String>,
+
+    /// Independently pinned capability-authority public key for remote trust control.
+    #[arg(
+        long,
+        global = true,
+        env = "CHIO_CONTROL_AUTHORITY_PUBLIC_KEY",
+        value_parser = parse_control_authority_public_key
+    )]
+    pub(crate) control_authority_public_key: Option<chio_core::PublicKey>,
+
+    /// Previously active authority keys trusted only for durable remote artifacts.
+    #[arg(
+        long,
+        global = true,
+        env = "CHIO_CONTROL_AUTHORITY_TRUSTED_PUBLIC_KEYS",
+        value_delimiter = ',',
+        value_parser = parse_control_authority_public_key
+    )]
+    pub(crate) control_authority_trusted_public_keys: Vec<chio_core::PublicKey>,
+}
+
+fn parse_control_authority_public_key(value: &str) -> Result<chio_core::PublicKey, String> {
+    chio_core::PublicKey::from_hex(value)
+        .map_err(|error| format!("invalid control-authority public key: {error}"))
 }
 
 impl Cli {
@@ -195,6 +219,41 @@ mod cli_env_tests {
         restore_env("CHIO_ADMIN_TOKEN", prior_admin);
         restore_env("CHIO_MCP_AUTH_TOKEN", prior_mcp_auth);
         restore_env("CHIO_MCP_ADMIN_TOKEN", prior_mcp_admin);
+    }
+
+    #[test]
+    fn remote_control_authority_keys_parse_at_the_cli_boundary() {
+        let _guard = env_lock();
+        let prior_current = std::env::var_os("CHIO_CONTROL_AUTHORITY_PUBLIC_KEY");
+        let prior_trusted = std::env::var_os("CHIO_CONTROL_AUTHORITY_TRUSTED_PUBLIC_KEYS");
+        let current = chio_core::Keypair::from_seed(&[41_u8; 32]).public_key();
+        let previous = chio_core::Keypair::from_seed(&[42_u8; 32]).public_key();
+        std::env::set_var("CHIO_CONTROL_AUTHORITY_PUBLIC_KEY", current.to_hex());
+        std::env::set_var(
+            "CHIO_CONTROL_AUTHORITY_TRUSTED_PUBLIC_KEYS",
+            format!("{},{}", previous.to_hex(), current.to_hex()),
+        );
+
+        let parsed = parse_cli([
+            "chio",
+            "run",
+            "--policy",
+            "policy.yaml",
+            "/bin/true",
+        ])
+        .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
+
+        assert_eq!(parsed.control_authority_public_key.as_ref(), Some(&current));
+        assert_eq!(
+            parsed.control_authority_trusted_public_keys,
+            vec![previous, current]
+        );
+
+        restore_env("CHIO_CONTROL_AUTHORITY_PUBLIC_KEY", prior_current);
+        restore_env(
+            "CHIO_CONTROL_AUTHORITY_TRUSTED_PUBLIC_KEYS",
+            prior_trusted,
+        );
     }
 
     #[test]

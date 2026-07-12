@@ -9,8 +9,8 @@ use super::report_rendering::{
 };
 use super::report_validation::{
     enforce_authority_mutation_fence, load_authority_status, load_capability_authority,
-    refresh_authority_mutation_fence, rotate_authority, validate_authority_mutation_auth,
-    validate_service_auth,
+    load_existing_authority_signing_context, refresh_authority_mutation_fence, rotate_authority,
+    validate_authority_mutation_auth, validate_service_auth,
 };
 use super::*;
 
@@ -75,6 +75,9 @@ pub(crate) async fn handle_issue_capability(
     {
         return response;
     }
+    if let Err(error) = payload.validate_at(unix_timestamp_now()) {
+        return plain_http_error(StatusCode::BAD_REQUEST, &error);
+    }
     match forward_authority_post_to_leader(&state, ISSUE_CAPABILITY_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
@@ -99,11 +102,37 @@ pub(crate) async fn handle_issue_capability(
         Ok(authority) => {
             match authority.issue_capability_with_attestation(
                 &subject,
-                payload.scope,
+                payload.scope.clone(),
                 payload.ttl_seconds,
-                payload.runtime_attestation,
+                payload.runtime_attestation.clone(),
             ) {
-                Ok(capability) => Json(IssueCapabilityResponse { capability }).into_response(),
+                Ok(capability) => {
+                    if let Err(response) = enforce_authority_mutation_fence(&state) {
+                        return response;
+                    }
+                    let signing_context =
+                        match load_existing_authority_signing_context(&state.config) {
+                            Ok(context) => context,
+                            Err(response) => return response,
+                        };
+                    let signed = match SignedIssueCapabilityResponse::sign(
+                        &payload,
+                        capability,
+                        &signing_context.keypair,
+                        signing_context.generation,
+                        signing_context.rotated_at,
+                        unix_timestamp_now(),
+                    ) {
+                        Ok(signed) => signed,
+                        Err(_) => {
+                            return plain_http_error(
+                                StatusCode::SERVICE_UNAVAILABLE,
+                                "capability issuance response could not be authenticated",
+                            );
+                        }
+                    };
+                    canonical_issue_capability_response(&signed)
+                }
                 Err(chio_kernel::KernelError::CapabilityIssuanceDenied(error)) => {
                     plain_http_error(StatusCode::FORBIDDEN, &error)
                 }
@@ -114,6 +143,34 @@ pub(crate) async fn handle_issue_capability(
         }
         Err(response) => response,
     }
+}
+
+fn canonical_issue_capability_response(signed: &SignedIssueCapabilityResponse) -> Response {
+    let body = match canonical_json_bytes(signed) {
+        Ok(body) => body,
+        Err(_) => {
+            return plain_http_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "capability issuance response serialization failed",
+            );
+        }
+    };
+    let body_len = match u64::try_from(body.len()) {
+        Ok(body_len) => body_len,
+        Err(_) => {
+            return plain_http_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "capability issuance response length overflow",
+            );
+        }
+    };
+    if body_len > CAPABILITY_ISSUANCE_RESPONSE_MAX_BYTES {
+        return plain_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "capability issuance response exceeds its byte bound",
+        );
+    }
+    ([(CONTENT_TYPE, "application/json")], body).into_response()
 }
 
 pub(crate) async fn handle_scim_create_user(
@@ -527,5 +584,126 @@ pub(crate) async fn handle_revoke_capability(
             )
         }
         Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::to_bytes;
+    use chio_core::capability::scope::{Operation, ToolGrant};
+    use chio_test_support::prelude::*;
+
+    fn unique_test_directory() -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .test_unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("chio-signed-capability-issuance-{nonce}"));
+        std::fs::create_dir_all(&path).test_unwrap();
+        path
+    }
+
+    fn test_state(receipt_db_path: PathBuf, authority_db_path: PathBuf) -> TrustServiceState {
+        TrustServiceState {
+            config: TrustServiceConfig {
+                listen: "127.0.0.1:0".parse().test_unwrap(),
+                service_token: "service-secret".to_string(),
+                tenant_read_tokens: BTreeMap::new(),
+                receipt_db_path: Some(receipt_db_path),
+                revocation_db_path: None,
+                authority_seed_path: None,
+                authority_db_path: Some(authority_db_path),
+                budget_db_path: None,
+                enterprise_providers_file: None,
+                federation_policies_file: None,
+                scim_lifecycle_file: None,
+                verifier_policies_file: None,
+                verifier_challenge_db_path: None,
+                passport_statuses_file: None,
+                passport_issuance_offers_file: None,
+                certification_registry_file: None,
+                certification_discovery_file: None,
+                issuance_policy: None,
+                runtime_assurance_policy: None,
+                advertise_url: Some("http://node-a".to_string()),
+                allow_local_peer_urls: true,
+                certification_public_metadata_ttl_seconds: PUBLIC_DISCOVERY_TTL_SECS,
+                peer_urls: Vec::new(),
+                cluster_sync_interval: Duration::from_millis(25),
+                memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            },
+            enterprise_provider_registry: None,
+            verifier_policy_registry: None,
+            federation_admission_rate_limiter: Arc::new(Mutex::new(
+                FederationAdmissionRateLimiter::default(),
+            )),
+            cluster: None,
+            cluster_progress: None,
+        }
+    }
+
+    fn auth_headers() -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer service-secret"),
+        );
+        headers
+    }
+
+    #[tokio::test]
+    async fn capability_issuance_handler_returns_request_bound_signed_envelope() {
+        let directory = unique_test_directory();
+        let receipt_path = directory.join("receipts.db");
+        let authority_path = directory.join("authority.db");
+        let authority = SqliteCapabilityAuthority::open(&authority_path).test_unwrap();
+        drop(SqliteReceiptStore::open(&receipt_path).test_unwrap());
+        let state = test_state(receipt_path, authority_path);
+        let subject = Keypair::generate();
+        let now = unix_timestamp_now();
+        let request = IssueCapabilityRequest::new(
+            "da".repeat(32),
+            now,
+            &subject.public_key(),
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "signed-issuance".to_string(),
+                    tool_name: "invoke".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                resource_grants: Vec::new(),
+                prompt_grants: Vec::new(),
+            },
+            60,
+            None,
+        );
+
+        let response =
+            handle_issue_capability(State(state), auth_headers(), Json(request.clone())).await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(
+            response.into_body(),
+            CAPABILITY_ISSUANCE_RESPONSE_MAX_BYTES as usize,
+        )
+        .await
+        .test_unwrap();
+        let signed: SignedIssueCapabilityResponse = serde_json::from_slice(&body).test_unwrap();
+        assert_eq!(body.as_ref(), canonical_json_bytes(&signed).test_unwrap());
+        signed
+            .verify(
+                &authority.status().test_unwrap().public_key,
+                &request,
+                unix_timestamp_now(),
+            )
+            .test_unwrap();
+        assert_eq!(signed.body.capability.subject, subject.public_key());
+        assert!(signed.body.capability.scope.is_subset_of(&request.scope));
     }
 }

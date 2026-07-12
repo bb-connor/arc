@@ -14,6 +14,8 @@ pub(crate) fn cmd_run(
     _session_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
+    control_authority_trusted_public_keys: &[chio_core::PublicKey],
 ) -> Result<(), CliError> {
     let loaded_policy = load_policy(policy_path)?;
     let policy_identity = loaded_policy.identity.clone();
@@ -31,7 +33,14 @@ pub(crate) fn cmd_run(
 
     let kernel_kp = Keypair::generate();
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
-    configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
+    configure_receipt_store(
+        &mut kernel,
+        receipt_db_path,
+        control_url,
+        control_token,
+        control_authority_public_key,
+        control_authority_trusted_public_keys,
+    )?;
     configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
     configure_capability_authority(
         &mut kernel,
@@ -42,6 +51,8 @@ pub(crate) fn cmd_run(
         budget_db_path,
         control_url,
         control_token,
+        control_authority_public_key,
+        control_authority_trusted_public_keys,
         issuance_policy,
         runtime_assurance_policy,
     )?;
@@ -328,6 +339,8 @@ pub(crate) fn cmd_check(
     _session_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
+    control_authority_trusted_public_keys: &[chio_core::PublicKey],
 ) -> Result<(), CliError> {
     let loaded_policy = load_policy(policy_path)?;
     let check_output = validate_check_mode(&loaded_policy, mode, output_fixture)?;
@@ -338,7 +351,14 @@ pub(crate) fn cmd_check(
 
     let kernel_kp = Keypair::generate();
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
-    configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
+    configure_receipt_store(
+        &mut kernel,
+        receipt_db_path,
+        control_url,
+        control_token,
+        control_authority_public_key,
+        control_authority_trusted_public_keys,
+    )?;
     configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
     configure_capability_authority(
         &mut kernel,
@@ -349,6 +369,8 @@ pub(crate) fn cmd_check(
         budget_db_path,
         control_url,
         control_token,
+        control_authority_public_key,
+        control_authority_trusted_public_keys,
         issuance_policy,
         runtime_assurance_policy,
     )?;
@@ -563,6 +585,8 @@ pub(crate) fn cmd_mcp_serve(
     _session_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
+    control_authority_trusted_public_keys: &[chio_core::PublicKey],
 ) -> Result<(), CliError> {
     // Resolve `--preset` to a materialized YAML on disk so the rest
     // of the plumbing can use `load_policy` unchanged. Keeping the
@@ -614,7 +638,14 @@ pub(crate) fn cmd_mcp_serve(
 
     let kernel_kp = Keypair::generate();
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
-    configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
+    configure_receipt_store(
+        &mut kernel,
+        receipt_db_path,
+        control_url,
+        control_token,
+        control_authority_public_key,
+        control_authority_trusted_public_keys,
+    )?;
     configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
     configure_capability_authority(
         &mut kernel,
@@ -625,6 +656,8 @@ pub(crate) fn cmd_mcp_serve(
         budget_db_path,
         control_url,
         control_token,
+        control_authority_public_key,
+        control_authority_trusted_public_keys,
         issuance_policy,
         runtime_assurance_policy,
     )?;
@@ -740,6 +773,8 @@ pub(crate) fn cmd_mcp_serve_http(
     session_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
+    control_authority_trusted_public_keys: &[chio_core::PublicKey],
 ) -> Result<(), CliError> {
     let loaded_policy = load_policy(policy_path)?;
     info!(
@@ -784,6 +819,8 @@ pub(crate) fn cmd_mcp_serve_http(
         admin_token,
         control_url: control_url.map(ToOwned::to_owned),
         control_token: control_token.map(ToOwned::to_owned),
+        control_authority_public_key: control_authority_public_key.cloned(),
+        control_authority_trusted_public_keys: control_authority_trusted_public_keys.to_vec(),
         public_base_url: public_base_url.map(ToOwned::to_owned),
         auth_servers: auth_servers.to_vec(),
         auth_authorization_endpoint: auth_authorization_endpoint.map(ToOwned::to_owned),

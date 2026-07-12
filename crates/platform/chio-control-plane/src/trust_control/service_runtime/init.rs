@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 
 pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
     config.validate()?;
+    initialize_trust_service_storage(&config)?;
     let listener = tokio::net::TcpListener::bind(config.listen).await?;
     let local_addr = listener.local_addr()?;
     let enterprise_provider_registry = load_enterprise_provider_registry(
@@ -109,6 +110,30 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
     serve_result.map(|_outcome| ()).map_err(|error| {
         CliError::cli_other_error(format!("trust control service failed: {error}"))
     })
+}
+
+fn initialize_trust_service_storage(config: &TrustServiceConfig) -> Result<(), CliError> {
+    match (
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    ) {
+        (Some(_), Some(_)) => {
+            return Err(CliError::cli_other_error(
+                "trust control service requires one authority backend".to_string(),
+            ));
+        }
+        (Some(path), None) => {
+            drop(load_or_create_authority_keypair(path)?);
+        }
+        (None, Some(path)) => {
+            drop(SqliteCapabilityAuthority::open(path)?);
+        }
+        (None, None) => {}
+    }
+    if let Some(path) = config.receipt_db_path.as_deref() {
+        drop(SqliteReceiptStore::open(path)?);
+    }
+    Ok(())
 }
 
 /// Time budget for the post-drain cluster-loop join: whatever remains of the

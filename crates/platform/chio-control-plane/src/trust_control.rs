@@ -11,7 +11,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::extract::Form;
 use axum::extract::{Path as AxumPath, Query, State};
@@ -251,7 +251,7 @@ use crate::{
         FederationAdmissionPolicyRecord, FederationAdmissionPolicyRegistry,
         FederationAdmissionRateLimit, FederationAdmissionRateLimitStatus,
     },
-    issuance, load_or_create_authority_keypair,
+    issuance, load_existing_authority_keypair, load_or_create_authority_keypair,
     passport_verifier::{
         Oid4vpVerifierTransactionStore, PassportIssuanceOfferRecord, PassportIssuanceOfferRegistry,
         PassportStatusListResponse, PassportStatusRegistry, PassportStatusRevocationRequest,
@@ -265,6 +265,8 @@ use crate::{
     CliError,
 };
 
+#[path = "trust_control/aggregate_family_root_handlers.rs"]
+mod aggregate_family_root_handlers;
 #[path = "trust_control/authority_handlers.rs"]
 mod authority_handlers;
 #[path = "trust_control/budget_handlers.rs"]
@@ -308,6 +310,7 @@ pub use self::config_and_public::*;
 pub use self::service_types::*;
 // The domain handler modules and credit_and_loss expose only crate-internal
 // (`pub(crate)`) items, so they are re-exported with crate visibility.
+pub(crate) use self::aggregate_family_root_handlers::*;
 pub(crate) use self::authority_handlers::*;
 pub(crate) use self::budget_handlers::*;
 pub use self::capital_and_liability::*;

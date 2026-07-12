@@ -97,6 +97,8 @@ pub(crate) const BUDGET_INCREMENT_PATH: &str = "/v1/budgets/increment";
 pub(crate) const BUDGET_AUTHORIZE_EXPOSURE_PATH: &str = "/v1/budgets/authorize-exposure";
 pub(crate) const BUDGET_RELEASE_EXPOSURE_PATH: &str = "/v1/budgets/release-exposure";
 pub(crate) const BUDGET_RECONCILE_SPEND_PATH: &str = "/v1/budgets/reconcile-spend";
+pub(crate) const AGGREGATE_FAMILY_ROOT_LOOKUP_PATH: &str =
+    "/v1/aggregate-family-roots/{root_capability_id}";
 pub(crate) const INTERNAL_CLUSTER_STATUS_PATH: &str = "/v1/internal/cluster/status";
 pub(crate) const INTERNAL_CLUSTER_SNAPSHOT_PATH: &str = "/v1/internal/cluster/snapshot";
 pub(crate) const INTERNAL_CLUSTER_PARTITION_PATH: &str = "/v1/internal/cluster/partition";
@@ -203,7 +205,6 @@ pub(crate) const DASHBOARD_DIST_DIR: &str = "dashboard/dist";
 pub(crate) const DEFAULT_LIST_LIMIT: usize = 50;
 pub(crate) const MAX_LIST_LIMIT: usize = 200;
 pub(crate) const BUDGET_DELTA_MAX_RECORDS: usize = MAX_LIST_LIMIT * 2;
-pub(crate) const AUTHORITY_CACHE_TTL: Duration = Duration::from_secs(2);
 pub(crate) const CONTROL_HTTP_TIMEOUT: Duration = Duration::from_secs(15);
 /// Hard cap on a single peer-response body the cluster client will buffer and
 /// decode. Matches the HTTP relay body-size posture; an oversized or

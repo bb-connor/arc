@@ -171,6 +171,8 @@ pub(crate) fn run() {
     let session_db = cli.session_db.clone();
     let control_url = cli.control_url.clone();
     let control_token = cli.control_token.clone();
+    let control_authority_public_key = cli.control_authority_public_key.clone();
+    let control_authority_trusted_public_keys = cli.control_authority_trusted_public_keys.clone();
     let json_output = cli.json_output();
 
     init_redacted_tracing();
@@ -189,6 +191,8 @@ pub(crate) fn run() {
             session_db.as_deref(),
             control_url.as_deref(),
             control_token.as_deref(),
+            control_authority_public_key.as_ref(),
+            &control_authority_trusted_public_keys,
         ),
         Commands::Check {
             policy,
@@ -213,10 +217,12 @@ pub(crate) fn run() {
             session_db.as_deref(),
             control_url.as_deref(),
             control_token.as_deref(),
+            control_authority_public_key.as_ref(),
+            &control_authority_trusted_public_keys,
         ),
         Commands::Init { path } => scaffold::cmd_init(&path),
         Commands::Api { command } => dispatch_api(command, receipt_db, authority_seed_file),
-        Commands::Mcp { command } => dispatch_mcp(command, receipt_db, revocation_db, authority_seed_file, authority_db, budget_db, session_db, control_url, control_token),
+        Commands::Mcp { command } => dispatch_mcp(command, receipt_db, revocation_db, authority_seed_file, authority_db, budget_db, session_db, control_url, control_token, control_authority_public_key, control_authority_trusted_public_keys),
         Commands::Trust { command } => dispatch_trust(command, json_output, receipt_db, revocation_db, authority_seed_file, authority_db, budget_db, session_db, control_url, control_token),
         Commands::Receipt { command } => dispatch_receipt(command, json_output, receipt_db, control_url, control_token),
         Commands::Evidence { command } => dispatch_evidence(command, json_output, receipt_db, control_url, control_token),

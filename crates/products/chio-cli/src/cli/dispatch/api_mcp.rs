@@ -37,6 +37,8 @@ pub(crate) fn dispatch_mcp(
     session_db: Option<PathBuf>,
     control_url: Option<String>,
     control_token: Option<String>,
+    control_authority_public_key: Option<chio_core::PublicKey>,
+    control_authority_trusted_public_keys: Vec<chio_core::PublicKey>,
 ) -> Result<(), CliError> {
     match command {
             McpCommands::Wrap(args) => cmd_mcp_wrap(&args),
@@ -68,6 +70,8 @@ pub(crate) fn dispatch_mcp(
                 session_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
+                control_authority_public_key.as_ref(),
+                &control_authority_trusted_public_keys,
             ),
             McpCommands::ServeHttp {
                 policy,
@@ -145,6 +149,8 @@ pub(crate) fn dispatch_mcp(
                 session_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
+                control_authority_public_key.as_ref(),
+                &control_authority_trusted_public_keys,
             ),
     }
 }

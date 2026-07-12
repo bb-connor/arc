@@ -392,7 +392,15 @@ pub fn configure_receipt_store(
     receipt_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
+    control_authority_trusted_public_keys: &[chio_core::PublicKey],
 ) -> Result<(), CliError> {
+    if control_url.is_some() && kernel.requires_web3_evidence() {
+        return Err(chio_kernel::KernelError::Web3EvidenceUnavailable(
+            "web3-enabled deployments require local receipt persistence with kernel-signed checkpoint support; append-only remote receipt mirrors are unsupported".to_string(),
+        )
+        .into());
+    }
     match (receipt_db_path, control_url) {
         (Some(_), Some(_)) => {
             return Err(CliError::cli_other_error(
@@ -401,6 +409,7 @@ pub fn configure_receipt_store(
             ));
         }
         (Some(path), None) => {
+            kernel.validate_web3_evidence_receipt_store(true)?;
             let store = Arc::new(chio_store_sqlite::SqliteReceiptStore::open(path)?);
             let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = store.clone();
             let root_resolver: Arc<
@@ -413,12 +422,25 @@ pub fn configure_receipt_store(
         }
         (None, Some(url)) => {
             let token = require_control_token(control_token)?;
-            kernel.clear_aggregate_family_root_resolver();
-            kernel.set_receipt_store(
+            let pinned_authority = control_authority_public_key.ok_or_else(|| {
+                CliError::cli_other_error(
+                    "remote aggregate family-root resolution requires an independently pinned control-authority public key"
+                        .to_string(),
+                )
+            })?;
+            let pinned_authority = trust_control::service_runtime::PinnedControlAuthority::new(
+                pinned_authority.clone(),
+                control_authority_trusted_public_keys.to_vec(),
+            )?;
+            let receipt_store =
                 trust_control::service_runtime::remote_stores::build_remote_receipt_store(
                     url, token,
-                )?,
+                )?;
+            let root_resolver = trust_control::service_runtime::remote_root_resolver::build_remote_aggregate_family_root_resolver(
+                url, token, pinned_authority,
             )?;
+            kernel.set_receipt_store(receipt_store)?;
+            kernel.set_aggregate_family_root_resolver(root_resolver);
         }
         (None, None) => {}
     }
@@ -466,6 +488,8 @@ pub fn configure_capability_authority(
     budget_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    control_authority_public_key: Option<&chio_core::PublicKey>,
+    control_authority_trusted_public_keys: &[chio_core::PublicKey],
     issuance_policy: Option<policy::ReputationIssuancePolicy>,
     runtime_assurance_policy: Option<policy::RuntimeAssuranceIssuancePolicy>,
 ) -> Result<(), CliError> {
@@ -481,9 +505,21 @@ pub fn configure_capability_authority(
             ));
         }
         let token = require_control_token(control_token)?;
+        let current_signer = control_authority_public_key.ok_or_else(|| {
+            CliError::cli_other_error(
+                "remote capability authority requires an independently pinned current public key"
+                    .to_string(),
+            )
+        })?;
+        let pinned_authority = trust_control::service_runtime::PinnedControlAuthority::new(
+            current_signer.clone(),
+            control_authority_trusted_public_keys.to_vec(),
+        )?;
         kernel.set_capability_authority(
             trust_control::service_runtime::remote_authority::build_remote_capability_authority(
-                url, token,
+                url,
+                token,
+                pinned_authority,
             )?,
         );
         return Ok(());
@@ -503,7 +539,7 @@ pub fn configure_capability_authority(
                 runtime_assurance_policy,
                 receipt_db_path,
                 budget_db_path,
-            ));
+            )?);
         }
         (None, Some(path)) => {
             kernel.set_capability_authority(issuance::wrap_capability_authority(
@@ -512,7 +548,7 @@ pub fn configure_capability_authority(
                 runtime_assurance_policy,
                 receipt_db_path,
                 budget_db_path,
-            ));
+            )?);
         }
         (None, None) => {
             if issuance_policy.is_some()
@@ -527,7 +563,7 @@ pub fn configure_capability_authority(
                     runtime_assurance_policy,
                     receipt_db_path,
                     budget_db_path,
-                ));
+                )?);
             }
         }
     }
@@ -599,6 +635,12 @@ pub fn load_or_create_authority_keypair(path: &Path) -> Result<Keypair, CliError
     }
 }
 
+/// Load existing seed-file signing custody without creating or repairing it.
+pub fn load_existing_authority_keypair(path: &Path) -> Result<Keypair, CliError> {
+    let seed_hex = fs::read_to_string(path)?;
+    Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
+}
+
 pub fn issue_default_capabilities(
     kernel: &ChioKernel,
     agent_pk: &chio_core::PublicKey,
@@ -651,6 +693,16 @@ mod tests {
     use chio_guards::PostInvocationPipeline;
 
     fn make_kernel(require_web3_evidence: bool) -> ChioKernel {
+        make_kernel_with_checkpoint_batch(
+            require_web3_evidence,
+            chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+        )
+    }
+
+    fn make_kernel_with_checkpoint_batch(
+        require_web3_evidence: bool,
+        checkpoint_batch_size: u64,
+    ) -> ChioKernel {
         ChioKernel::new(KernelConfig {
             keypair: Keypair::generate(),
             ca_public_keys: vec![],
@@ -662,7 +714,7 @@ mod tests {
             max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
             require_web3_evidence,
-            checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+            checkpoint_batch_size,
             retention_config: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             allow_ephemeral_receipt_log: true,
@@ -766,7 +818,7 @@ mod tests {
     fn web3_evidence_requires_local_receipt_store() {
         let mut kernel = make_kernel(true);
 
-        let error = configure_receipt_store(&mut kernel, None, None, None).unwrap_err();
+        let error = configure_receipt_store(&mut kernel, None, None, None, None, &[]).unwrap_err();
         assert!(matches!(
             error,
             CliError::Kernel(chio_kernel::KernelError::Web3EvidenceUnavailable(_))
@@ -778,14 +830,31 @@ mod tests {
         let path = unique_receipt_db_path("chio-control-plane-web3-evidence");
         let mut kernel = make_kernel(true);
 
-        configure_receipt_store(&mut kernel, Some(&path), None, None).unwrap();
+        configure_receipt_store(&mut kernel, Some(&path), None, None, None, &[]).unwrap();
         kernel.validate_web3_evidence_prerequisites().unwrap();
 
         let _ = std::fs::remove_file(path);
     }
 
     #[test]
-    fn aggregate_family_root_resolver_is_explicit_and_local_only() {
+    fn web3_evidence_preflight_rejects_before_receipt_store_mutation() {
+        let path = unique_receipt_db_path("chio-control-plane-web3-preflight");
+        let mut kernel = make_kernel_with_checkpoint_batch(true, 0);
+
+        let error =
+            configure_receipt_store(&mut kernel, Some(&path), None, None, None, &[]).unwrap_err();
+
+        assert!(error.to_string().contains("checkpoint_batch_size > 0"));
+        assert!(kernel.aggregate_family_root_resolver().is_none());
+        let unchanged = kernel
+            .validate_web3_evidence_prerequisites()
+            .expect_err("failed preflight must leave the receipt store uninstalled");
+        assert!(unchanged.to_string().contains("durable receipt store"));
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn aggregate_family_root_resolver_is_explicit_for_local_and_remote_stores() {
         let path = unique_receipt_db_path("chio-control-plane-family-resolver");
         let issuer = Keypair::generate();
         let subject = Keypair::generate();
@@ -827,7 +896,7 @@ mod tests {
         let mut kernel = make_kernel(false);
         assert!(kernel.aggregate_family_root_resolver().is_none());
 
-        configure_receipt_store(&mut kernel, Some(&path), None, None).unwrap();
+        configure_receipt_store(&mut kernel, Some(&path), None, None, None, &[]).unwrap();
         let resolver = kernel
             .aggregate_family_root_resolver()
             .expect("local SQLite composition must install a root resolver");
@@ -840,27 +909,55 @@ mod tests {
             ) if resolved.root_subject() == &root.subject
         ));
 
-        configure_receipt_store(
+        let error = configure_receipt_store(
+            &mut kernel,
+            None,
+            Some("http://control.example"),
+            Some("test-token"),
+            Some(&issuer.public_key()),
+            &[],
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("requires HTTPS"));
+        assert!(matches!(
+            kernel
+                .aggregate_family_root_resolver()
+                .expect("failed reconfiguration must preserve the local resolver")
+                .resolve_aggregate_family_root(&root.id),
+            Ok(
+                chio_core::capability::aggregate_budget::AggregateFamilyRootResolution::LegacyUnbound(
+                    _
+                )
+            )
+        ));
+
+        let remote_error = configure_receipt_store(
             &mut kernel,
             None,
             Some("http://127.0.0.1:8080"),
             Some("test-token"),
+            Some(&issuer.public_key()),
+            &[],
         )
-        .unwrap();
-        assert!(kernel.aggregate_family_root_resolver().is_none());
+        .unwrap_err();
+        assert!(remote_error.to_string().contains("requires HTTPS"));
 
         let _ = std::fs::remove_file(path);
     }
 
     #[test]
     fn web3_evidence_rejects_remote_append_only_receipt_store() {
+        let path = unique_receipt_db_path("chio-control-plane-web3-atomic-reconfiguration");
         let mut kernel = make_kernel(true);
+        configure_receipt_store(&mut kernel, Some(&path), None, None, None, &[]).unwrap();
 
         let error = configure_receipt_store(
             &mut kernel,
             None,
             Some("http://127.0.0.1:8080"),
             Some("test-token"),
+            Some(&Keypair::generate().public_key()),
+            &[],
         )
         .unwrap_err();
         assert!(matches!(
@@ -870,6 +967,34 @@ mod tests {
         assert!(error
             .to_string()
             .contains("append-only remote receipt mirrors are unsupported"));
+        kernel
+            .validate_web3_evidence_prerequisites()
+            .expect("failed remote reconfiguration must preserve the local receipt store");
+        assert!(kernel.aggregate_family_root_resolver().is_some());
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn remote_receipt_configuration_requires_a_pin_before_mutation() {
+        let path = unique_receipt_db_path("chio-control-plane-family-pin");
+        let mut kernel = make_kernel(false);
+        configure_receipt_store(&mut kernel, Some(&path), None, None, None, &[]).unwrap();
+
+        let error = configure_receipt_store(
+            &mut kernel,
+            None,
+            Some("https://control.example"),
+            Some("test-token"),
+            None,
+            &[],
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("independently pinned"));
+        assert!(kernel.aggregate_family_root_resolver().is_some());
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

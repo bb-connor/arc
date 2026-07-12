@@ -370,11 +370,16 @@ pub(crate) fn enforce_authority_mutation_fence(
         ));
     }
     if let Some(path) = state.config.authority_db_path.as_deref() {
-        SqliteCapabilityAuthority::open(path)
+        SqliteCapabilityAuthority::open_existing(path)
             .and_then(|authority| {
                 authority.enforce_cluster_fence(&authority_lease.leader_url, authority_lease.term)
             })
-            .map_err(|error| plain_http_error(StatusCode::CONFLICT, &error.to_string()))?;
+            .map_err(|_| {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "cluster authority fence is unavailable",
+                )
+            })?;
     }
     Ok(Some(authority_lease))
 }
@@ -392,11 +397,16 @@ pub(crate) fn refresh_authority_mutation_fence(state: &TrustServiceState) -> Res
     let Some(path) = state.config.authority_db_path.as_deref() else {
         return Ok(());
     };
-    SqliteCapabilityAuthority::open(path)
+    SqliteCapabilityAuthority::open_existing(path)
         .and_then(|authority| {
             authority.seed_cluster_fence(Some(&authority_lease.leader_url), authority_lease.term)
         })
-        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
+        .map_err(|_| {
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "cluster authority fence is unavailable",
+            )
+        })?;
     Ok(())
 }
 
@@ -567,19 +577,34 @@ pub(crate) fn load_capability_authority(
             "trust control service requires either --authority-seed-file or --authority-db, not both",
         )),
         (Some(path), None) => {
-            let keypair = load_or_create_authority_keypair(path).map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            let keypair = load_existing_authority_keypair(path).map_err(|_| {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "capability authority signing custody is unavailable",
+                )
             })?;
-            Ok(issuance::wrap_capability_authority(
+            issuance::wrap_capability_authority(
                 Box::new(LocalCapabilityAuthority::new(keypair)),
                 config.issuance_policy.clone(),
                 config.runtime_assurance_policy.clone(),
                 config.receipt_db_path.as_deref(),
                 config.budget_db_path.as_deref(),
-            ))
+            )
+            .map_err(|_| {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "capability issuance storage is unavailable",
+                )
+            })
         }
-        (None, Some(path)) => SqliteCapabilityAuthority::open(path)
-            .map(|authority| {
+        (None, Some(path)) => SqliteCapabilityAuthority::open_existing(path)
+            .map_err(|_| {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "capability authority storage is unavailable",
+                )
+            })
+            .and_then(|authority| {
                 issuance::wrap_capability_authority(
                     Box::new(authority),
                     config.issuance_policy.clone(),
@@ -587,9 +612,12 @@ pub(crate) fn load_capability_authority(
                     config.receipt_db_path.as_deref(),
                     config.budget_db_path.as_deref(),
                 )
-            })
-            .map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+                .map_err(|_| {
+                    plain_http_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "capability issuance storage is unavailable",
+                    )
+                })
             }),
         (None, None) => Err(plain_http_error(
             StatusCode::CONFLICT,
@@ -598,14 +626,84 @@ pub(crate) fn load_capability_authority(
     }
 }
 
+pub(crate) struct AuthoritySigningContext {
+    pub(crate) keypair: Keypair,
+    pub(crate) generation: u64,
+    pub(crate) rotated_at: u64,
+}
+
+pub(crate) fn load_existing_authority_signing_context(
+    config: &TrustServiceConfig,
+) -> Result<AuthoritySigningContext, Response> {
+    match (
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    ) {
+        (Some(_), Some(_)) => Err(plain_http_error(
+            StatusCode::CONFLICT,
+            "trust control service requires one authority backend",
+        )),
+        (Some(path), None) => load_existing_authority_keypair(path)
+            .map(|keypair| AuthoritySigningContext {
+                keypair,
+                generation: 1,
+                rotated_at: 0,
+            })
+            .map_err(|_| {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "authority signing custody is unavailable",
+                )
+            }),
+        (None, Some(path)) => {
+            let authority = SqliteCapabilityAuthority::open_existing(path).map_err(|_| {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "authority signing custody is unavailable",
+                )
+            })?;
+            let status = authority.status().map_err(|_| {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "authority state is unavailable",
+                )
+            })?;
+            let keypair = authority.current_keypair().map_err(|_| {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "authority signing custody is unavailable",
+                )
+            })?;
+            if keypair.public_key() != status.public_key {
+                return Err(plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "authority signing custody does not match authority state",
+                ));
+            }
+            Ok(AuthoritySigningContext {
+                keypair,
+                generation: status.generation,
+                rotated_at: status.rotated_at,
+            })
+        }
+        (None, None) => Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "authority signing custody is not configured",
+        )),
+    }
+}
+
 pub(crate) fn load_authority_status(
     config: &TrustServiceConfig,
 ) -> Result<TrustAuthorityStatus, Response> {
     if let Some(path) = config.authority_db_path.as_deref() {
-        let status = SqliteCapabilityAuthority::open(path)
+        let status = SqliteCapabilityAuthority::open_existing(path)
             .and_then(|authority| authority.status())
-            .map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            .map_err(|_| {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "capability authority state is unavailable",
+                )
             })?;
         return Ok(authority_status_response("sqlite".to_string(), status));
     }
@@ -651,10 +749,13 @@ pub(crate) fn rotate_authority(
     config: &TrustServiceConfig,
 ) -> Result<TrustAuthorityStatus, Response> {
     if let Some(path) = config.authority_db_path.as_deref() {
-        let status = SqliteCapabilityAuthority::open(path)
+        let status = SqliteCapabilityAuthority::open_existing(path)
             .and_then(|authority| authority.rotate())
-            .map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            .map_err(|_| {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "capability authority rotation storage is unavailable",
+                )
             })?;
         return Ok(authority_status_response("sqlite".to_string(), status));
     }

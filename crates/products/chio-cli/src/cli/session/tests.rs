@@ -57,7 +57,7 @@
     ) -> ChioKernel {
         let mut kernel = build_kernel(loaded_policy, kernel_kp);
         let receipt_db_path = unique_db_path("chio-cli-session-receipts");
-        configure_receipt_store(&mut kernel, Some(&receipt_db_path), None, None)
+        configure_receipt_store(&mut kernel, Some(&receipt_db_path), None, None, None, &[])
             .expect("configure receipt store for session test");
         kernel
     }
@@ -226,6 +226,8 @@ capabilities:
             None,
             None,
             None,
+            &[],
+            None,
             None,
         )
         .unwrap();
@@ -278,6 +280,8 @@ capabilities:
             None,
             None,
             None,
+            &[],
+            None,
             None,
         )
         .unwrap();
@@ -308,6 +312,8 @@ capabilities:
             None,
             None,
             None,
+            None,
+            &[],
             None,
             None,
         )

@@ -22,14 +22,20 @@ pub fn wrap_capability_authority(
     runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
     receipt_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
-) -> Box<dyn CapabilityAuthority> {
-    Box::new(PolicyBackedCapabilityAuthority {
+) -> Result<Box<dyn CapabilityAuthority>, KernelError> {
+    if let Some(path) = receipt_db_path {
+        drop(
+            SqliteReceiptStore::open_existing_strict(path)
+                .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?,
+        );
+    }
+    Ok(Box::new(PolicyBackedCapabilityAuthority {
         inner,
         issuance_policy,
         runtime_assurance_policy,
         receipt_db_path: receipt_db_path.map(Path::to_path_buf),
         budget_db_path: budget_db_path.map(Path::to_path_buf),
-    })
+    }))
 }
 
 struct PolicyBackedCapabilityAuthority {
@@ -125,7 +131,7 @@ impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
         )?;
 
         if let Some(path) = self.receipt_db_path.as_deref() {
-            let store = SqliteReceiptStore::open(path)
+            let store = SqliteReceiptStore::open_existing_strict(path)
                 .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
             if is_explicit_root_candidate(&capability) {
                 store

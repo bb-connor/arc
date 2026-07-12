@@ -144,6 +144,8 @@ pub struct RemoteServeHttpConfig {
     pub admin_token: Option<String>,
     pub control_url: Option<String>,
     pub control_token: Option<String>,
+    pub control_authority_public_key: Option<PublicKey>,
+    pub control_authority_trusted_public_keys: Vec<PublicKey>,
     pub public_base_url: Option<String>,
     pub auth_servers: Vec<String>,
     pub auth_authorization_endpoint: Option<String>,

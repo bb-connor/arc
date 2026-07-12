@@ -66,13 +66,7 @@ pub(crate) struct ClusterPeerClientAuth {
 
 pub(crate) struct RemoteCapabilityAuthority {
     pub(crate) client: TrustControlClient,
-    pub(crate) cache: Mutex<AuthorityKeyCache>,
-}
-
-pub(crate) struct AuthorityKeyCache {
-    pub(crate) current: Option<PublicKey>,
-    pub(crate) trusted: Vec<PublicKey>,
-    pub(crate) refreshed_at: Instant,
+    pub(crate) pinned_current: PublicKey,
 }
 
 pub(crate) struct RemoteRevocationStore {

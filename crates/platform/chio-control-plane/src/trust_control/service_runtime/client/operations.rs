@@ -13,34 +13,6 @@ impl TrustControlClient {
         self.post_json::<Value, TrustAuthorityStatus>(AUTHORITY_PATH, &json!({}))
     }
 
-    pub fn issue_capability(
-        &self,
-        subject: &PublicKey,
-        scope: ChioScope,
-        ttl_seconds: u64,
-    ) -> Result<CapabilityToken, CliError> {
-        self.issue_capability_with_attestation(subject, scope, ttl_seconds, None)
-    }
-
-    pub fn issue_capability_with_attestation(
-        &self,
-        subject: &PublicKey,
-        scope: ChioScope,
-        ttl_seconds: u64,
-        runtime_attestation: Option<RuntimeAttestationEvidence>,
-    ) -> Result<CapabilityToken, CliError> {
-        let response: IssueCapabilityResponse = self.post_json(
-            ISSUE_CAPABILITY_PATH,
-            &IssueCapabilityRequest {
-                subject_public_key: subject.to_hex(),
-                scope,
-                ttl_seconds,
-                runtime_attestation,
-            },
-        )?;
-        Ok(response.capability)
-    }
-
     pub fn federated_issue(
         &self,
         request: &FederatedIssueRequest,

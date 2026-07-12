@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TrustAuthorityStatus {
     pub configured: bool,
     pub backend: Option<String>,
@@ -11,22 +11,6 @@ pub struct TrustAuthorityStatus {
     pub applies_to_future_sessions_only: bool,
     #[serde(default)]
     pub trusted_public_keys: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct IssueCapabilityRequest {
-    pub(crate) subject_public_key: String,
-    pub(crate) scope: ChioScope,
-    pub(crate) ttl_seconds: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) runtime_attestation: Option<RuntimeAttestationEvidence>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct IssueCapabilityResponse {
-    pub(crate) capability: CapabilityToken,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

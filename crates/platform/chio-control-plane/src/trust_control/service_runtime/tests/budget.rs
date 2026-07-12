@@ -213,69 +213,6 @@ fn remote_budget_store_preserves_authority_term_and_commit_metadata() {
 }
 
 #[test]
-fn authority_key_cache_from_status_validates_and_deduplicates_current_key() {
-    let current = Keypair::generate().public_key().to_hex();
-    let trusted_only = Keypair::generate().public_key().to_hex();
-
-    let cache = AuthorityKeyCache::from_status(&TrustAuthorityStatus {
-        configured: true,
-        backend: Some("sqlite".to_string()),
-        public_key: Some(current.clone()),
-        generation: Some(7),
-        rotated_at: Some(11),
-        applies_to_future_sessions_only: false,
-        trusted_public_keys: vec![trusted_only.clone()],
-    })
-    .test_expect("cache from valid status");
-
-    assert_eq!(
-        cache.current.as_ref().test_expect("current key").to_hex(),
-        current
-    );
-    assert_eq!(cache.trusted.len(), 2);
-    assert!(cache
-        .trusted
-        .iter()
-        .any(|public_key| public_key.to_hex() == current));
-    assert!(cache
-        .trusted
-        .iter()
-        .any(|public_key| public_key.to_hex() == trusted_only));
-
-    let missing_current = match AuthorityKeyCache::from_status(&TrustAuthorityStatus {
-        configured: true,
-        backend: None,
-        public_key: None,
-        generation: None,
-        rotated_at: None,
-        applies_to_future_sessions_only: false,
-        trusted_public_keys: Vec::new(),
-    }) {
-        Ok(_) => panic!("missing current key should fail"),
-        Err(error) => error,
-    };
-    assert!(missing_current
-        .to_string()
-        .contains("no current authority public key"));
-
-    let unconfigured = match AuthorityKeyCache::from_status(&TrustAuthorityStatus {
-        configured: false,
-        backend: None,
-        public_key: Some(current),
-        generation: None,
-        rotated_at: None,
-        applies_to_future_sessions_only: false,
-        trusted_public_keys: Vec::new(),
-    }) {
-        Ok(_) => panic!("unconfigured authority should fail"),
-        Err(error) => error,
-    };
-    assert!(unconfigured
-        .to_string()
-        .contains("does not have an authority configured"));
-}
-
-#[test]
 fn trusted_authority_signer_check_accepts_rotated_keys() {
     let current = Keypair::generate().public_key();
     let previous = Keypair::generate().public_key();

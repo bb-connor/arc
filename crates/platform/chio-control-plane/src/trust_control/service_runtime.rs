@@ -8,10 +8,14 @@ mod errors;
 mod init;
 #[path = "service_runtime/issuance.rs"]
 pub mod issuance;
+#[path = "service_runtime/pinned_authority.rs"]
+mod pinned_authority;
 #[path = "service_runtime/public_registry.rs"]
 pub mod public_registry;
 #[path = "service_runtime/remote_authority.rs"]
 pub mod remote_authority;
+#[path = "service_runtime/remote_root_resolver.rs"]
+pub mod remote_root_resolver;
 #[path = "service_runtime/remote_stores.rs"]
 pub mod remote_stores;
 #[path = "service_runtime/reputation.rs"]
@@ -26,3 +30,4 @@ mod tests;
 use super::*;
 
 pub(crate) use init::serve_async;
+pub use pinned_authority::PinnedControlAuthority;

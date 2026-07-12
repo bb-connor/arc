@@ -6,6 +6,10 @@
 
 use super::*;
 
+#[path = "service_types/aggregate_family_root.rs"]
+mod aggregate_family_root;
+#[path = "service_types/capability_issuance.rs"]
+mod capability_issuance;
 #[path = "service_types/cluster_budget.rs"]
 mod cluster_budget;
 #[path = "service_types/config.rs"]
@@ -19,6 +23,17 @@ mod responses;
 #[path = "service_types/state.rs"]
 mod state;
 
+pub(crate) use self::aggregate_family_root::{
+    validate_lookup_nonce, AggregateFamilyRootCorruptionCode, AggregateFamilyRootLookupBody,
+    AggregateFamilyRootLookupOutcome, AggregateFamilyRootLookupQuery,
+    AggregateFamilyRootReadConsistency, SignedAggregateFamilyRootLookup,
+    AGGREGATE_FAMILY_ROOT_ID_MAX_BYTES, AGGREGATE_FAMILY_ROOT_LOOKUP_MAX_BYTES,
+    AGGREGATE_FAMILY_ROOT_LOOKUP_MAX_TTL_SECS, AGGREGATE_FAMILY_ROOT_LOOKUP_SCHEMA,
+};
+pub(crate) use self::capability_issuance::{
+    IssueCapabilityRequest, SignedIssueCapabilityResponse, CAPABILITY_ISSUANCE_MAX_CLOCK_SKEW_SECS,
+    CAPABILITY_ISSUANCE_RESPONSE_MAX_BYTES,
+};
 pub(crate) use self::cluster_budget::{
     AbandonedSeqRange, AuthoritySnapshotView, AuthorityTrustedKeyView, BudgetAuthorityMetadataView,
     BudgetCursorView, BudgetDeltaQuery, BudgetDeltaResponse, BudgetMutationAuthorityView,
@@ -38,9 +53,10 @@ pub(crate) use self::config::validate_control_secret;
 pub use self::config::TrustServiceConfig;
 pub use self::paths::FEDERATED_DELEGATION_POLICY_SCHEMA;
 pub(crate) use self::paths::{
-    AGENT_RECEIPTS_PATH, AUTHORITY_CACHE_TTL, AUTHORITY_PATH, AUTHORIZATION_CONTEXT_REPORT_PATH,
-    AUTHORIZATION_PROFILE_METADATA_PATH, AUTHORIZATION_REVIEW_PACK_PATH, BEHAVIORAL_FEED_PATH,
-    BUDGETS_PATH, BUDGET_AUTHORIZE_EXPOSURE_PATH, BUDGET_DELTA_MAX_RECORDS, BUDGET_INCREMENT_PATH,
+    AGENT_RECEIPTS_PATH, AGGREGATE_FAMILY_ROOT_LOOKUP_PATH, AUTHORITY_PATH,
+    AUTHORIZATION_CONTEXT_REPORT_PATH, AUTHORIZATION_PROFILE_METADATA_PATH,
+    AUTHORIZATION_REVIEW_PACK_PATH, BEHAVIORAL_FEED_PATH, BUDGETS_PATH,
+    BUDGET_AUTHORIZE_EXPOSURE_PATH, BUDGET_DELTA_MAX_RECORDS, BUDGET_INCREMENT_PATH,
     BUDGET_RECONCILE_SPEND_PATH, BUDGET_RELEASE_EXPOSURE_PATH, CAPITAL_ALLOCATION_ISSUE_PATH,
     CAPITAL_BOOK_PATH, CAPITAL_INSTRUCTION_ISSUE_PATH, CERTIFICATIONS_PATH,
     CERTIFICATION_DISCOVERY_CONSUME_PATH, CERTIFICATION_DISCOVERY_PATH,
@@ -107,8 +123,7 @@ pub(crate) use self::requests::{
     build_capability_snapshot, build_federated_delegation_anchor_snapshot,
     ensure_federated_delegation_policy_active,
     ensure_requested_capability_within_delegation_policy,
-    ensure_requested_capability_within_parent_snapshot, IssueCapabilityRequest,
-    IssueCapabilityResponse, RecordCapabilitySnapshotRequest,
+    ensure_requested_capability_within_parent_snapshot, RecordCapabilitySnapshotRequest,
 };
 pub use self::requests::{
     verify_federated_delegation_policy, AgentReceiptsHttpQuery, CapitalAllocationDecisionRequest,
@@ -142,7 +157,7 @@ pub use self::responses::{
 };
 pub use self::state::TrustControlClient;
 pub(crate) use self::state::{
-    AuthorityKeyCache, BudgetCursor, ClusterConsensusView, ClusterPeerClientAuth, ClusterProgress,
+    BudgetCursor, ClusterConsensusView, ClusterPeerClientAuth, ClusterProgress,
     ClusterRuntimeState, FederationAdmissionRateLimiter, PeerHealth, PeerSyncState,
     RemoteBudgetStore, RemoteCapabilityAuthority, RemoteReceiptStore, RemoteRevocationStore,
     RevocationCursor, TrustServiceState,

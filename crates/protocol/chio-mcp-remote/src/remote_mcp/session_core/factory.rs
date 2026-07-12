@@ -91,6 +91,8 @@ impl RemoteSessionFactory {
             self.config.receipt_db_path.as_deref(),
             self.config.control_url.as_deref(),
             self.config.control_token.as_deref(),
+            self.config.control_authority_public_key.as_ref(),
+            &self.config.control_authority_trusted_public_keys,
         )?;
         configure_revocation_store(
             &mut kernel,
@@ -107,6 +109,8 @@ impl RemoteSessionFactory {
             self.config.budget_db_path.as_deref(),
             self.config.control_url.as_deref(),
             self.config.control_token.as_deref(),
+            self.config.control_authority_public_key.as_ref(),
+            &self.config.control_authority_trusted_public_keys,
             issuance_policy,
             runtime_assurance_policy,
         )?;
@@ -269,6 +273,8 @@ impl RemoteSessionFactory {
             self.config.receipt_db_path.as_deref(),
             self.config.control_url.as_deref(),
             self.config.control_token.as_deref(),
+            self.config.control_authority_public_key.as_ref(),
+            &self.config.control_authority_trusted_public_keys,
         )?;
         configure_revocation_store(
             &mut kernel,
@@ -285,6 +291,8 @@ impl RemoteSessionFactory {
             self.config.budget_db_path.as_deref(),
             self.config.control_url.as_deref(),
             self.config.control_token.as_deref(),
+            self.config.control_authority_public_key.as_ref(),
+            &self.config.control_authority_trusted_public_keys,
             issuance_policy,
             runtime_assurance_policy,
         )?;

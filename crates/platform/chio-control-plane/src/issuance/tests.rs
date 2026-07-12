@@ -37,6 +37,26 @@ fn unique_path(prefix: &str, extension: &str) -> PathBuf {
     std::env::temp_dir().join(format!("{prefix}-{nonce}{extension}"))
 }
 
+fn wrap_capability_authority(
+    inner: Box<dyn CapabilityAuthority>,
+    issuance_policy: Option<ReputationIssuancePolicy>,
+    runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
+    receipt_db_path: Option<&std::path::Path>,
+    budget_db_path: Option<&std::path::Path>,
+) -> Box<dyn CapabilityAuthority> {
+    if let Some(path) = receipt_db_path {
+        drop(SqliteReceiptStore::open(path).test_unwrap());
+    }
+    super::wrap_capability_authority(
+        inner,
+        issuance_policy,
+        runtime_assurance_policy,
+        receipt_db_path,
+        budget_db_path,
+    )
+    .test_unwrap()
+}
+
 struct FixedCapabilityAuthority {
     capability: CapabilityToken,
     authority_public_key: chio_core::PublicKey,
@@ -137,6 +157,31 @@ fn aggregate_family_root_issuance_persists_explicit_legacy_before_return() {
     ));
 
     let _ = fs::remove_file(receipt_db_path);
+}
+
+#[test]
+fn capability_issuance_does_not_recreate_deleted_receipt_authority() {
+    let receipt_db_path = unique_path("issuance-deleted-receipts", ".sqlite3");
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let authority = wrap_capability_authority(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new(issuer)),
+        None,
+        None,
+        Some(&receipt_db_path),
+        None,
+    );
+    fs::remove_file(&receipt_db_path).test_unwrap();
+
+    let error = authority
+        .issue_capability(&subject.public_key(), delegable_root_scope(), 300)
+        .test_unwrap_err();
+
+    assert!(error.to_string().contains("receipt"));
+    assert!(
+        !receipt_db_path.exists(),
+        "issuance must not recreate deleted receipt authority state"
+    );
 }
 
 #[test]
