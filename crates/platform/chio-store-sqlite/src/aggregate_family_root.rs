@@ -231,6 +231,18 @@ struct AuthenticatedRoot {
     resolution: AggregateFamilyRootResolution,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct IssuedRootLineage {
+    capability_id: String,
+    subject_key: String,
+    issuer_key: String,
+    issued_at: i64,
+    expires_at: i64,
+    grants_json: String,
+    delegation_depth: i64,
+    parent_capability_id: Option<String>,
+}
+
 #[derive(Debug)]
 enum SchemaIntegrityError {
     Sqlite(rusqlite::Error),
@@ -327,6 +339,23 @@ impl SqliteReceiptStore {
 
         self.writer_handle()
             .run_write(move |connection| Ok(record_authenticated_roots(connection, &authenticated)))
+            .map_err(receipt_store_unavailable)?
+    }
+
+    /// Atomically register an issued direct root and its lineage snapshot.
+    pub fn record_issued_aggregate_family_root(
+        &self,
+        token: &CapabilityToken,
+        trusted_issuers: &[PublicKey],
+        recorded_at: u64,
+    ) -> Result<AggregateFamilyRootRecordStatus, AggregateFamilyRootStoreError> {
+        let authenticated = authenticate_root(token, trusted_issuers, recorded_at)?;
+        let lineage = issued_root_lineage(token, &authenticated)?;
+
+        self.writer_handle()
+            .run_write(move |connection| {
+                Ok(record_issued_root(connection, &authenticated, &lineage))
+            })
             .map_err(receipt_store_unavailable)?
     }
 }
@@ -500,9 +529,19 @@ fn record_authenticated_roots(
         .map_err(sqlite_to_store_error)?;
     validate_schema_integrity(&transaction).map_err(schema_integrity_to_store_error)?;
 
+    let statuses = apply_authenticated_roots(&transaction, roots)?;
+
+    transaction.commit().map_err(sqlite_to_store_error)?;
+    Ok(statuses)
+}
+
+fn apply_authenticated_roots(
+    connection: &Connection,
+    roots: &[AuthenticatedRoot],
+) -> Result<Vec<AggregateFamilyRootRecordStatus>, AggregateFamilyRootStoreError> {
     let mut statuses = Vec::with_capacity(roots.len());
     for root in roots {
-        let existing = load_root_record(&transaction, &root.record.root_capability_id)
+        let existing = load_root_record(connection, &root.record.root_capability_id)
             .map_err(sqlite_to_store_error)?;
         if let Some(existing) = existing {
             let existing = validate_stored_root(existing)?;
@@ -515,12 +554,141 @@ fn record_authenticated_roots(
             });
         }
 
-        insert_root_record(&transaction, &root.record).map_err(sqlite_to_store_error)?;
+        insert_root_record(connection, &root.record).map_err(sqlite_to_store_error)?;
         statuses.push(AggregateFamilyRootRecordStatus::Inserted);
     }
 
-    transaction.commit().map_err(sqlite_to_store_error)?;
     Ok(statuses)
+}
+
+fn record_issued_root(
+    connection: &mut Connection,
+    root: &AuthenticatedRoot,
+    lineage: &IssuedRootLineage,
+) -> Result<AggregateFamilyRootRecordStatus, AggregateFamilyRootStoreError> {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(sqlite_to_store_error)?;
+    validate_schema_integrity(&transaction).map_err(schema_integrity_to_store_error)?;
+
+    let mut statuses = apply_authenticated_roots(&transaction, core::slice::from_ref(root))?;
+    let status = statuses.pop().ok_or_else(|| {
+        AggregateFamilyRootStoreError::Corrupt(
+            "issued root registration returned no status".to_string(),
+        )
+    })?;
+    record_issued_root_lineage(&transaction, lineage)?;
+
+    transaction.commit().map_err(sqlite_to_store_error)?;
+    Ok(status)
+}
+
+fn issued_root_lineage(
+    token: &CapabilityToken,
+    root: &AuthenticatedRoot,
+) -> Result<IssuedRootLineage, AggregateFamilyRootStoreError> {
+    let grants_json = serde_json::to_string(&token.scope).map_err(|error| {
+        AggregateFamilyRootStoreError::InvalidRecord(format!(
+            "root lineage scope serialization failed: {error}"
+        ))
+    })?;
+
+    Ok(IssuedRootLineage {
+        capability_id: root.record.root_capability_id.clone(),
+        subject_key: root.record.subject_key.clone(),
+        issuer_key: root.record.issuer_key.clone(),
+        issued_at: root.record.issued_at,
+        expires_at: root.record.expires_at,
+        grants_json,
+        delegation_depth: 0,
+        parent_capability_id: None,
+    })
+}
+
+fn record_issued_root_lineage(
+    connection: &Connection,
+    expected: &IssuedRootLineage,
+) -> Result<(), AggregateFamilyRootStoreError> {
+    if let Some(existing) = load_issued_root_lineage(connection, &expected.capability_id)? {
+        if existing == *expected {
+            return Ok(());
+        }
+        return Err(AggregateFamilyRootStoreError::Conflict {
+            root_capability_id: expected.capability_id.clone(),
+        });
+    }
+
+    connection
+        .execute(
+            r#"
+            INSERT INTO capability_lineage (
+                capability_id, subject_key, issuer_key, issued_at, expires_at,
+                grants_json, delegation_depth, parent_capability_id
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            "#,
+            params![
+                expected.capability_id,
+                expected.subject_key,
+                expected.issuer_key,
+                expected.issued_at,
+                expected.expires_at,
+                expected.grants_json,
+                expected.delegation_depth,
+                expected.parent_capability_id,
+            ],
+        )
+        .map_err(sqlite_to_store_error)?;
+
+    match load_issued_root_lineage(connection, &expected.capability_id)? {
+        Some(inserted) if inserted == *expected => Ok(()),
+        Some(_) => Err(AggregateFamilyRootStoreError::Conflict {
+            root_capability_id: expected.capability_id.clone(),
+        }),
+        None => Err(AggregateFamilyRootStoreError::Corrupt(
+            "issued root lineage insert did not create a durable row".to_string(),
+        )),
+    }
+}
+
+fn load_issued_root_lineage(
+    connection: &Connection,
+    capability_id: &str,
+) -> Result<Option<IssuedRootLineage>, AggregateFamilyRootStoreError> {
+    let stored = connection
+        .query_row(
+            r#"
+            SELECT
+                capability_id, subject_key, issuer_key, issued_at, expires_at,
+                grants_json, delegation_depth, parent_capability_id
+            FROM capability_lineage
+            WHERE capability_id = ?1 COLLATE BINARY
+            "#,
+            params![capability_id],
+            |row| {
+                Ok(IssuedRootLineage {
+                    capability_id: row.get(0)?,
+                    subject_key: row.get(1)?,
+                    issuer_key: row.get(2)?,
+                    issued_at: row.get(3)?,
+                    expires_at: row.get(4)?,
+                    grants_json: row.get(5)?,
+                    delegation_depth: row.get(6)?,
+                    parent_capability_id: row.get(7)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(sqlite_to_store_error)?;
+
+    if let Some(stored) = stored.as_ref() {
+        if stored.issued_at < 0 || stored.expires_at < 0 || stored.delegation_depth < 0 {
+            return Err(AggregateFamilyRootStoreError::Corrupt(format!(
+                "capability lineage for {} contains a negative integer",
+                stored.capability_id
+            )));
+        }
+    }
+    Ok(stored)
 }
 
 fn insert_root_record(connection: &Connection, record: &RootRecord) -> Result<(), rusqlite::Error> {
@@ -1150,6 +1318,110 @@ mod tests {
             super::AggregateFamilyRootRecordStatus::AlreadyPresent
         );
         assert_eq!(row_count(&path)?, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn issued_aggregate_family_root_records_exact_lineage_idempotently() -> TestResult {
+        let directory = tempdir()?;
+        let path = directory.path().join("receipts.db");
+        let store = SqliteReceiptStore::open(&path)?;
+        let (issuer, _subject, token) = family_root("family-issued-lineage", 5)?;
+        let trusted = [issuer.public_key()];
+
+        assert_eq!(
+            store.record_issued_aggregate_family_root(&token, &trusted, 1_100)?,
+            super::AggregateFamilyRootRecordStatus::Inserted
+        );
+        assert_eq!(
+            store.record_issued_aggregate_family_root(&token, &trusted, 1_200)?,
+            super::AggregateFamilyRootRecordStatus::AlreadyPresent
+        );
+
+        let lineage = match store.get_lineage(&token.id)? {
+            Some(lineage) => lineage,
+            None => panic!("issued root lineage is missing"),
+        };
+        assert_eq!(lineage.capability_id, token.id);
+        assert_eq!(lineage.subject_key, token.subject.to_hex());
+        assert_eq!(lineage.issuer_key, token.issuer.to_hex());
+        assert_eq!(lineage.issued_at, token.issued_at);
+        assert_eq!(lineage.expires_at, token.expires_at);
+        assert_eq!(lineage.grants_json, serde_json::to_string(&token.scope)?);
+        assert_eq!(lineage.delegation_depth, 0);
+        assert_eq!(lineage.parent_capability_id, None);
+        assert_eq!(row_count(&path)?, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn issued_aggregate_family_root_lineage_failure_rolls_back_root() -> TestResult {
+        let directory = tempdir()?;
+        let path = directory.path().join("receipts.db");
+        let store = SqliteReceiptStore::open(&path)?;
+        let connection = Connection::open(&path)?;
+        connection.execute_batch(
+            "CREATE TRIGGER reject_issued_root_lineage
+             BEFORE INSERT ON capability_lineage
+             BEGIN
+                 SELECT RAISE(ABORT, 'lineage rejected');
+             END;",
+        )?;
+        let (issuer, _subject, token) = family_root("family-lineage-rollback", 5)?;
+
+        let error = match store.record_issued_aggregate_family_root(
+            &token,
+            &[issuer.public_key()],
+            1_100,
+        ) {
+            Err(error) => error,
+            Ok(_) => panic!("lineage rejection must fail root capture"),
+        };
+        assert!(matches!(
+            error,
+            super::AggregateFamilyRootStoreError::Unavailable(_)
+        ));
+        assert_eq!(row_count(&path)?, 0);
+        assert!(store.get_lineage(&token.id)?.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn issued_aggregate_family_root_conflicting_lineage_rolls_back_root() -> TestResult {
+        let directory = tempdir()?;
+        let path = directory.path().join("receipts.db");
+        let store = SqliteReceiptStore::open(&path)?;
+        let (issuer, _subject, token) = family_root("family-lineage-conflict", 5)?;
+        let conflicting_subject = Keypair::generate();
+        let conflicting = CapabilityToken::sign(
+            root_body(
+                &token.id,
+                issuer.public_key(),
+                conflicting_subject.public_key(),
+            ),
+            &issuer,
+        )?;
+        store.record_capability_snapshot(&conflicting, None)?;
+
+        let error = match store.record_issued_aggregate_family_root(
+            &token,
+            &[issuer.public_key()],
+            1_100,
+        ) {
+            Err(error) => error,
+            Ok(_) => panic!("conflicting lineage must fail root capture"),
+        };
+        assert!(matches!(
+            error,
+            super::AggregateFamilyRootStoreError::Conflict { ref root_capability_id }
+                if root_capability_id == &token.id
+        ));
+        assert_eq!(row_count(&path)?, 0);
+        let lineage = match store.get_lineage(&token.id)? {
+            Some(lineage) => lineage,
+            None => panic!("conflicting lineage was removed"),
+        };
+        assert_eq!(lineage.subject_key, conflicting.subject.to_hex());
         Ok(())
     }
 
