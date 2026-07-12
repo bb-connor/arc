@@ -155,6 +155,7 @@ fn watchdog_gauges_render_from_health_report() {
         checkpoint_error: None,
         db_size_bytes: None,
         retention_watermark_entry_seq: None,
+        retention_error: None,
     };
     // Checkpoint staleness is based on checkpoint PROGRESS, not write-commit
     // freshness. The first sample seeds the staleness clock at 0; a later sample

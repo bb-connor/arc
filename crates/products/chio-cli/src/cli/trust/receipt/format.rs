@@ -109,6 +109,9 @@ pub(crate) fn render_receipt_health_human(report: &chio_kernel::ReceiptStoreHeal
     if let Some(error) = report.checkpoint_error.as_deref() {
         lines.push(format!("checkpoint_error: {error}"));
     }
+    if let Some(error) = report.retention_error.as_deref() {
+        lines.push(format!("retention_error: {error}"));
+    }
     lines.join("\n") + "\n"
 }
 

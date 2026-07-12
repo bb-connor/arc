@@ -138,6 +138,11 @@ struct ReceiptCommitWriterHealth {
     inflight: AtomicU64,
     last_commit_unix_ms: AtomicU64,
     last_error: Mutex<Option<String>>,
+    // Last background-retention rotation failure, set by the kernel maintenance
+    // worker via `record_retention_rotation_outcome` and cleared on the next
+    // successful rotation. Surfaced by `receipt_store_health` so a silently
+    // failing background retention task is observable rather than healthy.
+    retention_error: Mutex<Option<String>>,
     // Verified-head snapshot, written only by the actor thread; read by
     // flush_report / receipt_store_health / kernel counters.
     head_checkpoint_seq: AtomicU64,
@@ -2391,6 +2396,20 @@ impl SqliteReceiptStore {
         self.flush_report(wal_checkpoint)
     }
 
+    /// Record the outcome of a background retention rotation into health.
+    /// `None` clears a prior failure after a successful rotation; `Some(message)`
+    /// records a rotation error or panic so a persistently failing background
+    /// maintenance task surfaces as unhealthy in `receipt_store_health` instead
+    /// of the failure living only in the worker's logs. Called by the kernel
+    /// maintenance worker on the store handle it holds; the health snapshot is
+    /// shared across all handles of this store, so the failure is visible to any
+    /// other handle sampling health.
+    pub fn record_retention_rotation_outcome(&self, failure: Option<&str>) {
+        if let Ok(mut retention_error) = self.receipt_commit_actor.health.retention_error.lock() {
+            *retention_error = failure.map(ToString::to_string);
+        }
+    }
+
     pub fn receipt_store_health(&self) -> Result<ReceiptStoreHealthReport, ReceiptStoreError> {
         self.validate_claim_receipt_log_projection_current()?;
         let status = self.receipt_checkpoint_status(Some(1))?;
@@ -2403,12 +2422,20 @@ impl SqliteReceiptStore {
                 status.latest_committed_entry_seq,
             )?;
         }
+        let retention_error = self
+            .receipt_commit_actor
+            .health
+            .retention_error
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone());
         let healthy = status.healthy
             && self
                 .receipt_commit_actor
                 .writer_counters()
                 .last_error
-                .is_none();
+                .is_none()
+            && retention_error.is_none();
         let (uncheckpointed_start_seq, uncheckpointed_end_seq) = uncheckpointed_range(
             status.latest_checkpointed_entry_seq,
             status.latest_committed_entry_seq,
@@ -2424,6 +2451,7 @@ impl SqliteReceiptStore {
             checkpoint_error: status.checkpoint_error,
             db_size_bytes: self.db_size_bytes().ok(),
             retention_watermark_entry_seq: status.retention_watermark_entry_seq,
+            retention_error,
         })
     }
 
@@ -2499,6 +2527,10 @@ impl SqliteReceiptStore {
                     checkpoint_error: None,
                     db_size_bytes: None,
                     retention_watermark_entry_seq,
+                    // A read-only observer cannot see the owning writer's
+                    // in-memory background-retention state, so it is defaulted
+                    // like the writer counters above.
+                    retention_error: None,
                 })
             }
             Err(error) => {
@@ -2515,6 +2547,7 @@ impl SqliteReceiptStore {
                     checkpoint_error: Some(error.to_string()),
                     db_size_bytes: None,
                     retention_watermark_entry_seq,
+                    retention_error: None,
                 })
             }
         }

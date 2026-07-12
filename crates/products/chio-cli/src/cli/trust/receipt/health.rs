@@ -517,6 +517,7 @@ mod receipt_operator_tests {
             checkpoint_error: Some("projection drift".to_string()),
             db_size_bytes: Some(4096),
             retention_watermark_entry_seq: Some(6),
+            retention_error: Some("archive path is unwritable".to_string()),
         };
         let health_output = render_receipt_health_human(&health);
         assert!(health_output.contains("checkpoint_seq: 2"));
@@ -526,6 +527,7 @@ mod receipt_operator_tests {
         assert!(health_output.contains("db_size_bytes: 4096"));
         assert!(health_output.contains("checkpoint_error: projection drift"));
         assert!(health_output.contains("writer_last_error: writer lag"));
+        assert!(health_output.contains("retention_error: archive path is unwritable"));
 
         let flush = chio_kernel::ReceiptFlushReport {
             writer: counters,
