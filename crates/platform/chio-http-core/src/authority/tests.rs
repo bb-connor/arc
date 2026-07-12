@@ -194,6 +194,44 @@ fn new_is_failclosed_without_a_durable_store() {
 }
 
 #[test]
+fn failclosed_authority_surfaces_durability_error_for_denied_projection() {
+    // A request projected as denied (deny-by-default with no capability) must
+    // still fail closed when no durable store is attached. The kernel's
+    // durability gate runs before the projection guard, so without this the
+    // authority would return a signed deny receipt and silently drop the denial
+    // audit record until an allowed request happened to surface the error.
+    let authority = HttpAuthority::new(Keypair::generate(), "policy-hash".to_string());
+    let query = HashMap::new();
+    let error = authority
+        .evaluate(HttpAuthorityInput {
+            request_id: "req-denied-durability".to_string(),
+            method: HttpMethod::Post,
+            route_pattern: "/pets".to_string(),
+            path: "/pets",
+            query: &query,
+            caller: caller(),
+            body_hash: Some("abc".to_string()),
+            body_length: 3,
+            session_id: None,
+            capability_id_hint: None,
+            presented_capability: None,
+            requested_tool_server: None,
+            requested_tool_name: None,
+            requested_arguments: None,
+            model_metadata: None,
+            execution_nonce: None,
+            policy: HttpAuthorityPolicy::DenyByDefault,
+        })
+        .test_unwrap_err();
+    let message = error.to_string();
+    assert!(
+        message.contains("durable receipt persistence unavailable")
+            || message.contains("durable revocation state unavailable"),
+        "a denied projection must fail closed on missing durable persistence, got: {message}"
+    );
+}
+
+#[test]
 fn builder_with_durable_stores_evaluates_without_persistence_deny(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;

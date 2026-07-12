@@ -6,14 +6,15 @@ use chio_core_types::capability::{
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core_types::crypto::{Keypair, PublicKey};
+use chio_core_types::receipt::decision::Decision;
 use chio_core_types::receipt::metadata::GuardEvidence;
 use chio_cross_protocol::discovery::{DiscoveryProtocol, TargetProtocolRegistry};
 use chio_cross_protocol::routing::{plan_authoritative_route, route_selection_metadata};
 use chio_kernel::{
     ApprovalStore, ChioKernel, ExecutionNonceConfig, ExecutionNonceStore, Guard, GuardContext,
     GuardDecision, InMemoryApprovalStore, KernelConfig, KernelError, ReceiptStore, RevocationStore,
-    SignedExecutionNonce, ToolCallRequest, ToolServerConnection, Verdict as KernelVerdict,
-    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    SignedExecutionNonce, ToolCallRequest, ToolCallResponse, ToolServerConnection,
+    Verdict as KernelVerdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use serde::{Deserialize, Serialize};
@@ -33,6 +34,24 @@ pub const HTTP_AUTHORITY_SERVER_ID: &str = "chio_http_authority";
 /// Tool name for HTTP-sidecar capability grants.
 pub const HTTP_AUTHORITY_TOOL_NAME: &str = "authorize_http_request";
 const HTTP_AUTHORITY_TTL_SECS: u64 = 60;
+
+/// Guard label the embedded kernel stamps on a deny receipt when it fails a
+/// mediated call closed for missing durable persistence (no receipt store or no
+/// durable revocation state). Kept in step with the kernel's fail-closed deny
+/// builder so the authority can surface a durability failure as an error rather
+/// than fold it into a routine deny receipt.
+const KERNEL_DURABILITY_FAILCLOSED_GUARD: &str = "kernel.receipt_persistence";
+
+/// Whether a kernel response is a fail-closed denial for missing durable
+/// persistence, as opposed to a routine policy or capability denial. The kernel
+/// runs its durability gate ahead of the HTTP projection guard, so this can fire
+/// for a request that is independently projected as denied.
+fn is_durability_failclosed_denial(response: &ToolCallResponse) -> bool {
+    matches!(
+        response.receipt.decision.as_ref(),
+        Some(Decision::Deny { guard, .. }) if guard == KERNEL_DURABILITY_FAILCLOSED_GUARD
+    )
+}
 
 #[must_use]
 pub fn http_authority_tool_grant() -> ToolGrant {
@@ -660,6 +679,21 @@ impl HttpAuthority {
             &presented_capability,
             input.execution_nonce,
         )?;
+
+        // A fail-closed durability denial (missing durable receipt store or
+        // revocation state) must surface as an error for every projection, not
+        // only allowed ones. The kernel runs its durability gate before the HTTP
+        // projection guard, so a request independently projected as denied would
+        // otherwise return a signed deny receipt while the misconfigured
+        // authority silently drops the denial audit record. Denial evidence must
+        // be as durable as allow evidence, so propagate it regardless of verdict.
+        if is_durability_failclosed_denial(&kernel_response) {
+            let reason = kernel_response
+                .reason
+                .clone()
+                .unwrap_or_else(|| "kernel denied for missing durable persistence".to_string());
+            return Err(HttpAuthorityError::Kernel(reason));
+        }
 
         let verdict = projected_verdict(binding.policy, &presented_capability);
         let expected_allowed = verdict.is_allowed();
