@@ -212,7 +212,8 @@ pub(crate) fn clear_dispatch_intent_tx(
 }
 
 /// Load every open intent for boot reconciliation, oldest first. A missing
-/// table (pre-journal database opened without DDL) reports no open intents.
+/// table (a pre-journal database sampled over a read-only connection, which
+/// runs no migration) reports no open intents.
 pub(crate) fn select_open_dispatch_intents(
     connection: &rusqlite::Connection,
 ) -> Result<Vec<DispatchIntentRecord>, ReceiptStoreError> {
@@ -319,11 +320,12 @@ fn dispatch_intent_count_by_state(
     Ok(count.max(0) as u64)
 }
 
-/// True if the non-audit `chio_dispatch_intents` journal table exists. A store
-/// opened via `open_existing` on a pre-journal database runs no DDL, so a
-/// missing table is reported as `false`; callers treat that as zero
-/// open/dead-letter intents (an accurate report: a database that never
-/// journaled has no orphans).
+/// True if the non-audit `chio_dispatch_intents` journal table exists. Every
+/// read-write open migrates the table into place and stamps the journal
+/// schema revision, but the read-only health sampler may still observe a
+/// pre-journal database; it reports a missing table as `false` and callers
+/// treat that as zero open/dead-letter intents (an accurate report: a
+/// database that never journaled has no orphans).
 pub(crate) fn dispatch_intents_table_exists(
     connection: &rusqlite::Connection,
 ) -> Result<bool, ReceiptStoreError> {

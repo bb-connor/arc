@@ -2,7 +2,13 @@ use super::*;
 
 /// Receipt-store schema revision. Bump on every schema-affecting change so an
 /// older binary refuses to open a database it cannot fully interpret.
-const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+///
+/// Revision history:
+/// - 0: initial stamped schema.
+/// - 1: adds the `chio_dispatch_intents` journal table. An older binary must
+///   refuse a database that may carry open intent rows, because it would
+///   serve without reconciling them or surfacing them in health.
+const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
 
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table. Distinct from the co-located approval store's key so the
@@ -32,6 +38,32 @@ const RECEIPT_STORE_LEGACY_ANCHOR_TABLES: &[&str] =
 /// foreign file, so each must also carry a receipt payload column before it is
 /// accepted. The Chio-specific `chio_tool_receipts` anchor needs no such check.
 const RECEIPT_STORE_GENERIC_LEGACY_ANCHOR_TABLES: &[&str] = &["http_receipts", "tool_receipts"];
+
+/// Non-audit operational journal: one durable row per in-flight
+/// side-effecting or monetary dispatch, written before the effect and
+/// consumed in the same transaction as the receipt append. Never signed,
+/// never entered into chio_tool_receipts, and never counted by checkpoints
+/// or retention. Shared by the create path and the `open_existing` additive
+/// migration from schema revision 0, so both produce identical DDL.
+const DISPATCH_INTENT_JOURNAL_DDL: &str = r#"
+    CREATE TABLE IF NOT EXISTS chio_dispatch_intents (
+        request_id            TEXT PRIMARY KEY,
+        capability_id         TEXT NOT NULL,
+        tool_server           TEXT NOT NULL,
+        tool_name             TEXT NOT NULL,
+        parameter_hash        TEXT NOT NULL,
+        side_effect_class     TEXT NOT NULL,
+        monetary              INTEGER NOT NULL,
+        rail                  TEXT,
+        rail_authorization_id TEXT,
+        tenant_id             TEXT,
+        created_at_unix_ms    INTEGER NOT NULL,
+        state                 TEXT NOT NULL DEFAULT 'open',
+        resolution_detail     TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_chio_dispatch_intents_state
+        ON chio_dispatch_intents(state);
+"#;
 
 fn configure_sqlite_connection(connection: &mut Connection) -> Result<(), ReceiptStoreError> {
     connection.execute_batch(
@@ -167,7 +199,7 @@ impl SqliteReceiptStore {
             // Validate provenance before configuring pragmas: a foreign or
             // future database must be refused before any write touches its
             // header, so a mistargeted path is never mutated into WAL mode.
-            crate::check_schema_version(
+            let on_disk_version = crate::check_schema_version(
                 &connection,
                 RECEIPT_STORE_SCHEMA_KEY,
                 RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
@@ -175,6 +207,21 @@ impl SqliteReceiptStore {
             )
             .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
             configure_sqlite_connection(&mut connection)?;
+            if on_disk_version < RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION {
+                // Additive migration up to the supported revision (currently
+                // only the dispatch-intent journal table), then stamp it:
+                // once this binary may write intent rows into the file, an
+                // older binary must refuse to open it rather than serve
+                // without reconciling those rows or surfacing them in
+                // health.
+                connection.execute_batch(DISPATCH_INTENT_JOURNAL_DDL)?;
+                crate::stamp_schema_version(
+                    &connection,
+                    RECEIPT_STORE_SCHEMA_KEY,
+                    RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
+                )
+                .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+            }
             super::support::ensure_transparency_projection_guards(&connection)?;
             drop(connection);
 
@@ -1130,31 +1177,9 @@ impl SqliteReceiptStore {
                 CHECK (archived_through_entry_seq >= 0)
             );
 
-            -- Non-audit operational journal: one durable row per in-flight
-            -- side-effecting or monetary dispatch, written before the effect
-            -- and consumed in the same transaction as the receipt append.
-            -- Never signed, never entered into chio_tool_receipts, and never
-            -- counted by checkpoints or retention.
-            CREATE TABLE IF NOT EXISTS chio_dispatch_intents (
-                request_id            TEXT PRIMARY KEY,
-                capability_id         TEXT NOT NULL,
-                tool_server           TEXT NOT NULL,
-                tool_name             TEXT NOT NULL,
-                parameter_hash        TEXT NOT NULL,
-                side_effect_class     TEXT NOT NULL,
-                monetary              INTEGER NOT NULL,
-                rail                  TEXT,
-                rail_authorization_id TEXT,
-                tenant_id             TEXT,
-                created_at_unix_ms    INTEGER NOT NULL,
-                state                 TEXT NOT NULL DEFAULT 'open',
-                resolution_detail     TEXT
-            );
-            CREATE INDEX IF NOT EXISTS idx_chio_dispatch_intents_state
-                ON chio_dispatch_intents(state);
-
             "#,
         )?;
+        connection.execute_batch(DISPATCH_INTENT_JOURNAL_DDL)?;
         connection.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
         ensure_tool_receipt_attribution_columns(&connection)?;
         super::support::ensure_receipt_lineage_statement_columns(&connection)?;

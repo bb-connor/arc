@@ -417,6 +417,75 @@ fn dead_letter_intent_flips_store_unhealthy() -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
+fn stamped_receipt_schema_version(
+    connection: &rusqlite::Connection,
+) -> Result<i32, Box<dyn std::error::Error>> {
+    Ok(connection.query_row(
+        "SELECT version FROM chio_store_schema_versions WHERE store_key = 'receipt'",
+        [],
+        |row| row.get(0),
+    )?)
+}
+
+#[test]
+fn receipt_schema_revision_covers_the_dispatch_intent_journal(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // A journal-bearing database must carry a schema revision above the
+    // pre-journal one, so an older binary (which would neither reconcile
+    // open intents nor surface them in health) refuses the file instead of
+    // serving it while orphaned effects sit invisible.
+    let path = unique_db_path("chio-intents-schema-revision");
+    let store = SqliteReceiptStore::open(&path)?;
+    let connection = store.reader_connection_for_test()?;
+    assert_eq!(
+        stamped_receipt_schema_version(&connection)?,
+        1,
+        "a freshly created journal-bearing store stamps revision 1"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn open_existing_migrates_a_pre_journal_database() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::receipt_store::support::dispatch_intents_table_exists;
+
+    let path = unique_db_path("chio-intents-schema-migration");
+    // Build a pre-journal database: create a full store, then rewind it by
+    // dropping the journal table and stamping the pre-journal revision.
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.flush_receipt_writes()?;
+    }
+    {
+        let connection = rusqlite::Connection::open(&path)?;
+        connection
+            .execute_batch("PRAGMA busy_timeout = 5000; DROP TABLE chio_dispatch_intents;")?;
+        crate::stamp_schema_version(&connection, "receipt", 0)?;
+    }
+
+    // open_existing on the pre-journal file runs the additive migration: the
+    // journal table exists afterwards and the current revision is stamped,
+    // so an older binary refuses the migrated file from then on.
+    {
+        let store = SqliteReceiptStore::open_existing(&path)?;
+        let connection = store.reader_connection_for_test()?;
+        assert!(
+            dispatch_intents_table_exists(&connection)?,
+            "open_existing must create the journal table on a pre-journal database"
+        );
+        assert_eq!(
+            stamped_receipt_schema_version(&connection)?,
+            1,
+            "the migrated database is stamped with the journal revision"
+        );
+    }
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 #[test]
 fn open_creates_dispatch_intents_table_and_open_existing_tolerates_absence(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -431,8 +500,8 @@ fn open_creates_dispatch_intents_table_and_open_existing_tolerates_absence(
             "open() must create chio_dispatch_intents"
         );
     }
-    // Reopening the same file via open_existing runs no DDL, but the table
-    // already exists from the create-branch open above.
+    // Reopening the same file via open_existing keeps the table (the
+    // database is already at the journal revision, so no migration runs).
     {
         let store = SqliteReceiptStore::open_existing(&path)?;
         let connection = store.reader_connection_for_test()?;
