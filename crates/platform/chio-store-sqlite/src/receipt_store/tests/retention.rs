@@ -974,7 +974,9 @@ fn incremental_rotation_audits_chain_before_deleting() -> Result<(), Box<dyn std
     let error = store
         .archive_receipts_before(150, archive_path)
         .err()
-        .ok_or("rotation over an unaudited checkpoint chain must fail closed, not archive-and-delete")?;
+        .ok_or(
+            "rotation over an unaudited checkpoint chain must fail closed, not archive-and-delete",
+        )?;
     assert!(
         matches!(error, ReceiptStoreError::Conflict(_)),
         "expected a fail-closed Conflict from the chain audit, got {error:?}"
@@ -2432,6 +2434,118 @@ fn rotation_preserves_binding_for_live_consumer_of_aged_authorization(
     assert_eq!(
         authorization_live, 1,
         "the authorization backing the live binding must remain live"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
+/// A surviving child receipt records its parent in
+/// `receipt_lineage_statements.parent_receipt_id`, and lineage verification
+/// resolves that parent only in the live receipt tables. Rotation must not
+/// advance the watermark past a lineage parent whose child is still live, or the
+/// child would lose its verified parent and governed call-chain validation would
+/// fail for a session whose parent just aged out.
+#[test]
+fn rotation_preserves_live_child_lineage_parent() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("lineage-parent-preserve");
+    let archive = unique_db_path("lineage-parent-preserve-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    // Checkpoints [1,2] and [3,4] are fully aged; [5,6] is fresh. The lineage
+    // parent sits at entry 3 (aged) and its child at entry 5 (fresh), so a naive
+    // cutoff would archive the parent while the child stays live and strand the
+    // child's verified lineage.
+    for i in 0..4u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("lp-aged-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    for i in 4..6u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("lp-fresh-{i}"),
+            i + 1,
+            500,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(store.load_checkpoint_by_seq(3)?.is_some());
+
+    let receipt_id_at = |entry_seq: i64| -> Result<String, Box<dyn std::error::Error>> {
+        let connection = store.reader_connection_for_test()?;
+        Ok(connection.query_row(
+            "SELECT receipt_id FROM claim_receipt_log_entries WHERE entry_seq = ?1",
+            rusqlite::params![entry_seq],
+            |row| row.get::<_, String>(0),
+        )?)
+    };
+    let parent_id = receipt_id_at(3)?;
+    let child_id = receipt_id_at(5)?;
+    // The live child (entry 5) records the aged receipt (entry 3) as its lineage
+    // parent.
+    store.writer_handle().run_write({
+        let parent_id = parent_id.clone();
+        let child_id = child_id.clone();
+        move |connection| {
+            connection.execute(
+                "INSERT INTO receipt_lineage_statements \
+                 (receipt_id, statement_id, request_id, session_id, session_anchor_id, chain_id, \
+                  parent_request_id, parent_receipt_id, evidence_class, evidence_sources_json, \
+                  verified_session_anchor, verified_parent_request, verified_parent_receipt, \
+                  replay_protected, recorded_at, source_kind, json_sha256, raw_json) \
+                 VALUES (?1, 'stmt-lp', NULL, NULL, NULL, 'chain-lp', NULL, ?2, 'delegated', NULL, \
+                         0, 0, 1, 0, 500, 'test', 'sha-lp', '{\"schema\":\"lineage\"}')",
+                rusqlite::params![child_id, parent_id],
+            )?;
+            Ok(())
+        }
+    })?;
+
+    // The watermark must stop at 2 (below the aged parent at entry 3), not
+    // advance to 4 and delete the parent the live child still points at.
+    let archived = store.archive_receipts_before(150, archive_path)?;
+    assert_eq!(
+        archived, 2,
+        "the watermark must stop below the lineage parent whose child is still live"
+    );
+
+    let live = store.reader_connection_for_test()?;
+    let parent_live: i64 = live.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE receipt_id = ?1",
+        rusqlite::params![parent_id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        parent_live, 1,
+        "the lineage parent backing the live child must remain live"
+    );
+    let parent_receipt_live: i64 = live.query_row(
+        "SELECT COUNT(*) FROM chio_tool_receipts WHERE receipt_id = ?1",
+        rusqlite::params![parent_id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        parent_receipt_live, 1,
+        "the parent's source receipt must survive so lineage verification can resolve it"
+    );
+    let lineage_live: i64 = live.query_row(
+        "SELECT COUNT(*) FROM receipt_lineage_statements WHERE receipt_id = ?1 AND parent_receipt_id = ?2",
+        rusqlite::params![child_id, parent_id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        lineage_live, 1,
+        "the live child's lineage row must still bind it to the surviving parent"
     );
 
     let _ = std::fs::remove_file(&path);

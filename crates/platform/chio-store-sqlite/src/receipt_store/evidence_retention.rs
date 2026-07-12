@@ -405,9 +405,10 @@ impl SqliteReceiptStore {
 }
 
 /// Largest checkpoint `batch_end_seq` whose entire covered prefix (in the
-/// entry_seq domain) has aged past `cutoff` and never splits a live
-/// authorization-consumption pair. 0 when no whole checkpointed batch qualifies
-/// (a no-op rotation).
+/// entry_seq domain) has aged past `cutoff`, never splits a live
+/// authorization-consumption pair, and never strands a live receipt from its
+/// lineage parent. 0 when no whole checkpointed batch qualifies (a no-op
+/// rotation).
 ///
 /// An authorization receipt and the consumer receipt that consumed it are bound
 /// by a `chio_authorization_receipt_consumptions` row keyed on the authorization
@@ -417,6 +418,16 @@ impl SqliteReceiptStore {
 /// watermark therefore never advances past an authorization whose bound consumer
 /// still sits above the boundary: the whole pair archives together on a later
 /// rotation once the consumer has also aged out.
+///
+/// Governed receipts carry the same hazard through receipt lineage. A surviving
+/// child receipt records its parent in `receipt_lineage_statements.parent_receipt_id`,
+/// and `receipt_lineage_verification` / `ReceiptStore::load_chio_receipt` resolve
+/// that parent only in the LIVE receipt tables. Deleting a parent whose live
+/// child still sits above the boundary would leave the child unable to resolve
+/// its verified parent, breaking governed call-chain validation and explain.
+/// The watermark therefore also never advances past a lineage parent whose child
+/// is still live; the parent is preserved until the child ages out and the whole
+/// lineage archives together on a later rotation.
 fn compute_archival_watermark(
     connection: &rusqlite::Connection,
     cutoff_unix_secs: u64,
@@ -436,6 +447,13 @@ fn compute_archival_watermark(
             JOIN claim_receipt_log_entries ae ON ae.receipt_id = ac.authorization_receipt_id
             JOIN claim_receipt_log_entries ce ON ce.receipt_id = ac.consumer_receipt_id
             WHERE ae.entry_seq <= kc.batch_end_seq
+              AND ce.entry_seq > kc.batch_end_seq
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM receipt_lineage_statements ls
+            JOIN claim_receipt_log_entries pe ON pe.receipt_id = ls.parent_receipt_id
+            JOIN claim_receipt_log_entries ce ON ce.receipt_id = ls.receipt_id
+            WHERE pe.entry_seq <= kc.batch_end_seq
               AND ce.entry_seq > kc.batch_end_seq
         )
         "#,
