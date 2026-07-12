@@ -22,6 +22,7 @@
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 
 pub mod admission_capture_authority;
+pub mod admission_operation;
 pub mod approval;
 pub mod approval_channels;
 pub mod authority;
@@ -121,6 +122,13 @@ pub use admission_capture_authority::{
     AdmissionCaptureAuthority, AdmissionCaptureDecision, AdmissionCaptureDenial,
     AdmissionCaptureDenialReason, AdmissionCaptureError, AdmissionCaptureMetadata,
     AdmissionCaptureRequest, MAX_AUTHORIZATION_ARTIFACT_DIGESTS_PER_ADMISSION,
+};
+pub use admission_operation::{
+    derive_operation_id, AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
+    AdmissionOperationCreateOutcome, AdmissionOperationError, AdmissionOperationKind,
+    AdmissionOperationState, AdmissionOperationStore, AdmissionRequestBindingInput,
+    InMemoryAdmissionOperationStore, PreparedAdmissionOperation, ADMISSION_OPERATION_SCHEMA,
+    MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION,
 };
 pub use approval::{
     compute_parameter_hash, resume_with_decision, ApprovalChannel, ApprovalContext,
