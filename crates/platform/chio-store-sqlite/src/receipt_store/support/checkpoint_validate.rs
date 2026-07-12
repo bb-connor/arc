@@ -411,27 +411,33 @@ pub(crate) fn trusted_retention_watermark(
 }
 
 /// True only when the archive named by the current watermark ledger row holds
-/// the entire claim-log prefix through `watermark`. Opens the archive read-only
-/// on its own connection (never ATTACHing onto the caller's) and counts the
-/// co-archived claim-log rows at or below the watermark. `entry_seq` is a
-/// contiguous `1..=W` prefix (AUTOINCREMENT, the base checkpoint starts at 1 and
-/// batches tile without gaps) that co-archival copies verbatim, so a faithful
-/// archive holds exactly `watermark` such rows. Any missing, unreadable, or
-/// short archive returns false so the caller falls back to full verification
-/// (fail-closed).
+/// the co-archived claim-log rows that re-derive the SIGNED checkpoint roots for
+/// every checkpoint covered by `watermark`.
+///
+/// A count of `entry_seq <= watermark` rows is not proof: an archive that merely
+/// holds `watermark` rows keyed on the right `entry_seq` values but carrying
+/// replaced or corrupted `raw_json` would satisfy a count check while no longer
+/// matching the signed checkpoint roots, so skipping the live Merkle rebuild for
+/// that prefix would accept a store whose only retained evidence has been
+/// tampered. Instead, for each covered checkpoint this re-derives the Merkle
+/// root from the archived receipts in the checkpoint's batch range and compares
+/// it to the checkpoint's signed root (obtained by parsing the live
+/// `kernel_checkpoints` row, which validates the signature and that the stored
+/// root matches the signed body). The kernel signing key is required to produce
+/// a batch of receipts that hash to a signed root, so a forged archive cannot
+/// pass. This is the deep re-verification the watermark exemption promises to
+/// serve from the archive; it is bounded to the archived rows and runs on the
+/// open/health path, never per append.
+///
+/// Opens the archive read-only on its own connection (never ATTACHing onto the
+/// caller's). Any missing, unreadable, short, non-contiguous, or root-divergent
+/// archive returns false so the caller falls back to full verification, which
+/// then rejects the store because the live prefix was deleted (fail-closed).
 fn archived_prefix_is_backed(
     connection: &Connection,
     watermark: i64,
 ) -> Result<bool, ReceiptStoreError> {
-    let archive_path: Option<String> = connection
-        .query_row(
-            "SELECT archive_path FROM receipt_retention_watermark \
-             ORDER BY archived_through_entry_seq DESC, rotated_at DESC LIMIT 1",
-            [],
-            |row| row.get(0),
-        )
-        .optional()?;
-    let Some(archive_path) = archive_path else {
+    let Some(archive_path) = latest_watermark_archive_path(connection)? else {
         return Ok(false);
     };
     let flags =
@@ -439,12 +445,53 @@ fn archived_prefix_is_backed(
     let Ok(archive) = rusqlite::Connection::open_with_flags(&archive_path, flags) else {
         return Ok(false);
     };
-    let covered = archive.query_row(
-        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq <= ?1",
-        params![watermark],
-        |row| row.get::<_, i64>(0),
-    );
-    Ok(matches!(covered, Ok(count) if count >= watermark))
+    let watermark = sqlite_u64(watermark, "watermark")?;
+    let covered: Vec<PersistedCheckpointRow> = load_all_persisted_checkpoint_rows(connection)?
+        .into_iter()
+        .filter(|row| row.batch_end_seq <= watermark)
+        .collect();
+    // A trusted watermark must fall on a real checkpoint boundary, so at least
+    // one covered checkpoint must exist; none means the boundary is not backed.
+    if covered.is_empty() {
+        return Ok(false);
+    }
+    for row in covered {
+        // Parse validates the signature and that the stored root matches the
+        // signed body, so `body.merkle_root` is the authenticated root.
+        let checkpoint = parse_persisted_checkpoint_row(row)?;
+        if !archive_batch_matches_signed_root(&archive, &checkpoint)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+/// Re-derive the Merkle root of `checkpoint`'s batch range from the archived
+/// receipts and compare it to the checkpoint's signed root. False (not an error)
+/// when the archive is missing rows, has the wrong leaf count, or produces a
+/// different root, so the caller withdraws the watermark exemption fail-closed.
+fn archive_batch_matches_signed_root(
+    archive: &Connection,
+    checkpoint: &KernelCheckpoint,
+) -> Result<bool, ReceiptStoreError> {
+    let rows = match load_claim_tree_canonical_bytes_range(
+        archive,
+        checkpoint.body.batch_start_seq,
+        checkpoint.body.batch_end_seq,
+    ) {
+        Ok(rows) => rows,
+        // A short or non-contiguous archived range is not proof of archival.
+        Err(_) => return Ok(false),
+    };
+    let receipt_bytes: Vec<Vec<u8>> = rows.into_iter().map(|(_, bytes)| bytes).collect();
+    if receipt_bytes.len() != checkpoint.body.tree_size {
+        return Ok(false);
+    }
+    let tree = match chio_core::merkle::MerkleTree::from_leaves(&receipt_bytes) {
+        Ok(tree) => tree,
+        Err(_) => return Ok(false),
+    };
+    Ok(tree.root() == checkpoint.body.merkle_root)
 }
 
 pub(crate) fn verify_checkpoint_chain_integrity(

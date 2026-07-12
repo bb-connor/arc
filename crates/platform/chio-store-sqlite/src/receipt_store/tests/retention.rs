@@ -2491,6 +2491,55 @@ fn rotation_rejects_archive_path_change_after_first() -> Result<(), Box<dyn std:
     Ok(())
 }
 
+/// The watermark exemption skips the live Merkle rebuild for the archived prefix
+/// and trusts the archive to serve that deep verification. A count of archived
+/// rows is not enough: an archive holding the right number of rows but with
+/// tampered contents no longer hashes to the signed checkpoint roots. Trust must
+/// be withdrawn when the archived receipts no longer re-derive the signed roots,
+/// even though the archived row count is unchanged.
+#[test]
+fn watermark_trust_rejects_tampered_archive_contents() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::receipt_store::support::trusted_retention_watermark;
+
+    let path = unique_db_path("watermark-tampered");
+    let archive = unique_db_path("watermark-tampered-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+    let store = store_with_archived_first_checkpoint(&path, archive_path, &keypair)?;
+
+    // A faithful archive backs the watermark.
+    let connection = store.reader_connection_for_test()?;
+    assert_eq!(trusted_retention_watermark(&connection)?, 2);
+    drop(connection);
+
+    // Tamper the archived claim-log contents WITHOUT changing the row count: the
+    // archive still holds two entries for [1,2], but one no longer matches the
+    // receipt that was checkpointed.
+    {
+        let tampered = rusqlite::Connection::open(&archive)?;
+        let changed = tampered.execute(
+            "UPDATE claim_receipt_log_entries SET raw_json = '{\"tampered\":true}' \
+             WHERE entry_seq = 1",
+            [],
+        )?;
+        assert_eq!(changed, 1, "exactly one archived row tampered");
+    }
+
+    // The row count is still 2, but the archived prefix no longer re-derives the
+    // signed checkpoint root, so the exemption is withdrawn fail-closed.
+    let connection = store.reader_connection_for_test()?;
+    assert_eq!(
+        trusted_retention_watermark(&connection)?,
+        0,
+        "a watermark whose archive no longer matches the signed roots must not be trusted"
+    );
+
+    drop(connection);
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// Primary correctness proof: a state-machine proptest that drives random
 /// interleaved sequences of tool/child appends (non-monotonic
 /// timestamps within an aged band, to exercise the MAX(timestamp)-over-prefix
