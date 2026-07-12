@@ -4,13 +4,18 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::budget_store::{
+    AuthorizedBudgetHold, BudgetAuthorityProfile, BudgetAuthorizeHoldDecision,
     BudgetCaptureHoldDecision, BudgetCaptureHoldRequest, BudgetCommitMetadata,
-    BudgetEventAuthority, BudgetHoldMutationDecision, BudgetInvocationReservationState,
-    BudgetMonetaryHoldState, BudgetMutationKind, BudgetMutationRecord,
+    BudgetEventAuthority, BudgetGuaranteeLevel, BudgetHoldMutationDecision, BudgetInvocationQuota,
+    BudgetInvocationQuotaUsage, BudgetInvocationReservationState, BudgetMeteringProfile,
+    BudgetMonetaryHoldState, BudgetMutationKind, BudgetMutationRecord, BudgetQuotaKey,
+    BudgetQuotaProfile, DeniedBudgetHold, MAX_INVOCATION_QUOTAS_PER_ADMISSION,
 };
+use chio_kernel::supplemental_quota::CanonicalRevocationSet;
 use chio_kernel::{BudgetStore, BudgetStoreError, BudgetUsageRecord};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
+mod composite;
 mod model;
 mod replication;
 mod rows;
@@ -30,6 +35,25 @@ use schema::*;
 
 pub struct SqliteBudgetStore {
     connection: Mutex<Connection>,
+}
+
+/// Trusted backend input for a kernel-verified composite budget admission.
+///
+/// The kernel remains responsible for deriving these descriptors from signed
+/// capability evidence. SQLite revalidates and durably binds every field before
+/// mutating counters.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SqliteCompositeAuthorizeInput {
+    pub capability_id: String,
+    pub grant_index: usize,
+    pub requested_exposure_units: u64,
+    pub max_cost_per_invocation: Option<u64>,
+    pub max_total_cost_units: Option<u64>,
+    pub hold_id: String,
+    pub event_id: String,
+    pub authority: Option<BudgetEventAuthority>,
+    pub invocation_quotas: Vec<BudgetInvocationQuota>,
+    pub revocation_set: CanonicalRevocationSet,
 }
 
 /// Result of one durable SQLite authorization attempt.

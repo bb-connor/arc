@@ -1,8 +1,10 @@
 use super::*;
 use chio_kernel::budget_store::{
-    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetReconcileHoldRequest,
-    BudgetReleaseHoldRequest, BudgetReverseHoldRequest,
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetInvocationQuota,
+    BudgetInvocationReservationState, BudgetQuotaKey, BudgetQuotaProfile,
+    BudgetReconcileHoldRequest, BudgetReleaseHoldRequest, BudgetReverseHoldRequest,
 };
+use chio_kernel::supplemental_quota::CanonicalRevocationSet;
 use chio_kernel::InMemoryBudgetStore;
 
 fn unique_db_path(prefix: &str) -> std::path::PathBuf {
@@ -44,6 +46,54 @@ fn authority(authority_id: &str, lease_id: &str, lease_epoch: u64) -> BudgetEven
         authority_id: authority_id.to_string(),
         lease_id: lease_id.to_string(),
         lease_epoch,
+    }
+}
+
+fn persisted_quota(
+    profile: BudgetQuotaProfile,
+    owner_id: &str,
+    grant_index: Option<u32>,
+    max_invocations: u32,
+) -> BudgetInvocationQuota {
+    let key =
+        BudgetQuotaKey::from_persisted_parts(profile, owner_id.to_string(), grant_index).unwrap();
+    BudgetInvocationQuota::from_persisted_parts(key, max_invocations).unwrap()
+}
+
+fn composite_authorize_input(
+    hold_id: &str,
+    event_id: &str,
+    aggregate_max: u32,
+) -> SqliteCompositeAuthorizeInput {
+    SqliteCompositeAuthorizeInput {
+        capability_id: "leaf".to_string(),
+        grant_index: 0,
+        requested_exposure_units: 100,
+        max_cost_per_invocation: Some(100),
+        max_total_cost_units: Some(1_000),
+        hold_id: hold_id.to_string(),
+        event_id: event_id.to_string(),
+        authority: None,
+        invocation_quotas: vec![
+            persisted_quota(BudgetQuotaProfile::GrantInvocation, "leaf", Some(0), 2),
+            persisted_quota(
+                BudgetQuotaProfile::AggregateCapabilityInvocation,
+                "leaf",
+                None,
+                aggregate_max,
+            ),
+            persisted_quota(
+                BudgetQuotaProfile::SupplementalBrokerExecution,
+                &"22".repeat(32),
+                None,
+                2,
+            ),
+        ],
+        revocation_set: CanonicalRevocationSet::from_persisted_parts(
+            vec!["leaf".to_string()],
+            "baaba5816d4ef1572cfbb26a183f273ea200681234cdd767ab965b9efbaeb12f".to_string(),
+        )
+        .unwrap(),
     }
 }
 
@@ -101,6 +151,207 @@ fn sqlite_budget_store_persists_across_reopen() {
     assert_eq!(records.len(), 1);
     assert_eq!(records[0].invocation_count, 2);
 
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn composite_authorization_is_atomic_idempotent_and_restart_durable_sqlite() {
+    let path = unique_db_path("chio-composite-budget-restart");
+    let first_request = composite_authorize_input("hold-composite-1", "event-composite-1", 1);
+    let first = {
+        let store = SqliteBudgetStore::open(&path).unwrap();
+        store
+            .authorize_composite_hold(first_request.clone())
+            .unwrap()
+    };
+    let BudgetAuthorizeHoldDecision::Authorized(first) = first else {
+        panic!("first composite authorization should pass");
+    };
+    assert_eq!(first.invocation_counts_after.len(), 3);
+    assert!(first
+        .invocation_counts_after
+        .iter()
+        .all(
+            |usage| usage.reserved_invocations_after == 1 && usage.captured_invocations_after == 0
+        ));
+    assert_eq!(
+        first.invocation_state,
+        BudgetInvocationReservationState::Authorized
+    );
+
+    let reopened = SqliteBudgetStore::open(&path).unwrap();
+    let retry = reopened.authorize_composite_hold(first_request).unwrap();
+    assert_eq!(
+        retry,
+        BudgetAuthorizeHoldDecision::Authorized(first.clone())
+    );
+
+    let denied = reopened
+        .authorize_composite_hold(composite_authorize_input(
+            "hold-composite-2",
+            "event-composite-2",
+            1,
+        ))
+        .unwrap();
+    let BudgetAuthorizeHoldDecision::Denied(denied) = denied else {
+        panic!("exhausted aggregate quota should deny");
+    };
+    assert_eq!(denied.invocation_counts_after.len(), 3);
+    assert!(denied
+        .invocation_counts_after
+        .iter()
+        .all(
+            |usage| usage.reserved_invocations_after == 1 && usage.captured_invocations_after == 0
+        ));
+    assert_eq!(
+        denied.invocation_state,
+        BudgetInvocationReservationState::Denied
+    );
+    assert_eq!(
+        reopened
+            .get_usage("leaf", 0)
+            .unwrap()
+            .unwrap()
+            .invocation_count,
+        1
+    );
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn composite_quota_maximum_is_pinned_even_by_a_denial() {
+    let path = unique_db_path("chio-composite-budget-pinned-maximum");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let denied = store
+        .authorize_composite_hold(composite_authorize_input(
+            "hold-pinned-1",
+            "event-pinned-1",
+            0,
+        ))
+        .unwrap();
+    assert!(!denied.is_authorized());
+
+    let error = store
+        .authorize_composite_hold(composite_authorize_input(
+            "hold-pinned-2",
+            "event-pinned-2",
+            1,
+        ))
+        .expect_err("a quota maximum must be immutable after its first presentation");
+    assert!(error.to_string().contains("different maximum"));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn composite_quota_maximum_cannot_be_changed_by_direct_sql() {
+    let path = unique_db_path("chio-composite-budget-immutable-maximum");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    store
+        .authorize_composite_hold(composite_authorize_input(
+            "hold-immutable-1",
+            "event-immutable-1",
+            2,
+        ))
+        .unwrap();
+
+    let connection = store.connection().unwrap();
+    let error = connection
+        .execute(
+            r#"
+            UPDATE budget_invocation_quota_usage
+            SET max_invocations = 99
+            WHERE profile = 'chio.aggregate-capability-invocation.v1'
+              AND owner_id = 'leaf'
+              AND grant_index_key = -1
+            "#,
+            [],
+        )
+        .expect_err("direct SQL must not change a pinned quota maximum");
+    assert!(error
+        .to_string()
+        .contains("immutable invocation quota maximum"));
+    drop(connection);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn composite_authorization_migrates_legacy_usage_without_resetting_reports() {
+    let path = unique_db_path("chio-composite-budget-legacy-migration");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    assert!(store.try_increment("leaf", 0, Some(10)).unwrap());
+    drop(store);
+
+    let reopened = SqliteBudgetStore::open(&path).unwrap();
+    let decision = reopened
+        .authorize_composite_hold(composite_authorize_input(
+            "hold-migrated-1",
+            "event-migrated-1",
+            2,
+        ))
+        .unwrap();
+    let BudgetAuthorizeHoldDecision::Authorized(authorized) = decision else {
+        panic!("legacy usage below every maximum should migrate and authorize");
+    };
+    let primary = authorized
+        .invocation_counts_after
+        .iter()
+        .find(|usage| usage.quota.key().profile() == BudgetQuotaProfile::GrantInvocation)
+        .unwrap();
+    assert_eq!(primary.reserved_invocations_after, 1);
+    assert_eq!(primary.captured_invocations_after, 1);
+    assert_eq!(
+        reopened
+            .get_usage("leaf", 0)
+            .unwrap()
+            .unwrap()
+            .invocation_count,
+        2
+    );
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn concurrent_composite_authorizations_admit_exactly_one_final_unit() {
+    let path = unique_db_path("chio-composite-budget-concurrency");
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+    let stores = [
+        SqliteBudgetStore::open(&path).unwrap(),
+        SqliteBudgetStore::open(&path).unwrap(),
+    ];
+    let mut threads = Vec::new();
+    for (index, store) in stores.into_iter().enumerate() {
+        let barrier = barrier.clone();
+        threads.push(std::thread::spawn(move || {
+            barrier.wait();
+            store
+                .authorize_composite_hold(composite_authorize_input(
+                    &format!("hold-race-{index}"),
+                    &format!("event-race-{index}"),
+                    1,
+                ))
+                .unwrap()
+                .is_authorized()
+        }));
+    }
+    let outcomes = threads
+        .into_iter()
+        .map(|thread| thread.join().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(outcomes.iter().filter(|allowed| **allowed).count(), 1);
+
+    let reopened = SqliteBudgetStore::open(&path).unwrap();
+    assert_eq!(
+        reopened
+            .get_usage("leaf", 0)
+            .unwrap()
+            .unwrap()
+            .invocation_count,
+        1
+    );
     let _ = fs::remove_file(path);
 }
 

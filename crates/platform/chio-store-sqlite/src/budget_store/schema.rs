@@ -1,5 +1,151 @@
 use super::*;
 
+pub(super) fn ensure_composite_budget_schema(
+    connection: &Connection,
+) -> Result<(), BudgetStoreError> {
+    connection.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS budget_invocation_quota_usage (
+            profile TEXT NOT NULL,
+            owner_id TEXT NOT NULL,
+            grant_index_key INTEGER NOT NULL,
+            max_invocations INTEGER NOT NULL,
+            reserved_invocations INTEGER NOT NULL DEFAULT 0,
+            captured_invocations INTEGER NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL,
+            seq INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (profile, owner_id, grant_index_key),
+            CHECK (max_invocations >= 0),
+            CHECK (reserved_invocations >= 0),
+            CHECK (captured_invocations >= 0),
+            CHECK (reserved_invocations + captured_invocations <= max_invocations),
+            CHECK (
+                (profile = 'chio.grant-invocation.v1' AND grant_index_key >= 0)
+                OR
+                (profile IN (
+                    'chio.aggregate-capability-invocation.v1',
+                    'chio.aggregate-family-invocation.v1',
+                    'chio.broker-capability-execution.v1'
+                ) AND grant_index_key = -1)
+            )
+        );
+
+        CREATE TABLE IF NOT EXISTS budget_composite_authorizations (
+            hold_id TEXT PRIMARY KEY,
+            event_id TEXT NOT NULL UNIQUE,
+            capability_id TEXT NOT NULL,
+            grant_index INTEGER NOT NULL,
+            requested_exposure_units INTEGER NOT NULL,
+            max_cost_per_invocation INTEGER,
+            max_total_cost_units INTEGER,
+            authority_id TEXT,
+            lease_id TEXT,
+            lease_epoch INTEGER,
+            allowed INTEGER NOT NULL CHECK (allowed IN (0, 1)),
+            invocation_state TEXT NOT NULL,
+            monetary_state TEXT NOT NULL,
+            revocation_set_digest TEXT NOT NULL,
+            revocation_ids_json TEXT NOT NULL,
+            committed_cost_units_after INTEGER NOT NULL,
+            invocation_count_after INTEGER NOT NULL,
+            event_seq INTEGER NOT NULL UNIQUE,
+            created_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS budget_composite_authorization_quotas (
+            hold_id TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            profile TEXT NOT NULL,
+            owner_id TEXT NOT NULL,
+            grant_index_key INTEGER NOT NULL,
+            max_invocations INTEGER NOT NULL,
+            reserved_invocations_after INTEGER NOT NULL,
+            captured_invocations_after INTEGER NOT NULL,
+            PRIMARY KEY (hold_id, position),
+            UNIQUE (hold_id, profile, owner_id, grant_index_key),
+            CHECK (position >= 0),
+            CHECK (max_invocations >= 0),
+            CHECK (reserved_invocations_after >= 0),
+            CHECK (captured_invocations_after >= 0),
+            CHECK (
+                reserved_invocations_after + captured_invocations_after
+                <= max_invocations
+            )
+        );
+
+        CREATE TABLE IF NOT EXISTS budget_composite_holds (
+            hold_id TEXT PRIMARY KEY,
+            invocation_state TEXT NOT NULL,
+            monetary_state TEXT NOT NULL,
+            revocation_set_digest TEXT NOT NULL,
+            revocation_ids_json TEXT NOT NULL,
+            remaining_exposure_units INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS budget_composite_mutation_snapshots (
+            event_id TEXT PRIMARY KEY,
+            invocation_state TEXT NOT NULL,
+            monetary_state TEXT NOT NULL,
+            revocation_set_digest TEXT NOT NULL,
+            revocation_ids_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS budget_composite_mutation_quota_snapshots (
+            event_id TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            profile TEXT NOT NULL,
+            owner_id TEXT NOT NULL,
+            grant_index_key INTEGER NOT NULL,
+            max_invocations INTEGER NOT NULL,
+            reserved_invocations_after INTEGER NOT NULL,
+            captured_invocations_after INTEGER NOT NULL,
+            PRIMARY KEY (event_id, position),
+            UNIQUE (event_id, profile, owner_id, grant_index_key)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_budget_invocation_quota_usage_seq
+            ON budget_invocation_quota_usage(seq);
+
+        CREATE TRIGGER IF NOT EXISTS budget_invocation_quota_identity_immutable
+        BEFORE UPDATE OF profile, owner_id, grant_index_key, max_invocations
+        ON budget_invocation_quota_usage
+        WHEN OLD.profile IS NOT NEW.profile
+          OR OLD.owner_id IS NOT NEW.owner_id
+          OR OLD.grant_index_key IS NOT NEW.grant_index_key
+          OR OLD.max_invocations IS NOT NEW.max_invocations
+        BEGIN
+            SELECT RAISE(ABORT, 'immutable invocation quota maximum or identity');
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS budget_composite_authorization_immutable
+        BEFORE UPDATE ON budget_composite_authorizations
+        BEGIN
+            SELECT RAISE(ABORT, 'immutable composite authorization');
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS budget_composite_authorization_delete_forbidden
+        BEFORE DELETE ON budget_composite_authorizations
+        BEGIN
+            SELECT RAISE(ABORT, 'immutable composite authorization');
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS budget_composite_authorization_quota_immutable
+        BEFORE UPDATE ON budget_composite_authorization_quotas
+        BEGIN
+            SELECT RAISE(ABORT, 'immutable composite authorization quota snapshot');
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS budget_composite_authorization_quota_delete_forbidden
+        BEFORE DELETE ON budget_composite_authorization_quotas
+        BEGIN
+            SELECT RAISE(ABORT, 'immutable composite authorization quota snapshot');
+        END;
+        "#,
+    )?;
+    Ok(())
+}
+
 pub(super) fn ensure_budget_seq_column(connection: &Connection) -> Result<(), BudgetStoreError> {
     let mut statement = connection.prepare("PRAGMA table_info(capability_grant_budgets)")?;
     let columns = statement.query_map([], |row| row.get::<_, String>(1))?;

@@ -244,6 +244,7 @@ impl SqliteBudgetStore {
         ensure_budget_hold_authority_columns(&connection)?;
         ensure_budget_mutation_event_authority_columns(&connection)?;
         ensure_budget_mutation_event_seq_column(&connection)?;
+        ensure_composite_budget_schema(&connection)?;
         ensure_budget_authorization_claims(&mut connection)?;
         initialize_budget_replication_seq(&mut connection)?;
 

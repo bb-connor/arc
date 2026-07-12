@@ -1268,9 +1268,36 @@ impl BudgetStore for SqliteBudgetStore {
         request: BudgetAuthorizeHoldRequest,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
         if !request.invocation_quotas().is_empty() || request.revocation_set().is_some() {
-            return Err(BudgetStoreError::Invariant(
-                "composite budget holds are unavailable for this backend".to_string(),
-            ));
+            if request.max_invocations.is_some() {
+                return Err(BudgetStoreError::Invariant(
+                    "composite budget hold must not also present legacy max_invocations"
+                        .to_string(),
+                ));
+            }
+            let invocation_quotas = request.invocation_quotas().to_vec();
+            let revocation_set = request.revocation_set().cloned().ok_or_else(|| {
+                BudgetStoreError::Invariant(
+                    "composite budget hold requires a canonical revocation set".to_string(),
+                )
+            })?;
+            let hold_id = request.hold_id.ok_or_else(|| {
+                BudgetStoreError::Invariant("composite budget hold requires hold_id".to_string())
+            })?;
+            let event_id = request.event_id.ok_or_else(|| {
+                BudgetStoreError::Invariant("composite budget hold requires event_id".to_string())
+            })?;
+            return self.authorize_composite_hold(SqliteCompositeAuthorizeInput {
+                capability_id: request.capability_id,
+                grant_index: request.grant_index,
+                requested_exposure_units: request.requested_exposure_units,
+                max_cost_per_invocation: request.max_cost_per_invocation,
+                max_total_cost_units: request.max_total_cost_units,
+                hold_id,
+                event_id,
+                authority: request.authority,
+                invocation_quotas,
+                revocation_set,
+            });
         }
         let event_id = effective_hold_event_id(
             request.event_id.as_deref(),
