@@ -1668,6 +1668,15 @@ mod tests {
             reconciled.monetary_state,
             BudgetMonetaryHoldState::Reconciled
         );
+        assert_eq!(reconciled.committed_cost_units_after, 60);
+        assert_eq!(
+            store
+                .get_usage("cap-composite", 0)
+                .unwrap()
+                .unwrap()
+                .total_cost_realized_spend,
+            60
+        );
         assert!(reconciled
             .invocation_counts_after
             .iter()
