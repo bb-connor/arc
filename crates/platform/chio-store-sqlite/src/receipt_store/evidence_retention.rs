@@ -536,6 +536,36 @@ fn ensure_archive_file_exists(archive_path: &str) -> Result<(), ReceiptStoreErro
     Ok(())
 }
 
+/// Resolve `archive_path` to an absolute, symlink-free location so the watermark
+/// ledger records a path that is stable across process working directories and
+/// restarts.
+///
+/// The recorded archive path is read back by the watermark-trust check
+/// (`archived_prefix_is_backed`), which opens it to confirm the deleted prefix
+/// still survives in the archive. A relative path stored verbatim (including the
+/// default `receipts-archive.sqlite3`) resolves against whatever working
+/// directory the reader happens to run in, so a restart or a CLI health check
+/// launched from a different directory would find no archive, withdraw the
+/// exemption, and then fail full verification because the live prefix was
+/// intentionally deleted. Canonicalizing before the insert ties the recorded
+/// location to the real file. Fail-closed: the archive is expected to exist by
+/// this point (it was just materialized and co-archived into), so a path that
+/// cannot be resolved aborts the rotation rather than sealing an unstable
+/// relative path behind a trusted watermark.
+fn absolute_archive_path(archive_path: &str) -> Result<String, ReceiptStoreError> {
+    let canonical = std::fs::canonicalize(std::path::Path::new(archive_path)).map_err(|error| {
+        ReceiptStoreError::Conflict(format!(
+            "retention archive path {archive_path:?} could not be resolved to an absolute path: \
+             {error}"
+        ))
+    })?;
+    canonical.to_str().map(str::to_owned).ok_or_else(|| {
+        ReceiptStoreError::Conflict(format!(
+            "retention archive path {archive_path:?} is not valid UTF-8 after canonicalization"
+        ))
+    })
+}
+
 /// Reject an archive target that could destroy the only copy of the evidence a
 /// rotation is about to delete.
 ///
@@ -665,6 +695,10 @@ fn archive_range(
 
     ensure_durable_distinct_archive_path(connection, archive_path)?;
     ensure_archive_file_exists(archive_path)?;
+    // Dial and record the archive by its absolute, symlink-free path so a later
+    // reader (a restart, a CLI health check) resolves the same file regardless
+    // of its working directory.
+    let archive_path = absolute_archive_path(archive_path)?;
     let escaped_path = archive_path.replace('\'', "''");
     connection.execute_batch(&format!("ATTACH DATABASE '{escaped_path}' AS archive"))?;
 
@@ -672,7 +706,7 @@ fn archive_range(
         create_archive_schema(connection)?;
         let archived = copy_archived_prefix(connection, w)?;
         verify_co_archival_complete(connection, w)?; // RetentionArchiveIncomplete on any shortfall
-        delete_archived_prefix_in_tx(connection, w, cutoff_unix_secs, archive_path)?;
+        delete_archived_prefix_in_tx(connection, w, cutoff_unix_secs, &archive_path)?;
         Ok(archived)
     })();
 
@@ -1180,6 +1214,11 @@ pub(super) fn retention_repair_on_writer(
     //    never touch the uncheckpointed suffix).
     ensure_durable_distinct_archive_path(connection, archive_path)?;
     ensure_archive_file_exists(archive_path)?;
+    // Record the archive by its absolute, symlink-free path (see
+    // `absolute_archive_path`): the repair watermark is trusted by the same
+    // working-directory-independent reader as a rotation watermark.
+    let archive_path = absolute_archive_path(archive_path)?;
+    let archive_path = archive_path.as_str();
     let escaped = archive_path.replace('\'', "''");
     connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
     let assert_result = (|| -> Result<u64, ReceiptStoreError> {

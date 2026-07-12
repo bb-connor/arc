@@ -2369,6 +2369,54 @@ fn read_only_health_floors_committed_at_watermark() -> Result<(), Box<dyn std::e
     Ok(())
 }
 
+/// The watermark-trust reader opens the archive by the path recorded in the
+/// ledger, so that path must be absolute: a relative or otherwise non-canonical
+/// path resolves against whatever working directory the reader runs in, so a
+/// restart or a CLI health check launched elsewhere would find no archive and
+/// withdraw the exemption. Give a rotation a non-canonical path (routed through
+/// a symlinked directory) and assert the ledger records the resolved location.
+#[cfg(unix)]
+#[test]
+fn rotation_records_absolute_archive_path() -> Result<(), Box<dyn std::error::Error>> {
+    let dir = unique_db_path("abs-archive-dir");
+    std::fs::create_dir_all(&dir)?;
+    let real_archive = dir.join("archive.sqlite3");
+    let link = dir.join("dirlink");
+    std::os::unix::fs::symlink(&dir, &link)?;
+    // Absolute but non-canonical: dir/dirlink/archive.sqlite3 resolves through
+    // the symlink to dir/archive.sqlite3.
+    let noncanonical = link.join("archive.sqlite3");
+    let noncanonical_str = noncanonical.to_str().ok_or("archive path not utf-8")?;
+
+    let path = unique_db_path("abs-archive-store");
+    let keypair = super::support::receipt_test_keypair();
+    let store = store_with_archived_first_checkpoint(&path, noncanonical_str, &keypair)?;
+
+    let connection = store.reader_connection_for_test()?;
+    let stored: String = connection.query_row(
+        "SELECT archive_path FROM receipt_retention_watermark \
+         ORDER BY archived_through_entry_seq DESC LIMIT 1",
+        [],
+        |row| row.get(0),
+    )?;
+    drop(connection);
+
+    let canonical = std::fs::canonicalize(&real_archive)?;
+    let canonical_str = canonical.to_str().ok_or("canonical path not utf-8")?;
+    assert_eq!(
+        stored, canonical_str,
+        "the ledger must record the canonical absolute archive path"
+    );
+    assert_ne!(
+        stored, noncanonical_str,
+        "the ledger must not record the non-canonical input path verbatim"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
 /// Primary correctness proof: a state-machine proptest that drives random
 /// interleaved sequences of tool/child appends (non-monotonic
 /// timestamps within an aged band, to exercise the MAX(timestamp)-over-prefix
