@@ -32,6 +32,10 @@ mod support {
     };
     use chio_store_sqlite::SqliteReceiptStore;
 
+    /// (rail, rail_authorization_id) pairs observed on open intents from
+    /// inside a tool invocation.
+    pub type ObservedRailRefs = Arc<Mutex<Vec<(Option<String>, Option<String>)>>>;
+
     pub fn unique_kernel_db_path(prefix: &str) -> std::path::PathBuf {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -48,7 +52,7 @@ mod support {
         store: Arc<SqliteReceiptStore>,
         pub invoked: Arc<AtomicUsize>,
         pub open_intents_seen_at_invoke: Arc<Mutex<Vec<u64>>>,
-        pub rail_refs_seen_at_invoke: Arc<Mutex<Vec<(Option<String>, Option<String>)>>>,
+        pub rail_refs_seen_at_invoke: ObservedRailRefs,
         /// When set, `invoke` fails AFTER recording the probe, modeling a tool
         /// whose side effect ran and then errored.
         pub fail_after_effect: bool,
@@ -276,7 +280,7 @@ mod support {
         pub capability: CapabilityToken,
         pub invoked: Arc<AtomicUsize>,
         pub open_intents_seen_at_invoke: Arc<Mutex<Vec<u64>>>,
-        pub rail_refs_seen_at_invoke: Arc<Mutex<Vec<(Option<String>, Option<String>)>>>,
+        pub rail_refs_seen_at_invoke: ObservedRailRefs,
         pub db_path: std::path::PathBuf,
     }
 

@@ -312,22 +312,17 @@ pub enum SideEffectClass {
 /// Which call classes must write a durable dispatch intent before dispatch.
 /// The compiled default covers every effecting class and exempts read-only;
 /// `KernelConfig` construction sites choose the deployment posture.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DispatchIntentJournalMode {
     /// No intent writes: an effect that crashes before its receipt commits
     /// leaves no durable trace. Operator opt-out only.
     Off,
     /// Write intents for the SideEffecting and Monetary classes.
+    #[default]
     SideEffecting,
     /// Write intents for every mediated call, including read-only.
     All,
-}
-
-impl Default for DispatchIntentJournalMode {
-    fn default() -> Self {
-        Self::SideEffecting
-    }
 }
 
 /// A durable operational record proving a side-effecting or monetary call was
