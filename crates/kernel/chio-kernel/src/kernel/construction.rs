@@ -706,20 +706,61 @@ impl ChioKernel {
         &mut self,
         receipt_store: Arc<dyn ReceiptStore>,
     ) -> Result<(), KernelError> {
-        // Before anything else, resolve every dispatch intent that survived
-        // a restart: each one marks a call whose effect may have run with no
-        // receipt. Reconciliation runs strictly BEFORE the store is attached
-        // or any background worker starts, so no new dispatch can journal an
-        // intent that interleaves with the boot pass, and a reconcile
-        // failure refuses the attach outright (fail-closed) instead of
-        // leaving a store serving with unresolved open intents. The default
-        // posture dead-letters orphans into durable, health-flipping
-        // incidents (a side effect is never blindly replayed); a store
+        // The handle is installed before recovery runs because the money-path
+        // reconcile below emits signed reconciliation receipts through it.
+        // Nothing serves yet (this method owns the kernel mutably), so no new
+        // dispatch can journal an intent that interleaves with the boot pass.
+        // Every fallible attach step follows; if any refuses, the handle and
+        // any worker installed on the way are rolled back so a failed attach
+        // never leaves a store serving (fail-closed), exactly as if the
+        // attach had been refused up front.
+        self.receipt_store = Some(Arc::clone(&receipt_store));
+        if let Err(error) = self.finish_receipt_store_attach(receipt_store) {
+            self.receipt_store = None;
+            self.retention_maintenance = None;
+            self.dispatch_intent_recovery = None;
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    fn finish_receipt_store_attach(
+        &mut self,
+        receipt_store: Arc<dyn ReceiptStore>,
+    ) -> Result<(), KernelError> {
+        // Resolve the money path first: every incomplete payment-journal row
+        // reaches a terminal outcome before the intent pass below runs, so
+        // that pass consults settled journal state instead of racing it. No
+        // priced call is in flight at attach time, so no grace horizon
+        // applies.
+        if self.payment_journal_active() {
+            let journal_report = self.reconcile_payment_journal(0)?;
+            if journal_report.resolved > 0 || journal_report.reconcile_failed > 0 {
+                tracing::warn!(
+                    resolved = journal_report.resolved,
+                    reconcile_failed = journal_report.reconcile_failed,
+                    "payment journal rows survived a restart; reconciled before serving"
+                );
+            }
+        }
+        // Resolve every dispatch intent that survived a restart: each one
+        // marks a call whose effect may have run with no receipt.
+        // Reconciliation runs strictly before any background worker starts,
+        // and a reconcile failure refuses the attach outright (fail-closed)
+        // instead of leaving a store serving with unresolved open intents.
+        // Monetary orphans resolve through the payment journal when it is in
+        // force; everything else dead-letters into durable, health-flipping
+        // incidents (a side effect is never blindly replayed). A store
         // without the journal reports an empty pass, and a store shared
         // with a live sibling writer defers that sibling's in-flight
         // intents to their owner rather than claiming them as orphans.
-        let report =
-            receipt_store.reconcile_dispatch_intents(&crate::DefaultDispatchIntentReconciler)?;
+        let report = if self.payment_journal_active() {
+            receipt_store.reconcile_dispatch_intents(&crate::MonetaryDispatchIntentReconciler {
+                kernel: self,
+            })?
+        } else {
+            receipt_store.reconcile_dispatch_intents(&crate::DefaultDispatchIntentReconciler)?
+        };
         if report.dead_lettered > 0 || report.monetary_reconciled > 0 {
             tracing::warn!(
                 open = report.open,
@@ -855,7 +896,6 @@ impl ChioKernel {
                     crate::receipt_store::DISPATCH_INTENT_RECOVERY_INTERVAL,
                 )
             });
-        self.receipt_store = Some(receipt_store);
         Ok(())
     }
 

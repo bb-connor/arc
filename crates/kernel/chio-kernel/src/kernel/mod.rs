@@ -12,6 +12,7 @@ mod error;
 mod kernel_drop_guard;
 mod kernel_scopes;
 mod kernel_struct;
+mod payment_reconcile;
 
 pub use construction::KernelBuildError;
 pub use dispatch_intent::DefaultDispatchIntentReconciler;
@@ -22,6 +23,9 @@ pub use kernel_struct::{
     DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RECEIPT_APPEND_BUDGET_MS,
     DEFAULT_RECEIPT_WRITER_POLL_MS, DEFAULT_RECEIPT_WRITER_STALL_MS, DEFAULT_RETENTION_DAYS,
     MIN_RECEIPT_APPEND_BUDGET_MS,
+};
+pub use payment_reconcile::{
+    MonetaryDispatchIntentReconciler, PaymentReconcileOutcome, PaymentReconcileReport,
 };
 
 pub(crate) use kernel_drop_guard::{

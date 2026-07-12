@@ -403,3 +403,224 @@ fn priced_call_walks_journal_to_closed() -> Result<(), Box<dyn std::error::Error
     harness.cleanup();
     Ok(())
 }
+
+#[test]
+fn boot_reconcile_resolves_every_incomplete_row() -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::payment::{PaymentJournalRecord, PaymentSettleAction, PaymentSettleIntent};
+
+    let harness = support::money_journal_harness("chio-boot-reconcile", 75)?;
+    let store = &harness.budget_store;
+
+    // Fabricate the post-crash journal directly, one row per crash window.
+    let base = |request_id: &str, state: PaymentJournalState| PaymentJournalRecord {
+        request_id: request_id.to_string(),
+        capability_id: "cap".to_string(),
+        grant_index: 0,
+        hold_id: Some(format!("hold-{request_id}")),
+        rail: "x402".to_string(),
+        authorization_id: Some(format!("auth-{request_id}")),
+        transaction_id: None,
+        amount_units: 100,
+        settle_action: None,
+        settle_amount_units: None,
+        currency: "USD".to_string(),
+        state,
+        created_at_unix_ms: 1,
+    };
+
+    // Crash before or during authorize: no authorization id is durable.
+    let mut hold_placed = base("req-hold", PaymentJournalState::HoldPlaced);
+    hold_placed.authorization_id = None;
+    store.record_payment_journal(&hold_placed)?;
+
+    // Crash after authorize, before any terminal action was committed.
+    store.record_payment_journal(&base("req-auth", PaymentJournalState::Authorized))?;
+
+    // Crash inside the rail call: the committed capture is durable.
+    store.record_payment_journal(&base("req-settling", PaymentJournalState::HoldPlaced))?;
+    store.advance_payment_journal(
+        "req-settling",
+        PaymentJournalState::HoldPlaced,
+        PaymentJournalState::Authorized,
+        Some("auth-req-settling"),
+        None,
+        None,
+    )?;
+    store.advance_payment_journal(
+        "req-settling",
+        PaymentJournalState::Authorized,
+        PaymentJournalState::Settling,
+        None,
+        None,
+        Some(PaymentSettleIntent {
+            action: PaymentSettleAction::Capture,
+            amount_units: Some(80),
+        }),
+    )?;
+
+    // Crash after the money moved, before the receipt closed the row.
+    store.record_payment_journal(&base("req-settled", PaymentJournalState::HoldPlaced))?;
+    store.advance_payment_journal(
+        "req-settled",
+        PaymentJournalState::HoldPlaced,
+        PaymentJournalState::Authorized,
+        Some("auth-req-settled"),
+        None,
+        None,
+    )?;
+    store.advance_payment_journal(
+        "req-settled",
+        PaymentJournalState::Authorized,
+        PaymentJournalState::Settling,
+        None,
+        None,
+        Some(PaymentSettleIntent {
+            action: PaymentSettleAction::Release,
+            amount_units: None,
+        }),
+    )?;
+    store.advance_payment_journal(
+        "req-settled",
+        PaymentJournalState::Settling,
+        PaymentJournalState::Settled,
+        None,
+        Some("txn-req-settled"),
+        None,
+    )?;
+
+    // A Settling row with no committed settle action is corrupt: recovery
+    // must raise an incident, never guess a capture or release.
+    let mut corrupt = base("req-corrupt", PaymentJournalState::Settling);
+    corrupt.settle_action = None;
+    store.record_payment_journal(&corrupt)?;
+
+    let report = harness.kernel.reconcile_payment_journal(0)?;
+    assert_eq!(
+        report.resolved, 4,
+        "four rows resolve terminally: {report:?}"
+    );
+    assert_eq!(
+        report.reconcile_failed, 1,
+        "the corrupt Settling row raises an incident: {report:?}"
+    );
+
+    // Every row reached a terminal state.
+    let remaining = store.list_incomplete_payment_journal(u64::MAX)?;
+    assert!(
+        remaining.is_empty(),
+        "unresolved rows after reconcile: {remaining:?}"
+    );
+
+    // The committed capture replayed exactly once; the price-free rows
+    // released instead.
+    assert_eq!(
+        harness
+            .rail
+            .captures
+            .load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "exactly one capture: the recorded settle action for req-settling"
+    );
+    assert_eq!(
+        harness
+            .rail
+            .releases
+            .load(std::sync::atomic::Ordering::SeqCst),
+        2,
+        "req-hold and req-auth release; the already-settled row does not touch the rail"
+    );
+
+    // Idempotent: a second pass finds nothing and moves no money.
+    let again = harness.kernel.reconcile_payment_journal(0)?;
+    assert_eq!(again.resolved, 0);
+    assert_eq!(again.reconcile_failed, 0);
+    assert_eq!(
+        harness
+            .rail
+            .captures
+            .load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "no double capture on a second pass"
+    );
+
+    harness.cleanup();
+    Ok(())
+}
+
+#[test]
+fn monetary_reconciler_resolves_orphaned_intents_through_the_journal(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::payment::PaymentJournalRecord;
+    use chio_kernel::receipt_store::{DispatchIntentRecord, SideEffectClass};
+    use chio_kernel::MonetaryDispatchIntentReconciler;
+    use chio_store_sqlite::SqliteReceiptStore;
+    use std::sync::Arc;
+
+    let harness = support::money_journal_harness("chio-monetary-reconciler", 75)?;
+
+    // Fabricate a monetary orphan: an open intent plus its Authorized
+    // journal row, exactly the state a crash after authorize leaves.
+    let intent_db_path = support::unique_db_path("chio-monetary-reconciler-intents");
+    let receipt_store = Arc::new(SqliteReceiptStore::open(&intent_db_path)?);
+    receipt_store.record_dispatch_intent_with_timeout(
+        &DispatchIntentRecord {
+            request_id: "req-orphan".to_string(),
+            capability_id: "cap".to_string(),
+            tool_server: "srv".to_string(),
+            tool_name: "write_file".to_string(),
+            parameter_hash: "hash".to_string(),
+            side_effect_class: SideEffectClass::Monetary,
+            monetary: true,
+            rail: Some("x402".to_string()),
+            rail_authorization_id: Some("auth-req-orphan".to_string()),
+            tenant_id: None,
+            created_at_unix_ms: 1,
+        },
+        std::time::Duration::from_secs(5),
+    )?;
+
+    harness
+        .budget_store
+        .record_payment_journal(&PaymentJournalRecord {
+            request_id: "req-orphan".to_string(),
+            capability_id: "cap".to_string(),
+            grant_index: 0,
+            hold_id: Some("hold-req-orphan".to_string()),
+            rail: "x402".to_string(),
+            authorization_id: Some("auth-req-orphan".to_string()),
+            transaction_id: None,
+            amount_units: 100,
+            settle_action: None,
+            settle_amount_units: None,
+            currency: "USD".to_string(),
+            state: PaymentJournalState::Authorized,
+            created_at_unix_ms: 1,
+        })?;
+
+    let reconciler = MonetaryDispatchIntentReconciler {
+        kernel: &harness.kernel,
+    };
+    let report = receipt_store.reconcile_dispatch_intents(&reconciler)?;
+    assert_eq!(report.open, 1);
+    assert_eq!(
+        report.replayed, 1,
+        "an Authorized orphan releases its hold: funds never moved, safe to replay: {report:?}"
+    );
+
+    // The journal row reached a terminal state and the rail hold released.
+    assert!(harness
+        .budget_store
+        .list_incomplete_payment_journal(u64::MAX)?
+        .is_empty());
+    assert_eq!(
+        harness
+            .rail
+            .releases
+            .load(std::sync::atomic::Ordering::SeqCst),
+        1
+    );
+
+    let _ = std::fs::remove_file(&intent_db_path);
+    harness.cleanup();
+    Ok(())
+}
