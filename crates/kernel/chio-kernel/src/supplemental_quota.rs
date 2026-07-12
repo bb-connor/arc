@@ -380,6 +380,20 @@ impl CanonicalRevocationSet {
         }
         Ok(())
     }
+
+    /// Reconstruct a canonical set from durable members and their stored digest.
+    ///
+    /// The supplied order, uniqueness, identifier bounds, and digest are all
+    /// revalidated. This set remains evidence metadata and cannot itself install
+    /// verified admission authority into the kernel.
+    pub fn from_persisted_parts(
+        ids: Vec<String>,
+        digest: String,
+    ) -> Result<Self, SupplementalQuotaError> {
+        let set = Self { ids, digest };
+        set.validate()?;
+        Ok(set)
+    }
 }
 
 fn revocation_set_digest(ids: &[String]) -> Result<String, SupplementalQuotaError> {
@@ -596,6 +610,33 @@ mod tests {
         first.validate().unwrap();
 
         assert!(CanonicalRevocationSet::new("leaf", &["leaf".to_string()], &[],).is_err());
+    }
+
+    #[test]
+    fn persisted_revocation_set_revalidates_members_and_digest() {
+        let original = CanonicalRevocationSet::new(
+            "leaf",
+            &["ancestor".to_string()],
+            &["supplemental".to_string()],
+        )
+        .unwrap();
+        let restored = CanonicalRevocationSet::from_persisted_parts(
+            original.ids().to_vec(),
+            original.digest().to_string(),
+        )
+        .unwrap();
+        assert_eq!(restored, original);
+
+        assert!(CanonicalRevocationSet::from_persisted_parts(
+            original.ids().to_vec(),
+            "00".repeat(32),
+        )
+        .is_err());
+        assert!(CanonicalRevocationSet::from_persisted_parts(
+            vec!["supplemental".to_string(), "leaf".to_string()],
+            original.digest().to_string(),
+        )
+        .is_err());
     }
 
     #[test]

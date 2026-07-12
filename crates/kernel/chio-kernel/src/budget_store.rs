@@ -139,6 +139,19 @@ impl BudgetQuotaKey {
         Ok(key)
     }
 
+    /// Reconstruct a read-only descriptor from durable store columns.
+    ///
+    /// This validates the same structural invariants as kernel derivation. The
+    /// descriptor is not admission authority: callers still cannot install it
+    /// into [`BudgetAuthorizeHoldRequest`].
+    pub fn from_persisted_parts(
+        profile: BudgetQuotaProfile,
+        owner_id: String,
+        grant_index: Option<u32>,
+    ) -> Result<Self, BudgetStoreError> {
+        Self::from_verified_parts(profile, owner_id, grant_index)
+    }
+
     pub fn profile(&self) -> BudgetQuotaProfile {
         self.profile
     }
@@ -189,6 +202,14 @@ impl BudgetInvocationQuota {
         };
         quota.validate()?;
         Ok(quota)
+    }
+
+    /// Reconstruct a read-only quota descriptor from validated durable state.
+    pub fn from_persisted_parts(
+        key: BudgetQuotaKey,
+        max_invocations: u32,
+    ) -> Result<Self, BudgetStoreError> {
+        Self::from_verified_parts(key, max_invocations)
     }
 }
 
@@ -314,6 +335,17 @@ impl BudgetInvocationQuotaUsage {
                 )
             })
     }
+
+    pub fn validate(&self) -> Result<(), BudgetStoreError> {
+        self.quota.validate()?;
+        let invocation_count = self.invocation_count_after()?;
+        if invocation_count > self.quota.max_invocations() {
+            return Err(BudgetStoreError::Invariant(
+                "invocation quota usage exceeds its immutable maximum".to_string(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -325,6 +357,29 @@ pub enum BudgetInvocationReservationState {
     Denied,
 }
 
+impl BudgetInvocationReservationState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Absent => "absent",
+            Self::Authorized => "authorized",
+            Self::Captured => "captured",
+            Self::Reversed => "reversed",
+            Self::Denied => "denied",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "absent" => Some(Self::Absent),
+            "authorized" => Some(Self::Authorized),
+            "captured" => Some(Self::Captured),
+            "reversed" => Some(Self::Reversed),
+            "denied" => Some(Self::Denied),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BudgetMonetaryHoldState {
     None,
@@ -333,6 +388,31 @@ pub enum BudgetMonetaryHoldState {
     Reconciled,
     Captured,
     Reversed,
+}
+
+impl BudgetMonetaryHoldState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Exposed => "exposed",
+            Self::Released => "released",
+            Self::Reconciled => "reconciled",
+            Self::Captured => "captured",
+            Self::Reversed => "reversed",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "none" => Some(Self::None),
+            "exposed" => Some(Self::Exposed),
+            "released" => Some(Self::Released),
+            "reconciled" => Some(Self::Reconciled),
+            "captured" => Some(Self::Captured),
+            "reversed" => Some(Self::Reversed),
+            _ => None,
+        }
+    }
 }
 
 pub(crate) fn validate_invocation_quotas(
@@ -1254,6 +1334,83 @@ mod tests {
                 2,
             ),
         ]
+    }
+
+    #[test]
+    fn persisted_quota_descriptors_revalidate_the_structured_key() {
+        let key = BudgetQuotaKey::from_persisted_parts(
+            BudgetQuotaProfile::GrantInvocation,
+            "cap-persisted".to_string(),
+            Some(7),
+        )
+        .unwrap();
+        let quota = BudgetInvocationQuota::from_persisted_parts(key, 11).unwrap();
+        assert_eq!(quota.key().profile(), BudgetQuotaProfile::GrantInvocation);
+        assert_eq!(quota.key().owner_id(), "cap-persisted");
+        assert_eq!(quota.key().grant_index(), Some(7));
+        assert_eq!(quota.max_invocations(), 11);
+
+        assert!(BudgetQuotaKey::from_persisted_parts(
+            BudgetQuotaProfile::AggregateFamilyInvocation,
+            "not-a-digest".to_string(),
+            None,
+        )
+        .is_err());
+        assert!(BudgetQuotaKey::from_persisted_parts(
+            BudgetQuotaProfile::AggregateCapabilityInvocation,
+            "cap-persisted".to_string(),
+            Some(7),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn persisted_quota_usage_revalidates_counters_and_states() {
+        let quota = BudgetInvocationQuota::from_persisted_parts(
+            BudgetQuotaKey::grant("cap-persisted", 0).unwrap(),
+            2,
+        )
+        .unwrap();
+        assert!(BudgetInvocationQuotaUsage {
+            quota: quota.clone(),
+            reserved_invocations_after: 1,
+            captured_invocations_after: 1,
+        }
+        .validate()
+        .is_ok());
+        assert!(BudgetInvocationQuotaUsage {
+            quota,
+            reserved_invocations_after: 2,
+            captured_invocations_after: 1,
+        }
+        .validate()
+        .is_err());
+
+        for state in [
+            BudgetInvocationReservationState::Absent,
+            BudgetInvocationReservationState::Authorized,
+            BudgetInvocationReservationState::Captured,
+            BudgetInvocationReservationState::Reversed,
+            BudgetInvocationReservationState::Denied,
+        ] {
+            assert_eq!(
+                BudgetInvocationReservationState::parse(state.as_str()),
+                Some(state)
+            );
+        }
+        assert_eq!(BudgetInvocationReservationState::parse("unknown"), None);
+
+        for state in [
+            BudgetMonetaryHoldState::None,
+            BudgetMonetaryHoldState::Exposed,
+            BudgetMonetaryHoldState::Released,
+            BudgetMonetaryHoldState::Reconciled,
+            BudgetMonetaryHoldState::Captured,
+            BudgetMonetaryHoldState::Reversed,
+        ] {
+            assert_eq!(BudgetMonetaryHoldState::parse(state.as_str()), Some(state));
+        }
+        assert_eq!(BudgetMonetaryHoldState::parse("unknown"), None);
     }
 
     #[test]
