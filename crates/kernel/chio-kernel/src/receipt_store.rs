@@ -44,6 +44,12 @@ pub struct ReceiptWriterCounters {
     pub failed_total: u64,
     pub saturated_total: u64,
     pub inflight: u64,
+    /// Commands still queued in the commit-actor channel, not yet pulled for
+    /// processing. Unlike `inflight`, this excludes work the actor has already
+    /// drained and is committing, so it is the honest saturation signal: the
+    /// channel is full only once this reaches its capacity.
+    #[serde(default)]
+    pub queue_depth: u64,
     #[serde(default)]
     pub last_commit_unix_ms: Option<u64>,
     /// Wall-clock (unix-ms) of the first append this writer ever accepted, set

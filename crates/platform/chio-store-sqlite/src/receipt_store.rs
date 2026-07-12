@@ -136,6 +136,13 @@ struct ReceiptCommitWriterHealth {
     failed_total: AtomicU64,
     saturated_total: AtomicU64,
     inflight: AtomicU64,
+    /// Commands currently sitting in the commit-actor channel, not yet pulled
+    /// for processing. Incremented before every send and decremented when the
+    /// actor pulls a command, so it tracks true channel occupancy rather than
+    /// `inflight`, which stays elevated through the commit of a drained batch.
+    /// The saturation gate reads this: a drained but still-committing batch must
+    /// not read as a full channel when the next send would in fact succeed.
+    queue_depth: AtomicU64,
     last_commit_unix_ms: AtomicU64,
     /// Wall-clock (unix-ms) of the first accepted append, set once (0 = unset).
     /// Retained for operator display of when this writer first did work.
@@ -184,6 +191,24 @@ impl ReceiptCommitWriterHealth {
         if let Ok(mut last_error) = self.last_error.lock() {
             *last_error = Some("sqlite receipt commit actor is unavailable".to_string());
         }
+    }
+
+    /// Count a command as occupying a channel slot. Called before every
+    /// `try_send`; a rejected send undoes it with `note_channel_send_rejected`,
+    /// and the actor calls `note_channel_dequeue` once when it pulls the
+    /// command. Incrementing before the send (not after) keeps the actor from
+    /// dequeuing and decrementing before this increment lands, which would leak
+    /// the count, mirroring the `inflight` accounting.
+    fn note_channel_send(&self) {
+        self.queue_depth.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn note_channel_send_rejected(&self) {
+        atomic_saturating_sub(&self.queue_depth, 1);
+    }
+
+    fn note_channel_dequeue(&self) {
+        atomic_saturating_sub(&self.queue_depth, 1);
     }
 
     fn store_head_snapshot(&self, head: &VerifiedHead) {
@@ -291,6 +316,7 @@ impl ReceiptCommitActor {
         // increment pairs correctly. Any failure of `try_send` undoes the
         // speculative increment before returning.
         let previous_inflight = self.health.inflight.fetch_add(1, Ordering::SeqCst);
+        self.health.note_channel_send();
         match self.sender.try_send(command) {
             Ok(()) => {
                 self.health.accepted_total.fetch_add(1, Ordering::SeqCst);
@@ -298,11 +324,13 @@ impl ReceiptCommitActor {
             }
             Err(mpsc::TrySendError::Full(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.note_channel_send_rejected();
                 self.health.saturated_total.fetch_add(1, Ordering::SeqCst);
                 return Err(receipt_actor_saturated_error());
             }
             Err(mpsc::TrySendError::Disconnected(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.note_channel_send_rejected();
                 self.health.note_writer_unavailable();
                 return Err(receipt_actor_unavailable_error());
             }
@@ -343,6 +371,7 @@ impl ReceiptCommitActor {
             response,
         }));
         let previous_inflight = self.health.inflight.fetch_add(1, Ordering::SeqCst);
+        self.health.note_channel_send();
         match self.sender.try_send(command) {
             Ok(()) => {
                 self.health.accepted_total.fetch_add(1, Ordering::SeqCst);
@@ -350,11 +379,13 @@ impl ReceiptCommitActor {
             }
             Err(mpsc::TrySendError::Full(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.note_channel_send_rejected();
                 self.health.saturated_total.fetch_add(1, Ordering::SeqCst);
                 return Err(receipt_actor_saturated_error());
             }
             Err(mpsc::TrySendError::Disconnected(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.note_channel_send_rejected();
                 self.health.note_writer_unavailable();
                 return Err(receipt_actor_unavailable_error());
             }
@@ -402,13 +433,16 @@ impl ReceiptCommitActor {
         ) -> Result<(), ReceiptStoreError>,
     ) -> Result<(), ReceiptStoreError> {
         let (response, result) = mpsc::sync_channel(1);
+        self.health.note_channel_send();
         match self.sender.try_send(ReceiptCommitCommand::Flush(response)) {
             Ok(()) => {}
             Err(mpsc::TrySendError::Full(_)) => {
+                self.health.note_channel_send_rejected();
                 self.health.saturated_total.fetch_add(1, Ordering::SeqCst);
                 return Err(receipt_actor_saturated_error());
             }
             Err(mpsc::TrySendError::Disconnected(_)) => {
+                self.health.note_channel_send_rejected();
                 self.health.note_writer_unavailable();
                 return Err(receipt_actor_unavailable_error());
             }
@@ -447,6 +481,7 @@ impl ReceiptCommitActor {
             failed_total: self.health.failed_total.load(Ordering::SeqCst),
             saturated_total: self.health.saturated_total.load(Ordering::SeqCst),
             inflight: self.health.inflight.load(Ordering::SeqCst),
+            queue_depth: self.health.queue_depth.load(Ordering::SeqCst),
             last_commit_unix_ms,
             first_accept_unix_ms,
             last_error,
@@ -650,6 +685,7 @@ impl WriterHandle {
         // increment in `append`). The actor decrements unconditionally on
         // dequeue; any send failure undoes the speculative increment.
         let previous_inflight = self.health.inflight.fetch_add(1, Ordering::SeqCst);
+        self.health.note_channel_send();
         match self.sender.try_send(ReceiptCommitCommand::Write {
             job: boxed,
             appends_receipts,
@@ -669,11 +705,13 @@ impl WriterHandle {
             }
             Err(mpsc::TrySendError::Full(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.note_channel_send_rejected();
                 self.health.saturated_total.fetch_add(1, Ordering::SeqCst);
                 return Err(receipt_actor_saturated_error());
             }
             Err(mpsc::TrySendError::Disconnected(_)) => {
                 atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.note_channel_send_rejected();
                 self.health.note_writer_unavailable();
                 return Err(receipt_actor_unavailable_error());
             }
@@ -766,13 +804,21 @@ fn receipt_commit_actor_loop(
     let mut pending_flush_error: Option<ReceiptStoreError> = None;
     let mut checkpoint_signer: Option<BackgroundCheckpointSigner> = None;
     while let Ok(command) = receiver.recv() {
+        // The command has left the channel; free its slot for the saturation
+        // gate. Every command exits the channel through this recv or the batch
+        // drain below, so both decrement exactly once per command.
+        health.note_channel_dequeue();
         match command {
             ReceiptCommitCommand::Append(request) => {
                 let mut requests = vec![*request];
                 let mut flushes = Vec::new();
                 let mut deferred: Option<ReceiptCommitCommand> = None;
                 while requests.len() < RECEIPT_GROUP_COMMIT_MAX_BATCH {
-                    match receiver.recv_timeout(RECEIPT_GROUP_COMMIT_FLUSH_DELAY) {
+                    let next = receiver.recv_timeout(RECEIPT_GROUP_COMMIT_FLUSH_DELAY);
+                    if next.is_ok() {
+                        health.note_channel_dequeue();
+                    }
+                    match next {
                         Ok(ReceiptCommitCommand::Append(request)) => requests.push(*request),
                         Ok(ReceiptCommitCommand::Flush(response)) => {
                             flushes.push(response);
@@ -1447,9 +1493,12 @@ fn atomic_saturating_sub(value: &AtomicU64, amount: u64) {
 ///   fresh work rather than judged wedged the instant it accepts. A timed-out
 ///   append leaves `inflight` elevated without advancing `failed_total` past
 ///   `accepted_total`, which is exactly the `inflight` signal this reads.
-/// - `Saturated`: the commit queue is full right now (`inflight` has reached the
-///   channel capacity), so the next append would be rejected. Deny admission
-///   rather than run a side effect whose receipt cannot be enqueued.
+/// - `Saturated`: the commit channel is full right now (`queue_depth` has
+///   reached the channel capacity), so the next send would be rejected. This
+///   reads `queue_depth` rather than `inflight` so a drained but still-committing
+///   batch, whose slots are already free, does not read as a full channel and
+///   deny admission when the next append would in fact be accepted. Deny
+///   admission rather than run a side effect whose receipt cannot be enqueued.
 /// - `Healthy`: none of the above.
 fn classify_writer_liveness(
     counters: &ReceiptWriterCounters,
@@ -1502,7 +1551,7 @@ fn classify_writer_liveness(
     if backlogged && stalled {
         return Liveness::Wedged;
     }
-    if counters.inflight >= channel_capacity {
+    if counters.queue_depth >= channel_capacity {
         return Liveness::Saturated;
     }
     Liveness::Healthy
@@ -1617,14 +1666,15 @@ mod writer_liveness_classifier_tests {
     }
 
     #[test]
-    fn full_commit_queue_reports_saturated() {
-        // Queue full right now but still committing (recent commit): a new append
+    fn full_commit_channel_reports_saturated() {
+        // Channel full right now but still committing (recent commit): a new send
         // would be rejected, so admission must be denied even though the writer
         // is not wedged.
         let counters = ReceiptWriterCounters {
             accepted_total: CAPACITY + 5,
             committed_total: 4,
             inflight: CAPACITY,
+            queue_depth: CAPACITY,
             last_commit_unix_ms: Some(NOW - 100),
             ..ReceiptWriterCounters::default()
         };
@@ -1633,6 +1683,28 @@ mod writer_liveness_classifier_tests {
             Liveness::Saturated
         );
         assert!(!Liveness::Saturated.healthy());
+    }
+
+    #[test]
+    fn a_drained_but_committing_batch_is_not_reported_saturated() {
+        // The actor has drained a full batch out of the channel and is committing
+        // it: `inflight` still counts that batch, but its channel slots are
+        // already free, so the next send would succeed. Saturation reads
+        // `queue_depth`, so this must classify Healthy rather than Saturated.
+        // Reading `inflight` here wrongly denied admission under heavy but
+        // healthy load.
+        let counters = ReceiptWriterCounters {
+            accepted_total: CAPACITY + RECEIPT_GROUP_COMMIT_MAX_BATCH as u64,
+            committed_total: 0,
+            inflight: CAPACITY,
+            queue_depth: CAPACITY - RECEIPT_GROUP_COMMIT_MAX_BATCH as u64,
+            last_commit_unix_ms: Some(NOW - 100),
+            ..ReceiptWriterCounters::default()
+        };
+        assert_eq!(
+            classify_writer_liveness(&counters, STALL_MS, CAPACITY, Some(NOW - 100), NOW),
+            Liveness::Healthy
+        );
     }
 
     #[test]
@@ -2635,14 +2707,23 @@ impl SqliteReceiptStore {
     /// entry point; it is also safe to call on a healthy store.
     pub fn reseed_verified_head(&self) -> Result<(), ReceiptStoreError> {
         let (response, result) = mpsc::sync_channel(1);
+        self.receipt_commit_actor.health.note_channel_send();
         match self
             .receipt_commit_actor
             .sender
             .try_send(ReceiptCommitCommand::ReseedHead(response))
         {
             Ok(()) => {}
-            Err(mpsc::TrySendError::Full(_)) => return Err(receipt_actor_saturated_error()),
+            Err(mpsc::TrySendError::Full(_)) => {
+                self.receipt_commit_actor
+                    .health
+                    .note_channel_send_rejected();
+                return Err(receipt_actor_saturated_error());
+            }
             Err(mpsc::TrySendError::Disconnected(_)) => {
+                self.receipt_commit_actor
+                    .health
+                    .note_channel_send_rejected();
                 return Err(receipt_actor_unavailable_error());
             }
         }
@@ -2658,14 +2739,25 @@ impl SqliteReceiptStore {
         &self,
         signer: BackgroundCheckpointSigner,
     ) -> Result<(), ReceiptStoreError> {
+        self.receipt_commit_actor.health.note_channel_send();
         match self
             .receipt_commit_actor
             .sender
             .try_send(ReceiptCommitCommand::InstallSigner(signer))
         {
             Ok(()) => Ok(()),
-            Err(mpsc::TrySendError::Full(_)) => Err(receipt_actor_saturated_error()),
-            Err(mpsc::TrySendError::Disconnected(_)) => Err(receipt_actor_unavailable_error()),
+            Err(mpsc::TrySendError::Full(_)) => {
+                self.receipt_commit_actor
+                    .health
+                    .note_channel_send_rejected();
+                Err(receipt_actor_saturated_error())
+            }
+            Err(mpsc::TrySendError::Disconnected(_)) => {
+                self.receipt_commit_actor
+                    .health
+                    .note_channel_send_rejected();
+                Err(receipt_actor_unavailable_error())
+            }
         }
     }
 
