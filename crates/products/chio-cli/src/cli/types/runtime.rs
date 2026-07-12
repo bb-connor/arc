@@ -851,5 +851,11 @@ pub(crate) enum ApiCommands {
         /// development only.
         #[arg(long, default_value_t = false)]
         allow_ephemeral_receipts: bool,
+
+        /// Wall-clock ceiling in seconds on a single upstream hop, including
+        /// reading the full response. Raise it for upstreams with legitimately
+        /// slow calls or large bounded responses. Defaults to 20 seconds.
+        #[arg(long = "upstream-timeout-secs")]
+        upstream_timeout_secs: Option<u64>,
     },
 }
