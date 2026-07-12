@@ -184,9 +184,11 @@ impl RequestEvaluator {
     }
 
     /// Build an evaluator whose embedded kernel is backed by durable stores when
-    /// provided. A `None` store falls back to the in-memory backend and opts the
-    /// kernel into ephemeral operation for that backend; a `Some` store is
-    /// attached and the kernel runs fail-closed against it.
+    /// provided. A `Some` store is attached and the kernel runs fail-closed
+    /// against it. When a store is absent (or an attached one reports ephemeral),
+    /// the kernel runs in-memory for that backend only when `allow_ephemeral` is
+    /// set: durable-by-default, an operator must explicitly opt into losing
+    /// receipts or revocation state on restart rather than getting it silently.
     #[allow(clippy::too_many_arguments)]
     pub fn new_with_durable_stores(
         routes: Vec<RouteEntry>,
@@ -196,6 +198,7 @@ impl RequestEvaluator {
         trusted_capability_issuers: Vec<PublicKey>,
         receipt_store: Option<Arc<dyn ReceiptStore>>,
         revocation_store: Option<Arc<dyn RevocationStore>>,
+        allow_ephemeral: bool,
     ) -> Result<Self, HttpAuthorityError> {
         let receipt_backend = if receipt_store.is_some() {
             BACKEND_DURABLE
@@ -216,11 +219,17 @@ impl RequestEvaluator {
             BACKEND_DURABLE
         };
 
+        // The ephemeral allowances gate on the explicit opt-in, not on whether a
+        // durable store happens to be absent. A durable revocation store keeps
+        // the gate satisfied regardless (the kernel checks the store's own
+        // durability); an absent or in-memory one requires `allow_ephemeral`, so
+        // an embedder with durable receipts can never silently re-accept a
+        // capability revoked before a restart from in-memory revocation state.
         let mut builder = HttpAuthority::builder()
             .approval_store(approval_store)
             .trusted_capability_issuers(trusted_capability_issuers)
-            .allow_ephemeral_receipt_log(receipt_store.is_none())
-            .allow_ephemeral_revocation_store(revocation_is_ephemeral);
+            .allow_ephemeral_receipt_log(allow_ephemeral)
+            .allow_ephemeral_revocation_store(allow_ephemeral);
         if let Some(store) = receipt_store {
             builder = builder.receipt_store(store);
         }
@@ -567,9 +576,80 @@ mod tests {
             Vec::new(),
             Some(receipt_store),
             Some(revocation_store),
+            false,
         )?;
         assert_eq!(evaluator.receipt_backend(), "durable");
         assert_eq!(evaluator.revocation_backend(), "durable");
+        Ok(())
+    }
+
+    /// Durable-by-default for revocation: an evaluator with durable receipts but
+    /// no durable revocation store must fail closed on a mediated request unless
+    /// the operator explicitly opts into ephemeral operation. Without the opt-in
+    /// the kernel refuses pre-dispatch rather than serving a capability whose
+    /// revocation state is lost on restart; with it, the same request serves,
+    /// matching the explicit-ephemeral path.
+    #[test]
+    fn durable_evaluator_requires_explicit_opt_in_for_ephemeral_revocation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let keypair = Keypair::generate();
+        let mut headers = HashMap::new();
+        headers.insert(
+            "X-Chio-Capability".to_string(),
+            signed_capability_token_json(&keypair, "cap-revocation-gate"),
+        );
+
+        let build = |file: &str,
+                     allow_ephemeral: bool|
+         -> Result<RequestEvaluator, Box<dyn std::error::Error>> {
+            let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = Arc::new(
+                chio_store_sqlite::SqliteReceiptStore::open(dir.path().join(file))?,
+            );
+            Ok(RequestEvaluator::new_with_durable_stores(
+                vec![],
+                keypair.clone(),
+                "test-policy".to_string(),
+                Arc::new(chio_kernel::InMemoryApprovalStore::new()),
+                Vec::new(),
+                Some(receipt_store),
+                None,
+                allow_ephemeral,
+            )?)
+        };
+
+        // No opt-in: durable receipts plus in-memory revocation fails closed.
+        // The kernel refuses pre-dispatch, surfaced as an evaluation error.
+        let denied = build("gated.db", false)?.evaluate(
+            HttpMethod::Post,
+            "/pets",
+            &HashMap::new(),
+            &headers,
+            None,
+            0,
+        );
+        let error = match denied {
+            Ok(_) => panic!("in-memory revocation without an opt-in must fail closed"),
+            Err(error) => error,
+        };
+        assert!(
+            error.to_string().contains("revocation"),
+            "the failure must name the missing revocation durability, got: {error}"
+        );
+
+        // Explicit opt-in: the same configuration serves the request.
+        let allowed = build("opted.db", true)?.evaluate(
+            HttpMethod::Post,
+            "/pets",
+            &HashMap::new(),
+            &headers,
+            None,
+            0,
+        )?;
+        assert!(
+            allowed.verdict.is_allowed(),
+            "an explicit ephemeral opt-in restores in-memory revocation serving"
+        );
         Ok(())
     }
 
@@ -622,6 +702,7 @@ mod tests {
             Vec::new(),
             None,
             None,
+            true,
         )?;
         assert_eq!(evaluator.receipt_backend(), "ephemeral");
         assert_eq!(evaluator.revocation_backend(), "ephemeral");

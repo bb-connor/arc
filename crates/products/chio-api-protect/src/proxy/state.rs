@@ -410,6 +410,7 @@ impl ProtectProxy {
             self.config.trusted_capability_issuers.clone(),
             durable_receipt_store,
             revocation_store.clone(),
+            self.config.allow_ephemeral_receipts,
         )
         .map_err(|error| ProtectError::Config(error.to_string()))?;
         let receipt_backend = evaluator.receipt_backend();
