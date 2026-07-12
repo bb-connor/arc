@@ -38,7 +38,10 @@ pub(crate) fn insert_dispatch_intent_tx(
             intent.rail.as_deref(),
             intent.rail_authorization_id.as_deref(),
             intent.tenant_id.as_deref(),
-            sqlite_i64(intent.created_at_unix_ms, "dispatch intent created_at_unix_ms")?,
+            sqlite_i64(
+                intent.created_at_unix_ms,
+                "dispatch intent created_at_unix_ms"
+            )?,
         ],
     )?;
     if changed == 0 {

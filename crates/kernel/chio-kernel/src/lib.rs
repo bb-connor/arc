@@ -443,15 +443,14 @@ pub(crate) use kernel::{current_unix_timestamp, MatchingGrant, ReceiptContent};
 
 pub use kernel::{
     AgentId, CapabilityId, ChildReceiptLog, ChioKernel, DefaultDispatchIntentReconciler, Guard,
-    GuardContext, GuardDecision,
-    HotPathDeadlineConfig, HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig,
-    KernelError, MemoryBudgetConfig, OverloadResource, PromptProvider, ReceiptLog,
-    ResourceProvider, RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
-    ServerId, StructuredErrorReport, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
-    DEFAULT_RECEIPT_APPEND_BUDGET_MS, DEFAULT_RECEIPT_WRITER_POLL_MS,
-    DEFAULT_RECEIPT_WRITER_STALL_MS, DEFAULT_RETENTION_DAYS, EMERGENCY_STOP_DENY_REASON,
-    MIN_RECEIPT_APPEND_BUDGET_MS,
+    GuardContext, GuardDecision, HotPathDeadlineConfig, HotPathStage, HybridSigningConfig,
+    KernelBuildError, KernelConfig, KernelError, MemoryBudgetConfig, OverloadResource,
+    PromptProvider, ReceiptLog, ResourceProvider, RuntimeAdmissionContext,
+    RuntimeAdmissionDecision, RuntimeAdmissionHook, ServerId, StructuredErrorReport,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RECEIPT_APPEND_BUDGET_MS,
+    DEFAULT_RECEIPT_WRITER_POLL_MS, DEFAULT_RECEIPT_WRITER_STALL_MS, DEFAULT_RETENTION_DAYS,
+    EMERGENCY_STOP_DENY_REASON, MIN_RECEIPT_APPEND_BUDGET_MS,
 };
 
 pub use kernel::evaluator::ToolEvaluator;

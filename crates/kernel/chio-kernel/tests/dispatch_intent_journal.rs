@@ -204,9 +204,7 @@ mod support {
             self.inner.as_ref().open_dispatch_intent_count()
         }
 
-        fn dead_letter_dispatch_intent_count(
-            &self,
-        ) -> Result<u64, chio_kernel::ReceiptStoreError> {
+        fn dead_letter_dispatch_intent_count(&self) -> Result<u64, chio_kernel::ReceiptStoreError> {
             self.inner.as_ref().dead_letter_dispatch_intent_count()
         }
     }
@@ -703,8 +701,7 @@ fn intent_write_failure_denies_before_dispatch_without_leaking_hold(
 }
 
 #[test]
-fn allow_receipt_consumes_the_intent_leaving_no_orphan(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn allow_receipt_consumes_the_intent_leaving_no_orphan() -> Result<(), Box<dyn std::error::Error>> {
     use chio_kernel::Verdict;
 
     // Drive a full side-effecting evaluate to Allow: committing the receipt
@@ -729,8 +726,7 @@ fn allow_receipt_consumes_the_intent_leaving_no_orphan(
 }
 
 #[test]
-fn post_dispatch_tool_error_still_consumes_the_intent(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn post_dispatch_tool_error_still_consumes_the_intent() -> Result<(), Box<dyn std::error::Error>> {
     use chio_kernel::Verdict;
 
     // A tool that fails AFTER its side effect ends in a post-dispatch deny
@@ -791,8 +787,7 @@ fn monetary_intent_carries_rail_and_authorization_id_before_dispatch(
 }
 
 #[test]
-fn boot_reconciliation_dead_letters_a_surviving_orphan(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn boot_reconciliation_dead_letters_a_surviving_orphan() -> Result<(), Box<dyn std::error::Error>> {
     use std::sync::Arc;
 
     // Simulate a crash: an intent is durably open in the store file with no
@@ -813,9 +808,7 @@ fn boot_reconciliation_dead_letters_a_surviving_orphan(
     // unhealthy until an operator resolves it.
     let store = Arc::new(chio_store_sqlite::SqliteReceiptStore::open(&path)?);
     let mut kernel = chio_kernel::ChioKernel::new(support::journal_config(Keypair::generate()));
-    kernel.set_receipt_store_handle(
-        Arc::clone(&store) as Arc<dyn chio_kernel::ReceiptStore>
-    )?;
+    kernel.set_receipt_store_handle(Arc::clone(&store) as Arc<dyn chio_kernel::ReceiptStore>)?;
 
     assert_eq!(store.open_dispatch_intent_count()?, 0);
     assert_eq!(store.dead_letter_dispatch_intent_count()?, 1);

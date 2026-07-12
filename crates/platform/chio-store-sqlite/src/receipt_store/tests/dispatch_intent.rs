@@ -33,8 +33,8 @@ fn open_intent_row_count(store: &SqliteReceiptStore) -> Result<i64, Box<dyn std:
 }
 
 #[test]
-fn record_dispatch_intent_inserts_and_rejects_duplicate(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn record_dispatch_intent_inserts_and_rejects_duplicate() -> Result<(), Box<dyn std::error::Error>>
+{
     let path = unique_db_path("chio-intents-insert");
     let store = SqliteReceiptStore::open(&path)?;
 
@@ -270,7 +270,10 @@ fn dead_letter_intent_flips_store_unhealthy() -> Result<(), Box<dyn std::error::
     store.reconcile_dispatch_intents(&RecordingReconciler)?;
     let after = store.receipt_store_health()?;
     assert_eq!(after.dead_letter_dispatch_intents, 1);
-    assert!(!after.healthy, "a dead-letter incident flips health to false");
+    assert!(
+        !after.healthy,
+        "a dead-letter incident flips health to false"
+    );
     assert_eq!(store.open_dispatch_intent_count()?, 0);
     assert_eq!(store.dead_letter_dispatch_intent_count()?, 1);
 

@@ -676,8 +676,7 @@ pub struct ChioKernel {
     /// and the evaluate future can migrate workers at the dispatch await, so
     /// the pre-dispatch intent binding travels in this map (exactly like the
     /// tenant scope above) for the terminal receipt sink to consume.
-    pub(super) dispatch_intents:
-        Arc<DashMap<String, crate::receipt_store::DispatchIntentHandle>>,
+    pub(super) dispatch_intents: Arc<DashMap<String, crate::receipt_store::DispatchIntentHandle>>,
     /// Request-keyed copy of the receipt-version admission snapshot.
     /// Async evaluate futures may resume on a different Tokio worker
     /// after dispatch. This map keeps the admitted version and peer state
