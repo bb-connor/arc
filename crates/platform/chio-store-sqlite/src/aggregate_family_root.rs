@@ -1,12 +1,11 @@
 use chio_core::capability::aggregate_budget::{
-    verify_direct_aggregate_family_root, AggregateFamilyRootResolution,
-    AggregateFamilyRootResolutionError, AggregateFamilyRootResolver, AggregateInvocationScope,
-    LegacyUnboundAggregateRoot,
+    verify_direct_aggregate_root_record, AggregateFamilyRootResolution,
+    AggregateFamilyRootResolutionError, AggregateFamilyRootResolver,
 };
 use chio_core::capability::attenuation::scope_hash;
 use chio_core::capability::token::CapabilityToken;
 use chio_core::{
-    canonical_json_bytes, canonical_json_bytes_from_str, sha256_hex, PublicKey, SigningAlgorithm,
+    canonical_json_bytes, canonical_json_bytes_from_str, sha256_hex, Error as CoreError, PublicKey,
 };
 use chio_kernel::ReceiptStoreError;
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
@@ -497,38 +496,17 @@ fn authenticate_root(
     trusted_issuers: &[PublicKey],
     recorded_at: u64,
 ) -> Result<AuthenticatedRoot, AggregateFamilyRootStoreError> {
-    if !token.delegation_chain.is_empty() {
-        return Err(AggregateFamilyRootStoreError::InvalidRecord(
-            "root registration requires an empty delegation chain".to_string(),
-        ));
-    }
-    if !token.scope.authorizes_delegation() {
-        return Err(AggregateFamilyRootStoreError::InvalidRecord(
-            "root registration requires a scope that authorizes delegation".to_string(),
-        ));
-    }
-    if !token.caveats.is_empty()
-        || token
-            .scope_attenuations
-            .as_ref()
-            .is_some_and(|attenuations| !attenuations.is_empty())
-        || token.attenuation_proof.is_some()
-        || token.budget_share_bps.is_some()
-    {
-        return Err(AggregateFamilyRootStoreError::InvalidRecord(
-            "root registration does not permit attenuated or caveated tokens".to_string(),
-        ));
-    }
-    if token.issued_at >= token.expires_at {
-        return Err(AggregateFamilyRootStoreError::InvalidRecord(
-            "root expiry must be later than issuance".to_string(),
-        ));
-    }
-
     let issued_at = sqlite_record_i64(token.issued_at, "issued_at")?;
     let expires_at = sqlite_record_i64(token.expires_at, "expires_at")?;
     let recorded_at = sqlite_record_i64(recorded_at, "recorded_at")?;
-    authenticate_token_signature(token, trusted_issuers)?;
+    let resolution = verify_direct_aggregate_root_record(token, trusted_issuers).map_err(
+        |error| match error {
+            CoreError::InvalidSignature(_) | CoreError::InvalidPublicKey(_) => {
+                AggregateFamilyRootStoreError::Authentication(error.to_string())
+            }
+            _ => AggregateFamilyRootStoreError::InvalidRecord(error.to_string()),
+        },
+    )?;
 
     let canonical_token = canonical_json_bytes(token).map_err(|error| {
         AggregateFamilyRootStoreError::InvalidRecord(format!(
@@ -544,38 +522,20 @@ fn authenticate_root(
         AggregateFamilyRootStoreError::InvalidRecord(format!("root scope hashing failed: {error}"))
     })?;
 
-    let (root_kind, family_binding_digest, family_owner, family_max_invocations, resolution) =
-        match token.aggregate_invocation_budget.as_ref() {
-            None => (
-                StoredRootKind::LegacyUnbound,
-                None,
-                None,
-                None,
-                AggregateFamilyRootResolution::LegacyUnbound(LegacyUnboundAggregateRoot::new(
-                    token.id.clone(),
-                    token.subject.clone(),
-                    root_scope_hash.clone(),
-                    token.expires_at,
-                )),
+    let (root_kind, family_binding_digest, family_owner, family_max_invocations) = match &resolution
+    {
+        AggregateFamilyRootResolution::LegacyUnbound(_) => {
+            (StoredRootKind::LegacyUnbound, None, None, None)
+        }
+            AggregateFamilyRootResolution::FamilyBound(verified) => (
+                StoredRootKind::FamilyBound,
+                Some(verified.root_binding_digest().to_string()),
+                Some(verified.family_owner().to_string()),
+                Some(i64::from(verified.max_invocations())),
             ),
-            Some(budget) if budget.scope == AggregateInvocationScope::DelegationFamily => {
-                let verified = verify_direct_aggregate_family_root(token, trusted_issuers)
-                    .map_err(|error| {
-                        AggregateFamilyRootStoreError::Authentication(format!(
-                            "aggregate family binding verification failed: {error}"
-                        ))
-                    })?;
-                (
-                    StoredRootKind::FamilyBound,
-                    Some(verified.root_binding_digest().to_string()),
-                    Some(verified.family_owner().to_string()),
-                    Some(i64::from(verified.max_invocations())),
-                    AggregateFamilyRootResolution::FamilyBound(verified),
-                )
-            }
-            Some(_) => {
+            _ => {
                 return Err(AggregateFamilyRootStoreError::InvalidRecord(
-                    "capability-scoped aggregate budgets are not family roots".to_string(),
+                    "aggregate root verifier returned an unsupported resolution".to_string(),
                 ));
             }
         };
@@ -642,36 +602,6 @@ fn authenticate_replication_root(
         ));
     }
     authenticate_root(&token, trusted_issuers, recorded_at)
-}
-
-fn authenticate_token_signature(
-    token: &CapabilityToken,
-    trusted_issuers: &[PublicKey],
-) -> Result<(), AggregateFamilyRootStoreError> {
-    let declared_algorithm = token.algorithm.unwrap_or(SigningAlgorithm::Ed25519);
-    if declared_algorithm != token.issuer.algorithm()
-        || declared_algorithm != token.signature.algorithm()
-    {
-        return Err(AggregateFamilyRootStoreError::Authentication(
-            "capability algorithm envelope does not match issuer and signature".to_string(),
-        ));
-    }
-    if !trusted_issuers.contains(&token.issuer) {
-        return Err(AggregateFamilyRootStoreError::Authentication(
-            "root issuer is not trusted".to_string(),
-        ));
-    }
-    let verified = token.verify_signature().map_err(|error| {
-        AggregateFamilyRootStoreError::Authentication(format!(
-            "root capability signature verification failed: {error}"
-        ))
-    })?;
-    if !verified {
-        return Err(AggregateFamilyRootStoreError::Authentication(
-            "root capability signature is invalid".to_string(),
-        ));
-    }
-    Ok(())
 }
 
 fn record_authenticated_roots(

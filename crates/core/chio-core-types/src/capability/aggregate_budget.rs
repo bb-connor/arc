@@ -771,6 +771,80 @@ pub fn verify_direct_aggregate_family_root(
     })
 }
 
+/// Authenticate a complete direct token as a durable aggregate-root record.
+///
+/// This is stricter than family-binding verification alone. Both explicit
+/// legacy roots and family-bound roots must be direct, delegable, unattenuated
+/// authority artifacts with a valid lifetime and trusted outer signature.
+pub fn verify_direct_aggregate_root_record(
+    token: &CapabilityToken,
+    trusted_issuers: &[PublicKey],
+) -> Result<AggregateFamilyRootResolution> {
+    ensure_algorithm_consistency(
+        token.algorithm,
+        &token.issuer,
+        &token.signature,
+        "aggregate root capability algorithm does not match issuer and signature",
+    )?;
+    if !token.verify_signature()? {
+        return Err(Error::InvalidSignature(
+            "aggregate root capability signature invalid".to_string(),
+        ));
+    }
+    if !trusted_issuers.contains(&token.issuer) {
+        return Err(Error::InvalidPublicKey(
+            "aggregate root issuer is not trusted".to_string(),
+        ));
+    }
+    if !token.delegation_chain.is_empty() {
+        return Err(Error::AttenuationViolation {
+            reason: "aggregate root record requires an empty delegation chain".to_string(),
+        });
+    }
+    if !token.scope.authorizes_delegation() {
+        return Err(Error::AttenuationViolation {
+            reason: "aggregate root record requires a scope that authorizes delegation".to_string(),
+        });
+    }
+    if !token.caveats.is_empty()
+        || token
+            .scope_attenuations
+            .as_ref()
+            .is_some_and(|attenuations| !attenuations.is_empty())
+        || token.attenuation_proof.is_some()
+        || token.budget_share_bps.is_some()
+    {
+        return Err(Error::AttenuationViolation {
+            reason: "aggregate root record cannot be attenuated or caveated".to_string(),
+        });
+    }
+    if token.issued_at >= token.expires_at {
+        return Err(Error::AttenuationViolation {
+            reason: "aggregate root expiry must be later than issuance".to_string(),
+        });
+    }
+
+    match token.aggregate_invocation_budget.as_ref() {
+        None => Ok(AggregateFamilyRootResolution::LegacyUnbound(
+            LegacyUnboundAggregateRoot::new(
+                token.id.clone(),
+                token.subject.clone(),
+                scope_hash(&token.scope)?,
+                token.expires_at,
+            ),
+        )),
+        Some(budget) if budget.scope == AggregateInvocationScope::DelegationFamily => {
+            Ok(AggregateFamilyRootResolution::FamilyBound(
+                verify_direct_aggregate_family_root(token, trusted_issuers)?,
+            ))
+        }
+        Some(_) => Err(Error::AttenuationViolation {
+            reason: "capability-scoped aggregate budget is not an aggregate family root"
+                .to_string(),
+        }),
+    }
+}
+
 /// Authenticate aggregate authority for a direct capability or descendant.
 ///
 /// Direct family roots use [`verify_direct_aggregate_family_root`]. Every
@@ -1106,6 +1180,7 @@ mod tests {
     use core::sync::atomic::{AtomicUsize, Ordering};
 
     use crate::capability::attenuation::{scope_hash, DelegationLink, DelegationLinkBody};
+    use crate::capability::scope::{Operation, ToolGrant};
     use crate::capability::token::{CapabilityToken, CapabilityTokenBody};
     use crate::crypto::{
         canonical_json_bytes, sha256_hex, Ed25519Backend, Keypair, SigningAlgorithm, SigningBackend,
@@ -1151,6 +1226,25 @@ mod tests {
             delegation_chain: Vec::new(),
             aggregate_invocation_budget: None,
         }
+    }
+
+    fn delegable_root_body(
+        issuer: &PublicKey,
+        subject: &PublicKey,
+        id: &str,
+    ) -> CapabilityTokenBody {
+        let mut body = ordinary_root_body(issuer, subject, id);
+        body.scope.grants.push(ToolGrant {
+            server_id: "aggregate-root-server".to_string(),
+            tool_name: "aggregate-root-tool".to_string(),
+            operations: vec![Operation::Invoke, Operation::Delegate],
+            constraints: Vec::new(),
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        });
+        body
     }
 
     fn valid_root(max_invocations: u32) -> (Keypair, CapabilityToken) {
@@ -1365,6 +1459,43 @@ mod tests {
                 .body
                 .unverified_family_owner()
                 .unwrap()
+        );
+    }
+
+    #[test]
+    fn direct_aggregate_root_record_verifier_authenticates_family_and_legacy_shapes() {
+        let issuer = fixed_issuer();
+        let subject = fixed_subject();
+        let family = issue_aggregate_family_root(
+            delegable_root_body(&issuer.public_key(), &subject.public_key(), "family-root"),
+            0,
+            &issuer,
+        )
+        .expect("family root");
+        let legacy = CapabilityToken::sign(
+            delegable_root_body(&issuer.public_key(), &subject.public_key(), "legacy-root"),
+            &issuer,
+        )
+        .expect("legacy root");
+
+        assert!(matches!(
+            verify_direct_aggregate_root_record(&family, &[issuer.public_key()]),
+            Ok(AggregateFamilyRootResolution::FamilyBound(root))
+                if root.root_capability_id() == "family-root" && root.max_invocations() == 0
+        ));
+        assert!(matches!(
+            verify_direct_aggregate_root_record(&legacy, &[issuer.public_key()]),
+            Ok(AggregateFamilyRootResolution::LegacyUnbound(root))
+                if root.root_capability_id() == "legacy-root"
+        ));
+
+        let nondelegable = CapabilityToken::sign(
+            ordinary_root_body(&issuer.public_key(), &subject.public_key(), "not-a-root"),
+            &issuer,
+        )
+        .expect("signed direct token");
+        assert!(
+            verify_direct_aggregate_root_record(&nondelegable, &[issuer.public_key()]).is_err()
         );
     }
 
