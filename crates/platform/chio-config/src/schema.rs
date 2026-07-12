@@ -41,6 +41,49 @@ pub struct ChioConfig {
     pub wasm_guards: Vec<WasmGuardEntry>,
 }
 
+/// Kernel default for the maximum capability delegation depth. The file schema
+/// does not yet expose this knob, so a config-built kernel takes the same
+/// conservative bound the runtime scaffolds use elsewhere.
+const DEFAULT_MAX_DELEGATION_DEPTH: u32 = 5;
+
+impl ChioConfig {
+    /// Lower this validated file config into the runtime [`chio_kernel::KernelConfig`]
+    /// used to construct a `ChioKernel`.
+    ///
+    /// This is the bridge that makes a loaded `chio.yaml` actually govern kernel
+    /// behavior: the operator's `[kernel.deadlines]` budgets flow through
+    /// [`KernelDeadlinesFileConfig::to_hot_path_deadline_config`] into the
+    /// constructed kernel's `deadlines`, and `kernel.signing_key` becomes the
+    /// receipt-signing keypair.
+    ///
+    /// Fields the file schema does not yet express take the kernel's own
+    /// defaults, chosen fail-closed: nested sampling and elicitation stay
+    /// disabled, no external capability authorities are trusted, and ephemeral
+    /// receipt logs are refused so successful dispatch requires durable receipt
+    /// persistence. Deployments that need those knobs configure them on the
+    /// returned value before construction.
+    pub fn to_kernel_config(&self) -> Result<chio_kernel::KernelConfig, crate::ConfigError> {
+        let keypair = self.kernel.signing_keypair()?;
+        Ok(chio_kernel::KernelConfig {
+            keypair,
+            ca_public_keys: Vec::new(),
+            max_delegation_depth: DEFAULT_MAX_DELEGATION_DEPTH,
+            policy_hash: String::new(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: false,
+            checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            deadlines: self.kernel.deadlines.to_hot_path_deadline_config(),
+        })
+    }
+}
+
 /// Kernel section -- the only section that is always required.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -59,6 +102,19 @@ pub struct KernelConfig {
     /// Hot-path wall-clock budgets. Optional; validated at load.
     #[serde(default)]
     pub deadlines: KernelDeadlinesFileConfig,
+}
+
+impl KernelConfig {
+    /// Resolve `signing_key` into the receipt-signing keypair. The literal
+    /// `"generate"` mints a fresh ephemeral key for dev mode; any other value is
+    /// parsed as a 32-byte Ed25519 seed in lowercase hex.
+    pub fn signing_keypair(&self) -> Result<chio_core::crypto::Keypair, crate::ConfigError> {
+        if self.signing_key == "generate" {
+            return Ok(chio_core::crypto::Keypair::generate());
+        }
+        chio_core::crypto::Keypair::from_seed_hex(&self.signing_key)
+            .map_err(|e| crate::ConfigError::Kernel(format!("invalid kernel.signing_key: {e}")))
+    }
 }
 
 /// Config-file surface for the runtime hot-path deadline budgets. Only the
@@ -430,5 +486,45 @@ mod tests {
             config.receipt_writer_stall_ms,
             defaults.receipt_writer_stall_ms
         );
+    }
+
+    #[test]
+    fn loaded_deadlines_reach_the_constructed_kernel_config() {
+        // A loaded `chio.yaml` whose `[kernel.deadlines]` differs from every
+        // kernel default must carry those budgets all the way into the runtime
+        // `KernelConfig` the kernel is built from. A bridge that lowered
+        // `HotPathDeadlineConfig::default()` instead would leave configured
+        // budgets disabled; this asserts the operator's values win.
+        let yaml = r#"
+kernel:
+  signing_key: "generate"
+  deadlines:
+    guard_pipeline_budget_ms: 1500
+    dispatch_budget_ms: 2500
+    receipt_append_budget_ms: 750
+    receipt_writer_poll_ms: 250
+    receipt_writer_stall_ms: 30000
+
+adapters:
+  - id: "petstore"
+    protocol: "openapi"
+    upstream: "http://localhost:8000"
+"#;
+        let config =
+            crate::load_from_str(yaml).unwrap_or_else(|e| panic!("config should load: {e}"));
+        let kernel_config = config
+            .to_kernel_config()
+            .unwrap_or_else(|e| panic!("kernel config should build: {e}"));
+
+        assert_eq!(kernel_config.deadlines.guard_pipeline_budget_ms, 1_500);
+        assert_eq!(kernel_config.deadlines.dispatch_budget_ms, 2_500);
+        assert_eq!(kernel_config.deadlines.receipt_append_budget_ms, 750);
+        assert_eq!(kernel_config.deadlines.receipt_writer_poll_ms, 250);
+        assert_eq!(kernel_config.deadlines.receipt_writer_stall_ms, 30_000);
+
+        // The lowered config must actually construct a kernel through the
+        // validated entrypoint, proving the budgets reach a live kernel.
+        chio_kernel::ChioKernel::try_new(kernel_config)
+            .unwrap_or_else(|e| panic!("kernel should construct from config deadlines: {e}"));
     }
 }
