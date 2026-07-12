@@ -485,12 +485,15 @@ impl ChioKernel {
     }
 
     /// Async wrapper deciding how to run the synchronous guard pipeline. When a
-    /// pipeline budget, a per-guard override, or `always_offload_guards`
-    /// applies (and the current runtime has a timer driver), the sync core runs
-    /// under `spawn_blocking` wrapped in `tokio::time::timeout`, so a blocking
-    /// guard can no longer pin an async worker and a hung guard fails closed as
-    /// `HotPathDeadlineExceeded`. Otherwise, or with no timer-enabled runtime,
-    /// it keeps the inline behavior.
+    /// pipeline budget, a per-guard override, or `always_offload_guards` applies,
+    /// the sync core runs under `spawn_blocking` (wrapped in `tokio::time::timeout`
+    /// only when the runtime has a timer driver), so a blocking guard can no longer
+    /// pin an async worker and a hung guard fails closed as
+    /// `HotPathDeadlineExceeded`. A budget with no timer driver degrades to inline
+    /// because the timeout wrapper would panic; `always_offload_guards` still
+    /// offloads in that case and simply skips the unenforceable timeout. With no
+    /// Tokio runtime at all `spawn_blocking` is unavailable, so the guards run
+    /// inline.
     ///
     /// `tokio::time::timeout` drops the `JoinHandle` on expiry, which detaches
     /// (does not kill) the blocking thread: a runaway guard runs to completion
@@ -506,21 +509,31 @@ impl ChioKernel {
     ) -> Result<Vec<chio_core::receipt::metadata::GuardEvidence>, GuardRunError> {
         let has_per_guard = !self.config.deadlines.per_guard_budget_ms.is_empty();
         let pipeline_budget = self.config.deadlines.guard_pipeline_budget();
-        // A pipeline or per-guard budget is only enforceable with a Tokio time
-        // driver: the timeout wrapper panics without one, so those degrade to
-        // inline. Offloading itself needs no timer but does need an entered Tokio
-        // runtime, since `spawn_blocking` panics without one; a synchronous host
-        // bridging dispatch through `futures::executor::block_on` has no runtime,
-        // so the offload degrades to inline there too. In a timerless but present
-        // runtime `always_offload_guards` still moves a blocking guard onto
-        // `spawn_blocking`; only the (absent) timeout is skipped.
         let needs_timer = pipeline_budget.is_some() || has_per_guard;
-        let want_offload = needs_timer || self.config.deadlines.always_offload_guards;
+        let always_offload = self.config.deadlines.always_offload_guards;
+        let want_offload = needs_timer || always_offload;
 
-        if !want_offload
-            || !dispatch_runtime_available()
-            || (needs_timer && !dispatch_timer_available())
-        {
+        // Offloading needs an entered Tokio runtime, since `spawn_blocking` panics
+        // without one; a synchronous host bridging dispatch through
+        // `futures::executor::block_on` has no runtime, so the offload degrades to
+        // inline there.
+        if !want_offload || !dispatch_runtime_available() {
+            return self.run_guards(
+                request,
+                scope,
+                session_filesystem_roots,
+                matched_grant_index,
+            );
+        }
+
+        // A budget is only enforceable with a Tokio time driver: the timeout
+        // wrapper panics without one. A budget-only configuration therefore
+        // degrades to inline when no timer is present. `always_offload_guards` is
+        // different: it asks to keep a blocking guard off the async worker
+        // regardless of budgets, so it still offloads onto `spawn_blocking` here
+        // and only skips the (unenforceable) timeout.
+        let timer_available = dispatch_timer_available();
+        if needs_timer && !timer_available && !always_offload {
             return self.run_guards(
                 request,
                 scope,
@@ -536,7 +549,12 @@ impl ChioKernel {
             matched_grant_index,
         });
 
-        if has_per_guard {
+        // Per-guard budgets require a per-guard timeout, so this path only runs
+        // with a timer driver. Without one (reached only because
+        // `always_offload_guards` forced the offload past the missing timer),
+        // fall through to a single whole-pipeline `spawn_blocking` with no
+        // enforceable timeout.
+        if has_per_guard && timer_available {
             // Per-guard budgets bound each guard individually, but the whole
             // loop must still honor the pipeline budget: without an outer
             // deadline a chain of guards, each within its own budget, can run
@@ -561,7 +579,7 @@ impl ChioKernel {
         let guards = Arc::clone(&self.guards);
         let owned_for_task = Arc::clone(&owned);
         let join = tokio::task::spawn_blocking(move || run_guards_owned(&guards, &owned_for_task));
-        match pipeline_budget {
+        match pipeline_budget.filter(|_| timer_available) {
             Some(budget) => match tokio::time::timeout(budget, join).await {
                 Ok(Ok(result)) => result,
                 Ok(Err(join_err)) => Err(GuardRunError::new(

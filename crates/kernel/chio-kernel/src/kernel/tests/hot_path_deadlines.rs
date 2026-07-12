@@ -591,6 +591,56 @@ fn always_offload_moves_guards_off_the_async_worker_without_a_timer(
 }
 
 #[test]
+fn always_offload_moves_guards_off_the_worker_without_a_timer_even_with_a_budget(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // A guard budget configured alongside `always_offload_guards` must not defeat
+    // the offload in a timerless runtime. The budget alone is unenforceable
+    // without a time driver, but the operator still asked to keep a blocking guard
+    // off the async worker, so the pipeline must offload onto spawn_blocking and
+    // skip only the (unenforceable) timeout rather than degrading to inline.
+    let mut config = make_config();
+    config.deadlines.always_offload_guards = true;
+    config.deadlines.guard_pipeline_budget_ms = 200;
+    let mut kernel = make_kernel(config);
+    let guard_thread = Arc::new(std::sync::Mutex::new(None));
+    kernel.add_guard(Box::new(ThreadRecordingGuard {
+        label: "recording".to_string(),
+        thread: Arc::clone(&guard_thread),
+    }));
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-offload", "noop")]),
+        300,
+    );
+    let request = make_request("req-offload-budget", &cap, "noop", "srv-offload");
+    let scope = make_scope(vec![make_grant("srv-offload", "noop")]);
+
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+    runtime.block_on(async {
+        assert!(
+            !super::dispatch::dispatch_timer_available(),
+            "the test runtime must be timerless"
+        );
+        let worker = std::thread::current().id();
+        let outcome = kernel
+            .run_guards_within_budget(&request, &scope, None, None)
+            .await;
+        assert!(outcome.is_ok(), "the recording guard allows");
+        let guard = guard_thread
+            .lock()
+            .expect("read guard thread")
+            .expect("guard ran");
+        assert_ne!(
+            guard, worker,
+            "a configured budget must not defeat always_offload in a timerless runtime"
+        );
+    });
+    Ok(())
+}
+
+#[test]
 fn always_offload_runs_guards_inline_without_a_tokio_runtime(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // A synchronous host bridges dispatch through `futures::executor::block_on`,
