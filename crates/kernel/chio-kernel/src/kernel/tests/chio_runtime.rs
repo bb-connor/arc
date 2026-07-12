@@ -2649,8 +2649,9 @@ impl ToolServerConnection for NestedChildOpServer {
 }
 
 // Normal nested-flow exit: the buffered child receipt must be recorded exactly
-// once (no double-record between the normal `record_child_receipts` flush and
-// the disarmed drop guard) and the parent receipt must be a non-cancellation.
+// once (no double-record between the normal `record_buffered_child_receipts`
+// flush and the disarmed drop guard) and the parent receipt must be a
+// non-cancellation.
 #[test]
 fn nested_flow_normal_path_records_child_receipt_exactly_once(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -2946,6 +2947,137 @@ fn nested_flow_transient_child_append_timeout_preserves_child_receipt(
         child_receipt_log.len(),
         1,
         "the buffered child receipt must be preserved and flushed on the drop-path retry, not lost"
+    );
+    Ok(())
+}
+
+// A tool server whose dispatch performs TWO nested child operations (buffering
+// two already-signed child receipts) and then parks forever. Dropping the
+// parked parent future exercises the drop-path flush with more than one
+// buffered receipt, so a failure on the first append must not discard the
+// second.
+struct TwoChildOpParkingServer {
+    id: String,
+    tools: Vec<String>,
+    child_ops: std::sync::Arc<AtomicU64>,
+}
+
+impl TwoChildOpParkingServer {
+    fn new(id: &str, tools: Vec<&str>, child_ops: std::sync::Arc<AtomicU64>) -> Self {
+        Self {
+            id: id.to_string(),
+            tools: tools.into_iter().map(String::from).collect(),
+            child_ops,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for TwoChildOpParkingServer {
+    fn server_id(&self) -> &str {
+        &self.id
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        self.tools.clone()
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        // Two nested child ops buffer two distinct signed child receipts (each
+        // list_roots mints a fresh nonce-suffixed child request id).
+        if let Some(bridge) = nested_flow_bridge {
+            let _ = bridge.list_roots();
+            let _ = bridge.list_roots();
+            self.child_ops.fetch_add(2, Ordering::SeqCst);
+        }
+        std::future::pending::<Result<serde_json::Value, KernelError>>().await
+    }
+}
+
+// Post-dispatch parent drop with more than one buffered child receipt where the
+// first bounded append fails closed. The drop path records each receipt
+// independently, so the second already-signed receipt must still land on the
+// append-only log rather than being discarded with the failed first append. A
+// stop-at-first-failure batch record would lose it.
+#[test]
+fn nested_flow_drop_path_preserves_child_receipts_after_a_first_append_failure(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let child_ops = std::sync::Arc::new(AtomicU64::new(0));
+    let child_appends = std::sync::Arc::new(AtomicU64::new(0));
+    let mut kernel = make_kernel(make_config());
+    kernel.set_receipt_store(Box::new(ChildAppendFailsOnceStore {
+        child_appends: std::sync::Arc::clone(&child_appends),
+    }))?;
+    kernel.register_tool_server(Box::new(TwoChildOpParkingServer::new(
+        "srv-chio-runtime",
+        vec!["destructive_update"],
+        std::sync::Arc::clone(&child_ops),
+    )));
+
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
+        300,
+    );
+    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;
+    kernel.activate_session(&session_id)?;
+    let context = make_operation_context(
+        &session_id,
+        "req-chio-nested-drop-multi",
+        &agent_kp.public_key().to_hex(),
+    );
+    kernel.begin_session_request(&context, OperationKind::ToolCall, true)?;
+    let request = make_request_with_arguments(
+        "req-chio-nested-drop-multi",
+        &cap,
+        "destructive_update",
+        "srv-chio-runtime",
+        serde_json::json!({"record": "vendor-ledger-7", "value": "closed"}),
+    );
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    rt.block_on(async {
+        let mut client = NoopNestedFlowClient;
+        let eval = kernel.evaluate_tool_call_with_nested_flow_client_async(
+            &context,
+            &request,
+            &mut client,
+            None,
+        );
+        let raced = tokio::time::timeout(std::time::Duration::from_millis(200), eval).await;
+        assert!(
+            raced.is_err(),
+            "parked nested dispatch must be dropped by the timeout"
+        );
+    });
+
+    assert_eq!(
+        child_ops.load(Ordering::SeqCst),
+        2,
+        "both nested child ops must have run before the drop"
+    );
+    // The first buffered receipt's bounded append fails closed; the second must
+    // still be attempted. A batch record that stopped at the first failure
+    // would leave this at 1.
+    assert_eq!(
+        child_appends.load(Ordering::SeqCst),
+        2,
+        "the drop path must attempt every buffered child receipt, not stop at the first failure"
+    );
+    let child_receipt_log = kernel.child_receipt_log();
+    assert_eq!(
+        child_receipt_log.len(),
+        1,
+        "the child receipt queued behind the failed append must be preserved on the drop-path flush"
     );
     Ok(())
 }

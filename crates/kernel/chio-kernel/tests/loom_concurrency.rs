@@ -549,7 +549,7 @@ struct ModelDropGuard {
 #[cfg(any(loom, chio_kernel_loom))]
 /// Models the kernel's receipt store (see
 /// chio-kernel/src/kernel/responses/receipt_persistence.rs::record_chio_receipt
-/// and dispatch.rs::record_child_receipts) as a non-atomic check-then-write:
+/// and dispatch.rs::record_child_receipt) as a non-atomic check-then-write:
 /// snapshot the next free slot, yield (so loom can schedule a competing
 /// append between the read and the write), then write the receipt into
 /// that slot and publish the new length. A single call is race-free only

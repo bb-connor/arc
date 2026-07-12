@@ -317,24 +317,26 @@ impl<'a> PostAdmissionDropGuard<'a> {
 
     /// Flush the child receipts the nested-flow bridge buffered during dispatch
     /// onto the append-only log. The receipts are ALREADY SIGNED, so this
-    /// persists them through the same synchronous record path the normal exit
-    /// uses (`record_child_receipts`). Called only from the post-dispatch drop
-    /// branch (a child operation can only have run once dispatch started); a
-    /// pre-dispatch drop leaves the buffer empty. Best-effort from Drop: a
-    /// failure logs an `audit_fault` and never panics, and the buffer is drained
-    /// unconditionally so the guard cannot re-record on a later drop.
+    /// persists each through the same synchronous per-receipt record path the
+    /// normal exit uses. Called only from the post-dispatch drop branch (a child
+    /// operation can only have run once dispatch started); a pre-dispatch drop
+    /// leaves the buffer empty. Each receipt is recorded independently and a
+    /// failure does NOT abandon the receipts queued behind it: a saturated or
+    /// wedged writer that fails one bounded append must not discard the rest,
+    /// which a stop-at-first-failure batch record would. Best-effort from Drop:
+    /// a per-receipt failure logs an `audit_fault` and never panics, and the
+    /// buffer is drained unconditionally so the guard cannot re-record on a
+    /// later drop.
     fn flush_buffered_child_receipts_from_drop(&mut self) {
-        let receipts = std::mem::take(&mut self.child_receipts);
-        if receipts.is_empty() {
-            return;
-        }
-        if let Err(error) = self.kernel.record_child_receipts(receipts) {
-            warn!(
-                request_id = %self.request.request_id,
-                reason = %redacted!(&error),
-                audit_fault = "post_admission_drop_child_receipts_unrecorded",
-                "failed to flush buffered nested child receipts on post-admission drop"
-            );
+        for receipt in std::mem::take(&mut self.child_receipts) {
+            if let Err(error) = self.kernel.record_child_receipt(&receipt) {
+                warn!(
+                    request_id = %self.request.request_id,
+                    reason = %redacted!(&error),
+                    audit_fault = "post_admission_drop_child_receipts_unrecorded",
+                    "failed to flush a buffered nested child receipt on post-admission drop"
+                );
+            }
         }
     }
 

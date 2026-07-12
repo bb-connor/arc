@@ -953,20 +953,6 @@ impl ChioKernel {
         Ok(())
     }
 
-    /// Persist a batch of already-signed child receipts in order, stopping at the
-    /// first append that fails closed. Callers that must not lose the unpersisted
-    /// remainder should drain their buffer per receipt instead (see
-    /// `PostAdmissionDropGuard::record_buffered_child_receipts`).
-    pub(crate) fn record_child_receipts(
-        &self,
-        receipts: Vec<ChildRequestReceipt>,
-    ) -> Result<(), KernelError> {
-        for receipt in &receipts {
-            self.record_child_receipt(receipt)?;
-        }
-        Ok(())
-    }
-
     pub(crate) fn append_chio_receipt_to_local_log(&self, receipt: ChioReceipt) {
         match self.receipt_log.lock() {
             Ok(mut log) => log.append(receipt),
