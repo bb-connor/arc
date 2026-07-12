@@ -2831,6 +2831,31 @@ impl SqliteBudgetStore {
         Ok(())
     }
 
+    pub(super) fn reject_composite_managed_grant(
+        transaction: &rusqlite::Transaction<'_>,
+        capability_id: &str,
+        grant_index: usize,
+    ) -> Result<(), BudgetStoreError> {
+        let managed = transaction
+            .query_row(
+                r#"
+                SELECT 1
+                FROM budget_composite_managed_grants
+                WHERE capability_id = ?1 AND grant_index = ?2
+                "#,
+                params![capability_id, grant_index as i64],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some();
+        if managed {
+            return Err(BudgetStoreError::Invariant(format!(
+                "grant `{capability_id}` requires composite invocation admission"
+            )));
+        }
+        Ok(())
+    }
+
     pub fn try_increment_with_event_id(
         &self,
         capability_id: &str,
@@ -2851,6 +2876,11 @@ impl SqliteBudgetStore {
             transaction.rollback()?;
             return Ok(allowed);
         }
+        SqliteBudgetStore::reject_composite_managed_grant(
+            &transaction,
+            capability_id,
+            grant_index,
+        )?;
 
         let current: Option<(u32, u64, u64)> = transaction
             .query_row(

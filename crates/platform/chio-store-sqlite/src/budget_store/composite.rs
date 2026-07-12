@@ -598,6 +598,21 @@ impl SqliteBudgetStore {
             now,
             &invocation_counts_after,
         )?;
+        if request.invocation_quotas.len() > 1 {
+            transaction.execute(
+                r#"
+                INSERT INTO budget_composite_managed_grants (
+                    capability_id, grant_index, first_hold_id
+                ) VALUES (?1, ?2, ?3)
+                ON CONFLICT(capability_id, grant_index) DO NOTHING
+                "#,
+                params![
+                    request.capability_id,
+                    request.grant_index as i64,
+                    request.hold_id,
+                ],
+            )?;
+        }
         transaction.commit()?;
 
         let metadata = composite_metadata(

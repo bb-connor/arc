@@ -240,6 +240,12 @@ fn composite_quota_maximum_is_pinned_even_by_a_denial() {
         ))
         .expect_err("a quota maximum must be immutable after its first presentation");
     assert!(error.to_string().contains("different maximum"));
+    let bypass = store
+        .try_increment("leaf", 0, Some(10))
+        .expect_err("a composite-managed grant must reject legacy counter writes");
+    assert!(bypass
+        .to_string()
+        .contains("requires composite invocation admission"));
 
     let _ = fs::remove_file(path);
 }

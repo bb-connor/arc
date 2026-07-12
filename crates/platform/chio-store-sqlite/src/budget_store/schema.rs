@@ -83,6 +83,13 @@ pub(super) fn ensure_composite_budget_schema(
             updated_at INTEGER NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS budget_composite_managed_grants (
+            capability_id TEXT NOT NULL,
+            grant_index INTEGER NOT NULL,
+            first_hold_id TEXT NOT NULL,
+            PRIMARY KEY (capability_id, grant_index)
+        );
+
         CREATE TABLE IF NOT EXISTS budget_composite_mutation_snapshots (
             event_id TEXT PRIMARY KEY,
             invocation_state TEXT NOT NULL,

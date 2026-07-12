@@ -166,6 +166,11 @@ impl SqliteBudgetStore {
                 hold_id.unwrap_or("<missing>")
             )));
         }
+        SqliteBudgetStore::reject_composite_managed_grant(
+            &transaction,
+            capability_id,
+            grant_index,
+        )?;
 
         let row: Option<(u32, u64, u64)> = transaction
             .query_row(
