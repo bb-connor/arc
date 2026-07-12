@@ -43,6 +43,7 @@ pub mod receipt_query;
 pub mod receipt_store;
 pub mod revocation_store;
 pub mod schema_version;
+pub mod settle_attempts;
 
 pub use chio_core::crypto::SharedCanonicalBytes;
 pub use chio_core::{CanonicalBytes, CanonicalJsonWitness};
@@ -256,6 +257,7 @@ pub use revocation_store::SqliteRevocationStore;
 pub use schema_version::{
     check_schema_version, stamp_schema_version, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID,
 };
+pub use settle_attempts::SqliteSettlementRetryStore;
 
 #[cfg(test)]
 mod tests {
