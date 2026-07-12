@@ -25,6 +25,7 @@
 #![forbid(unsafe_code)]
 
 pub mod admission_capture_authority;
+pub mod admission_operation_store;
 pub mod aggregate_family_root;
 pub mod approval_store;
 pub mod authority;
@@ -97,6 +98,7 @@ impl Default for SqliteStoreOptions {
 pub use admission_capture_authority::{
     SqliteAdmissionCaptureAuthority, SqliteRevocationWriteOutcome,
 };
+pub use admission_operation_store::SqliteAdmissionOperationStore;
 pub use aggregate_family_root::{
     aggregate_family_root_token_digest, AggregateFamilyRootLookupSnapshot,
     AggregateFamilyRootRecordStatus, AggregateFamilyRootStoreError, StoredAggregateFamilyRoot,
