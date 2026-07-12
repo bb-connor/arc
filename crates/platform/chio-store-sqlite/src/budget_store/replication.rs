@@ -108,8 +108,8 @@ pub(super) fn initialize_budget_replication_seq(
 pub(super) fn allocate_budget_replication_seq(
     transaction: &rusqlite::Transaction<'_>,
 ) -> Result<u64, BudgetStoreError> {
-    let authoritative = max_budget_usage_seq(transaction)?
-        .max(max_budget_mutation_event_seq(transaction)?);
+    let authoritative =
+        max_budget_usage_seq(transaction)?.max(max_budget_mutation_event_seq(transaction)?);
     let current = if SqliteBudgetStore::admission_authority_mode(transaction)?.is_some() {
         authoritative
     } else {
