@@ -1,6 +1,7 @@
 use super::*;
 use axum::body::to_bytes;
 use chio_core_types::capability::{
+    attenuation::{DelegationLink, DelegationLinkBody},
     governance::{GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody},
     scope::ChioScope,
     token::{CapabilityToken, CapabilityTokenBody},
@@ -2744,6 +2745,94 @@ async fn sidecar_validate_capability_reports_revoked_capability() {
     assert!(json["reason"].as_str().test_unwrap().contains("revoked"));
 
     let _ = std::fs::remove_file(receipt_db);
+}
+
+/// Build a leaf capability token whose delegation chain records `parent_id` as
+/// an ancestor. The leaf is signed by the trusted issuer so it passes the
+/// issuer-trust, signature, and expiry gates; only the ancestor's revocation
+/// status is left for the validate handler to weigh.
+fn child_token_with_chain_ancestor(
+    state: &ProxyState,
+    leaf_id: &str,
+    parent_id: &str,
+) -> CapabilityToken {
+    let now = chrono::Utc::now().timestamp() as u64;
+    let delegator = Keypair::generate();
+    let delegatee = Keypair::generate();
+    let link = DelegationLink::sign(
+        DelegationLinkBody {
+            capability_id: parent_id.to_string(),
+            delegator: delegator.public_key(),
+            delegatee: delegatee.public_key(),
+            attenuations: Vec::new(),
+            timestamp: now,
+            scope_hash: None,
+        },
+        &delegator,
+    )
+    .test_unwrap();
+    CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: leaf_id.to_string(),
+            issuer: state.signer_keypair.public_key(),
+            subject: delegatee.public_key(),
+            scope: ChioScope::default(),
+            issued_at: now.saturating_sub(60),
+            expires_at: now + 3600,
+            delegation_chain: vec![link],
+        },
+        &state.signer_keypair,
+    )
+    .test_unwrap()
+}
+
+#[tokio::test]
+async fn sidecar_validate_capability_rejects_revoked_delegation_chain_ancestor() {
+    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    let parent_id = "cap-parent-delegator";
+    let child = child_token_with_chain_ancestor(&state, "cap-child-leaf", parent_id);
+
+    // Revoke the parent capability while the leaf itself stays live: the
+    // validate handler must still refuse the delegated child.
+    state
+        .revoked_capability_ids
+        .lock()
+        .await
+        .insert(parent_id.to_string());
+
+    let validate_body = serde_json::to_value(&child).test_unwrap();
+    let response = build_app(Arc::clone(&state))
+        .oneshot(loopback_post("/v1/capabilities/validate", validate_body))
+        .await
+        .test_unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let bytes = to_bytes(response.into_body(), 1024 * 1024)
+        .await
+        .test_unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).test_unwrap();
+    assert_eq!(json["valid"], false);
+    assert!(json["reason"].as_str().test_unwrap().contains("chain"));
+}
+
+#[tokio::test]
+async fn sidecar_validate_capability_accepts_live_delegation_chain() {
+    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    let child = child_token_with_chain_ancestor(&state, "cap-child-live", "cap-parent-live");
+
+    let validate_body = serde_json::to_value(&child).test_unwrap();
+    let response = build_app(Arc::clone(&state))
+        .oneshot(loopback_post("/v1/capabilities/validate", validate_body))
+        .await
+        .test_unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let bytes = to_bytes(response.into_body(), 1024 * 1024)
+        .await
+        .test_unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).test_unwrap();
+    assert_eq!(json["valid"], true);
+    assert_eq!(json["capability_id"], "cap-child-live");
 }
 
 #[tokio::test]

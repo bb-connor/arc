@@ -686,6 +686,28 @@ pub(crate) async fn sidecar_validate_capability_handler(
             .into_response();
     }
 
+    // A delegated token is only as live as its lineage: revoking a parent
+    // must invalidate every attenuated child minted beneath it. Consult the
+    // durable store for each delegation-chain ancestor so this freshness
+    // signal matches the mediated request path, which also rejects a token
+    // when any chain ancestor is revoked.
+    for ancestor in &token.delegation_chain {
+        if state.capability_is_revoked(&ancestor.capability_id).await {
+            return (
+                StatusCode::OK,
+                axum::Json(SidecarValidateCapabilityResponse {
+                    valid: false,
+                    reason: Some(
+                        "a delegated capability in the chain has been revoked".to_string(),
+                    ),
+                    expires_at,
+                    capability_id,
+                }),
+            )
+                .into_response();
+        }
+    }
+
     if !state.trusted_capability_issuers.contains(&token.issuer) {
         return (
             StatusCode::OK,
