@@ -77,11 +77,13 @@ pub(crate) fn dispatch_intent_insert_job(
 /// unguarded window is only the commit itself. A write racing that window
 /// either answers in the instant between the deadline and the marker (and is
 /// honored by the caller instead of reported as a timeout) or lands anyway;
-/// the timeout path sweeps a landed row with a guarded clear enqueued behind
-/// this job on the single writer (see `record_dispatch_intent_with_timeout`).
+/// a landed commit records itself in the shared `landed` slot, which the
+/// sweep enqueued behind this job on the single writer reads before deleting
+/// anything (see [`dispatch_intent_sweep_landed_job`]).
 pub(crate) fn dispatch_intent_insert_job_unless_abandoned(
     intent: &DispatchIntentRecord,
     abandoned: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    landed: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) -> impl FnOnce(&mut SqliteStoreConnection) -> Result<(), ReceiptStoreError> + Send + 'static {
     let intent = intent.clone();
     move |connection| {
@@ -100,6 +102,36 @@ pub(crate) fn dispatch_intent_insert_job_unless_abandoned(
             // Dropping the transaction rolls the insert back.
             return Err(abandoned_error(&intent.request_id));
         }
+        tx.commit()?;
+        landed.store(true, std::sync::atomic::Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+/// Timeout-path sweep for [`dispatch_intent_insert_job_unless_abandoned`]:
+/// deletes the intent row only when the shared `landed` slot proves THIS
+/// attempt's insert committed it. The timed-out attempt may have been a
+/// retry or concurrent duplicate of a request whose intent is already open
+/// from an earlier invocation; that insert refuses on the primary key, and
+/// an unconditional delete here would erase the earlier invocation's durable
+/// crash marker and reject its terminal receipt's consume. FIFO order on the
+/// single writer runs this job strictly after the insert, so the slot is
+/// always settled by the time it is read; a sweep with nothing of its own to
+/// delete reports `NotFound` and leaves the row alone.
+pub(crate) fn dispatch_intent_sweep_landed_job(
+    key: &chio_kernel::receipt_store::DispatchIntentKey,
+    landed: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> impl FnOnce(&mut SqliteStoreConnection) -> Result<(), ReceiptStoreError> + Send + 'static {
+    let key = key.clone();
+    move |connection| {
+        if !landed.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(ReceiptStoreError::NotFound(format!(
+                "timed-out dispatch intent write for request `{}` landed no row to sweep",
+                key.request_id
+            )));
+        }
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        clear_dispatch_intent_tx(&tx, &key)?;
         tx.commit()?;
         Ok(())
     }

@@ -238,39 +238,94 @@ fn straddling_intent_commit_is_cleared_after_a_timeout_deny(
     // inside its commit when the caller's deadline expires: the abandoned
     // marker can no longer stop the row from landing, the caller reports a
     // timeout, and the evaluator denies before dispatch. The landed row must
-    // then be swept by the guarded clear the timeout path enqueues behind the
-    // insert on the single writer; otherwise it would dead-letter at the next
-    // boot as a false orphan for a call that never executed.
+    // then be swept by the job the timeout path enqueues behind the insert
+    // on the single writer; otherwise it would dead-letter at the next boot
+    // as a false orphan for a call that never executed. The instant between
+    // the deadline expiring and the marker landing cannot be held open from
+    // outside, so this drives the production job pair through the writer
+    // with the shared slots staged exactly as that race leaves them.
     let path = unique_db_path("chio-intents-straddle-clear");
     let store = SqliteReceiptStore::open(&path)?;
 
-    // Model the straddling commit deterministically: the writer-occupying job
-    // lands the caller's intent row through the production insert job and then
-    // parks past the caller's budget, so the caller times out while the row is
-    // already durable (exactly the state a commit that outruns the abandoned
-    // marker leaves behind).
     let intent = sample_intent("req-straddle-clear");
+    let abandoned = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let landed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let insert = super::super::support::dispatch_intent_insert_job_unless_abandoned(
+        &intent,
+        std::sync::Arc::clone(&abandoned),
+        std::sync::Arc::clone(&landed),
+    );
+    // The final abandoned check races ahead of the marker and the commit
+    // lands: the caller's own insert is durable even though the caller is
+    // about to observe a timeout.
+    store.writer_handle().run_write(insert)?;
+    assert_eq!(
+        open_intent_row_count(&store)?,
+        1,
+        "the straddling insert must be durable before the caller times out"
+    );
+    // Only now does the deadline fire: too late for the marker to stop the
+    // commit, which already recorded itself in the shared slot.
+    abandoned.store(true, std::sync::atomic::Ordering::SeqCst);
+    assert!(
+        landed.load(std::sync::atomic::Ordering::SeqCst),
+        "a commit that outruns the marker must record itself as landed"
+    );
+
+    // The sweep the timeout path enqueues behind the insert reads the slot
+    // and deletes exactly the row this attempt created.
+    let key = chio_kernel::receipt_store::DispatchIntentKey {
+        request_id: intent.request_id.clone(),
+        parameter_hash: intent.parameter_hash.clone(),
+        tenant_id: intent.tenant_id.clone(),
+    };
+    store
+        .writer_handle()
+        .run_write(super::super::support::dispatch_intent_sweep_landed_job(
+            &key, landed,
+        ))?;
+
+    assert_eq!(
+        open_intent_row_count(&store)?,
+        0,
+        "a landed intent row must not survive a timeout deny as a false orphan"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn duplicate_timeout_does_not_clear_the_preexisting_open_intent(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // A retry (or concurrent duplicate) of a request that already has an
+    // open intent can time out on a slow writer. Its queued insert then
+    // refuses (abandoned marker, or the primary key it collides with), so
+    // the compensating sweep behind it has nothing of its own to delete:
+    // removing the first invocation's row would erase that call's durable
+    // crash marker and reject its terminal receipt's consume.
+    let path = unique_db_path("chio-intents-duplicate-timeout");
+    let store = SqliteReceiptStore::open(&path)?;
+
+    // The first invocation's intent is durably open; its call is in flight.
+    let intent = sample_intent("req-duplicate-timeout");
+    store.record_dispatch_intent(&intent)?;
+    assert_eq!(open_intent_row_count(&store)?, 1);
+
+    // Park the writer so the duplicate attempt's bounded wait expires while
+    // its insert (and the sweep behind it) are still queued.
     let (started_tx, started_rx) = std::sync::mpsc::channel();
     let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
     let blocker_handle = store.writer_handle();
-    let landed_insert = super::super::support::dispatch_intent_insert_job(&intent);
     let blocker = std::thread::spawn(move || {
-        blocker_handle.run_write(move |connection| {
-            landed_insert(connection)?;
+        blocker_handle.run_write(move |_connection| {
             let _ = started_tx.send(());
             let _ = release_rx.recv_timeout(std::time::Duration::from_secs(30));
             Ok(())
         })
     });
     started_rx.recv_timeout(std::time::Duration::from_secs(5))?;
-    assert_eq!(
-        open_intent_row_count(&store)?,
-        1,
-        "the straddling insert must be durable before the caller times out"
-    );
 
-    // The caller's own insert job is queued behind the parked writer; its
-    // bounded wait expires and the evaluator will deny before dispatch.
     let error =
         store.record_dispatch_intent_with_timeout(&intent, std::time::Duration::from_millis(100));
     assert!(
@@ -278,19 +333,18 @@ fn straddling_intent_commit_is_cleared_after_a_timeout_deny(
             error,
             Err(chio_kernel::receipt_store::ReceiptStoreError::Timeout { .. })
         ),
-        "the bounded intent write must still fail closed on expiry"
+        "the duplicate attempt must still fail closed on expiry"
     );
 
-    // Unblock the writer and drain the queue past the abandoned insert and
-    // the compensating clear.
+    // Drain the queue past the refused insert and the sweep behind it.
     release_tx.send(())?;
     blocker.join().map_err(|_| "blocker thread panicked")??;
     store.writer_handle().run_write(|_connection| Ok(()))?;
 
     assert_eq!(
         open_intent_row_count(&store)?,
-        0,
-        "a landed intent row must not survive a timeout deny as a false orphan"
+        1,
+        "the first invocation's open intent must survive a duplicate's timeout"
     );
 
     let _ = std::fs::remove_file(&path);

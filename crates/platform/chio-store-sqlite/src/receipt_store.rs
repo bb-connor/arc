@@ -3103,41 +3103,53 @@ impl SqliteReceiptStore {
     /// row that would dead-letter at the next boot as a false orphan for a
     /// call that never executed. Because the marker cannot stop an insert
     /// that has already passed its final check and is inside its commit when
-    /// the deadline expires, the timeout path also enqueues a guarded clear
-    /// behind the insert, so even a commit that outruns the marker leaves no
-    /// row behind.
+    /// the deadline expires, the timeout path also enqueues a sweep behind
+    /// the insert, keyed to this attempt's own commit, so a commit that
+    /// outruns the marker leaves no row behind while a pre-existing intent
+    /// for the same request is never touched.
     pub fn record_dispatch_intent_with_timeout(
         &self,
         intent: &chio_kernel::receipt_store::DispatchIntentRecord,
         budget: Duration,
     ) -> Result<(), ReceiptStoreError> {
         let abandoned = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let job = dispatch_intent_insert_job_unless_abandoned(intent, Arc::clone(&abandoned));
+        let landed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let job = dispatch_intent_insert_job_unless_abandoned(
+            intent,
+            Arc::clone(&abandoned),
+            Arc::clone(&landed),
+        );
         let result = self
             .writer_handle()
             .run_write_abandoning_on_timeout(job, budget, abandoned);
         if matches!(result, Err(ReceiptStoreError::Timeout { .. })) {
             // The caller is about to deny before dispatch, yet an insert that
             // was inside its commit when the marker landed may still have
-            // committed. Enqueue an open-state-guarded clear on the same
-            // single-writer queue: FIFO order runs it strictly after the
-            // insert job, so it deletes the row when the straddling commit
-            // landed and reports NotFound when the insert refused. Even when
-            // this bounded confirmation wait expires as well, the queued
-            // clear still drains with the writer, so a slow-but-alive writer
-            // cannot leave a row that would dead-letter as a false orphan for
-            // a call that never dispatched. NotFound is the common outcome
-            // (the insert refused via the marker); any other failure is
-            // already recorded in the writer health counters by the bounded
-            // write path, and the row is left for boot reconciliation, which
-            // at worst surfaces an extra operator-visible dead letter rather
-            // than losing a real orphan.
+            // committed. Enqueue a sweep on the same single-writer queue:
+            // FIFO order runs it strictly after the insert job, so it deletes
+            // the row when the straddling commit recorded itself in the
+            // `landed` slot and reports NotFound when the insert refused.
+            // The slot keys the sweep to THIS attempt: a timed-out retry or
+            // concurrent duplicate whose insert collided with a request's
+            // pre-existing open intent must not delete that earlier
+            // invocation's crash marker out from under its in-flight call.
+            // Even when this bounded confirmation wait expires as well, the
+            // queued sweep still drains with the writer, so a slow-but-alive
+            // writer cannot leave a row that would dead-letter as a false
+            // orphan for a call that never dispatched. NotFound is the
+            // common outcome (the insert refused via the marker); any other
+            // failure is already recorded in the writer health counters by
+            // the bounded write path, and the row is left for boot
+            // reconciliation, which at worst surfaces an extra
+            // operator-visible dead letter rather than losing a real orphan.
             let key = chio_kernel::receipt_store::DispatchIntentKey {
                 request_id: intent.request_id.clone(),
                 parameter_hash: intent.parameter_hash.clone(),
                 tenant_id: intent.tenant_id.clone(),
             };
-            let _ = self.clear_dispatch_intent_with_timeout(&key, budget);
+            let _ = self
+                .writer_handle()
+                .run_write_with_timeout(dispatch_intent_sweep_landed_job(&key, landed), budget);
         }
         result
     }
