@@ -15,6 +15,7 @@ struct CountingMonetaryServer {
 struct PendingMonetaryServer {
     id: String,
     started: std::sync::Arc<tokio::sync::Notify>,
+    invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
 struct StaticPriceOracle {
@@ -192,7 +193,9 @@ impl ToolServerConnection for PendingMonetaryServer {
         _arguments: serde_json::Value,
         _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError> {
-        self.started.notify_waiters();
+        self.invocations
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.started.notify_one();
         std::future::pending::<Result<serde_json::Value, KernelError>>().await
     }
 
@@ -646,7 +649,8 @@ fn make_runtime_attestation(
     }
 }
 
-fn make_trusted_azure_runtime_attestation() -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
+fn make_trusted_azure_runtime_attestation(
+) -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
     let now = current_unix_timestamp();
     chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
         schema: "chio.runtime-attestation.azure-maa.jwt.v1".to_string(),
@@ -665,7 +669,8 @@ fn make_trusted_azure_runtime_attestation() -> chio_core::capability::runtime_at
     }
 }
 
-fn make_trusted_google_runtime_attestation() -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
+fn make_trusted_google_runtime_attestation(
+) -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
     let now = current_unix_timestamp();
     chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
         schema: "chio.runtime-attestation.google-confidential-vm.jwt.v1".to_string(),
@@ -688,7 +693,8 @@ fn make_trusted_google_runtime_attestation() -> chio_core::capability::runtime_a
     }
 }
 
-fn make_trusted_nitro_runtime_attestation() -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
+fn make_trusted_nitro_runtime_attestation(
+) -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
     let now = current_unix_timestamp();
     chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
         schema: "chio.runtime-attestation.aws-nitro-attestation.v1".to_string(),
@@ -754,7 +760,8 @@ fn make_attestation_trust_policy() -> chio_core::capability::trust_policy::Attes
     }
 }
 
-fn make_attested_attestation_trust_policy() -> chio_core::capability::trust_policy::AttestationTrustPolicy {
+fn make_attested_attestation_trust_policy(
+) -> chio_core::capability::trust_policy::AttestationTrustPolicy {
     chio_core::capability::trust_policy::AttestationTrustPolicy {
         rules: vec![chio_core::capability::trust_policy::AttestationTrustRule {
             name: "azure-contoso-attested".to_string(),
@@ -862,7 +869,8 @@ fn make_governed_call_chain_continuation_token(
     let now = current_unix_timestamp();
     CallChainContinuationToken::sign(
         CallChainContinuationTokenBody {
-            schema: chio_core::capability::governance::CHIO_CALL_CHAIN_CONTINUATION_SCHEMA.to_string(),
+            schema: chio_core::capability::governance::CHIO_CALL_CHAIN_CONTINUATION_SCHEMA
+                .to_string(),
             token_id: "continuation-token-1".to_string(),
             signer: fixture.signer.public_key(),
             subject: fixture.subject.clone(),
@@ -1102,91 +1110,8 @@ impl PaymentAdapter for TrackingPaymentAdapter {
     }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn dropping_async_evaluate_after_monetary_admission_unwinds_budget_payment_and_receipt() {
-    let started = std::sync::Arc::new(tokio::sync::Notify::new());
-    let payment = TrackingPaymentAdapter::new();
-    let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(payment.clone()));
-    kernel.register_tool_server(Box::new(PendingMonetaryServer {
-        id: "cost-srv".to_string(),
-        started: std::sync::Arc::clone(&started),
-    }));
-
-    struct AbortEvidenceGuard;
-    impl Guard for AbortEvidenceGuard {
-        fn name(&self) -> &str {
-            "abort-evidence"
-        }
-
-        fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
-            Ok(GuardDecision::allow_with_evidence(vec![GuardEvidence {
-                guard_name: "abort-evidence".to_string(),
-                verdict: true,
-                details: Some("pre-invocation evidence recorded before abort".to_string()),
-            }]))
-        }
-    }
-    kernel.add_guard(Box::new(AbortEvidenceGuard));
-
-    let agent_kp = Keypair::generate();
-    let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
-    let cap = kernel
-        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
-        .unwrap();
-    let request = ToolCallRequest {
-        request_id: "req-drop-after-admission".to_string(),
-        capability: cap.clone(),
-        tool_name: "compute".to_string(),
-        server_id: "cost-srv".to_string(),
-        agent_id: agent_kp.public_key().to_hex(),
-        arguments: serde_json::json!({}),
-        dpop_proof: None,
-        execution_nonce: None,
-        governed_intent: None,
-        approval_token: None,
-        model_metadata: None,
-        federated_origin_kernel_id: None,
-    };
-
-    let kernel = std::sync::Arc::new(kernel);
-    let eval = {
-        let kernel = std::sync::Arc::clone(&kernel);
-        tokio::spawn(async move { kernel.evaluate_tool_call(&request).await })
-    };
-
-    tokio::time::timeout(Duration::from_secs(1), started.notified())
-        .await
-        .expect("pending monetary tool should be invoked before abort");
-    eval.abort();
-    let join = eval.await.expect_err("aborted evaluation should not complete");
-    assert!(join.is_cancelled());
-
-    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
-    assert_eq!(usage.invocation_count, 0);
-    assert_eq!(usage.committed_cost_units().unwrap(), 0);
-    assert_eq!(
-        payment
-            .authorized
-            .load(std::sync::atomic::Ordering::SeqCst),
-        1
-    );
-    assert_eq!(
-        payment.released.load(std::sync::atomic::Ordering::SeqCst),
-        1
-    );
-    assert_eq!(
-        payment.refunded.load(std::sync::atomic::Ordering::SeqCst),
-        0
-    );
-
-    let receipt_log = kernel.receipt_log();
-    assert_eq!(receipt_log.len(), 1);
-    let receipt = receipt_log.get(0).unwrap();
-    assert!(receipt.is_cancelled());
-    assert_eq!(receipt.evidence.len(), 1);
-    assert_eq!(receipt.evidence[0].guard_name, "abort-evidence");
-}
+#[path = "support_monetary_durability.rs"]
+mod support_monetary_durability;
 
 fn make_dpop_grant(server: &str, tool: &str) -> ToolGrant {
     ToolGrant {

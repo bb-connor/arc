@@ -32,6 +32,7 @@ chio-did = { workspace = true }
 chio-external-guards = { workspace = true }
 chio-http-serve = { workspace = true }
 chio-kernel = { workspace = true }
+chio-log-redact = { workspace = true }
 chio-metrics-spec = { workspace = true }
 chio-guards = { workspace = true }
 chio-policy = { workspace = true }

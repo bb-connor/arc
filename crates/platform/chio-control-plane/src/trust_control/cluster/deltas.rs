@@ -1057,17 +1057,17 @@ fn sync_peer_lineage(
 
 fn budget_authorize_compensation_event_id(
     payload: &TryChargeCostRequest,
-    budget_seq: u64,
+    authorize_event_seq: u64,
 ) -> String {
     if let Some(event_id) = payload.event_id.as_deref() {
-        return format!("{event_id}:rollback:{budget_seq}");
+        return format!("{event_id}:rollback:{authorize_event_seq}");
     }
     if let Some(hold_id) = payload.hold_id.as_deref() {
-        return format!("{hold_id}:rollback:{budget_seq}");
+        return format!("{hold_id}:rollback:{authorize_event_seq}");
     }
     format!(
         "rollback:{}:{}:{}",
-        payload.capability_id, payload.grant_index, budget_seq
+        payload.capability_id, payload.grant_index, authorize_event_seq
     )
 }
 
@@ -1075,6 +1075,7 @@ pub(crate) fn rollback_budget_authorize_exposure(
     state: &TrustServiceState,
     payload: &TryChargeCostRequest,
     authority: Option<&BudgetEventAuthority>,
+    authorize_event_seq: u64,
 ) -> Result<(), BudgetStoreError> {
     let store = open_budget_store(&state.config).map_err(|response| {
         BudgetStoreError::Invariant(format!(
@@ -1082,14 +1083,7 @@ pub(crate) fn rollback_budget_authorize_exposure(
             response.status()
         ))
     })?;
-    let usage = store.get_usage(&payload.capability_id, payload.grant_index)?;
-    let Some(usage) = usage else {
-        return Ok(());
-    };
-    if usage.total_cost_exposed == 0 {
-        return Ok(());
-    }
-    let rollback_event_id = budget_authorize_compensation_event_id(payload, usage.seq);
+    let rollback_event_id = budget_authorize_compensation_event_id(payload, authorize_event_seq);
     store.reverse_charge_cost_with_ids_and_authority(
         &payload.capability_id,
         payload.grant_index,

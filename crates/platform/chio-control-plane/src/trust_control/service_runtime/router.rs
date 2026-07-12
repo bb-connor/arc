@@ -283,6 +283,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         .route(BUDGET_INCREMENT_PATH, post(handle_try_increment_budget))
         .route(BUDGET_AUTHORIZE_EXPOSURE_PATH, post(handle_try_charge_cost))
         .route(
+            BUDGET_CAPTURE_INVOCATION_PATH,
+            post(handle_capture_invocation),
+        )
+        .route(
             BUDGET_RELEASE_EXPOSURE_PATH,
             post(handle_reverse_charge_cost),
         )
@@ -722,6 +726,28 @@ mod tests {
             body.contains("chio_capability_revocation_lag_seconds"),
             "the capability-revocation-lag family must be present after building the serve router: {body}"
         );
+    }
+
+    #[tokio::test]
+    async fn captured_before_dispatch_cancellation_route_is_not_served(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use axum::body::Body;
+        use axum::http::Request;
+        use tower::ServiceExt;
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/v1/budgets/cancel-captured-before-dispatch")
+            .header(AUTHORIZATION, "Bearer service-secret")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"capabilityId":"cap-budget","grantIndex":0,"holdId":"hold-budget","eventId":"hold-budget:cancel"}"#,
+            ))?;
+        let response = super::build_router(metrics_state("service-secret"))
+            .oneshot(request)
+            .await?;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        Ok(())
     }
 
     /// A stream receipt embeds one digest per retained chunk, so a valid receipt

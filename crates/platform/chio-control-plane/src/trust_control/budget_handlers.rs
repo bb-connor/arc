@@ -12,6 +12,12 @@ use super::report_rendering::{
 };
 use super::report_validation::{budget_visibility_matches, validate_service_auth};
 use super::*;
+use chio_log_redact::redacted;
+
+fn budget_internal_error(error: &BudgetStoreError, public_message: &'static str) -> Response {
+    warn!(reason = %redacted!(error), message = public_message, "budget store operation failed");
+    plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, public_message)
+}
 
 pub(crate) async fn handle_list_budgets(
     State(state): State<TrustServiceState>,
@@ -28,7 +34,7 @@ pub(crate) async fn handle_list_budgets(
     let usages = match store.list_usages(list_limit(query.limit), query.capability_id.as_deref()) {
         Ok(usages) => usages,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return budget_internal_error(&error, "budget usage listing failed");
         }
     };
 
@@ -77,7 +83,7 @@ pub(crate) async fn handle_try_increment_budget(
     ) {
         Ok(allowed) => allowed,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return budget_internal_error(&error, "budget increment failed");
         }
     };
     respond_after_leader_visible_write(
@@ -87,9 +93,7 @@ pub(crate) async fn handle_try_increment_budget(
             let invocation_count = store
                 .get_usage(&payload.capability_id, payload.grant_index)
                 .map(|usage| usage.map(|usage| usage.invocation_count))
-                .map_err(|error| {
-                    plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-                })?;
+                .map_err(|error| budget_internal_error(&error, "budget usage lookup failed"))?;
             if budget_visibility_matches(allowed, invocation_count, payload.max_invocations) {
                 Ok(Some(TryIncrementBudgetResponse {
                     capability_id: payload.capability_id.clone(),
@@ -156,7 +160,7 @@ fn budget_write_token(
     event_id: Option<&str>,
 ) -> Result<BudgetWriteToken, Response> {
     let http_error = |error: BudgetStoreError| {
-        plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+        budget_internal_error(&error, "budget write witness lookup failed")
     };
     match authority {
         Some(current) => {
@@ -229,28 +233,65 @@ pub(crate) async fn handle_try_charge_cost(
         .event_id
         .clone()
         .unwrap_or_else(generated_budget_event_id);
-    let allowed = match store.try_charge_cost_with_ids_and_authority(
-        &payload.capability_id,
-        payload.grant_index,
-        payload.max_invocations,
-        payload.cost_units,
-        payload.max_cost_per_invocation,
-        payload.max_total_cost_units,
-        payload.hold_id.as_deref(),
-        Some(effective_event_id.as_str()),
-        authority.as_ref(),
-    ) {
-        Ok(allowed) => allowed,
+    let decision = match store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+        capability_id: payload.capability_id.clone(),
+        grant_index: payload.grant_index,
+        max_invocations: payload.max_invocations,
+        requested_exposure_units: payload.cost_units,
+        max_cost_per_invocation: payload.max_cost_per_invocation,
+        max_total_cost_units: payload.max_total_cost_units,
+        hold_id: payload.hold_id.clone(),
+        event_id: Some(effective_event_id.clone()),
+        authority: authority.clone(),
+    }) {
+        Ok(decision) => decision,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return budget_internal_error(&error, "budget authorization failed");
         }
     };
-    if allowed {
-        let write = match budget_write_token(
-            &store,
-            authority.as_ref(),
-            Some(effective_event_id.as_str()),
-        ) {
+    let (already_captured, admission, denied) = match decision {
+        BudgetAuthorizeHoldDecision::Authorized(authorized) => (
+            false,
+            Some((
+                authorized.metadata,
+                authorized.authorized_exposure_units,
+                0,
+                authorized.invocation_count_after,
+                authorized.committed_cost_units_after,
+            )),
+            None,
+        ),
+        BudgetAuthorizeHoldDecision::AlreadyCaptured(mutation) => (
+            true,
+            Some((
+                mutation.metadata,
+                mutation.exposure_units,
+                mutation.realized_spend_units,
+                mutation.invocation_count_after,
+                mutation.committed_cost_units_after,
+            )),
+            None,
+        ),
+        BudgetAuthorizeHoldDecision::Denied(denied) => (false, None, Some(denied)),
+    };
+    if let Some((
+        admission_metadata,
+        exposure_units,
+        realized_spend_units,
+        mutation_invocation_count_after,
+        mutation_committed_cost_units_after,
+    )) = admission
+    {
+        let event_id = match admission_metadata.event_id {
+            Some(event_id) => event_id,
+            None => {
+                return plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "budget authorization did not retain its event identity",
+                )
+            }
+        };
+        let write = match budget_write_token(&store, authority.as_ref(), Some(&event_id)) {
             Ok(write) => write,
             Err(response) => return response,
         };
@@ -259,7 +300,18 @@ pub(crate) async fn handle_try_charge_cost(
             Ok(Some(usage)) => Some(TryChargeCostResponse {
                 capability_id: payload.capability_id.clone(),
                 grant_index: payload.grant_index,
-                allowed,
+                allowed: !already_captured,
+                decision: if already_captured {
+                    BudgetAuthorizeExposureDecision::AlreadyCaptured
+                } else {
+                    BudgetAuthorizeExposureDecision::Authorized
+                },
+                event_id: Some(event_id),
+                exposure_units: Some(exposure_units),
+                realized_spend_units: Some(realized_spend_units),
+                mutation_invocation_count_after: Some(mutation_invocation_count_after),
+                mutation_committed_cost_units_after: Some(mutation_committed_cost_units_after),
+                usage_seq: Some(usage.seq),
                 invocation_count: Some(usage.invocation_count),
                 total_cost_exposed: Some(usage.total_cost_exposed),
                 total_cost_realized_spend: Some(usage.total_cost_realized_spend),
@@ -272,7 +324,7 @@ pub(crate) async fn handle_try_charge_cost(
             }),
             Ok(None) => None,
             Err(error) => {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+                return budget_internal_error(&error, "budget usage lookup failed");
             }
         };
         drop(store);
@@ -286,8 +338,18 @@ pub(crate) async fn handle_try_charge_cost(
         let budget_commit = match wait_for_budget_write_quorum_commit(&state, write).await {
             Ok(budget_commit) => budget_commit,
             Err(_) => {
-                let rollback_result =
-                    rollback_budget_authorize_exposure(&state, &payload, authority.as_ref());
+                if already_captured {
+                    return plain_http_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "captured budget authorization replay could not confirm quorum commit; admission retained",
+                    );
+                }
+                let rollback_result = rollback_budget_authorize_exposure(
+                    &state,
+                    &payload,
+                    authority.as_ref(),
+                    commit_index,
+                );
                 return match rollback_result {
                     Ok(()) => plain_http_error(
                         StatusCode::SERVICE_UNAVAILABLE,
@@ -295,30 +357,33 @@ pub(crate) async fn handle_try_charge_cost(
                             "budget authorize became leader-visible at commit index {commit_index} but failed quorum commit; local exposure rollback succeeded"
                         ),
                     ),
-                    Err(error) => plain_http_error(
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        &format!(
-                            "budget authorize became leader-visible at commit index {commit_index} but failed quorum commit and local exposure rollback also failed: {error}"
-                        ),
+                    Err(error) => budget_internal_error(
+                        &error,
+                        "budget authorize quorum failure and rollback failed; admission retained",
                     ),
                 };
             }
         };
         json_response_with_leader_visibility_and_budget_commit(&state, response, budget_commit)
-    } else {
+    } else if let Some(denied) = denied {
         respond_after_leader_visible_write(
             &state,
             "budget exposure state was not visible on the leader after write",
             || {
                 let usage = store
                     .get_usage(&payload.capability_id, payload.grant_index)
-                    .map_err(|error| {
-                        plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-                    })?;
+                    .map_err(|error| budget_internal_error(&error, "budget usage lookup failed"))?;
                 Ok(Some(TryChargeCostResponse {
                     capability_id: payload.capability_id.clone(),
                     grant_index: payload.grant_index,
-                    allowed,
+                    allowed: false,
+                    decision: BudgetAuthorizeExposureDecision::Denied,
+                    event_id: denied.metadata.event_id.clone(),
+                    exposure_units: None,
+                    realized_spend_units: None,
+                    mutation_invocation_count_after: Some(denied.invocation_count_after),
+                    mutation_committed_cost_units_after: Some(denied.committed_cost_units_after),
+                    usage_seq: usage.as_ref().map(|usage| usage.seq),
                     invocation_count: usage.as_ref().map(|usage| usage.invocation_count),
                     total_cost_exposed: usage.as_ref().map(|usage| usage.total_cost_exposed),
                     total_cost_realized_spend: usage
@@ -333,6 +398,8 @@ pub(crate) async fn handle_try_charge_cost(
                 }))
             },
         )
+    } else {
+        plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, "missing budget decision")
     }
 }
 
@@ -372,7 +439,7 @@ pub(crate) async fn handle_reverse_charge_cost(
         Some(effective_event_id.as_str()),
         authority.as_ref(),
     ) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        return budget_internal_error(&error, "budget exposure release failed");
     }
     let write = match budget_write_token(
         &store,
@@ -401,7 +468,7 @@ pub(crate) async fn handle_reverse_charge_cost(
         )),
         Ok(None) => None,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return budget_internal_error(&error, "budget usage lookup failed");
         }
     };
     drop(store);
@@ -409,6 +476,99 @@ pub(crate) async fn handle_reverse_charge_cost(
         &state,
         "released budget exposure state was not visible on the leader after write",
         committed_response,
+    )
+    .await
+}
+
+pub(crate) async fn handle_capture_invocation(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(payload): Json<CaptureInvocationRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    match forward_post_to_leader(&state, BUDGET_CAPTURE_INVOCATION_PATH, &payload).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
+    }
+    let mut store = match open_budget_store(&state.config) {
+        Ok(store) => store,
+        Err(response) => return response,
+    };
+    let authority = match resolve_budget_hold_authority(&state, &mut store, Some(&payload.hold_id))
+    {
+        Ok(authority) => authority,
+        Err(response) => return response,
+    };
+    let (decision, mutation) =
+        match store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            capability_id: payload.capability_id.clone(),
+            grant_index: payload.grant_index,
+            hold_id: payload.hold_id.clone(),
+            event_id: payload.event_id.clone(),
+            authority: authority.clone(),
+        }) {
+            Ok(BudgetInvocationCaptureDecision::Captured(mutation)) => {
+                (CaptureInvocationDecision::Captured, mutation)
+            }
+            Ok(BudgetInvocationCaptureDecision::AlreadyCaptured(mutation)) => {
+                (CaptureInvocationDecision::AlreadyCaptured, mutation)
+            }
+            Err(error) => {
+                return budget_internal_error(&error, "budget invocation capture failed");
+            }
+        };
+    let Some(event_id) = mutation.metadata.event_id.clone() else {
+        return plain_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "capture mutation did not retain its event identity",
+        );
+    };
+    let usage = match store.get_usage(&payload.capability_id, payload.grant_index) {
+        Ok(Some(usage)) => usage,
+        Ok(None) => {
+            return plain_http_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "captured budget usage was not visible on the leader after write",
+            )
+        }
+        Err(error) => {
+            return budget_internal_error(&error, "budget usage lookup failed");
+        }
+    };
+    let write = match budget_write_token(&store, authority.as_ref(), Some(&event_id)) {
+        Ok(write) => write,
+        Err(response) => return response,
+    };
+    drop(store);
+    respond_after_budget_write_quorum_commit(
+        &state,
+        "captured budget invocation state was not visible on the leader after write",
+        Some((
+            CaptureInvocationResponse {
+                capability_id: payload.capability_id,
+                grant_index: payload.grant_index,
+                hold_id: payload.hold_id,
+                event_id,
+                decision,
+                exposure_units: mutation.exposure_units,
+                invocation_count_after: mutation.invocation_count_after,
+                usage_invocation_count: usage.invocation_count,
+                committed_cost_units_after: mutation.committed_cost_units_after,
+                total_cost_exposed_after: usage.total_cost_exposed,
+                total_cost_realized_spend_after: usage.total_cost_realized_spend,
+                usage_seq: Some(usage.seq),
+                budget_authority: budget_authority_metadata_view(
+                    &state,
+                    mutation.metadata.budget_commit_index,
+                    budget_authority_guarantee_level(&state, mutation.metadata.budget_commit_index),
+                ),
+                budget_commit: None,
+            },
+            write,
+        )),
     )
     .await
 }
@@ -465,7 +625,7 @@ pub(crate) async fn handle_reduce_charge_cost(
         )
     };
     if let Err(error) = reconcile_result {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        return budget_internal_error(&error, "budget reconciliation failed");
     }
     let write = match budget_write_token(
         &store,
@@ -495,7 +655,7 @@ pub(crate) async fn handle_reduce_charge_cost(
         )),
         Ok(None) => None,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return budget_internal_error(&error, "budget usage lookup failed");
         }
     };
     drop(store);
@@ -517,9 +677,9 @@ fn resolve_budget_hold_authority(
             Ok(Some(authority)) => return Ok(Some(authority)),
             Ok(None) => {}
             Err(error) => {
-                return Err(plain_http_error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    &error.to_string(),
+                return Err(budget_internal_error(
+                    &error,
+                    "budget hold authority lookup failed",
                 ));
             }
         }

@@ -34,6 +34,8 @@ impl BudgetUsageRecord {
 pub enum BudgetMutationKind {
     IncrementInvocation,
     AuthorizeExposure,
+    CaptureInvocation,
+    CancelCapturedBeforeDispatch,
     ReverseExposure,
     ReleaseExposure,
     ReconcileSpend,
@@ -44,6 +46,8 @@ impl BudgetMutationKind {
         match self {
             Self::IncrementInvocation => "increment_invocation",
             Self::AuthorizeExposure => "authorize_exposure",
+            Self::CaptureInvocation => "capture_invocation",
+            Self::CancelCapturedBeforeDispatch => "cancel_captured_before_dispatch",
             Self::ReverseExposure => "reverse_exposure",
             Self::ReleaseExposure => "release_exposure",
             Self::ReconcileSpend => "reconcile_spend",
@@ -54,6 +58,8 @@ impl BudgetMutationKind {
         match value {
             "increment_invocation" => Some(Self::IncrementInvocation),
             "authorize_exposure" => Some(Self::AuthorizeExposure),
+            "capture_invocation" => Some(Self::CaptureInvocation),
+            "cancel_captured_before_dispatch" => Some(Self::CancelCapturedBeforeDispatch),
             "reverse_exposure" => Some(Self::ReverseExposure),
             "release_exposure" => Some(Self::ReleaseExposure),
             "reconcile_spend" => Some(Self::ReconcileSpend),
@@ -206,6 +212,36 @@ pub struct BudgetReverseHoldRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BudgetCaptureInvocationRequest {
+    pub capability_id: String,
+    pub grant_index: usize,
+    pub hold_id: String,
+    pub event_id: String,
+    pub authority: Option<BudgetEventAuthority>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BudgetInvocationCaptureDecision {
+    Captured(BudgetHoldMutationDecision),
+    AlreadyCaptured(BudgetHoldMutationDecision),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BudgetCancelCapturedBeforeDispatchRequest {
+    pub capability_id: String,
+    pub grant_index: usize,
+    pub hold_id: String,
+    pub event_id: String,
+    pub authority: Option<BudgetEventAuthority>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BudgetCapturedBeforeDispatchCancellationDecision {
+    Cancelled(BudgetHoldMutationDecision),
+    AlreadyCancelled(BudgetHoldMutationDecision),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BudgetReconcileHoldRequest {
     pub capability_id: String,
     pub grant_index: usize,
@@ -240,6 +276,7 @@ pub struct DeniedBudgetHold {
 pub enum BudgetAuthorizeHoldDecision {
     Authorized(AuthorizedBudgetHold),
     Denied(DeniedBudgetHold),
+    AlreadyCaptured(BudgetHoldMutationDecision),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -502,6 +539,25 @@ pub trait BudgetStore: Send + Sync {
 
     fn budget_metering_profile(&self) -> BudgetMeteringProfile {
         BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual
+    }
+
+    fn capture_invocation_reservations(
+        &self,
+        _request: BudgetCaptureInvocationRequest,
+    ) -> Result<BudgetInvocationCaptureDecision, BudgetStoreError> {
+        Err(BudgetStoreError::Invariant(
+            "invocation capture is not supported by this budget store".to_string(),
+        ))
+    }
+
+    fn cancel_captured_before_dispatch(
+        &self,
+        _request: BudgetCancelCapturedBeforeDispatchRequest,
+    ) -> Result<BudgetCapturedBeforeDispatchCancellationDecision, BudgetStoreError> {
+        Err(BudgetStoreError::Invariant(
+            "captured-before-dispatch cancellation is not supported by this budget store"
+                .to_string(),
+        ))
     }
 
     fn authorize_budget_hold(

@@ -143,39 +143,6 @@ impl<'a> PostAdmissionDropGuard<'a> {
         self.armed = false;
     }
 
-    /// Reverse the pre-execution monetary hold, if any, and fold the
-    /// reversal into the receipt metadata. Charge-gated: a `None`
-    /// charge_result (every non-monetary grant) returns the base metadata
-    /// unchanged. Errors are logged; a Drop impl cannot surface them.
-    fn unwind_charge_from_drop(&self) -> Option<serde_json::Value> {
-        let base = self.receipt_context.extra_metadata.clone();
-        let Some(charge) = self.budget_mutation.charge_result() else {
-            return base;
-        };
-        let unwind = self.kernel.unwind_aborted_monetary_invocation(
-            self.request,
-            self.cap,
-            self.budget_mutation.charge_result(),
-            self.payment_authorization,
-        );
-        match &unwind {
-            Ok(Some(reverse)) => self.kernel.merge_budget_receipt_metadata(
-                base,
-                self.kernel
-                    .budget_execution_receipt_metadata(charge, Some(("reversed", reverse))),
-            ),
-            Ok(None) => base,
-            Err(error) => {
-                warn!(
-                    request_id = %self.request.request_id,
-                    reason = %redacted!(error),
-                    "failed to unwind dropped post-admission monetary invocation"
-                );
-                base
-            }
-        }
-    }
-
     /// Fully unwind a future dropped BEFORE tool-server dispatch. No side
     /// effect is possible, so every pre-execution mutation is reversed: the
     /// monetary hold, an invocation-only budget increment (Finding A),
@@ -190,7 +157,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
 
         // 1. Monetary hold reversal (budget charge + payment release/refund).
         if self.budget_mutation.charge_result().is_some() {
-            if let Err(error) = self.kernel.unwind_aborted_monetary_invocation(
+            if let Err(error) = self.kernel.unwind_pre_dispatch_monetary_invocation(
                 self.request,
                 self.cap,
                 self.budget_mutation.charge_result(),
@@ -410,12 +377,6 @@ impl Drop for PostAdmissionDropGuard<'_> {
         // completed child requests off the log (RFC-0002 receipt-completeness).
         self.flush_buffered_child_receipts_from_drop();
 
-        // Charge-gated section: reverse the pre-execution monetary hold, if
-        // any, folding the reversal into the post-dispatch receipt metadata.
-        // Best-effort from a Drop context; a non-monetary grant returns the
-        // base metadata unchanged.
-        let reversed_metadata = self.unwind_charge_from_drop();
-
         // Post-dispatch drop. The tool-server invoke was in flight; a side
         // effect MAY have executed. Fail closed: retain the runtime-
         // admission reservations (releasing a single-use destructive lease
@@ -424,9 +385,11 @@ impl Drop for PostAdmissionDropGuard<'_> {
         // log (closes F02). The retained reservations are marked in the
         // receipt metadata so the burned lease is auditable and
         // operator-recoverable (closes the F08 audit gap).
-        let receipt_metadata = self
-            .kernel
-            .mark_runtime_admission_reservations_retained_fail_closed(reversed_metadata);
+        let receipt_metadata = self.kernel.ambiguous_dispatch_receipt_metadata(
+            self.budget_mutation,
+            self.payment_authorization,
+            self.receipt_context.extra_metadata.clone(),
+        );
 
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             self.receipt_context.pre_invocation_guard_evidence.clone(),
@@ -446,11 +409,4 @@ impl Drop for PostAdmissionDropGuard<'_> {
             );
         }
     }
-}
-
-pub(crate) fn dispatch_error_precedes_tool_side_effect(error: &KernelError) -> bool {
-    matches!(
-        error,
-        KernelError::ToolNotRegistered(_) | KernelError::UrlElicitationsRequired { .. }
-    )
 }

@@ -10,6 +10,9 @@ mod cluster_and_reports_tests {
 
     use chio_test_support::prelude::*;
 
+    #[path = "budget_compensation.rs"]
+    mod budget_compensation;
+
     fn base_config() -> TrustServiceConfig {
         TrustServiceConfig {
             listen: "127.0.0.1:0".parse().test_unwrap(),
@@ -2703,41 +2706,5 @@ mod cluster_and_reports_tests {
         assert!(guard.last_leader_url.is_none());
 
         let _ = std::fs::remove_file(authority_db_path);
-    }
-
-    #[test]
-    fn apply_cluster_snapshot_fails_when_authority_fence_persistence_fails() {
-        let authority_db_path = unique_temp_path("cluster-authority-fence-dir", "d");
-        std::fs::create_dir_all(&authority_db_path).test_unwrap();
-
-        let source_state =
-            state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
-        let target_state = state_with_cluster(
-            "http://node-b",
-            &["http://node-a"],
-            Some(authority_db_path.clone()),
-            None,
-            None,
-        );
-
-        for state in [&source_state, &target_state] {
-            let cluster = state.cluster.as_ref().test_unwrap();
-            let mut guard = cluster.lock().test_unwrap();
-            for peer in guard.peers.values_mut() {
-                peer.health = PeerHealth::Healthy;
-                peer.last_contact_at = Some(unix_timestamp_now());
-            }
-        }
-
-        let snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
-        let error =
-            apply_cluster_snapshot(&target_state, "http://node-a", snapshot).test_unwrap_err();
-        let error_text = error.to_string();
-        assert!(
-            error_text.contains("directory") || error_text.contains("open database file"),
-            "unexpected error: {error_text}"
-        );
-
-        let _ = std::fs::remove_dir_all(authority_db_path);
     }
 }

@@ -37,6 +37,7 @@ pub(super) struct SqliteBudgetHold {
     pub(super) authorized_exposure_units: u64,
     pub(super) remaining_exposure_units: u64,
     pub(super) invocation_count_debited: bool,
+    pub(super) invocation_captured: bool,
     pub(super) disposition: HoldDisposition,
     pub(super) authority: Option<BudgetEventAuthority>,
 }

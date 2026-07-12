@@ -25,10 +25,7 @@ pub use kernel_struct::{
     MIN_RECEIPT_APPEND_BUDGET_MS,
 };
 
-pub(crate) use kernel_drop_guard::{
-    dispatch_error_precedes_tool_side_effect, reserved_runtime_admission_ids,
-    PostAdmissionDropGuard, PostAdmissionReceiptContext,
-};
+pub(crate) use kernel_drop_guard::{PostAdmissionDropGuard, PostAdmissionReceiptContext};
 pub(crate) use kernel_scopes::{
     current_scoped_receipt_federation_admission, current_scoped_receipt_tenant_id,
     extract_tenant_id_from_auth_context, scope_receipt_federation_admission,
@@ -560,17 +557,32 @@ pub(crate) struct BudgetChargeResult {
     new_committed_cost_units: u64,
     budget_hold_id: String,
     authorize_metadata: BudgetCommitMetadata,
+    invocation_capture: Option<Box<crate::budget_store::BudgetHoldMutationDecision>>,
 }
 
 impl BudgetChargeResult {
     /// The rail/store hold id for the monetary budget charge, so a cleanup
     /// fault can name the stuck budget hold that needs manual recovery.
-    pub(crate) fn budget_hold_id(&self) -> &str {
-        &self.budget_hold_id
+    fn reverse_event_id(&self) -> String {
+        let authorize_event_id = self
+            .authorize_metadata
+            .event_id
+            .as_deref()
+            .unwrap_or(&self.budget_hold_id);
+        let authorize_commit_index = self.authorize_metadata.budget_commit_index.unwrap_or(0);
+        format!("{authorize_event_id}:rollback:{authorize_commit_index}")
     }
 
-    fn reverse_event_id(&self) -> String {
-        format!("{}:reverse", self.budget_hold_id)
+    fn capture_invocation_event_id(&self) -> String {
+        let authorize_commit_index = self.authorize_metadata.budget_commit_index.unwrap_or(0);
+        format!(
+            "{}:capture-invocation:{authorize_commit_index}",
+            self.budget_hold_id
+        )
+    }
+
+    fn cancel_captured_before_dispatch_event_id(&self) -> String {
+        self.reverse_event_id()
     }
 
     fn reconcile_event_id(&self) -> String {
@@ -589,6 +601,13 @@ impl PreExecutionBudgetMutation {
         match self {
             Self::Charge(charge) => Some(charge),
             Self::None | Self::Invocation { .. } => None,
+        }
+    }
+
+    fn charge_result_mut(&mut self) -> Option<&mut BudgetChargeResult> {
+        match self {
+            Self::Charge(charge) => Some(charge),
+            Self::Invocation { .. } | Self::None => None,
         }
     }
 

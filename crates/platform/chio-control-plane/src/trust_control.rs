@@ -81,7 +81,8 @@ use chio_credentials::{
 use chio_did::DidChio;
 use chio_kernel::budget_store::{
     AuthorizedBudgetHold, BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
-    BudgetCommitMetadata, BudgetEventAuthority, BudgetGuaranteeLevel, BudgetHoldMutationDecision,
+    BudgetCaptureInvocationRequest, BudgetCommitMetadata, BudgetEventAuthority,
+    BudgetGuaranteeLevel, BudgetHoldMutationDecision, BudgetInvocationCaptureDecision,
     BudgetMutationKind, BudgetMutationRecord, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
     BudgetReverseHoldRequest, DeniedBudgetHold,
 };

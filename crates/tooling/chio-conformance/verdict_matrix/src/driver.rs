@@ -655,6 +655,7 @@ fn nonce_binding(
 ) -> NonceBinding {
     NonceBinding {
         subject_id: capability.subject.to_hex(),
+        request_id: request.request_id.clone(),
         capability_id: capability.id.clone(),
         tool_server: request.server_id.clone(),
         tool_name: request.tool_name.clone(),

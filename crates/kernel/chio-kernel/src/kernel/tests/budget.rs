@@ -517,16 +517,28 @@ fn monetary_allow_records_budget_hold_and_append_only_events() {
         .list_mutation_events(10, Some(&cap.id), Some(0))
         .unwrap();
 
-    assert_eq!(events.len(), 2);
+    assert_eq!(events.len(), 3);
     assert_eq!(events[0].event_id, authorize_event_id);
     assert_eq!(events[0].hold_id.as_deref(), Some(hold_id.as_str()));
     assert_eq!(events[0].allowed, Some(true));
     assert_eq!(events[0].exposure_units, 100);
-    assert_eq!(events[1].event_id, reconcile_event_id);
+    let capture_event_id = format!("{hold_id}:capture-invocation:{}", events[0].event_seq);
+    assert_eq!(events[1].event_id, capture_event_id);
     assert_eq!(events[1].hold_id.as_deref(), Some(hold_id.as_str()));
-    assert_eq!(events[1].realized_spend_units, 75);
-    assert_eq!(events[1].total_cost_exposed_after, 0);
-    assert_eq!(events[1].total_cost_realized_spend_after, 75);
+    assert_eq!(events[1].kind, BudgetMutationKind::CaptureInvocation);
+    assert_eq!(events[1].invocation_count_after, 1);
+    assert_eq!(events[1].total_cost_exposed_after, 100);
+    assert_eq!(events[2].event_id, reconcile_event_id);
+    assert_eq!(events[2].hold_id.as_deref(), Some(hold_id.as_str()));
+    assert_eq!(events[2].realized_spend_units, 75);
+    assert_eq!(events[2].total_cost_exposed_after, 0);
+    assert_eq!(events[2].total_cost_realized_spend_after, 75);
+    assert_eq!(
+        response.receipt.metadata.as_ref().and_then(|metadata| metadata
+            ["budget_authority"]["invocation_capture"]["event_id"]
+            .as_str()),
+        Some(capture_event_id.as_str())
+    );
 }
 
 #[test]
@@ -1079,7 +1091,219 @@ fn monetary_server_not_reporting_cost_charges_max_cost_per_invocation() {
 }
 
 #[test]
-fn monetary_tool_server_error_releases_precharged_budget() {
+fn captured_monetary_invocation_only_explicit_predispatch_cancel_can_release(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let store = InMemoryBudgetStore::new();
+    let hold_id = "hold-captured-no-effect";
+    let authorized = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+        capability_id: "cap-captured-no-effect".to_string(),
+        grant_index: 0,
+        max_invocations: Some(1),
+        requested_exposure_units: 100,
+        max_cost_per_invocation: Some(100),
+        max_total_cost_units: Some(100),
+        hold_id: Some(hold_id.to_string()),
+        event_id: Some(format!("{hold_id}:authorize")),
+        authority: None,
+    })?;
+    assert!(matches!(
+        authorized,
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+    let capture = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+        capability_id: "cap-captured-no-effect".to_string(),
+        grant_index: 0,
+        hold_id: hold_id.to_string(),
+        event_id: format!("{hold_id}:capture-invocation"),
+        authority: None,
+    })?;
+    assert!(matches!(
+        capture,
+        BudgetInvocationCaptureDecision::Captured(_)
+    ));
+    let different_capture_event =
+        store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            capability_id: "cap-captured-no-effect".to_string(),
+            grant_index: 0,
+            hold_id: hold_id.to_string(),
+            event_id: format!("{hold_id}:different-capture-event"),
+            authority: None,
+        })?;
+    let original_capture = match different_capture_event {
+        BudgetInvocationCaptureDecision::AlreadyCaptured(mutation) => mutation,
+        BudgetInvocationCaptureDecision::Captured(_) => {
+            return Err(std::io::Error::other("different event recaptured invocation").into())
+        }
+    };
+    assert_eq!(
+        original_capture.metadata.event_id.as_deref(),
+        Some(format!("{hold_id}:capture-invocation").as_str())
+    );
+
+    assert!(store
+        .reverse_budget_hold(BudgetReverseHoldRequest {
+            capability_id: "cap-captured-no-effect".to_string(),
+            grant_index: 0,
+            reversed_exposure_units: 100,
+            hold_id: Some(hold_id.to_string()),
+            event_id: Some(format!("{hold_id}:reverse")),
+            authority: None,
+        })
+        .is_err());
+    assert!(store
+        .release_budget_hold(BudgetReleaseHoldRequest {
+            capability_id: "cap-captured-no-effect".to_string(),
+            grant_index: 0,
+            released_exposure_units: 100,
+            hold_id: Some(hold_id.to_string()),
+            event_id: Some(format!("{hold_id}:release")),
+            authority: None,
+        })
+        .is_err());
+    assert!(store
+        .reverse_charge_cost("cap-captured-no-effect", 0, 100)
+        .is_err());
+    assert!(store
+        .reduce_charge_cost("cap-captured-no-effect", 0, 100)
+        .is_err());
+    let retained = store
+        .get_usage("cap-captured-no-effect", 0)?
+        .ok_or_else(|| std::io::Error::other("captured usage missing"))?;
+    assert_eq!(retained.invocation_count, 1);
+    assert_eq!(retained.committed_cost_units()?, 100);
+
+    let cancellation_request = BudgetCancelCapturedBeforeDispatchRequest {
+        capability_id: "cap-captured-no-effect".to_string(),
+        grant_index: 0,
+        hold_id: hold_id.to_string(),
+        event_id: format!("{hold_id}:cancel-captured-before-dispatch"),
+        authority: None,
+    };
+    assert!(matches!(
+        store.cancel_captured_before_dispatch(cancellation_request.clone())?,
+        BudgetCapturedBeforeDispatchCancellationDecision::Cancelled(_)
+    ));
+    assert!(matches!(
+        store.cancel_captured_before_dispatch(cancellation_request)?,
+        BudgetCapturedBeforeDispatchCancellationDecision::AlreadyCancelled(_)
+    ));
+    let cancelled = store
+        .get_usage("cap-captured-no-effect", 0)?
+        .ok_or_else(|| std::io::Error::other("cancelled usage missing"))?;
+    assert_eq!(cancelled.invocation_count, 0);
+    assert_eq!(cancelled.committed_cost_units()?, 0);
+    assert!(store
+        .list_mutation_events(10, Some("cap-captured-no-effect"), Some(0))?
+        .iter()
+        .any(|event| event.kind == BudgetMutationKind::CancelCapturedBeforeDispatch));
+    Ok(())
+}
+
+#[test]
+fn in_memory_capture_replay_preserves_historical_mutation_values(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let store = InMemoryBudgetStore::new();
+    for hold_id in ["hold-capture-history-1", "hold-capture-history-2"] {
+        assert!(matches!(
+            store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+                capability_id: "cap-capture-history".to_string(),
+                grant_index: 0,
+                max_invocations: Some(2),
+                requested_exposure_units: 100,
+                max_cost_per_invocation: Some(100),
+                max_total_cost_units: Some(200),
+                hold_id: Some(hold_id.to_string()),
+                event_id: Some(format!("{hold_id}:authorize")),
+                authority: None,
+            })?,
+            BudgetAuthorizeHoldDecision::Authorized(_)
+        ));
+        if hold_id.ends_with('1') {
+            store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+                capability_id: "cap-capture-history".to_string(),
+                grant_index: 0,
+                hold_id: hold_id.to_string(),
+                event_id: format!("{hold_id}:capture-invocation"),
+                authority: None,
+            })?;
+        }
+    }
+
+    let replay = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+        capability_id: "cap-capture-history".to_string(),
+        grant_index: 0,
+        hold_id: "hold-capture-history-1".to_string(),
+        event_id: "hold-capture-history-1:different-capture".to_string(),
+        authority: None,
+    })?;
+    let BudgetInvocationCaptureDecision::AlreadyCaptured(mutation) = replay else {
+        return Err(std::io::Error::other("capture replay was not recognized").into());
+    };
+    assert_eq!(mutation.invocation_count_after, 1);
+    assert_eq!(mutation.committed_cost_units_after, 100);
+    assert_eq!(
+        mutation.metadata.event_id.as_deref(),
+        Some("hold-capture-history-1:capture-invocation")
+    );
+    Ok(())
+}
+
+#[test]
+fn captured_reconciled_hold_rejects_legacy_reverse_without_hold_id(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let store = InMemoryBudgetStore::new();
+    let hold_id = "hold-captured-reconciled";
+    assert!(matches!(
+        store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+            capability_id: "cap-captured-reconciled".to_string(),
+            grant_index: 0,
+            max_invocations: Some(1),
+            requested_exposure_units: 100,
+            max_cost_per_invocation: Some(100),
+            max_total_cost_units: Some(100),
+            hold_id: Some(hold_id.to_string()),
+            event_id: Some(format!("{hold_id}:authorize")),
+            authority: None,
+        })?,
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+    assert!(matches!(
+        store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            capability_id: "cap-captured-reconciled".to_string(),
+            grant_index: 0,
+            hold_id: hold_id.to_string(),
+            event_id: format!("{hold_id}:capture-invocation"),
+            authority: None,
+        })?,
+        BudgetInvocationCaptureDecision::Captured(_)
+    ));
+    store.reconcile_budget_hold(BudgetReconcileHoldRequest {
+        capability_id: "cap-captured-reconciled".to_string(),
+        grant_index: 0,
+        exposed_cost_units: 100,
+        realized_spend_units: 100,
+        hold_id: Some(hold_id.to_string()),
+        event_id: Some(format!("{hold_id}:reconcile")),
+        authority: None,
+    })?;
+
+    assert!(store
+        .reverse_charge_cost("cap-captured-reconciled", 0, 0)
+        .is_err());
+    assert!(store
+        .reduce_charge_cost("cap-captured-reconciled", 0, 0)
+        .is_err());
+    let usage = store
+        .get_usage("cap-captured-reconciled", 0)?
+        .ok_or_else(|| std::io::Error::other("reconciled usage missing"))?;
+    assert_eq!(usage.invocation_count, 1);
+    assert_eq!(usage.committed_cost_units()?, 100);
+    Ok(())
+}
+
+#[test]
+fn monetary_tool_server_error_retains_precharged_budget(
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_monetary_config());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(FailingMonetaryServer {
@@ -1089,7 +1313,7 @@ fn monetary_tool_server_error_releases_precharged_budget() {
     let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
     let cap = kernel
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
-        .unwrap();
+        ?;
 
     let response = kernel
         .evaluate_tool_call_blocking(&ToolCallRequest {
@@ -1105,18 +1329,16 @@ fn monetary_tool_server_error_releases_precharged_budget() {
             approval_token: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
-        })
-        .unwrap();
+        })?;
 
     assert_eq!(response.verdict, Verdict::Deny);
     let usage = kernel
-
         .budget_store
-        .get_usage(&cap.id, 0)
-        .unwrap()
-        .unwrap();
-    assert_eq!(usage.invocation_count, 0);
-    assert_eq!(usage.committed_cost_units().unwrap(), 0);
+        .get_usage(&cap.id, 0)?
+        .ok_or_else(|| std::io::Error::other("monetary usage missing after tool error"))?;
+    assert_eq!(usage.invocation_count, 1);
+    assert_eq!(usage.committed_cost_units()?, 100);
+    Ok(())
 }
 
 #[test]

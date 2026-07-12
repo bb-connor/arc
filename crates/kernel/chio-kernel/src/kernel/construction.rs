@@ -1559,6 +1559,7 @@ impl ChioKernel {
         let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
         let binding = crate::execution_nonce::NonceBinding {
             subject_id: cap.subject.to_hex(),
+            request_id: request.request_id.clone(),
             capability_id: cap.id.clone(),
             tool_server: request.server_id.clone(),
             tool_name: request.tool_name.clone(),
@@ -1619,6 +1620,15 @@ impl ChioKernel {
         request: &ToolCallRequest,
         cap: &CapabilityToken,
     ) -> Result<(), KernelError> {
+        self.validate_required_execution_nonce(request, cap)?;
+        self.reserve_presented_execution_nonce(request)
+    }
+
+    pub(crate) fn validate_required_execution_nonce(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+    ) -> Result<(), KernelError> {
         let presented = request.execution_nonce.as_ref();
         if !self.execution_nonce_required() && presented.is_none() {
             return Ok(());
@@ -1628,6 +1638,11 @@ impl ChioKernel {
                 "execution nonce required but not presented on tool call".to_string(),
             )
         })?;
+        if self.execution_nonce_store.is_none() {
+            return Err(KernelError::Internal(
+                "execution nonce store is not installed".to_string(),
+            ));
+        }
         let parameter_hash = chio_core::receipt::decision::ToolCallAction::from_parameters(
             request.arguments.clone(),
         )
@@ -1635,12 +1650,33 @@ impl ChioKernel {
         .parameter_hash;
         let expected = crate::execution_nonce::NonceBinding {
             subject_id: cap.subject.to_hex(),
+            request_id: request.request_id.clone(),
             capability_id: cap.id.clone(),
             tool_server: request.server_id.clone(),
             tool_name: request.tool_name.clone(),
             parameter_hash,
         };
-        self.verify_presented_execution_nonce(presented, &expected)
+        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
+        crate::execution_nonce::validate_execution_nonce(
+            presented,
+            &self.config.keypair.public_key(),
+            &expected,
+            now,
+        )
+        .map_err(|e| KernelError::Internal(format!("{e}")))
+    }
+
+    pub(crate) fn reserve_presented_execution_nonce(
+        &self,
+        request: &ToolCallRequest,
+    ) -> Result<(), KernelError> {
+        let Some(presented) = request.execution_nonce.as_ref() else {
+            return Ok(());
+        };
+        let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
+            KernelError::Internal("execution nonce store is not installed".to_string())
+        })?;
+        crate::execution_nonce::reserve_execution_nonce(presented, store)
             .map_err(|e| KernelError::Internal(format!("{e}")))
     }
 

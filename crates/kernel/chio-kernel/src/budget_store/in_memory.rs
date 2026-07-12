@@ -4,11 +4,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::{
     budget_commit_metadata, checked_committed_cost_units, AuthorizedBudgetHold,
-    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureHoldDecision,
-    BudgetCaptureHoldRequest, BudgetEventAuthority, BudgetHoldMutationDecision, BudgetMutationKind,
-    BudgetMutationRecord, BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
-    BudgetReleaseHoldDecision, BudgetReleaseHoldRequest, BudgetReverseHoldDecision,
-    BudgetReverseHoldRequest, BudgetStore, BudgetStoreError, BudgetUsageRecord, DeniedBudgetHold,
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
+    BudgetCancelCapturedBeforeDispatchRequest, BudgetCaptureHoldDecision, BudgetCaptureHoldRequest,
+    BudgetCaptureInvocationRequest, BudgetCapturedBeforeDispatchCancellationDecision,
+    BudgetEventAuthority, BudgetHoldMutationDecision, BudgetInvocationCaptureDecision,
+    BudgetMutationKind, BudgetMutationRecord, BudgetReconcileHoldDecision,
+    BudgetReconcileHoldRequest, BudgetReleaseHoldDecision, BudgetReleaseHoldRequest,
+    BudgetReverseHoldDecision, BudgetReverseHoldRequest, BudgetStore, BudgetStoreError,
+    BudgetUsageRecord, DeniedBudgetHold,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,6 +29,7 @@ struct BudgetHoldState {
     authorized_exposure_units: u64,
     remaining_exposure_units: u64,
     invocation_count_debited: bool,
+    invocation_captured: bool,
     disposition: BudgetHoldDisposition,
     authority: Option<BudgetEventAuthority>,
 }
@@ -41,31 +45,38 @@ enum BudgetMutationRequest {
         capability_id: String,
         grant_index: usize,
         hold_id: Option<String>,
-        authority: Option<BudgetEventAuthority>,
         cost_units: u64,
         max_invocations: Option<u32>,
         max_cost_per_invocation: Option<u64>,
         max_total_cost_units: Option<u64>,
     },
+    CaptureInvocation {
+        capability_id: String,
+        grant_index: usize,
+        hold_id: String,
+    },
+    CancelCapturedBeforeDispatch {
+        capability_id: String,
+        grant_index: usize,
+        hold_id: String,
+        cost_units: u64,
+    },
     Reverse {
         capability_id: String,
         grant_index: usize,
         hold_id: Option<String>,
-        authority: Option<BudgetEventAuthority>,
         cost_units: u64,
     },
     Release {
         capability_id: String,
         grant_index: usize,
         hold_id: Option<String>,
-        authority: Option<BudgetEventAuthority>,
         cost_units: u64,
     },
     Reconcile {
         capability_id: String,
         grant_index: usize,
         hold_id: Option<String>,
-        authority: Option<BudgetEventAuthority>,
         exposed_cost_units: u64,
         realized_cost_units: u64,
     },
@@ -98,6 +109,42 @@ impl InMemoryBudgetStore {
         self.inner.lock().map_err(|_| {
             BudgetStoreError::Invariant("in-memory budget store lock poisoned".to_string())
         })
+    }
+
+    fn recorded_mutation_decision(
+        &self,
+        inner: &InMemoryBudgetStoreInner,
+        event_id: Option<&str>,
+    ) -> Result<Option<BudgetHoldMutationDecision>, BudgetStoreError> {
+        let Some(event_id) = event_id else {
+            return Ok(None);
+        };
+        let event = inner
+            .events
+            .iter()
+            .find(|event| event.event_id == event_id)
+            .cloned()
+            .ok_or_else(|| {
+                BudgetStoreError::Invariant(
+                    "mutation event disappeared while building decision".to_string(),
+                )
+            })?;
+        Ok(Some(BudgetHoldMutationDecision {
+            hold_id: event.hold_id,
+            exposure_units: event.exposure_units,
+            realized_spend_units: event.realized_spend_units,
+            committed_cost_units_after: checked_committed_cost_units(
+                event.total_cost_exposed_after,
+                event.total_cost_realized_spend_after,
+            )?,
+            invocation_count_after: event.invocation_count_after,
+            metadata: budget_commit_metadata(
+                self,
+                event.authority,
+                Some(event.event_seq),
+                Some(event.event_id),
+            ),
+        }))
     }
 }
 
@@ -355,14 +402,68 @@ impl InMemoryBudgetStoreInner {
             capability_id: capability_id.to_string(),
             grant_index,
             hold_id: hold_id.map(ToOwned::to_owned),
-            authority: authority.cloned(),
             cost_units,
             max_invocations,
             max_cost_per_invocation,
             max_total_cost_units,
         };
         if let Some(existing) = self.duplicate_mutation(event_id, &request)? {
-            return Ok(existing.record.allowed.unwrap_or(false));
+            let invocation_captured = hold_id
+                .and_then(|hold_id| self.holds.get(hold_id))
+                .is_some_and(|hold| hold.invocation_captured);
+            if invocation_captured && existing.record.allowed == Some(true) {
+                return Ok(false);
+            }
+            let retry_follows_rollback = event_id.is_some_and(|event_id| {
+                let rollback_event_id =
+                    format!("{event_id}:rollback:{}", existing.record.event_seq);
+                self.events.iter().any(|event| {
+                    event.event_id == rollback_event_id
+                        && matches!(
+                            event.kind,
+                            BudgetMutationKind::ReverseExposure
+                                | BudgetMutationKind::CancelCapturedBeforeDispatch
+                        )
+                        && event.hold_id.as_deref() == hold_id
+                        && event.capability_id == capability_id
+                        && event.grant_index == grant_index as u32
+                        && match event.kind {
+                            BudgetMutationKind::ReverseExposure => event.allowed.is_none(),
+                            BudgetMutationKind::CancelCapturedBeforeDispatch => {
+                                event.allowed == Some(true)
+                            }
+                            _ => false,
+                        }
+                        && event.exposure_units == cost_units
+                        && event.realized_spend_units == 0
+                        && event.event_seq > existing.record.event_seq
+                        && event.authority == existing.record.authority
+                })
+            });
+            let reversed_matching_hold = hold_id
+                .and_then(|hold_id| self.holds.get(hold_id))
+                .is_some_and(|hold| {
+                    hold.capability_id == capability_id
+                        && hold.grant_index == grant_index
+                        && hold.authorized_exposure_units == cost_units
+                        && hold.invocation_count_debited
+                        && !hold.invocation_captured
+                        && hold.disposition == BudgetHoldDisposition::Reversed
+                });
+            if existing.record.allowed == Some(true)
+                && retry_follows_rollback
+                && reversed_matching_hold
+            {
+                if let Some(event_id) = event_id {
+                    self.explicit_events.remove(event_id);
+                    self.events.retain(|event| event.event_id != event_id);
+                }
+                if let Some(hold_id) = hold_id {
+                    self.holds.remove(hold_id);
+                }
+            } else {
+                return Ok(existing.record.allowed.unwrap_or(false));
+            }
         }
 
         let key = (capability_id.to_string(), grant_index);
@@ -438,6 +539,7 @@ impl InMemoryBudgetStoreInner {
                         authorized_exposure_units: cost_units,
                         remaining_exposure_units: cost_units,
                         invocation_count_debited: true,
+                        invocation_captured: false,
                         disposition: BudgetHoldDisposition::Open,
                         authority: authority.cloned(),
                     },
@@ -483,6 +585,117 @@ impl InMemoryBudgetStoreInner {
         Ok(allowed)
     }
 
+    fn capture_invocation_reservations(
+        &mut self,
+        request: &BudgetCaptureInvocationRequest,
+    ) -> Result<(bool, u64, String, BudgetUsageRecord), BudgetStoreError> {
+        let mutation = BudgetMutationRequest::CaptureInvocation {
+            capability_id: request.capability_id.clone(),
+            grant_index: request.grant_index,
+            hold_id: request.hold_id.clone(),
+        };
+        if let Some(existing) = self.duplicate_mutation(Some(&request.event_id), &mutation)? {
+            return Ok((
+                false,
+                existing.record.event_seq,
+                existing.record.event_id,
+                BudgetUsageRecord {
+                    capability_id: existing.record.capability_id,
+                    grant_index: existing.record.grant_index,
+                    invocation_count: existing.record.invocation_count_after,
+                    updated_at: existing.record.recorded_at,
+                    seq: existing.record.usage_seq.unwrap_or(0),
+                    total_cost_exposed: existing.record.total_cost_exposed_after,
+                    total_cost_realized_spend: existing.record.total_cost_realized_spend_after,
+                },
+            ));
+        }
+
+        let hold = self.validate_open_hold(
+            &request.hold_id,
+            &request.capability_id,
+            request.grant_index,
+        )?;
+        Self::validate_hold_authority(
+            &request.hold_id,
+            hold.authority.as_ref(),
+            request.authority.as_ref(),
+        )?;
+        if hold.invocation_captured {
+            let latest_authorize_seq = self
+                .events
+                .iter()
+                .rev()
+                .find(|event| {
+                    event.hold_id.as_deref() == Some(request.hold_id.as_str())
+                        && event.kind == BudgetMutationKind::AuthorizeExposure
+                })
+                .map_or(0, |event| event.event_seq);
+            let existing = self
+                .events
+                .iter()
+                .rev()
+                .find(|event| {
+                    event.hold_id.as_deref() == Some(request.hold_id.as_str())
+                        && event.kind == BudgetMutationKind::CaptureInvocation
+                        && event.event_seq > latest_authorize_seq
+                })
+                .cloned()
+                .ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "captured invocation is missing its mutation event".to_string(),
+                    )
+                })?;
+            let usage = BudgetUsageRecord {
+                capability_id: existing.capability_id.clone(),
+                grant_index: existing.grant_index,
+                invocation_count: existing.invocation_count_after,
+                updated_at: existing.recorded_at,
+                seq: existing.usage_seq.unwrap_or(0),
+                total_cost_exposed: existing.total_cost_exposed_after,
+                total_cost_realized_spend: existing.total_cost_realized_spend_after,
+            };
+            return Ok((false, existing.event_seq, existing.event_id, usage));
+        }
+
+        let key = (request.capability_id.clone(), request.grant_index);
+        let usage =
+            self.counts.get(&key).cloned().ok_or_else(|| {
+                BudgetStoreError::Invariant("missing charged budget row".to_string())
+            })?;
+        let event_seq = self.next_seq.saturating_add(1);
+        self.next_seq = event_seq;
+        let hold = self.holds.get_mut(&request.hold_id).ok_or_else(|| {
+            BudgetStoreError::Invariant("validated budget hold missing".to_string())
+        })?;
+        hold.invocation_captured = true;
+        self.append_mutation(
+            Some(&request.event_id),
+            mutation,
+            BudgetMutationRecord {
+                event_id: String::new(),
+                hold_id: Some(request.hold_id.clone()),
+                capability_id: request.capability_id.clone(),
+                grant_index: request.grant_index as u32,
+                kind: BudgetMutationKind::CaptureInvocation,
+                allowed: Some(true),
+                recorded_at: unix_now(),
+                event_seq,
+                usage_seq: Some(usage.seq),
+                exposure_units: 0,
+                realized_spend_units: 0,
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost_units: None,
+                invocation_count_after: usage.invocation_count,
+                total_cost_exposed_after: usage.total_cost_exposed,
+                total_cost_realized_spend_after: usage.total_cost_realized_spend,
+                authority: request.authority.clone(),
+            },
+        );
+        Ok((true, event_seq, request.event_id.clone(), usage))
+    }
+
     fn reverse_charge_cost(
         &mut self,
         capability_id: &str,
@@ -523,11 +736,49 @@ impl InMemoryBudgetStoreInner {
             capability_id: capability_id.to_string(),
             grant_index,
             hold_id: hold_id.map(ToOwned::to_owned),
-            authority: authority.cloned(),
             cost_units,
         };
-        if self.duplicate_mutation(event_id, &request)?.is_some() {
-            return Ok(());
+        self.reverse_charge_cost_with_mutation(
+            capability_id,
+            grant_index,
+            cost_units,
+            hold_id,
+            event_id,
+            authority,
+            request,
+            BudgetMutationKind::ReverseExposure,
+            false,
+        )?;
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn reverse_charge_cost_with_mutation(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&BudgetEventAuthority>,
+        request: BudgetMutationRequest,
+        kind: BudgetMutationKind,
+        cancels_captured_before_dispatch: bool,
+    ) -> Result<(bool, u64, BudgetUsageRecord), BudgetStoreError> {
+        if let Some(existing) = self.duplicate_mutation(event_id, &request)? {
+            return Ok((
+                false,
+                existing.record.event_seq,
+                BudgetUsageRecord {
+                    capability_id: existing.record.capability_id,
+                    grant_index: existing.record.grant_index,
+                    invocation_count: existing.record.invocation_count_after,
+                    updated_at: existing.record.recorded_at,
+                    seq: existing.record.usage_seq.unwrap_or(0),
+                    total_cost_exposed: existing.record.total_cost_exposed_after,
+                    total_cost_realized_spend: existing.record.total_cost_realized_spend_after,
+                },
+            ));
         }
         if let Some(hold_id) = hold_id {
             let hold = self.validate_open_hold(hold_id, capability_id, grant_index)?;
@@ -536,7 +787,27 @@ impl InMemoryBudgetStoreInner {
                     "budget hold `{hold_id}` does not match reverse amount"
                 )));
             }
+            if hold.invocation_captured != cancels_captured_before_dispatch {
+                let action = if cancels_captured_before_dispatch {
+                    "cancel an uncaptured"
+                } else {
+                    "reverse a captured"
+                };
+                return Err(BudgetStoreError::Invariant(format!(
+                    "cannot {action} budget hold `{hold_id}`"
+                )));
+            }
             Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
+        } else if !cancels_captured_before_dispatch
+            && self.holds.values().any(|hold| {
+                hold.capability_id == capability_id
+                    && hold.grant_index == grant_index
+                    && hold.invocation_captured
+            })
+        {
+            return Err(BudgetStoreError::Invariant(
+                "cannot reverse exposure while a captured budget hold is open".to_string(),
+            ));
         }
 
         let key = (capability_id.to_string(), grant_index);
@@ -578,6 +849,9 @@ impl InMemoryBudgetStoreInner {
                 ));
             };
             hold.remaining_exposure_units = 0;
+            if cancels_captured_before_dispatch {
+                hold.invocation_captured = false;
+            }
             hold.disposition = BudgetHoldDisposition::Reversed;
             hold.authority = authority.cloned().or_else(|| hold.authority.clone());
         }
@@ -589,8 +863,8 @@ impl InMemoryBudgetStoreInner {
                 hold_id: hold_id.map(ToOwned::to_owned),
                 capability_id: capability_id.to_string(),
                 grant_index: grant_index as u32,
-                kind: BudgetMutationKind::ReverseExposure,
-                allowed: None,
+                kind,
+                allowed: cancels_captured_before_dispatch.then_some(true),
                 recorded_at: unix_now(),
                 event_seq: seq,
                 usage_seq: Some(seq),
@@ -605,7 +879,48 @@ impl InMemoryBudgetStoreInner {
                 authority: authority.cloned(),
             },
         );
-        Ok(())
+        Ok((
+            true,
+            seq,
+            BudgetUsageRecord {
+                capability_id: capability_id.to_string(),
+                grant_index: grant_index as u32,
+                invocation_count: invocation_count_after,
+                updated_at: unix_now(),
+                seq,
+                total_cost_exposed: total_cost_exposed_after,
+                total_cost_realized_spend: total_cost_realized_spend_after,
+            },
+        ))
+    }
+
+    fn cancel_captured_before_dispatch(
+        &mut self,
+        request: &BudgetCancelCapturedBeforeDispatchRequest,
+    ) -> Result<(bool, u64, BudgetUsageRecord), BudgetStoreError> {
+        let cost_units = self
+            .holds
+            .get(&request.hold_id)
+            .ok_or_else(|| {
+                BudgetStoreError::Invariant(format!("unknown budget hold `{}`", request.hold_id))
+            })?
+            .authorized_exposure_units;
+        self.reverse_charge_cost_with_mutation(
+            &request.capability_id,
+            request.grant_index,
+            cost_units,
+            Some(&request.hold_id),
+            Some(&request.event_id),
+            request.authority.as_ref(),
+            BudgetMutationRequest::CancelCapturedBeforeDispatch {
+                capability_id: request.capability_id.clone(),
+                grant_index: request.grant_index,
+                hold_id: request.hold_id.clone(),
+                cost_units,
+            },
+            BudgetMutationKind::CancelCapturedBeforeDispatch,
+            true,
+        )
     }
 
     fn reduce_charge_cost(
@@ -648,7 +963,6 @@ impl InMemoryBudgetStoreInner {
             capability_id: capability_id.to_string(),
             grant_index,
             hold_id: hold_id.map(ToOwned::to_owned),
-            authority: authority.cloned(),
             cost_units,
         };
         if self.duplicate_mutation(event_id, &request)?.is_some() {
@@ -661,7 +975,20 @@ impl InMemoryBudgetStoreInner {
                     "budget hold `{hold_id}` cannot release more than remaining exposure"
                 )));
             }
+            if hold.invocation_captured {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "cannot release captured budget hold `{hold_id}`"
+                )));
+            }
             Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
+        } else if self.holds.values().any(|hold| {
+            hold.capability_id == capability_id
+                && hold.grant_index == grant_index
+                && hold.invocation_captured
+        }) {
+            return Err(BudgetStoreError::Invariant(
+                "cannot release exposure while a captured budget hold is open".to_string(),
+            ));
         }
 
         let key = (capability_id.to_string(), grant_index);
@@ -788,7 +1115,6 @@ impl InMemoryBudgetStoreInner {
             capability_id: capability_id.to_string(),
             grant_index,
             hold_id: hold_id.map(ToOwned::to_owned),
-            authority: authority.cloned(),
             exposed_cost_units,
             realized_cost_units,
         };
@@ -945,6 +1271,91 @@ impl BudgetStore for InMemoryBudgetStore {
     ) -> Result<bool, BudgetStoreError> {
         self.lock_inner()?
             .try_increment(capability_id, grant_index, max_invocations)
+    }
+
+    fn capture_invocation_reservations(
+        &self,
+        request: BudgetCaptureInvocationRequest,
+    ) -> Result<BudgetInvocationCaptureDecision, BudgetStoreError> {
+        let mut inner = self.lock_inner()?;
+        let (captured, _event_seq, event_id, _usage) =
+            inner.capture_invocation_reservations(&request)?;
+        let event = inner
+            .events
+            .iter()
+            .find(|event| event.event_id == event_id)
+            .cloned()
+            .ok_or_else(|| {
+                BudgetStoreError::Invariant(
+                    "capture event disappeared while building decision".to_string(),
+                )
+            })?;
+        let mutation = BudgetHoldMutationDecision {
+            hold_id: event.hold_id,
+            exposure_units: event.exposure_units,
+            realized_spend_units: event.realized_spend_units,
+            committed_cost_units_after: checked_committed_cost_units(
+                event.total_cost_exposed_after,
+                event.total_cost_realized_spend_after,
+            )?,
+            invocation_count_after: event.invocation_count_after,
+            metadata: budget_commit_metadata(
+                self,
+                event.authority,
+                Some(event.event_seq),
+                Some(event.event_id),
+            ),
+        };
+        Ok(if captured {
+            BudgetInvocationCaptureDecision::Captured(mutation)
+        } else {
+            BudgetInvocationCaptureDecision::AlreadyCaptured(mutation)
+        })
+    }
+
+    fn cancel_captured_before_dispatch(
+        &self,
+        request: BudgetCancelCapturedBeforeDispatchRequest,
+    ) -> Result<BudgetCapturedBeforeDispatchCancellationDecision, BudgetStoreError> {
+        let hold_id = request.hold_id.clone();
+        let mut inner = self.lock_inner()?;
+        let exposure_units = inner
+            .holds
+            .get(&hold_id)
+            .ok_or_else(|| BudgetStoreError::Invariant(format!("unknown budget hold `{hold_id}`")))?
+            .authorized_exposure_units;
+        let (cancelled, _event_seq, _usage) = inner.cancel_captured_before_dispatch(&request)?;
+        let event = inner
+            .events
+            .iter()
+            .find(|event| event.event_id == request.event_id)
+            .cloned()
+            .ok_or_else(|| {
+                BudgetStoreError::Invariant(
+                    "cancellation event disappeared while building decision".to_string(),
+                )
+            })?;
+        let mutation = BudgetHoldMutationDecision {
+            hold_id: Some(hold_id),
+            exposure_units,
+            realized_spend_units: event.realized_spend_units,
+            committed_cost_units_after: checked_committed_cost_units(
+                event.total_cost_exposed_after,
+                event.total_cost_realized_spend_after,
+            )?,
+            invocation_count_after: event.invocation_count_after,
+            metadata: budget_commit_metadata(
+                self,
+                event.authority,
+                Some(event.event_seq),
+                Some(event.event_id),
+            ),
+        };
+        Ok(if cancelled {
+            BudgetCapturedBeforeDispatchCancellationDecision::Cancelled(mutation)
+        } else {
+            BudgetCapturedBeforeDispatchCancellationDecision::AlreadyCancelled(mutation)
+        })
     }
 
     fn try_charge_cost(
@@ -1210,6 +1621,98 @@ impl BudgetStore for InMemoryBudgetStore {
             request.authority.as_ref(),
         )?;
         let usage = inner.get_usage(&request.capability_id, request.grant_index)?;
+        let authorize_event = request
+            .event_id
+            .as_deref()
+            .and_then(|event_id| inner.explicit_events.get(event_id))
+            .map(|recorded| recorded.record.clone());
+        let captured_event = if allowed {
+            None
+        } else {
+            request.hold_id.as_deref().and_then(|hold_id| {
+                inner
+                    .holds
+                    .get(hold_id)
+                    .and_then(|hold| {
+                        hold.invocation_captured
+                            .then_some(hold.authorized_exposure_units)
+                    })
+                    .and_then(|authorized_exposure_units| {
+                        let latest_authorize_seq = inner
+                            .events
+                            .iter()
+                            .rev()
+                            .find(|event| {
+                                event.hold_id.as_deref() == Some(hold_id)
+                                    && event.kind == BudgetMutationKind::AuthorizeExposure
+                            })
+                            .map_or(0, |event| event.event_seq);
+                        inner
+                            .events
+                            .iter()
+                            .rev()
+                            .find(|event| {
+                                event.hold_id.as_deref() == Some(hold_id)
+                                    && event.kind == BudgetMutationKind::CaptureInvocation
+                                    && event.event_seq > latest_authorize_seq
+                            })
+                            .cloned()
+                            .map(|event| (event, authorized_exposure_units))
+                    })
+            })
+        };
+        if let Some((capture, authorized_exposure_units)) = captured_event {
+            return Ok(BudgetAuthorizeHoldDecision::AlreadyCaptured(
+                BudgetHoldMutationDecision {
+                    hold_id: capture.hold_id,
+                    exposure_units: authorized_exposure_units,
+                    realized_spend_units: capture.realized_spend_units,
+                    committed_cost_units_after: checked_committed_cost_units(
+                        capture.total_cost_exposed_after,
+                        capture.total_cost_realized_spend_after,
+                    )?,
+                    invocation_count_after: capture.invocation_count_after,
+                    metadata: budget_commit_metadata(
+                        self,
+                        capture.authority,
+                        Some(capture.event_seq),
+                        Some(capture.event_id),
+                    ),
+                },
+            ));
+        }
+        if let Some(event) = authorize_event {
+            let committed_cost_units_after = checked_committed_cost_units(
+                event.total_cost_exposed_after,
+                event.total_cost_realized_spend_after,
+            )?;
+            let metadata = budget_commit_metadata(
+                self,
+                event.authority,
+                event
+                    .allowed
+                    .and_then(|allowed| allowed.then_some(event.event_seq)),
+                Some(event.event_id),
+            );
+            if event.allowed == Some(true) {
+                return Ok(BudgetAuthorizeHoldDecision::Authorized(
+                    AuthorizedBudgetHold {
+                        hold_id: event.hold_id,
+                        authorized_exposure_units: event.exposure_units,
+                        committed_cost_units_after,
+                        invocation_count_after: event.invocation_count_after,
+                        metadata,
+                    },
+                ));
+            }
+            return Ok(BudgetAuthorizeHoldDecision::Denied(DeniedBudgetHold {
+                hold_id: event.hold_id,
+                attempted_exposure_units: event.exposure_units,
+                committed_cost_units_after,
+                invocation_count_after: event.invocation_count_after,
+                metadata,
+            }));
+        }
         let committed_cost_units_after = usage
             .as_ref()
             .map(BudgetUsageRecord::committed_cost_units)
@@ -1259,6 +1762,11 @@ impl BudgetStore for InMemoryBudgetStore {
             request.event_id.as_deref(),
             request.authority.as_ref(),
         )?;
+        if let Some(decision) =
+            self.recorded_mutation_decision(&inner, request.event_id.as_deref())?
+        {
+            return Ok(decision);
+        }
         let usage = inner.get_usage(&request.capability_id, request.grant_index)?;
         Ok(BudgetHoldMutationDecision {
             hold_id: request.hold_id,
@@ -1292,6 +1800,11 @@ impl BudgetStore for InMemoryBudgetStore {
             request.event_id.as_deref(),
             request.authority.as_ref(),
         )?;
+        if let Some(decision) =
+            self.recorded_mutation_decision(&inner, request.event_id.as_deref())?
+        {
+            return Ok(decision);
+        }
         let usage = inner.get_usage(&request.capability_id, request.grant_index)?;
         Ok(BudgetHoldMutationDecision {
             hold_id: request.hold_id,
@@ -1326,6 +1839,11 @@ impl BudgetStore for InMemoryBudgetStore {
             request.event_id.as_deref(),
             request.authority.as_ref(),
         )?;
+        if let Some(decision) =
+            self.recorded_mutation_decision(&inner, request.event_id.as_deref())?
+        {
+            return Ok(decision);
+        }
         let usage = inner.get_usage(&request.capability_id, request.grant_index)?;
         Ok(BudgetHoldMutationDecision {
             hold_id: request.hold_id,

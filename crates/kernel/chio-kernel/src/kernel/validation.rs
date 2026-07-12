@@ -9,9 +9,11 @@ use chio_log_redact::redacted;
 use self::responses::FinalizeToolOutputCostContext;
 use super::*;
 use crate::budget_store::{
-    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetEventAuthority,
-    BudgetHoldMutationDecision, BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
-    BudgetReverseHoldDecision, BudgetReverseHoldRequest,
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
+    BudgetCancelCapturedBeforeDispatchRequest, BudgetCaptureInvocationRequest,
+    BudgetCapturedBeforeDispatchCancellationDecision, BudgetEventAuthority,
+    BudgetHoldMutationDecision, BudgetInvocationCaptureDecision, BudgetReconcileHoldDecision,
+    BudgetReconcileHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest,
 };
 
 impl ChioKernel {
@@ -768,6 +770,27 @@ impl ChioKernel {
             serde_json::Value::Object(authorize),
         );
 
+        if let Some(capture) = charge.invocation_capture.as_ref() {
+            let mut invocation_capture = serde_json::Map::new();
+            if let Some(event_id) = capture.metadata.event_id.as_ref() {
+                invocation_capture.insert("event_id".to_string(), serde_json::json!(event_id));
+            }
+            if let Some(commit_index) = capture.metadata.budget_commit_index {
+                invocation_capture.insert(
+                    "budget_commit_index".to_string(),
+                    serde_json::json!(commit_index),
+                );
+            }
+            invocation_capture.insert(
+                "invocation_count_after".to_string(),
+                serde_json::json!(capture.invocation_count_after),
+            );
+            budget_authority.insert(
+                "invocation_capture".to_string(),
+                serde_json::Value::Object(invocation_capture),
+            );
+        }
+
         if let Some((disposition, terminal_event)) = terminal_event {
             let mut terminal = serde_json::Map::new();
             terminal.insert("disposition".to_string(), serde_json::json!(disposition));
@@ -804,6 +827,121 @@ impl ChioKernel {
         budget_metadata: serde_json::Value,
     ) -> Option<serde_json::Value> {
         merge_metadata_objects(extra_metadata, Some(budget_metadata))
+    }
+
+    pub(crate) fn retained_admission_receipt_metadata(
+        &self,
+        budget_mutation: &PreExecutionBudgetMutation,
+        runtime_metadata: Option<serde_json::Value>,
+    ) -> Option<serde_json::Value> {
+        let retained =
+            self.mark_runtime_admission_reservations_retained_fail_closed(runtime_metadata);
+        match budget_mutation.charge_result() {
+            Some(charge) => self.merge_budget_receipt_metadata(
+                retained,
+                self.budget_execution_receipt_metadata(charge, None),
+            ),
+            None => retained,
+        }
+    }
+
+    pub(crate) fn ambiguous_invocation_capture_receipt_metadata(
+        &self,
+        budget_mutation: &PreExecutionBudgetMutation,
+        runtime_metadata: Option<serde_json::Value>,
+    ) -> Option<serde_json::Value> {
+        let retained =
+            self.mark_runtime_admission_reservations_retained_fail_closed(runtime_metadata);
+        let Some(charge) = budget_mutation.charge_result() else {
+            return retained;
+        };
+        let mut budget_metadata = self.budget_execution_receipt_metadata(charge, None);
+        if let Some(budget_authority) = budget_metadata
+            .get_mut("budget_authority")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            budget_authority.insert(
+                "invocation_capture".to_string(),
+                serde_json::json!({
+                    "event_id": charge.capture_invocation_event_id(),
+                    "invocation_capture_ambiguous": true,
+                    "admission_retained": true,
+                }),
+            );
+        }
+        self.merge_budget_receipt_metadata(retained, budget_metadata)
+    }
+
+    pub(crate) fn ambiguous_cancellation_receipt_metadata(
+        &self,
+        charge: &BudgetChargeResult,
+        runtime_metadata: Option<serde_json::Value>,
+    ) -> Option<serde_json::Value> {
+        let mut budget_metadata = self.budget_execution_receipt_metadata(charge, None);
+        if let Some(budget_authority) = budget_metadata
+            .get_mut("budget_authority")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            if let Some(capture) = budget_authority
+                .get_mut("invocation_capture")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                capture.insert(
+                    "admission_retained".to_string(),
+                    serde_json::Value::Bool(true),
+                );
+            }
+            budget_authority.insert(
+                "cancel_captured_before_dispatch".to_string(),
+                serde_json::json!({
+                    "event_id": charge.cancel_captured_before_dispatch_event_id(),
+                    "cancellation_ambiguous": true,
+                    "pre_dispatch_admission_release_attempted": true,
+                }),
+            );
+        }
+        self.merge_budget_receipt_metadata(runtime_metadata, budget_metadata)
+    }
+
+    pub(crate) fn captured_admission_retained_receipt_metadata(
+        &self,
+        charge: &BudgetChargeResult,
+        runtime_metadata: Option<serde_json::Value>,
+    ) -> Option<serde_json::Value> {
+        let mut budget_metadata = self.budget_execution_receipt_metadata(charge, None);
+        if let Some(capture) = budget_metadata
+            .get_mut("budget_authority")
+            .and_then(serde_json::Value::as_object_mut)
+            .and_then(|authority| authority.get_mut("invocation_capture"))
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            capture.insert(
+                "admission_retained".to_string(),
+                serde_json::Value::Bool(true),
+            );
+        }
+        self.merge_budget_receipt_metadata(runtime_metadata, budget_metadata)
+    }
+
+    pub(crate) fn ambiguous_dispatch_receipt_metadata(
+        &self,
+        budget_mutation: &PreExecutionBudgetMutation,
+        payment_authorization: Option<&PaymentAuthorization>,
+        runtime_metadata: Option<serde_json::Value>,
+    ) -> Option<serde_json::Value> {
+        let retained = self.retained_admission_receipt_metadata(budget_mutation, runtime_metadata);
+        match payment_authorization {
+            Some(authorization) => merge_metadata_objects(
+                retained,
+                Some(serde_json::json!({
+                    "financial": {
+                        "payment_reference": authorization.authorization_id,
+                        "payment_authorization_retained": true
+                    }
+                })),
+            ),
+            None => retained,
+        }
     }
 
     /// Check and decrement the invocation budget for a capability.
@@ -868,11 +1006,15 @@ impl ChioKernel {
                                 .hold_id
                                 .unwrap_or_else(|| budget_hold_id.clone()),
                             authorize_metadata: authorized.metadata,
+                            invocation_capture: None,
                         };
                         return Ok((matching.index, PreExecutionBudgetMutation::Charge(charge)));
                     }
                     BudgetAuthorizeHoldDecision::Denied(_) => {
                         saw_exhausted_budget = true;
+                    }
+                    BudgetAuthorizeHoldDecision::AlreadyCaptured(_) => {
+                        return Err(KernelError::BudgetExhausted(cap.id.clone()));
                     }
                 }
             } else {
@@ -918,6 +1060,61 @@ impl ChioKernel {
                 event_id: Some(charge.reverse_event_id()),
                 authority,
             })?)
+        })
+    }
+
+    pub(crate) fn capture_monetary_invocation(
+        &self,
+        cap: &CapabilityToken,
+        budget_mutation: &mut PreExecutionBudgetMutation,
+    ) -> Result<BudgetInvocationCaptureDecision, KernelError> {
+        let charge = budget_mutation.charge_result_mut().ok_or_else(|| {
+            KernelError::Internal(
+                "monetary invocation capture requires an authorized budget hold".to_string(),
+            )
+        })?;
+        let authority = charge.authorize_metadata.authority.clone();
+        let decision = self.with_budget_store(|store| {
+            Ok(
+                store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+                    capability_id: cap.id.clone(),
+                    grant_index: charge.grant_index,
+                    hold_id: charge.budget_hold_id.clone(),
+                    event_id: charge.capture_invocation_event_id(),
+                    authority,
+                })?,
+            )
+        })?;
+        let capture = match &decision {
+            BudgetInvocationCaptureDecision::Captured(capture)
+            | BudgetInvocationCaptureDecision::AlreadyCaptured(capture) => capture,
+        };
+        charge.invocation_capture = Some(Box::new(capture.clone()));
+        Ok(decision)
+    }
+
+    pub(crate) fn cancel_captured_monetary_before_dispatch(
+        &self,
+        capability_id: &str,
+        charge: &BudgetChargeResult,
+    ) -> Result<BudgetHoldMutationDecision, KernelError> {
+        let authority = charge.authorize_metadata.authority.clone();
+        let decision = self.with_budget_store(|store| {
+            Ok(store.cancel_captured_before_dispatch(
+                BudgetCancelCapturedBeforeDispatchRequest {
+                    capability_id: capability_id.to_string(),
+                    grant_index: charge.grant_index,
+                    hold_id: charge.budget_hold_id.clone(),
+                    event_id: charge.cancel_captured_before_dispatch_event_id(),
+                    authority,
+                },
+            )?)
+        })?;
+        Ok(match decision {
+            BudgetCapturedBeforeDispatchCancellationDecision::Cancelled(mutation)
+            | BudgetCapturedBeforeDispatchCancellationDecision::AlreadyCancelled(mutation) => {
+                mutation
+            }
         })
     }
 

@@ -77,6 +77,24 @@ impl TrustControlClient {
         self.reverse_charge_cost_with_ids(capability_id, grant_index, cost_units, None, None)
     }
 
+    pub(crate) fn capture_invocation_reservations(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        hold_id: &str,
+        event_id: &str,
+    ) -> Result<CaptureInvocationResponse, CliError> {
+        self.post_json(
+            BUDGET_CAPTURE_INVOCATION_PATH,
+            &CaptureInvocationRequest {
+                capability_id: capability_id.to_string(),
+                grant_index,
+                hold_id: hold_id.to_string(),
+                event_id: event_id.to_string(),
+            },
+        )
+    }
+
     pub(crate) fn reverse_charge_cost_with_ids(
         &self,
         capability_id: &str,

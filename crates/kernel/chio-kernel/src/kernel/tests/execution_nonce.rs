@@ -41,6 +41,7 @@ fn binding_for_request(cap: &CapabilityToken, request: &ToolCallRequest) -> Nonc
     .parameter_hash;
     NonceBinding {
         subject_id: cap.subject.to_hex(),
+        request_id: request.request_id.clone(),
         capability_id: cap.id.clone(),
         tool_server: request.server_id.clone(),
         tool_name: request.tool_name.clone(),
@@ -55,7 +56,12 @@ fn mint_nonce_for_request(
     cfg: &ExecutionNonceConfig,
 ) -> crate::execution_nonce::SignedExecutionNonce {
     let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-    mint_execution_nonce(&kernel.config.keypair, binding_for_request(cap, request), cfg, now)
+    mint_execution_nonce(
+        &kernel.config.keypair,
+        binding_for_request(cap, request),
+        cfg,
+        now,
+    )
         .unwrap()
 }
 
@@ -71,13 +77,7 @@ fn allow_verdict_carries_signed_execution_nonce_and_verifies() {
         .execution_nonce
         .expect("allow verdict must carry an execution nonce");
 
-    let expected = NonceBinding {
-        subject_id: cap.subject.to_hex(),
-        capability_id: cap.id.clone(),
-        tool_server: request.server_id.clone(),
-        tool_name: request.tool_name.clone(),
-        parameter_hash: response.receipt.action.parameter_hash.clone(),
-    };
+    let expected = binding_for_request(&cap, &request);
     kernel
         .verify_presented_execution_nonce(&signed, &expected)
         .unwrap();
@@ -94,6 +94,7 @@ fn stale_nonce_is_rejected_after_ttl() {
     let kp = Keypair::generate();
     let binding = NonceBinding {
         subject_id: "s".into(),
+        request_id: "request-stale".into(),
         capability_id: "c".into(),
         tool_server: "t".into(),
         tool_name: "n".into(),
@@ -125,13 +126,7 @@ fn replayed_nonce_is_rejected_by_store() {
     let signed = response
         .execution_nonce
         .expect("allow verdict must carry an execution nonce");
-    let expected = NonceBinding {
-        subject_id: cap.subject.to_hex(),
-        capability_id: cap.id.clone(),
-        tool_server: request.server_id.clone(),
-        tool_name: request.tool_name.clone(),
-        parameter_hash: response.receipt.action.parameter_hash.clone(),
-    };
+    let expected = binding_for_request(&cap, &request);
 
     // First verification consumes the nonce.
     kernel
@@ -159,13 +154,8 @@ fn mismatched_binding_is_rejected() {
 
     // Corrupt the expected tool name -- the kernel was bound to read_file
     // but the caller claims write_file.
-    let expected = NonceBinding {
-        subject_id: cap.subject.to_hex(),
-        capability_id: cap.id.clone(),
-        tool_server: request.server_id.clone(),
-        tool_name: "write_file".to_string(),
-        parameter_hash: response.receipt.action.parameter_hash.clone(),
-    };
+    let mut expected = binding_for_request(&cap, &request);
+    expected.tool_name = "write_file".to_string();
     let err = kernel
         .verify_presented_execution_nonce(&signed, &expected)
         .unwrap_err();
@@ -186,6 +176,7 @@ fn tampered_signature_is_rejected() {
     let kp = Keypair::generate();
     let binding = NonceBinding {
         subject_id: "s".into(),
+        request_id: "request-tampered".into(),
         capability_id: "c".into(),
         tool_server: "t".into(),
         tool_name: "n".into(),
@@ -483,10 +474,80 @@ fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
     assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
 
     kernel.set_payment_adapter(Box::new(StubPaymentAdapter));
-    request.request_id = "req-nonce-payment-allow".to_string();
     let allowed = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(allowed.verdict, Verdict::Allow);
     assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+#[test]
+fn strict_nonce_mode_request_id_mismatch_precedes_monetary_side_effects(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let payment = TrackingPaymentAdapter::new();
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.register_tool_server(Box::new(MonetaryCostServer {
+        id: "cost-srv".to_string(),
+        reported_cost: Some(ToolInvocationCost {
+            units: 50,
+            currency: "USD".to_string(),
+            breakdown: None,
+        }),
+    }));
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: true,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
+    let agent_kp = Keypair::generate();
+    let cap = kernel.issue_capability(
+        &agent_kp.public_key(),
+        make_scope(vec![make_monetary_grant(
+            "cost-srv", "compute", 100, 1000, "USD",
+        )]),
+        3600,
+    )?;
+    let request = ToolCallRequest {
+        request_id: "req-nonce-bound-a".to_string(),
+        capability: cap,
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    };
+    let preflight = kernel.evaluate_tool_call_blocking(&request)?;
+    let nonce = preflight
+        .execution_nonce
+        .ok_or_else(|| std::io::Error::other("strict preflight nonce missing"))?;
+    let mut changed = request.clone();
+    changed.request_id = "req-nonce-bound-b".to_string();
+    changed.execution_nonce = Some(*nonce);
+
+    let denied = kernel.evaluate_tool_call_blocking(&changed)?;
+    assert_eq!(denied.verdict, Verdict::Deny);
+    assert_eq!(
+        payment
+            .authorized
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
+    let captures = kernel
+        .budget_store
+        .list_mutation_events(100, None, None)?
+        .into_iter()
+        .filter(|event| event.kind == BudgetMutationKind::CaptureInvocation)
+        .count();
+    assert_eq!(captures, 0);
+    Ok(())
 }
 
 #[test]
@@ -605,6 +666,7 @@ fn kernel_ttl_enforces_30s_default() {
     let kp = Keypair::generate();
     let binding = NonceBinding {
         subject_id: "s".into(),
+        request_id: "request-expiry".into(),
         capability_id: "c".into(),
         tool_server: "t".into(),
         tool_name: "n".into(),

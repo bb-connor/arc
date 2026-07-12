@@ -11,7 +11,7 @@
 //!
 //! * The nonce body is an opaque `nonce_id` plus a `NonceBinding` that
 //!   binds the nonce to the exact `(subject, capability, server, tool,
-//!   parameter_hash)` tuple. Substituting a nonce between unrelated tool
+//!   request_id, parameter_hash)` tuple. Substituting a nonce between unrelated tool
 //!   calls therefore fails the binding check.
 //! * The kernel signs the full body (nonce id + binding + expires_at)
 //!   with its receipt-signing key, so downstream tool servers can
@@ -44,7 +44,7 @@ use uuid::Uuid;
 use crate::KernelError;
 
 /// Schema identifier for Chio execution nonces.
-pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v1";
+pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v2";
 
 /// Default TTL for a freshly minted execution nonce.
 pub const DEFAULT_EXECUTION_NONCE_TTL_SECS: u64 = 30;
@@ -63,22 +63,22 @@ pub fn is_supported_execution_nonce_schema(schema: &str) -> bool {
 
 /// Fields that tie a nonce to one specific tool invocation.
 ///
-/// All five fields are in the signed body, so any mismatch during verify
+/// All six fields are in the signed body, so any mismatch during verify
 /// means either the nonce was minted for a different call or the nonce was
 /// tampered with after issuance.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NonceBinding {
     /// Hex-encoded subject (agent) public key, taken from `capability.subject`.
     pub subject_id: String,
+    /// Stable idempotency identity of the tool request.
+    pub request_id: String,
     /// ID of the capability that authorized this invocation.
     pub capability_id: String,
     /// Tool server that is expected to execute the call.
     pub tool_server: String,
     /// Tool name that is expected to execute.
     pub tool_name: String,
-    /// SHA-256 hex of the canonical JSON of the evaluated arguments. Taken
-    /// directly from the `ToolCallAction::parameter_hash` that the kernel
-    /// embedded in the allow receipt.
+    /// SHA-256 hex of the canonical JSON of the evaluated arguments.
     pub parameter_hash: String,
 }
 
@@ -402,6 +402,17 @@ pub fn verify_execution_nonce(
     now: i64,
     nonce_store: &dyn ExecutionNonceStore,
 ) -> Result<(), ExecutionNonceError> {
+    validate_execution_nonce(presented, kernel_pubkey, expected, now)?;
+    reserve_execution_nonce(presented, nonce_store)
+}
+
+/// Validate a signed execution nonce without consuming it in the replay store.
+pub(crate) fn validate_execution_nonce(
+    presented: &SignedExecutionNonce,
+    kernel_pubkey: &PublicKey,
+    expected: &NonceBinding,
+    now: i64,
+) -> Result<(), ExecutionNonceError> {
     if !is_supported_execution_nonce_schema(&presented.nonce.schema) {
         warn!(
             schema = %presented.nonce.schema,
@@ -429,6 +440,11 @@ pub fn verify_execution_nonce(
     if bound.subject_id != expected.subject_id {
         return Err(ExecutionNonceError::BindingMismatch {
             field: "subject_id",
+        });
+    }
+    if bound.request_id != expected.request_id {
+        return Err(ExecutionNonceError::BindingMismatch {
+            field: "request_id",
         });
     }
     if bound.capability_id != expected.capability_id {
@@ -460,6 +476,14 @@ pub fn verify_execution_nonce(
         return Err(ExecutionNonceError::InvalidSignature);
     }
 
+    Ok(())
+}
+
+/// Consume a previously validated execution nonce in the replay store.
+pub(crate) fn reserve_execution_nonce(
+    presented: &SignedExecutionNonce,
+    nonce_store: &dyn ExecutionNonceStore,
+) -> Result<(), ExecutionNonceError> {
     // Pass the nonce's signed expiry so durable stores retain the
     // consumed marker for the full validity window - otherwise the row
     // can be pruned while the nonce is still cryptographically valid,
@@ -486,6 +510,7 @@ mod tests {
     fn sample_binding() -> NonceBinding {
         NonceBinding {
             subject_id: "subject-abc".to_string(),
+            request_id: "request-abc".to_string(),
             capability_id: "cap-123".to_string(),
             tool_server: "fs".to_string(),
             tool_name: "read_file".to_string(),

@@ -1,5 +1,13 @@
 #![allow(deprecated)]
 
+use crate::budget_store::{
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
+    BudgetCancelCapturedBeforeDispatchRequest, BudgetCaptureInvocationRequest,
+    BudgetCapturedBeforeDispatchCancellationDecision, BudgetInvocationCaptureDecision,
+    BudgetMutationKind, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
+    BudgetReverseHoldRequest,
+};
+
 include!("tests/support.rs");
 include!("tests/support_delegation_plain.rs");
 include!("tests/support_monetary.rs");

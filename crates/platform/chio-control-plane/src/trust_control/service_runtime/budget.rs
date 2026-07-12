@@ -293,40 +293,143 @@ impl BudgetStore for RemoteBudgetStore {
         self.cache_usage(
             &request.capability_id,
             request.grant_index,
-            response_budget_commit_index(
-                response.budget_authority.as_ref(),
-                response.budget_commit.as_ref(),
-            ),
+            response.usage_seq,
             response.invocation_count,
             response.total_cost_exposed,
             response.total_cost_realized_spend,
         );
         let usage = self.cached_usage_or_default(&request.capability_id, request.grant_index);
+        let event_id = match response.decision {
+            BudgetAuthorizeExposureDecision::AlreadyCaptured => {
+                let Some(event_id) = response.event_id.clone() else {
+                    return Err(BudgetStoreError::Invariant(
+                        "captured remote authorization replay omitted capture event identity"
+                            .to_string(),
+                    ));
+                };
+                Some(event_id)
+            }
+            _ => response
+                .event_id
+                .clone()
+                .or_else(|| request.event_id.clone()),
+        };
         let metadata = self.remote_budget_commit_metadata(
             response.budget_authority.as_ref(),
             response.budget_commit.as_ref(),
             request.authority.as_ref(),
-            request.event_id.clone(),
+            event_id,
         );
-        if response.allowed {
-            Ok(BudgetAuthorizeHoldDecision::Authorized(
-                AuthorizedBudgetHold {
+        let committed_cost_units_after = usage.committed_cost_units()?;
+        match (response.decision, response.allowed) {
+            (BudgetAuthorizeExposureDecision::Authorized, true) => {
+                Ok(BudgetAuthorizeHoldDecision::Authorized(AuthorizedBudgetHold {
                     hold_id: request.hold_id,
                     authorized_exposure_units: request.requested_exposure_units,
-                    committed_cost_units_after: usage.committed_cost_units()?,
-                    invocation_count_after: usage.invocation_count,
+                    committed_cost_units_after: response
+                        .mutation_committed_cost_units_after
+                        .unwrap_or(committed_cost_units_after),
+                    invocation_count_after: response
+                        .mutation_invocation_count_after
+                        .unwrap_or(usage.invocation_count),
                     metadata,
-                },
-            ))
-        } else {
-            Ok(BudgetAuthorizeHoldDecision::Denied(DeniedBudgetHold {
-                hold_id: request.hold_id,
-                attempted_exposure_units: request.requested_exposure_units,
-                committed_cost_units_after: usage.committed_cost_units()?,
-                invocation_count_after: usage.invocation_count,
-                metadata,
-            }))
+                }))
+            }
+            (BudgetAuthorizeExposureDecision::Denied, false) => {
+                Ok(BudgetAuthorizeHoldDecision::Denied(DeniedBudgetHold {
+                    hold_id: request.hold_id,
+                    attempted_exposure_units: request.requested_exposure_units,
+                    committed_cost_units_after: response
+                        .mutation_committed_cost_units_after
+                        .unwrap_or(committed_cost_units_after),
+                    invocation_count_after: response
+                        .mutation_invocation_count_after
+                        .unwrap_or(usage.invocation_count),
+                    metadata,
+                }))
+            }
+            (BudgetAuthorizeExposureDecision::AlreadyCaptured, false) => Ok(
+                BudgetAuthorizeHoldDecision::AlreadyCaptured(BudgetHoldMutationDecision {
+                    hold_id: request.hold_id,
+                    exposure_units: response.exposure_units.ok_or_else(|| {
+                        BudgetStoreError::Invariant(
+                            "captured remote authorization replay omitted original exposure"
+                                .to_string(),
+                        )
+                    })?,
+                    realized_spend_units: response.realized_spend_units.ok_or_else(|| {
+                        BudgetStoreError::Invariant(
+                            "captured remote authorization replay omitted original realized spend"
+                                .to_string(),
+                        )
+                    })?,
+                    committed_cost_units_after: response
+                        .mutation_committed_cost_units_after
+                        .ok_or_else(|| {
+                            BudgetStoreError::Invariant(
+                                "captured remote authorization replay omitted original committed cost"
+                                    .to_string(),
+                            )
+                        })?,
+                    invocation_count_after: response
+                        .mutation_invocation_count_after
+                        .ok_or_else(|| {
+                            BudgetStoreError::Invariant(
+                                "captured remote authorization replay omitted original invocation count"
+                                    .to_string(),
+                            )
+                        })?,
+                    metadata,
+                }),
+            ),
+            _ => Err(BudgetStoreError::Invariant(
+                "remote budget authorization decision contradicted its allowed flag".to_string(),
+            )),
         }
+    }
+
+    fn capture_invocation_reservations(
+        &self,
+        request: BudgetCaptureInvocationRequest,
+    ) -> Result<BudgetInvocationCaptureDecision, BudgetStoreError> {
+        let response = self
+            .client
+            .capture_invocation_reservations(
+                &request.capability_id,
+                request.grant_index,
+                &request.hold_id,
+                &request.event_id,
+            )
+            .map_err(into_budget_store_error)?;
+        self.cache_usage(
+            &request.capability_id,
+            request.grant_index,
+            response.usage_seq,
+            Some(response.usage_invocation_count),
+            Some(response.total_cost_exposed_after),
+            Some(response.total_cost_realized_spend_after),
+        );
+        let mutation = BudgetHoldMutationDecision {
+            hold_id: Some(response.hold_id),
+            exposure_units: response.exposure_units,
+            realized_spend_units: 0,
+            committed_cost_units_after: response.committed_cost_units_after,
+            invocation_count_after: response.invocation_count_after,
+            metadata: self.remote_budget_commit_metadata(
+                response.budget_authority.as_ref(),
+                response.budget_commit.as_ref(),
+                request.authority.as_ref(),
+                Some(response.event_id),
+            ),
+        };
+        Ok(match response.decision {
+            CaptureInvocationDecision::Captured => {
+                BudgetInvocationCaptureDecision::Captured(mutation)
+            }
+            CaptureInvocationDecision::AlreadyCaptured => {
+                BudgetInvocationCaptureDecision::AlreadyCaptured(mutation)
+            }
+        })
     }
 
     fn reverse_budget_hold(
@@ -501,7 +604,7 @@ impl BudgetStore for RemoteBudgetStore {
 }
 
 impl RemoteBudgetStore {
-    fn cache_usage(
+    pub(super) fn cache_usage(
         &self,
         capability_id: &str,
         grant_index: usize,
@@ -519,6 +622,16 @@ impl RemoteBudgetStore {
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_secs() as i64)
             .unwrap_or(0);
+
+        if let Some(existing) = cached_usage.get(&key) {
+            let stale = match seq {
+                Some(seq) => seq < existing.seq,
+                None => existing.seq > 0,
+            };
+            if stale {
+                return;
+            }
+        }
 
         match (
             invocation_count,
@@ -639,17 +752,18 @@ fn remote_budget_event_authority(
     authority: Option<&BudgetAuthorityMetadataView>,
     commit: Option<&BudgetWriteCommitView>,
 ) -> Option<BudgetEventAuthority> {
-    authority
-        .map(|authority| BudgetEventAuthority {
-            authority_id: authority.authority_id.clone(),
-            lease_id: authority.lease_id.clone(),
-            lease_epoch: authority.lease_epoch,
+    commit
+        .filter(|commit| commit.quorum_committed)
+        .map(|commit| BudgetEventAuthority {
+            authority_id: commit.authority_id.clone(),
+            lease_id: commit.lease_id.clone(),
+            lease_epoch: commit.lease_epoch,
         })
         .or_else(|| {
-            commit.map(|commit| BudgetEventAuthority {
-                authority_id: commit.authority_id.clone(),
-                lease_id: commit.lease_id.clone(),
-                lease_epoch: commit.lease_epoch,
+            authority.map(|authority| BudgetEventAuthority {
+                authority_id: authority.authority_id.clone(),
+                lease_id: authority.lease_id.clone(),
+                lease_epoch: authority.lease_epoch,
             })
         })
 }
@@ -658,6 +772,9 @@ fn remote_budget_guarantee_level(
     authority: Option<&BudgetAuthorityMetadataView>,
     commit: Option<&BudgetWriteCommitView>,
 ) -> BudgetGuaranteeLevel {
+    if commit.is_some_and(|commit| commit.quorum_committed) {
+        return BudgetGuaranteeLevel::HaLinearizable;
+    }
     match authority.map(|authority| authority.guarantee_level.as_str()) {
         Some("single_node_atomic") => BudgetGuaranteeLevel::SingleNodeAtomic,
         Some("ha_quorum_commit") | Some("ha_linearizable") => BudgetGuaranteeLevel::HaLinearizable,
