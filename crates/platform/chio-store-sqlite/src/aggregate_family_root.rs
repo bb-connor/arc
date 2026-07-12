@@ -9,6 +9,8 @@ use chio_core::{
 };
 use chio_kernel::ReceiptStoreError;
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+use std::path::Path;
+use std::time::Duration;
 
 use crate::SqliteReceiptStore;
 
@@ -321,6 +323,12 @@ pub(crate) fn ensure_aggregate_family_root_schema(
     Ok(())
 }
 
+pub(crate) fn validate_existing_aggregate_family_root_schema(
+    connection: &Connection,
+) -> Result<(), ReceiptStoreError> {
+    validate_schema_integrity(connection).map_err(schema_integrity_to_receipt_error)
+}
+
 impl SqliteReceiptStore {
     /// Register one authenticated direct aggregate or explicit legacy root.
     pub fn record_aggregate_family_root(
@@ -381,48 +389,23 @@ impl SqliteReceiptStore {
         root_capability_id: &str,
     ) -> Result<AggregateFamilyRootLookupSnapshot, AggregateFamilyRootStoreError> {
         let mut connection = self.connection().map_err(receipt_store_unavailable)?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Deferred)
+        lookup_aggregate_family_root_snapshot(&mut connection, root_capability_id)
+    }
+
+    /// Read one root from an existing authority without creating or repairing state.
+    pub fn lookup_existing_aggregate_family_root(
+        path: impl AsRef<Path>,
+        root_capability_id: &str,
+    ) -> Result<AggregateFamilyRootLookupSnapshot, AggregateFamilyRootStoreError> {
+        let mut connection = Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(sqlite_to_store_error)?;
+        connection
+            .busy_timeout(Duration::from_secs(5))
             .map_err(sqlite_to_store_error)?;
-        validate_schema_integrity(&transaction).map_err(schema_integrity_to_store_error)?;
-        let high_watermark = transaction
-            .query_row(
-                "SELECT COALESCE(MAX(seq), 0) FROM chio_aggregate_family_roots",
-                [],
-                |row| row.get::<_, i64>(0),
-            )
-            .map_err(sqlite_to_store_error)?;
-        let seq = transaction
-            .query_row(
-                "SELECT seq FROM chio_aggregate_family_roots WHERE root_capability_id = ?1",
-                params![root_capability_id],
-                |row| row.get::<_, i64>(0),
-            )
-            .optional()
-            .map_err(sqlite_to_store_error)?;
-        let record = match seq {
-            Some(seq) => {
-                let stored = load_root_record(&transaction, root_capability_id)
-                    .map_err(sqlite_to_store_error)?
-                    .ok_or_else(|| {
-                        AggregateFamilyRootStoreError::Corrupt(format!(
-                            "aggregate family-root sequence {seq} has no record"
-                        ))
-                    })?;
-                let authenticated = validate_stored_root(stored)?;
-                Some(StoredAggregateFamilyRoot {
-                    seq: stored_sequence_u64(seq, "aggregate family-root sequence")?,
-                    canonical_token_json: authenticated.record.canonical_token_json,
-                    token_digest: authenticated.record.token_digest,
-                })
-            }
-            None => None,
-        };
-        transaction.commit().map_err(sqlite_to_store_error)?;
-        Ok(AggregateFamilyRootLookupSnapshot {
-            high_watermark: stored_sequence_u64(high_watermark, "aggregate family-root head")?,
-            record,
-        })
+        lookup_aggregate_family_root_snapshot(&mut connection, root_capability_id)
     }
 
     /// Highest local aggregate family-root sequence, or zero when empty.
@@ -526,6 +509,54 @@ impl SqliteReceiptStore {
             .run_write(move |connection| Ok(record_authenticated_roots(connection, &authenticated)))
             .map_err(receipt_store_unavailable)?
     }
+}
+
+fn lookup_aggregate_family_root_snapshot(
+    connection: &mut Connection,
+    root_capability_id: &str,
+) -> Result<AggregateFamilyRootLookupSnapshot, AggregateFamilyRootStoreError> {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Deferred)
+        .map_err(sqlite_to_store_error)?;
+    validate_schema_integrity(&transaction).map_err(schema_integrity_to_store_error)?;
+    let high_watermark = transaction
+        .query_row(
+            "SELECT COALESCE(MAX(seq), 0) FROM chio_aggregate_family_roots",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(sqlite_to_store_error)?;
+    let seq = transaction
+        .query_row(
+            "SELECT seq FROM chio_aggregate_family_roots WHERE root_capability_id = ?1",
+            params![root_capability_id],
+            |row| row.get::<_, i64>(0),
+        )
+        .optional()
+        .map_err(sqlite_to_store_error)?;
+    let record = match seq {
+        Some(seq) => {
+            let stored = load_root_record(&transaction, root_capability_id)
+                .map_err(sqlite_to_store_error)?
+                .ok_or_else(|| {
+                    AggregateFamilyRootStoreError::Corrupt(format!(
+                        "aggregate family-root sequence {seq} has no record"
+                    ))
+                })?;
+            let authenticated = validate_stored_root(stored)?;
+            Some(StoredAggregateFamilyRoot {
+                seq: stored_sequence_u64(seq, "aggregate family-root sequence")?,
+                canonical_token_json: authenticated.record.canonical_token_json,
+                token_digest: authenticated.record.token_digest,
+            })
+        }
+        None => None,
+    };
+    transaction.commit().map_err(sqlite_to_store_error)?;
+    Ok(AggregateFamilyRootLookupSnapshot {
+        high_watermark: stored_sequence_u64(high_watermark, "aggregate family-root head")?,
+        record,
+    })
 }
 
 impl AggregateFamilyRootResolver for SqliteReceiptStore {
@@ -878,6 +909,30 @@ fn load_root_record(
     connection: &Connection,
     root_capability_id: &str,
 ) -> Result<Option<RootRecord>, rusqlite::Error> {
+    let encoded_len = connection
+        .query_row(
+            "SELECT length(CAST(canonical_token_json AS BLOB)) \
+             FROM chio_aggregate_family_roots \
+             WHERE root_capability_id = ?1 COLLATE BINARY",
+            params![root_capability_id],
+            |row| row.get::<_, i64>(0),
+        )
+        .optional()?;
+    let Some(encoded_len) = encoded_len else {
+        return Ok(None);
+    };
+    let maximum = i64::try_from(MAX_AGGREGATE_FAMILY_ROOT_TOKEN_BYTES)
+        .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
+    if encoded_len < 0 || encoded_len > maximum {
+        return Err(rusqlite::Error::FromSqlConversionFailure(
+            2,
+            rusqlite::types::Type::Text,
+            format!(
+                "stored aggregate family-root token has {encoded_len} bytes, maximum is {maximum}"
+            )
+            .into(),
+        ));
+    }
     connection
         .query_row(
             r#"
@@ -2695,6 +2750,64 @@ mod tests {
             reopened.resolve_aggregate_family_root("not-registered"),
             Err(AggregateFamilyRootResolutionError::Missing)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_family_root_existing_point_lookup_never_runs_migration() -> TestResult {
+        let directory = tempdir()?;
+        let path = directory.path().join("receipts.db");
+        {
+            let store = SqliteReceiptStore::open(&path)?;
+            let connection = Connection::open(&path)?;
+            connection.execute_batch(
+                "DROP TABLE chio_aggregate_family_roots;
+                 DROP TABLE chio_aggregate_family_root_schema;
+                 DELETE FROM chio_module_schema_version
+                 WHERE module = 'aggregate_family_root_authority';",
+            )?;
+            drop(store);
+        }
+
+        assert!(matches!(
+            SqliteReceiptStore::lookup_existing_aggregate_family_root(&path, "missing"),
+            Err(super::AggregateFamilyRootStoreError::Corrupt(_))
+        ));
+        assert!(SqliteReceiptStore::open_existing_strict(&path).is_err());
+        let connection = Connection::open(&path)?;
+        let object_count: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE name IN (
+                'chio_aggregate_family_roots',
+                'chio_aggregate_family_root_schema'
+             )",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(object_count, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_family_root_rejects_oversized_stored_text_before_decoding() -> TestResult {
+        let directory = tempdir()?;
+        let path = directory.path().join("receipts.db");
+        let store = SqliteReceiptStore::open(&path)?;
+        let (issuer, _, token) = legacy_root("oversized-stored-root")?;
+        store.record_aggregate_family_root(&token, &[issuer.public_key()], 1_100)?;
+        let connection = Connection::open(&path)?;
+        connection.execute_batch(
+            "DROP TRIGGER chio_aggregate_family_roots_immutable_update;
+             UPDATE chio_aggregate_family_roots
+             SET canonical_token_json = CAST(zeroblob(524289) AS TEXT)
+             WHERE root_capability_id = 'oversized-stored-root';",
+        )?;
+        connection.execute_batch(super::AGGREGATE_FAMILY_ROOT_UPDATE_TRIGGER_SQL)?;
+
+        assert!(matches!(
+            store.lookup_aggregate_family_root(&token.id),
+            Err(super::AggregateFamilyRootStoreError::Corrupt(_))
+        ));
         Ok(())
     }
 

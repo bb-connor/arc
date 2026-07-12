@@ -54,6 +54,10 @@ impl SqliteReceiptStore {
         Self::open_existing_with_pool_config(path, crate::SqlitePoolConfig::default())
     }
 
+    pub fn open_existing_strict(path: impl AsRef<Path>) -> Result<Self, ReceiptStoreError> {
+        Self::open_existing_strict_with_pool_config(path, crate::SqlitePoolConfig::default())
+    }
+
     pub fn open_with_pool_config(
         path: impl AsRef<Path>,
         pool_config: crate::SqlitePoolConfig,
@@ -80,24 +84,40 @@ impl SqliteReceiptStore {
         )
     }
 
+    fn open_existing_strict_with_pool_config(
+        path: impl AsRef<Path>,
+        pool_config: crate::SqlitePoolConfig,
+    ) -> Result<Self, ReceiptStoreError> {
+        Self::open_with_pool_config_and_flags(
+            path,
+            crate::SqliteStoreOptions {
+                pool: pool_config,
+                ..crate::SqliteStoreOptions::default()
+            },
+            false,
+            false,
+        )
+    }
+
     pub fn open_with_options(
         path: impl AsRef<Path>,
         options: crate::SqliteStoreOptions,
     ) -> Result<Self, ReceiptStoreError> {
-        Self::open_with_pool_config_and_flags(path, options, true)
+        Self::open_with_pool_config_and_flags(path, options, true, false)
     }
 
     pub fn open_existing_with_options(
         path: impl AsRef<Path>,
         options: crate::SqliteStoreOptions,
     ) -> Result<Self, ReceiptStoreError> {
-        Self::open_with_pool_config_and_flags(path, options, false)
+        Self::open_with_pool_config_and_flags(path, options, false, true)
     }
 
     fn open_with_pool_config_and_flags(
         path: impl AsRef<Path>,
         options: crate::SqliteStoreOptions,
         create_if_missing: bool,
+        repair_existing: bool,
     ) -> Result<Self, ReceiptStoreError> {
         let path = path.as_ref();
         let connection_flags = if create_if_missing {
@@ -128,8 +148,14 @@ impl SqliteReceiptStore {
         if !create_if_missing {
             require_existing_receipt_schema(path, &connection)?;
             configure_sqlite_connection(&mut connection)?;
-            crate::aggregate_family_root::ensure_aggregate_family_root_schema(&mut connection)?;
-            super::support::ensure_transparency_projection_guards(&connection)?;
+            if repair_existing {
+                crate::aggregate_family_root::ensure_aggregate_family_root_schema(&mut connection)?;
+                super::support::ensure_transparency_projection_guards(&connection)?;
+            } else {
+                crate::aggregate_family_root::validate_existing_aggregate_family_root_schema(
+                    &connection,
+                )?;
+            }
             drop(connection);
 
             let reader_pool = build_receipt_pool(
