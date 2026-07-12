@@ -531,7 +531,11 @@ pub struct ChioKernel {
     pub(super) budget_store_lock: Mutex<()>,
     pub(super) revocation_store: Arc<dyn RevocationStore>,
     pub(super) capability_authority: Box<dyn CapabilityAuthority>,
-    pub(super) tool_servers: HashMap<ServerId, Box<dyn ToolServerConnection>>,
+    // Held behind `Arc` so a single connection can be cloned into a
+    // `spawn_blocking` task, letting the dispatch deadline drive the call off the
+    // async worker (a connection that blocks before its first `.await` cannot then
+    // pin the worker).
+    pub(super) tool_servers: HashMap<ServerId, Arc<dyn ToolServerConnection>>,
     pub(super) resource_providers: Vec<Box<dyn ResourceProvider>>,
     pub(super) prompt_providers: Vec<Box<dyn PromptProvider>>,
     pub(super) sessions: DashMap<SessionId, Arc<Session>>,

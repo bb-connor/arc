@@ -1544,7 +1544,7 @@ impl ChioKernel {
     pub fn register_tool_server(&mut self, connection: Box<dyn ToolServerConnection>) {
         let id = connection.server_id().to_owned();
         info!(server_id = %id, "registering tool server");
-        self.tool_servers.insert(id, connection);
+        self.tool_servers.insert(id, Arc::from(connection));
     }
 
     /// Register a resource provider.

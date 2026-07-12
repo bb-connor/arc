@@ -848,30 +848,121 @@ impl ChioKernel {
 
     /// Bound the tool-server call by the per-server (or default) dispatch
     /// budget. On expiry the call fails closed with `HotPathDeadlineExceeded`,
-    /// which the evaluate core unwinds like a cancellation. With no budget, or
-    /// on the no-runtime fallback where no Tokio timer driver exists (wrapping
-    /// would panic rather than degrade), the call runs inline; the no-runtime
-    /// path has no async transport to hang on.
+    /// which the evaluate core unwinds like a cancellation.
+    ///
+    /// Wrapping the call future in `timeout` only bounds it if the connection
+    /// yields to Tokio; a connection that does synchronous blocking work before
+    /// its first `.await` would pin the polling worker and the timer would never
+    /// fire. So on a multi-thread runtime a budgeted call is driven on a
+    /// `spawn_blocking` thread (like the guard pipeline) and only its join handle
+    /// is awaited under the deadline, keeping a blocking connection off the async
+    /// worker pool. With no budget the call runs inline. On a current-thread
+    /// runtime the call also runs inline under the timeout: there is no spare
+    /// worker to isolate a blocking poll onto, and driving the call on a second
+    /// thread would contend for the sole scheduler (so a blocking connection can
+    /// still pin the only worker there, an inherent single-threaded-runtime
+    /// limit). With no runtime at all it runs inline without a timeout (there is
+    /// no async transport to hang on, and the timeout wrapper would panic without
+    /// a timer driver).
     pub(crate) async fn dispatch_within_budget(
         &self,
         request: &ToolCallRequest,
         has_monetary_grant: bool,
     ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
-        let call = self.dispatch_tool_call_with_cost_after_nonce_check(request, has_monetary_grant);
-        match self
+        let Some(budget) = self
             .config
             .deadlines
             .dispatch_budget_for(&request.server_id)
-        {
-            None => call.await,
-            Some(_) if !dispatch_timer_available() => call.await,
-            Some(budget) => match tokio::time::timeout(budget, call).await {
-                Ok(result) => result,
+        else {
+            return self
+                .dispatch_tool_call_with_cost_after_nonce_check(request, has_monetary_grant)
+                .await;
+        };
+
+        let timer_available = dispatch_timer_available();
+        let multi_thread = matches!(
+            tokio::runtime::Handle::try_current().map(|handle| handle.runtime_flavor()),
+            Ok(tokio::runtime::RuntimeFlavor::MultiThread)
+        );
+        if !multi_thread {
+            let call =
+                self.dispatch_tool_call_with_cost_after_nonce_check(request, has_monetary_grant);
+            if timer_available {
+                return match tokio::time::timeout(budget, call).await {
+                    Ok(result) => result,
+                    Err(_elapsed) => Err(KernelError::HotPathDeadlineExceeded {
+                        stage: HotPathStage::Dispatch,
+                        budget_ms: budget_ms_saturating(budget),
+                    }),
+                };
+            }
+            return call.await;
+        }
+
+        let server = match self.tool_servers.get(&request.server_id) {
+            Some(server) => Arc::clone(server),
+            None => {
+                return Err(KernelError::ToolNotRegistered(format!(
+                    "server \"{}\" / tool \"{}\"",
+                    request.server_id, request.tool_name
+                )));
+            }
+        };
+        let tool_name = request.tool_name.clone();
+        let arguments = request.arguments.clone();
+        let handle = tokio::runtime::Handle::current();
+        // Drive the connection call to completion on the blocking pool via
+        // `Handle::block_on`. `spawn_blocking` threads carry the runtime handle
+        // without being marked as "inside" it, so `block_on` does not panic there,
+        // and a blocking first poll stays on the blocking pool rather than the
+        // async worker.
+        //
+        // The inner timeout matters for a *cooperating* connection that never
+        // completes (it yields but never resolves): `block_on` cannot be
+        // cancelled by dropping the join handle, so without it that blocking
+        // thread would be pinned forever. The inner timeout lets `block_on` return
+        // at the budget, freeing the blocking thread. It cannot fire for a
+        // connection still stuck in a synchronous blocking poll (the timer cannot
+        // be polled either); that thread frees when the blocking work finally
+        // returns, bounded by Tokio's blocking-pool ceiling rather than growing
+        // without limit. Either way the outer timeout frees the async worker at
+        // the budget, so the per-eval wall clock holds.
+        let join = tokio::task::spawn_blocking(move || {
+            let call =
+                Self::invoke_resolved_server(server, tool_name, arguments, has_monetary_grant);
+            if timer_available {
+                handle.block_on(async move {
+                    match tokio::time::timeout(budget, call).await {
+                        Ok(result) => result,
+                        Err(_elapsed) => Err(KernelError::HotPathDeadlineExceeded {
+                            stage: HotPathStage::Dispatch,
+                            budget_ms: budget_ms_saturating(budget),
+                        }),
+                    }
+                })
+            } else {
+                handle.block_on(call)
+            }
+        });
+
+        if timer_available {
+            match tokio::time::timeout(budget, join).await {
+                Ok(Ok(result)) => result,
+                Ok(Err(join_error)) => Err(KernelError::Internal(format!(
+                    "dispatch task join failed: {join_error}"
+                ))),
                 Err(_elapsed) => Err(KernelError::HotPathDeadlineExceeded {
                     stage: HotPathStage::Dispatch,
                     budget_ms: budget_ms_saturating(budget),
                 }),
-            },
+            }
+        } else {
+            match join.await {
+                Ok(result) => result,
+                Err(join_error) => Err(KernelError::Internal(format!(
+                    "dispatch task join failed: {join_error}"
+                ))),
+            }
         }
     }
 
@@ -886,7 +977,26 @@ impl ChioKernel {
                 request.server_id, request.tool_name
             ))
         })?;
+        Self::invoke_resolved_server(
+            Arc::clone(server),
+            request.tool_name.clone(),
+            request.arguments.clone(),
+            has_monetary_grant,
+        )
+        .await
+    }
 
+    /// Drive one already-resolved tool-server invocation to completion. Taken
+    /// over owned inputs and free of any `&self` borrow so the dispatch deadline
+    /// path can move it onto a `spawn_blocking` thread (`'static`), isolating a
+    /// connection that blocks synchronously before its first `.await` from the
+    /// async worker.
+    async fn invoke_resolved_server(
+        server: Arc<dyn ToolServerConnection>,
+        tool_name: String,
+        arguments: serde_json::Value,
+        has_monetary_grant: bool,
+    ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
         // Try streaming first regardless of monetary mode.
         //
         // Why the kernel cannot bound stream memory "as chunks arrive" at THIS
@@ -926,21 +1036,17 @@ impl ChioKernel {
         //     the monetary charge for an already-executed stream, so this seam
         //     does not hard-deny.
         if let Some(stream) = server
-            .invoke_stream(&request.tool_name, request.arguments.clone(), None)
+            .invoke_stream(&tool_name, arguments.clone(), None)
             .await?
         {
             return Ok((ToolServerOutput::Stream(stream), None));
         }
 
         if has_monetary_grant {
-            let (value, cost) = server
-                .invoke_with_cost(&request.tool_name, request.arguments.clone(), None)
-                .await?;
+            let (value, cost) = server.invoke_with_cost(&tool_name, arguments, None).await?;
             Ok((ToolServerOutput::Value(value), cost))
         } else {
-            let value = server
-                .invoke(&request.tool_name, request.arguments.clone(), None)
-                .await?;
+            let value = server.invoke(&tool_name, arguments, None).await?;
             Ok((ToolServerOutput::Value(value), None))
         }
     }

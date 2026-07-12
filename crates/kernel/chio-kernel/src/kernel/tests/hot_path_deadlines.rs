@@ -71,6 +71,39 @@ impl ToolServerConnection for HangingToolServer {
     }
 }
 
+/// A tool server whose `invoke` performs synchronous blocking work *before* its
+/// first `.await`, modeling a connection doing blocking I/O in its poll. Polled
+/// inline on the async worker it pins the worker so the dispatch timeout never
+/// fires; only offloading the call to a blocking thread keeps the deadline live.
+struct BlockingToolServer {
+    id: String,
+    tools: Vec<String>,
+    invocations: Arc<AtomicU64>,
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for BlockingToolServer {
+    fn server_id(&self) -> &str {
+        &self.id
+    }
+    fn tool_names(&self) -> Vec<String> {
+        self.tools.clone()
+    }
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        self.invocations.fetch_add(1, Ordering::SeqCst);
+        // Synchronous blocking work before the first `.await`. Bounded so the
+        // offloaded blocking thread does not stall runtime teardown after the
+        // deadline has fired.
+        std::thread::sleep(Duration::from_secs(2));
+        Ok(serde_json::json!({ "ok": true }))
+    }
+}
+
 /// A store double that reports a wedged writer, to drive the pre-dispatch gate
 /// without a real stuck sqlite writer.
 struct WedgedLivenessStore;
@@ -520,6 +553,50 @@ async fn phase_dispatch_honors_the_configured_dispatch_budget(
         }
         other => panic!("expected a dispatch deadline error, got {other:?}"),
     }
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn dispatch_budget_bounds_a_connection_that_blocks_before_awaiting(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // A connection that performs synchronous blocking work before its first
+    // `.await` must still be bounded by the dispatch budget. Wrapping the call in
+    // `timeout` alone does not help: the blocking poll pins the async worker and
+    // the timer never fires. Offloading the call onto a blocking thread keeps the
+    // worker free so the deadline fires near the budget.
+    let invocations = Arc::new(AtomicU64::new(0));
+    let mut config = make_config();
+    config.deadlines.dispatch_budget_ms = 200;
+    let mut kernel = make_kernel(config);
+    kernel.register_tool_server(Box::new(BlockingToolServer {
+        id: "srv-blocking".to_string(),
+        tools: vec!["noop".to_string()],
+        invocations: Arc::clone(&invocations),
+    }));
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-blocking", "noop")]),
+        300,
+    );
+    let request = make_request("req-blocking-dispatch", &cap, "noop", "srv-blocking");
+    let kernel = Arc::new(kernel);
+
+    let start = std::time::Instant::now();
+    let response = kernel.evaluate_tool_call(&request).await?;
+    let elapsed = start.elapsed();
+
+    assert!(
+        elapsed < Duration::from_secs(1),
+        "a connection that blocks before awaiting must be bounded near the 200ms dispatch budget, took {elapsed:?}"
+    );
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        1,
+        "dispatch did start the blocking connection"
+    );
+    assert_eq!(response.verdict, Verdict::Deny);
     Ok(())
 }
 
