@@ -197,9 +197,19 @@ pub(crate) fn cmd_receipt_retention_repair(
         // poisoned (the next append is still rejected). Ask the store for its
         // real post-repair state and only claim it is writable when a health
         // check confirms it, fail-closed: an unhealthy report or a health error
-        // both mean the drift survived the extra-shape repair.
-        let writable = matches!(store.receipt_store_health(), Ok(report) if report.healthy);
+        // both mean the drift survived the extra-shape repair. The default human
+        // mode must then EXIT non-zero exactly as the JSON branch does, so an
+        // operator is never told a repair that left the store unwritable
+        // succeeded.
+        let health = store.receipt_store_health();
+        let writable = matches!(&health, Ok(report) if report.healthy);
         print!("{}", render_receipt_retention_repair_human(removed, writable));
+        if !writable {
+            return Err(match health {
+                Ok(report) => receipt_health_report_error(&report),
+                Err(error) => CliError::from(error),
+            });
+        }
     }
     Ok(())
 }
@@ -419,6 +429,65 @@ mod receipt_operator_tests {
         assert!(
             result.is_err(),
             "json retention repair must fail closed on a not-writable store"
+        );
+
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(&archive);
+        Ok(())
+    }
+
+    /// `chio receipt retention repair` in the DEFAULT human mode (no `--json`)
+    /// must fail closed too: on a store left not writable after the repair, an
+    /// operator gets a non-zero exit rather than a silent success. Mirrors the
+    /// JSON fail-closed contract on the path most operators actually run.
+    #[test]
+    fn retention_repair_human_fails_closed_when_store_not_writable(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let path = unique_temp_path("retention-repair-human", "sqlite3");
+        let archive = unique_temp_path("retention-repair-human-archive", "sqlite3");
+        let keypair = chio_core::crypto::Keypair::generate();
+
+        // Source-without-projection drift: delete a projection row whose source
+        // receipt still exists. No rows are orphaned, so `retention_repair`
+        // returns Ok(0) while the store stays not writable.
+        {
+            let store = chio_store_sqlite::SqliteReceiptStore::open(&path)?;
+            for i in 0..2u64 {
+                let receipt = operator_sample_receipt_with_id_and_keypair(
+                    &format!("rr-human-{i}"),
+                    &keypair,
+                )?;
+                store.append_chio_receipt_returning_seq(&receipt)?;
+            }
+            store.flush_receipt_writes()?;
+        }
+        {
+            let connection = rusqlite::Connection::open(&path)?;
+            connection.execute_batch(
+                "DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete; \
+                 DELETE FROM claim_receipt_log_entries WHERE entry_seq = 1;",
+            )?;
+        }
+
+        // Precondition: the corrupted store is genuinely not writable.
+        let store = chio_store_sqlite::SqliteReceiptStore::open_existing(&path)?;
+        assert!(
+            !matches!(store.receipt_store_health(), Ok(report) if report.healthy),
+            "the corrupted store must report not-writable"
+        );
+        drop(store);
+
+        // Human mode must fail closed, matching the JSON path.
+        let human_backend = QueryBackend {
+            json_output: false,
+            receipt_db_path: Some(path.as_path()),
+            control_url: None,
+            control_token: None,
+        };
+        let result = cmd_receipt_retention_repair(&archive, human_backend);
+        assert!(
+            result.is_err(),
+            "human retention repair must fail closed on a not-writable store"
         );
 
         let _ = std::fs::remove_file(&path);
