@@ -36,6 +36,142 @@ impl Guard for HoldRequestGuard {
     }
 }
 
+/// (open-intent count, journaled tenant) pairs observed from inside a tool
+/// invocation.
+type ObservedIntentJournal = std::sync::Arc<Mutex<Vec<(i64, Option<String>)>>>;
+
+/// Tool server that inspects the dispatch-intent journal from INSIDE
+/// `invoke`, capturing the number of open rows and the journaled tenant for
+/// its own request at the moment the effect runs. Reads the store file over
+/// its own connection so it observes exactly what would survive a crash.
+struct IntentProbeServer {
+    id: String,
+    tools: Vec<String>,
+    db_path: PathBuf,
+    seen: ObservedIntentJournal,
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for IntentProbeServer {
+    fn server_id(&self) -> &str {
+        &self.id
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        self.tools.clone()
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        let connection = Connection::open(&self.db_path)
+            .map_err(|error| KernelError::Internal(error.to_string()))?;
+        let open: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM chio_dispatch_intents WHERE state = 'open'",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|error| KernelError::Internal(error.to_string()))?;
+        let tenant: Option<String> = connection
+            .query_row(
+                "SELECT tenant_id FROM chio_dispatch_intents WHERE state = 'open' LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|error| KernelError::Internal(error.to_string()))?
+            .flatten();
+        if let Ok(mut seen) = self.seen.lock() {
+            seen.push((open, tenant));
+        }
+        Ok(serde_json::json!({"status": "ok"}))
+    }
+}
+
+#[test]
+fn nested_flow_dispatch_journals_a_durable_intent_and_consumes_it_on_allow(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // The nested-flow evaluator shares the crash-window contract with the
+    // top-level path: a side-effecting nested dispatch must observe its own
+    // durable intent (written before the tool runs, tagged with the
+    // request-scoped tenant) and the terminal allow receipt must consume it.
+    let path = unique_receipt_db_path("chio-intent-nested-journal");
+    let mut config = make_config();
+    config.dispatch_intent_journal = crate::DispatchIntentJournalMode::SideEffecting;
+    let mut kernel = make_kernel(config);
+    let store = std::sync::Arc::new(SqliteReceiptStore::open(&path)?);
+    kernel.set_receipt_store_handle(
+        std::sync::Arc::clone(&store) as std::sync::Arc<dyn crate::receipt_store::ReceiptStore>
+    )?;
+
+    let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
+    kernel.register_tool_server(Box::new(IntentProbeServer {
+        id: "srv-nested".to_string(),
+        tools: vec!["destructive_update".to_string()],
+        db_path: path.clone(),
+        seen: std::sync::Arc::clone(&seen),
+    }));
+
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-nested", "destructive_update")]),
+        300,
+    );
+    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;
+    kernel.set_session_auth_context(&session_id, oauth_auth_with_enterprise_tenant("tenant-A"))?;
+    kernel.activate_session(&session_id)?;
+    let context = make_operation_context(
+        &session_id,
+        "req-nested-intent",
+        &agent_kp.public_key().to_hex(),
+    );
+    kernel.begin_session_request(&context, OperationKind::ToolCall, true)?;
+    let request = make_request("req-nested-intent", &cap, "destructive_update", "srv-nested");
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    let response = rt.block_on(async {
+        let mut client = NoopNestedFlowClient;
+        kernel
+            .evaluate_tool_call_with_nested_flow_client_async(&context, &request, &mut client, None)
+            .await
+    })?;
+
+    assert!(
+        matches!(response.verdict, Verdict::Allow),
+        "expected Allow, got {:?}: {:?}",
+        response.verdict,
+        response.reason
+    );
+    let seen = seen.lock().map_err(|_| "probe lock poisoned")?.clone();
+    assert_eq!(
+        seen,
+        vec![(1, Some("tenant-A".to_string()))],
+        "the nested dispatch must observe its own durable intent, tagged \
+         with the session tenant"
+    );
+    assert_eq!(
+        response.receipt.tenant_id.as_deref(),
+        Some("tenant-A"),
+        "the nested terminal receipt carries the request-scoped tenant"
+    );
+    assert_eq!(
+        ReceiptStore::open_dispatch_intent_count(store.as_ref())?,
+        0,
+        "the nested allow receipt consumed the intent"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 #[test]
 fn intent_and_receipt_tenant_ignore_a_foreign_thread_scope(
 ) -> Result<(), Box<dyn std::error::Error>> {
