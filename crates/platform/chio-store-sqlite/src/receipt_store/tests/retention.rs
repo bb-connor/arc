@@ -2245,6 +2245,46 @@ fn checkpoint_status_floors_committed_at_watermark_after_full_archive(
     Ok(())
 }
 
+/// Direct trait callers read committed progress from `latest_committed_entry_seq`.
+/// After a full-prefix rotation empties the live claim-log table, its raw
+/// MAX(entry_seq) is 0 while the checkpoint chain and retention watermark still
+/// sit at the archived boundary W. This accessor must fold in the archived
+/// prefix like the status/health/flush paths, otherwise a `ReceiptStore` caller
+/// sees committed regress to 0 until the next append.
+#[test]
+fn latest_committed_entry_seq_floors_at_watermark_after_full_archive(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("committed-floor-watermark");
+    let archive = unique_db_path("committed-floor-watermark-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for i in 0..4u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("lc-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    store.flush_receipt_writes()?;
+    let archived = store.archive_receipts_before(150, archive_path)?;
+    assert_eq!(archived, 4, "the whole history archives");
+
+    assert_eq!(
+        store.latest_committed_entry_seq()?,
+        4,
+        "committed progress must fold in the archived prefix, not regress to 0"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// `chio receipt flush` reads committed progress from `flush_report`. After a
 /// full-prefix rotation deletes every live claim-log row, the live MAX(entry_seq)
 /// is 0 while the checkpoint chain and retention watermark still sit at the

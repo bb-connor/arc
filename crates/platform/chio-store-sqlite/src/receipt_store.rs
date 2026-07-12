@@ -2555,7 +2555,16 @@ impl SqliteReceiptStore {
 
     pub fn latest_committed_entry_seq(&self) -> Result<u64, ReceiptStoreError> {
         let connection = self.connection()?;
-        latest_claim_log_entry_seq(&connection)
+        // After a full-prefix rotation the live claim-log table is empty, so
+        // MAX(entry_seq) drops to 0 while the latest checkpoint and the
+        // retention watermark still sit at the archived boundary W. Committed
+        // progress must fold in the archived prefix; floor the live committed
+        // seq at the watermark so a direct trait caller does not see committed
+        // regress to 0 behind its checkpoints. Mirrors receipt_checkpoint_status,
+        // receipt_store_health_read_only, and flush_report.
+        let live = latest_claim_log_entry_seq(&connection)?;
+        let watermark = support::retention_watermark(&connection)?.unwrap_or(0);
+        Ok(live.max(watermark))
     }
 
     pub fn latest_checkpointed_entry_seq(&self) -> Result<u64, ReceiptStoreError> {
