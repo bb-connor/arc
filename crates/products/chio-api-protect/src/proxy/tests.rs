@@ -2835,6 +2835,78 @@ async fn sidecar_validate_capability_accepts_live_delegation_chain() {
     assert_eq!(json["capability_id"], "cap-child-live");
 }
 
+/// An untrusted token must be rejected on issuer trust before its delegation
+/// chain is walked, so an unauthenticated caller cannot force one revocation
+/// lookup per fabricated ancestor. The leaf carries a revoked ancestor, so a
+/// handler that walked the chain first would report the chain-revoked reason;
+/// the correct order reports the untrusted-issuer reason and never consults the
+/// ancestor's revocation status.
+#[tokio::test]
+async fn sidecar_validate_capability_checks_issuer_trust_before_walking_chain() {
+    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    let untrusted_issuer = Keypair::generate();
+    let parent_id = "cap-parent-untrusted";
+
+    let now = chrono::Utc::now().timestamp() as u64;
+    let delegator = Keypair::generate();
+    let delegatee = Keypair::generate();
+    let link = DelegationLink::sign(
+        DelegationLinkBody {
+            capability_id: parent_id.to_string(),
+            delegator: delegator.public_key(),
+            delegatee: delegatee.public_key(),
+            attenuations: Vec::new(),
+            timestamp: now,
+            scope_hash: None,
+        },
+        &delegator,
+    )
+    .test_unwrap();
+    let child = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-child-untrusted".to_string(),
+            issuer: untrusted_issuer.public_key(),
+            subject: delegatee.public_key(),
+            scope: ChioScope::default(),
+            issued_at: now.saturating_sub(60),
+            expires_at: now + 3600,
+            delegation_chain: vec![link],
+        },
+        &untrusted_issuer,
+    )
+    .test_unwrap();
+
+    // Revoke the ancestor. A handler that walks the chain before the issuer
+    // gate would surface this; the correct order never reaches it.
+    state
+        .revoked_capability_ids
+        .lock()
+        .await
+        .insert(parent_id.to_string());
+
+    let validate_body = serde_json::to_value(&child).test_unwrap();
+    let response = build_app(Arc::clone(&state))
+        .oneshot(loopback_post("/v1/capabilities/validate", validate_body))
+        .await
+        .test_unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let bytes = to_bytes(response.into_body(), 1024 * 1024)
+        .await
+        .test_unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).test_unwrap();
+    assert_eq!(json["valid"], false);
+    let reason = json["reason"].as_str().test_unwrap();
+    assert!(
+        reason.contains("issuer is not trusted"),
+        "an untrusted token must be rejected on issuer trust before its chain is walked, got: {reason}"
+    );
+    assert!(
+        !reason.contains("chain"),
+        "the delegation chain must not be consulted for an untrusted token, got: {reason}"
+    );
+}
+
 #[tokio::test]
 async fn sidecar_validate_capability_rejects_untrusted_issuer() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
