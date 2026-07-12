@@ -3040,6 +3040,50 @@ impl SqliteReceiptStore {
         })
     }
 
+    /// Durably write a dispatch intent as a metadata-only single-writer job.
+    /// The response is sent only after `tx.commit()` returns, so the caller
+    /// observes a durable (WAL-fsynced) commit before it proceeds to dispatch.
+    pub fn record_dispatch_intent(
+        &self,
+        intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+    ) -> Result<(), ReceiptStoreError> {
+        self.writer_handle()
+            .run_write(dispatch_intent_insert_job(intent))
+    }
+
+    /// Bounded variant of [`Self::record_dispatch_intent`]: identical up to
+    /// the response wait, which is capped at `budget` so a writer that wedges
+    /// after the pre-dispatch liveness check fails this caller closed instead
+    /// of hanging the evaluation inside the intent write.
+    pub fn record_dispatch_intent_with_timeout(
+        &self,
+        intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+        budget: Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        self.writer_handle()
+            .run_write_with_timeout(dispatch_intent_insert_job(intent), budget)
+    }
+
+    /// Attach a rail authorization id to the open monetary intent for
+    /// `request_id`. Best-effort from the caller's perspective (`NotFound`
+    /// when the intent was already consumed or never written), but the update
+    /// itself commits durably on the single writer.
+    pub fn attach_dispatch_intent_rail_ref(
+        &self,
+        request_id: &str,
+        rail_authorization_id: &str,
+    ) -> Result<(), ReceiptStoreError> {
+        let request_id = request_id.to_string();
+        let rail_authorization_id = rail_authorization_id.to_string();
+        self.writer_handle().run_write(move |connection| {
+            let tx =
+                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            attach_dispatch_intent_rail_ref_tx(&tx, &request_id, &rail_authorization_id)?;
+            tx.commit()?;
+            Ok(())
+        })
+    }
+
     pub fn flush_receipt_writes(&self) -> Result<ReceiptFlushReport, ReceiptStoreError> {
         self.receipt_commit_actor.flush()?;
         let wal_checkpoint = Some(self.wal_checkpoint_passive()?);

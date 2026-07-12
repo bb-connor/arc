@@ -364,6 +364,29 @@ impl ReceiptStore for SqliteReceiptStore {
         SqliteReceiptStore::append_chio_receipt_consuming_authorization(self, receipt, consumption)
     }
 
+    fn record_dispatch_intent(
+        &self,
+        intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::record_dispatch_intent(self, intent)
+    }
+
+    fn record_dispatch_intent_with_timeout(
+        &self,
+        intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+        budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::record_dispatch_intent_with_timeout(self, intent, budget)
+    }
+
+    fn attach_dispatch_intent_rail_ref(
+        &self,
+        request_id: &str,
+        rail_authorization_id: &str,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::attach_dispatch_intent_rail_ref(self, request_id, rail_authorization_id)
+    }
+
     fn receipts_canonical_bytes_range(
         &self,
         start_seq: u64,
