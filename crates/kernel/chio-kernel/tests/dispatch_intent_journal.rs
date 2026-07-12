@@ -48,6 +48,9 @@ mod support {
         store: Arc<SqliteReceiptStore>,
         pub invoked: Arc<AtomicUsize>,
         pub open_intents_seen_at_invoke: Arc<Mutex<Vec<u64>>>,
+        /// When set, `invoke` fails AFTER recording the probe, modeling a tool
+        /// whose side effect ran and then errored.
+        pub fail_after_effect: bool,
     }
 
     #[async_trait::async_trait]
@@ -79,6 +82,11 @@ mod support {
                 .lock()
                 .expect("probe lock")
                 .push(open);
+            if self.fail_after_effect {
+                return Err(KernelError::Internal(
+                    "tool failed after its side effect".to_string(),
+                ));
+            }
             Ok(serde_json::json!({ "ok": true }))
         }
     }
@@ -264,20 +272,27 @@ mod support {
     }
 
     pub fn journal_harness(prefix: &str) -> Result<JournalHarness, Box<dyn std::error::Error>> {
-        journal_harness_with(prefix, None, false)
+        journal_harness_with(prefix, None, false, false)
+    }
+
+    pub fn journal_harness_failing_tool(
+        prefix: &str,
+    ) -> Result<JournalHarness, Box<dyn std::error::Error>> {
+        journal_harness_with(prefix, None, false, true)
     }
 
     pub fn journal_harness_rejecting_first_intent_write(
         prefix: &str,
         max_invocations: Option<u32>,
     ) -> Result<JournalHarness, Box<dyn std::error::Error>> {
-        journal_harness_with(prefix, max_invocations, true)
+        journal_harness_with(prefix, max_invocations, true, false)
     }
 
     fn journal_harness_with(
         prefix: &str,
         max_invocations: Option<u32>,
         reject_first_intent_write: bool,
+        fail_after_effect: bool,
     ) -> Result<JournalHarness, Box<dyn std::error::Error>> {
         let db_path = unique_kernel_db_path(prefix);
         let store = Arc::new(SqliteReceiptStore::open(&db_path)?);
@@ -289,6 +304,7 @@ mod support {
             store: Arc::clone(&store),
             invoked: Arc::clone(&invoked),
             open_intents_seen_at_invoke: Arc::clone(&open_intents_seen_at_invoke),
+            fail_after_effect,
         }));
         if reject_first_intent_write {
             kernel.set_receipt_store_handle(Arc::new(IntentRejectingStore {
@@ -588,6 +604,56 @@ fn intent_write_failure_denies_before_dispatch_without_leaking_hold(
         harness.invoked.load(std::sync::atomic::Ordering::SeqCst),
         1,
         "the retry dispatches exactly once"
+    );
+
+    let _ = std::fs::remove_file(&harness.db_path);
+    Ok(())
+}
+
+#[test]
+fn allow_receipt_consumes_the_intent_leaving_no_orphan(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::Verdict;
+
+    // Drive a full side-effecting evaluate to Allow: committing the receipt
+    // must consume the intent in the same transaction, so a later boot
+    // reconciliation finds nothing to dead-letter.
+    let harness = support::journal_harness("chio-intent-consume-on-allow")?;
+    let response = harness
+        .kernel
+        .evaluate_tool_call_blocking(&harness.request("write_file"))?;
+    assert!(matches!(response.verdict, Verdict::Allow));
+    harness.store.flush_receipt_writes()?;
+    assert_eq!(
+        harness.store.open_dispatch_intent_count()?,
+        0,
+        "the committed receipt consumed the intent"
+    );
+    assert_eq!(harness.store.dead_letter_dispatch_intent_count()?, 0);
+    assert!(harness.store.receipt_store_health()?.healthy);
+
+    let _ = std::fs::remove_file(&harness.db_path);
+    Ok(())
+}
+
+#[test]
+fn post_dispatch_tool_error_still_consumes_the_intent(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::Verdict;
+
+    // A tool that fails AFTER its side effect ends in a post-dispatch deny
+    // receipt; committing that receipt must also consume the intent so an
+    // effecting call that ends in a deny never leaves a false orphan.
+    let harness = support::journal_harness_failing_tool("chio-intent-consume-on-deny")?;
+    let response = harness
+        .kernel
+        .evaluate_tool_call_blocking(&harness.request("write_file"))?;
+    assert!(matches!(response.verdict, Verdict::Deny));
+    harness.store.flush_receipt_writes()?;
+    assert_eq!(
+        harness.store.open_dispatch_intent_count()?,
+        0,
+        "the deny receipt consumed the intent"
     );
 
     let _ = std::fs::remove_file(&harness.db_path);

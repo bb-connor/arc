@@ -123,7 +123,7 @@ impl ChioKernel {
             admission.remote_kernel_id.as_deref() == request.federated_origin_kernel_id.as_deref()
         });
         let scoped_admission = request_admission.as_ref().or(thread_admission);
-        self.record_chio_receipt(receipt)?;
+        self.record_chio_receipt_consuming_optional_intent(receipt, Some(&request.request_id))?;
         self.apply_federation_cosign(
             request,
             receipt,
@@ -150,7 +150,7 @@ impl ChioKernel {
 
     fn record_chio_receipt_for_admitted_request_local_only(
         &self,
-        _request: &crate::runtime::ToolCallRequest,
+        request: &crate::runtime::ToolCallRequest,
         receipt: &ChioReceipt,
     ) -> Result<(), KernelError> {
         // Persist the v1 deny receipt locally and
@@ -158,10 +158,26 @@ impl ChioKernel {
         // runtime-admission deny path does not co-sign because the deny
         // decision is locally authoritative and may have been triggered
         // before any federation peer was contacted.
-        self.record_chio_receipt(receipt)
+        self.record_chio_receipt_consuming_optional_intent(receipt, Some(&request.request_id))
     }
 
     pub(crate) fn record_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), KernelError> {
+        self.record_chio_receipt_consuming_optional_intent(receipt, None)
+    }
+
+    /// Persist a terminal receipt and, when the request journaled a dispatch
+    /// intent, consume that intent in the SAME transaction as the receipt
+    /// insert. Request-id-less callers pass `None` and get the plain append.
+    /// The request-aware sinks pass the request id, so allow, post-dispatch
+    /// deny, cancelled, and incomplete receipts all consume the intent and an
+    /// effecting call that ends in any terminal receipt leaves no false
+    /// orphan behind.
+    pub(crate) fn record_chio_receipt_consuming_optional_intent(
+        &self,
+        receipt: &ChioReceipt,
+        request_id: Option<&str>,
+    ) -> Result<(), KernelError> {
+        let intent = self.dispatch_intent_for_request(request_id);
         // Scope the receipt-store write lock so it is released before the
         // settlement observer runs. Holding the mutex across
         // `run_settlement_observer` would serialize all concurrent receipt
@@ -178,12 +194,30 @@ impl ChioKernel {
             // call) indefinitely. On timeout this fails closed with
             // ReceiptPersistence(Timeout); no allow response is signed until the
             // append succeeds.
-            self.with_receipt_store(|store| {
-                Ok(store.append_chio_receipt_with_timeout(
-                    receipt,
-                    self.config.deadlines.receipt_append_budget(),
-                )?)
-            })?;
+            let budget = self.config.deadlines.receipt_append_budget();
+            match intent {
+                Some(intent) => {
+                    // The key binds the consume to the exact attested call:
+                    // request id from the pre-dispatch handle, parameter hash
+                    // and tenant from the receipt itself. Any disagreement
+                    // aborts the transaction with the receipt unpersisted.
+                    let key = crate::receipt_store::DispatchIntentKey {
+                        request_id: intent.request_id,
+                        parameter_hash: receipt.action.parameter_hash.clone(),
+                        tenant_id: receipt.tenant_id.clone(),
+                    };
+                    self.with_receipt_store(|store| {
+                        Ok(store.append_chio_receipt_consuming_intent_with_timeout(
+                            receipt, &key, budget,
+                        )?)
+                    })?;
+                }
+                None => {
+                    self.with_receipt_store(|store| {
+                        Ok(store.append_chio_receipt_with_timeout(receipt, budget)?)
+                    })?;
+                }
+            }
             self.append_chio_receipt_to_local_log(receipt.clone());
         }
         let _settlement_status = self.run_settlement_observer(receipt);
