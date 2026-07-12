@@ -352,6 +352,134 @@ fn nested_flow_url_elicitation_exit_clears_the_journaled_intent(
 }
 
 #[test]
+fn a_failed_pre_dispatch_cleanup_clears_the_journaled_intent(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // A dispatch error that precedes any tool side effect routes through the
+    // pre-dispatch cleanup denial. When a cleanup step itself fails (here:
+    // the pre-execution budget reversal), the evaluation exits with an error
+    // before any receipt is recorded. The journaled intent must be cleared on
+    // that exit: the tool never ran, so an open row would dead-letter at the
+    // next boot as a false orphan.
+    let path = unique_receipt_db_path("chio-intent-cleanup-abort-clear");
+    let mut config = make_config();
+    config.dispatch_intent_journal = crate::DispatchIntentJournalMode::SideEffecting;
+    let mut kernel = make_kernel(config);
+    let store = std::sync::Arc::new(SqliteReceiptStore::open(&path)?);
+    kernel.set_receipt_store_handle(
+        std::sync::Arc::clone(&store) as std::sync::Arc<dyn crate::receipt_store::ReceiptStore>
+    )?;
+    kernel.register_tool_server(Box::new(ToolNotRegisteredDispatchServer::new(
+        "srv-chio-runtime",
+        vec!["destructive_update"],
+    )));
+    kernel.set_budget_store_handle(std::sync::Arc::new(FailingReverseBudgetStore::new()));
+
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_invocation_limited_grant(
+            "srv-chio-runtime",
+            "destructive_update",
+            1,
+        )]),
+        300,
+    );
+    let request = make_request(
+        "req-cleanup-abort-clear",
+        &cap,
+        "destructive_update",
+        "srv-chio-runtime",
+    );
+
+    let result = kernel.evaluate_tool_call_blocking(&request);
+    assert!(
+        result.is_err(),
+        "the failed budget reversal must surface as an error, got {result:?}"
+    );
+    store.flush_receipt_writes()?;
+    assert_eq!(
+        store.open_dispatch_intent_count()?,
+        0,
+        "an aborted pre-dispatch cleanup must not leave an open intent for a \
+         tool that never ran"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn nested_flow_failed_pre_dispatch_cleanup_clears_the_journaled_intent(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Nested-flow mirror of the cleanup-abort clear: its pre-dispatch denial
+    // arms route through the same cleanup builder and share the contract.
+    let path = unique_receipt_db_path("chio-intent-cleanup-abort-clear-nested");
+    let mut config = make_config();
+    config.dispatch_intent_journal = crate::DispatchIntentJournalMode::SideEffecting;
+    let mut kernel = make_kernel(config);
+    let store = std::sync::Arc::new(SqliteReceiptStore::open(&path)?);
+    kernel.set_receipt_store_handle(
+        std::sync::Arc::clone(&store) as std::sync::Arc<dyn crate::receipt_store::ReceiptStore>
+    )?;
+    kernel.register_tool_server(Box::new(ToolNotRegisteredDispatchServer::new(
+        "srv-chio-runtime",
+        vec!["destructive_update"],
+    )));
+    kernel.set_budget_store_handle(std::sync::Arc::new(FailingReverseBudgetStore::new()));
+
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_invocation_limited_grant(
+            "srv-chio-runtime",
+            "destructive_update",
+            1,
+        )]),
+        300,
+    );
+    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;
+    kernel.activate_session(&session_id)?;
+    let context = make_operation_context(
+        &session_id,
+        "req-cleanup-abort-clear-nested",
+        &agent_kp.public_key().to_hex(),
+    );
+    kernel.begin_session_request(&context, OperationKind::ToolCall, true)?;
+    let request = make_request(
+        "req-cleanup-abort-clear-nested",
+        &cap,
+        "destructive_update",
+        "srv-chio-runtime",
+    );
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    let result = rt.block_on(async {
+        let mut client = NoopNestedFlowClient;
+        kernel
+            .evaluate_tool_call_with_nested_flow_client_async(&context, &request, &mut client, None)
+            .await
+    });
+    assert!(
+        result.is_err(),
+        "the failed budget reversal must surface as an error, got {result:?}"
+    );
+    store.flush_receipt_writes()?;
+    assert_eq!(
+        store.open_dispatch_intent_count()?,
+        0,
+        "a nested aborted pre-dispatch cleanup must not leave an open intent \
+         for a tool that never ran"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
 fn a_second_cleanup_fault_receipt_persists_after_the_first_consumes_the_intent(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // A URL-elicitation unwind can legitimately record more than one signed
