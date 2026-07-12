@@ -73,20 +73,20 @@ impl ChioKernel {
         .flatten()
     }
 
+    /// Install the RESOLVED tenant for `request_id`, including a known-none
+    /// entry for a tenantless request. The entry must exist either way:
+    /// readers that miss the map fall back to the thread-local scope, and on
+    /// a worker resuming this request while a sibling task's scope guard is
+    /// alive that fallback would leak the sibling's tenant into this
+    /// request's receipts and journaled dispatch intent.
     pub(crate) fn scope_receipt_tenant_id_for_request(
         &self,
         request_id: &str,
         tenant_id: Option<String>,
     ) -> ScopedKernelReceiptTenantId {
-        let previous = match tenant_id {
-            Some(tenant_id) => self
-                .receipt_tenant_ids
-                .insert(request_id.to_string(), tenant_id),
-            None => self
-                .receipt_tenant_ids
-                .remove(request_id)
-                .map(|(_, previous)| previous),
-        };
+        let previous = self
+            .receipt_tenant_ids
+            .insert(request_id.to_string(), tenant_id);
         ScopedKernelReceiptTenantId {
             request_id: request_id.to_string(),
             tenant_ids: Arc::clone(&self.receipt_tenant_ids),
@@ -124,7 +124,14 @@ impl ChioKernel {
         })
     }
 
-    pub(crate) fn receipt_tenant_id_for_request(&self, request_id: Option<&str>) -> Option<String> {
+    /// The tenant resolved for `request_id` by its evaluation scope. The
+    /// outer `Option` is presence of the request-scoped entry; the inner one
+    /// is the resolved tenant itself, so a known tenantless request returns
+    /// `Some(None)` and callers do not fall back to the thread-local scope.
+    pub(crate) fn receipt_tenant_id_for_request(
+        &self,
+        request_id: Option<&str>,
+    ) -> Option<Option<String>> {
         request_id.and_then(|request_id| {
             self.receipt_tenant_ids
                 .get(request_id)

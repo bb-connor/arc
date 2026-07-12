@@ -670,8 +670,11 @@ pub struct ChioKernel {
         Option<std::sync::Arc<dyn crate::federation_artifact_store::FederationArtifactStore>>,
     /// Request-keyed tenant scope for receipts. Async evaluate futures
     /// can resume on a different worker after dispatch, so the scope is
-    /// stored in this map rather than a thread-local.
-    pub(super) receipt_tenant_ids: Arc<DashMap<String, String>>,
+    /// stored in this map rather than a thread-local. The value is the
+    /// RESOLVED tenant, including `None` for a tenantless request: the entry
+    /// itself proves the request's tenant is known, so no reader falls back
+    /// to a thread-local that may carry a concurrent sibling task's tenant.
+    pub(super) receipt_tenant_ids: Arc<DashMap<String, Option<String>>>,
     /// Request-keyed dispatch-intent handles. Receipts carry no request id
     /// and the evaluate future can migrate workers at the dispatch await, so
     /// the pre-dispatch intent binding travels in this map (exactly like the

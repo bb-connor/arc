@@ -601,39 +601,35 @@ impl ChioKernel {
         // unwind the admission and authorize arms use, then deny before any
         // effect. Read-only calls return None here and pay nothing.
         let has_monetary = budget_mutation.charge_result().is_some();
-        let intent_tenant = current_scoped_receipt_tenant_id();
-        let dispatch_intent = match self.record_dispatch_intent_if_side_effecting(
-            request,
-            has_monetary,
-            intent_tenant.as_deref(),
-            now_unix_ms,
-        ) {
-            Ok(handle) => handle,
-            Err(error) => {
-                let msg = error.to_string();
-                warn!(
-                    request_id = %request.request_id,
-                    reason = %redacted!(&msg),
-                    "dispatch intent write failed; denying before dispatch"
-                );
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                            request,
-                            reason: &msg,
-                            timestamp: now,
-                            matched_grant_index,
-                            cap,
-                            budget_mutation: &budget_mutation,
-                            payment_authorization: None,
-                            runtime_admission_metadata: extra_metadata.clone(),
-                            budget_lease_acquired,
-                        })
-                    },
-                );
-            }
-        };
+        let dispatch_intent =
+            match self.record_dispatch_intent_if_side_effecting(request, has_monetary, now_unix_ms)
+            {
+                Ok(handle) => handle,
+                Err(error) => {
+                    let msg = error.to_string();
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %redacted!(&msg),
+                        "dispatch intent write failed; denying before dispatch"
+                    );
+                    return self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
+                                request,
+                                reason: &msg,
+                                timestamp: now,
+                                matched_grant_index,
+                                cap,
+                                budget_mutation: &budget_mutation,
+                                payment_authorization: None,
+                                runtime_admission_metadata: extra_metadata.clone(),
+                                budget_lease_acquired,
+                            })
+                        },
+                    );
+                }
+            };
         // Register the handle for the whole evaluation so whichever terminal
         // receipt commits first consumes the intent; the guard clears the
         // registration when this future finishes (or is dropped).

@@ -10,17 +10,24 @@ impl ChioKernel {
         // Precedence:
         //   1. An explicit override on `ReceiptParams` (currently unused).
         //   2. The request-keyed tenant context set by the evaluate path.
+        //      A present entry is authoritative even when it resolves to
+        //      no tenant: falling through to the thread-local scope from a
+        //      known-tenantless request would adopt whatever tenant a
+        //      concurrent sibling task's scope guard left on the resuming
+        //      worker thread.
         //   3. The active scoped tenant context set by the evaluate path
-        //      from `session.auth_context().enterprise_identity.tenant_id`.
+        //      from `session.auth_context().enterprise_identity.tenant_id`,
+        //      for receipts built outside any request-scoped evaluation.
         //
         // Tenant_id is never taken from a caller-provided field on the
         // request: allowing caller choice would defeat the isolation the
         // store-level WHERE clause enforces.
-        let tenant_id = params
-            .tenant_id
-            .clone()
-            .or_else(|| self.receipt_tenant_id_for_request(params.request_id))
-            .or_else(current_scoped_receipt_tenant_id);
+        let tenant_id = match params.tenant_id.clone() {
+            Some(tenant_id) => Some(tenant_id),
+            None => self
+                .receipt_tenant_id_for_request(params.request_id)
+                .unwrap_or_else(current_scoped_receipt_tenant_id),
+        };
 
         let request_metadata = params.request_id.map(|request_id| {
             serde_json::json!({

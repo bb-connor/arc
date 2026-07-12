@@ -41,10 +41,16 @@ pub(crate) fn current_scoped_receipt_tenant_id() -> Option<String> {
     RECEIPT_TENANT_ID_SCOPE.with(|slot| slot.borrow().clone())
 }
 
+/// Request-keyed tenant registration, dropped when the evaluation future
+/// finishes. The map stores the RESOLVED tenant for the request, including a
+/// known-none entry for tenantless requests: an entry that merely disappeared
+/// would fall back to the thread-local scope, and on a worker that resumes
+/// this evaluation while a sibling task's scope guard is still alive that
+/// fallback would leak the sibling's tenant into this request's receipts.
 pub(crate) struct ScopedKernelReceiptTenantId {
     pub(super) request_id: String,
-    pub(super) tenant_ids: Arc<DashMap<String, String>>,
-    pub(super) previous: Option<String>,
+    pub(super) tenant_ids: Arc<DashMap<String, Option<String>>>,
+    pub(super) previous: Option<Option<String>>,
 }
 
 impl Drop for ScopedKernelReceiptTenantId {

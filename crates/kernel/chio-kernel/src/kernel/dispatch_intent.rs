@@ -49,13 +49,23 @@ impl ChioKernel {
         &self,
         request: &crate::runtime::ToolCallRequest,
         has_monetary: bool,
-        tenant_id: Option<&str>,
         now_unix_ms: u64,
     ) -> Result<Option<DispatchIntentHandle>, KernelError> {
         let mode = self.config.dispatch_intent_journal;
         if matches!(mode, DispatchIntentJournalMode::Off) {
             return Ok(None);
         }
+
+        // The intent's tenant must be resolved EXACTLY as the terminal
+        // receipt resolves it (request-scoped entry first, thread-local scope
+        // only for callers outside a request scope): the consuming append
+        // keys on the receipt's tenant, so any divergence here would strand
+        // the intent after the side effect already ran. The request-scoped
+        // entry is installed at the top of every evaluate path and is stable
+        // across worker migration, unlike the thread-local.
+        let tenant_id = self
+            .receipt_tenant_id_for_request(Some(request.request_id.as_str()))
+            .unwrap_or_else(current_scoped_receipt_tenant_id);
 
         // Class order: monetary wins, then the connection's read-only
         // annotation, else side-effecting. An unregistered server or
@@ -110,7 +120,7 @@ impl ChioKernel {
             monetary: has_monetary,
             rail,
             rail_authorization_id: None,
-            tenant_id: tenant_id.map(str::to_string),
+            tenant_id: tenant_id.clone(),
             created_at_unix_ms: now_unix_ms,
         };
 
@@ -131,7 +141,7 @@ impl ChioKernel {
         Ok(Some(DispatchIntentHandle {
             request_id: request.request_id.clone(),
             parameter_hash,
-            tenant_id: tenant_id.map(str::to_string),
+            tenant_id,
         }))
     }
 }
