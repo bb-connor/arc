@@ -320,12 +320,16 @@ mod receipt_operator_tests {
             uncheckpointed_end_seq: Some(12),
             checkpoint_error: Some("projection drift".to_string()),
             db_size_bytes: Some(4096),
+            writer_level: Default::default(),
+            writer_restart_total: 4,
         };
         let health_output = render_receipt_health_human(&health);
         assert!(health_output.contains("checkpoint_seq: 2"));
         assert!(health_output.contains("uncheckpointed_range: 9..=12"));
         assert!(health_output.contains("writer_accepted_total: 10"));
         assert!(health_output.contains("writer_saturated_total: 2"));
+        assert!(health_output.contains("writer_level: healthy"));
+        assert!(health_output.contains("writer_restart_total: 4"));
         assert!(health_output.contains("db_size_bytes: 4096"));
         assert!(health_output.contains("checkpoint_error: projection drift"));
         assert!(health_output.contains("writer_last_error: writer lag"));

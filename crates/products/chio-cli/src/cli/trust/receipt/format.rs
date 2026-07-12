@@ -73,6 +73,7 @@ pub(crate) fn push_writer_counters_human(
 }
 
 pub(crate) fn render_receipt_health_human(report: &chio_kernel::ReceiptStoreHealthReport) -> String {
+    let writer_level = format!("{:?}", report.writer_level).to_ascii_lowercase();
     let mut lines = vec![
         format!(
             "status: {}",
@@ -88,6 +89,8 @@ pub(crate) fn render_receipt_health_human(report: &chio_kernel::ReceiptStoreHeal
             "checkpointed_entry_seq: {}",
             report.latest_checkpointed_entry_seq
         ),
+        format!("writer_level: {writer_level}"),
+        format!("writer_restart_total: {}", report.writer_restart_total),
     ];
     if let (Some(start), Some(end)) = (
         report.uncheckpointed_start_seq,
