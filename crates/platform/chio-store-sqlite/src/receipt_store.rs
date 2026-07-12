@@ -3270,16 +3270,21 @@ impl SqliteReceiptStore {
         if open.is_empty() {
             return Ok(report);
         }
-        let mut annotations: Vec<(String, String)> = Vec::with_capacity(open.len());
+        let mut dead_letters: Vec<(String, String)> = Vec::new();
+        let mut reconciled: Vec<(String, String)> = Vec::new();
         for intent in &open {
             match reconciler.resolve(intent)? {
                 DispatchIntentResolution::DeadLetter { detail } => {
                     report.dead_lettered += 1;
-                    annotations.push((intent.request_id.clone(), detail));
+                    dead_letters.push((intent.request_id.clone(), detail));
                 }
                 DispatchIntentResolution::MonetaryReconciled { rail_reference } => {
+                    // A rail-proven outcome gets its own terminal state: it
+                    // is resolved work, not an outcome-unknown incident, so
+                    // it must not dead-letter (which flips health until an
+                    // operator intervenes).
                     report.monetary_reconciled += 1;
-                    annotations.push((
+                    reconciled.push((
                         intent.request_id.clone(),
                         format!("monetary reconciled; rail_reference={rail_reference}"),
                     ));
@@ -3295,8 +3300,11 @@ impl SqliteReceiptStore {
         self.writer_handle().run_write(move |connection| {
             let tx =
                 connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-            for (request_id, detail) in &annotations {
+            for (request_id, detail) in &dead_letters {
                 dead_letter_dispatch_intent_tx(&tx, request_id, detail)?;
+            }
+            for (request_id, detail) in &reconciled {
+                reconcile_dispatch_intent_tx(&tx, request_id, detail)?;
             }
             tx.commit()?;
             Ok(())

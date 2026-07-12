@@ -299,6 +299,85 @@ fn reconcile_dead_letters_orphans_and_reports_counts() -> Result<(), Box<dyn std
     Ok(())
 }
 
+/// Rail-aware reconciler: proves the outcome of monetary orphans against the
+/// rail and dead-letters everything else.
+struct RailProvingReconciler;
+
+impl chio_kernel::receipt_store::DispatchIntentReconciler for RailProvingReconciler {
+    fn resolve(
+        &self,
+        intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+    ) -> Result<
+        chio_kernel::receipt_store::DispatchIntentResolution,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        if intent.monetary {
+            Ok(
+                chio_kernel::receipt_store::DispatchIntentResolution::MonetaryReconciled {
+                    rail_reference: "tx-123".to_string(),
+                },
+            )
+        } else {
+            Ok(
+                chio_kernel::receipt_store::DispatchIntentResolution::DeadLetter {
+                    detail: "outcome unknown".to_string(),
+                },
+            )
+        }
+    }
+}
+
+#[test]
+fn monetary_reconciled_intent_is_not_a_dead_letter_and_health_stays_green(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-intents-monetary-reconciled");
+    let store = SqliteReceiptStore::open(&path)?;
+    // One writer round trip so the later health sample observes the seeded
+    // verified head rather than racing writer-thread startup.
+    store.flush_receipt_writes()?;
+
+    let mut monetary = sample_intent("orphan-reconciled");
+    monetary.side_effect_class = chio_kernel::receipt_store::SideEffectClass::Monetary;
+    monetary.monetary = true;
+    monetary.rail = Some("x402".to_string());
+    monetary.rail_authorization_id = Some("auth-7".to_string());
+    store.record_dispatch_intent(&monetary)?;
+
+    let report = store.reconcile_dispatch_intents(&RailProvingReconciler)?;
+    assert_eq!(report.open, 1);
+    assert_eq!(report.monetary_reconciled, 1);
+    assert_eq!(report.dead_lettered, 0);
+
+    // The reconciled intent reaches its own terminal state carrying the rail
+    // reference: the reconciler PROVED the outcome, so the row is neither
+    // open nor an outcome-unknown dead letter.
+    let connection = store.reader_connection_for_test()?;
+    let (state, detail): (String, String) = connection.query_row(
+        "SELECT state, resolution_detail FROM chio_dispatch_intents \
+         WHERE request_id = 'orphan-reconciled'",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    drop(connection);
+    assert_eq!(state, "reconciled");
+    assert!(
+        detail.contains("tx-123"),
+        "the terminal disposition names the rail reference: {detail}"
+    );
+    assert_eq!(store.open_dispatch_intent_count()?, 0);
+    assert_eq!(store.dead_letter_dispatch_intent_count()?, 0);
+
+    let health = store.receipt_store_health()?;
+    assert!(
+        health.healthy,
+        "a rail-proven reconciliation is not an incident and must not flip health"
+    );
+    assert_eq!(health.dead_letter_dispatch_intents, 0);
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 #[test]
 fn dead_letter_intent_flips_store_unhealthy() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-intents-health");

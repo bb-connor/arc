@@ -270,6 +270,24 @@ pub(crate) fn dead_letter_dispatch_intent_tx(
     Ok(())
 }
 
+/// Mark an orphaned monetary intent whose outcome the reconciler PROVED
+/// against the rail as terminally reconciled. Distinct from a dead letter:
+/// the outcome is known, so the row must not count as an outcome-unknown
+/// incident or flip store health; the annotation preserves the rail
+/// reference the proof came from.
+pub(crate) fn reconcile_dispatch_intent_tx(
+    tx: &rusqlite::Transaction<'_>,
+    request_id: &str,
+    detail: &str,
+) -> Result<(), ReceiptStoreError> {
+    tx.execute(
+        "UPDATE chio_dispatch_intents SET state = 'reconciled', resolution_detail = ?2 \
+         WHERE request_id = ?1 AND state = 'open'",
+        rusqlite::params![request_id, detail],
+    )?;
+    Ok(())
+}
+
 /// Count of open (in-flight or unreconciled) dispatch intents, tolerant of a
 /// missing table on a pre-journal database.
 pub(crate) fn open_dispatch_intent_count_query(
