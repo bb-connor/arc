@@ -1,8 +1,9 @@
 use super::*;
 use chio_kernel::budget_store::{
-    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest,
-    BudgetInvocationQuota, BudgetInvocationReservationState, BudgetQuotaKey, BudgetQuotaProfile,
-    BudgetReconcileHoldRequest, BudgetReleaseHoldRequest, BudgetReverseHoldRequest,
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureHoldRequest,
+    BudgetCaptureInvocationRequest, BudgetInvocationQuota, BudgetInvocationReservationState,
+    BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
+    BudgetReverseHoldRequest,
 };
 use chio_kernel::supplemental_quota::CanonicalRevocationSet;
 use chio_kernel::InMemoryBudgetStore;
@@ -413,6 +414,236 @@ fn composite_invocation_capture_is_atomic_idempotent_and_restart_durable() {
         1
     );
 
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn composite_reverse_restores_every_reserved_quota_and_survives_restart() {
+    let path = unique_db_path("chio-composite-budget-reverse");
+    let reverse_request = BudgetReverseHoldRequest {
+        capability_id: "leaf".to_string(),
+        grant_index: 0,
+        reversed_exposure_units: 100,
+        hold_id: Some("hold-reverse-composite-1".to_string()),
+        event_id: Some("event-reverse-composite-1".to_string()),
+        authority: None,
+    };
+    let reversed = {
+        let store = SqliteBudgetStore::open(&path).unwrap();
+        assert!(store
+            .authorize_composite_hold(composite_authorize_input(
+                "hold-reverse-composite-1",
+                "event-authorize-reverse-composite-1",
+                1,
+            ))
+            .unwrap()
+            .is_authorized());
+        store.reverse_budget_hold(reverse_request.clone()).unwrap()
+    };
+    assert_eq!(
+        reversed.invocation_state,
+        BudgetInvocationReservationState::Reversed
+    );
+    assert_eq!(reversed.monetary_state, BudgetMonetaryHoldState::Reversed);
+    assert!(reversed
+        .invocation_counts_after
+        .iter()
+        .all(
+            |usage| usage.reserved_invocations_after == 0 && usage.captured_invocations_after == 0
+        ));
+
+    let reopened = SqliteBudgetStore::open(&path).unwrap();
+    assert_eq!(
+        reopened.reverse_budget_hold(reverse_request).unwrap(),
+        reversed
+    );
+    assert_eq!(
+        reopened
+            .get_usage("leaf", 0)
+            .unwrap()
+            .unwrap()
+            .invocation_count,
+        0
+    );
+    assert!(reopened
+        .authorize_composite_hold(composite_authorize_input(
+            "hold-reverse-composite-2",
+            "event-authorize-reverse-composite-2",
+            1,
+        ))
+        .unwrap()
+        .is_authorized());
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn composite_reconcile_preserves_captured_invocation_evidence() {
+    let path = unique_db_path("chio-composite-budget-reconcile");
+    let reconcile_request = BudgetReconcileHoldRequest {
+        capability_id: "leaf".to_string(),
+        grant_index: 0,
+        exposed_cost_units: 100,
+        realized_spend_units: 30,
+        hold_id: Some("hold-reconcile-composite-1".to_string()),
+        event_id: Some("event-reconcile-composite-1".to_string()),
+        authority: None,
+    };
+    let reconciled = {
+        let store = SqliteBudgetStore::open(&path).unwrap();
+        assert!(store
+            .authorize_composite_hold(composite_authorize_input(
+                "hold-reconcile-composite-1",
+                "event-authorize-reconcile-composite-1",
+                2,
+            ))
+            .unwrap()
+            .is_authorized());
+        store
+            .capture_invocation_reservations(BudgetCaptureInvocationRequest {
+                capability_id: "leaf".to_string(),
+                grant_index: 0,
+                hold_id: Some("hold-reconcile-composite-1".to_string()),
+                event_id: Some("event-capture-reconcile-composite-1".to_string()),
+                authority: None,
+            })
+            .unwrap();
+        store
+            .reconcile_budget_hold(reconcile_request.clone())
+            .unwrap()
+    };
+    assert_eq!(
+        reconciled.invocation_state,
+        BudgetInvocationReservationState::Captured
+    );
+    assert_eq!(
+        reconciled.monetary_state,
+        BudgetMonetaryHoldState::Reconciled
+    );
+    assert_eq!(reconciled.committed_cost_units_after, 30);
+    assert!(reconciled
+        .invocation_counts_after
+        .iter()
+        .all(
+            |usage| usage.reserved_invocations_after == 0 && usage.captured_invocations_after == 1
+        ));
+
+    let reopened = SqliteBudgetStore::open(&path).unwrap();
+    assert_eq!(
+        reopened.reconcile_budget_hold(reconcile_request).unwrap(),
+        reconciled
+    );
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn composite_partial_release_preserves_invocation_state_and_remaining_exposure() {
+    let path = unique_db_path("chio-composite-budget-release");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    assert!(store
+        .authorize_composite_hold(composite_authorize_input(
+            "hold-release-composite-1",
+            "event-authorize-release-composite-1",
+            2,
+        ))
+        .unwrap()
+        .is_authorized());
+    store
+        .capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            capability_id: "leaf".to_string(),
+            grant_index: 0,
+            hold_id: Some("hold-release-composite-1".to_string()),
+            event_id: Some("event-capture-release-composite-1".to_string()),
+            authority: None,
+        })
+        .unwrap();
+    let partial = store
+        .release_budget_hold(BudgetReleaseHoldRequest {
+            capability_id: "leaf".to_string(),
+            grant_index: 0,
+            released_exposure_units: 40,
+            hold_id: Some("hold-release-composite-1".to_string()),
+            event_id: Some("event-release-composite-1".to_string()),
+            authority: None,
+        })
+        .unwrap();
+    assert_eq!(
+        partial.invocation_state,
+        BudgetInvocationReservationState::Captured
+    );
+    assert_eq!(partial.monetary_state, BudgetMonetaryHoldState::Exposed);
+    assert_eq!(partial.committed_cost_units_after, 60);
+
+    let final_request = BudgetReleaseHoldRequest {
+        capability_id: "leaf".to_string(),
+        grant_index: 0,
+        released_exposure_units: 60,
+        hold_id: Some("hold-release-composite-1".to_string()),
+        event_id: Some("event-release-composite-2".to_string()),
+        authority: None,
+    };
+    let released = store.release_budget_hold(final_request.clone()).unwrap();
+    assert_eq!(
+        released.invocation_state,
+        BudgetInvocationReservationState::Captured
+    );
+    assert_eq!(released.monetary_state, BudgetMonetaryHoldState::Released);
+    assert_eq!(released.committed_cost_units_after, 0);
+    drop(store);
+
+    let reopened = SqliteBudgetStore::open(&path).unwrap();
+    assert_eq!(
+        reopened.release_budget_hold(final_request).unwrap(),
+        released
+    );
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn composite_monetary_capture_preserves_captured_invocation_evidence() {
+    let path = unique_db_path("chio-composite-budget-monetary-capture");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    assert!(store
+        .authorize_composite_hold(composite_authorize_input(
+            "hold-monetary-capture-1",
+            "event-authorize-monetary-capture-1",
+            2,
+        ))
+        .unwrap()
+        .is_authorized());
+    store
+        .capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            capability_id: "leaf".to_string(),
+            grant_index: 0,
+            hold_id: Some("hold-monetary-capture-1".to_string()),
+            event_id: Some("event-invocation-monetary-capture-1".to_string()),
+            authority: None,
+        })
+        .unwrap();
+    let captured = store
+        .capture_budget_hold(BudgetCaptureHoldRequest {
+            capability_id: "leaf".to_string(),
+            grant_index: 0,
+            exposed_cost_units: 100,
+            realized_spend_units: 25,
+            hold_id: Some("hold-monetary-capture-1".to_string()),
+            event_id: Some("event-monetary-capture-1".to_string()),
+            authority: None,
+        })
+        .unwrap();
+    assert_eq!(
+        captured.invocation_state,
+        BudgetInvocationReservationState::Captured
+    );
+    assert_eq!(captured.monetary_state, BudgetMonetaryHoldState::Captured);
+    assert_eq!(captured.committed_cost_units_after, 25);
+    assert!(captured
+        .invocation_counts_after
+        .iter()
+        .all(
+            |usage| usage.reserved_invocations_after == 0 && usage.captured_invocations_after == 1
+        ));
     let _ = fs::remove_file(path);
 }
 

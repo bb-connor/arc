@@ -1333,6 +1333,9 @@ impl BudgetStore for SqliteBudgetStore {
         &self,
         request: BudgetReverseHoldRequest,
     ) -> Result<BudgetReverseHoldDecision, BudgetStoreError> {
+        if self.has_composite_authorization(request.hold_id.as_deref())? {
+            return self.reverse_composite_budget_hold(request);
+        }
         let event_id = effective_hold_event_id(
             request.event_id.as_deref(),
             BudgetMutationKind::ReverseExposure,
@@ -1357,6 +1360,9 @@ impl BudgetStore for SqliteBudgetStore {
         &self,
         request: BudgetReleaseHoldRequest,
     ) -> Result<BudgetReleaseHoldDecision, BudgetStoreError> {
+        if self.has_composite_authorization(request.hold_id.as_deref())? {
+            return self.release_composite_budget_hold(request);
+        }
         let event_id = effective_hold_event_id(
             request.event_id.as_deref(),
             BudgetMutationKind::ReleaseExposure,
@@ -1381,6 +1387,9 @@ impl BudgetStore for SqliteBudgetStore {
         &self,
         request: BudgetReconcileHoldRequest,
     ) -> Result<BudgetReconcileHoldDecision, BudgetStoreError> {
+        if self.has_composite_authorization(request.hold_id.as_deref())? {
+            return self.settle_composite_budget_hold(request, false);
+        }
         let event_id = effective_hold_event_id(
             request.event_id.as_deref(),
             BudgetMutationKind::ReconcileSpend,
@@ -1406,6 +1415,9 @@ impl BudgetStore for SqliteBudgetStore {
         &self,
         request: BudgetCaptureHoldRequest,
     ) -> Result<BudgetCaptureHoldDecision, BudgetStoreError> {
+        if self.has_composite_authorization(request.hold_id.as_deref())? {
+            return self.settle_composite_budget_hold(request, true);
+        }
         if request.realized_spend_units > request.exposed_cost_units {
             return Err(BudgetStoreError::Invariant(
                 "cannot realize spend larger than exposed cost".to_string(),
