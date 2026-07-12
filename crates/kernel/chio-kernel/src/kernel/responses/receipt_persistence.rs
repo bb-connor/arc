@@ -213,16 +213,48 @@ impl ChioKernel {
                         parameter_hash: receipt.action.parameter_hash.clone(),
                         tenant_id: receipt.tenant_id.clone(),
                     };
-                    self.with_receipt_store(|store| {
+                    let append = self.with_receipt_store(|store| {
                         Ok(store.append_chio_receipt_consuming_intent_with_timeout(
                             receipt, &key, budget,
-                        )?)
+                        ))
                     })?;
-                    // The consuming append deleted the durable row; drop the
-                    // request-scoped handle under the same write lock so any
-                    // later receipt for this request appends plainly instead
-                    // of retrying the consume against the missing row.
-                    self.mark_dispatch_intent_consumed(&key.request_id);
+                    if let Some(append) = append {
+                        match append {
+                            Ok(_) => {
+                                // The consuming append deleted the durable
+                                // row; drop the request-scoped handle under
+                                // the same write lock so any later receipt
+                                // for this request appends plainly instead of
+                                // retrying the consume against the missing
+                                // row.
+                                self.mark_dispatch_intent_consumed(&key.request_id);
+                            }
+                            Err(error) => {
+                                // A timeout is an UNCERTAIN consume: the job
+                                // is still queued on the single writer and
+                                // may commit after this wait expired, so a
+                                // retained handle could send a later receipt
+                                // for the request back through the consume
+                                // and reject it against a row the late commit
+                                // already deleted. Drop the handle so later
+                                // receipts append plainly; if the queued job
+                                // never lands, the still-open row surfaces at
+                                // the next boot instead of costing an audit
+                                // record now. A definitive refusal (the row
+                                // is provably still present) keeps the handle
+                                // so the next receipt can consume it. This
+                                // receipt's own error propagates unchanged
+                                // either way.
+                                if matches!(
+                                    error,
+                                    crate::receipt_store::ReceiptStoreError::Timeout { .. }
+                                ) {
+                                    self.mark_dispatch_intent_consumed(&key.request_id);
+                                }
+                                return Err(error.into());
+                            }
+                        }
+                    }
                 }
                 None => {
                     self.with_receipt_store(|store| {

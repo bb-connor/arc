@@ -125,12 +125,15 @@ impl ChioKernel {
     }
 
     /// Unregister the request-scoped intent handle once a receipt has
-    /// consumed the durable row. A request can legitimately record more than
-    /// one receipt (cleanup fault receipts alongside the terminal outcome);
-    /// a handle retained past the consume would send every later receipt
-    /// back through the consuming append, which rejects against the missing
-    /// row and loses that audit record. With the handle gone, later receipts
-    /// for the request append plainly.
+    /// consumed the durable row, or once a timed-out consuming append has
+    /// made the consume uncertain (the queued job may still commit and
+    /// delete the row). A request can legitimately record more than one
+    /// receipt (cleanup fault receipts alongside the terminal outcome); a
+    /// handle retained past the consume would send every later receipt back
+    /// through the consuming append, which rejects against the missing row
+    /// and loses that audit record. With the handle gone, later receipts for
+    /// the request append plainly, and a row an uncertain consume left open
+    /// surfaces at the next boot.
     pub(crate) fn mark_dispatch_intent_consumed(&self, request_id: &str) {
         self.dispatch_intents.remove(request_id);
     }

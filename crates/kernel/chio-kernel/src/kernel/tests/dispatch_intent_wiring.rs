@@ -560,6 +560,118 @@ fn a_second_cleanup_fault_receipt_persists_after_the_first_consumes_the_intent(
     Ok(())
 }
 
+/// Store whose consuming append COMMITS (receipt recorded, intent consumed)
+/// but reports a timeout: the writer-queued job outran the caller's bounded
+/// wait. A later consuming append for the same request finds the intent gone
+/// and rejects, mirroring the durable store's key-guarded delete.
+struct TimedOutConsumeStore {
+    receipts: Mutex<Vec<String>>,
+    intent_open: std::sync::atomic::AtomicBool,
+}
+
+impl TimedOutConsumeStore {
+    fn new() -> Self {
+        Self {
+            receipts: Mutex::new(Vec::new()),
+            intent_open: std::sync::atomic::AtomicBool::new(true),
+        }
+    }
+
+    fn receipt_ids(&self) -> Vec<String> {
+        self.receipts
+            .lock()
+            .map(|receipts| receipts.clone())
+            .unwrap_or_default()
+    }
+}
+
+impl crate::receipt_store::ReceiptStore for TimedOutConsumeStore {
+    fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        if let Ok(mut receipts) = self.receipts.lock() {
+            receipts.push(receipt.id.clone());
+        }
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_chio_receipt_consuming_intent(
+        &self,
+        receipt: &ChioReceipt,
+        _intent: &crate::receipt_store::DispatchIntentKey,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        if !self
+            .intent_open
+            .swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(ReceiptStoreError::Conflict(
+                "dispatch intent not found; refusing to commit the receipt".to_string(),
+            ));
+        }
+        if let Ok(mut receipts) = self.receipts.lock() {
+            receipts.push(receipt.id.clone());
+        }
+        Err(ReceiptStoreError::Timeout {
+            operation: "receipt consuming append".to_string(),
+            timeout_ms: 25,
+        })
+    }
+}
+
+#[test]
+fn a_receipt_after_a_timed_out_consume_appends_plainly() -> Result<(), Box<dyn std::error::Error>>
+{
+    // A timed-out consuming append is an UNCERTAIN consume: the queued job
+    // can still commit and delete the intent row after the caller's bounded
+    // wait expired (here it already has). The first receipt's timeout must
+    // propagate unchanged, but the request's intent handle must not outlive
+    // it: a later receipt for the same request (a second cleanup fault, for
+    // example) would otherwise retry the consume against the missing row and
+    // lose its audit record.
+    let mut kernel = make_kernel(make_config());
+    let store = std::sync::Arc::new(TimedOutConsumeStore::new());
+    kernel.set_receipt_store_handle(
+        std::sync::Arc::clone(&store) as std::sync::Arc<dyn crate::receipt_store::ReceiptStore>
+    )?;
+
+    let kp = make_keypair();
+    let first = make_signed_receipt(&kp, "receipt-uncertain-consume-1");
+    let second = make_signed_receipt(&kp, "receipt-uncertain-consume-2");
+    let _intent_scope = kernel.scope_dispatch_intent_for_request(
+        "req-uncertain-consume",
+        Some(crate::receipt_store::DispatchIntentHandle {
+            request_id: "req-uncertain-consume".to_string(),
+            parameter_hash: first.action.parameter_hash.clone(),
+            tenant_id: None,
+        }),
+    );
+
+    let error =
+        kernel.record_chio_receipt_consuming_optional_intent(&first, Some("req-uncertain-consume"));
+    assert!(
+        matches!(
+            error,
+            Err(KernelError::ReceiptPersistence(
+                ReceiptStoreError::Timeout { .. }
+            ))
+        ),
+        "the first receipt's timeout must still propagate: {error:?}"
+    );
+
+    kernel.record_chio_receipt_consuming_optional_intent(&second, Some("req-uncertain-consume"))?;
+    assert_eq!(
+        store.receipt_ids(),
+        vec![first.id.clone(), second.id.clone()],
+        "the receipt recorded after the uncertain consume must persist"
+    );
+    Ok(())
+}
+
 #[test]
 fn intent_and_receipt_tenant_ignore_a_foreign_thread_scope(
 ) -> Result<(), Box<dyn std::error::Error>> {
