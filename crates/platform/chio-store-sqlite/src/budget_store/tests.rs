@@ -419,6 +419,32 @@ fn composite_invocation_capture_is_atomic_idempotent_and_restart_durable() {
 }
 
 #[test]
+fn artifact_bound_hold_rejects_ordinary_invocation_capture() {
+    let path = unique_db_path("chio-composite-budget-combined-only");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let mut authorization =
+        composite_authorize_input("hold-combined-only-1", "event-authorize-combined-only-1", 2);
+    authorization.authorization_artifact_digests = vec!["11".repeat(32)];
+    assert!(store
+        .authorize_composite_hold(authorization)
+        .unwrap()
+        .is_authorized());
+    let error = store
+        .capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            capability_id: "leaf".to_string(),
+            grant_index: 0,
+            hold_id: Some("hold-combined-only-1".to_string()),
+            event_id: Some("event-capture-combined-only-1".to_string()),
+            authority: None,
+        })
+        .expect_err("artifact-bound capture must use AdmissionCaptureAuthority");
+    assert!(error
+        .to_string()
+        .contains("combined admission capture authority"));
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn composite_reverse_restores_every_reserved_quota_and_survives_restart() {
     let path = unique_db_path("chio-composite-budget-reverse");
     let reverse_request = BudgetReverseHoldRequest {

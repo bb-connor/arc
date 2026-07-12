@@ -96,6 +96,19 @@ impl SqliteBudgetStore {
     ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
         let mut connection = self.connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let hold_id = request.hold_id.as_deref().ok_or_else(|| {
+            BudgetStoreError::Invariant("invocation capture requires hold_id".to_string())
+        })?;
+        let artifact_count = transaction.query_row(
+            "SELECT COUNT(*) FROM budget_composite_authorization_artifacts WHERE hold_id = ?1",
+            params![hold_id],
+            |row| budget_u64_from_row(row, 0, "authorization artifact count"),
+        )?;
+        if artifact_count > 0 {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` requires the combined admission capture authority"
+            )));
+        }
         let decision =
             Self::capture_composite_invocation_reservations_in_transaction(&transaction, &request)?;
         transaction.commit()?;
