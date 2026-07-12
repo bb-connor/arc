@@ -221,6 +221,22 @@ where
 {
     use chio_http_core::TransportDenyInput;
 
+    // Route the transport-level denial through the same durability gate as the
+    // normal request path. When the evaluator has neither a durable receipt sink
+    // nor an explicit ephemeral opt-in, `prepare` denies normal requests with a
+    // durable-persistence error (surfaced as a 502 by the service), so an
+    // oversized body must not slip past that gate with a signed 413 whose audit
+    // record cannot be recorded. Fail closed with the same server error.
+    if !evaluator.receipts_are_audited() {
+        tracing::error!(
+            target: "chio::tower",
+            "refusing to sign a transport-deny receipt without durable receipt storage; failing closed"
+        );
+        let mut response = http::Response::new(ResBody::default());
+        *response.status_mut() = http::StatusCode::BAD_GATEWAY;
+        return response;
+    }
+
     let status = http::StatusCode::PAYLOAD_TOO_LARGE;
     let caller_identity_hash = caller.identity_hash().ok();
 
@@ -860,6 +876,57 @@ mod tests {
                 .unwrap_or_else(|e| panic!("verify failed: {e}")),
             "deserialised receipt body must verify under the embedded kernel key"
         );
+    }
+
+    /// Durability parity for the transport-deny path: an evaluator with neither
+    /// a durable receipt store nor an explicit ephemeral opt-in is fail-closed,
+    /// so an oversized body must not receive a signed 413 whose audit record is
+    /// silently dropped. It fails closed with the same server error the normal
+    /// request path returns for a missing durable store.
+    #[tokio::test]
+    async fn service_413_fails_closed_without_durable_receipts() {
+        let keypair = Keypair::generate();
+        // `ChioEvaluator::new` attaches no durable store and does not opt into
+        // ephemeral receipts, matching a misconfigured production deployment.
+        let evaluator = ChioEvaluator::new(keypair, "fail-closed-policy".to_string());
+
+        let inner = tower::service_fn(|_req: http::Request<TestBody>| async {
+            panic!("inner should not be called for oversized requests");
+            #[allow(unreachable_code)]
+            Ok::<http::Response<TestBody>, Box<dyn std::error::Error + Send + Sync>>(
+                http::Response::new(Full::new(Bytes::new())),
+            )
+        });
+
+        let mut service = ChioService::new(inner, evaluator).with_max_body_bytes(16);
+
+        let oversized = Bytes::from(vec![b'x'; 64]);
+        let req = http::Request::builder()
+            .method("POST")
+            .uri("/pets")
+            .body(Full::new(oversized))
+            .unwrap_or_else(|e| panic!("build failed: {e}"));
+
+        let resp: http::Response<TestBody> = service
+            .ready()
+            .await
+            .unwrap_or_else(|e| panic!("ready failed: {e}"))
+            .call(req)
+            .await
+            .unwrap_or_else(|e| panic!("call failed: {e}"));
+
+        // Fail closed exactly like the normal path's durability denial: a server
+        // error, and no signed receipt implying an audit trail that never landed.
+        assert_eq!(resp.status(), http::StatusCode::BAD_GATEWAY);
+        assert!(resp.extensions().get::<HttpReceipt>().is_none());
+        assert!(resp.headers().get("x-chio-receipt-id").is_none());
+        let body_bytes = resp
+            .into_body()
+            .collect()
+            .await
+            .unwrap_or_else(|e| panic!("collect failed: {e}"))
+            .to_bytes();
+        assert!(body_bytes.is_empty());
     }
 
     #[tokio::test]

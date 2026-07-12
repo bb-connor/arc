@@ -71,6 +71,12 @@ pub struct ChioEvaluator {
     /// Durable sink for the HTTP receipts signed at the tower edge. `Some` only
     /// when the evaluator was built with a durable receipt store.
     receipt_sink: Option<HttpReceiptSink>,
+    /// Whether the operator explicitly opted into ephemeral (in-memory)
+    /// receipts. With no durable sink and no opt-in the evaluator is
+    /// fail-closed, and every receipt-emitting path (including the transport
+    /// deny path) must refuse rather than sign a receipt that cannot be
+    /// durably recorded.
+    allow_ephemeral: bool,
 }
 
 impl ChioEvaluator {
@@ -87,6 +93,7 @@ impl ChioEvaluator {
             route_resolver: default_route_resolver,
             fail_open: false,
             receipt_sink: None,
+            allow_ephemeral: false,
         }
     }
 
@@ -99,6 +106,7 @@ impl ChioEvaluator {
             route_resolver: default_route_resolver,
             fail_open: false,
             receipt_sink: None,
+            allow_ephemeral: true,
         }
     }
 
@@ -245,6 +253,17 @@ impl ChioEvaluator {
             .map_err(Into::into)
     }
 
+    /// Whether the receipts this evaluator signs can be recorded: either a
+    /// durable receipt store is attached, or the operator explicitly opted into
+    /// ephemeral (in-memory) receipts. When neither holds the evaluator is
+    /// fail-closed - the embedded kernel denies normal requests for missing
+    /// durable persistence - so a transport-level denial must refuse the same
+    /// way instead of emitting a signed receipt whose audit record is silently
+    /// dropped. Denial evidence must be as durable as allow evidence.
+    pub(crate) fn receipts_are_audited(&self) -> bool {
+        self.receipt_sink.is_some() || self.allow_ephemeral
+    }
+
     /// Append an outer HTTP receipt to the durable receipt store when one is
     /// configured. [`crate::ChioService`] signs decision, final-response, and
     /// transport-deny receipts at the HTTP edge; without this they would live
@@ -377,6 +396,7 @@ impl ChioEvaluatorBuilder {
             route_resolver: self.route_resolver,
             fail_open: self.fail_open,
             receipt_sink,
+            allow_ephemeral: self.allow_ephemeral,
         })
     }
 }
@@ -417,6 +437,7 @@ impl Clone for ChioEvaluator {
             route_resolver: self.route_resolver,
             fail_open: self.fail_open,
             receipt_sink: self.receipt_sink.clone(),
+            allow_ephemeral: self.allow_ephemeral,
         }
     }
 }
