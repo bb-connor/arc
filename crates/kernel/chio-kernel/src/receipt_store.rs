@@ -286,6 +286,119 @@ pub struct AuthorizationReceiptConsumption {
     pub consumed_at_unix_ms: u64,
 }
 
+/// Side-effect classification that gates the durable dispatch-intent write.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SideEffectClass {
+    /// Pure/read-only: no durable intent is written; time to first response
+    /// is unchanged.
+    ReadOnly,
+    /// Externally visible effect (file write, message send, non-monetary tool).
+    SideEffecting,
+    /// Moves funds on a payment rail; carries a rail reference.
+    Monetary,
+}
+
+/// Which call classes must write a durable dispatch intent before dispatch.
+/// The compiled default covers every effecting class and exempts read-only;
+/// `KernelConfig` construction sites choose the deployment posture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DispatchIntentJournalMode {
+    /// No intent writes: an effect that crashes before its receipt commits
+    /// leaves no durable trace. Operator opt-out only.
+    Off,
+    /// Write intents for the SideEffecting and Monetary classes.
+    SideEffecting,
+    /// Write intents for every mediated call, including read-only.
+    All,
+}
+
+impl Default for DispatchIntentJournalMode {
+    fn default() -> Self {
+        Self::SideEffecting
+    }
+}
+
+/// A durable operational record proving a side-effecting or monetary call was
+/// about to dispatch. Never signed, never entered into the receipt log, and
+/// never advances the checkpoint sequence.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DispatchIntentRecord {
+    pub request_id: String,
+    pub capability_id: String,
+    pub tool_server: String,
+    pub tool_name: String,
+    pub parameter_hash: String,
+    pub side_effect_class: SideEffectClass,
+    pub monetary: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rail: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rail_authorization_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant_id: Option<String>,
+    pub created_at_unix_ms: u64,
+}
+
+/// Key used to consume an intent in the same transaction as the receipt
+/// append.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DispatchIntentKey {
+    pub request_id: String,
+    /// Must equal the receipt's `action.parameter_hash`; a mismatch fails
+    /// closed so a consumed intent always matches the exact call the receipt
+    /// attests.
+    pub parameter_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant_id: Option<String>,
+}
+
+/// Threaded from the pre-dispatch intent write to the terminal receipt sink
+/// so the receipt-append transaction consumes the matching intent. Receipts
+/// carry no request id, so the binding must travel with the evaluation.
+#[derive(Debug, Clone)]
+pub struct DispatchIntentHandle {
+    pub request_id: String,
+    pub parameter_hash: String,
+    pub tenant_id: Option<String>,
+}
+
+/// Outcome of reconciling one orphaned intent surviving a restart.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DispatchIntentResolution {
+    /// Effect could not be confirmed; record an outcome-unknown incident.
+    DeadLetter { detail: String },
+    /// Reconciler proved the effect never occurred and it is safe to retry.
+    SafeToReplay,
+    /// Rail query confirmed a monetary outcome; the incident carries the
+    /// reference.
+    MonetaryReconciled { rail_reference: String },
+}
+
+/// Decides how to resolve an orphaned dispatch intent at boot. The default
+/// kernel reconciler dead-letters every orphan (a side effect is never
+/// blindly replayed); a rail-querying reconciler can prove a monetary
+/// outcome instead.
+pub trait DispatchIntentReconciler: Send + Sync {
+    fn resolve(
+        &self,
+        intent: &DispatchIntentRecord,
+    ) -> Result<DispatchIntentResolution, ReceiptStoreError>;
+}
+
+/// Summary of one boot reconciliation pass over surviving intents.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DispatchIntentReconcileReport {
+    pub open: u64,
+    pub dead_lettered: u64,
+    pub replayed: u64,
+    pub monetary_reconciled: u64,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ReceiptStoreError {
     #[error("sqlite error: {0}")]
@@ -454,6 +567,87 @@ pub trait ReceiptStore: Send + Sync {
             "durable authorization receipt consumption is not supported by this receipt store"
                 .to_string(),
         ))
+    }
+    /// Durably write a dispatch intent before a side-effecting or monetary
+    /// call dispatches. Fails closed on any store that does not support the
+    /// journal: the caller denies before the effect rather than dispatching
+    /// without a durable trace.
+    fn record_dispatch_intent(
+        &self,
+        _intent: &DispatchIntentRecord,
+    ) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "durable dispatch-intent journal is not supported by this receipt store".to_string(),
+        ))
+    }
+    /// Bounded variant of `record_dispatch_intent`, failing closed with
+    /// `ReceiptStoreError::Timeout` if the writer round trip exceeds `budget`.
+    /// The default ignores the budget (the unbounded default already fails
+    /// closed); a store with an async commit writer overrides this so a
+    /// writer that stalls after the pre-dispatch liveness check cannot hang
+    /// the evaluation inside the intent write.
+    fn record_dispatch_intent_with_timeout(
+        &self,
+        intent: &DispatchIntentRecord,
+        _budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        self.record_dispatch_intent(intent)
+    }
+    /// Append a receipt and, in the SAME transaction, consume the matching
+    /// dispatch intent. A `parameter_hash` mismatch or missing intent aborts
+    /// the whole transaction: neither the receipt nor the delete commits.
+    fn append_chio_receipt_consuming_intent(
+        &self,
+        _receipt: &ChioReceipt,
+        _intent: &DispatchIntentKey,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "durable dispatch-intent consumption is not supported by this receipt store"
+                .to_string(),
+        ))
+    }
+    /// Bounded variant of `append_chio_receipt_consuming_intent`, failing
+    /// closed with `ReceiptStoreError::Timeout` if the commit round trip
+    /// exceeds `budget`, so a wedged writer cannot pin the kernel-wide
+    /// receipt write lock through the consuming append.
+    fn append_chio_receipt_consuming_intent_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        intent: &DispatchIntentKey,
+        _budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        self.append_chio_receipt_consuming_intent(receipt, intent)
+    }
+    /// Best-effort attach of a rail authorization id to an open monetary
+    /// intent, so a monetary orphan names the exact reference an operator
+    /// reconciles against.
+    fn attach_dispatch_intent_rail_ref(
+        &self,
+        _request_id: &str,
+        _rail_authorization_id: &str,
+    ) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "dispatch-intent rail reference attach is not supported by this receipt store"
+                .to_string(),
+        ))
+    }
+    /// Reconcile every open intent surviving a restart. Default: a no-op
+    /// empty report, because a store without the journal has no orphans.
+    fn reconcile_dispatch_intents(
+        &self,
+        _reconciler: &dyn DispatchIntentReconciler,
+    ) -> Result<DispatchIntentReconcileReport, ReceiptStoreError> {
+        Ok(DispatchIntentReconcileReport::default())
+    }
+    /// Count of open (in-flight or orphaned-but-unreconciled) dispatch
+    /// intents. Default 0 for stores without the journal.
+    fn open_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
+        Ok(0)
+    }
+    /// Count of dead-letter (orphaned, outcome-unknown) dispatch intents.
+    /// Default 0 for stores without the journal.
+    fn dead_letter_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
+        Ok(0)
     }
     fn append_child_receipt(&self, receipt: &ChildRequestReceipt) -> Result<(), ReceiptStoreError>;
     fn append_child_receipt_returning_seq(

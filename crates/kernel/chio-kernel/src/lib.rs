@@ -413,11 +413,13 @@ pub use receipt_query::{
     ReceiptReadContext, ReceiptReadContextSource, MAX_QUERY_LIMIT,
 };
 pub use receipt_store::{
-    AuthorizationReceiptConsumption, FederatedEvidenceShareImport, FederatedEvidenceShareSummary,
+    AuthorizationReceiptConsumption, DispatchIntentJournalMode, DispatchIntentKey,
+    DispatchIntentReconcileReport, DispatchIntentReconciler, DispatchIntentRecord,
+    DispatchIntentResolution, FederatedEvidenceShareImport, FederatedEvidenceShareSummary,
     ReceiptCheckpointCreateReport, ReceiptCheckpointRange, ReceiptCheckpointStatusReport,
     ReceiptFlushReport, ReceiptStore, ReceiptStoreError, ReceiptStoreHealthReport,
     ReceiptWalCheckpointReport, ReceiptWriterCounters, ReceiptWriterLiveness, RetentionConfig,
-    StoredChildReceipt, StoredToolReceipt,
+    SideEffectClass, StoredChildReceipt, StoredToolReceipt,
 };
 pub use revocation_runtime::{InMemoryRevocationStore, RevocationStore};
 pub use revocation_store::{RevocationRecord, RevocationStoreError};
