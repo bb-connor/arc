@@ -68,8 +68,10 @@ spec:
   template:
     metadata:
       annotations:
-        # Keep 1 instance warm; pin to 1 because the receipt store is a
-        # single-writer SQLite database (see section 7)
+        # Keep 1 instance warm; pin to 1 so a single instance keeps one
+        # coherent in-memory audit stream. Cloud Run has no per-instance
+        # persistent disk, so this reference runs an ephemeral audit log
+        # (see section 7 for the durable-platform options).
         autoscaling.knative.dev/minScale: "1"
         autoscaling.knative.dev/maxScale: "1"
         # Container startup ordering
@@ -95,8 +97,12 @@ spec:
           ports:
             - containerPort: 9090
           # Routes and scopes derive from the operator-provided OpenAPI spec;
-          # receipts are written to a durable SQLite audit log; the signing
-          # seed is read from a mounted secret file.
+          # the signing seed is read from a mounted secret file. Cloud Run has
+          # no per-instance persistent disk, so the audit log cannot be durable
+          # here: opt into ephemeral in-memory receipts explicitly rather than
+          # pointing --receipt-store at scratch storage, which would boot
+          # reporting a durable backend yet lose every receipt on revision
+          # recycle. See section 7 for a durable audit trail.
           args:
             - "api"
             - "protect"
@@ -106,8 +112,7 @@ spec:
             - "/etc/chio/spec/openapi.yaml"
             - "--listen"
             - "0.0.0.0:9090"
-            - "--receipt-store"
-            - "/var/lib/chio/receipts.db"
+            - "--allow-ephemeral-receipts"
             - "--authority-seed-file"
             - "/etc/chio/seed/authority.seed"
           startupProbe:
@@ -309,6 +314,11 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             cpu: json('0.25')
             memory: '0.5Gi'
           }
+          // Container Apps offers no per-replica persistent disk, so the audit
+          // log cannot be durable here: opt into ephemeral in-memory receipts
+          // explicitly rather than pointing --receipt-store at scratch storage,
+          // which would report a durable backend yet lose every receipt on
+          // replica recycle. See section 7 for a durable audit trail.
           args: [
             'api'
             'protect'
@@ -318,8 +328,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             '/etc/chio/spec/openapi.yaml'
             '--listen'
             '0.0.0.0:9090'
-            '--receipt-store'
-            '/var/lib/chio/receipts.db'
+            '--allow-ephemeral-receipts'
             '--authority-seed-file'
             '/etc/chio/seed/authority.seed'
           ]
