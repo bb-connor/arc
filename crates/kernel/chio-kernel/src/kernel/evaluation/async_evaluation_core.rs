@@ -110,6 +110,75 @@ impl ChioKernel {
             "evaluating tool call"
         );
 
+        // Confirm durable persistence is healthy before any path that records a
+        // receipt. Both the capability-rejection denials below and the
+        // capability-lineage write persist through the receipt writer; against a
+        // serving-closed writer that append fails and would surface its own error
+        // (or a 500) instead of a clean signed fail-closed Deny. Gating here means
+        // a degraded writer always produces the dedicated persistence Deny first.
+        if let Err(error) = self.ensure_federated_receipt_persistence_ready(
+            request.federated_origin_kernel_id.as_deref(),
+        ) {
+            let msg = error.to_string();
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&msg),
+                "federated receipt persistence unavailable pre-dispatch"
+            );
+            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+        if let Err(error) = self.ensure_tcb_locks_healthy() {
+            let msg = error.to_string();
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&msg),
+                "tcb lock poisoned pre-dispatch"
+            );
+            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+        if let Err(error) = self.ensure_receipt_persistence_ready() {
+            let msg = error.to_string();
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&msg),
+                "receipt persistence unavailable pre-dispatch"
+            );
+            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+        if let Err(error) = self.ensure_revocation_durability_ready() {
+            let msg = error.to_string();
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&msg),
+                "revocation durability unavailable pre-dispatch"
+            );
+            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+
         let cap = &request.capability;
 
         // Signature is verified first (no budget mutation); the actual
@@ -235,58 +304,12 @@ impl ChioKernel {
             );
         }
 
+        // Persistence was confirmed healthy at the pre-dispatch gate above, so the
+        // writer-backed lineage write can run without racing a dead writer.
         if let Err(error) = self.record_observed_capability_snapshot(cap) {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "failed to persist capability lineage");
             return self.build_deny_response_with_metadata(
-                request,
-                &msg,
-                now,
-                None,
-                extra_metadata.clone(),
-            );
-        }
-
-        if let Err(error) = self.ensure_federated_receipt_persistence_ready(
-            request.federated_origin_kernel_id.as_deref(),
-        ) {
-            let msg = error.to_string();
-            warn!(
-                request_id = %request.request_id,
-                reason = %redacted!(&msg),
-                "federated receipt persistence unavailable pre-dispatch"
-            );
-            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
-                request,
-                &msg,
-                now,
-                None,
-                extra_metadata.clone(),
-            );
-        }
-        if let Err(error) = self.ensure_receipt_persistence_ready() {
-            let msg = error.to_string();
-            warn!(
-                request_id = %request.request_id,
-                reason = %redacted!(&msg),
-                "receipt persistence unavailable pre-dispatch"
-            );
-            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
-                request,
-                &msg,
-                now,
-                None,
-                extra_metadata.clone(),
-            );
-        }
-        if let Err(error) = self.ensure_revocation_durability_ready() {
-            let msg = error.to_string();
-            warn!(
-                request_id = %request.request_id,
-                reason = %redacted!(&msg),
-                "revocation durability unavailable pre-dispatch"
-            );
-            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
                 request,
                 &msg,
                 now,
@@ -426,12 +449,15 @@ impl ChioKernel {
         let _governed_call_chain_receipt_evidence_scope =
             scope_governed_call_chain_receipt_evidence(governed_call_chain_receipt_evidence);
 
-        let pre_invocation_guard_evidence = match self.run_guards(
-            request,
-            &cap.scope,
-            session_filesystem_roots,
-            Some(matched_grant_index),
-        ) {
+        let pre_invocation_guard_evidence = match self
+            .run_guards_within_budget(
+                request,
+                &cap.scope,
+                session_filesystem_roots,
+                Some(matched_grant_index),
+            )
+            .await
+        {
             Ok(evidence) => evidence,
             Err(e) => {
                 let msg = e.error.to_string();
@@ -627,9 +653,7 @@ impl ChioKernel {
             budget_lease_acquired,
         );
         post_admission_drop_guard.mark_dispatch_started();
-        let dispatch_result = self
-            .dispatch_tool_call_with_cost_after_nonce_check(request, has_monetary)
-            .await;
+        let dispatch_result = self.dispatch_within_budget(request, has_monetary).await;
         post_admission_drop_guard.disarm();
         drop(post_admission_drop_guard);
         let (tool_output, reported_cost) = match dispatch_result {
@@ -754,6 +778,50 @@ impl ChioKernel {
                     reason = %redacted!(&reason),
                     "tool call cancelled"
                 );
+                return self.with_pre_invocation_guard_evidence(
+                    &pre_invocation_guard_evidence,
+                    || {
+                        self.build_cancelled_response_with_metadata(
+                            request,
+                            &reason,
+                            now,
+                            Some(matched_grant_index),
+                            self.mark_runtime_admission_reservations_retained_fail_closed(
+                                match (budget_mutation.charge_result(), unwind.as_ref()) {
+                                    (Some(charge), Some(reverse)) => self
+                                        .merge_budget_receipt_metadata(
+                                            extra_metadata.clone(),
+                                            self.budget_execution_receipt_metadata(
+                                                charge,
+                                                Some(("reversed", reverse)),
+                                            ),
+                                        ),
+                                    _ => extra_metadata.clone(),
+                                },
+                            ),
+                        )
+                    },
+                );
+            }
+            Err(KernelError::HotPathDeadlineExceeded { stage, budget_ms }) => {
+                let reason = format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms");
+                let unwind = self.unwind_aborted_monetary_invocation(
+                    request,
+                    cap,
+                    budget_mutation.charge_result(),
+                    payment_authorization.as_ref(),
+                )?;
+                warn!(
+                    request_id = %request.request_id,
+                    reason = %redacted!(&reason),
+                    "tool call deadline expired"
+                );
+                // A timed-out dispatch may already have applied its side effect,
+                // so the runtime-admission reservation is NOT released; it is
+                // retained and marked auditable, exactly as the cancellation arm
+                // does. Releasing here would be fail-open: a single-use
+                // destructive lease could be replayed after the destructive
+                // action already executed.
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {

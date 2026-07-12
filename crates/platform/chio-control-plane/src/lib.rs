@@ -344,6 +344,7 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
         checkpoint_batch_size: kernel_policy.checkpoint_batch_size,
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
     };
 
     let mut kernel = ChioKernel::new(config);
@@ -677,6 +678,7 @@ mod tests {
             checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
             allow_ephemeral_receipt_log: true,
             allow_ephemeral_revocation_store: true,
         })

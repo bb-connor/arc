@@ -173,10 +173,50 @@ impl ChioKernel {
             let _receipt_store_write = self.receipt_store_write_lock.lock().map_err(|_| {
                 KernelError::Internal("receipt store write lock poisoned".to_string())
             })?;
-            self.with_receipt_store(|store| Ok(store.append_chio_receipt_returning_seq(receipt)?))?;
+            // Bound the commit round trip so a wedged writer cannot pin the
+            // kernel-wide receipt write lock (and thus every subsequent tool
+            // call) indefinitely. On timeout this fails closed with
+            // ReceiptPersistence(Timeout); no allow response is signed until the
+            // append succeeds.
+            self.with_receipt_store(|store| {
+                Ok(store.append_chio_receipt_with_timeout(
+                    receipt,
+                    self.config.deadlines.receipt_append_budget(),
+                )?)
+            })?;
             self.append_chio_receipt_to_local_log(receipt.clone());
         }
         let _settlement_status = self.run_settlement_observer(receipt);
         Ok(())
+    }
+
+    /// Whether a durable receipt store is configured but no longer serving (its
+    /// commit writer has died or its verified head is poisoned). This is exactly
+    /// the condition the pre-dispatch persistence gate denies on, so the deny it
+    /// produces must not try to append to the same store.
+    fn receipt_store_serving_closed(&self) -> bool {
+        matches!(
+            self.with_receipt_store(|store| Ok(store.writer_serving_closed())),
+            Ok(Some(true))
+        )
+    }
+
+    /// Persist a fail-closed deny receipt, tolerating a serving-closed durable
+    /// store. Several pre-dispatch gates deny precisely because the durable
+    /// receipt writer can no longer persist; appending this deny receipt to that
+    /// same closed store would fail and mask a clean signed Deny as an opaque
+    /// error. A deny executes no tool, so nothing is admitted without a durable
+    /// receipt: when the store is serving-closed, record the signed deny in the
+    /// in-memory log for local audit and surface the verdict instead of failing.
+    /// When the store is serving, persist durably as usual.
+    pub(crate) fn record_failclosed_deny_receipt(
+        &self,
+        receipt: &ChioReceipt,
+    ) -> Result<(), KernelError> {
+        if self.receipt_store_serving_closed() {
+            self.append_chio_receipt_to_local_log(receipt.clone());
+            return Ok(());
+        }
+        self.record_chio_receipt(receipt)
     }
 }

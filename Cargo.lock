@@ -2975,6 +2975,8 @@ name = "chio-config"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
+ "chio-core",
+ "chio-kernel",
  "regex",
  "serde",
  "serde_yml",
@@ -3667,6 +3669,7 @@ dependencies = [
  "chio-metrics-spec",
  "chio-settle",
  "chio-store-sqlite",
+ "chio-supervisor",
  "chio-test-support",
  "chio-tool-call-fabric",
  "chio-underwriting",
@@ -4429,6 +4432,7 @@ dependencies = [
  "chio-credit",
  "chio-kernel",
  "chio-settle",
+ "chio-supervisor",
  "chio-test-support",
  "criterion",
  "loom",
@@ -4443,6 +4447,17 @@ dependencies = [
  "tracing",
  "uuid",
  "zeroize",
+]
+
+[[package]]
+name = "chio-supervisor"
+version = "0.1.0"
+dependencies = [
+ "loom",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
