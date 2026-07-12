@@ -13,6 +13,8 @@ use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use crate::SqliteReceiptStore;
 
 const AGGREGATE_FAMILY_ROOT_TOKEN_DIGEST_DOMAIN: &str = "chio.aggregate-family-root-record.v1\0";
+/// Maximum canonical bytes accepted for one durable aggregate-root token.
+pub const MAX_AGGREGATE_FAMILY_ROOT_TOKEN_BYTES: usize = 512 * 1024;
 const AGGREGATE_FAMILY_ROOT_SCHEMA_VERSION: i64 = 1;
 const AGGREGATE_FAMILY_ROOT_SCHEMA_FINGERPRINT: &str =
     "chio.aggregate-family-root-authority.sqlite.v1";
@@ -178,6 +180,13 @@ pub struct StoredAggregateFamilyRoot {
     pub seq: u64,
     pub canonical_token_json: String,
     pub token_digest: String,
+}
+
+/// Point lookup result and immutable stream head observed in one read snapshot.
+#[derive(Clone, Debug)]
+pub struct AggregateFamilyRootLookupSnapshot {
+    pub high_watermark: u64,
+    pub record: Option<StoredAggregateFamilyRoot>,
 }
 
 /// Typed failures from aggregate family-root registration.
@@ -366,6 +375,56 @@ impl SqliteReceiptStore {
             .map_err(receipt_store_unavailable)?
     }
 
+    /// Load one exact root artifact and the local stream head atomically.
+    pub fn lookup_aggregate_family_root(
+        &self,
+        root_capability_id: &str,
+    ) -> Result<AggregateFamilyRootLookupSnapshot, AggregateFamilyRootStoreError> {
+        let mut connection = self.connection().map_err(receipt_store_unavailable)?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .map_err(sqlite_to_store_error)?;
+        validate_schema_integrity(&transaction).map_err(schema_integrity_to_store_error)?;
+        let high_watermark = transaction
+            .query_row(
+                "SELECT COALESCE(MAX(seq), 0) FROM chio_aggregate_family_roots",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(sqlite_to_store_error)?;
+        let seq = transaction
+            .query_row(
+                "SELECT seq FROM chio_aggregate_family_roots WHERE root_capability_id = ?1",
+                params![root_capability_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()
+            .map_err(sqlite_to_store_error)?;
+        let record = match seq {
+            Some(seq) => {
+                let stored = load_root_record(&transaction, root_capability_id)
+                    .map_err(sqlite_to_store_error)?
+                    .ok_or_else(|| {
+                        AggregateFamilyRootStoreError::Corrupt(format!(
+                            "aggregate family-root sequence {seq} has no record"
+                        ))
+                    })?;
+                let authenticated = validate_stored_root(stored)?;
+                Some(StoredAggregateFamilyRoot {
+                    seq: stored_sequence_u64(seq, "aggregate family-root sequence")?,
+                    canonical_token_json: authenticated.record.canonical_token_json,
+                    token_digest: authenticated.record.token_digest,
+                })
+            }
+            None => None,
+        };
+        transaction.commit().map_err(sqlite_to_store_error)?;
+        Ok(AggregateFamilyRootLookupSnapshot {
+            high_watermark: stored_sequence_u64(high_watermark, "aggregate family-root head")?,
+            record,
+        })
+    }
+
     /// Highest local aggregate family-root sequence, or zero when empty.
     pub fn max_aggregate_family_root_seq(&self) -> Result<u64, AggregateFamilyRootStoreError> {
         let mut connection = self.connection().map_err(receipt_store_unavailable)?;
@@ -513,6 +572,11 @@ fn authenticate_root(
             "root token canonicalization failed: {error}"
         ))
     })?;
+    if canonical_token.len() > MAX_AGGREGATE_FAMILY_ROOT_TOKEN_BYTES {
+        return Err(AggregateFamilyRootStoreError::InvalidRecord(format!(
+            "root token exceeds the {MAX_AGGREGATE_FAMILY_ROOT_TOKEN_BYTES}-byte bound"
+        )));
+    }
     let canonical_token_json = String::from_utf8(canonical_token.clone()).map_err(|error| {
         AggregateFamilyRootStoreError::InvalidRecord(format!(
             "root token canonical JSON is not UTF-8: {error}"
@@ -527,18 +591,18 @@ fn authenticate_root(
         AggregateFamilyRootResolution::LegacyUnbound(_) => {
             (StoredRootKind::LegacyUnbound, None, None, None)
         }
-            AggregateFamilyRootResolution::FamilyBound(verified) => (
-                StoredRootKind::FamilyBound,
-                Some(verified.root_binding_digest().to_string()),
-                Some(verified.family_owner().to_string()),
-                Some(i64::from(verified.max_invocations())),
-            ),
-            _ => {
-                return Err(AggregateFamilyRootStoreError::InvalidRecord(
-                    "aggregate root verifier returned an unsupported resolution".to_string(),
-                ));
-            }
-        };
+        AggregateFamilyRootResolution::FamilyBound(verified) => (
+            StoredRootKind::FamilyBound,
+            Some(verified.root_binding_digest().to_string()),
+            Some(verified.family_owner().to_string()),
+            Some(i64::from(verified.max_invocations())),
+        ),
+        _ => {
+            return Err(AggregateFamilyRootStoreError::InvalidRecord(
+                "aggregate root verifier returned an unsupported resolution".to_string(),
+            ));
+        }
+    };
 
     Ok(AuthenticatedRoot {
         record: RootRecord {
@@ -570,6 +634,11 @@ fn authenticate_replication_root(
     trusted_issuers: &[PublicKey],
     recorded_at: u64,
 ) -> Result<AuthenticatedRoot, AggregateFamilyRootStoreError> {
+    if record.canonical_token_json.len() > MAX_AGGREGATE_FAMILY_ROOT_TOKEN_BYTES {
+        return Err(AggregateFamilyRootStoreError::InvalidRecord(format!(
+            "replicated root token exceeds the {MAX_AGGREGATE_FAMILY_ROOT_TOKEN_BYTES}-byte bound"
+        )));
+    }
     let strict_canonical =
         canonical_json_bytes_from_str(&record.canonical_token_json).map_err(|error| {
             AggregateFamilyRootStoreError::InvalidRecord(format!(
@@ -861,6 +930,11 @@ fn validate_stored_root(
             "stored recorded_at is negative".to_string(),
         ));
     }
+    if stored.canonical_token_json.len() > MAX_AGGREGATE_FAMILY_ROOT_TOKEN_BYTES {
+        return Err(AggregateFamilyRootStoreError::Corrupt(format!(
+            "stored root token exceeds the {MAX_AGGREGATE_FAMILY_ROOT_TOKEN_BYTES}-byte bound"
+        )));
+    }
     let strict_canonical =
         canonical_json_bytes_from_str(&stored.canonical_token_json).map_err(|error| {
             AggregateFamilyRootStoreError::Corrupt(format!(
@@ -922,7 +996,8 @@ fn sqlite_record_i64(value: u64, field: &str) -> Result<i64, AggregateFamilyRoot
     })
 }
 
-pub(crate) fn aggregate_family_root_token_digest(canonical_token: &[u8]) -> String {
+/// Domain-separated digest of one exact canonical aggregate-root token.
+pub fn aggregate_family_root_token_digest(canonical_token: &[u8]) -> String {
     let mut bytes =
         Vec::with_capacity(AGGREGATE_FAMILY_ROOT_TOKEN_DIGEST_DOMAIN.len() + canonical_token.len());
     bytes.extend_from_slice(AGGREGATE_FAMILY_ROOT_TOKEN_DIGEST_DOMAIN.as_bytes());
@@ -1570,6 +1645,35 @@ mod tests {
             })
             .collect::<Result<Vec<_>, _>>()?;
         assert_eq!(reopened_ids, vec![family.id, legacy.id]);
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_family_root_lookup_returns_token_and_head_from_one_snapshot() -> TestResult {
+        let directory = tempdir()?;
+        let store = SqliteReceiptStore::open(directory.path().join("roots.db"))?;
+        let (issuer, _subject, token) = family_root("lookup-family-root", 5)?;
+        store.record_aggregate_family_root(&token, &[issuer.public_key()], 1_100)?;
+
+        let found = store.lookup_aggregate_family_root(&token.id)?;
+        assert_eq!(found.high_watermark, 1);
+        let record = match found.record {
+            Some(record) => record,
+            None => panic!("recorded root must be returned"),
+        };
+        assert_eq!(record.seq, 1);
+        assert_eq!(
+            serde_json::from_str::<CapabilityToken>(&record.canonical_token_json)?.id,
+            token.id
+        );
+        assert_eq!(
+            record.token_digest,
+            super::aggregate_family_root_token_digest(record.canonical_token_json.as_bytes())
+        );
+
+        let missing = store.lookup_aggregate_family_root("missing-root")?;
+        assert_eq!(missing.high_watermark, 1);
+        assert!(missing.record.is_none());
         Ok(())
     }
 
@@ -2359,6 +2463,24 @@ mod tests {
             ));
         }
         assert_eq!(row_count(&path)?, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_family_root_rejects_token_above_transport_bound() -> TestResult {
+        let directory = tempdir()?;
+        let store = SqliteReceiptStore::open(directory.path().join("receipts.db"))?;
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let mut body = root_body("oversized-root", issuer.public_key(), subject.public_key());
+        body.scope.grants[0].server_id =
+            "x".repeat(super::MAX_AGGREGATE_FAMILY_ROOT_TOKEN_BYTES + 1);
+        let token = CapabilityToken::sign(body, &issuer)?;
+
+        assert!(matches!(
+            store.record_aggregate_family_root(&token, &[issuer.public_key()], 1_100),
+            Err(super::AggregateFamilyRootStoreError::InvalidRecord(_))
+        ));
         Ok(())
     }
 

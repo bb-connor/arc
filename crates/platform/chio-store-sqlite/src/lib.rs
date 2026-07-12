@@ -94,7 +94,9 @@ impl Default for SqliteStoreOptions {
 }
 
 pub use aggregate_family_root::{
+    aggregate_family_root_token_digest, AggregateFamilyRootLookupSnapshot,
     AggregateFamilyRootRecordStatus, AggregateFamilyRootStoreError, StoredAggregateFamilyRoot,
+    MAX_AGGREGATE_FAMILY_ROOT_TOKEN_BYTES,
 };
 pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
