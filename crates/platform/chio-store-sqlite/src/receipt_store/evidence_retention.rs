@@ -616,6 +616,37 @@ fn ensure_durable_distinct_archive_path(
     Ok(())
 }
 
+/// Reject a rotation whose archive target differs from the one an earlier
+/// rotation already committed to.
+///
+/// Retention archives a contiguous `[1, W]` prefix and then deletes those live
+/// rows. Once deleted they can never be re-copied, so a second rotation pointed
+/// at a NEW target writes only the newer suffix `(W1, W2]` there: the co-archival
+/// check still passes (it only inspects the still-live rows, all now above `W1`)
+/// and the ledger advances to `W2` naming the new target, but that target holds
+/// only `(W1, W2]` while `[1, W1]` remains stranded in the original archive. The
+/// watermark-trust reader then asks the new target for the whole `[1, W2]`
+/// prefix, finds it short, and withdraws the exemption, leaving a store whose
+/// evidence is real but split across two files that neither alone can satisfy.
+/// Pinning the archive path (compared canonical-to-canonical, see
+/// `absolute_archive_path`) keeps the archived prefix whole. Fail-closed: a
+/// mismatch aborts before any copy or delete.
+fn ensure_archive_path_matches_ledger(
+    connection: &rusqlite::Connection,
+    archive_path: &str,
+) -> Result<(), ReceiptStoreError> {
+    if let Some(recorded) = super::support::latest_watermark_archive_path(connection)? {
+        if recorded != archive_path {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "retention archive path {archive_path:?} differs from the archive {recorded:?} an \
+                 earlier rotation committed to; the archived prefix would be split across two \
+                 files. Keep the same archive path or start a fresh store"
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// True when `archive_path` names the same on-disk file as the live database:
 /// an identical path string, the same file after resolving symlinks and
 /// `.`/`..`, or (on Unix) the same device+inode as a hard link.
@@ -699,6 +730,7 @@ fn archive_range(
     // reader (a restart, a CLI health check) resolves the same file regardless
     // of its working directory.
     let archive_path = absolute_archive_path(archive_path)?;
+    ensure_archive_path_matches_ledger(connection, &archive_path)?;
     let escaped_path = archive_path.replace('\'', "''");
     connection.execute_batch(&format!("ATTACH DATABASE '{escaped_path}' AS archive"))?;
 

@@ -130,6 +130,34 @@ pub(crate) fn retention_watermark(
     }
 }
 
+/// The archive path recorded by the most recent watermark row, or `None` when
+/// the store has never archived.
+///
+/// Retention archives a contiguous `[1, W]` prefix, and every faithful archive
+/// of that prefix holds ALL of `[1, W]`. Once the first rotation deletes the
+/// live rows it can never re-copy them, so a later rotation pointed at a
+/// DIFFERENT target would write only the new suffix there and leave the earlier
+/// prefix stranded in the original archive, splitting one logical archive across
+/// two files that neither alone can satisfy. Callers use this to pin the archive
+/// path across rotations. Ordered by the watermark high-water mark (with
+/// `rotated_at` as a tiebreak) so the most recently advanced mark wins.
+pub(crate) fn latest_watermark_archive_path(
+    connection: &rusqlite::Connection,
+) -> Result<Option<String>, ReceiptStoreError> {
+    if !receipt_retention_watermark_table_exists(connection)? {
+        return Ok(None);
+    }
+    let path: Option<String> = connection
+        .query_row(
+            "SELECT archive_path FROM receipt_retention_watermark \
+             ORDER BY archived_through_entry_seq DESC, rotated_at DESC LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(path)
+}
+
 fn receipt_retention_watermark_table_exists(
     connection: &rusqlite::Connection,
 ) -> Result<bool, ReceiptStoreError> {

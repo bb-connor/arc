@@ -2417,6 +2417,80 @@ fn rotation_records_absolute_archive_path() -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
+/// Once the first rotation deletes the archived prefix it can never re-copy
+/// those rows, so a later rotation pointed at a DIFFERENT archive would write
+/// only the newer suffix there and strand the earlier prefix in the original
+/// file, splitting one logical archive across two files that neither alone can
+/// satisfy. A rotation whose archive path differs from the one an earlier
+/// rotation committed to must be rejected fail-closed before any copy or delete.
+#[test]
+fn rotation_rejects_archive_path_change_after_first() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("archive-path-change");
+    let archive_a = unique_db_path("archive-path-change-a");
+    let archive_b = unique_db_path("archive-path-change-b");
+    let archive_a_path = archive_a.to_str().ok_or("archive path invalid")?;
+    let archive_b_path = archive_b.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    // Two aged batches: [1,2] at timestamp 100, [3,4] at timestamp 200.
+    for i in 0..2u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("a-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    for i in 2..4u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("b-{i}"),
+            i + 1,
+            200,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(store.load_checkpoint_by_seq(2)?.is_some());
+
+    // First rotation archives [1,2] to archive A (W=2).
+    let first = store.archive_receipts_before(150, archive_a_path)?;
+    assert_eq!(first, 2, "the aged [1,2] batch archives to A");
+
+    // A second rotation would advance to W=4 but names a DIFFERENT archive B: it
+    // must be rejected before any copy or delete.
+    let result = store.archive_receipts_before(250, archive_b_path);
+    let message = result
+        .err()
+        .ok_or("expected a Conflict; rotation accepted a changed archive path")?
+        .to_string();
+    assert!(
+        message.contains("differs from the archive"),
+        "unexpected error: {message}"
+    );
+
+    // The [3,4] rows are intact in live: the abort happened before any delete.
+    let live = store.reader_connection_for_test()?;
+    let live_log: i64 = live.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq > 2",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        live_log, 2,
+        "no [3,4] rows deleted when the path change is rejected"
+    );
+
+    drop(live);
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive_a);
+    let _ = std::fs::remove_file(&archive_b);
+    Ok(())
+}
+
 /// Primary correctness proof: a state-machine proptest that drives random
 /// interleaved sequences of tool/child appends (non-monotonic
 /// timestamps within an aged band, to exercise the MAX(timestamp)-over-prefix
