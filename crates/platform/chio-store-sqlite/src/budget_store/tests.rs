@@ -303,6 +303,39 @@ fn admission_managed_budget_store_rejects_legacy_projection_imports() {
 }
 
 #[test]
+fn admission_managed_sequence_ignores_transport_cache_drift() {
+    let path = unique_db_path("chio-admission-managed-sequence-cache");
+    let _authority = crate::SqliteAdmissionCaptureAuthority::open(&path).unwrap();
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    store
+        .connection()
+        .unwrap()
+        .execute(
+            "UPDATE budget_replication_meta SET next_seq = 900 WHERE singleton = 1",
+            [],
+        )
+        .unwrap();
+
+    store
+        .authorize_composite_hold(composite_authorize_input(
+            "hold-managed-sequence",
+            "event-managed-sequence",
+            2,
+        ))
+        .unwrap();
+
+    assert_eq!(
+        store
+            .mutation_event_seq_for_event_id("event-managed-sequence")
+            .unwrap(),
+        Some(1)
+    );
+    assert_eq!(replication_floor(&store), 1);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn composite_quota_maximum_cannot_be_changed_by_direct_sql() {
     let path = unique_db_path("chio-composite-budget-immutable-maximum");
     let store = SqliteBudgetStore::open(&path).unwrap();

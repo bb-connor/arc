@@ -264,7 +264,7 @@ impl SqliteBudgetStore {
         Ok(Self::admission_authority_mode(&connection)?.is_some())
     }
 
-    fn admission_authority_mode(
+    pub(super) fn admission_authority_mode(
         connection: &Connection,
     ) -> Result<Option<String>, BudgetStoreError> {
         let marker_exists = connection.query_row(
