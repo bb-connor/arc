@@ -329,6 +329,7 @@ Commit: `feat(kernel): authorize composite invocation quotas atomically`
 - [ ] Persist invocation and monetary substates plus every quota member so crash recovery can finish, compensate, or reconcile deterministically.
 - [ ] Return counts, authority lease, guarantee level, and commit index from the same transaction.
 - [ ] Extend remote request and response DTOs without dropping authority metadata.
+- [ ] Make the remote service assign initial hold authority. Authorize requests must omit caller-local authority; every later transition must present the exact authority returned by authorization.
 - [ ] Let the kernel include only the installed supplemental verifier's result in the same composite request. Do not accept a caller-built broker claim, add a broker-only counter endpoint, or make the broker reserve that key a second time.
 - [ ] Expose invocation capture separately from monetary capture, release, and reconciliation through local and remote DTOs.
 - [ ] Add `AdmissionCaptureAuthority` for broker dispatch. In one commit domain it verifies the operation-bound revocation-set digest, reads latest state for the leaf, every delegation ancestor, and every supplemental id, rejects revoked or mismatched authorization, captures every invocation quota, and returns combined budget and revocation commit metadata.

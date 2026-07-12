@@ -292,6 +292,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         )
         .route(BUDGET_RECONCILE_SPEND_PATH, post(handle_reduce_charge_cost))
         .route(
+            BUDGET_CAPTURE_EXPOSURE_PATH,
+            post(handle_capture_budget_hold),
+        )
+        .route(
             INTERNAL_CLUSTER_STATUS_PATH,
             get(handle_internal_cluster_status),
         )

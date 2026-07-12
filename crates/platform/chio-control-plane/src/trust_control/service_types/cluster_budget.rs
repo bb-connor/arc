@@ -216,7 +216,7 @@ pub(crate) struct BudgetCursorView {
     pub(crate) grant_index: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BudgetMutationAuthorityView {
     pub(crate) authority_id: String,
@@ -427,6 +427,7 @@ pub(crate) struct ReverseChargeCostRequest {
     pub(crate) cost_units: u64,
     pub(crate) hold_id: Option<String>,
     pub(crate) event_id: Option<String>,
+    pub(crate) budget_authority: Option<BudgetMutationAuthorityView>,
 }
 
 #[derive(Debug)]
@@ -449,6 +450,7 @@ pub(crate) struct ReduceChargeCostRequest {
     pub(crate) realized_spend_units: Option<u64>,
     pub(crate) hold_id: Option<String>,
     pub(crate) event_id: Option<String>,
+    pub(crate) budget_authority: Option<BudgetMutationAuthorityView>,
 }
 
 #[derive(Debug)]
@@ -625,6 +627,8 @@ struct ReverseChargeCostRequestWire<'a> {
     hold_id: Option<&'a str>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     event_id: Option<&'a str>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    budget_authority: Option<&'a BudgetMutationAuthorityView>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -638,6 +642,8 @@ struct ReverseChargeCostRequestWireInput {
     hold_id: Option<String>,
     #[serde(default)]
     event_id: Option<String>,
+    #[serde(default)]
+    budget_authority: Option<BudgetMutationAuthorityView>,
 }
 
 impl Serialize for ReverseChargeCostRequest {
@@ -651,6 +657,7 @@ impl Serialize for ReverseChargeCostRequest {
             exposure_units: self.cost_units,
             hold_id: self.hold_id.as_deref(),
             event_id: self.event_id.as_deref(),
+            budget_authority: self.budget_authority.as_ref(),
         }
         .serialize(serializer)
     }
@@ -671,6 +678,7 @@ impl<'de> Deserialize<'de> for ReverseChargeCostRequest {
             )?,
             hold_id: wire.hold_id,
             event_id: wire.event_id,
+            budget_authority: wire.budget_authority,
         })
     }
 }
@@ -759,6 +767,8 @@ struct ReduceChargeCostRequestWire<'a> {
     hold_id: Option<&'a str>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     event_id: Option<&'a str>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    budget_authority: Option<&'a BudgetMutationAuthorityView>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -776,6 +786,8 @@ struct ReduceChargeCostRequestWireInput {
     hold_id: Option<String>,
     #[serde(default)]
     event_id: Option<String>,
+    #[serde(default)]
+    budget_authority: Option<BudgetMutationAuthorityView>,
 }
 
 impl ReduceChargeCostRequest {
@@ -797,6 +809,7 @@ impl Serialize for ReduceChargeCostRequest {
             reduction_units: self.cost_units,
             hold_id: self.hold_id.as_deref(),
             event_id: self.event_id.as_deref(),
+            budget_authority: self.budget_authority.as_ref(),
         }
         .serialize(serializer)
     }
@@ -837,6 +850,7 @@ impl<'de> Deserialize<'de> for ReduceChargeCostRequest {
             realized_spend_units: wire.realized_spend_units,
             hold_id: wire.hold_id,
             event_id: wire.event_id,
+            budget_authority: wire.budget_authority,
         })
     }
 }

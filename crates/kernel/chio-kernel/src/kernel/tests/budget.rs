@@ -1,4 +1,35 @@
 #[test]
+fn supplemental_quota_verification_requires_an_installed_kernel_verifier() {
+    let kernel = make_kernel(make_config());
+    let artifact = crate::supplemental_quota::OpaqueSignedSupplementalQuota::new(
+        b"signed-supplemental-artifact".to_vec(),
+    )
+    .unwrap();
+    let context = crate::supplemental_quota::SupplementalQuotaVerificationContext {
+        capability_id: "cap-supplemental".to_string(),
+        capability_digest: "11".repeat(32),
+        subject: Keypair::generate().public_key(),
+        request_id: "request-supplemental".to_string(),
+        destination: crate::supplemental_quota::SupplementalQuotaDestination::new(
+            "broker",
+            "execute",
+        )
+        .unwrap(),
+        arguments_digest: "22".repeat(32),
+        request_binding_hash: "33".repeat(32),
+        now: 100,
+        negotiated_profile: crate::budget_store::BudgetQuotaProfile::SupplementalBrokerExecution,
+        negotiated_features:
+            chio_core::capability::features::CapabilityNegotiation::t1_default(),
+    };
+
+    assert!(matches!(
+        kernel.verify_supplemental_quota(&artifact, &context),
+        Err(crate::supplemental_quota::SupplementalQuotaError::VerifierUnavailable)
+    ));
+}
+
+#[test]
 fn budget_exhaustion() {
     let mut kernel = make_kernel(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));

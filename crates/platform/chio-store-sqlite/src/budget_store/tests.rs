@@ -1,4 +1,8 @@
 use super::*;
+use chio_kernel::budget_store::{
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetReconcileHoldRequest,
+    BudgetReleaseHoldRequest, BudgetReverseHoldRequest,
+};
 use chio_kernel::InMemoryBudgetStore;
 
 fn unique_db_path(prefix: &str) -> std::path::PathBuf {
@@ -41,6 +45,45 @@ fn authority(authority_id: &str, lease_id: &str, lease_epoch: u64) -> BudgetEven
         lease_id: lease_id.to_string(),
         lease_epoch,
     }
+}
+
+fn import_integrity_record(event_id: &str, event_seq: u64) -> BudgetMutationRecord {
+    BudgetMutationRecord {
+        event_id: event_id.to_string(),
+        hold_id: None,
+        capability_id: "cap-import-integrity".to_string(),
+        grant_index: 0,
+        kind: BudgetMutationKind::IncrementInvocation,
+        allowed: Some(true),
+        recorded_at: 100,
+        event_seq,
+        usage_seq: Some(event_seq),
+        exposure_units: 0,
+        realized_spend_units: 0,
+        max_invocations: Some(10),
+        max_cost_per_invocation: None,
+        max_total_cost_units: None,
+        invocation_count_after: 1,
+        invocation_counts_after: Vec::new(),
+        invocation_state: BudgetInvocationReservationState::Captured,
+        monetary_state: BudgetMonetaryHoldState::None,
+        revocation_set: None,
+        total_cost_exposed_after: 0,
+        total_cost_realized_spend_after: 0,
+        authority: Some(authority("budget-primary", "lease-1", 1)),
+    }
+}
+
+fn replication_floor(store: &SqliteBudgetStore) -> i64 {
+    store
+        .connection()
+        .unwrap()
+        .query_row(
+            "SELECT next_seq FROM budget_replication_meta WHERE singleton = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap()
 }
 
 #[test]
@@ -551,6 +594,614 @@ fn budget_store_settle_with_ids_is_idempotent_and_append_only_sqlite() {
 }
 
 #[test]
+fn budget_store_capture_is_terminal_truthful_and_exact_after_reopen_sqlite() {
+    let path = unique_db_path("chio-capture-charge-exact");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let hold_id = "hold-cap-capture-0";
+    let authorize_event_id = "hold-cap-capture-0:authorize";
+    let capture_event_id = "hold-cap-capture-0:capture";
+
+    assert!(store
+        .try_charge_cost_with_ids(
+            "cap-capture",
+            0,
+            Some(10),
+            100,
+            Some(200),
+            Some(1000),
+            Some(hold_id),
+            Some(authorize_event_id),
+        )
+        .unwrap());
+    let request = BudgetCaptureHoldRequest {
+        capability_id: "cap-capture".to_string(),
+        grant_index: 0,
+        exposed_cost_units: 100,
+        realized_spend_units: 70,
+        hold_id: Some(hold_id.to_string()),
+        event_id: Some(capture_event_id.to_string()),
+        authority: None,
+    };
+    let captured = store.capture_budget_hold(request.clone()).unwrap();
+    assert_eq!(captured.monetary_state, BudgetMonetaryHoldState::Captured);
+    assert_eq!(captured.exposure_units, 100);
+    assert_eq!(captured.realized_spend_units, 70);
+    assert_eq!(captured.committed_cost_units_after, 70);
+    assert_eq!(captured.invocation_count_after, 1);
+
+    let usage = store.get_usage("cap-capture", 0).unwrap().unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert_usage_totals(&usage, 0, 70);
+    {
+        let mut connection = store.connection().unwrap();
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .unwrap();
+        let hold = SqliteBudgetStore::load_hold(&transaction, hold_id)
+            .unwrap()
+            .expect("captured hold state");
+        assert_eq!(hold.remaining_exposure_units, 0);
+        assert_eq!(hold.disposition, HoldDisposition::Captured);
+    }
+    let events = store
+        .list_mutation_events(10, Some("cap-capture"), Some(0))
+        .unwrap();
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[1].event_id, capture_event_id);
+    assert_eq!(events[1].kind, BudgetMutationKind::CaptureExposure);
+    assert_eq!(events[1].monetary_state, BudgetMonetaryHoldState::Captured);
+    drop(store);
+
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    assert!(store
+        .try_charge_cost_with_ids(
+            "cap-capture",
+            0,
+            Some(10),
+            10,
+            Some(200),
+            Some(1000),
+            Some("hold-cap-capture-1"),
+            Some("hold-cap-capture-1:authorize"),
+        )
+        .unwrap());
+    let usage_before_retry = store.get_usage("cap-capture", 0).unwrap().unwrap();
+    assert_eq!(usage_before_retry.invocation_count, 2);
+    assert_usage_totals(&usage_before_retry, 10, 70);
+
+    assert_eq!(store.capture_budget_hold(request).unwrap(), captured);
+    assert_eq!(
+        store.get_usage("cap-capture", 0).unwrap().unwrap(),
+        usage_before_retry
+    );
+    assert_eq!(
+        store
+            .list_mutation_events(10, Some("cap-capture"), Some(0))
+            .unwrap()
+            .len(),
+        3
+    );
+
+    let reconcile_error = store
+        .settle_charge_cost_with_ids(
+            "cap-capture",
+            0,
+            100,
+            70,
+            Some(hold_id),
+            Some("hold-cap-capture-0:reconcile"),
+        )
+        .expect_err("a captured hold must not be reconciled again");
+    assert!(reconcile_error.to_string().contains("is no longer open"));
+    assert_eq!(
+        store.get_usage("cap-capture", 0).unwrap().unwrap(),
+        usage_before_retry
+    );
+    assert_eq!(
+        store
+            .list_mutation_events(10, Some("cap-capture"), Some(0))
+            .unwrap()
+            .len(),
+        3
+    );
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn high_level_authorize_retry_returns_original_allowed_snapshot_after_later_write() {
+    let path = unique_db_path("chio-budget-authorize-allowed-snapshot-retry");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let leased = authority("budget-primary", "lease-1", 1);
+    let request = BudgetAuthorizeHoldRequest::legacy(
+        "cap-authorize-snapshot".to_string(),
+        0,
+        Some(5),
+        100,
+        Some(100),
+        Some(500),
+        Some("hold-authorize-snapshot-0".to_string()),
+        Some("event-authorize-snapshot".to_string()),
+        Some(leased.clone()),
+    );
+    let first = store.authorize_budget_hold(request.clone()).unwrap();
+    assert!(first.is_authorized());
+    let later = BudgetAuthorizeHoldRequest::legacy(
+        "cap-authorize-snapshot".to_string(),
+        0,
+        Some(5),
+        50,
+        Some(100),
+        Some(500),
+        Some("hold-authorize-snapshot-1".to_string()),
+        Some("event-authorize-snapshot-later".to_string()),
+        Some(leased.clone()),
+    );
+    assert!(store.authorize_budget_hold(later).unwrap().is_authorized());
+
+    assert_eq!(store.authorize_budget_hold(request).unwrap(), first);
+    let BudgetAuthorizeHoldDecision::Authorized(first) = first else {
+        panic!("first authorization must be allowed");
+    };
+    assert_eq!(first.committed_cost_units_after, 100);
+    assert_eq!(first.invocation_count_after, 1);
+    assert_eq!(first.metadata.authority.as_ref(), Some(&leased));
+    assert_eq!(
+        first.metadata.event_id.as_deref(),
+        Some("event-authorize-snapshot")
+    );
+    assert!(first.metadata.budget_commit_index.is_some());
+
+    let zero_with_limit = store
+        .authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
+            "cap-authorize-zero-limit".to_string(),
+            0,
+            Some(1),
+            0,
+            Some(0),
+            None,
+            Some("hold-authorize-zero-limit".to_string()),
+            Some("event-authorize-zero-limit".to_string()),
+            None,
+        ))
+        .unwrap();
+    let BudgetAuthorizeHoldDecision::Authorized(zero_with_limit) = zero_with_limit else {
+        panic!("zero-exposure authorization with a monetary limit must be allowed");
+    };
+    assert_eq!(
+        zero_with_limit.monetary_state,
+        BudgetMonetaryHoldState::Exposed
+    );
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn denied_authorization_claim_survives_reopen_and_freezes_retry_snapshot() {
+    let path = unique_db_path("chio-budget-authorize-denied-claim-reopen");
+    let leased = authority("budget-primary", "lease-1", 1);
+    let request = BudgetAuthorizeHoldRequest::legacy(
+        "cap-authorize-denied".to_string(),
+        0,
+        Some(5),
+        100,
+        Some(50),
+        Some(500),
+        Some("hold-authorize-denied".to_string()),
+        Some("event-authorize-denied".to_string()),
+        Some(leased.clone()),
+    );
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let first = store.authorize_budget_hold(request.clone()).unwrap();
+    assert!(matches!(first, BudgetAuthorizeHoldDecision::Denied(_)));
+    drop(store);
+
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let events_before = store
+        .list_mutation_events(10, Some("cap-authorize-denied"), Some(0))
+        .unwrap();
+    let collision = store
+        .authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
+            "cap-authorize-denied".to_string(),
+            0,
+            Some(5),
+            100,
+            Some(50),
+            Some(500),
+            Some("hold-authorize-denied".to_string()),
+            Some("event-authorize-denied-rebound".to_string()),
+            Some(leased.clone()),
+        ))
+        .expect_err("a denied hold ID must not be rebound under a fresh event or maxima");
+    assert!(matches!(collision, BudgetStoreError::Invariant(_)));
+    assert!(store
+        .get_usage("cap-authorize-denied", 0)
+        .unwrap()
+        .is_none());
+    assert_eq!(
+        store
+            .list_mutation_events(10, Some("cap-authorize-denied"), Some(0))
+            .unwrap(),
+        events_before
+    );
+    let (claim_count, open_hold_count): (i64, i64) = store
+        .connection()
+        .unwrap()
+        .query_row(
+            r#"
+            SELECT
+                (SELECT COUNT(*) FROM budget_authorization_claims WHERE hold_id = 'hold-authorize-denied'),
+                (SELECT COUNT(*) FROM budget_authorization_holds WHERE hold_id = 'hold-authorize-denied')
+            "#,
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!((claim_count, open_hold_count), (1, 0));
+
+    assert!(store
+        .authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
+            "cap-authorize-denied".to_string(),
+            0,
+            Some(5),
+            40,
+            Some(50),
+            Some(500),
+            Some("hold-authorize-denied-later".to_string()),
+            Some("event-authorize-denied-later".to_string()),
+            Some(leased.clone()),
+        ))
+        .unwrap()
+        .is_authorized());
+    assert_eq!(store.authorize_budget_hold(request).unwrap(), first);
+    let BudgetAuthorizeHoldDecision::Denied(first) = first else {
+        panic!("first authorization must remain denied");
+    };
+    assert_eq!(first.committed_cost_units_after, 0);
+    assert_eq!(first.invocation_count_after, 0);
+    assert_eq!(
+        first.invocation_state,
+        BudgetInvocationReservationState::Denied
+    );
+    assert_eq!(first.metadata.authority.as_ref(), Some(&leased));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn imported_denied_authorization_claim_rejects_rebind_atomically() {
+    let leader_path = unique_db_path("chio-budget-import-denied-claim-leader");
+    let follower_path = unique_db_path("chio-budget-import-denied-claim-follower");
+    let leader = SqliteBudgetStore::open(&leader_path).unwrap();
+    let request = BudgetAuthorizeHoldRequest::legacy(
+        "cap-import-denied-claim".to_string(),
+        0,
+        Some(5),
+        40,
+        Some(20),
+        Some(100),
+        Some("hold-import-denied-claim".to_string()),
+        Some("event-import-denied-claim".to_string()),
+        None,
+    );
+    assert!(matches!(
+        leader.authorize_budget_hold(request).unwrap(),
+        BudgetAuthorizeHoldDecision::Denied(_)
+    ));
+    let event = leader
+        .list_mutation_events(10, Some("cap-import-denied-claim"), Some(0))
+        .unwrap()
+        .pop()
+        .expect("denied authorization event");
+
+    let follower = SqliteBudgetStore::open(&follower_path).unwrap();
+    follower.import_snapshot_records(&[], &[event]).unwrap();
+    let events_before = follower
+        .list_mutation_events(10, Some("cap-import-denied-claim"), Some(0))
+        .unwrap();
+    let error = follower
+        .try_charge_cost_with_ids(
+            "cap-import-denied-claim",
+            0,
+            Some(5),
+            40,
+            Some(20),
+            Some(100),
+            Some("hold-import-denied-claim"),
+            Some("event-import-denied-claim-rebound"),
+        )
+        .expect_err("an imported denied claim must permanently bind its hold ID");
+    assert!(matches!(error, BudgetStoreError::Invariant(_)));
+    assert!(follower
+        .get_usage("cap-import-denied-claim", 0)
+        .unwrap()
+        .is_none());
+    assert_eq!(
+        follower
+            .list_mutation_events(10, Some("cap-import-denied-claim"), Some(0))
+            .unwrap(),
+        events_before
+    );
+
+    let _ = fs::remove_file(leader_path);
+    let _ = fs::remove_file(follower_path);
+}
+
+#[test]
+fn authorization_claim_migration_backfills_existing_authorization_event() {
+    let path = unique_db_path("chio-budget-authorization-claim-migration");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    assert!(store
+        .authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
+            "cap-claim-migration".to_string(),
+            0,
+            Some(2),
+            10,
+            Some(10),
+            Some(20),
+            Some("hold-claim-migration".to_string()),
+            Some("event-claim-migration".to_string()),
+            None,
+        ))
+        .unwrap()
+        .is_authorized());
+    store
+        .connection()
+        .unwrap()
+        .execute("DROP TABLE budget_authorization_claims", [])
+        .unwrap();
+    drop(store);
+
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let claim_count: i64 = store
+        .connection()
+        .unwrap()
+        .query_row(
+            "SELECT COUNT(*) FROM budget_authorization_claims WHERE hold_id = 'hold-claim-migration'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(claim_count, 1);
+    let error = store
+        .try_charge_cost_with_ids(
+            "cap-claim-migration",
+            0,
+            Some(2),
+            10,
+            Some(10),
+            Some(20),
+            Some("hold-claim-migration"),
+            Some("event-claim-migration-rebound"),
+        )
+        .expect_err("migration-backfilled claim must close the fresh-event bypass");
+    assert!(matches!(error, BudgetStoreError::Invariant(_)));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn allowed_authorization_claim_rejects_fresh_event_and_maximum_bypass() {
+    let path = unique_db_path("chio-budget-authorize-allowed-claim-rebind");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let request = BudgetAuthorizeHoldRequest::legacy(
+        "cap-authorize-claimed".to_string(),
+        0,
+        Some(1),
+        25,
+        Some(25),
+        Some(25),
+        Some("hold-authorize-claimed".to_string()),
+        Some("event-authorize-claimed".to_string()),
+        None,
+    );
+    let first = store.authorize_budget_hold(request.clone()).unwrap();
+    assert!(first.is_authorized());
+    let usage_before = store
+        .get_usage("cap-authorize-claimed", 0)
+        .unwrap()
+        .unwrap();
+    let events_before = store
+        .list_mutation_events(10, Some("cap-authorize-claimed"), Some(0))
+        .unwrap();
+
+    for max_invocations in [Some(1), None] {
+        let error = store
+            .authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
+                "cap-authorize-claimed".to_string(),
+                0,
+                max_invocations,
+                25,
+                Some(25),
+                Some(25),
+                Some("hold-authorize-claimed".to_string()),
+                Some(format!(
+                    "event-authorize-claimed-rebound-{max_invocations:?}"
+                )),
+                None,
+            ))
+            .expect_err("a claimed allowed hold must reject every fresh event");
+        assert!(matches!(error, BudgetStoreError::Invariant(_)));
+    }
+    assert_eq!(
+        store
+            .get_usage("cap-authorize-claimed", 0)
+            .unwrap()
+            .unwrap(),
+        usage_before
+    );
+    assert_eq!(
+        store
+            .list_mutation_events(10, Some("cap-authorize-claimed"), Some(0))
+            .unwrap(),
+        events_before
+    );
+    assert_eq!(store.authorize_budget_hold(request).unwrap(), first);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn high_level_reverse_retry_returns_original_persisted_snapshot_after_later_write() {
+    let path = unique_db_path("chio-budget-reverse-snapshot-retry");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let leased = authority("budget-primary", "lease-1", 1);
+    assert!(store
+        .try_charge_cost_with_ids_and_authority(
+            "cap-reverse-snapshot",
+            0,
+            Some(5),
+            100,
+            Some(100),
+            Some(500),
+            Some("hold-reverse-snapshot-0"),
+            Some("event-reverse-snapshot-authorize"),
+            Some(&leased),
+        )
+        .unwrap());
+    let request = BudgetReverseHoldRequest {
+        capability_id: "cap-reverse-snapshot".to_string(),
+        grant_index: 0,
+        reversed_exposure_units: 100,
+        hold_id: Some("hold-reverse-snapshot-0".to_string()),
+        event_id: Some("event-reverse-snapshot".to_string()),
+        authority: Some(leased.clone()),
+    };
+    let first = store.reverse_budget_hold(request.clone()).unwrap();
+    assert!(store
+        .try_charge_cost_with_ids_and_authority(
+            "cap-reverse-snapshot",
+            0,
+            Some(5),
+            50,
+            Some(100),
+            Some(500),
+            Some("hold-reverse-snapshot-1"),
+            Some("event-reverse-snapshot-later"),
+            Some(&leased),
+        )
+        .unwrap());
+
+    assert_eq!(store.reverse_budget_hold(request).unwrap(), first);
+    assert_eq!(first.metadata.authority.as_ref(), Some(&leased));
+    assert_eq!(
+        first.metadata.event_id.as_deref(),
+        Some("event-reverse-snapshot")
+    );
+    assert_eq!(first.monetary_state, BudgetMonetaryHoldState::Reversed);
+    assert!(first.metadata.budget_commit_index.is_some());
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn high_level_release_retry_returns_original_persisted_snapshot_after_later_write() {
+    let path = unique_db_path("chio-budget-release-snapshot-retry");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let leased = authority("budget-primary", "lease-1", 1);
+    assert!(store
+        .try_charge_cost_with_ids_and_authority(
+            "cap-release-snapshot",
+            0,
+            Some(5),
+            100,
+            Some(100),
+            Some(500),
+            Some("hold-release-snapshot-0"),
+            Some("event-release-snapshot-authorize"),
+            Some(&leased),
+        )
+        .unwrap());
+    let request = BudgetReleaseHoldRequest {
+        capability_id: "cap-release-snapshot".to_string(),
+        grant_index: 0,
+        released_exposure_units: 100,
+        hold_id: Some("hold-release-snapshot-0".to_string()),
+        event_id: Some("event-release-snapshot".to_string()),
+        authority: Some(leased.clone()),
+    };
+    let first = store.release_budget_hold(request.clone()).unwrap();
+    assert!(store
+        .try_charge_cost_with_ids_and_authority(
+            "cap-release-snapshot",
+            0,
+            Some(5),
+            50,
+            Some(100),
+            Some(500),
+            Some("hold-release-snapshot-1"),
+            Some("event-release-snapshot-later"),
+            Some(&leased),
+        )
+        .unwrap());
+
+    assert_eq!(store.release_budget_hold(request).unwrap(), first);
+    assert_eq!(first.metadata.authority.as_ref(), Some(&leased));
+    assert_eq!(
+        first.metadata.event_id.as_deref(),
+        Some("event-release-snapshot")
+    );
+    assert_eq!(first.monetary_state, BudgetMonetaryHoldState::Released);
+    assert!(first.metadata.budget_commit_index.is_some());
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn high_level_reconcile_retry_returns_original_persisted_snapshot_after_later_write() {
+    let path = unique_db_path("chio-budget-reconcile-snapshot-retry");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let leased = authority("budget-primary", "lease-1", 1);
+    assert!(store
+        .try_charge_cost_with_ids_and_authority(
+            "cap-reconcile-snapshot",
+            0,
+            Some(5),
+            100,
+            Some(100),
+            Some(500),
+            Some("hold-reconcile-snapshot-0"),
+            Some("event-reconcile-snapshot-authorize"),
+            Some(&leased),
+        )
+        .unwrap());
+    let request = BudgetReconcileHoldRequest {
+        capability_id: "cap-reconcile-snapshot".to_string(),
+        grant_index: 0,
+        exposed_cost_units: 100,
+        realized_spend_units: 70,
+        hold_id: Some("hold-reconcile-snapshot-0".to_string()),
+        event_id: Some("event-reconcile-snapshot".to_string()),
+        authority: Some(leased.clone()),
+    };
+    let first = store.reconcile_budget_hold(request.clone()).unwrap();
+    assert!(store
+        .try_charge_cost_with_ids_and_authority(
+            "cap-reconcile-snapshot",
+            0,
+            Some(5),
+            50,
+            Some(100),
+            Some(500),
+            Some("hold-reconcile-snapshot-1"),
+            Some("event-reconcile-snapshot-later"),
+            Some(&leased),
+        )
+        .unwrap());
+
+    assert_eq!(store.reconcile_budget_hold(request).unwrap(), first);
+    assert_eq!(first.metadata.authority.as_ref(), Some(&leased));
+    assert_eq!(
+        first.metadata.event_id.as_deref(),
+        Some("event-reconcile-snapshot")
+    );
+    assert_eq!(first.monetary_state, BudgetMonetaryHoldState::Reconciled);
+    assert!(first.metadata.budget_commit_index.is_some());
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn budget_store_reduce_charge_cost_allows_zero_invocation_release_sqlite() {
     let path = unique_db_path("chio-reduce-charge-zero-invocations");
     let store = SqliteBudgetStore::open(&path).unwrap();
@@ -715,7 +1366,7 @@ fn budget_store_hold_authority_requires_exact_lease_inmemory() {
 }
 
 #[test]
-fn budget_store_event_id_retry_survives_authority_rollover_sqlite() {
+fn budget_store_event_id_retry_rejects_authority_rollover_sqlite() {
     let path = unique_db_path("chio-hold-authority-event-reuse");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let hold_id = "hold-cap-lease-0";
@@ -737,7 +1388,7 @@ fn budget_store_event_id_retry_survives_authority_rollover_sqlite() {
         )
         .unwrap());
 
-    assert!(store
+    let authority_error = store
         .try_charge_cost_with_ids_and_authority(
             "cap-lease",
             0,
@@ -749,7 +1400,8 @@ fn budget_store_event_id_retry_survives_authority_rollover_sqlite() {
             Some(event_id),
             Some(&changed),
         )
-        .unwrap());
+        .expect_err("reused event id under a different authority should fail closed");
+    assert!(matches!(authority_error, BudgetStoreError::Invariant(_)));
 
     let error = store
         .try_charge_cost_with_ids_and_authority(
@@ -764,9 +1416,7 @@ fn budget_store_event_id_retry_survives_authority_rollover_sqlite() {
             Some(&changed),
         )
         .expect_err("reused event id with a different mutation should fail closed");
-    assert!(error
-        .to_string()
-        .contains("was reused for a different mutation"));
+    assert!(matches!(error, BudgetStoreError::Invariant(_)));
 
     let usage = store.get_usage("cap-lease", 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 1);
@@ -917,7 +1567,241 @@ fn budget_store_rollback_artifact_allows_retry_with_new_authority_sqlite() {
 }
 
 #[test]
-fn budget_store_retry_after_rollback_replaces_orphaned_open_hold_sqlite() {
+fn unrelated_typed_reverse_with_rollback_prefix_cannot_rebind_authorization_claim() {
+    let path = unique_db_path("chio-hold-forged-rollback-prefix");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let hold_id = "hold-target-0";
+    let event_id = "hold-target-0:authorize";
+    let initial = authority("budget-primary", "lease-7", 7);
+    let changed = authority("budget-primary", "lease-8", 8);
+
+    assert!(store
+        .try_charge_cost_with_ids_and_authority(
+            "cap-target",
+            0,
+            Some(10),
+            100,
+            Some(200),
+            Some(1_000),
+            Some(hold_id),
+            Some(event_id),
+            Some(&initial),
+        )
+        .unwrap());
+
+    assert!(store
+        .try_charge_cost_with_ids_and_authority(
+            "cap-unrelated",
+            0,
+            Some(10),
+            1,
+            Some(10),
+            Some(100),
+            Some("hold-unrelated-0"),
+            Some("hold-unrelated-0:authorize"),
+            Some(&changed),
+        )
+        .unwrap());
+    store
+        .reverse_charge_cost_with_ids_and_authority(
+            "cap-unrelated",
+            0,
+            1,
+            Some("hold-unrelated-0"),
+            Some("hold-target-0:authorize:rollback:forged"),
+            Some(&changed),
+        )
+        .unwrap();
+
+    let error = store
+        .try_charge_cost_with_ids_and_authority(
+            "cap-target",
+            0,
+            Some(10),
+            100,
+            Some(200),
+            Some(1_000),
+            Some(hold_id),
+            Some(event_id),
+            Some(&changed),
+        )
+        .expect_err("an unrelated prefixed reverse must not unlock authority rebinding");
+    assert!(matches!(error, BudgetStoreError::Invariant(_)));
+
+    let target_events = store
+        .list_mutation_events(10, Some("cap-target"), Some(0))
+        .unwrap();
+    assert_eq!(target_events.len(), 1);
+    assert_eq!(target_events[0].event_id, event_id);
+    assert_eq!(target_events[0].authority.as_ref(), Some(&initial));
+    let usage = store.get_usage("cap-target", 0).unwrap().unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert_usage_totals(&usage, 100, 0);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn compensated_authorization_resolves_current_authority_but_exact_retry_stays_frozen() {
+    let path = unique_db_path("chio-hold-authority-source-after-compensation");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let hold_id = "hold-authority-source";
+    let event_id = "hold-authority-source:authorize";
+    let initial = authority("budget-primary", "lease-7", 7);
+    let changed = authority("budget-primary", "lease-8", 8);
+
+    assert!(store
+        .try_charge_cost_with_ids_and_authority(
+            "cap-authority-source",
+            0,
+            Some(10),
+            50,
+            Some(100),
+            Some(500),
+            Some(hold_id),
+            Some(event_id),
+            Some(&initial),
+        )
+        .unwrap());
+    let persisted_hint = store
+        .authorization_authority_source(Some(hold_id), event_id)
+        .unwrap();
+    assert_eq!(
+        persisted_hint,
+        SqliteBudgetAuthorizationAuthority::Persisted(Some(initial.clone()))
+    );
+
+    store
+        .reverse_charge_cost_with_ids_and_authority(
+            "cap-authority-source",
+            0,
+            50,
+            Some(hold_id),
+            Some("hold-authority-source:authorize:rollback:1"),
+            Some(&initial),
+        )
+        .unwrap();
+    assert_eq!(
+        store
+            .authorization_authority_source(Some(hold_id), event_id)
+            .unwrap(),
+        SqliteBudgetAuthorizationAuthority::Current
+    );
+
+    let stale_candidate = match persisted_hint {
+        SqliteBudgetAuthorizationAuthority::Persisted(_) => {
+            SqliteBudgetCurrentAuthority::Unavailable
+        }
+        SqliteBudgetAuthorizationAuthority::Current => {
+            panic!("pre-compensation source unexpectedly required current authority")
+        }
+    };
+    let unavailable_error = store
+        .try_charge_cost_with_ids_and_current_authority_outcome(
+            "cap-authority-source",
+            0,
+            Some(10),
+            50,
+            Some(100),
+            Some(500),
+            Some(hold_id),
+            Some(event_id),
+            stale_candidate,
+        )
+        .expect_err("a stale persisted-authority hint must not survive compensation");
+    assert!(matches!(unavailable_error, BudgetStoreError::Invariant(_)));
+
+    let downgrade_error = store
+        .try_charge_cost_with_ids_and_current_authority_outcome(
+            "cap-authority-source",
+            0,
+            Some(10),
+            50,
+            Some(100),
+            Some(500),
+            Some(hold_id),
+            Some(event_id),
+            SqliteBudgetCurrentAuthority::Resolved(None),
+        )
+        .expect_err("a compensated HA claim must not downgrade to detached authority");
+    assert!(matches!(downgrade_error, BudgetStoreError::Invariant(_)));
+
+    let replacement = store
+        .try_charge_cost_with_ids_and_current_authority_outcome(
+            "cap-authority-source",
+            0,
+            Some(10),
+            50,
+            Some(100),
+            Some(500),
+            Some(hold_id),
+            Some(event_id),
+            SqliteBudgetCurrentAuthority::Resolved(Some(changed.clone())),
+        )
+        .unwrap();
+    assert!(replacement.allowed);
+    assert!(replacement.event_created);
+    assert_eq!(replacement.authority.as_ref(), Some(&changed));
+
+    let events = store
+        .list_mutation_events(10, Some("cap-authority-source"), Some(0))
+        .unwrap();
+    let authorize = events
+        .iter()
+        .find(|event| event.event_id == event_id)
+        .expect("replacement authorization event");
+    assert_eq!(authorize.authority.as_ref(), Some(&changed));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn authorization_write_outcome_marks_only_the_transaction_that_created_the_event() {
+    let path = unique_db_path("chio-hold-created-outcome");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let authority = authority("budget-primary", "lease-7", 7);
+
+    let first = store
+        .try_charge_cost_with_ids_and_authority_outcome(
+            "cap-created-outcome",
+            0,
+            Some(10),
+            25,
+            Some(50),
+            Some(500),
+            Some("hold-created-outcome"),
+            Some("hold-created-outcome:authorize"),
+            Some(&authority),
+        )
+        .unwrap();
+    assert!(first.allowed);
+    assert!(first.event_created);
+
+    let retry = store
+        .try_charge_cost_with_ids_and_authority_outcome(
+            "cap-created-outcome",
+            0,
+            Some(10),
+            25,
+            Some(50),
+            Some(500),
+            Some("hold-created-outcome"),
+            Some("hold-created-outcome:authorize"),
+            Some(&authority),
+        )
+        .unwrap();
+    assert!(retry.allowed);
+    assert!(!retry.event_created);
+
+    let usage = store.get_usage("cap-created-outcome", 0).unwrap().unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert_usage_totals(&usage, 25, 0);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn budget_store_retry_after_rollback_replaces_orphaned_open_hold_once_sqlite() {
     let path = unique_db_path("chio-hold-rollback-orphan-retry");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let hold_id = "hold-cap-orphan-0";
@@ -1038,7 +1922,7 @@ fn budget_store_retry_after_rollback_replaces_orphaned_open_hold_sqlite() {
         transaction.commit().unwrap();
     }
 
-    assert!(store
+    let missing_replacement = store
         .try_charge_cost_with_ids_and_authority(
             "cap-orphan",
             0,
@@ -1050,16 +1934,17 @@ fn budget_store_retry_after_rollback_replaces_orphaned_open_hold_sqlite() {
             Some(event_id),
             Some(&changed),
         )
-        .unwrap());
+        .expect_err("a replacement authorization event cannot be recreated without compensation");
+    assert!(matches!(
+        missing_replacement,
+        BudgetStoreError::Invariant(_)
+    ));
     let events = store
         .list_mutation_events(20, Some("cap-orphan"), Some(0))
         .unwrap();
-    let replayed_retry = events
-        .iter()
-        .find(|record| record.event_id == event_id)
-        .expect("replayed retry authorize event");
-    assert_eq!(replayed_retry.allowed, Some(true));
-    assert_eq!(replayed_retry.usage_seq, Some(usage.seq));
+    assert!(events.iter().all(|record| record.event_id != event_id));
+    let unchanged = store.get_usage("cap-orphan", 0).unwrap().unwrap();
+    assert_eq!(unchanged, usage);
 
     let _ = fs::remove_file(path);
 }
@@ -1124,6 +2009,389 @@ fn import_mutation_record_keeps_duplicate_release_events_idempotent_sqlite() {
 }
 
 #[test]
+fn import_mutation_record_preserves_captured_hold_state_sqlite() {
+    let source_path = unique_db_path("chio-budget-import-capture-source");
+    let target_path = unique_db_path("chio-budget-import-capture-target");
+    let source = SqliteBudgetStore::open(&source_path).unwrap();
+    let hold_id = "hold-cap-import-capture-0";
+
+    assert!(source
+        .try_charge_cost_with_ids(
+            "cap-import-capture",
+            0,
+            Some(10),
+            100,
+            Some(200),
+            Some(1000),
+            Some(hold_id),
+            Some("hold-cap-import-capture-0:authorize"),
+        )
+        .unwrap());
+    source
+        .capture_budget_hold(BudgetCaptureHoldRequest {
+            capability_id: "cap-import-capture".to_string(),
+            grant_index: 0,
+            exposed_cost_units: 100,
+            realized_spend_units: 60,
+            hold_id: Some(hold_id.to_string()),
+            event_id: Some("hold-cap-import-capture-0:capture".to_string()),
+            authority: None,
+        })
+        .unwrap();
+    let records = source
+        .list_mutation_events(10, Some("cap-import-capture"), Some(0))
+        .unwrap();
+    assert_eq!(records.len(), 2);
+    assert_eq!(records[1].kind, BudgetMutationKind::CaptureExposure);
+    assert_eq!(records[1].monetary_state, BudgetMonetaryHoldState::Captured);
+
+    let target = SqliteBudgetStore::open(&target_path).unwrap();
+    target.import_mutation_record(&records[0]).unwrap();
+    target.import_mutation_record(&records[1]).unwrap();
+    target.import_mutation_record(&records[1]).unwrap();
+
+    {
+        let mut connection = target.connection().unwrap();
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .unwrap();
+        let hold = SqliteBudgetStore::load_hold(&transaction, hold_id)
+            .unwrap()
+            .expect("imported captured hold state");
+        assert_eq!(hold.remaining_exposure_units, 0);
+        assert_eq!(hold.disposition, HoldDisposition::Captured);
+    }
+    let imported = target
+        .list_mutation_events(10, Some("cap-import-capture"), Some(0))
+        .unwrap();
+    assert_eq!(imported.len(), 2);
+    assert_eq!(imported[1].kind, BudgetMutationKind::CaptureExposure);
+    assert_eq!(
+        imported[1].monetary_state,
+        BudgetMonetaryHoldState::Captured
+    );
+
+    let _ = fs::remove_file(source_path);
+    let _ = fs::remove_file(target_path);
+}
+
+#[test]
+fn import_mutation_record_rejects_out_of_range_sqlite_integers_before_floor_raise() {
+    let mut candidates = Vec::new();
+
+    let mut record = import_integrity_record("overflow-event-seq", 2);
+    record.event_seq = u64::MAX;
+    candidates.push(("event_seq", record));
+
+    let mut record = import_integrity_record("overflow-usage-seq", 2);
+    record.usage_seq = Some(u64::MAX);
+    candidates.push(("usage_seq", record));
+
+    let mut record = import_integrity_record("overflow-exposure", 2);
+    record.exposure_units = u64::MAX;
+    candidates.push(("exposure_units", record));
+
+    let mut record = import_integrity_record("overflow-realized", 2);
+    record.realized_spend_units = u64::MAX;
+    candidates.push(("realized_spend_units", record));
+
+    let mut record = import_integrity_record("overflow-max-per", 2);
+    record.max_cost_per_invocation = Some(u64::MAX);
+    candidates.push(("max_cost_per_invocation", record));
+
+    let mut record = import_integrity_record("overflow-max-total", 2);
+    record.max_total_cost_units = Some(u64::MAX);
+    candidates.push(("max_total_cost_units", record));
+
+    let mut record = import_integrity_record("overflow-exposed-total", 2);
+    record.total_cost_exposed_after = u64::MAX;
+    candidates.push(("total_cost_exposed_after", record));
+
+    let mut record = import_integrity_record("overflow-realized-total", 2);
+    record.total_cost_realized_spend_after = u64::MAX;
+    candidates.push(("total_cost_realized_spend_after", record));
+
+    let mut record = import_integrity_record("overflow-lease-epoch", 2);
+    record.authority.as_mut().unwrap().lease_epoch = u64::MAX;
+    candidates.push(("lease_epoch", record));
+
+    for (field, record) in candidates {
+        let path = unique_db_path(&format!("chio-budget-import-overflow-{field}"));
+        let store = SqliteBudgetStore::open(&path).unwrap();
+        store
+            .import_mutation_record(&import_integrity_record("baseline", 1))
+            .unwrap();
+
+        let error = store
+            .import_mutation_record(&record)
+            .expect_err("out-of-range imported integer must fail closed");
+        assert!(
+            matches!(error, BudgetStoreError::Overflow(_)),
+            "{field} returned the wrong error: {error}"
+        );
+        assert_eq!(
+            replication_floor(&store),
+            1,
+            "{field} advanced the replication floor before rejection"
+        );
+        assert_eq!(
+            store.max_mutation_event_seq().unwrap(),
+            1,
+            "{field} persisted a rejected mutation"
+        );
+
+        let _ = fs::remove_file(path);
+    }
+}
+
+#[test]
+fn imported_usage_rejects_out_of_range_sqlite_integers_before_floor_raise() {
+    let mut records = Vec::new();
+
+    let mut record = usage_record("cap-overflow-seq", 0, 1, 100, 1, 0, 0);
+    record.seq = u64::MAX;
+    records.push(("seq", record));
+
+    let mut record = usage_record("cap-overflow-exposed", 0, 1, 100, 1, 0, 0);
+    record.total_cost_exposed = u64::MAX;
+    records.push(("total_cost_exposed", record));
+
+    let mut record = usage_record("cap-overflow-realized", 0, 1, 100, 1, 0, 0);
+    record.total_cost_realized_spend = u64::MAX;
+    records.push(("total_cost_realized_spend", record));
+
+    for (field, record) in records {
+        let path = unique_db_path(&format!("chio-budget-usage-overflow-{field}"));
+        let store = SqliteBudgetStore::open(&path).unwrap();
+
+        let error = store
+            .upsert_usage(&record)
+            .expect_err("out-of-range imported usage must fail closed");
+        assert!(
+            matches!(error, BudgetStoreError::Overflow(_)),
+            "{field} returned the wrong error: {error}"
+        );
+        assert_eq!(replication_floor(&store), 0, "{field} advanced the floor");
+        assert!(store.list_all_usages().unwrap().is_empty());
+
+        let _ = fs::remove_file(path);
+    }
+}
+
+#[test]
+fn imported_duplicate_identity_binds_sequences_time_states_and_authority() {
+    let path = unique_db_path("chio-budget-import-exact-identity");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let original = import_integrity_record("exact-event", 1);
+    store.import_mutation_record(&original).unwrap();
+    store.import_mutation_record(&original).unwrap();
+
+    let mut variants = Vec::new();
+
+    let mut record = original.clone();
+    record.event_seq = 2;
+    record.usage_seq = Some(2);
+    variants.push(("event_seq", record));
+
+    let mut record = original.clone();
+    record.usage_seq = Some(2);
+    variants.push(("usage_seq", record));
+
+    let mut record = original.clone();
+    record.recorded_at += 1;
+    variants.push(("recorded_at", record));
+
+    let mut record = original.clone();
+    record.invocation_state = BudgetInvocationReservationState::Denied;
+    variants.push(("invocation_state", record));
+
+    let mut record = original.clone();
+    record.monetary_state = BudgetMonetaryHoldState::Captured;
+    variants.push(("monetary_state", record));
+
+    let mut record = original.clone();
+    record.authority.as_mut().unwrap().lease_epoch += 1;
+    variants.push(("authority", record));
+
+    for (field, record) in variants {
+        let error = store
+            .import_mutation_record(&record)
+            .expect_err("changed duplicate identity must fail closed");
+        assert!(
+            matches!(error, BudgetStoreError::Invariant(_)),
+            "{field} returned the wrong error: {error}"
+        );
+        assert_eq!(
+            replication_floor(&store),
+            1,
+            "{field} advanced the floor before duplicate rejection"
+        );
+        assert_eq!(
+            store
+                .mutation_event_seq_for_event_id("exact-event")
+                .unwrap(),
+            Some(1)
+        );
+    }
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn capture_fails_closed_when_replication_sequence_is_exhausted() {
+    let path = unique_db_path("chio-budget-capture-sequence-exhausted");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let hold_id = "hold-sequence-exhausted";
+    assert!(store
+        .try_charge_cost_with_ids(
+            "cap-sequence-exhausted",
+            0,
+            Some(2),
+            100,
+            Some(100),
+            Some(200),
+            Some(hold_id),
+            Some("event-sequence-exhausted-authorize"),
+        )
+        .unwrap());
+    store
+        .connection()
+        .unwrap()
+        .execute(
+            "UPDATE budget_replication_meta SET next_seq = ?1 WHERE singleton = 1",
+            params![i64::MAX],
+        )
+        .unwrap();
+
+    let error = store
+        .capture_budget_hold(BudgetCaptureHoldRequest {
+            capability_id: "cap-sequence-exhausted".to_string(),
+            grant_index: 0,
+            exposed_cost_units: 100,
+            realized_spend_units: 60,
+            hold_id: Some(hold_id.to_string()),
+            event_id: Some("event-sequence-exhausted-capture".to_string()),
+            authority: None,
+        })
+        .expect_err("sequence exhaustion must reject capture");
+    assert!(
+        error
+            .to_string()
+            .contains("budget replication sequence exceeds SQLite INTEGER"),
+        "unexpected error: {error}"
+    );
+    assert_eq!(replication_floor(&store), i64::MAX);
+    let usage = store
+        .get_usage("cap-sequence-exhausted", 0)
+        .unwrap()
+        .unwrap();
+    assert_usage_totals(&usage, 100, 0);
+    let mut connection = store.connection().unwrap();
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Deferred)
+        .unwrap();
+    let hold = SqliteBudgetStore::load_hold(&transaction, hold_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(hold.remaining_exposure_units, 100);
+    assert_eq!(hold.disposition, HoldDisposition::Open);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn abandoned_sequence_snapshot_rejects_out_of_range_before_mutation() {
+    let path = unique_db_path("chio-budget-abandoned-sequence-overflow");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    store.record_abandoned_event_seqs(&[1]).unwrap();
+
+    let error = store
+        .record_abandoned_event_seqs(&[2, u64::MAX])
+        .expect_err("out-of-range abandoned sequence must fail closed");
+    assert!(matches!(error, BudgetStoreError::Overflow(_)));
+    assert_eq!(store.list_abandoned_event_seqs().unwrap(), vec![1]);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn abandoned_sequence_range_snapshot_rejects_out_of_range_before_mutation() {
+    let path = unique_db_path("chio-budget-abandoned-range-overflow");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    store
+        .import_mutation_record(&import_integrity_record("range-boundary", 2))
+        .unwrap();
+    store.record_abandoned_event_seq_ranges(&[(1, 1)]).unwrap();
+
+    let cases = [vec![(2, 2), (4, u64::MAX)], vec![(u64::MAX, u64::MAX)]];
+    for ranges in cases {
+        let error = store
+            .record_abandoned_event_seq_ranges(&ranges)
+            .expect_err("out-of-range abandoned sequence range must fail closed");
+        assert!(matches!(error, BudgetStoreError::Overflow(_)));
+        assert_eq!(store.list_abandoned_event_seqs().unwrap(), vec![1]);
+    }
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn abandoned_sequence_range_snapshot_rejects_noncanonical_work_before_mutation() {
+    let path = unique_db_path("chio-budget-abandoned-range-bounds");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    store
+        .import_mutation_record(&import_integrity_record("range-canonical-boundary", 2))
+        .unwrap();
+    store.record_abandoned_event_seq_ranges(&[(1, 1)]).unwrap();
+
+    let invalid = [
+        ("unsorted", vec![(10, 10), (3, 3)]),
+        ("overlap", vec![(3, 5), (5, 7)]),
+        ("adjacent", vec![(3, 5), (6, 7)]),
+    ];
+    for (case, ranges) in invalid {
+        let error = store
+            .record_abandoned_event_seq_ranges(&ranges)
+            .expect_err("invalid abandoned range snapshot must fail closed");
+        assert!(
+            matches!(error, BudgetStoreError::Invariant(_)),
+            "{case} returned the wrong error: {error}"
+        );
+        assert_eq!(
+            store.list_abandoned_event_seqs().unwrap(),
+            vec![1],
+            "{case} partially mutated the abandoned sequence set"
+        );
+    }
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn budget_import_floor_snapshot_rejects_out_of_range_before_mutation() {
+    let path = unique_db_path("chio-budget-import-floor-overflow");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let mut event = import_integrity_record("overflow-import-floor", u64::MAX);
+    event.usage_seq = None;
+
+    let error = store
+        .record_budget_import_floors(&[event])
+        .expect_err("out-of-range imported floor must fail closed");
+    assert!(matches!(error, BudgetStoreError::Overflow(_)));
+    assert_eq!(store.budget_import_floor("budget-primary").unwrap(), 0);
+    let count: i64 = store
+        .connection()
+        .unwrap()
+        .query_row("SELECT COUNT(*) FROM budget_import_floors", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(count, 0);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn import_snapshot_records_replay_is_idempotent_when_peer_cursor_is_lost_sqlite() {
     let source_path = unique_db_path("chio-budget-import-replay-source");
     let target_path = unique_db_path("chio-budget-import-replay-target");
@@ -1177,7 +2445,7 @@ fn import_snapshot_records_replay_is_idempotent_when_peer_cursor_is_lost_sqlite(
 }
 
 #[test]
-fn import_snapshot_records_duplicate_event_ignores_peer_transport_fields_sqlite() {
+fn import_snapshot_records_rejects_changed_duplicate_transport_identity_without_mutation_sqlite() {
     let source_path = unique_db_path("chio-budget-import-transport-source");
     let target_path = unique_db_path("chio-budget-import-transport-target");
     let source = SqliteBudgetStore::open(&source_path).unwrap();
@@ -1210,18 +2478,31 @@ fn import_snapshot_records_duplicate_event_ignores_peer_transport_fields_sqlite(
     target
         .import_snapshot_records(std::slice::from_ref(&usage), &events)
         .unwrap();
-    target
-        .import_snapshot_records(std::slice::from_ref(&usage), &[replayed_event])
+    let floor_before = replication_floor(&target);
+    let usage_before = target
+        .get_usage("cap-import-transport", 0)
+        .unwrap()
         .unwrap();
+    let events_before = target
+        .list_mutation_events(10, Some("cap-import-transport"), Some(0))
+        .unwrap();
+    let error = target
+        .import_snapshot_records(std::slice::from_ref(&usage), &[replayed_event])
+        .expect_err("changed duplicate transport identity must fail closed");
+    assert!(matches!(error, BudgetStoreError::Invariant(_)));
+    assert_eq!(replication_floor(&target), floor_before);
+    assert_eq!(
+        target
+            .get_usage("cap-import-transport", 0)
+            .unwrap()
+            .unwrap(),
+        usage_before
+    );
 
     let replicated_events = target
         .list_mutation_events(10, Some("cap-import-transport"), Some(0))
         .unwrap();
-    assert_eq!(replicated_events.len(), 1);
-    assert_eq!(
-        replicated_events[0].event_id,
-        "hold-import-transport-0:authorize"
-    );
+    assert_eq!(replicated_events, events_before);
 
     let _ = fs::remove_file(source_path);
     let _ = fs::remove_file(target_path);
@@ -1274,7 +2555,7 @@ fn import_snapshot_records_rolls_back_usage_rows_when_mutation_conflicts_sqlite(
 }
 
 #[test]
-fn budget_store_open_hold_recovers_missing_authorize_event_sqlite() {
+fn budget_store_open_hold_rejects_missing_authorize_event_without_compensation_sqlite() {
     let path = unique_db_path("chio-hold-authority-recover-missing-event");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let hold_id = "hold-cap-recover-0";
@@ -1294,9 +2575,10 @@ fn budget_store_open_hold_recovers_missing_authorize_event_sqlite() {
             Some(&authority),
         )
         .unwrap());
+    let usage_before = store.get_usage("cap-recover", 0).unwrap().unwrap();
     store.delete_mutation_event(event_id).unwrap();
 
-    assert!(store
+    let error = store
         .try_charge_cost_with_ids_and_authority(
             "cap-recover",
             0,
@@ -1308,13 +2590,17 @@ fn budget_store_open_hold_recovers_missing_authorize_event_sqlite() {
             Some(event_id),
             Some(&authority),
         )
-        .unwrap());
+        .expect_err("an authorize event cannot be recreated without a rollback artifact");
+    assert!(matches!(error, BudgetStoreError::Invariant(_)));
+    assert_eq!(
+        store.get_usage("cap-recover", 0).unwrap().unwrap(),
+        usage_before
+    );
 
     let events = store
         .list_mutation_events(10, Some("cap-recover"), Some(0))
         .unwrap();
-    assert_eq!(events.len(), 1);
-    assert_eq!(events[0].event_id, event_id);
+    assert!(events.is_empty());
 
     let _ = fs::remove_file(path);
 }
@@ -1537,6 +2823,10 @@ fn budget_ack_heads_reports_contiguous_prefix_only() -> Result<(), Box<dyn std::
         max_cost_per_invocation: None,
         max_total_cost_units: None,
         invocation_count_after: 1,
+        invocation_counts_after: Vec::new(),
+        invocation_state: BudgetInvocationReservationState::Absent,
+        monetary_state: BudgetMonetaryHoldState::Exposed,
+        revocation_set: None,
         total_cost_exposed_after: 1,
         total_cost_realized_spend_after: 0,
         authority: Some(BudgetEventAuthority {
@@ -1591,6 +2881,10 @@ fn budget_ack_heads_caps_partial_head_at_interior_gap() -> Result<(), Box<dyn st
         max_cost_per_invocation: None,
         max_total_cost_units: None,
         invocation_count_after: 1,
+        invocation_counts_after: Vec::new(),
+        invocation_state: BudgetInvocationReservationState::Absent,
+        monetary_state: BudgetMonetaryHoldState::Exposed,
+        revocation_set: None,
         total_cost_exposed_after: 1,
         total_cost_realized_spend_after: 0,
         authority: Some(BudgetEventAuthority {
@@ -1650,6 +2944,10 @@ fn budget_ack_heads_stays_pinned_at_a_post_watermark_gap() -> Result<(), Box<dyn
         max_cost_per_invocation: None,
         max_total_cost_units: None,
         invocation_count_after: 1,
+        invocation_counts_after: Vec::new(),
+        invocation_state: BudgetInvocationReservationState::Absent,
+        monetary_state: BudgetMonetaryHoldState::Exposed,
+        revocation_set: None,
         total_cost_exposed_after: 1,
         total_cost_realized_spend_after: 0,
         authority: Some(BudgetEventAuthority {
@@ -1728,10 +3026,9 @@ fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn 
     // The cluster snapshot carries abandoned seqs RANGE-ENCODED so a rollback storm's
     // long contiguous run stays a handful of small pairs instead of an unbounded
     // integer list that could exceed MAX_PEER_RESPONSE_BYTES and stall recovery.
-    // list_abandoned_event_seq_ranges
-    // must COLLAPSE contiguous runs, and record_abandoned_event_seq_ranges must EXPAND
-    // them back to the identical seq set so the filled-or-abandoned head advance is
-    // preserved bit-for-bit.
+    // list_abandoned_event_seq_ranges must COLLAPSE contiguous runs, and
+    // record_abandoned_event_seq_ranges must preserve them compactly while exposing
+    // the identical bounded sequence set.
     let head_for = |heads: &[(String, u64)], origin: &str| {
         heads.iter().find(|(o, _)| o == origin).map(|(_, seq)| *seq)
     };
@@ -1746,20 +3043,28 @@ fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn 
         "contiguous abandoned seqs must collapse to inclusive runs"
     );
 
-    // Range form -> enumerated set on a fresh follower (lossless expansion).
+    // Range form -> bounded sequence set on a fresh follower.
     let follower_path = unique_db_path("chio-abandoned-ranges-follower");
     let follower = SqliteBudgetStore::open(&follower_path)?;
+    follower.import_snapshot_records(&[], &[ack_head_event(11, "boundary", "http://o")])?;
     follower.record_abandoned_event_seq_ranges(&[(2, 4), (7, 7), (9, 10)])?;
     assert_eq!(
         follower.list_abandoned_event_seqs()?,
         vec![2, 3, 4, 7, 9, 10],
-        "a follower expands the runs to the identical abandoned seq set"
+        "a follower exposes the compact runs as the identical bounded seq set"
     );
 
     // A single LARGE contiguous run collapses to ONE pair (the rollback-storm case):
-    // recorded cheaply via the range insert (a recursive CTE, not per-seq round-trips).
+    // recorded as one durable compact row.
     let storm_path = unique_db_path("chio-abandoned-ranges-storm");
     let storm = SqliteBudgetStore::open(&storm_path)?;
+    storm.import_snapshot_records(
+        &[],
+        &[
+            ack_head_event(1, "e1", "http://o"),
+            ack_head_event(50_002, "e-tail", "http://o"),
+        ],
+    )?;
     storm.record_abandoned_event_seq_ranges(&[(2, 50_001)])?;
     let ranges = storm.list_abandoned_event_seq_ranges()?;
     assert_eq!(
@@ -1772,13 +3077,6 @@ fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn 
     // Head advance: present {1, 50002} with the whole (2, 50001) run abandoned makes
     // [1..=50002] contiguous, so the head advances across the run - exactly as if each
     // seq had been recorded individually.
-    storm.import_snapshot_records(
-        &[],
-        &[
-            ack_head_event(1, "e1", "http://o"),
-            ack_head_event(50_002, "e-tail", "http://o"),
-        ],
-    )?;
     assert_eq!(
         head_for(&storm.budget_ack_heads()?, "http://o"),
         Some(50_002),
@@ -1788,6 +3086,98 @@ fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn 
     let _ = fs::remove_file(&source_path);
     let _ = fs::remove_file(&follower_path);
     let _ = fs::remove_file(&storm_path);
+    Ok(())
+}
+
+#[test]
+fn compact_abandoned_billion_span_stays_constant_size_and_advances_ack_head(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-abandoned-ranges-billion");
+    let store = SqliteBudgetStore::open(&path)?;
+    let tail = 2_000_000_001u64;
+    store.import_snapshot_records(
+        &[],
+        &[
+            ack_head_event(1, "billion-head", "http://compact-origin"),
+            ack_head_event(tail, "billion-tail", "http://compact-origin"),
+        ],
+    )?;
+
+    let live_overlap = store
+        .record_abandoned_event_seq_ranges(&[(tail - 1, tail)])
+        .expect_err("an abandoned range must not overlap a live mutation event");
+    assert!(matches!(live_overlap, BudgetStoreError::Invariant(_)));
+    assert!(store.list_abandoned_event_seq_ranges()?.is_empty());
+
+    store.record_abandoned_event_seq_ranges(&[(2, 1_000_000_001)])?;
+    store.record_abandoned_event_seq_ranges(&[(500_000_000, 1_500_000_000)])?;
+    store.record_abandoned_event_seq_ranges(&[(1_500_000_001, 2_000_000_000)])?;
+    assert_eq!(
+        store.list_abandoned_event_seq_ranges()?,
+        vec![(2, 2_000_000_000)]
+    );
+    let (range_rows, point_rows): (i64, i64) = store.connection()?.query_row(
+        r#"
+        SELECT
+            (SELECT COUNT(*) FROM budget_abandoned_event_ranges),
+            (SELECT COUNT(*) FROM budget_abandoned_event_seqs)
+        "#,
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    assert_eq!((range_rows, point_rows), (1, 0));
+    assert_eq!(
+        store.list_abandoned_event_seqs_in_range(0, tail, 5)?,
+        vec![2, 3, 4, 5, 6]
+    );
+    assert!(matches!(
+        store.list_abandoned_event_seqs(),
+        Err(BudgetStoreError::Invariant(_))
+    ));
+
+    let heads = store.budget_ack_heads()?;
+    assert_eq!(
+        heads
+            .iter()
+            .find(|(origin, _)| origin == "http://compact-origin")
+            .map(|(_, seq)| *seq),
+        Some(tail)
+    );
+
+    let imported_collision = store
+        .import_mutation_record(&ack_head_event(
+            1_000_000,
+            "inside-compact-range",
+            "http://compact-origin",
+        ))
+        .expect_err("an imported live event must not reuse an abandoned range slot");
+    assert!(matches!(imported_collision, BudgetStoreError::Invariant(_)));
+    assert!(store
+        .list_mutation_events(10, None, None)?
+        .iter()
+        .all(|event| event.event_id != "inside-compact-range"));
+
+    assert!(store.try_increment_with_event_id(
+        "cap-after-compact-range",
+        0,
+        None,
+        Some("event-after-compact-range"),
+    )?);
+    let allocated = store
+        .list_mutation_events(10, Some("cap-after-compact-range"), Some(0))?
+        .into_iter()
+        .find(|event| event.event_id == "event-after-compact-range")
+        .expect("allocated event after compact range");
+    assert_eq!(allocated.event_seq, tail + 1);
+
+    let ranges_before = store.list_abandoned_event_seq_ranges()?;
+    let future = store
+        .record_abandoned_event_seq_ranges(&[(tail + 2, tail + 10)])
+        .expect_err("a future abandoned range must not raise the allocation floor");
+    assert!(matches!(future, BudgetStoreError::Invariant(_)));
+    assert_eq!(store.list_abandoned_event_seq_ranges()?, ranges_before);
+
+    let _ = fs::remove_file(path);
     Ok(())
 }
 
@@ -1817,6 +3207,10 @@ fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
         max_cost_per_invocation: None,
         max_total_cost_units: None,
         invocation_count_after: 1,
+        invocation_counts_after: Vec::new(),
+        invocation_state: BudgetInvocationReservationState::Absent,
+        monetary_state: BudgetMonetaryHoldState::Exposed,
+        revocation_set: None,
         total_cost_exposed_after: 1,
         total_cost_realized_spend_after: 0,
         authority: Some(BudgetEventAuthority {
@@ -1899,6 +3293,10 @@ fn ack_head_event(seq: u64, event_id: &str, origin: &str) -> BudgetMutationRecor
         max_cost_per_invocation: None,
         max_total_cost_units: None,
         invocation_count_after: 1,
+        invocation_counts_after: Vec::new(),
+        invocation_state: BudgetInvocationReservationState::Absent,
+        monetary_state: BudgetMonetaryHoldState::Exposed,
+        revocation_set: None,
         total_cost_exposed_after: 1,
         total_cost_realized_spend_after: 0,
         authority: Some(BudgetEventAuthority {

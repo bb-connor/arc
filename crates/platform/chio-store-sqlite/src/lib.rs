@@ -101,7 +101,10 @@ pub use aggregate_family_root::{
 pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use batch_approval_store::SqliteBatchApprovalStore;
-pub use budget_store::SqliteBudgetStore;
+pub use budget_store::{
+    SqliteBudgetAuthorizationAuthority, SqliteBudgetAuthorizationOutcome,
+    SqliteBudgetCurrentAuthority, SqliteBudgetStore,
+};
 pub use encrypted_blob::{
     decrypt_blob, encrypt_blob, BlobHandle, BlobStoreError, DecryptError, EncryptError,
     EncryptedBlob, SqliteEncryptedBlobStore, TenantId, TenantKey,

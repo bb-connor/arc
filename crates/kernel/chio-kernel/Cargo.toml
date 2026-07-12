@@ -23,6 +23,7 @@ name = "chio_kernel"
 default = ["delegation"]
 dhat-heap = []
 sustained-p99-nightly = []
+loom-tests = ["dep:loom"]
 otel = ["dep:opentelemetry-semantic-conventions"]
 tokio-console-smoke = ["tokio/tracing"]
 # Hybrid signing path: pulls the pq cargo feature on chio-core-types so
@@ -76,6 +77,7 @@ uuid = { workspace = true, features = ["v7"] }
 ureq = { version = "2.10", features = ["json"] }
 rand = { workspace = true }
 base64 = { workspace = true }
+loom = { workspace = true, optional = true }
 
 # Linux-only: read the real page size via sysconf(_SC_PAGESIZE) for the RSS
 # soft-ceiling sampler. Already present in the workspace lockfile transitively,
@@ -88,7 +90,6 @@ chio-store-sqlite = { workspace = true }
 chio-test-support = { workspace = true }
 criterion = { workspace = true }
 dhat = { workspace = true }
-loom = { workspace = true }
 # proptest = "1.10" (via workspace.dependencies). Used by:
 # - tests/property_budget_store.rs
 # - tests/replay_proptest.rs (replay-invariance suite)

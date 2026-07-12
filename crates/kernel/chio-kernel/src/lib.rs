@@ -53,6 +53,7 @@ pub mod revocation_runtime;
 pub mod revocation_store;
 pub mod runtime;
 pub mod session;
+pub mod supplemental_quota;
 pub mod transport;
 pub mod weights_binding;
 

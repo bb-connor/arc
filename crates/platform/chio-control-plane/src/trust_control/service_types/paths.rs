@@ -97,6 +97,7 @@ pub(crate) const BUDGET_INCREMENT_PATH: &str = "/v1/budgets/increment";
 pub(crate) const BUDGET_AUTHORIZE_EXPOSURE_PATH: &str = "/v1/budgets/authorize-exposure";
 pub(crate) const BUDGET_RELEASE_EXPOSURE_PATH: &str = "/v1/budgets/release-exposure";
 pub(crate) const BUDGET_RECONCILE_SPEND_PATH: &str = "/v1/budgets/reconcile-spend";
+pub(crate) const BUDGET_CAPTURE_EXPOSURE_PATH: &str = "/v1/budgets/capture-exposure";
 pub(crate) const AGGREGATE_FAMILY_ROOT_LOOKUP_PATH: &str =
     "/v1/aggregate-family-roots/{root_capability_id}";
 pub(crate) const INTERNAL_CLUSTER_STATUS_PATH: &str = "/v1/internal/cluster/status";

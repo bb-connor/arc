@@ -871,6 +871,10 @@ mod cluster_and_reports_tests {
         );
         assert_eq!(commit.budget_term, 7);
         assert_eq!(commit.lease_id, "http://writer#term-7");
+        assert!(
+            !commit.quorum_committed,
+            "historical witness metadata must not itself authorize a stale-term commit"
+        );
     }
 
     #[test]
@@ -1225,6 +1229,79 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
+    fn zero_exposure_compensation_still_reverses_the_invocation_debit() {
+        let budget_path = unique_temp_path("chio-zero-exposure-compensation", "sqlite3");
+        let state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b"],
+            None,
+            None,
+            Some(budget_path.clone()),
+        );
+        let store = SqliteBudgetStore::open(&budget_path).test_unwrap();
+        let authority = BudgetEventAuthority {
+            authority_id: "http://node-a".to_string(),
+            lease_id: "http://node-a#term-1".to_string(),
+            lease_epoch: 1,
+        };
+        let payload = TryChargeCostRequest {
+            capability_id: "cap-zero-compensation".to_string(),
+            grant_index: 0,
+            max_invocations: Some(1),
+            cost_units: 0,
+            max_cost_per_invocation: Some(0),
+            max_total_cost_units: Some(10),
+            hold_id: Some("hold-zero-compensation".to_string()),
+            event_id: Some("hold-zero-compensation:authorize".to_string()),
+        };
+        assert!(store
+            .try_charge_cost_with_ids_and_authority(
+                &payload.capability_id,
+                payload.grant_index,
+                payload.max_invocations,
+                payload.cost_units,
+                payload.max_cost_per_invocation,
+                payload.max_total_cost_units,
+                payload.hold_id.as_deref(),
+                payload.event_id.as_deref(),
+                Some(&authority),
+            )
+            .test_unwrap());
+        let before = store
+            .get_usage(&payload.capability_id, payload.grant_index)
+            .test_unwrap()
+            .test_unwrap();
+        assert_eq!(before.invocation_count, 1);
+        assert_eq!(before.total_cost_exposed, 0);
+
+        rollback_budget_authorize_exposure(
+            &state,
+            &payload,
+            payload.event_id.as_deref().test_unwrap(),
+            Some(&authority),
+        )
+        .test_unwrap();
+
+        let after = store
+            .get_usage(&payload.capability_id, payload.grant_index)
+            .test_unwrap()
+            .test_unwrap();
+        assert_eq!(after.invocation_count, 0);
+        assert_eq!(after.total_cost_exposed, 0);
+        assert_eq!(after.total_cost_realized_spend, 0);
+        let events = store
+            .list_mutation_events(10, Some(&payload.capability_id), Some(payload.grant_index))
+            .test_unwrap();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[1].kind, BudgetMutationKind::ReverseExposure);
+        assert!(events[1]
+            .event_id
+            .starts_with("hold-zero-compensation:authorize:rollback:"));
+
+        let _ = std::fs::remove_file(budget_path);
+    }
+
+    #[test]
     fn budget_write_progress_close_fails_closed_while_clustered() {
         // If the ClusterProgress sender is lost mid-write, a node that is STILL
         // clustered must fail closed (503) so the caller rolls back
@@ -1244,14 +1321,54 @@ mod cluster_and_reports_tests {
         };
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
 
-        // Genuinely unclustered: the closed channel is expected, not an error.
+        // Detaching does not downgrade an already-authored HA write into an
+        // unclustered success.
         let mut unclustered = clustered.clone();
         unclustered.cluster = None;
         unclustered.cluster_progress = None;
+        assert!(budget_write_progress_closed_outcome(&unclustered, &write).is_err());
+
+        // A write born unclustered carries the explicit empty/term-zero token and
+        // is the only legitimate no-quorum success.
+        let local_write = BudgetWriteToken {
+            origin_id: String::new(),
+            event_seq: 0,
+            budget_term: 0,
+        };
         assert!(matches!(
-            budget_write_progress_closed_outcome(&unclustered, &write),
+            budget_write_progress_closed_outcome(&unclustered, &local_write),
             Ok(None)
         ));
+    }
+
+    #[tokio::test]
+    async fn quorum_wait_rejects_a_commit_after_authority_term_changes() {
+        let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+        update_peer_reachable(&state, "http://node-b");
+        update_peer_budget_acks(
+            &state,
+            "http://node-b",
+            &[BudgetOriginAck {
+                origin_id: "http://node-a".to_string(),
+                event_seq: 42,
+            }],
+        );
+        let stale_write = BudgetWriteToken {
+            origin_id: "http://node-a".to_string(),
+            event_seq: 42,
+            budget_term: 7,
+        };
+        assert!(
+            budget_write_quorum_commit_view(&state, &stale_write)
+                .test_unwrap()
+                .quorum_committed,
+            "the raw witness view is intentionally independent of the live lease gate"
+        );
+
+        let response = wait_for_budget_write_quorum_commit(&state, stale_write)
+            .await
+            .test_expect_err("stale authority term must fail before commit acceptance");
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

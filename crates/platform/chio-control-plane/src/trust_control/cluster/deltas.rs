@@ -1055,25 +1055,14 @@ fn sync_peer_lineage(
     Ok(applied)
 }
 
-fn budget_authorize_compensation_event_id(
-    payload: &TryChargeCostRequest,
-    budget_seq: u64,
-) -> String {
-    if let Some(event_id) = payload.event_id.as_deref() {
-        return format!("{event_id}:rollback:{budget_seq}");
-    }
-    if let Some(hold_id) = payload.hold_id.as_deref() {
-        return format!("{hold_id}:rollback:{budget_seq}");
-    }
-    format!(
-        "rollback:{}:{}:{}",
-        payload.capability_id, payload.grant_index, budget_seq
-    )
+fn budget_authorize_compensation_event_id(authorize_event_id: &str, budget_seq: u64) -> String {
+    format!("{authorize_event_id}:rollback:{budget_seq}")
 }
 
 pub(crate) fn rollback_budget_authorize_exposure(
     state: &TrustServiceState,
     payload: &TryChargeCostRequest,
+    authorize_event_id: &str,
     authority: Option<&BudgetEventAuthority>,
 ) -> Result<(), BudgetStoreError> {
     let store = open_budget_store(&state.config).map_err(|response| {
@@ -1086,10 +1075,11 @@ pub(crate) fn rollback_budget_authorize_exposure(
     let Some(usage) = usage else {
         return Ok(());
     };
-    if usage.total_cost_exposed == 0 {
-        return Ok(());
-    }
-    let rollback_event_id = budget_authorize_compensation_event_id(payload, usage.seq);
+    let rollback_event_id = budget_authorize_compensation_event_id(authorize_event_id, usage.seq);
+    // Do not use aggregate exposure as a proxy for an open authorization hold.
+    // A zero-cost authorization still debits invocation quota and must traverse
+    // the typed reverse path, which atomically validates the hold identity,
+    // amount, and authority before restoring that debit.
     store.reverse_charge_cost_with_ids_and_authority(
         &payload.capability_id,
         payload.grant_index,
@@ -1145,6 +1135,31 @@ pub(crate) struct BudgetWriteToken {
     pub(crate) origin_id: String,
     pub(crate) event_seq: u64,
     pub(crate) budget_term: u64,
+}
+
+fn budget_write_matches_live_authority(
+    write: &BudgetWriteToken,
+    live_authority: Option<&BudgetEventAuthority>,
+) -> bool {
+    live_authority.is_some_and(|authority| {
+        authority.authority_id == write.origin_id
+            && authority.lease_epoch == write.budget_term
+            && authority.lease_id == format!("{}#term-{}", write.origin_id, write.budget_term)
+    })
+}
+
+fn is_unclustered_budget_write(write: &BudgetWriteToken) -> bool {
+    write.origin_id.is_empty() && write.budget_term == 0
+}
+
+fn stale_budget_write_authority_response(write: &BudgetWriteToken) -> Response {
+    plain_http_error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        &format!(
+            "budget write at commit index {} was authored by authority `{}` term {} but that authority lease is no longer live",
+            write.event_seq, write.origin_id, write.budget_term
+        ),
+    )
 }
 
 pub(crate) fn budget_write_quorum_commit_view(
@@ -1313,13 +1328,14 @@ fn budget_write_quorum_commit_timeout(sync_interval: Duration, peer_count: usize
 /// caller only rolls back on `Err`; returning `Ok(None)` here would render as a
 /// successful leader-visible write with NO `budgetCommit`, indistinguishable
 /// from a genuinely unclustered node, so an HA budget write could be acked
-/// without ever reaching quorum. Only a node that has since dropped its cluster
-/// (`state.cluster` is `None`) returns the legitimately-unclustered `Ok(None)`.
+/// without ever reaching quorum. Dropping cluster state cannot downgrade a write
+/// that was authored under an HA lease. Only an explicit unclustered placeholder
+/// token (empty origin, term zero) returns the legitimate `Ok(None)`.
 pub(crate) fn budget_write_progress_closed_outcome(
     state: &TrustServiceState,
     write: &BudgetWriteToken,
 ) -> Result<Option<BudgetWriteCommitView>, Response> {
-    if state.cluster.is_some() {
+    if state.cluster.is_some() || !is_unclustered_budget_write(write) {
         return Err(plain_http_error(
             StatusCode::SERVICE_UNAVAILABLE,
             &format!(
@@ -1336,7 +1352,11 @@ pub(crate) async fn wait_for_budget_write_quorum_commit(
     write: BudgetWriteToken,
 ) -> Result<Option<BudgetWriteCommitView>, Response> {
     let Some(progress) = state.cluster_progress.as_ref() else {
-        return Ok(None); // not clustered
+        return if is_unclustered_budget_write(&write) {
+            Ok(None)
+        } else {
+            Err(stale_budget_write_authority_response(&write))
+        };
     };
     let peer_count = cluster_peer_count(state);
     let timeout =
@@ -1351,8 +1371,16 @@ pub(crate) async fn wait_for_budget_write_quorum_commit(
     let waited = tokio::time::timeout(timeout, async {
         loop {
             let Some(view) = budget_write_quorum_commit_view(state, &write) else {
-                return Ok::<_, Response>(None);
+                return if is_unclustered_budget_write(&write) {
+                    Ok::<_, Response>(None)
+                } else {
+                    Err(stale_budget_write_authority_response(&write))
+                };
             };
+            let live_authority = current_budget_event_authority(state)?;
+            if !budget_write_matches_live_authority(&write, live_authority.as_ref()) {
+                return Err(stale_budget_write_authority_response(&write));
+            }
             if view.quorum_committed {
                 return Ok(Some(view));
             }
@@ -1517,6 +1545,44 @@ pub(crate) fn budget_mutation_record_from_view(
             event.kind
         ))
     })?;
+    let invocation_state = match kind {
+        BudgetMutationKind::IncrementInvocation | BudgetMutationKind::CaptureInvocations => {
+            if event.allowed == Some(false) {
+                BudgetInvocationReservationState::Denied
+            } else {
+                BudgetInvocationReservationState::Captured
+            }
+        }
+        BudgetMutationKind::ReserveInvocations => {
+            if event.allowed == Some(false) {
+                BudgetInvocationReservationState::Denied
+            } else {
+                BudgetInvocationReservationState::Authorized
+            }
+        }
+        BudgetMutationKind::ReverseInvocations => BudgetInvocationReservationState::Reversed,
+        BudgetMutationKind::AuthorizeExposure
+        | BudgetMutationKind::CaptureExposure
+        | BudgetMutationKind::ReverseExposure
+        | BudgetMutationKind::ReleaseExposure
+        | BudgetMutationKind::ReconcileSpend => BudgetInvocationReservationState::Absent,
+    };
+    let monetary_state = match kind {
+        BudgetMutationKind::AuthorizeExposure | BudgetMutationKind::ReserveInvocations
+            if event.allowed != Some(false) && event.exposure_units > 0 =>
+        {
+            BudgetMonetaryHoldState::Exposed
+        }
+        BudgetMutationKind::CaptureExposure => BudgetMonetaryHoldState::Captured,
+        BudgetMutationKind::ReverseExposure => BudgetMonetaryHoldState::Reversed,
+        BudgetMutationKind::ReleaseExposure => BudgetMonetaryHoldState::Released,
+        BudgetMutationKind::ReconcileSpend => BudgetMonetaryHoldState::Reconciled,
+        BudgetMutationKind::IncrementInvocation
+        | BudgetMutationKind::ReserveInvocations
+        | BudgetMutationKind::CaptureInvocations
+        | BudgetMutationKind::ReverseInvocations
+        | BudgetMutationKind::AuthorizeExposure => BudgetMonetaryHoldState::None,
+    };
 
     Ok(BudgetMutationRecord {
         event_id: event.event_id.clone(),
@@ -1534,6 +1600,10 @@ pub(crate) fn budget_mutation_record_from_view(
         max_cost_per_invocation: event.max_cost_per_invocation,
         max_total_cost_units: event.max_total_cost_units,
         invocation_count_after: event.invocation_count_after,
+        invocation_counts_after: Vec::new(),
+        invocation_state,
+        monetary_state,
+        revocation_set: None,
         total_cost_exposed_after: event.total_cost_exposed_after,
         total_cost_realized_spend_after: event.total_cost_realized_spend_after,
         authority: event
@@ -1541,6 +1611,47 @@ pub(crate) fn budget_mutation_record_from_view(
             .as_ref()
             .map(budget_event_authority_from_view),
     })
+}
+
+#[cfg(test)]
+mod budget_write_authority_tests {
+    use super::{budget_write_matches_live_authority, BudgetEventAuthority, BudgetWriteToken};
+
+    #[test]
+    fn quorum_write_requires_the_same_live_authority_and_term() {
+        let write = BudgetWriteToken {
+            origin_id: "http://node-a".to_string(),
+            event_seq: 42,
+            budget_term: 7,
+        };
+        let matching = BudgetEventAuthority {
+            authority_id: "http://node-a".to_string(),
+            lease_id: "http://node-a#term-7".to_string(),
+            lease_epoch: 7,
+        };
+        assert!(budget_write_matches_live_authority(&write, Some(&matching)));
+        assert!(!budget_write_matches_live_authority(&write, None));
+
+        let next_term = BudgetEventAuthority {
+            authority_id: "http://node-a".to_string(),
+            lease_id: "http://node-a#term-8".to_string(),
+            lease_epoch: 8,
+        };
+        assert!(!budget_write_matches_live_authority(
+            &write,
+            Some(&next_term)
+        ));
+
+        let next_leader = BudgetEventAuthority {
+            authority_id: "http://node-b".to_string(),
+            lease_id: "http://node-b#term-7".to_string(),
+            lease_epoch: 7,
+        };
+        assert!(!budget_write_matches_live_authority(
+            &write,
+            Some(&next_leader)
+        ));
+    }
 }
 
 #[cfg(test)]

@@ -85,6 +85,25 @@ impl TrustControlClient {
         hold_id: Option<&str>,
         event_id: Option<&str>,
     ) -> Result<ReverseChargeCostResponse, CliError> {
+        self.reverse_charge_cost_with_ids_and_authority(
+            capability_id,
+            grant_index,
+            cost_units,
+            hold_id,
+            event_id,
+            None,
+        )
+    }
+
+    pub(crate) fn reverse_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&BudgetEventAuthority>,
+    ) -> Result<ReverseChargeCostResponse, CliError> {
         self.post_json(
             BUDGET_RELEASE_EXPOSURE_PATH,
             &ReverseChargeCostRequest {
@@ -93,6 +112,7 @@ impl TrustControlClient {
                 cost_units,
                 hold_id: hold_id.map(ToOwned::to_owned),
                 event_id: event_id.map(ToOwned::to_owned),
+                budget_authority: authority.map(budget_mutation_authority_view),
             },
         )
     }
@@ -114,6 +134,25 @@ impl TrustControlClient {
         hold_id: Option<&str>,
         event_id: Option<&str>,
     ) -> Result<ReduceChargeCostResponse, CliError> {
+        self.reduce_charge_cost_with_ids_and_authority(
+            capability_id,
+            grant_index,
+            cost_units,
+            hold_id,
+            event_id,
+            None,
+        )
+    }
+
+    pub(crate) fn reduce_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&BudgetEventAuthority>,
+    ) -> Result<ReduceChargeCostResponse, CliError> {
         self.post_json(
             BUDGET_RECONCILE_SPEND_PATH,
             &ReduceChargeCostRequest {
@@ -124,6 +163,7 @@ impl TrustControlClient {
                 realized_spend_units: None,
                 hold_id: hold_id.map(ToOwned::to_owned),
                 event_id: event_id.map(ToOwned::to_owned),
+                budget_authority: authority.map(budget_mutation_authority_view),
             },
         )
     }
@@ -154,6 +194,28 @@ impl TrustControlClient {
         hold_id: Option<&str>,
         event_id: Option<&str>,
     ) -> Result<ReduceChargeCostResponse, CliError> {
+        self.reconcile_budget_spend_with_ids_and_authority(
+            capability_id,
+            grant_index,
+            authorized_exposure_units,
+            realized_spend_units,
+            hold_id,
+            event_id,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn reconcile_budget_spend_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        authorized_exposure_units: u64,
+        realized_spend_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&BudgetEventAuthority>,
+    ) -> Result<ReduceChargeCostResponse, CliError> {
         let released_exposure_units = authorized_exposure_units
             .checked_sub(realized_spend_units)
             .ok_or_else(|| {
@@ -172,7 +234,48 @@ impl TrustControlClient {
                 realized_spend_units: Some(realized_spend_units),
                 hold_id: hold_id.map(ToOwned::to_owned),
                 event_id: event_id.map(ToOwned::to_owned),
+                budget_authority: authority.map(budget_mutation_authority_view),
             },
         )
+    }
+
+    pub(crate) fn capture_budget_spend_with_ids(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        authorized_exposure_units: u64,
+        realized_spend_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&BudgetEventAuthority>,
+    ) -> Result<ReduceChargeCostResponse, CliError> {
+        let released_exposure_units = authorized_exposure_units
+            .checked_sub(realized_spend_units)
+            .ok_or_else(|| {
+                CliError::cli_other_error(
+                    "realized spend cannot exceed authorized exposure during capture".to_string(),
+                )
+            })?;
+        self.post_json(
+            BUDGET_CAPTURE_EXPOSURE_PATH,
+            &ReduceChargeCostRequest {
+                capability_id: capability_id.to_string(),
+                grant_index,
+                cost_units: released_exposure_units,
+                exposure_units: Some(authorized_exposure_units),
+                realized_spend_units: Some(realized_spend_units),
+                hold_id: hold_id.map(ToOwned::to_owned),
+                event_id: event_id.map(ToOwned::to_owned),
+                budget_authority: authority.map(budget_mutation_authority_view),
+            },
+        )
+    }
+}
+
+fn budget_mutation_authority_view(authority: &BudgetEventAuthority) -> BudgetMutationAuthorityView {
+    BudgetMutationAuthorityView {
+        authority_id: authority.authority_id.clone(),
+        lease_id: authority.lease_id.clone(),
+        lease_epoch: authority.lease_epoch,
     }
 }

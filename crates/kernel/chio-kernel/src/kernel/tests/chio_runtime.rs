@@ -1927,18 +1927,19 @@ fn authorize_fabricated_drop_hold(
 ) -> Result<(), Box<dyn std::error::Error>> {
     kernel
         .with_budget_store(|store| {
-            let decision =
-                store.authorize_budget_hold(crate::budget_store::BudgetAuthorizeHoldRequest {
-                    capability_id: capability_id.to_string(),
-                    grant_index: 0,
-                    max_invocations: None,
-                    requested_exposure_units: 5,
-                    max_cost_per_invocation: Some(100),
-                    max_total_cost_units: Some(1_000),
-                    hold_id: Some("hold-drop-guard-tests".to_string()),
-                    event_id: Some("hold-drop-guard-tests:authorize".to_string()),
-                    authority: None,
-                })?;
+            let decision = store.authorize_budget_hold(
+                crate::budget_store::BudgetAuthorizeHoldRequest::legacy(
+                    capability_id.to_string(),
+                    0,
+                    None,
+                    5,
+                    Some(100),
+                    Some(1_000),
+                    Some("hold-drop-guard-tests".to_string()),
+                    Some("hold-drop-guard-tests:authorize".to_string()),
+                    None,
+                ),
+            )?;
             assert!(
                 matches!(
                     decision,

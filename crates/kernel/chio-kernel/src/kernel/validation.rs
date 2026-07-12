@@ -826,17 +826,19 @@ impl ChioKernel {
                 let authority = self.local_budget_event_authority();
 
                 let decision = self.with_budget_store(|store| {
-                    Ok(store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
-                        capability_id: cap.id.clone(),
-                        grant_index: matching.index,
-                        max_invocations: grant.max_invocations,
-                        requested_exposure_units: cost_units,
-                        max_cost_per_invocation: max_per,
-                        max_total_cost_units: max_total,
-                        hold_id: Some(budget_hold_id.clone()),
-                        event_id: Some(authorize_event_id),
-                        authority: Some(authority.clone()),
-                    })?)
+                    Ok(
+                        store.authorize_budget_hold(BudgetAuthorizeHoldRequest::legacy(
+                            cap.id.clone(),
+                            matching.index,
+                            grant.max_invocations,
+                            cost_units,
+                            max_per,
+                            max_total,
+                            Some(budget_hold_id.clone()),
+                            Some(authorize_event_id),
+                            Some(authority.clone()),
+                        ))?,
+                    )
                 })?;
                 match decision {
                     BudgetAuthorizeHoldDecision::Authorized(authorized) => {

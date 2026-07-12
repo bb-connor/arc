@@ -1,5 +1,18 @@
 use super::*;
 
+pub(super) fn sqlite_integer_from_u64(value: u64, label: &str) -> Result<i64, BudgetStoreError> {
+    i64::try_from(value)
+        .map_err(|_| BudgetStoreError::Overflow(format!("{label} exceeds SQLite INTEGER")))
+}
+
+fn checked_next_replication_seq(current: u64) -> Result<u64, BudgetStoreError> {
+    let next = current.checked_add(1).ok_or_else(|| {
+        BudgetStoreError::Overflow("budget replication sequence overflowed u64".to_string())
+    })?;
+    sqlite_integer_from_u64(next, "budget replication sequence")?;
+    Ok(next)
+}
+
 /// Initialize the replication sequence counter from existing rows on first open.
 ///
 /// Uses an IMMEDIATE transaction, which acquires a write lock before any reads
@@ -30,10 +43,11 @@ pub(super) fn initialize_budget_replication_seq(
         .collect::<Result<Vec<_>, _>>()?;
     drop(statement);
     for rowid in pending {
-        next_seq = next_seq.saturating_add(1);
+        next_seq = checked_next_replication_seq(next_seq)?;
+        let sqlite_next_seq = sqlite_integer_from_u64(next_seq, "budget replication sequence")?;
         transaction.execute(
             "UPDATE capability_grant_budgets SET seq = ?1 WHERE rowid = ?2",
-            params![next_seq as i64, rowid],
+            params![sqlite_next_seq, rowid],
         )?;
     }
 
@@ -56,10 +70,11 @@ pub(super) fn initialize_budget_replication_seq(
         drop(statement);
         let mut event_seq = 0u64;
         for rowid in pending {
-            event_seq = event_seq.saturating_add(1);
+            event_seq = checked_next_replication_seq(event_seq)?;
+            let sqlite_event_seq = sqlite_integer_from_u64(event_seq, "budget event sequence")?;
             transaction.execute(
                 "UPDATE budget_mutation_events SET event_seq = ?1 WHERE rowid = ?2",
-                params![event_seq as i64, rowid],
+                params![sqlite_event_seq, rowid],
             )?;
         }
         next_seq = next_seq.max(event_seq);
@@ -77,10 +92,11 @@ pub(super) fn initialize_budget_replication_seq(
             .collect::<Result<Vec<_>, _>>()?;
         drop(statement);
         for rowid in pending {
-            next_seq = next_seq.saturating_add(1);
+            next_seq = checked_next_replication_seq(next_seq)?;
+            let sqlite_next_seq = sqlite_integer_from_u64(next_seq, "budget replication sequence")?;
             transaction.execute(
                 "UPDATE budget_mutation_events SET event_seq = ?1 WHERE rowid = ?2",
-                params![next_seq as i64, rowid],
+                params![sqlite_next_seq, rowid],
             )?;
         }
     }
@@ -95,7 +111,7 @@ pub(super) fn allocate_budget_replication_seq(
     let current = current_budget_replication_seq(transaction)?
         .max(max_budget_usage_seq(transaction)?)
         .max(max_budget_mutation_event_seq(transaction)?);
-    let next_seq = current.saturating_add(1);
+    let next_seq = checked_next_replication_seq(current)?;
     set_budget_replication_seq(transaction, next_seq)?;
     Ok(next_seq)
 }
@@ -146,9 +162,10 @@ fn set_budget_replication_seq(
     transaction: &rusqlite::Transaction<'_>,
     seq: u64,
 ) -> Result<(), BudgetStoreError> {
+    let sqlite_seq = sqlite_integer_from_u64(seq, "budget replication sequence")?;
     transaction.execute(
         "UPDATE budget_replication_meta SET next_seq = ?1 WHERE singleton = 1",
-        params![seq as i64],
+        params![sqlite_seq],
     )?;
     Ok(())
 }

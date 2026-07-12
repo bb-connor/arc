@@ -382,4 +382,5 @@ proptest! {
         prop_assert_eq!(usage.committed_cost_units().unwrap(), first_charge);
         prop_assert_eq!(usage.seq, 1);
     }
+
 }

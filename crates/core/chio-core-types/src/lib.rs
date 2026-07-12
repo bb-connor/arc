@@ -103,5 +103,5 @@ pub type AgentId = alloc::string::String;
 /// Opaque tool server identifier.
 pub type ServerId = alloc::string::String;
 
-/// UUIDv7 capability identifier (time-ordered).
+/// Opaque capability identifier carried exactly as signed.
 pub type CapabilityId = alloc::string::String;

@@ -3,6 +3,7 @@ use super::*;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum HoldDisposition {
     Open,
+    Captured,
     Released,
     Reversed,
     Reconciled,
@@ -12,6 +13,7 @@ impl HoldDisposition {
     pub(super) fn as_str(&self) -> &'static str {
         match self {
             Self::Open => "open",
+            Self::Captured => "captured",
             Self::Released => "released",
             Self::Reversed => "reversed",
             Self::Reconciled => "reconciled",
@@ -21,6 +23,7 @@ impl HoldDisposition {
     pub(super) fn parse(value: &str) -> Option<Self> {
         match value {
             "open" => Some(Self::Open),
+            "captured" => Some(Self::Captured),
             "released" => Some(Self::Released),
             "reversed" => Some(Self::Reversed),
             "reconciled" => Some(Self::Reconciled),

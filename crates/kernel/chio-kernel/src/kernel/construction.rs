@@ -210,6 +210,7 @@ impl ChioKernel {
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
             budget_store: Arc::new(InMemoryBudgetStore::new()),
             budget_store_lock: Mutex::new(()),
+            supplemental_quota_verifier: None,
             revocation_store: Arc::new(InMemoryRevocationStore::new()),
             capability_authority: Box::new(LocalCapabilityAuthority::new(authority_keypair)),
             tool_servers: HashMap::new(),
@@ -592,6 +593,28 @@ impl ChioKernel {
 
     pub fn set_budget_store_handle(&mut self, budget_store: Arc<dyn BudgetStore>) {
         self.budget_store = budget_store;
+    }
+
+    pub fn set_supplemental_quota_verifier(
+        &mut self,
+        verifier: Arc<dyn crate::supplemental_quota::SupplementalQuotaVerifier>,
+    ) {
+        self.supplemental_quota_verifier = Some(verifier);
+    }
+
+    pub fn verify_supplemental_quota(
+        &self,
+        artifact: &crate::supplemental_quota::OpaqueSignedSupplementalQuota,
+        context: &crate::supplemental_quota::SupplementalQuotaVerificationContext,
+    ) -> Result<
+        crate::supplemental_quota::VerifiedSupplementalQuota,
+        crate::supplemental_quota::SupplementalQuotaError,
+    > {
+        let verifier = self
+            .supplemental_quota_verifier
+            .as_ref()
+            .ok_or(crate::supplemental_quota::SupplementalQuotaError::VerifierUnavailable)?;
+        crate::supplemental_quota::verify_supplemental_quota(verifier.as_ref(), artifact, context)
     }
 
     pub fn set_post_invocation_pipeline(

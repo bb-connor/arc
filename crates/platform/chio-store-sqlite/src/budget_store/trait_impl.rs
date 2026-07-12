@@ -1,61 +1,14 @@
 use super::*;
+use chio_kernel::budget_store::{
+    AuthorizedBudgetHold, BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
+    BudgetReconcileHoldDecision, BudgetReconcileHoldRequest, BudgetReleaseHoldDecision,
+    BudgetReleaseHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest,
+    DeniedBudgetHold,
+};
 
-impl BudgetStore for SqliteBudgetStore {
-    fn try_increment(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.try_increment_with_event_id(capability_id, grant_index, max_invocations, None)
-    }
-
-    fn try_charge_cost(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.try_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-            None,
-            None,
-        )
-    }
-
-    fn try_charge_cost_with_ids(
-        &self,
-        capability_id: &str,
-        grant_index: usize,
-        max_invocations: Option<u32>,
-        cost_units: u64,
-        max_cost_per_invocation: Option<u64>,
-        max_total_cost_units: Option<u64>,
-        hold_id: Option<&str>,
-        event_id: Option<&str>,
-    ) -> Result<bool, BudgetStoreError> {
-        self.try_charge_cost_with_ids_and_authority(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-            hold_id,
-            event_id,
-            None,
-        )
-    }
-
-    fn try_charge_cost_with_ids_and_authority(
+impl SqliteBudgetStore {
+    #[allow(clippy::too_many_arguments)]
+    pub fn try_charge_cost_with_ids_and_authority_outcome(
         &self,
         capability_id: &str,
         grant_index: usize,
@@ -66,9 +19,94 @@ impl BudgetStore for SqliteBudgetStore {
         hold_id: Option<&str>,
         event_id: Option<&str>,
         authority: Option<&BudgetEventAuthority>,
-    ) -> Result<bool, BudgetStoreError> {
+    ) -> Result<SqliteBudgetAuthorizationOutcome, BudgetStoreError> {
+        self.try_charge_cost_with_ids_and_authority_mode_outcome(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+            hold_id,
+            event_id,
+            SqliteBudgetAuthorizationAuthorityMode::CallerPinned(authority.cloned()),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn try_charge_cost_with_ids_and_current_authority_outcome(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        current_authority: SqliteBudgetCurrentAuthority,
+    ) -> Result<SqliteBudgetAuthorizationOutcome, BudgetStoreError> {
+        self.try_charge_cost_with_ids_and_authority_mode_outcome(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+            hold_id,
+            event_id,
+            SqliteBudgetAuthorizationAuthorityMode::ServerCurrent(current_authority),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn try_charge_cost_with_ids_and_authority_mode_outcome(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority_mode: SqliteBudgetAuthorizationAuthorityMode,
+    ) -> Result<SqliteBudgetAuthorizationOutcome, BudgetStoreError> {
+        let effective_event_id = match event_id {
+            Some(event_id) => Some(event_id.to_string()),
+            None if hold_id.is_some() => Some(effective_hold_event_id(
+                None,
+                BudgetMutationKind::AuthorizeExposure,
+            )),
+            None => None,
+        };
+        let event_id = effective_event_id.as_deref();
         let mut connection = self.connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let selected_authority = SqliteBudgetStore::authorization_authority_in_transaction(
+            &transaction,
+            hold_id,
+            event_id,
+            &authority_mode,
+        )?;
+        let authority = selected_authority.as_ref();
+
+        let (prior_claim_decision, claim_follows_rollback) = match (hold_id, event_id) {
+            (Some(hold_id), Some(event_id)) => SqliteBudgetStore::claim_authorization_attempt(
+                &transaction,
+                hold_id,
+                event_id,
+                capability_id,
+                grant_index,
+                cost_units,
+                max_invocations,
+                max_cost_per_invocation,
+                max_total_cost_units,
+                authority,
+                None,
+            )?,
+            _ => (None, false),
+        };
 
         if let Some(existing_allowed) = SqliteBudgetStore::existing_event_allowed(
             &transaction,
@@ -84,8 +122,49 @@ impl BudgetStore for SqliteBudgetStore {
             max_cost_per_invocation,
             max_total_cost_units,
         )? {
+            let existing_allowed = existing_allowed.ok_or_else(|| {
+                BudgetStoreError::Invariant(
+                    "persisted budget authorization is missing its frozen decision".to_string(),
+                )
+            })?;
+            if prior_claim_decision
+                .is_some_and(|claimed_allowed| claimed_allowed != existing_allowed)
+            {
+                return Err(BudgetStoreError::Invariant(
+                    "persisted budget authorization conflicts with its durable claim".to_string(),
+                ));
+            }
             transaction.rollback()?;
-            return Ok(existing_allowed.unwrap_or(false));
+            return Ok(SqliteBudgetAuthorizationOutcome {
+                allowed: existing_allowed,
+                event_created: false,
+                authority: selected_authority,
+            });
+        }
+        let retry_follows_rollback = if claim_follows_rollback {
+            true
+        } else {
+            event_id
+                .map(|event_id| {
+                    SqliteBudgetStore::rollback_event_exists(
+                        &transaction,
+                        event_id,
+                        hold_id,
+                        capability_id,
+                        grant_index,
+                        cost_units,
+                        authority,
+                    )
+                })
+                .transpose()?
+                .unwrap_or(false)
+        };
+        if prior_claim_decision.is_some() && !retry_follows_rollback {
+            transaction.rollback()?;
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{}` has a durable authorization claim but its event is missing",
+                hold_id.unwrap_or("<missing>")
+            )));
         }
 
         let row: Option<(u32, u64, u64)> = transaction
@@ -108,9 +187,21 @@ impl BudgetStore for SqliteBudgetStore {
         let (current_count, current_exposed, current_realized) = row.unwrap_or((0, 0, 0));
 
         if let Some(hold_id) = hold_id {
-            let retry_follows_rollback = match event_id {
-                Some(event_id) => Self::rollback_event_exists(&transaction, event_id)?,
-                None => false,
+            let retry_follows_rollback = if claim_follows_rollback {
+                true
+            } else {
+                match event_id {
+                    Some(event_id) => Self::rollback_event_exists(
+                        &transaction,
+                        event_id,
+                        Some(hold_id),
+                        capability_id,
+                        grant_index,
+                        cost_units,
+                        authority,
+                    )?,
+                    None => false,
+                }
             };
             if let Some(hold) = SqliteBudgetStore::load_hold(&transaction, hold_id)? {
                 if hold.capability_id == capability_id
@@ -163,6 +254,23 @@ impl BudgetStore for SqliteBudgetStore {
                                 authority,
                             )?;
                         }
+                        SqliteBudgetStore::claim_authorization_attempt(
+                            &transaction,
+                            hold_id,
+                            event_id.ok_or_else(|| {
+                                BudgetStoreError::Invariant(
+                                    "claimed budget authorization is missing event_id".to_string(),
+                                )
+                            })?,
+                            capability_id,
+                            grant_index,
+                            cost_units,
+                            max_invocations,
+                            max_cost_per_invocation,
+                            max_total_cost_units,
+                            authority,
+                            Some(true),
+                        )?;
                         SqliteBudgetStore::append_mutation_event(
                             &transaction,
                             event_id,
@@ -184,7 +292,11 @@ impl BudgetStore for SqliteBudgetStore {
                             total_cost_realized_spend_after,
                         )?;
                         transaction.commit()?;
-                        return Ok(true);
+                        return Ok(SqliteBudgetAuthorizationOutcome {
+                            allowed: true,
+                            event_created: true,
+                            authority: selected_authority,
+                        });
                     }
                 }
             }
@@ -216,6 +328,21 @@ impl BudgetStore for SqliteBudgetStore {
                 allowed = false;
             }
         }
+        if let (Some(hold_id), Some(event_id)) = (hold_id, event_id) {
+            SqliteBudgetStore::claim_authorization_attempt(
+                &transaction,
+                hold_id,
+                event_id,
+                capability_id,
+                grant_index,
+                cost_units,
+                max_invocations,
+                max_cost_per_invocation,
+                max_total_cost_units,
+                authority,
+                Some(allowed),
+            )?;
+        }
 
         let (
             invocation_count_after,
@@ -226,9 +353,21 @@ impl BudgetStore for SqliteBudgetStore {
         );
         if allowed {
             if let Some(hold_id) = hold_id {
-                let retry_follows_rollback = match event_id {
-                    Some(event_id) => Self::rollback_event_exists(&transaction, event_id)?,
-                    None => false,
+                let retry_follows_rollback = if claim_follows_rollback {
+                    true
+                } else {
+                    match event_id {
+                        Some(event_id) => Self::rollback_event_exists(
+                            &transaction,
+                            event_id,
+                            Some(hold_id),
+                            capability_id,
+                            grant_index,
+                            cost_units,
+                            authority,
+                        )?,
+                        None => false,
+                    }
                 };
                 if retry_follows_rollback {
                     if let Some(hold) = SqliteBudgetStore::load_hold(&transaction, hold_id)? {
@@ -301,7 +440,11 @@ impl BudgetStore for SqliteBudgetStore {
                                     total_cost_realized_spend_after,
                                 )?;
                                 transaction.commit()?;
-                                return Ok(true);
+                                return Ok(SqliteBudgetAuthorizationOutcome {
+                                    allowed: true,
+                                    event_created: true,
+                                    authority: selected_authority,
+                                });
                             }
                         }
                     }
@@ -370,7 +513,11 @@ impl BudgetStore for SqliteBudgetStore {
                                 total_cost_realized_spend_after,
                             )?;
                             transaction.commit()?;
-                            return Ok(true);
+                            return Ok(SqliteBudgetAuthorizationOutcome {
+                                allowed: true,
+                                event_created: true,
+                                authority: selected_authority,
+                            });
                         }
                     }
                     transaction.rollback()?;
@@ -458,7 +605,94 @@ impl BudgetStore for SqliteBudgetStore {
             total_cost_realized_spend_after,
         )?;
         transaction.commit()?;
-        Ok(allowed)
+        Ok(SqliteBudgetAuthorizationOutcome {
+            allowed,
+            event_created: true,
+            authority: selected_authority,
+        })
+    }
+}
+
+impl BudgetStore for SqliteBudgetStore {
+    fn try_increment(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.try_increment_with_event_id(capability_id, grant_index, max_invocations, None)
+    }
+
+    fn try_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.try_charge_cost_with_ids(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+            None,
+            None,
+        )
+    }
+
+    fn try_charge_cost_with_ids(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.try_charge_cost_with_ids_and_authority(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+            hold_id,
+            event_id,
+            None,
+        )
+    }
+
+    fn try_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&BudgetEventAuthority>,
+    ) -> Result<bool, BudgetStoreError> {
+        Ok(self
+            .try_charge_cost_with_ids_and_authority_outcome(
+                capability_id,
+                grant_index,
+                max_invocations,
+                cost_units,
+                max_cost_per_invocation,
+                max_total_cost_units,
+                hold_id,
+                event_id,
+                authority,
+            )?
+            .allowed)
     }
 
     fn reverse_charge_cost(
@@ -1029,6 +1263,321 @@ impl BudgetStore for SqliteBudgetStore {
         Ok(())
     }
 
+    fn authorize_budget_hold(
+        &self,
+        request: BudgetAuthorizeHoldRequest,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        if !request.invocation_quotas().is_empty() || request.revocation_set().is_some() {
+            return Err(BudgetStoreError::Invariant(
+                "composite budget holds are unavailable for this backend".to_string(),
+            ));
+        }
+        let event_id = effective_hold_event_id(
+            request.event_id.as_deref(),
+            BudgetMutationKind::AuthorizeExposure,
+        );
+        self.try_charge_cost_with_ids_and_authority(
+            &request.capability_id,
+            request.grant_index,
+            request.max_invocations,
+            request.requested_exposure_units,
+            request.max_cost_per_invocation,
+            request.max_total_cost_units,
+            request.hold_id.as_deref(),
+            Some(&event_id),
+            request.authority.as_ref(),
+        )?;
+        load_authorize_decision_for_event(self, &event_id)
+    }
+
+    fn reverse_budget_hold(
+        &self,
+        request: BudgetReverseHoldRequest,
+    ) -> Result<BudgetReverseHoldDecision, BudgetStoreError> {
+        let event_id = effective_hold_event_id(
+            request.event_id.as_deref(),
+            BudgetMutationKind::ReverseExposure,
+        );
+        self.reverse_charge_cost_with_ids_and_authority(
+            &request.capability_id,
+            request.grant_index,
+            request.reversed_exposure_units,
+            request.hold_id.as_deref(),
+            Some(&event_id),
+            request.authority.as_ref(),
+        )?;
+        load_hold_decision_for_event(
+            self,
+            &event_id,
+            BudgetMutationKind::ReverseExposure,
+            BudgetMonetaryHoldState::Reversed,
+        )
+    }
+
+    fn release_budget_hold(
+        &self,
+        request: BudgetReleaseHoldRequest,
+    ) -> Result<BudgetReleaseHoldDecision, BudgetStoreError> {
+        let event_id = effective_hold_event_id(
+            request.event_id.as_deref(),
+            BudgetMutationKind::ReleaseExposure,
+        );
+        self.reduce_charge_cost_with_ids_and_authority(
+            &request.capability_id,
+            request.grant_index,
+            request.released_exposure_units,
+            request.hold_id.as_deref(),
+            Some(&event_id),
+            request.authority.as_ref(),
+        )?;
+        load_hold_decision_for_event(
+            self,
+            &event_id,
+            BudgetMutationKind::ReleaseExposure,
+            BudgetMonetaryHoldState::Released,
+        )
+    }
+
+    fn reconcile_budget_hold(
+        &self,
+        request: BudgetReconcileHoldRequest,
+    ) -> Result<BudgetReconcileHoldDecision, BudgetStoreError> {
+        let event_id = effective_hold_event_id(
+            request.event_id.as_deref(),
+            BudgetMutationKind::ReconcileSpend,
+        );
+        self.settle_charge_cost_with_ids_and_authority(
+            &request.capability_id,
+            request.grant_index,
+            request.exposed_cost_units,
+            request.realized_spend_units,
+            request.hold_id.as_deref(),
+            Some(&event_id),
+            request.authority.as_ref(),
+        )?;
+        load_hold_decision_for_event(
+            self,
+            &event_id,
+            BudgetMutationKind::ReconcileSpend,
+            BudgetMonetaryHoldState::Reconciled,
+        )
+    }
+
+    fn capture_budget_hold(
+        &self,
+        request: BudgetCaptureHoldRequest,
+    ) -> Result<BudgetCaptureHoldDecision, BudgetStoreError> {
+        if request.realized_spend_units > request.exposed_cost_units {
+            return Err(BudgetStoreError::Invariant(
+                "cannot realize spend larger than exposed cost".to_string(),
+            ));
+        }
+        let grant_index_i64 = i64::try_from(request.grant_index).map_err(|_| {
+            BudgetStoreError::Overflow("budget grant index exceeds SQLite INTEGER".to_string())
+        })?;
+
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        if SqliteBudgetStore::existing_event_allowed(
+            &transaction,
+            request.event_id.as_deref(),
+            BudgetMutationKind::CaptureExposure,
+            &request.capability_id,
+            request.grant_index,
+            request.hold_id.as_deref(),
+            request.authority.as_ref(),
+            request.exposed_cost_units,
+            request.realized_spend_units,
+            None,
+            None,
+            None,
+        )?
+        .is_some()
+        {
+            let event_id = request.event_id.as_deref().ok_or_else(|| {
+                BudgetStoreError::Invariant(
+                    "captured budget retry is missing its persisted event_id".to_string(),
+                )
+            })?;
+            let record = SqliteBudgetStore::load_mutation_event(&transaction, event_id)?
+                .ok_or_else(|| {
+                    BudgetStoreError::Invariant(format!(
+                        "captured budget event `{event_id}` disappeared during retry"
+                    ))
+                })?;
+            transaction.rollback()?;
+            return capture_decision_from_record(self, &record);
+        }
+
+        if let Some(hold_id) = request.hold_id.as_deref() {
+            let hold = SqliteBudgetStore::ensure_open_hold(
+                &transaction,
+                hold_id,
+                &request.capability_id,
+                request.grant_index,
+            )?;
+            if hold.remaining_exposure_units != request.exposed_cost_units {
+                transaction.rollback()?;
+                return Err(BudgetStoreError::Invariant(format!(
+                    "budget hold `{hold_id}` does not match captured exposure"
+                )));
+            }
+            SqliteBudgetStore::validate_hold_authority(
+                hold_id,
+                hold.authority.as_ref(),
+                request.authority.as_ref(),
+            )?;
+        }
+
+        let current = transaction
+            .query_row(
+                r#"
+                SELECT invocation_count, total_cost_exposed, total_cost_realized_spend
+                FROM capability_grant_budgets
+                WHERE capability_id = ?1 AND grant_index = ?2
+                "#,
+                params![request.capability_id, grant_index_i64],
+                |row| {
+                    Ok((
+                        budget_u32_from_row(row, 0, "invocation_count")?,
+                        budget_u64_from_row(row, 1, "total_cost_exposed")?,
+                        budget_u64_from_row(row, 2, "total_cost_realized_spend")?,
+                    ))
+                },
+            )
+            .optional()?;
+
+        let Some((invocation_count, total_cost_exposed, total_cost_realized_spend)) = current
+        else {
+            transaction.rollback()?;
+            return Err(BudgetStoreError::Invariant(
+                "missing charged budget row".to_string(),
+            ));
+        };
+        if invocation_count == 0 {
+            transaction.rollback()?;
+            return Err(BudgetStoreError::Invariant(
+                "cannot capture charge with zero invocation_count".to_string(),
+            ));
+        }
+        if total_cost_exposed < request.exposed_cost_units {
+            transaction.rollback()?;
+            return Err(BudgetStoreError::Invariant(
+                "cannot capture more exposure than total_cost_exposed".to_string(),
+            ));
+        }
+
+        let total_cost_exposed_after = total_cost_exposed - request.exposed_cost_units;
+        let total_cost_realized_spend_after = total_cost_realized_spend
+            .checked_add(request.realized_spend_units)
+            .ok_or_else(|| {
+                BudgetStoreError::Overflow(
+                    "total_cost_realized_spend + realized_spend_units overflowed u64".to_string(),
+                )
+            })?;
+        let committed_cost_units_after = checked_committed_cost_units(
+            total_cost_exposed_after,
+            total_cost_realized_spend_after,
+        )?;
+        let seq = allocate_budget_replication_seq(&transaction)?;
+        let seq_i64 = i64::try_from(seq).map_err(|_| {
+            BudgetStoreError::Overflow("budget sequence exceeds SQLite INTEGER".to_string())
+        })?;
+        let total_cost_exposed_after_i64 =
+            i64::try_from(total_cost_exposed_after).map_err(|_| {
+                BudgetStoreError::Overflow(
+                    "captured exposure total exceeds SQLite INTEGER".to_string(),
+                )
+            })?;
+        let total_cost_realized_spend_after_i64 = i64::try_from(total_cost_realized_spend_after)
+            .map_err(|_| {
+                BudgetStoreError::Overflow(
+                    "captured realized spend exceeds SQLite INTEGER".to_string(),
+                )
+            })?;
+        transaction.execute(
+            r#"
+            UPDATE capability_grant_budgets
+            SET updated_at = ?3,
+                seq = ?4,
+                total_cost_exposed = ?5,
+                total_cost_realized_spend = ?6
+            WHERE capability_id = ?1 AND grant_index = ?2
+            "#,
+            params![
+                request.capability_id,
+                grant_index_i64,
+                unix_now(),
+                seq_i64,
+                total_cost_exposed_after_i64,
+                total_cost_realized_spend_after_i64,
+            ],
+        )?;
+        if let Some(hold_id) = request.hold_id.as_deref() {
+            let next_authority = SqliteBudgetStore::validate_hold_authority(
+                hold_id,
+                SqliteBudgetStore::ensure_open_hold(
+                    &transaction,
+                    hold_id,
+                    &request.capability_id,
+                    request.grant_index,
+                )?
+                .authority
+                .as_ref(),
+                request.authority.as_ref(),
+            )?;
+            SqliteBudgetStore::update_hold(
+                &transaction,
+                hold_id,
+                0,
+                HoldDisposition::Captured,
+                next_authority.as_ref(),
+            )?;
+        }
+        SqliteBudgetStore::append_mutation_event(
+            &transaction,
+            request.event_id.as_deref(),
+            request.hold_id.as_deref(),
+            request.authority.as_ref(),
+            &request.capability_id,
+            request.grant_index,
+            BudgetMutationKind::CaptureExposure,
+            None,
+            seq,
+            Some(seq),
+            request.exposed_cost_units,
+            request.realized_spend_units,
+            None,
+            None,
+            None,
+            invocation_count,
+            total_cost_exposed_after,
+            total_cost_realized_spend_after,
+        )?;
+        transaction.commit()?;
+
+        Ok(BudgetHoldMutationDecision {
+            hold_id: request.hold_id,
+            exposure_units: request.exposed_cost_units,
+            realized_spend_units: request.realized_spend_units,
+            committed_cost_units_after,
+            invocation_count_after: invocation_count,
+            invocation_counts_after: Vec::new(),
+            invocation_state: BudgetInvocationReservationState::Absent,
+            monetary_state: BudgetMonetaryHoldState::Captured,
+            revocation_set: None,
+            metadata: BudgetCommitMetadata {
+                authority: request.authority,
+                guarantee_level: self.budget_guarantee_level(),
+                budget_profile: self.budget_authority_profile(),
+                metering_profile: self.budget_metering_profile(),
+                budget_commit_index: Some(seq),
+                event_id: request.event_id,
+            },
+        })
+    }
+
     fn list_usages(
         &self,
         limit: usize,
@@ -1128,4 +1677,166 @@ impl BudgetStore for SqliteBudgetStore {
         )?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
+}
+
+fn effective_hold_event_id(requested: Option<&str>, kind: BudgetMutationKind) -> String {
+    requested.map_or_else(
+        || format!("sqlite-budget-{}-{}", kind.as_str(), uuid::Uuid::now_v7()),
+        ToOwned::to_owned,
+    )
+}
+
+fn load_authorize_decision_for_event(
+    store: &SqliteBudgetStore,
+    event_id: &str,
+) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+    let mut connection = store.connection()?;
+    let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+    let record =
+        SqliteBudgetStore::load_mutation_event(&transaction, event_id)?.ok_or_else(|| {
+            BudgetStoreError::Invariant(format!(
+                "budget event_id `{event_id}` disappeared after authorization"
+            ))
+        })?;
+    transaction.rollback()?;
+    authorize_decision_from_record(store, &record)
+}
+
+fn authorize_decision_from_record(
+    store: &SqliteBudgetStore,
+    record: &BudgetMutationRecord,
+) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+    if record.kind != BudgetMutationKind::AuthorizeExposure {
+        return Err(BudgetStoreError::Invariant(format!(
+            "budget event_id `{}` is not a persisted authorization",
+            record.event_id
+        )));
+    }
+    let allowed = record.allowed.ok_or_else(|| {
+        BudgetStoreError::Invariant(format!(
+            "budget authorization event `{}` is missing its frozen decision",
+            record.event_id
+        ))
+    })?;
+    let committed_cost_units_after = checked_committed_cost_units(
+        record.total_cost_exposed_after,
+        record.total_cost_realized_spend_after,
+    )?;
+    let metadata = BudgetCommitMetadata {
+        authority: record.authority.clone(),
+        guarantee_level: store.budget_guarantee_level(),
+        budget_profile: store.budget_authority_profile(),
+        metering_profile: store.budget_metering_profile(),
+        budget_commit_index: record.usage_seq,
+        event_id: Some(record.event_id.clone()),
+    };
+    if allowed {
+        let monetary_state = if record.exposure_units > 0
+            || record.max_cost_per_invocation.is_some()
+            || record.max_total_cost_units.is_some()
+        {
+            BudgetMonetaryHoldState::Exposed
+        } else {
+            BudgetMonetaryHoldState::None
+        };
+        Ok(BudgetAuthorizeHoldDecision::Authorized(
+            AuthorizedBudgetHold {
+                hold_id: record.hold_id.clone(),
+                authorized_exposure_units: record.exposure_units,
+                committed_cost_units_after,
+                invocation_count_after: record.invocation_count_after,
+                invocation_counts_after: record.invocation_counts_after.clone(),
+                invocation_state: BudgetInvocationReservationState::Absent,
+                monetary_state,
+                revocation_set: record.revocation_set.clone(),
+                metadata,
+            },
+        ))
+    } else {
+        Ok(BudgetAuthorizeHoldDecision::Denied(DeniedBudgetHold {
+            hold_id: record.hold_id.clone(),
+            attempted_exposure_units: record.exposure_units,
+            committed_cost_units_after,
+            invocation_count_after: record.invocation_count_after,
+            invocation_counts_after: record.invocation_counts_after.clone(),
+            invocation_state: BudgetInvocationReservationState::Denied,
+            monetary_state: BudgetMonetaryHoldState::None,
+            revocation_set: record.revocation_set.clone(),
+            metadata,
+        }))
+    }
+}
+
+fn load_hold_decision_for_event(
+    store: &SqliteBudgetStore,
+    event_id: &str,
+    expected_kind: BudgetMutationKind,
+    expected_monetary_state: BudgetMonetaryHoldState,
+) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
+    let mut connection = store.connection()?;
+    let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+    let record =
+        SqliteBudgetStore::load_mutation_event(&transaction, event_id)?.ok_or_else(|| {
+            BudgetStoreError::Invariant(format!(
+                "budget event_id `{event_id}` disappeared after its hold transition"
+            ))
+        })?;
+    transaction.rollback()?;
+    hold_decision_from_record(store, &record, expected_kind, expected_monetary_state)
+}
+
+fn hold_decision_from_record(
+    store: &SqliteBudgetStore,
+    record: &BudgetMutationRecord,
+    expected_kind: BudgetMutationKind,
+    expected_monetary_state: BudgetMonetaryHoldState,
+) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
+    if record.kind != expected_kind || record.monetary_state != expected_monetary_state {
+        return Err(BudgetStoreError::Invariant(format!(
+            "budget event_id `{}` is not the expected persisted hold transition",
+            record.event_id
+        )));
+    }
+    Ok(BudgetHoldMutationDecision {
+        hold_id: record.hold_id.clone(),
+        exposure_units: record.exposure_units,
+        realized_spend_units: record.realized_spend_units,
+        committed_cost_units_after: checked_committed_cost_units(
+            record.total_cost_exposed_after,
+            record.total_cost_realized_spend_after,
+        )?,
+        invocation_count_after: record.invocation_count_after,
+        invocation_counts_after: record.invocation_counts_after.clone(),
+        invocation_state: record.invocation_state,
+        monetary_state: record.monetary_state,
+        revocation_set: record.revocation_set.clone(),
+        metadata: BudgetCommitMetadata {
+            authority: record.authority.clone(),
+            guarantee_level: store.budget_guarantee_level(),
+            budget_profile: store.budget_authority_profile(),
+            metering_profile: store.budget_metering_profile(),
+            budget_commit_index: record.usage_seq,
+            event_id: Some(record.event_id.clone()),
+        },
+    })
+}
+
+fn capture_decision_from_record(
+    store: &SqliteBudgetStore,
+    record: &BudgetMutationRecord,
+) -> Result<BudgetCaptureHoldDecision, BudgetStoreError> {
+    if record.kind != BudgetMutationKind::CaptureExposure
+        || record.monetary_state != BudgetMonetaryHoldState::Captured
+    {
+        return Err(BudgetStoreError::Invariant(format!(
+            "budget event_id `{}` is not a captured monetary hold",
+            record.event_id
+        )));
+    }
+    hold_decision_from_record(
+        store,
+        record,
+        BudgetMutationKind::CaptureExposure,
+        BudgetMonetaryHoldState::Captured,
+    )
 }

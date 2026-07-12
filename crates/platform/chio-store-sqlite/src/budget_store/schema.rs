@@ -109,6 +109,134 @@ pub(super) fn ensure_budget_mutation_event_seq_column(
     Ok(())
 }
 
+/// Backfill immutable hold-ID authorization claims on upgrade.
+///
+/// A database created before the claim table may contain at most one surviving
+/// authorization event per hold ID. Multiple events prove that the old fresh-event
+/// replay bug already rebound the namespace, so opening that database fails closed
+/// instead of choosing one history arbitrarily.
+pub(super) fn ensure_budget_authorization_claims(
+    connection: &mut Connection,
+) -> Result<(), BudgetStoreError> {
+    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let undecided_hold = transaction
+        .query_row(
+            r#"
+            SELECT hold_id
+            FROM budget_mutation_events
+            WHERE kind = 'authorize_exposure'
+              AND hold_id IS NOT NULL
+              AND allowed IS NULL
+            LIMIT 1
+            "#,
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    if let Some(hold_id) = undecided_hold {
+        return Err(BudgetStoreError::Invariant(format!(
+            "budget hold `{hold_id}` has an authorization event without a frozen decision"
+        )));
+    }
+    let conflicting_hold = transaction
+        .query_row(
+            r#"
+            SELECT hold_id
+            FROM budget_mutation_events
+            WHERE kind = 'authorize_exposure' AND hold_id IS NOT NULL
+            GROUP BY hold_id
+            HAVING COUNT(*) > 1
+            LIMIT 1
+            "#,
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    if let Some(hold_id) = conflicting_hold {
+        return Err(BudgetStoreError::Invariant(format!(
+            "budget hold `{hold_id}` has conflicting historical authorization events"
+        )));
+    }
+
+    let mismatched_claim = transaction
+        .query_row(
+            r#"
+            SELECT claim.hold_id
+            FROM budget_authorization_claims AS claim
+            JOIN budget_mutation_events AS event
+              ON event.hold_id = claim.hold_id
+             AND event.kind = 'authorize_exposure'
+            WHERE NOT (
+                claim.event_id IS event.event_id
+                AND claim.capability_id IS event.capability_id
+                AND claim.grant_index IS event.grant_index
+                AND claim.requested_exposure_units IS event.exposure_units
+                AND claim.max_invocations IS event.max_invocations
+                AND claim.max_exposure_per_invocation IS event.max_exposure_per_invocation
+                AND claim.max_total_exposure_units IS event.max_total_exposure_units
+                AND claim.authority_id IS event.authority_id
+                AND claim.lease_id IS event.lease_id
+                AND claim.lease_epoch IS event.lease_epoch
+                AND claim.allowed IS event.allowed
+            )
+            LIMIT 1
+            "#,
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    if let Some(hold_id) = mismatched_claim {
+        return Err(BudgetStoreError::Invariant(format!(
+            "budget hold `{hold_id}` has a claim that conflicts with its authorization event"
+        )));
+    }
+
+    transaction.execute(
+        r#"
+        INSERT INTO budget_authorization_claims (
+            hold_id,
+            event_id,
+            capability_id,
+            grant_index,
+            requested_exposure_units,
+            max_invocations,
+            max_exposure_per_invocation,
+            max_total_exposure_units,
+            authority_id,
+            lease_id,
+            lease_epoch,
+            allowed,
+            created_at
+        )
+        SELECT
+            hold_id,
+            event_id,
+            capability_id,
+            grant_index,
+            exposure_units,
+            max_invocations,
+            max_exposure_per_invocation,
+            max_total_exposure_units,
+            authority_id,
+            lease_id,
+            lease_epoch,
+            allowed,
+            recorded_at
+        FROM budget_mutation_events
+        WHERE kind = 'authorize_exposure'
+          AND hold_id IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM budget_authorization_claims AS existing
+              WHERE existing.hold_id = budget_mutation_events.hold_id
+          )
+        "#,
+        [],
+    )?;
+    transaction.commit()?;
+    Ok(())
+}
+
 /// Ensure the AFTER DELETE trigger that resets the ack-head watermark AND clears
 /// the per-origin heads exists, so any delete from `budget_mutation_events`
 /// forces `budget_ack_heads` to re-verify contiguity from genesis (fail-closed).

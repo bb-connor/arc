@@ -295,6 +295,27 @@ The v1 signed body is:
 | `delegation_chain` | Ordered chain of delegation links |
 | `algorithm` | Optional envelope hint: `ed25519`, `p256`, `p384`, or `hybrid` |
 
+### Canonical revocation sets
+
+Capability and supplemental revocation identifiers are opaque signed Unicode
+scalar sequences. Chio does not normalize Unicode, fold case, trim identifiers,
+or apply locale collation. A revocation-set member MUST be nonempty, contain no
+NUL scalar, and encode to at most 512 UTF-8 bytes. Its first and last scalar MUST
+NOT be any of U+0009 through U+000D, U+0020, U+0085, U+00A0, U+1680, U+2000
+through U+200A, U+2028, U+2029, U+202F, U+205F, or U+3000.
+
+The canonical set order is ascending unsigned UTF-8 byte order. When one byte
+sequence is a prefix of another, the shorter sequence sorts first. Duplicate
+means byte-identical UTF-8. This ordering is an application-level array order;
+RFC 8785 object-member ordering does not apply. The canonical set digest is:
+
+```text
+SHA256("chio.revocation-set.v1\0" || RFC8785(sorted_identifier_array))
+```
+
+Implementations MUST reject an unsorted array, a duplicate, an omitted or added
+member, more than 128 members, or a digest mismatch.
+
 Capability public-key fields and signatures use the same self-describing
 encoding defined in section 4. Hybrid capability tokens set
 `algorithm: "hybrid"` and encode `issuer`, `subject`, delegation-link keys,

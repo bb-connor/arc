@@ -42,17 +42,57 @@ pub(super) fn mutation_record_from_row(
         )
     })?;
     let authority = sqlite_budget_event_authority(row.get(17)?, row.get(18)?, row.get(19)?)?;
+    let allowed = row.get::<_, Option<i64>>(5)?.map(|value| value > 0);
+    let exposure_units = budget_u64_from_row(row, 9, "exposure_units")?;
+    let invocation_state = match kind {
+        BudgetMutationKind::IncrementInvocation | BudgetMutationKind::CaptureInvocations => {
+            if allowed == Some(false) {
+                BudgetInvocationReservationState::Denied
+            } else {
+                BudgetInvocationReservationState::Captured
+            }
+        }
+        BudgetMutationKind::ReserveInvocations => {
+            if allowed == Some(false) {
+                BudgetInvocationReservationState::Denied
+            } else {
+                BudgetInvocationReservationState::Authorized
+            }
+        }
+        BudgetMutationKind::ReverseInvocations => BudgetInvocationReservationState::Reversed,
+        BudgetMutationKind::AuthorizeExposure
+        | BudgetMutationKind::CaptureExposure
+        | BudgetMutationKind::ReverseExposure
+        | BudgetMutationKind::ReleaseExposure
+        | BudgetMutationKind::ReconcileSpend => BudgetInvocationReservationState::Absent,
+    };
+    let monetary_state = match kind {
+        BudgetMutationKind::AuthorizeExposure | BudgetMutationKind::ReserveInvocations
+            if allowed != Some(false) && exposure_units > 0 =>
+        {
+            BudgetMonetaryHoldState::Exposed
+        }
+        BudgetMutationKind::CaptureExposure => BudgetMonetaryHoldState::Captured,
+        BudgetMutationKind::ReverseExposure => BudgetMonetaryHoldState::Reversed,
+        BudgetMutationKind::ReleaseExposure => BudgetMonetaryHoldState::Released,
+        BudgetMutationKind::ReconcileSpend => BudgetMonetaryHoldState::Reconciled,
+        BudgetMutationKind::IncrementInvocation
+        | BudgetMutationKind::ReserveInvocations
+        | BudgetMutationKind::CaptureInvocations
+        | BudgetMutationKind::ReverseInvocations
+        | BudgetMutationKind::AuthorizeExposure => BudgetMonetaryHoldState::None,
+    };
     Ok(BudgetMutationRecord {
         event_id: row.get(0)?,
         hold_id: row.get(1)?,
         capability_id: row.get(2)?,
         grant_index: budget_u32_from_row(row, 3, "grant_index")?,
         kind,
-        allowed: row.get::<_, Option<i64>>(5)?.map(|value| value > 0),
+        allowed,
         recorded_at: row.get(6)?,
         event_seq: budget_u64_from_row(row, 7, "event_seq")?,
         usage_seq: optional_budget_u64_from_row(row, 8, "usage_seq")?,
-        exposure_units: budget_u64_from_row(row, 9, "exposure_units")?,
+        exposure_units,
         realized_spend_units: budget_u64_from_row(row, 10, "realized_spend_units")?,
         max_invocations: optional_budget_u32_from_row(row, 11, "max_invocations")?,
         max_cost_per_invocation: optional_budget_u64_from_row(
@@ -62,6 +102,10 @@ pub(super) fn mutation_record_from_row(
         )?,
         max_total_cost_units: optional_budget_u64_from_row(row, 13, "max_total_exposure_units")?,
         invocation_count_after: budget_u32_from_row(row, 14, "invocation_count_after")?,
+        invocation_counts_after: Vec::new(),
+        invocation_state,
+        monetary_state,
+        revocation_set: None,
         total_cost_exposed_after: budget_u64_from_row(row, 15, "total_cost_exposed_after")?,
         total_cost_realized_spend_after: budget_u64_from_row(
             row,
