@@ -287,6 +287,9 @@ pub struct ChioKernel {
     pub(super) post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline,
     pub(super) budget_store: Arc<dyn BudgetStore>,
     pub(super) budget_store_lock: Mutex<()>,
+    pub(super) admission_operation_store:
+        Option<Arc<dyn crate::admission_operation::AdmissionOperationStore>>,
+    pub(super) dispatch_worker_count: usize,
     pub(super) supplemental_quota_verifier:
         Option<Arc<dyn crate::supplemental_quota::SupplementalQuotaVerifier>>,
     pub(super) revocation_store: Arc<dyn RevocationStore>,

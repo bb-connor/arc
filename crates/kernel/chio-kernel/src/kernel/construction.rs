@@ -210,6 +210,8 @@ impl ChioKernel {
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
             budget_store: Arc::new(InMemoryBudgetStore::new()),
             budget_store_lock: Mutex::new(()),
+            admission_operation_store: None,
+            dispatch_worker_count: 1,
             supplemental_quota_verifier: None,
             revocation_store: Arc::new(InMemoryRevocationStore::new()),
             capability_authority: Box::new(LocalCapabilityAuthority::new(authority_keypair)),
@@ -593,6 +595,90 @@ impl ChioKernel {
 
     pub fn set_budget_store_handle(&mut self, budget_store: Arc<dyn BudgetStore>) {
         self.budget_store = budget_store;
+    }
+
+    pub fn set_dispatch_worker_count(
+        &mut self,
+        dispatch_worker_count: usize,
+    ) -> Result<(), KernelError> {
+        if dispatch_worker_count == 0 {
+            return Err(KernelError::Internal(
+                "dispatch worker count must be greater than zero".to_string(),
+            ));
+        }
+        if let Some(store) = self.admission_operation_store.as_ref() {
+            Self::validate_admission_operation_store_profile(
+                store.authority_profile(),
+                dispatch_worker_count,
+            )?;
+        }
+        self.dispatch_worker_count = dispatch_worker_count;
+        Ok(())
+    }
+
+    pub fn set_admission_operation_store(
+        &mut self,
+        store: Box<dyn crate::admission_operation::AdmissionOperationStore>,
+    ) -> Result<(), KernelError> {
+        self.set_admission_operation_store_handle(Arc::from(store))
+    }
+
+    pub fn set_admission_operation_store_handle(
+        &mut self,
+        store: Arc<dyn crate::admission_operation::AdmissionOperationStore>,
+    ) -> Result<(), KernelError> {
+        Self::validate_admission_operation_store_profile(
+            store.authority_profile(),
+            self.dispatch_worker_count,
+        )?;
+        self.admission_operation_store = Some(store);
+        Ok(())
+    }
+
+    pub fn clear_admission_operation_store(&mut self) {
+        self.admission_operation_store = None;
+    }
+
+    fn validate_admission_operation_store_profile(
+        profile: crate::admission_operation::AdmissionOperationStoreProfile,
+        dispatch_worker_count: usize,
+    ) -> Result<(), KernelError> {
+        if profile.supports_dispatch_workers(dispatch_worker_count) {
+            return Ok(());
+        }
+        if matches!(
+            profile,
+            crate::admission_operation::AdmissionOperationStoreProfile::EphemeralLocal
+        ) {
+            return Err(KernelError::Internal(
+                "durable admission operation store authority is required".to_string(),
+            ));
+        }
+        Err(KernelError::Internal(
+            "multiple dispatch workers require a shared linearizable admission operation store"
+                .to_string(),
+        ))
+    }
+
+    pub fn persist_prepared_admission_operation(
+        &self,
+        operation: crate::admission_operation::AdmissionOperation,
+    ) -> Result<crate::admission_operation::AdmissionOperation, KernelError> {
+        let store = self.admission_operation_store.as_ref().ok_or_else(|| {
+            KernelError::Internal("durable admission operation store is not installed".to_string())
+        })?;
+        Self::validate_admission_operation_store_profile(
+            store.authority_profile(),
+            self.dispatch_worker_count,
+        )?;
+        match store.create_prepared(operation).map_err(|error| {
+            KernelError::Internal(format!("failed to persist admission operation: {error}"))
+        })? {
+            crate::admission_operation::AdmissionOperationCreateOutcome::Created(operation)
+            | crate::admission_operation::AdmissionOperationCreateOutcome::Existing(operation) => {
+                Ok(operation)
+            }
+        }
     }
 
     pub fn set_supplemental_quota_verifier(

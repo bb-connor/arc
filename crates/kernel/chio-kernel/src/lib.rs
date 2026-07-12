@@ -126,9 +126,9 @@ pub use admission_capture_authority::{
 pub use admission_operation::{
     derive_operation_id, AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
     AdmissionOperationCreateOutcome, AdmissionOperationError, AdmissionOperationKind,
-    AdmissionOperationState, AdmissionOperationStore, AdmissionRequestBindingInput,
-    InMemoryAdmissionOperationStore, PreparedAdmissionOperation, ADMISSION_OPERATION_SCHEMA,
-    MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION,
+    AdmissionOperationState, AdmissionOperationStore, AdmissionOperationStoreProfile,
+    AdmissionRequestBindingInput, InMemoryAdmissionOperationStore, PreparedAdmissionOperation,
+    ReplayReservationState, ADMISSION_OPERATION_SCHEMA, MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION,
 };
 pub use approval::{
     compute_parameter_hash, resume_with_decision, ApprovalChannel, ApprovalContext,

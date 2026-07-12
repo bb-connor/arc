@@ -10,7 +10,34 @@ const ADMISSION_OPERATION_DOMAIN: &[u8] = b"chio.admission-operation.v1\0";
 const ADMISSION_REQUEST_BINDING_DOMAIN: &[u8] = b"chio.admission-request-binding.v1\0";
 const MAX_ADMISSION_IDENTIFIER_BYTES: usize = 512;
 const MAX_ADMISSION_ERROR_BYTES: usize = 4_096;
-pub const MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION: usize = 64;
+pub const MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION: usize = 32;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReplayReservationState {
+    Reserved,
+    Committed,
+    Cancelled,
+}
+
+impl ReplayReservationState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Reserved => "reserved",
+            Self::Committed => "committed",
+            Self::Cancelled => "cancelled",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "reserved" => Some(Self::Reserved),
+            "committed" => Some(Self::Committed),
+            "cancelled" => Some(Self::Cancelled),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum AdmissionOperationError {
@@ -516,7 +543,28 @@ pub enum AdmissionOperationCasOutcome {
     Missing,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdmissionOperationStoreProfile {
+    EphemeralLocal,
+    SingleNodeDurable,
+    SharedLinearizable,
+}
+
+impl AdmissionOperationStoreProfile {
+    pub fn supports_dispatch_workers(self, dispatch_worker_count: usize) -> bool {
+        match self {
+            Self::EphemeralLocal => false,
+            Self::SingleNodeDurable => dispatch_worker_count == 1,
+            Self::SharedLinearizable => dispatch_worker_count > 0,
+        }
+    }
+}
+
 pub trait AdmissionOperationStore: Send + Sync {
+    fn authority_profile(&self) -> AdmissionOperationStoreProfile {
+        AdmissionOperationStoreProfile::EphemeralLocal
+    }
+
     fn create_prepared(
         &self,
         operation: AdmissionOperation,

@@ -5,7 +5,7 @@ use std::sync::{Mutex, MutexGuard};
 use chio_kernel::{
     AdmissionDispatchState, AdmissionOperation, AdmissionOperationCasOutcome,
     AdmissionOperationCreateOutcome, AdmissionOperationError, AdmissionOperationKind,
-    AdmissionOperationState, AdmissionOperationStore,
+    AdmissionOperationState, AdmissionOperationStore, AdmissionOperationStoreProfile,
 };
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
@@ -74,6 +74,10 @@ impl SqliteAdmissionOperationStore {
 }
 
 impl AdmissionOperationStore for SqliteAdmissionOperationStore {
+    fn authority_profile(&self) -> AdmissionOperationStoreProfile {
+        AdmissionOperationStoreProfile::SingleNodeDurable
+    }
+
     fn create_prepared(
         &self,
         operation: AdmissionOperation,
@@ -388,6 +392,10 @@ mod tests {
         let operation = operation();
         {
             let store = SqliteAdmissionOperationStore::open(&path).unwrap();
+            assert_eq!(
+                store.authority_profile(),
+                AdmissionOperationStoreProfile::SingleNodeDurable
+            );
             assert!(matches!(
                 store.create_prepared(operation.clone()).unwrap(),
                 AdmissionOperationCreateOutcome::Created(_)
