@@ -221,6 +221,57 @@ struct SupplementalQuotaBinding {
     negotiated_features_digest: String,
 }
 
+/// Read-only projection of invocation admission evidence derived by the kernel.
+///
+/// The projection exposes durable descriptors and binding evidence without
+/// exposing a constructor or the private authority installation path.
+#[derive(Debug, Clone, Copy)]
+pub struct BudgetInvocationAdmissionEvidence<'a> {
+    admission: &'a VerifiedInvocationAdmission,
+}
+
+impl<'a> BudgetInvocationAdmissionEvidence<'a> {
+    pub fn quotas(self) -> &'a [BudgetInvocationQuota] {
+        &self.admission.quotas
+    }
+
+    pub fn revocation_set(self) -> &'a CanonicalRevocationSet {
+        &self.admission.revocation_set
+    }
+
+    pub fn aggregate_binding_digest(self) -> Option<&'a str> {
+        self.admission.aggregate_binding_digest.as_deref()
+    }
+
+    pub fn supplemental_artifact_digest(self) -> Option<&'a str> {
+        self.admission
+            .supplemental_binding
+            .as_ref()
+            .map(|binding| binding.artifact_digest.as_str())
+    }
+
+    pub fn supplemental_verifier_id(self) -> Option<&'a str> {
+        self.admission
+            .supplemental_binding
+            .as_ref()
+            .map(|binding| binding.verifier_id.as_str())
+    }
+
+    pub fn supplemental_request_binding_hash(self) -> Option<&'a str> {
+        self.admission
+            .supplemental_binding
+            .as_ref()
+            .map(|binding| binding.request_binding_hash.as_str())
+    }
+
+    pub fn supplemental_negotiated_features_digest(self) -> Option<&'a str> {
+        self.admission
+            .supplemental_binding
+            .as_ref()
+            .map(|binding| binding.negotiated_features_digest.as_str())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct VerifiedInvocationAdmission {
     quotas: Vec<BudgetInvocationQuota>,
@@ -680,6 +731,12 @@ impl BudgetAuthorizeHoldRequest {
         self.invocation_admission
             .as_ref()
             .map(VerifiedInvocationAdmission::revocation_set)
+    }
+
+    pub fn invocation_admission_evidence(&self) -> Option<BudgetInvocationAdmissionEvidence<'_>> {
+        self.invocation_admission
+            .as_ref()
+            .map(|admission| BudgetInvocationAdmissionEvidence { admission })
     }
 
     pub(crate) fn install_verified_invocation_admission(
@@ -1334,6 +1391,42 @@ mod tests {
                 2,
             ),
         ]
+    }
+
+    #[test]
+    fn authorization_request_exposes_verified_admission_evidence_read_only() {
+        let mut request = composite_request("hold-evidence", "event-evidence", three_quotas(3));
+        request
+            .invocation_admission
+            .as_mut()
+            .unwrap()
+            .aggregate_binding_digest = Some("44".repeat(32));
+
+        let evidence = request
+            .invocation_admission_evidence()
+            .expect("verified admission evidence");
+        assert_eq!(evidence.quotas(), request.invocation_quotas());
+        assert_eq!(
+            evidence.revocation_set().digest(),
+            request.revocation_set().unwrap().digest()
+        );
+        assert_eq!(
+            evidence.aggregate_binding_digest(),
+            Some("44".repeat(32).as_str())
+        );
+        assert_eq!(
+            evidence.supplemental_artifact_digest(),
+            Some("11".repeat(32).as_str())
+        );
+        assert_eq!(evidence.supplemental_verifier_id(), Some("test-verifier"));
+        assert_eq!(
+            evidence.supplemental_request_binding_hash(),
+            Some("22".repeat(32).as_str())
+        );
+        assert_eq!(
+            evidence.supplemental_negotiated_features_digest(),
+            Some("33".repeat(32).as_str())
+        );
     }
 
     #[test]

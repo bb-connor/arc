@@ -21,6 +21,7 @@
 
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 
+pub mod admission_capture_authority;
 pub mod approval;
 pub mod approval_channels;
 pub mod authority;
@@ -116,6 +117,11 @@ pub use request_matching::{
     capability_request_requires_dpop, capability_request_requires_dpop_with_model_metadata,
 };
 
+pub use admission_capture_authority::{
+    AdmissionCaptureAuthority, AdmissionCaptureDecision, AdmissionCaptureDenial,
+    AdmissionCaptureDenialReason, AdmissionCaptureError, AdmissionCaptureMetadata,
+    AdmissionCaptureRequest, MAX_AUTHORIZATION_ARTIFACT_DIGESTS_PER_ADMISSION,
+};
 pub use approval::{
     compute_parameter_hash, resume_with_decision, ApprovalChannel, ApprovalContext,
     ApprovalDecision, ApprovalFilter, ApprovalGuard, ApprovalOutcome, ApprovalRequest,
@@ -128,7 +134,10 @@ pub use authority::{
     AuthoritySnapshot, AuthorityStatus, AuthorityStoreError, AuthorityTrustedKeySnapshot,
     CapabilityAuthority, LocalCapabilityAuthority,
 };
-pub use budget_store::{BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore};
+pub use budget_store::{
+    BudgetInvocationAdmissionEvidence, BudgetStore, BudgetStoreError, BudgetUsageRecord,
+    InMemoryBudgetStore,
+};
 pub use capability_lineage::{
     CapabilityLineageError, CapabilitySnapshot, StoredCapabilitySnapshot,
 };
