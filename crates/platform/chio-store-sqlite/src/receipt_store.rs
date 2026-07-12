@@ -1113,6 +1113,14 @@ fn handle_non_append_command(
                         if let Ok(mut last_error) = health.last_error.lock() {
                             *last_error = None;
                         }
+                        // Clear the actor loop's stale flush error, mirroring the
+                        // ReseedHead recovery path: if an earlier append poisoned
+                        // the head and set `pending_flush_error`, the repair has
+                        // now reseeded a revalidated head, so a subsequent
+                        // STANDALONE `flush_receipt_writes()` must not keep
+                        // returning the pre-repair append error. Fail-closed is
+                        // unaffected: a real later batch failure re-sets it.
+                        *pending_flush_error = None;
                         *head_state = WriterHeadState::Verified(Box::new(head));
                     }
                     Err(error) => {
