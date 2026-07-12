@@ -70,6 +70,15 @@ pub(crate) fn ensure_receipt_retention_watermark_table(
 /// insert whose id is tombstoned, DB-enforced like the immutability guards so a
 /// writer that bypasses the Rust append path still cannot resurrect an archived
 /// id. Created on every writable open (new and existing).
+///
+/// The tombstone rows are themselves append-only. Once a rotation deletes the
+/// live receipt (and its `UNIQUE(receipt_id)` sentinel), the tombstone is the
+/// only DB-level record that the id was archived, so it carries the same
+/// immutability guarantee as the append-only projection tables: two
+/// `BEFORE UPDATE`/`BEFORE DELETE` triggers RAISE(ABORT) so a writer that
+/// bypasses the Rust path cannot delete or rewrite a tombstone and then
+/// re-insert the archived id, recreating the archived/live ambiguity these
+/// triggers exist to prevent.
 pub(crate) fn ensure_receipt_retention_tombstones(
     connection: &rusqlite::Connection,
 ) -> Result<(), ReceiptStoreError> {
@@ -81,6 +90,18 @@ pub(crate) fn ensure_receipt_retention_tombstones(
             archived_through_entry_seq INTEGER NOT NULL,
             tombstoned_at              INTEGER NOT NULL
         );
+
+        CREATE TRIGGER IF NOT EXISTS receipt_retention_tombstones_reject_update
+        BEFORE UPDATE ON receipt_retention_tombstones
+        BEGIN
+            SELECT RAISE(ABORT, 'receipt retention tombstones are append-only');
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS receipt_retention_tombstones_reject_delete
+        BEFORE DELETE ON receipt_retention_tombstones
+        BEGIN
+            SELECT RAISE(ABORT, 'receipt retention tombstones are append-only');
+        END;
 
         CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_archived_reuse
         BEFORE INSERT ON chio_tool_receipts

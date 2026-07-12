@@ -2615,6 +2615,442 @@ fn repair_tombstones_archived_ids_to_block_reuse() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+/// In incremental mode the rotation skips the O(N) chain rebuild and trusts the
+/// per-append verified head. That head can be stale relative to
+/// `kernel_checkpoints` when a second store instance appends checkpoint rows
+/// after it was seeded, and computing the archival watermark from every
+/// persisted checkpoint would then prune up to an unaudited boundary. Rotation
+/// must cap the watermark at the checkpoint boundary the actor has actually
+/// verified, archiving only the audited prefix and leaving the newer checkpoint
+/// for a later, verified pass.
+#[test]
+fn rotation_caps_watermark_at_verified_head() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("rotation-verified-ceiling");
+    let archive = unique_db_path("rotation-verified-ceiling-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    // Instance A checkpoints [1,2] and keeps its verified head at boundary 2.
+    let store_a = SqliteReceiptStore::open(&path)?;
+    store_a.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for i in 0..2u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("ceil-a-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store_a.append_chio_receipt_returning_seq(&r)?;
+    }
+    store_a.flush_receipt_writes()?;
+    assert!(store_a.load_checkpoint_by_seq(1)?.is_some());
+
+    // A second instance appends [3,4] and builds checkpoint 2 covering boundary
+    // 4. Instance A stays idle, so its cached verified head never advances past
+    // boundary 2 even though the DB now holds an aged, checkpointed [1,4].
+    {
+        let store_b = SqliteReceiptStore::open_existing(&path)?;
+        store_b.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+        for i in 2..4u64 {
+            let r = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("ceil-b-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store_b.append_chio_receipt_returning_seq(&r)?;
+        }
+        store_b.flush_receipt_writes()?;
+        assert!(store_b.load_checkpoint_by_seq(2)?.is_some());
+    }
+
+    // Rotate through the stale instance A. Uncapped it would archive the whole
+    // aged [1,4]; capped at the verified boundary it archives only [1,2].
+    let archived = store_a.archive_receipts_before(150, archive_path)?;
+    assert_eq!(
+        archived, 2,
+        "rotation must cap at the verified checkpoint boundary"
+    );
+
+    let conn = store_a.reader_connection_for_test()?;
+    let watermark: Option<i64> = conn.query_row(
+        "SELECT MAX(archived_through_entry_seq) FROM receipt_retention_watermark",
+        [],
+        |r| r.get(0),
+    )?;
+    assert_eq!(
+        watermark,
+        Some(2),
+        "the watermark stays at the verified boundary"
+    );
+    let survivors: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq IN (3, 4)",
+        [],
+        |r| r.get(0),
+    )?;
+    assert_eq!(
+        survivors, 2,
+        "the unaudited checkpoint's rows must not be pruned"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
+/// A store opened through `open_existing` skips the writable `open()` migration
+/// that creates the watermark ledger, so a legacy database can reach rotation
+/// without it. The rotation records the archival high-water mark, so it must
+/// create the ledger first; otherwise the insert fails on a missing table after
+/// the archive copy has run, rolling the delete back and looping forever without
+/// pruning.
+#[test]
+fn rotation_creates_missing_watermark_ledger_on_legacy_store(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("legacy-rotation-watermark");
+    let archive = unique_db_path("legacy-rotation-watermark-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+        for i in 0..4u64 {
+            let r = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("lgr-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store.append_chio_receipt_returning_seq(&r)?;
+        }
+        store.flush_receipt_writes()?;
+        assert!(store.load_checkpoint_by_seq(2)?.is_some());
+        // Drop the watermark ledger so the store looks like it predates the
+        // retention migration.
+        store.writer_handle().run_write(|connection| {
+            connection.execute_batch("DROP TABLE IF EXISTS receipt_retention_watermark;")?;
+            Ok(())
+        })?;
+    }
+
+    // Reopen through open_existing (skips the ledger-creating migration) and
+    // rotate. Without creating the ledger the watermark insert fails on the
+    // missing table and the rotation errors after copying the archive.
+    let store = SqliteReceiptStore::open_existing(&path)?;
+    let archived = store.archive_receipts_before(150, archive_path)?;
+    assert_eq!(
+        archived, 4,
+        "the aged checkpointed prefix archives once the ledger is created"
+    );
+
+    let conn = store.reader_connection_for_test()?;
+    let watermark: Option<i64> = conn.query_row(
+        "SELECT MAX(archived_through_entry_seq) FROM receipt_retention_watermark",
+        [],
+        |r| r.get(0),
+    )?;
+    assert_eq!(
+        watermark,
+        Some(4),
+        "the rotation created the ledger and recorded the boundary"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
+/// Once a rotation deletes the live receipt (and its `UNIQUE(receipt_id)`
+/// sentinel), the tombstone row is the only DB-level record that the id was
+/// archived, so it must be as immutable as the append-only projection tables. A
+/// writer that bypasses the Rust path must not be able to delete or rewrite a
+/// tombstone and then re-insert the archived id.
+#[test]
+fn retention_tombstones_are_immutable() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("tombstone-immutable");
+    let store = SqliteReceiptStore::open(&path)?;
+    let conn = store.reader_connection_for_test()?;
+
+    // open() creates the tombstone table; seed one row (INSERT stays allowed).
+    conn.execute(
+        "INSERT INTO receipt_retention_tombstones \
+         (receipt_id, receipt_kind, archived_through_entry_seq, tombstoned_at) \
+         VALUES ('archived-1', 'tool_receipt', 5, 100)",
+        [],
+    )?;
+
+    // A raw UPDATE is rejected by the reject-update trigger.
+    let updated = conn.execute(
+        "UPDATE receipt_retention_tombstones SET archived_through_entry_seq = 999",
+        [],
+    );
+    assert!(
+        updated.is_err(),
+        "raw UPDATE of a tombstone must be rejected"
+    );
+
+    // A raw DELETE is rejected by the reject-delete trigger.
+    let deleted = conn.execute("DELETE FROM receipt_retention_tombstones", []);
+    assert!(
+        deleted.is_err(),
+        "raw DELETE of a tombstone must be rejected"
+    );
+
+    // The tombstone is unchanged: still exactly the one seeded row.
+    let (count, seq): (i64, i64) = conn.query_row(
+        "SELECT COUNT(*), COALESCE(MAX(archived_through_entry_seq), 0) FROM receipt_retention_tombstones",
+        [],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    assert_eq!(count, 1);
+    assert_eq!(seq, 5);
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+/// A subsequent rotation only appends the newer suffix to the archive the ledger
+/// already committed to; the earlier prefix was deleted from the live store and
+/// survives nowhere else. If that archive is missing, recreating an empty file
+/// and co-archiving only the new suffix would advance the watermark while the
+/// earlier prefix is backed by no archive. Rotation must verify the recorded
+/// archive still backs the committed watermark and fail closed otherwise.
+#[test]
+fn rotation_refuses_when_prior_archive_missing() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("rotation-missing-prior-archive");
+    let archive = unique_db_path("rotation-missing-prior-archive-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+    let store = store_with_archived_first_checkpoint(&path, archive_path, &keypair)?;
+
+    // Delete the archive that backs the committed [1,2] prefix.
+    std::fs::remove_file(&archive)?;
+
+    // A second rotation would advance the watermark to cover the aged [3,4]
+    // batch; with the prior archive gone it must refuse rather than strand [1,2].
+    let result = store.archive_receipts_before(600, archive_path);
+    let message = result
+        .err()
+        .ok_or("expected a fail-closed refusal; rotation stranded the prior prefix")?
+        .to_string();
+    assert!(
+        message.contains("no longer backs the committed watermark"),
+        "unexpected error: {message}"
+    );
+
+    // Fail-closed: the watermark stays at 2 and the [3,4] rows survive.
+    let conn = store.reader_connection_for_test()?;
+    let watermark: Option<i64> = conn.query_row(
+        "SELECT MAX(archived_through_entry_seq) FROM receipt_retention_watermark",
+        [],
+        |r| r.get(0),
+    )?;
+    assert_eq!(watermark, Some(2), "the watermark must not advance");
+    let survivors: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq IN (3, 4)",
+        [],
+        |r| r.get(0),
+    )?;
+    assert_eq!(survivors, 2, "the suffix rows must survive the refusal");
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
+/// Repair stamps a checkpoint-aligned watermark that trusts the whole prefix as
+/// archived and skips its Merkle rebuild. For prefix rows already deleted from
+/// the live projection there is no live row to compare, so a full-count archive
+/// carrying corrupted bytes would pass the presence check yet fail the next
+/// archive-backed chain verification and brick the store. Repair must re-derive
+/// the covered checkpoint roots from the archive and refuse a divergent one.
+#[test]
+fn repair_rejects_corrupted_archive_prefix() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("repair-corrupt-prefix");
+    let archive = unique_db_path("repair-corrupt-prefix-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    {
+        // One checkpoint covers [1,4] (max_batch 4), so repair rounds to 4.
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 4))?;
+        for i in 0..4u64 {
+            let r = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("cp-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store.append_chio_receipt_returning_seq(&r)?;
+        }
+        store.flush_receipt_writes()?;
+        assert!(store.load_checkpoint_by_seq(1)?.is_some());
+        // Archive the FULL prefix [1,4] but corrupt entry 1's raw_json, then
+        // delete all source rows and delete claim-log rows [1,2] outright (so they
+        // have no live row to compare). Orphans [3,4] survive and pass the
+        // per-extra identity check; the count check passes (archive holds 4 rows);
+        // only re-deriving the checkpoint root from the archive catches the
+        // corrupted entry 1.
+        store.writer_handle().run_write({
+            let archive_path = archive_path.to_string();
+            move |connection| {
+                let escaped = archive_path.replace('\'', "''");
+                connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
+                connection.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries \
+                       (entry_seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, receipt_kind TEXT NOT NULL, \
+                        source_seq INTEGER NOT NULL, timestamp INTEGER NOT NULL, capability_id TEXT, session_id TEXT, \
+                        parent_request_id TEXT, request_id TEXT, subject_key TEXT, issuer_key TEXT, tool_server TEXT, \
+                        tool_name TEXT, raw_json TEXT NOT NULL); \
+                     INSERT OR IGNORE INTO archive.claim_receipt_log_entries \
+                       SELECT * FROM main.claim_receipt_log_entries WHERE entry_seq <= 4; \
+                     UPDATE archive.claim_receipt_log_entries SET raw_json = '{\"tampered\":true}' WHERE entry_seq = 1; \
+                     DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
+                     DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete; \
+                     DELETE FROM main.chio_tool_receipts WHERE seq <= 4; \
+                     DELETE FROM main.claim_receipt_log_entries WHERE entry_seq <= 2; \
+                     CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
+                       BEFORE DELETE ON chio_tool_receipts \
+                       BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END; \
+                     CREATE TRIGGER IF NOT EXISTS claim_receipt_log_entries_reject_delete \
+                       BEFORE DELETE ON claim_receipt_log_entries \
+                       BEGIN SELECT RAISE(ABORT, 'claim_receipt_log_entries is append-only'); END;",
+                )?;
+                connection.execute_batch("DETACH DATABASE archive")?;
+                Ok(())
+            }
+        })?;
+    }
+
+    let store = SqliteReceiptStore::open_existing(&path)?;
+    let result = store.retention_repair(archive_path);
+    let message = result
+        .err()
+        .ok_or("expected a fail-closed refusal; repair sealed a corrupted archive")?
+        .to_string();
+    assert!(
+        message.contains("co-archival incomplete"),
+        "unexpected error: {message}"
+    );
+
+    // Fail-closed: surviving orphans remain and no watermark is stamped.
+    let conn = store.reader_connection_for_test()?;
+    let orphans: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq IN (3, 4)",
+        [],
+        |r| r.get(0),
+    )?;
+    assert_eq!(
+        orphans, 2,
+        "surviving orphans must remain after the refusal"
+    );
+    let watermark: Option<i64> = conn.query_row(
+        "SELECT MAX(archived_through_entry_seq) FROM receipt_retention_watermark",
+        [],
+        |r| r.get::<_, Option<i64>>(0),
+    )?;
+    assert_eq!(watermark, None, "no watermark may seal a corrupted archive");
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
+/// A prior botched rotation can leave a watermark covering the boundary but
+/// pointing at a missing or wrong archive, with the orphaned claim-log rows still
+/// live. Re-running repair with the correct archive must not silently skip the
+/// insert (the monotonic ledger cannot be corrected in place) and delete the
+/// orphans behind a watermark whose recorded archive can never satisfy
+/// verification. Repair must require the ledger archive to back the prefix and
+/// fail closed without deleting when it does not.
+#[test]
+fn repair_refuses_when_ledger_names_missing_archive() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("repair-ledger-missing-archive");
+    let archive = unique_db_path("repair-ledger-missing-archive-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+        for i in 0..4u64 {
+            let r = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("lm-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store.append_chio_receipt_returning_seq(&r)?;
+        }
+        store.flush_receipt_writes()?;
+        assert!(store.load_checkpoint_by_seq(1)?.is_some());
+        // Co-archive [1,2] faithfully into the correct archive, orphan them
+        // (delete only their source rows), and record a watermark at boundary 2
+        // that names a non-existent archive path (the botched rotation's stale
+        // ledger entry).
+        store.writer_handle().run_write({
+            let archive_path = archive_path.to_string();
+            move |connection| {
+                let escaped = archive_path.replace('\'', "''");
+                connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
+                connection.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries \
+                       (entry_seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, receipt_kind TEXT NOT NULL, \
+                        source_seq INTEGER NOT NULL, timestamp INTEGER NOT NULL, capability_id TEXT, session_id TEXT, \
+                        parent_request_id TEXT, request_id TEXT, subject_key TEXT, issuer_key TEXT, tool_server TEXT, \
+                        tool_name TEXT, raw_json TEXT NOT NULL); \
+                     INSERT OR IGNORE INTO archive.claim_receipt_log_entries \
+                       SELECT * FROM main.claim_receipt_log_entries WHERE entry_seq <= 2; \
+                     DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
+                     DELETE FROM main.chio_tool_receipts WHERE seq <= 2; \
+                     CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
+                       BEFORE DELETE ON chio_tool_receipts \
+                       BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END;",
+                )?;
+                connection.execute_batch("DETACH DATABASE archive")?;
+                // Record a covering watermark that names a path with no archive.
+                let missing = format!("{archive_path}.missing");
+                crate::receipt_store::support::insert_receipt_retention_watermark(
+                    connection, 2, 100, &missing, None, 1,
+                )?;
+                Ok(())
+            }
+        })?;
+    }
+
+    // Repair with the correct archive. The ledger already covers boundary 2, so
+    // repair would skip the insert; it must instead verify the LEDGER archive
+    // backs the prefix, find it missing, and refuse without deleting the orphans.
+    let store = SqliteReceiptStore::open_existing(&path)?;
+    let result = store.retention_repair(archive_path);
+    let message = result
+        .err()
+        .ok_or("expected a fail-closed refusal; repair deleted orphans behind a broken ledger")?
+        .to_string();
+    assert!(
+        message.contains("co-archival incomplete"),
+        "unexpected error: {message}"
+    );
+
+    // Fail-closed: the orphaned rows survive.
+    let conn = store.reader_connection_for_test()?;
+    let orphans: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq <= 2",
+        [],
+        |r| r.get(0),
+    )?;
+    assert_eq!(
+        orphans, 2,
+        "orphaned rows must survive a refusal over a broken ledger"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// Primary correctness proof: a state-machine proptest that drives random
 /// interleaved sequences of tool/child appends (non-monotonic
 /// timestamps within an aged band, to exercise the MAX(timestamp)-over-prefix

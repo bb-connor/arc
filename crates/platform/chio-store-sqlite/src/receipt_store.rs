@@ -920,12 +920,32 @@ fn handle_non_append_command(
                 let _ = response.send(Err(error));
                 return;
             }
+            // In incremental mode the O(N) chain rebuild above is skipped, so the
+            // rotation must not archive past the checkpoint boundary this actor
+            // has actually verified: a second store instance or an operator
+            // import may have appended checkpoint rows since the head was seeded,
+            // and those are unaudited until a later append catches the head up.
+            // Cap the archival watermark at the verified boundary. Full
+            // verification already covered every persisted checkpoint in
+            // non-incremental mode, so no cap is needed there.
+            let verified_ceiling = if incremental_verification {
+                match head_state {
+                    WriterHeadState::Verified(head) => Some(head.checkpointed_entry_seq()),
+                    WriterHeadState::Poisoned(_) => Some(0),
+                }
+            } else {
+                None
+            };
             // Panic isolation: the writer actor re-acquires a fresh connection
             // for every command, so a caught panic fails only THIS rotation
             // (fail-closed) and no state from the panicking closure is reused
             // afterward.
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                evidence_retention::rotate_on_writer_connection(&mut connection, &config)
+                evidence_retention::rotate_on_writer_connection(
+                    &mut connection,
+                    &config,
+                    verified_ceiling,
+                )
             }))
             .unwrap_or_else(|payload| Err(receipt_writer_job_panic_error(&payload)));
             // After a successful bottom-of-log delete the cached head's

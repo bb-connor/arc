@@ -440,12 +440,42 @@ fn archived_prefix_is_backed(
     let Some(archive_path) = latest_watermark_archive_path(connection)? else {
         return Ok(false);
     };
+    archive_path_backs_prefix(
+        connection,
+        &archive_path,
+        sqlite_u64(watermark, "watermark")?,
+    )
+}
+
+/// True only when the archive at `archive_path` holds co-archived claim-log rows
+/// that re-derive the SIGNED checkpoint roots for every checkpoint covered by
+/// `watermark`.
+///
+/// The watermark-trust reader (`archived_prefix_is_backed`) resolves the path
+/// from the ledger, but the rotation and repair paths must vet a SPECIFIC
+/// archive before advancing or sealing a watermark over it: a subsequent
+/// rotation must confirm the ledger archive still backs the committed prefix
+/// before extending it, and a repair must confirm the supplied (or ledger)
+/// archive re-derives the covered roots before deleting the orphaned live rows.
+/// A row count is not proof: an archive holding the right `entry_seq` values but
+/// replaced or corrupted `raw_json` would satisfy a count while no longer
+/// matching the signed roots. Opens the archive read-only on its own connection.
+/// Any missing, unreadable, short, non-contiguous, or root-divergent archive
+/// returns false (never an error) so every caller falls back to full
+/// verification fail-closed.
+pub(crate) fn archive_path_backs_prefix(
+    connection: &Connection,
+    archive_path: &str,
+    watermark: u64,
+) -> Result<bool, ReceiptStoreError> {
+    if watermark == 0 {
+        return Ok(false);
+    }
     let flags =
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX;
-    let Ok(archive) = rusqlite::Connection::open_with_flags(&archive_path, flags) else {
+    let Ok(archive) = rusqlite::Connection::open_with_flags(archive_path, flags) else {
         return Ok(false);
     };
-    let watermark = sqlite_u64(watermark, "watermark")?;
     let covered: Vec<PersistedCheckpointRow> = load_all_persisted_checkpoint_rows(connection)?
         .into_iter()
         .filter(|row| row.batch_end_seq <= watermark)

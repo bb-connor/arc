@@ -676,9 +676,22 @@ fn archive_path_aliases_live(main_file: &str, archive_path: &str) -> bool {
 }
 
 /// Entry point run on the single writer connection by the `Rotate` command.
+///
+/// `verified_checkpoint_ceiling` caps the archival watermark at the newest
+/// checkpoint boundary the writer actor has verified. In incremental mode the
+/// caller skips the O(N) chain rebuild before rotating and trusts the
+/// per-append verified head instead, but that head can be stale relative to
+/// `kernel_checkpoints` when a second store instance or an operator import has
+/// appended checkpoint rows since the head was seeded. Computing the watermark
+/// from every persisted checkpoint would then archive and delete up to an
+/// unaudited boundary. Capping at the verified boundary keeps pruning behind the
+/// chain the actor has actually validated; the unaudited suffix is archived only
+/// after a later append catches the head up and verifies it. `None` imposes no
+/// cap (the caller already ran full checkpoint verification).
 pub(super) fn rotate_on_writer_connection(
     connection: &mut rusqlite::Connection,
     config: &RetentionConfig,
+    verified_checkpoint_ceiling: Option<u64>,
 ) -> Result<u64, ReceiptStoreError> {
     if config.tenant_id.is_some() {
         return Err(ReceiptStoreError::RetentionTenantScopeUnsupported);
@@ -691,10 +704,22 @@ pub(super) fn rotate_on_writer_connection(
     // sure it and its reuse-reject triggers exist even on a store opened before
     // this migration.
     super::support::ensure_receipt_retention_tombstones(connection)?;
+    // A store opened through `open_existing` skips the writable `open()`
+    // migration that creates the watermark ledger, so a legacy database can
+    // reach rotation without it. The delete transaction records the archival
+    // high-water mark here; create the ledger first so that insert cannot fail
+    // on a missing table after the archive copy has already run and roll the
+    // whole rotation back into an endless retry.
+    super::support::ensure_receipt_retention_watermark_table(connection)?;
     let Some(cutoff) = resolve_rotation_cutoff(connection, config)? else {
         return Ok(0);
     };
-    archive_range(connection, cutoff, &config.archive_path)
+    archive_range(
+        connection,
+        cutoff,
+        &config.archive_path,
+        verified_checkpoint_ceiling,
+    )
 }
 
 /// Co-archive-and-delete the checkpoint-aligned prefix [1, W]. All deletes plus
@@ -706,8 +731,13 @@ fn archive_range(
     connection: &mut rusqlite::Connection,
     cutoff_unix_secs: u64,
     archive_path: &str,
+    verified_checkpoint_ceiling: Option<u64>,
 ) -> Result<u64, ReceiptStoreError> {
-    let watermark = compute_archival_watermark(connection, cutoff_unix_secs)?;
+    // Never archive past the checkpoint boundary the caller has verified. The
+    // ceiling is itself a checkpoint `batch_end_seq`, and `compute_archival_watermark`
+    // returns one too, so the minimum still lands on a real boundary.
+    let watermark = compute_archival_watermark(connection, cutoff_unix_secs)?
+        .min(verified_checkpoint_ceiling.unwrap_or(u64::MAX));
     if watermark == 0 {
         return Ok(0); // fail-safe: nothing checkpointed has fully aged.
     }
@@ -720,6 +750,31 @@ fn archive_range(
     if let Some(current) = super::support::retention_watermark(connection)? {
         if watermark <= current {
             return Ok(0);
+        }
+        // A subsequent rotation only ever appends the newer suffix to the
+        // archive the ledger already committed to; the earlier `[1, current]`
+        // prefix was deleted from the live store and survives nowhere else. If
+        // that archive was deleted or replaced, `ensure_archive_file_exists`
+        // below would recreate an empty file, co-archive only the new suffix,
+        // and advance the watermark while the earlier prefix is backed by no
+        // archive at all. Verify the recorded archive still re-derives the
+        // signed checkpoint roots for `[1, current]` before touching the file,
+        // and fail closed otherwise so the deleted prefix can never be stranded.
+        if current > 0 {
+            let backed = match super::support::latest_watermark_archive_path(connection)? {
+                Some(ledger_path) => {
+                    super::support::archive_path_backs_prefix(connection, &ledger_path, current)?
+                }
+                None => false,
+            };
+            if !backed {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "retention archive no longer backs the committed watermark {current}; the \
+                     prior archive is missing, unreadable, or does not re-derive the signed \
+                     checkpoint roots. Refusing to rotate and strand the deleted prefix; restore \
+                     the archive before rotating again"
+                )));
+            }
         }
     }
     let w = sqlite_i64(watermark, "archival watermark")?;
@@ -1343,7 +1398,37 @@ pub(super) fn retention_repair_on_writer(
                 archived: sqlite_u64(archived_prefix.max(0), "repair archived prefix count")?,
             });
         }
-        sqlite_u64(rounded, "repair rounded watermark")
+        // Row presence is not integrity. For prefix rows already deleted from the
+        // live projection there is no live row to compare against, so corrupted
+        // `raw_json` or attribution in the archived copy passes the count check
+        // yet would fail the next archive-backed chain verification and leave the
+        // store bricked. Re-derive the signed checkpoint roots from the archive
+        // that will back the trusted watermark AFTER repair: the ledger archive
+        // when an existing watermark already covers this boundary (repair skips
+        // the insert and keeps pointing there), otherwise the supplied archive
+        // this repair is about to record. A ledger that names a missing or wrong
+        // archive therefore cannot let repair delete the orphans behind a
+        // watermark the recorded archive can never satisfy; fail closed and
+        // delete nothing when the covered roots do not re-derive.
+        let rounded_u64 = sqlite_u64(rounded, "repair rounded watermark")?;
+        let watermark_covers = matches!(
+            super::support::retention_watermark(connection)?,
+            Some(current) if current >= rounded_u64
+        );
+        let backing_archive = if watermark_covers {
+            super::support::latest_watermark_archive_path(connection)?
+                .unwrap_or_else(|| archive_path.to_string())
+        } else {
+            archive_path.to_string()
+        };
+        if !super::support::archive_path_backs_prefix(connection, &backing_archive, rounded_u64)? {
+            return Err(ReceiptStoreError::RetentionArchiveIncomplete {
+                table: "claim_receipt_log_entries",
+                live: rounded_u64,
+                archived: 0,
+            });
+        }
+        Ok(rounded_u64)
     })();
     let detach = connection.execute_batch("DETACH DATABASE archive");
     let rounded_watermark = match (assert_result, detach) {
