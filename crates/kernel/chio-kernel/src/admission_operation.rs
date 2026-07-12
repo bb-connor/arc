@@ -294,16 +294,13 @@ impl AdmissionOperation {
         validate_optional_identifier(input.budget_hold_id.as_deref(), "budget_hold_id")?;
         validate_optional_digest(input.approval_set_hash.as_deref(), "approval_set_hash")?;
         validate_optional_identifier(input.execution_nonce_id.as_deref(), "execution_nonce_id")?;
-        if input.kind == AdmissionOperationKind::GovernedActiveResponse
-            && (input.broker_attempt_id.is_some()
-                || input.budget_hold_id.is_some()
-                || input.execution_nonce_id.is_some())
-        {
-            return Err(AdmissionOperationError::Invalid(
-                "governed active response cannot bind budget, broker, or nonce participants"
-                    .to_string(),
-            ));
-        }
+        validate_kind_participants(
+            input.kind,
+            input.broker_attempt_id.as_deref(),
+            input.budget_hold_id.as_deref(),
+            input.execution_nonce_id.as_deref(),
+            AdmissionOperationState::Prepared,
+        )?;
         let operation_id = derive_operation_id(
             input.kind,
             &input.coordinator_authority_id,
@@ -373,6 +370,13 @@ impl AdmissionOperation {
         validate_optional_identifier(execution_nonce_id.as_deref(), "execution_nonce_id")?;
         validate_last_error(last_error.as_deref())?;
         validate_state_dispatch_pair(state, dispatch_state)?;
+        validate_kind_participants(
+            kind,
+            broker_attempt_id.as_deref(),
+            budget_hold_id.as_deref(),
+            execution_nonce_id.as_deref(),
+            state,
+        )?;
         Ok(Self {
             kind,
             operation_id,
@@ -422,6 +426,10 @@ impl AdmissionOperation {
         &self.request_id
     }
 
+    pub fn coordinator_authority_id(&self) -> &str {
+        &self.coordinator_authority_id
+    }
+
     pub fn capability_id(&self) -> &str {
         &self.capability_id
     }
@@ -458,7 +466,7 @@ impl AdmissionOperation {
         self.last_error.as_deref()
     }
 
-    fn transition(
+    pub fn transition_checked(
         &self,
         next_state: AdmissionOperationState,
         next_dispatch_state: AdmissionDispatchState,
@@ -610,7 +618,7 @@ impl AdmissionOperationStore for InMemoryAdmissionOperationStore {
         {
             return Ok(AdmissionOperationCasOutcome::Conflict(current));
         }
-        let next = current.transition(
+        let next = current.transition_checked(
             next_state,
             next_dispatch_state,
             next_coordinator_lease_epoch,
@@ -736,6 +744,35 @@ fn validate_state_dispatch_pair(
             "admission state and dispatch state are inconsistent".to_string(),
         ))
     }
+}
+
+fn validate_kind_participants(
+    kind: AdmissionOperationKind,
+    broker_attempt_id: Option<&str>,
+    budget_hold_id: Option<&str>,
+    execution_nonce_id: Option<&str>,
+    state: AdmissionOperationState,
+) -> Result<(), AdmissionOperationError> {
+    if kind == AdmissionOperationKind::GovernedActiveResponse {
+        if broker_attempt_id.is_some() || budget_hold_id.is_some() || execution_nonce_id.is_some() {
+            return Err(AdmissionOperationError::Invalid(
+                "governed active response cannot bind budget, broker, or nonce participants"
+                    .to_string(),
+            ));
+        }
+        if matches!(
+            state,
+            AdmissionOperationState::BrokerAttemptRegistered
+                | AdmissionOperationState::BudgetAuthorized
+                | AdmissionOperationState::ReadyToDispatch
+                | AdmissionOperationState::CapturePending
+        ) {
+            return Err(AdmissionOperationError::Invalid(
+                "governed active response has a tool-dispatch-only state".to_string(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn validate_identifier(value: &str, label: &'static str) -> Result<(), AdmissionOperationError> {
