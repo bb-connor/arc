@@ -74,6 +74,26 @@ impl SqliteBudgetStore {
             CREATE INDEX IF NOT EXISTS idx_budget_authorization_holds_capability
                 ON budget_authorization_holds(capability_id, grant_index);
 
+            CREATE TABLE IF NOT EXISTS payment_journal (
+                request_id          TEXT PRIMARY KEY,
+                capability_id       TEXT NOT NULL,
+                grant_index         INTEGER NOT NULL,
+                hold_id             TEXT,
+                rail                TEXT NOT NULL,
+                authorization_id    TEXT,
+                transaction_id      TEXT,
+                amount_units        INTEGER NOT NULL,
+                settle_action       TEXT,
+                settle_amount_units INTEGER,
+                currency            TEXT NOT NULL,
+                state               TEXT NOT NULL,
+                created_at          INTEGER NOT NULL,
+                updated_at          INTEGER NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_payment_journal_state
+                ON payment_journal(state);
+
             CREATE TABLE IF NOT EXISTS budget_mutation_events (
                 event_id TEXT PRIMARY KEY,
                 hold_id TEXT,

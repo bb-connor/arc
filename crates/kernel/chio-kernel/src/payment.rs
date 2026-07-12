@@ -238,6 +238,74 @@ pub enum PaymentError {
     RailError(String),
 }
 
+/// Durable money-path journal state. One row per priced request, written
+/// before the rail is touched and advanced around every rail call, so a
+/// crash in any window leaves a recoverable record instead of moved funds
+/// with no trace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PaymentJournalState {
+    /// Row written with the budget hold, before the rail authorize call.
+    HoldPlaced,
+    /// The rail authorize returned; the authorization id is recorded.
+    Authorized,
+    /// About to call capture or release; the rail may move money next.
+    Settling,
+    /// Capture returned settled or release returned released.
+    Settled,
+    /// Receipt persisted; terminal success.
+    Closed,
+    /// Boot reconciliation could not settle or determine the outcome;
+    /// operator incident.
+    ReconcileFailed,
+}
+
+/// Terminal action committed before entering [`PaymentJournalState::Settling`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PaymentSettleAction {
+    /// Capture the recorded amount from the hold.
+    Capture,
+    /// Release the whole hold without capturing.
+    Release,
+}
+
+/// The committed settle decision, stamped atomically with the advance to
+/// `Settling` so reconciliation replays the exact operation rather than
+/// guessing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PaymentSettleIntent {
+    /// The rail call recovery must replay for an in-flight settle.
+    pub action: PaymentSettleAction,
+    /// Exact capture amount for `Capture`; `None` for `Release`.
+    pub amount_units: Option<u64>,
+}
+
+/// One durable payment-journal row, keyed by the request id the kernel also
+/// uses as the rail idempotency reference.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaymentJournalRecord {
+    pub request_id: String,
+    pub capability_id: String,
+    pub grant_index: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hold_id: Option<String>,
+    pub rail: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transaction_id: Option<String>,
+    pub amount_units: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settle_action: Option<PaymentSettleAction>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settle_amount_units: Option<u64>,
+    pub currency: String,
+    pub state: PaymentJournalState,
+    pub created_at_unix_ms: u64,
+}
+
 /// Thin prepaid HTTP payment bridge for x402-style per-request settlement.
 ///
 /// The adapter intentionally stays narrow: it only performs one remote

@@ -1933,6 +1933,7 @@ fn authorize_fabricated_drop_hold(
                     hold_id: Some("hold-drop-guard-tests".to_string()),
                     event_id: Some("hold-drop-guard-tests:authorize".to_string()),
                     authority: None,
+                    payment_journal: None,
                 })?;
             assert!(
                 matches!(

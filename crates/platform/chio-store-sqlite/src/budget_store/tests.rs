@@ -2655,3 +2655,214 @@ fn mutation_event_witness_returns_stored_origin_authority() -> Result<(), Box<dy
     let _ = fs::remove_file(&path);
     Ok(())
 }
+
+#[test]
+fn payment_journal_insert_advance_close_and_conflict() {
+    use chio_kernel::budget_store::BudgetStore;
+    use chio_kernel::payment::{
+        PaymentJournalRecord, PaymentJournalState, PaymentSettleAction, PaymentSettleIntent,
+    };
+
+    let path = unique_db_path("payment-journal");
+    let store = SqliteBudgetStore::open(&path).expect("open budget store");
+
+    let record = PaymentJournalRecord {
+        request_id: "req-J".to_string(),
+        capability_id: "cap".to_string(),
+        grant_index: 0,
+        hold_id: Some("hold-1".to_string()),
+        rail: "x402".to_string(),
+        authorization_id: None,
+        transaction_id: None,
+        amount_units: 100,
+        settle_action: None,
+        settle_amount_units: None,
+        currency: "USD".to_string(),
+        state: PaymentJournalState::HoldPlaced,
+        created_at_unix_ms: 1_000,
+    };
+    store.record_payment_journal(&record).expect("insert");
+
+    // Reused request_id fails closed, even for an identical record.
+    assert!(
+        store.record_payment_journal(&record).is_err(),
+        "reused request_id must conflict"
+    );
+
+    // HoldPlaced -> Authorized attaches the authorization id.
+    store
+        .advance_payment_journal(
+            "req-J",
+            PaymentJournalState::HoldPlaced,
+            PaymentJournalState::Authorized,
+            Some("auth-9"),
+            None,
+            None,
+        )
+        .expect("advance to Authorized");
+
+    // A wrong expected state fails closed.
+    assert!(
+        store
+            .advance_payment_journal(
+                "req-J",
+                PaymentJournalState::HoldPlaced,
+                PaymentJournalState::Settling,
+                None,
+                None,
+                Some(PaymentSettleIntent {
+                    action: PaymentSettleAction::Capture,
+                    amount_units: Some(80),
+                }),
+            )
+            .is_err(),
+        "wrong expected state must fail closed"
+    );
+
+    // A Settling advance without a settle intent fails closed.
+    assert!(
+        store
+            .advance_payment_journal(
+                "req-J",
+                PaymentJournalState::Authorized,
+                PaymentJournalState::Settling,
+                None,
+                None,
+                None,
+            )
+            .is_err(),
+        "Settling advance must carry the committed settle intent"
+    );
+
+    // Authorized -> Settling stamps settle_action and settle_amount_units.
+    store
+        .advance_payment_journal(
+            "req-J",
+            PaymentJournalState::Authorized,
+            PaymentJournalState::Settling,
+            None,
+            None,
+            Some(PaymentSettleIntent {
+                action: PaymentSettleAction::Capture,
+                amount_units: Some(80),
+            }),
+        )
+        .expect("advance to Settling with settle intent");
+
+    // Settling -> Settled attaches the transaction id.
+    store
+        .advance_payment_journal(
+            "req-J",
+            PaymentJournalState::Settling,
+            PaymentJournalState::Settled,
+            None,
+            Some("txn-7"),
+            None,
+        )
+        .expect("advance to Settled");
+
+    let incomplete = store
+        .list_incomplete_payment_journal(u64::MAX)
+        .expect("list");
+    let row = incomplete
+        .iter()
+        .find(|row| row.request_id == "req-J")
+        .expect("row present");
+    assert_eq!(row.authorization_id.as_deref(), Some("auth-9"));
+    assert_eq!(row.transaction_id.as_deref(), Some("txn-7"));
+    assert_eq!(row.settle_action, Some(PaymentSettleAction::Capture));
+    assert_eq!(row.settle_amount_units, Some(80));
+    assert_eq!(row.state, PaymentJournalState::Settled);
+
+    // Close is idempotent.
+    assert!(store.close_payment_journal("req-J").expect("close"));
+    assert!(!store
+        .close_payment_journal("req-J")
+        .expect("close again returns false"));
+    assert!(store
+        .list_incomplete_payment_journal(u64::MAX)
+        .expect("list after close")
+        .iter()
+        .all(|row| row.request_id != "req-J"));
+
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn authorize_budget_hold_writes_journal_atomically() {
+    use chio_kernel::budget_store::{BudgetAuthorizeHoldRequest, BudgetStore};
+    use chio_kernel::payment::{PaymentJournalRecord, PaymentJournalState};
+
+    let path = unique_db_path("hold-journal-atomic");
+    let store = SqliteBudgetStore::open(&path).expect("open");
+    let journal = PaymentJournalRecord {
+        request_id: "req-H".to_string(),
+        capability_id: "cap".to_string(),
+        grant_index: 0,
+        hold_id: Some("hold-req-H".to_string()),
+        rail: "x402".to_string(),
+        authorization_id: None,
+        transaction_id: None,
+        amount_units: 50,
+        settle_action: None,
+        settle_amount_units: None,
+        currency: "USD".to_string(),
+        state: PaymentJournalState::HoldPlaced,
+        created_at_unix_ms: 2_000,
+    };
+    store
+        .authorize_budget_hold(BudgetAuthorizeHoldRequest {
+            capability_id: "cap".to_string(),
+            grant_index: 0,
+            max_invocations: Some(10),
+            requested_exposure_units: 50,
+            max_cost_per_invocation: Some(50),
+            max_total_cost_units: Some(500),
+            hold_id: Some("hold-req-H".to_string()),
+            event_id: Some("hold-req-H:authorize".to_string()),
+            authority: None,
+            payment_journal: Some(journal),
+        })
+        .expect("authorize hold with journal");
+    // The HoldPlaced row is durable after the same transaction that wrote
+    // the hold.
+    let rows = store
+        .list_incomplete_payment_journal(u64::MAX)
+        .expect("list");
+    assert!(rows
+        .iter()
+        .any(|row| row.request_id == "req-H" && row.state == PaymentJournalState::HoldPlaced));
+
+    // A denied hold writes no journal row.
+    let denied_journal = PaymentJournalRecord {
+        request_id: "req-D".to_string(),
+        hold_id: Some("hold-req-D".to_string()),
+        amount_units: 10_000,
+        ..rows[0].clone()
+    };
+    let decision = store
+        .authorize_budget_hold(BudgetAuthorizeHoldRequest {
+            capability_id: "cap".to_string(),
+            grant_index: 0,
+            max_invocations: Some(10),
+            requested_exposure_units: 10_000,
+            max_cost_per_invocation: Some(50),
+            max_total_cost_units: Some(500),
+            hold_id: Some("hold-req-D".to_string()),
+            event_id: Some("hold-req-D:authorize".to_string()),
+            authority: None,
+            payment_journal: Some(denied_journal),
+        })
+        .expect("denied authorize still returns a decision");
+    assert!(matches!(
+        decision,
+        chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Denied(_)
+    ));
+    assert!(store
+        .list_incomplete_payment_journal(u64::MAX)
+        .expect("list after deny")
+        .iter()
+        .all(|row| row.request_id != "req-D"));
+
+    let _ = std::fs::remove_file(&path);
+}

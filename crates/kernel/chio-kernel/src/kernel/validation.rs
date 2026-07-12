@@ -854,6 +854,7 @@ impl ChioKernel {
                         hold_id: Some(budget_hold_id.clone()),
                         event_id: Some(authorize_event_id),
                         authority: Some(authority.clone()),
+                        payment_journal: None,
                     })?)
                 })?;
                 match decision {

@@ -156,7 +156,10 @@ impl BudgetCommitMetadata {
     }
 }
 
-fn budget_commit_metadata<T: BudgetStore + ?Sized>(
+/// Assemble the commit metadata a hold decision carries, stamped with the
+/// store's guarantee and metering profiles. Public so store implementations
+/// that override the defaulted hold methods can produce identical metadata.
+pub fn budget_commit_metadata<T: BudgetStore + ?Sized>(
     store: &T,
     authority: Option<BudgetEventAuthority>,
     budget_commit_index: Option<u64>,
@@ -183,6 +186,11 @@ pub struct BudgetAuthorizeHoldRequest {
     pub hold_id: Option<String>,
     pub event_id: Option<String>,
     pub authority: Option<BudgetEventAuthority>,
+    /// Optional payment-journal row committed in the SAME transaction as
+    /// the hold write, so the money path's recoverable record is durable
+    /// before the rail is touched. `None` for non-monetary calls and for
+    /// stores without the journal.
+    pub payment_journal: Option<crate::payment::PaymentJournalRecord>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -504,6 +512,54 @@ pub trait BudgetStore: Send + Sync {
         BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual
     }
 
+    /// Insert a fresh payment-journal row in `HoldPlaced`. Fails closed on
+    /// a reused request id. Default: unsupported.
+    fn record_payment_journal(
+        &self,
+        _entry: &crate::payment::PaymentJournalRecord,
+    ) -> Result<(), BudgetStoreError> {
+        Err(BudgetStoreError::Invariant(
+            "payment journal is not supported by this budget store".to_string(),
+        ))
+    }
+
+    /// Compare-and-set state advance. `expected` must match the current row
+    /// state or the call fails closed. When advancing to `Settling` the
+    /// caller MUST pass `settle` so the store stamps the committed action
+    /// and amount atomically with the state change; `settle` is invalid on
+    /// every other transition. Default: unsupported.
+    fn advance_payment_journal(
+        &self,
+        _request_id: &str,
+        _expected: crate::payment::PaymentJournalState,
+        _next: crate::payment::PaymentJournalState,
+        _authorization_id: Option<&str>,
+        _transaction_id: Option<&str>,
+        _settle: Option<crate::payment::PaymentSettleIntent>,
+    ) -> Result<(), BudgetStoreError> {
+        Err(BudgetStoreError::Invariant(
+            "payment journal is not supported by this budget store".to_string(),
+        ))
+    }
+
+    /// Move the row to `Closed`. Idempotent: an already-closed or absent
+    /// row returns `Ok(false)`. Default: unsupported.
+    fn close_payment_journal(&self, _request_id: &str) -> Result<bool, BudgetStoreError> {
+        Err(BudgetStoreError::Invariant(
+            "payment journal is not supported by this budget store".to_string(),
+        ))
+    }
+
+    /// Rows in a non-terminal state created at or before
+    /// `older_than_unix_ms`, oldest first, for boot reconciliation.
+    /// Default: empty (stores without the journal have no orphans).
+    fn list_incomplete_payment_journal(
+        &self,
+        _older_than_unix_ms: u64,
+    ) -> Result<Vec<crate::payment::PaymentJournalRecord>, BudgetStoreError> {
+        Ok(Vec::new())
+    }
+
     fn authorize_budget_hold(
         &self,
         request: BudgetAuthorizeHoldRequest,
@@ -702,6 +758,7 @@ mod tests {
                 hold_id: Some("hold-budget-1".to_string()),
                 event_id: Some("hold-budget-1:authorize".to_string()),
                 authority: Some(authority.clone()),
+                payment_journal: None,
             })
             .unwrap();
         let BudgetAuthorizeHoldDecision::Authorized(authorized) = decision else {
@@ -774,6 +831,7 @@ mod tests {
                 hold_id: Some("hold-budget-deny".to_string()),
                 event_id: Some("hold-budget-deny:authorize".to_string()),
                 authority: Some(authority.clone()),
+                payment_journal: None,
             })
             .unwrap();
         let BudgetAuthorizeHoldDecision::Denied(denied) = decision else {
