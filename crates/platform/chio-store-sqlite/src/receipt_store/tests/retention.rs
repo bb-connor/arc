@@ -2615,6 +2615,89 @@ fn repair_tombstones_archived_ids_to_block_reuse() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+/// Repair must tombstone EVERY archived id in the repaired prefix, not only the
+/// claim-log rows that survived as extras. When a botched rotation already
+/// deleted some archived rows from the live projection, those ids have no live
+/// UNIQUE(receipt_id) sentinel AND no extra to iterate, so tombstoning only the
+/// extras would leave them re-appendable and recreate the archived/live identity
+/// ambiguity. Re-appending an already-deleted archived id must still be rejected.
+#[test]
+fn repair_tombstones_already_deleted_prefix_ids() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("repair-tombstone-prefix");
+    let archive = unique_db_path("repair-tombstone-prefix-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    // Build a store, co-archive [1,2], then fabricate a mixed drift: delete the
+    // source rows for [1,2] AND the LIVE claim-log row for entry_seq 1, leaving
+    // only entry_seq 2 as a surviving orphan. Entry 1's archived id is gone from
+    // the live projection entirely, so it is not an extra repair would iterate.
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+        for i in 0..4u64 {
+            let r = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("pre-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store.append_chio_receipt_returning_seq(&r)?;
+        }
+        store.flush_receipt_writes()?;
+        store.writer_handle().run_write({
+            let archive_path = archive_path.to_string();
+            move |connection| {
+                let escaped = archive_path.replace('\'', "''");
+                connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
+                connection.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries \
+                       (entry_seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, receipt_kind TEXT NOT NULL, \
+                        source_seq INTEGER NOT NULL, timestamp INTEGER NOT NULL, capability_id TEXT, session_id TEXT, \
+                        parent_request_id TEXT, request_id TEXT, subject_key TEXT, issuer_key TEXT, tool_server TEXT, \
+                        tool_name TEXT, raw_json TEXT NOT NULL); \
+                     INSERT OR IGNORE INTO archive.claim_receipt_log_entries \
+                       SELECT * FROM main.claim_receipt_log_entries WHERE entry_seq <= 2; \
+                     DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
+                     DELETE FROM main.chio_tool_receipts WHERE seq <= 2; \
+                     CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
+                       BEFORE DELETE ON chio_tool_receipts \
+                       BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END; \
+                     DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete; \
+                     DELETE FROM main.claim_receipt_log_entries WHERE entry_seq = 1; \
+                     CREATE TRIGGER IF NOT EXISTS claim_receipt_log_entries_reject_delete \
+                       BEFORE DELETE ON claim_receipt_log_entries \
+                       BEGIN SELECT RAISE(ABORT, 'claim receipt log entries are immutable'); END;",
+                )?;
+                connection.execute_batch("DETACH DATABASE archive")?;
+                Ok(())
+            }
+        })?;
+    }
+
+    // Repair removes only the surviving orphan (entry 2) but must tombstone the
+    // whole archived prefix [1,2].
+    let store = SqliteReceiptStore::open_existing(&path)?;
+    let removed = store.retention_repair(archive_path)?;
+    assert_eq!(removed, 1, "repair removed the one surviving orphaned row");
+    drop(store);
+
+    // The already-deleted archived id (entry 1, "pre-0") must be tombstoned too:
+    // re-appending it as a fresh live receipt is rejected.
+    let reopened = SqliteReceiptStore::open(&path)?;
+    let reused =
+        super::support::sample_receipt_with_keypair_and_timestamp("pre-0", 1, 100, &keypair);
+    let result = reopened.append_chio_receipt_returning_seq(&reused);
+    assert!(
+        result.is_err(),
+        "re-appending an already-deleted archived receipt id must be rejected by the tombstone"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// In incremental mode the rotation skips the O(N) chain rebuild and trusts the
 /// per-append verified head. That head can be stale relative to
 /// `kernel_checkpoints` when a second store instance appends checkpoint rows

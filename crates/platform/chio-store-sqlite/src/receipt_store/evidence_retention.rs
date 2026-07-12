@@ -1504,70 +1504,101 @@ pub(super) fn retention_repair_on_writer(
         }
         Ok(rounded_u64)
     })();
-    let detach = connection.execute_batch("DETACH DATABASE archive");
-    let rounded_watermark = match (assert_result, detach) {
-        (Ok(w), Ok(())) => w,
-        (Err(error), _) => return Err(error),
-        (Ok(_), Err(error)) => return Err(error.into()),
+    let rounded_watermark = match assert_result {
+        Ok(w) => w,
+        Err(error) => {
+            // Detach the archive even when the pre-flight assertions reject the
+            // repair, so a refusal never strands an attached database on the
+            // writer connection.
+            let _ = connection.execute_batch("DETACH DATABASE archive");
+            return Err(error);
+        }
     };
 
-    // 3. One BEGIN IMMEDIATE tx: drop guard, delete extras, insert watermark,
-    //    recreate guard, commit.
+    // 3. One BEGIN IMMEDIATE tx: drop guard, tombstone the archived prefix,
+    //    delete extras, insert watermark, recreate guard, commit. The archive
+    //    stays attached through the transaction so the tombstones can be stamped
+    //    from the archived rows, and is detached only once the repair commits
+    //    (DETACH cannot run inside an open transaction).
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
     let removed = extras.len() as u64;
-    let rounded_i64 = sqlite_i64(rounded_watermark, "repair rounded watermark")?;
-    let now_i64 = sqlite_i64(now, "repair tombstone timestamp")?;
-    let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-    tx.execute_batch("DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete;")?;
-    // Repair runs on an `open_existing` connection, which skips the writable
-    // open() migration that creates the tombstone table and its reuse-reject
-    // triggers. Create them before deleting so a legacy store repaired here still
-    // blocks archived-id reuse.
-    super::support::ensure_receipt_retention_tombstones(&tx)?;
-    for (entry_seq, _) in &extras {
-        // Tombstone the archived id BEFORE removing its claim-log row, exactly as
-        // the rotation delete does: the source receipt is already gone, so this
-        // orphaned claim-log row holds the last live UNIQUE(receipt_id) sentinel.
-        // Deleting it without a tombstone would let the same archived receipt_id
-        // be appended again as a brand-new live receipt, recreating the
-        // archived/live identity ambiguity the tombstone exists to prevent.
+    let repair_result = (|| -> Result<(), ReceiptStoreError> {
+        let rounded_i64 = sqlite_i64(rounded_watermark, "repair rounded watermark")?;
+        let now_i64 = sqlite_i64(now, "repair tombstone timestamp")?;
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        tx.execute_batch("DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete;")?;
+        // Repair runs on an `open_existing` connection, which skips the writable
+        // open() migration that creates the tombstone table and its reuse-reject
+        // triggers. Create them before deleting so a legacy store repaired here
+        // still blocks archived-id reuse.
+        super::support::ensure_receipt_retention_tombstones(&tx)?;
+        // Tombstone EVERY archived id in the repaired prefix, not just the
+        // claim-log rows that survived as extras. A botched rotation may have
+        // already deleted some archived rows from the live projection, so those
+        // ids have neither a live UNIQUE(receipt_id) sentinel nor an extra to
+        // iterate; without a tombstone the same archived receipt_id could be
+        // appended again as a brand-new live receipt, recreating the archived/live
+        // identity ambiguity the tombstone exists to prevent. The archive is
+        // already vetted to hold a faithful row for every entry_seq in the covered
+        // prefix (the prefix-completeness and root re-derivation checks above), so
+        // stamp the tombstones from the archived prefix, which also covers the
+        // surviving extras.
         tx.execute(
             "INSERT OR IGNORE INTO receipt_retention_tombstones \
                  (receipt_id, receipt_kind, archived_through_entry_seq, tombstoned_at) \
              SELECT receipt_id, receipt_kind, ?1, ?2 \
-             FROM claim_receipt_log_entries WHERE entry_seq = ?3",
-            params![rounded_i64, now_i64, entry_seq],
+             FROM archive.claim_receipt_log_entries WHERE entry_seq <= ?3",
+            params![rounded_i64, now_i64, rounded_i64],
         )?;
-        tx.execute(
-            "DELETE FROM claim_receipt_log_entries WHERE entry_seq = ?1",
-            params![entry_seq],
-        )?;
+        // Remove the surviving orphaned claim-log rows (the extras). Their source
+        // receipts are already gone and the ids are now tombstoned above.
+        for (entry_seq, _) in &extras {
+            tx.execute(
+                "DELETE FROM claim_receipt_log_entries WHERE entry_seq = ?1",
+                params![entry_seq],
+            )?;
+        }
+        // A store created before the retention migration has no watermark ledger,
+        // and repair runs on an `open_existing` connection, which skips the
+        // writable open() migration that would create it. Create the ledger before
+        // recording the repair watermark; otherwise the insert fails on a missing
+        // table and rolls the whole repair back, leaving the bricked store
+        // unrepaired.
+        super::support::ensure_receipt_retention_watermark_table(&tx)?;
+        // A prior botched rotation may have already recorded a watermark at or
+        // above this repair boundary while leaving the orphaned claim-log rows
+        // behind. The ledger's monotonic-insert trigger rejects a non-increasing
+        // mark, so an unconditional re-insert at the covered boundary would abort
+        // and roll the whole repair back, leaving the store permanently
+        // unrepairable. The watermark already covers the boundary, so skip the
+        // redundant insert and let the deletion of the orphans stand.
+        let watermark_covers = matches!(
+            super::support::retention_watermark(&tx)?,
+            Some(current) if current >= rounded_watermark
+        );
+        if !watermark_covers {
+            insert_receipt_retention_watermark(
+                &tx,
+                rounded_watermark,
+                now,
+                archive_path,
+                None,
+                now,
+            )?;
+        }
+        ensure_transparency_projection_guards(&tx)?;
+        tx.commit()?;
+        Ok(())
+    })();
+    let detach = connection.execute_batch("DETACH DATABASE archive");
+    match (repair_result, detach) {
+        (Ok(()), Ok(())) => {}
+        (Err(error), _) => return Err(error),
+        (Ok(()), Err(error)) => return Err(error.into()),
     }
-    // A store created before the retention migration has no watermark ledger,
-    // and repair runs on an `open_existing` connection, which skips the writable
-    // open() migration that would create it. Create the ledger before recording
-    // the repair watermark; otherwise the insert fails on a missing table and
-    // rolls the whole repair back, leaving the bricked store unrepaired.
-    super::support::ensure_receipt_retention_watermark_table(&tx)?;
-    // A prior botched rotation may have already recorded a watermark at or above
-    // this repair boundary while leaving the orphaned claim-log rows behind. The
-    // ledger's monotonic-insert trigger rejects a non-increasing mark, so an
-    // unconditional re-insert at the covered boundary would abort and roll the
-    // whole repair back, leaving the store permanently unrepairable. The
-    // watermark already covers the boundary, so skip the redundant insert and let
-    // the deletion of the orphans stand.
-    let watermark_covers = matches!(
-        super::support::retention_watermark(&tx)?,
-        Some(current) if current >= rounded_watermark
-    );
-    if !watermark_covers {
-        insert_receipt_retention_watermark(&tx, rounded_watermark, now, archive_path, None, now)?;
-    }
-    ensure_transparency_projection_guards(&tx)?;
-    tx.commit()?;
 
     connection.execute_batch("PRAGMA incremental_vacuum")?;
     connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")?;
