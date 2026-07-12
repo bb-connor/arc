@@ -53,8 +53,10 @@ impl ChioConfig {
     /// This is the bridge that makes a loaded `chio.yaml` actually govern kernel
     /// behavior: the operator's `[kernel.deadlines]` budgets flow through
     /// [`KernelDeadlinesFileConfig::to_hot_path_deadline_config`] into the
-    /// constructed kernel's `deadlines`, and `kernel.signing_key` becomes the
-    /// receipt-signing keypair.
+    /// constructed kernel's `deadlines`, `kernel.signing_key` becomes the
+    /// receipt-signing keypair, and the `[receipts]` section governs the
+    /// checkpoint cadence (`checkpoint_interval`) and retention window
+    /// (`retention_days`) rather than silently defaulting them.
     ///
     /// Fields the file schema does not yet express take the kernel's own
     /// defaults, chosen fail-closed: nested sampling and elicitation stay
@@ -76,8 +78,17 @@ impl ChioConfig {
             max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
             require_web3_evidence: false,
             allow_ephemeral_receipt_log: false,
-            checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
-            retention_config: None,
+            // Honor the operator's `[receipts]` settings: the checkpoint cadence
+            // and the retention window are parsed by this same crate, so they
+            // must reach the kernel instead of reverting to hard-coded defaults.
+            // The remaining `RetentionConfig` knobs (archive path, size ceiling,
+            // tenant scope) are not yet expressed in the file schema and keep
+            // their defaults.
+            checkpoint_batch_size: self.receipts.checkpoint_interval,
+            retention_config: Some(chio_kernel::RetentionConfig {
+                retention_days: self.receipts.retention_days,
+                ..chio_kernel::RetentionConfig::default()
+            }),
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             deadlines: self.kernel.deadlines.to_hot_path_deadline_config(),
         })
@@ -526,5 +537,45 @@ adapters:
         // validated entrypoint, proving the budgets reach a live kernel.
         chio_kernel::ChioKernel::try_new(kernel_config)
             .unwrap_or_else(|e| panic!("kernel should construct from config deadlines: {e}"));
+    }
+
+    #[test]
+    fn loaded_receipt_settings_reach_the_constructed_kernel_config() {
+        // A loaded `chio.yaml` whose `[receipts]` section sets a non-default
+        // checkpoint cadence and retention window must carry both into the
+        // runtime `KernelConfig`. A bridge that hard-coded the checkpoint
+        // default and dropped retention would leave the operator's values
+        // unenforced; this asserts they win.
+        let yaml = r#"
+kernel:
+  signing_key: "generate"
+
+receipts:
+  checkpoint_interval: 250
+  retention_days: 30
+
+adapters:
+  - id: "petstore"
+    protocol: "openapi"
+    upstream: "http://localhost:8000"
+"#;
+        let config =
+            crate::load_from_str(yaml).unwrap_or_else(|e| panic!("config should load: {e}"));
+        assert_eq!(config.receipts.checkpoint_interval, 250);
+        assert_eq!(config.receipts.retention_days, 30);
+
+        let kernel_config = config
+            .to_kernel_config()
+            .unwrap_or_else(|e| panic!("kernel config should build: {e}"));
+
+        assert_eq!(kernel_config.checkpoint_batch_size, 250);
+        let retention = kernel_config
+            .retention_config
+            .as_ref()
+            .unwrap_or_else(|| panic!("retention config should be honored, not dropped"));
+        assert_eq!(retention.retention_days, 30);
+
+        chio_kernel::ChioKernel::try_new(kernel_config)
+            .unwrap_or_else(|e| panic!("kernel should construct from config receipts: {e}"));
     }
 }
