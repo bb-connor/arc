@@ -45,6 +45,70 @@ pub struct RequestEvaluator {
 }
 
 impl RequestEvaluator {
+    /// Compatibility shim for the pre-rename constructor name. Renamed to
+    /// [`RequestEvaluator::new_ephemeral`] so an embedder never gets in-memory
+    /// audit state by mistake; kept so existing callers keep compiling.
+    #[deprecated(
+        note = "renamed to `new_ephemeral`: this keeps the receipt log and revocation state in memory, lost on restart"
+    )]
+    pub fn new(routes: Vec<RouteEntry>, keypair: Keypair, policy_hash: String) -> Self {
+        Self::new_ephemeral(routes, keypair, policy_hash)
+    }
+
+    /// Compatibility shim for the pre-rename constructor name; see
+    /// [`RequestEvaluator::new_ephemeral_with_trusted_capability_issuers`].
+    #[deprecated(
+        note = "renamed to `new_ephemeral_with_trusted_capability_issuers`: this keeps the receipt log and revocation state in memory, lost on restart"
+    )]
+    pub fn new_with_trusted_capability_issuers(
+        routes: Vec<RouteEntry>,
+        keypair: Keypair,
+        policy_hash: String,
+        trusted_capability_issuers: Vec<PublicKey>,
+    ) -> Self {
+        Self::new_ephemeral_with_trusted_capability_issuers(
+            routes,
+            keypair,
+            policy_hash,
+            trusted_capability_issuers,
+        )
+    }
+
+    /// Compatibility shim for the pre-rename constructor name; see
+    /// [`RequestEvaluator::new_ephemeral_with_approval_store`].
+    #[deprecated(
+        note = "renamed to `new_ephemeral_with_approval_store`: this keeps the receipt log and revocation state in memory, lost on restart"
+    )]
+    pub fn new_with_approval_store(
+        routes: Vec<RouteEntry>,
+        keypair: Keypair,
+        policy_hash: String,
+        approval_store: Arc<dyn ApprovalStore>,
+    ) -> Self {
+        Self::new_ephemeral_with_approval_store(routes, keypair, policy_hash, approval_store)
+    }
+
+    /// Compatibility shim for the pre-rename constructor name; see
+    /// [`RequestEvaluator::new_ephemeral_with_approval_store_and_trusted_capability_issuers`].
+    #[deprecated(
+        note = "renamed to `new_ephemeral_with_approval_store_and_trusted_capability_issuers`: this keeps the receipt log and revocation state in memory, lost on restart"
+    )]
+    pub fn new_with_approval_store_and_trusted_capability_issuers(
+        routes: Vec<RouteEntry>,
+        keypair: Keypair,
+        policy_hash: String,
+        approval_store: Arc<dyn ApprovalStore>,
+        trusted_capability_issuers: Vec<PublicKey>,
+    ) -> Self {
+        Self::new_ephemeral_with_approval_store_and_trusted_capability_issuers(
+            routes,
+            keypair,
+            policy_hash,
+            approval_store,
+            trusted_capability_issuers,
+        )
+    }
+
     /// Build an evaluator whose embedded kernel keeps its receipt log and
     /// revocation state in memory; both are lost on restart. Ephemerality is
     /// opted into through the constructor name so an embedder never gets
@@ -507,6 +571,44 @@ mod tests {
         assert_eq!(evaluator.receipt_backend(), "durable");
         assert_eq!(evaluator.revocation_backend(), "durable");
         Ok(())
+    }
+
+    /// The pre-rename constructor names remain source-compatible for external
+    /// embedders, delegating to the explicit-ephemeral path. Without the shims
+    /// this test would not compile.
+    #[test]
+    #[allow(deprecated)]
+    fn deprecated_constructor_shims_delegate_to_ephemeral() {
+        let keypair = Keypair::generate();
+
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        assert_eq!(evaluator.receipt_backend(), "ephemeral");
+        assert_eq!(evaluator.revocation_backend(), "ephemeral");
+
+        let evaluator = RequestEvaluator::new_with_trusted_capability_issuers(
+            vec![],
+            keypair.clone(),
+            "test-policy".to_string(),
+            vec![],
+        );
+        assert_eq!(evaluator.receipt_backend(), "ephemeral");
+
+        let evaluator = RequestEvaluator::new_with_approval_store(
+            vec![],
+            keypair.clone(),
+            "test-policy".to_string(),
+            Arc::new(chio_kernel::InMemoryApprovalStore::new()),
+        );
+        assert_eq!(evaluator.receipt_backend(), "ephemeral");
+
+        let evaluator = RequestEvaluator::new_with_approval_store_and_trusted_capability_issuers(
+            vec![],
+            keypair,
+            "test-policy".to_string(),
+            Arc::new(chio_kernel::InMemoryApprovalStore::new()),
+            vec![],
+        );
+        assert_eq!(evaluator.revocation_backend(), "ephemeral");
     }
 
     #[test]
