@@ -38,31 +38,36 @@ curl -fsSL https://www.chio.computer/install.sh | sh
 
 ## What is Chio
 
-Chio is the trust-control layer for autonomous AI. A capability-scoped Rust kernel
-mediates every tool an agent calls: cryptographically attenuated capabilities go in,
-forgery-resistant signed receipts come out. On that proof spine Chio builds a full
-**governance** layer (self-certifying identity, delegated authority, policy, federation)
-and an **economic protocol** (metering, budgets, markets, settlement), so agents can
-act, transact, and be held to account, with cryptographic evidence for every decision.
+Chio is a Rust kernel that mediates every tool an AI agent tries to call. To act, the agent
+must present a capability: a signed, expiring grant that says who is acting and what they may
+do, and that can be narrowed as it is handed off but never widened. The kernel verifies the
+grant, screens the request and the result, runs the tool, and signs a receipt of what happened
+that cannot be forged or backdated. It refuses any call it cannot authorize and any result it
+cannot sign.
 
 > MCP tells an agent *how* to call a tool.
 > Chio proves *what it was allowed to do, what it cost, and what happened.*
 
-Proof-carrying tool calls turn software agents into first-class economic actors. Every tool
-call is a priced, budgeted, metered transaction: a capability carries its own spend limits,
-the kernel meters real cost and settles it, and the action closes into a signed receipt of
-what was authorized, what it cost, and how it was paid. On that foundation Chio runs a
-complete agent economy: discoverable service markets with open bidding and reputation-tiered
-pricing, credit lines and bonded execution, liability underwriting and insurance, and on-chain
-settlement anchored across EVM, Bitcoin, and Solana. Agents transact with one another and with
-the outside world under signed policy, and every payment, claim, and credit decision cites
-prior signed truth instead of restating it. The result is an agent economy that is auditable,
-insurable, and settlement-ready by construction.
+Because the receipt records what a call cost and how it was paid, an agent can hold a balance
+and be billed for what it spends, like any other economic actor. Each capability carries a
+spending limit. The kernel meters the real cost of a call, holds the funds before it runs,
+settles the bill afterward, and writes the price into the receipt beside the authority and the
+outcome. A service sets its own price, and an agent with a long record of clean receipts pays
+less for the same work.
+
+The same receipts support a full financial layer. Agents bid for one another's work in open
+markets, draw credit, and post bonds to take on jobs they cannot yet cover. Underwriters price
+the risk of an agent or a task and sell insurance against it, and claims pay out against the
+receipts that recorded what happened. Payments settle on-chain, anchored across EVM, Bitcoin,
+and Solana. Each of these clears against receipts the kernel signed when the calls ran.
 
 ## The three pillars
 
 <p align="center">
-  <img src="docs/assets/pillars.svg" alt="The three pillars of Chio: Proofs, Governance, and Economic Protocol, on a signed-receipt spine" width="900" />
+  <picture>
+    <source media="(max-width: 500px)" srcset="docs/assets/pillars-mobile.svg" />
+    <img src="docs/assets/pillars.svg" alt="The three pillars of Chio: Proofs, Governance, and Economic Protocol, on a signed-receipt spine" width="900" />
+  </picture>
 </p>
 
 Three layers on one proof spine: every capability, decision, and payment resolves to a signed
