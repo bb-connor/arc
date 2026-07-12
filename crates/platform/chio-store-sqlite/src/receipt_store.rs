@@ -687,11 +687,23 @@ fn receipt_commit_actor_loop(
                         )
                     })) {
                         Ok(flush_error) => flush_error,
-                        Err(payload) => Some(fan_out_batch_panic_error(
-                            &health,
-                            request_responses,
-                            receipt_writer_job_panic_error(&payload),
-                        )),
+                        Err(payload) => {
+                            // A panic inside the append or lineage commit is at
+                            // least as serious as the store-wide append faults
+                            // `commit_receipt_batch` already poisons on: the
+                            // batch's durable position can no longer be trusted.
+                            // Poison the head so the pre-dispatch gate fails closed
+                            // rather than admitting more tools whose receipts may
+                            // not persist, until an operator reseeds.
+                            let panic_error = receipt_writer_job_panic_error(&payload);
+                            health.set_head_poisoned(true);
+                            head_state = WriterHeadState::Poisoned(panic_error.to_string());
+                            Some(fan_out_batch_panic_error(
+                                &health,
+                                request_responses,
+                                panic_error,
+                            ))
+                        }
                     };
                 // Checkpoint construction runs AFTER commit_receipt_batch has
                 // already sent every APPEND durability response, so ADR-0013
