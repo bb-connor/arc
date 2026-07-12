@@ -264,6 +264,25 @@ pub(crate) enum SettleCommands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Drive due settlement attempts through the configured settlement
+    /// driver (see the global `--settlement-driver`), turning drained
+    /// attempts into the settled records `chio settle status` reports.
+    Drive {
+        /// Path to the chio-store-sqlite database. Defaults to
+        /// `--receipt-db` when omitted.
+        #[arg(long, value_name = "PATH")]
+        store: Option<PathBuf>,
+
+        /// Maximum attempts drained in this pass.
+        #[arg(long, default_value_t = 256)]
+        batch: usize,
+
+        /// Emit a structured JSON report on stdout instead of the
+        /// human-readable text summary.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 /// `chio budget` subcommands.

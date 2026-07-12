@@ -62,12 +62,13 @@ pub use observe::{
     SettlementFinalityStatus, SettlementRecoveryAction,
 };
 pub use ops::{
-    classify_settlement_lane, ensure_settlement_operation_allowed, SettlementAlertSeverity,
-    SettlementControlChangeRecord, SettlementControlState, SettlementEmergencyControls,
-    SettlementEmergencyMode, SettlementIncidentAlert, SettlementIndexerCursor,
-    SettlementIndexerCursorInput, SettlementIndexerStatus, SettlementLaneRuntimeStatus,
-    SettlementLaneRuntimeStatusInput, SettlementOperationKind, SettlementRecoveryRecord,
-    SettlementRuntimeReport, SettlementRuntimeStatus, CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
+    classify_settlement_lane, ensure_settlement_operation_allowed, OpsSettlementHook,
+    SettlementAlertSeverity, SettlementControlChangeRecord, SettlementControlState,
+    SettlementDriveStep, SettlementEmergencyControls, SettlementEmergencyMode,
+    SettlementIncidentAlert, SettlementIndexerCursor, SettlementIndexerCursorInput,
+    SettlementIndexerStatus, SettlementLaneRuntimeStatus, SettlementLaneRuntimeStatusInput,
+    SettlementOperationKind, SettlementRecoveryRecord, SettlementRuntime, SettlementRuntimeReport,
+    SettlementRuntimeStatus, CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
 };
 pub use payments::{
     build_x402_payment_requirements, evaluate_circle_nanopayment, prepare_paymaster_compatibility,

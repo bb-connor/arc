@@ -238,7 +238,9 @@ pub(crate) fn run() {
         Commands::Pheromone { command } => dispatch_chio_pheromone_command(command),
         Commands::Replay(args) => cmd_replay(&args),
         Commands::Lineage { command } => dispatch_lineage(command, json_output),
-        Commands::Settle { command } => dispatch_settle(command, json_output, receipt_db),
+        Commands::Settle { command } => {
+            dispatch_settle(command, json_output, receipt_db, &cli.settlement_driver)
+        }
         Commands::Budget { command } => dispatch_budget(command, json_output, budget_db.clone()),
         Commands::Doctor(args) => cmd_doctor(&args, json_output),
         Commands::Arena { command } => dispatch_arena(command, json_output),
