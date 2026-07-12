@@ -178,6 +178,174 @@ impl MerkleTree {
             audit_path,
         })
     }
+
+    /// Generate the RFC 6962 consistency proof from `old_size` to this tree.
+    ///
+    /// The old tree is the prefix containing the first `old_size` leaves.
+    /// A same-size proof is valid and has an empty audit path. Zero-sized and
+    /// regressing proofs are rejected because this API has no RFC empty-tree
+    /// root representation.
+    pub fn consistency_proof(&self, old_size: usize) -> Result<MerkleConsistencyProof> {
+        let new_size = self.leaf_count();
+        if old_size == 0 || old_size > new_size {
+            return Err(Error::MerkleProofFailed);
+        }
+
+        let mut audit_path = Vec::new();
+        if old_size < new_size {
+            consistency_subproof(old_size, &self.levels[0], true, &mut audit_path)?;
+        }
+
+        Ok(MerkleConsistencyProof {
+            old_size,
+            new_size,
+            audit_path,
+        })
+    }
+}
+
+/// RFC 6962 consistency proof between two tree sizes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MerkleConsistencyProof {
+    /// Number of leaves committed by the older root.
+    pub old_size: usize,
+    /// Number of leaves committed by the newer root.
+    pub new_size: usize,
+    /// RFC 6962 consistency path ordered from the deepest node to the root.
+    pub audit_path: Vec<Hash>,
+}
+
+impl MerkleConsistencyProof {
+    /// Verify this proof against both advertised roots.
+    ///
+    /// Verification consumes the complete audit path and rejects malformed,
+    /// truncated, extended, zero-sized, or regressing proofs.
+    pub fn verify(&self, old_root: &Hash, new_root: &Hash) -> Result<()> {
+        let maximum_path_length = usize::BITS as usize + 1;
+        if self.audit_path.len() > maximum_path_length {
+            return Err(Error::MerkleProofFailed);
+        }
+
+        if self.old_size == 0 || self.old_size > self.new_size {
+            return Err(Error::MerkleProofFailed);
+        }
+
+        if self.old_size == self.new_size {
+            if self.audit_path.is_empty() && old_root == new_root {
+                return Ok(());
+            }
+            return Err(Error::MerkleProofFailed);
+        }
+
+        let mut old_node = self
+            .old_size
+            .checked_sub(1)
+            .ok_or(Error::MerkleProofFailed)?;
+        let mut new_node = self
+            .new_size
+            .checked_sub(1)
+            .ok_or(Error::MerkleProofFailed)?;
+
+        while old_node & 1 == 1 {
+            old_node >>= 1;
+            new_node >>= 1;
+        }
+
+        let (mut old_hash, mut new_hash, mut path_index) = if old_node == 0 {
+            (*old_root, *old_root, 0usize)
+        } else {
+            let seed = *self.audit_path.first().ok_or(Error::MerkleProofFailed)?;
+            (seed, seed, 1usize)
+        };
+
+        while path_index < self.audit_path.len() {
+            if new_node == 0 {
+                return Err(Error::MerkleProofFailed);
+            }
+
+            let sibling = &self.audit_path[path_index];
+            path_index = path_index.checked_add(1).ok_or(Error::MerkleProofFailed)?;
+
+            if old_node & 1 == 1 || old_node == new_node {
+                old_hash = node_hash(sibling, &old_hash);
+                new_hash = node_hash(sibling, &new_hash);
+
+                while old_node != 0 && old_node & 1 == 0 {
+                    old_node >>= 1;
+                    new_node >>= 1;
+                }
+            } else {
+                new_hash = node_hash(&new_hash, sibling);
+            }
+
+            old_node >>= 1;
+            new_node >>= 1;
+        }
+
+        if new_node == 0 && old_hash == *old_root && new_hash == *new_root {
+            Ok(())
+        } else {
+            Err(Error::MerkleProofFailed)
+        }
+    }
+}
+
+fn consistency_subproof(
+    old_size: usize,
+    leaves: &[Hash],
+    old_root_known: bool,
+    audit_path: &mut Vec<Hash>,
+) -> Result<()> {
+    if old_size == 0 || old_size > leaves.len() {
+        return Err(Error::MerkleProofFailed);
+    }
+
+    if old_size == leaves.len() {
+        if !old_root_known {
+            audit_path.push(subtree_root(leaves)?);
+        }
+        return Ok(());
+    }
+
+    let split = largest_power_of_two_less_than(leaves.len())?;
+    if old_size <= split {
+        consistency_subproof(old_size, &leaves[..split], old_root_known, audit_path)?;
+        audit_path.push(subtree_root(&leaves[split..])?);
+    } else {
+        let right_old_size = old_size
+            .checked_sub(split)
+            .ok_or(Error::MerkleProofFailed)?;
+        consistency_subproof(right_old_size, &leaves[split..], false, audit_path)?;
+        audit_path.push(subtree_root(&leaves[..split])?);
+    }
+
+    Ok(())
+}
+
+fn subtree_root(leaves: &[Hash]) -> Result<Hash> {
+    match leaves {
+        [] => Err(Error::EmptyTree),
+        [leaf] => Ok(*leaf),
+        _ => {
+            let split = largest_power_of_two_less_than(leaves.len())?;
+            let left = subtree_root(&leaves[..split])?;
+            let right = subtree_root(&leaves[split..])?;
+            Ok(node_hash(&left, &right))
+        }
+    }
+}
+
+fn largest_power_of_two_less_than(value: usize) -> Result<usize> {
+    let below = value.checked_sub(1).ok_or(Error::MerkleProofFailed)?;
+    if below == 0 {
+        return Err(Error::MerkleProofFailed);
+    }
+    let exponent = usize::BITS
+        .checked_sub(1)
+        .and_then(|bits| bits.checked_sub(below.leading_zeros()))
+        .ok_or(Error::MerkleProofFailed)?;
+    1usize.checked_shl(exponent).ok_or(Error::MerkleProofFailed)
 }
 
 /// Merkle inclusion proof.
@@ -399,5 +567,173 @@ mod tests {
         let lh = leaf_hash(&leaves[2]);
         assert!(proof.verify_hash(lh, &root));
         assert!(!proof.verify_hash(Hash::zero(), &root));
+    }
+
+    fn rfc_example_leaves(count: usize) -> Vec<Vec<u8>> {
+        (0..count)
+            .map(|index| format!("d{index}").into_bytes())
+            .collect()
+    }
+
+    fn hashes_from_hex(values: &[&str]) -> Vec<Hash> {
+        values
+            .iter()
+            .map(|value| Hash::from_hex(value).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn consistency_fixed_roots_match_rfc_6962_tree_hashing() {
+        // Inputs follow the d0, d1, ... notation in RFC 6962 section 2.1.3.
+        // Constants were independently generated from the RFC 6962 MTH
+        // recurrence, rather than from MerkleTree's level representation.
+        let expected = [
+            "c67f9ffe68e0761021341dd516428f42fbdea633731cbdada03bea6b84c652f7",
+            "46c78708413a23175f51faf1c22604bccb44482d553b45943b189130ea8221c8",
+            "c64c5b9326951a2db82d5462565696286659d1c7a4a26a92703568f63462f7ba",
+            "8df3870b33fae650e81938994f98eb4551b143b86c95d3dae4e6444e00715016",
+            "2b650a5633502111de1a865b3581e012a91dc1f8b780ddf646a44873dec93163",
+            "b65368cd1f024732c21e9db86bcde27d7de95dc2c40d728dd979ffcf943556e3",
+            "73a590fb266b81557040b146b9d479e2a1b5849b125167642f5b64866f1d5c7d",
+            "3b0c343929799440e33ea5b8376857850457f497736ca6ada6c320ee235b67a4",
+            "68be87542fb826407adcdf28d49f0376082c7f3070e51523b21a8e75ddf90fcf",
+            "9bfd185351345de98fdfed73047051035dbdc257fedac0fad5531585f20f6e41",
+            "bb4b9330960c6cb3f6969214116c4a5b7b079915a3fabd8fc4eba5e46a18bbb8",
+            "f7927246750d5116cfc53cfb5f8f3b94b22c4e370ccf4663800a4feaf6e9d3bb",
+            "110d9590d50288d53f00eb0d9aabe113f707cc9b67596c347dfe85f750893ab2",
+            "93713d9e0a3a1c1fc2f9720045ce7a6a0206dfb9a0c814a03e347f1f9703a02f",
+            "21847fe1e39c8488b1c0704c4160d1ecc7c752e857a00777f7744d6540845da0",
+            "9f24435f890045ade488df835da5496be8cb932b5b69ea2927abbca7a9687253",
+        ];
+        let leaves = rfc_example_leaves(expected.len());
+
+        for (index, expected_root) in expected.iter().enumerate() {
+            let tree = MerkleTree::from_leaves(&leaves[..=index]).unwrap();
+            assert_eq!(
+                tree.root().to_hex(),
+                *expected_root,
+                "tree size {}",
+                index + 1
+            );
+        }
+    }
+
+    #[test]
+    fn consistency_fixed_paths_match_rfc_6962_example_shape() {
+        // RFC 6962 section 2.1.3 specifies PROOF(3, D[7]) = [c,d,g,l],
+        // PROOF(4, D[7]) = [l], and PROOF(6, D[7]) = [i,j,k].
+        let leaves = rfc_example_leaves(7);
+        let tree = MerkleTree::from_leaves(&leaves).unwrap();
+        let vectors = [
+            (
+                3,
+                &[
+                    "f366df4718ef75064317794ff5300e0963e96dd93fe24203118055fa5a00be13",
+                    "5e0c4e1130dfa84d27437ba073eb817e1896643d42ea100a0940f8752d496783",
+                    "46c78708413a23175f51faf1c22604bccb44482d553b45943b189130ea8221c8",
+                    "3cf05ff16d26c024828e93b3a14c5656e5abcbc5e6f0bce2cf8a169720599674",
+                ][..],
+            ),
+            (
+                4,
+                &["3cf05ff16d26c024828e93b3a14c5656e5abcbc5e6f0bce2cf8a169720599674"][..],
+            ),
+            (
+                6,
+                &[
+                    "a4f2a847cce0dce0519b1d6b83e4ca15166193dbb0c8f864e736665edbde1994",
+                    "d750ca922fabc5422eec469d4370779b61d5488186cb871eeea299d8113d20bc",
+                    "8df3870b33fae650e81938994f98eb4551b143b86c95d3dae4e6444e00715016",
+                ][..],
+            ),
+        ];
+
+        for (old_size, expected_path) in vectors {
+            let proof = tree.consistency_proof(old_size).unwrap();
+            assert_eq!(proof.audit_path, hashes_from_hex(expected_path));
+        }
+    }
+
+    #[test]
+    fn consistency_all_pairs_verify_through_sixteen_leaves() {
+        let leaves = rfc_example_leaves(16);
+
+        for new_size in 1..=leaves.len() {
+            let new_tree = MerkleTree::from_leaves(&leaves[..new_size]).unwrap();
+            for old_size in 1..=new_size {
+                let old_tree = MerkleTree::from_leaves(&leaves[..old_size]).unwrap();
+                let proof = new_tree.consistency_proof(old_size).unwrap();
+                proof.verify(&old_tree.root(), &new_tree.root()).unwrap();
+            }
+        }
+    }
+
+    #[test]
+    fn consistency_rejects_malformed_proofs_and_roots() {
+        let leaves = rfc_example_leaves(7);
+        let old_tree = MerkleTree::from_leaves(&leaves[..3]).unwrap();
+        let new_tree = MerkleTree::from_leaves(&leaves).unwrap();
+        let proof = new_tree.consistency_proof(3).unwrap();
+        proof.verify(&old_tree.root(), &new_tree.root()).unwrap();
+
+        assert!(proof.verify(&Hash::zero(), &new_tree.root()).is_err());
+        assert!(proof.verify(&old_tree.root(), &Hash::zero()).is_err());
+
+        let mut reordered = proof.clone();
+        reordered.audit_path.swap(0, 1);
+        assert!(reordered
+            .verify(&old_tree.root(), &new_tree.root())
+            .is_err());
+
+        let mut truncated = proof.clone();
+        truncated.audit_path.pop();
+        assert!(truncated
+            .verify(&old_tree.root(), &new_tree.root())
+            .is_err());
+
+        let mut extended = proof.clone();
+        extended.audit_path.push(Hash::zero());
+        assert!(extended.verify(&old_tree.root(), &new_tree.root()).is_err());
+
+        let zero = MerkleConsistencyProof {
+            old_size: 0,
+            new_size: 7,
+            audit_path: Vec::new(),
+        };
+        assert!(zero.verify(&old_tree.root(), &new_tree.root()).is_err());
+
+        let regressed = MerkleConsistencyProof {
+            old_size: 8,
+            new_size: 7,
+            audit_path: Vec::new(),
+        };
+        assert!(regressed
+            .verify(&old_tree.root(), &new_tree.root())
+            .is_err());
+
+        let overflow_boundary = MerkleConsistencyProof {
+            old_size: usize::MAX - 1,
+            new_size: usize::MAX,
+            audit_path: Vec::new(),
+        };
+        assert!(overflow_boundary
+            .verify(&old_tree.root(), &new_tree.root())
+            .is_err());
+
+        let overlong = MerkleConsistencyProof {
+            old_size: 3,
+            new_size: 7,
+            audit_path: vec![Hash::zero(); usize::BITS as usize + 2],
+        };
+        assert!(overlong.verify(&old_tree.root(), &new_tree.root()).is_err());
+    }
+
+    #[test]
+    fn consistency_generation_rejects_zero_and_oversized_old_tree() {
+        let leaves = rfc_example_leaves(4);
+        let tree = MerkleTree::from_leaves(&leaves).unwrap();
+
+        assert!(tree.consistency_proof(0).is_err());
+        assert!(tree.consistency_proof(5).is_err());
     }
 }
