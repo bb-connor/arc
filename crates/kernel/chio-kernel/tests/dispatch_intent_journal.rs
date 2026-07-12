@@ -48,6 +48,7 @@ mod support {
         store: Arc<SqliteReceiptStore>,
         pub invoked: Arc<AtomicUsize>,
         pub open_intents_seen_at_invoke: Arc<Mutex<Vec<u64>>>,
+        pub rail_refs_seen_at_invoke: Arc<Mutex<Vec<(Option<String>, Option<String>)>>>,
         /// When set, `invoke` fails AFTER recording the probe, modeling a tool
         /// whose side effect ran and then errored.
         pub fail_after_effect: bool,
@@ -82,6 +83,16 @@ mod support {
                 .lock()
                 .expect("probe lock")
                 .push(open);
+            for intent in self
+                .store
+                .open_dispatch_intents()
+                .expect("list open intents from inside the tool")
+            {
+                self.rail_refs_seen_at_invoke
+                    .lock()
+                    .expect("rail probe lock")
+                    .push((intent.rail, intent.rail_authorization_id));
+            }
             if self.fail_after_effect {
                 return Err(KernelError::Internal(
                     "tool failed after its side effect".to_string(),
@@ -200,12 +211,74 @@ mod support {
         }
     }
 
+    /// Payment rail whose authorize hands out a fixed reference; capture,
+    /// release, and refund settle locally so monetary evaluations complete.
+    pub struct RecordingRail;
+
+    impl chio_kernel::PaymentAdapter for RecordingRail {
+        fn rail_id(&self) -> &str {
+            "x402"
+        }
+
+        fn authorize(
+            &self,
+            _request: &chio_kernel::PaymentAuthorizeRequest,
+        ) -> Result<chio_kernel::PaymentAuthorization, chio_kernel::PaymentError> {
+            Ok(chio_kernel::PaymentAuthorization {
+                authorization_id: "auth-42".to_string(),
+                settled: false,
+                metadata: serde_json::json!({}),
+            })
+        }
+
+        fn capture(
+            &self,
+            authorization_id: &str,
+            _amount_units: u64,
+            _currency: &str,
+            _reference: &str,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            Ok(chio_kernel::PaymentResult {
+                transaction_id: authorization_id.to_string(),
+                settlement_status: chio_kernel::RailSettlementStatus::Settled,
+                metadata: serde_json::json!({}),
+            })
+        }
+
+        fn release(
+            &self,
+            authorization_id: &str,
+            _reference: &str,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            Ok(chio_kernel::PaymentResult {
+                transaction_id: authorization_id.to_string(),
+                settlement_status: chio_kernel::RailSettlementStatus::Released,
+                metadata: serde_json::json!({}),
+            })
+        }
+
+        fn refund(
+            &self,
+            transaction_id: &str,
+            _amount_units: u64,
+            _currency: &str,
+            _reference: &str,
+        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            Ok(chio_kernel::PaymentResult {
+                transaction_id: transaction_id.to_string(),
+                settlement_status: chio_kernel::RailSettlementStatus::Refunded,
+                metadata: serde_json::json!({}),
+            })
+        }
+    }
+
     pub struct JournalHarness {
         pub kernel: ChioKernel,
         pub store: Arc<SqliteReceiptStore>,
         pub capability: CapabilityToken,
         pub invoked: Arc<AtomicUsize>,
         pub open_intents_seen_at_invoke: Arc<Mutex<Vec<u64>>>,
+        pub rail_refs_seen_at_invoke: Arc<Mutex<Vec<(Option<String>, Option<String>)>>>,
         pub db_path: std::path::PathBuf,
     }
 
@@ -254,15 +327,21 @@ mod support {
         }
     }
 
-    fn tool_scope(max_invocations: Option<u32>) -> ChioScope {
+    fn tool_scope(max_invocations: Option<u32>, monetary: bool) -> ChioScope {
+        let cost = |units: u64| {
+            monetary.then(|| chio_core::capability::scope::MonetaryAmount {
+                units,
+                currency: "USD".to_string(),
+            })
+        };
         let grant = |tool_name: &str| ToolGrant {
             server_id: "srv".to_string(),
             tool_name: tool_name.to_string(),
             operations: vec![Operation::Invoke],
             constraints: vec![],
             max_invocations,
-            max_cost_per_invocation: None,
-            max_total_cost: None,
+            max_cost_per_invocation: cost(100),
+            max_total_cost: cost(10_000),
             dpop_required: None,
         };
         ChioScope {
@@ -272,20 +351,26 @@ mod support {
     }
 
     pub fn journal_harness(prefix: &str) -> Result<JournalHarness, Box<dyn std::error::Error>> {
-        journal_harness_with(prefix, None, false, false)
+        journal_harness_with(prefix, None, false, false, false)
     }
 
     pub fn journal_harness_failing_tool(
         prefix: &str,
     ) -> Result<JournalHarness, Box<dyn std::error::Error>> {
-        journal_harness_with(prefix, None, false, true)
+        journal_harness_with(prefix, None, false, true, false)
     }
 
     pub fn journal_harness_rejecting_first_intent_write(
         prefix: &str,
         max_invocations: Option<u32>,
     ) -> Result<JournalHarness, Box<dyn std::error::Error>> {
-        journal_harness_with(prefix, max_invocations, true, false)
+        journal_harness_with(prefix, max_invocations, true, false, false)
+    }
+
+    pub fn monetary_journal_harness(
+        prefix: &str,
+    ) -> Result<JournalHarness, Box<dyn std::error::Error>> {
+        journal_harness_with(prefix, None, false, false, true)
     }
 
     fn journal_harness_with(
@@ -293,19 +378,25 @@ mod support {
         max_invocations: Option<u32>,
         reject_first_intent_write: bool,
         fail_after_effect: bool,
+        monetary: bool,
     ) -> Result<JournalHarness, Box<dyn std::error::Error>> {
         let db_path = unique_kernel_db_path(prefix);
         let store = Arc::new(SqliteReceiptStore::open(&db_path)?);
         let invoked = Arc::new(AtomicUsize::new(0));
         let open_intents_seen_at_invoke = Arc::new(Mutex::new(Vec::new()));
+        let rail_refs_seen_at_invoke = Arc::new(Mutex::new(Vec::new()));
 
         let mut kernel = ChioKernel::new(journal_config(Keypair::generate()));
         kernel.register_tool_server(Box::new(ProbeServer {
             store: Arc::clone(&store),
             invoked: Arc::clone(&invoked),
             open_intents_seen_at_invoke: Arc::clone(&open_intents_seen_at_invoke),
+            rail_refs_seen_at_invoke: Arc::clone(&rail_refs_seen_at_invoke),
             fail_after_effect,
         }));
+        if monetary {
+            kernel.set_payment_adapter(Box::new(RecordingRail));
+        }
         if reject_first_intent_write {
             kernel.set_receipt_store_handle(Arc::new(IntentRejectingStore {
                 inner: Arc::clone(&store),
@@ -318,7 +409,7 @@ mod support {
         let agent_keypair = Keypair::generate();
         let capability = kernel.issue_capability(
             &agent_keypair.public_key(),
-            tool_scope(max_invocations),
+            tool_scope(max_invocations, monetary),
             300,
         )?;
         Ok(JournalHarness {
@@ -327,6 +418,7 @@ mod support {
             capability,
             invoked,
             open_intents_seen_at_invoke,
+            rail_refs_seen_at_invoke,
             db_path,
         })
     }
@@ -655,6 +747,44 @@ fn post_dispatch_tool_error_still_consumes_the_intent(
         0,
         "the deny receipt consumed the intent"
     );
+
+    let _ = std::fs::remove_file(&harness.db_path);
+    Ok(())
+}
+
+#[test]
+fn monetary_intent_carries_rail_and_authorization_id_before_dispatch(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::Verdict;
+
+    // A monetary call authorizes on the rail before dispatch; by invoke time
+    // the open intent must already name both the rail and the authorization
+    // id, so a crash after this point leaves an orphan an operator can
+    // reconcile against the rail without guessing.
+    let harness = support::monetary_journal_harness("chio-intent-rail-ref")?;
+    let response = harness
+        .kernel
+        .evaluate_tool_call_blocking(&harness.request("write_file"))?;
+    assert!(
+        matches!(response.verdict, Verdict::Allow),
+        "monetary evaluate allows: {:?}",
+        response.reason
+    );
+
+    let refs = harness
+        .rail_refs_seen_at_invoke
+        .lock()
+        .expect("rail probe lock")
+        .clone();
+    assert_eq!(
+        refs,
+        vec![(Some("x402".to_string()), Some("auth-42".to_string()))],
+        "the open monetary intent names its rail and authorization id"
+    );
+
+    // The allow receipt still consumes the monetary intent.
+    harness.store.flush_receipt_writes()?;
+    assert_eq!(harness.store.open_dispatch_intent_count()?, 0);
 
     let _ = std::fs::remove_file(&harness.db_path);
     Ok(())

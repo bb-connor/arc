@@ -65,6 +65,22 @@ pub(crate) fn dispatch_intent_insert_job(
     }
 }
 
+/// Writer job that binds a rail authorization id to one open intent in its
+/// own immediate transaction. Shared by the bounded and unbounded paths.
+pub(crate) fn dispatch_intent_rail_ref_job(
+    request_id: &str,
+    rail_authorization_id: &str,
+) -> impl FnOnce(&mut SqliteStoreConnection) -> Result<(), ReceiptStoreError> + Send + 'static {
+    let request_id = request_id.to_string();
+    let rail_authorization_id = rail_authorization_id.to_string();
+    move |connection| {
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        attach_dispatch_intent_rail_ref_tx(&tx, &request_id, &rail_authorization_id)?;
+        tx.commit()?;
+        Ok(())
+    }
+}
+
 /// Attach a rail authorization id to an open monetary intent (best-effort).
 /// Zero rows changed (already consumed, or never written) is `NotFound`.
 pub(crate) fn attach_dispatch_intent_rail_ref_tx(

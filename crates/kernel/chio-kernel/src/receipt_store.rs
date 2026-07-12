@@ -641,6 +641,17 @@ pub trait ReceiptStore: Send + Sync {
                 .to_string(),
         ))
     }
+    /// Bounded variant of `attach_dispatch_intent_rail_ref`, failing closed
+    /// with `ReceiptStoreError::Timeout` past `budget` so the best-effort
+    /// post-authorize attach can never hang an evaluation on a wedged writer.
+    fn attach_dispatch_intent_rail_ref_with_timeout(
+        &self,
+        request_id: &str,
+        rail_authorization_id: &str,
+        _budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        self.attach_dispatch_intent_rail_ref(request_id, rail_authorization_id)
+    }
     /// Reconcile every open intent surviving a restart. Default: a no-op
     /// empty report, because a store without the journal has no orphans.
     fn reconcile_dispatch_intents(

@@ -666,6 +666,30 @@ impl ChioKernel {
             }
         };
 
+        // Money path: bind the rail's authorization id to the open intent so a
+        // monetary orphan names the exact reference an operator reconciles
+        // against. Best-effort and bounded: the open intent already proves a
+        // monetary attempt through its rail column, so a failed or timed-out
+        // attach is logged and never fails the call.
+        if let Some(authorization) = payment_authorization.as_ref() {
+            if let Some(handle) = self.dispatch_intent_for_request(Some(&request.request_id)) {
+                let budget = self.config.deadlines.receipt_append_budget();
+                if let Err(error) = self.with_receipt_store(|store| {
+                    Ok(store.attach_dispatch_intent_rail_ref_with_timeout(
+                        &handle.request_id,
+                        &authorization.authorization_id,
+                        budget,
+                    )?)
+                }) {
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %redacted!(&error.to_string()),
+                        "dispatch intent rail-ref attach failed"
+                    );
+                }
+            }
+        }
+
         if let Err(error) = self.require_presented_execution_nonce(request, cap) {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "execution nonce denied");

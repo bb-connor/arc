@@ -3148,15 +3148,34 @@ impl SqliteReceiptStore {
         request_id: &str,
         rail_authorization_id: &str,
     ) -> Result<(), ReceiptStoreError> {
-        let request_id = request_id.to_string();
-        let rail_authorization_id = rail_authorization_id.to_string();
-        self.writer_handle().run_write(move |connection| {
-            let tx =
-                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-            attach_dispatch_intent_rail_ref_tx(&tx, &request_id, &rail_authorization_id)?;
-            tx.commit()?;
-            Ok(())
-        })
+        self.writer_handle().run_write(dispatch_intent_rail_ref_job(
+            request_id,
+            rail_authorization_id,
+        ))
+    }
+
+    /// Bounded variant of [`Self::attach_dispatch_intent_rail_ref`], so the
+    /// best-effort post-authorize attach fails closed within budget instead
+    /// of hanging its caller on a wedged writer.
+    pub fn attach_dispatch_intent_rail_ref_with_timeout(
+        &self,
+        request_id: &str,
+        rail_authorization_id: &str,
+        budget: Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        self.writer_handle().run_write_with_timeout(
+            dispatch_intent_rail_ref_job(request_id, rail_authorization_id),
+            budget,
+        )
+    }
+
+    /// List the open dispatch intents, oldest first: the operator view of
+    /// work that is either in flight or awaiting boot reconciliation.
+    pub fn open_dispatch_intents(
+        &self,
+    ) -> Result<Vec<chio_kernel::receipt_store::DispatchIntentRecord>, ReceiptStoreError> {
+        let connection = self.connection()?;
+        select_open_dispatch_intents(&connection)
     }
 
     /// Resolve every open intent that survived a restart. Reads run on the
