@@ -156,12 +156,25 @@ pub trait PaymentAdapter: Send + Sync {
     }
 
     /// Authorize or prepay up to `amount_units` before the tool executes.
+    ///
+    /// Contract: implementations MUST be idempotent keyed on
+    /// `request.reference` (the durable request id the kernel records
+    /// before the call). A repeated authorize with the same reference
+    /// returns the same authorization and places AT MOST ONE rail-side
+    /// hold, so crash recovery can re-drive the call without stacking
+    /// holds.
     fn authorize(
         &self,
         request: &PaymentAuthorizeRequest,
     ) -> Result<PaymentAuthorization, PaymentError>;
 
     /// Finalize payment for the actual cost after tool execution.
+    ///
+    /// Contract: implementations MUST be idempotent keyed on
+    /// `(authorization_id, reference)`. A repeated call with the same key
+    /// returns an equivalent [`PaymentResult`] and moves money AT MOST
+    /// ONCE; boot reconciliation replays a committed capture relying on
+    /// this.
     fn capture(
         &self,
         authorization_id: &str,
@@ -171,6 +184,9 @@ pub trait PaymentAdapter: Send + Sync {
     ) -> Result<PaymentResult, PaymentError>;
 
     /// Release an unused authorization hold.
+    ///
+    /// Contract: implementations MUST be idempotent keyed on
+    /// `(authorization_id, reference)`, releasing the hold AT MOST ONCE.
     fn release(
         &self,
         authorization_id: &str,
@@ -185,6 +201,26 @@ pub trait PaymentAdapter: Send + Sync {
         currency: &str,
         reference: &str,
     ) -> Result<PaymentResult, PaymentError>;
+
+    /// Query the current rail-side settlement state for a prior
+    /// authorization WITHOUT moving funds. Idempotent and side-effect-free.
+    ///
+    /// Keyed on `reference` (the durable request id recorded before
+    /// authorize) so it stays answerable in the crash window where no
+    /// authorization id is durable yet; `authorization_id` is an optional
+    /// refinement passed once known. Defaulted to `Unavailable` so an
+    /// adapter that cannot answer forces a fail-closed operator incident
+    /// during reconciliation rather than a silent close.
+    fn settlement_state(
+        &self,
+        reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<PaymentResult, PaymentError> {
+        let _ = (reference, authorization_id);
+        Err(PaymentError::Unavailable(
+            "settlement_state query not implemented by this adapter".to_string(),
+        ))
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -295,6 +331,26 @@ impl PaymentAdapter for X402PaymentAdapter {
         "x402"
     }
 
+    fn settlement_state(
+        &self,
+        reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<PaymentResult, PaymentError> {
+        // Prepaid rail: funds move at authorize and capture is a local
+        // no-op, so the state query is a pure read reporting Settled for
+        // the known reference.
+        Ok(PaymentResult {
+            transaction_id: authorization_id.unwrap_or(reference).to_string(),
+            settlement_status: RailSettlementStatus::Settled,
+            metadata: serde_json::json!({
+                "adapter": "x402",
+                "mode": "prepaid",
+                "action": "settlement_state",
+                "reference": reference
+            }),
+        })
+    }
+
     fn authorize(
         &self,
         request: &PaymentAuthorizeRequest,
@@ -381,6 +437,26 @@ impl PaymentAdapter for X402PaymentAdapter {
 impl PaymentAdapter for AcpPaymentAdapter {
     fn rail_id(&self) -> &str {
         "acp"
+    }
+
+    fn settlement_state(
+        &self,
+        reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<PaymentResult, PaymentError> {
+        // The shared-payment-token hold settles at authorize time and the
+        // local capture/release are no-ops, so the state query is a pure
+        // read reporting Settled for the known reference.
+        Ok(PaymentResult {
+            transaction_id: authorization_id.unwrap_or(reference).to_string(),
+            settlement_status: RailSettlementStatus::Settled,
+            metadata: serde_json::json!({
+                "adapter": "acp",
+                "mode": "shared_payment_token_hold",
+                "action": "settlement_state",
+                "reference": reference
+            }),
+        })
     }
 
     fn authorize(
@@ -611,6 +687,83 @@ mod tests {
     use std::net::TcpListener;
     use std::sync::mpsc;
     use std::thread;
+
+    #[test]
+    fn settlement_state_default_fails_closed_to_unavailable() {
+        struct BareAdapter;
+        impl PaymentAdapter for BareAdapter {
+            fn authorize(
+                &self,
+                _request: &PaymentAuthorizeRequest,
+            ) -> Result<PaymentAuthorization, PaymentError> {
+                Err(PaymentError::Unavailable("test".to_string()))
+            }
+            fn capture(
+                &self,
+                _authorization_id: &str,
+                _amount_units: u64,
+                _currency: &str,
+                _reference: &str,
+            ) -> Result<PaymentResult, PaymentError> {
+                Err(PaymentError::Unavailable("test".to_string()))
+            }
+            fn release(
+                &self,
+                _authorization_id: &str,
+                _reference: &str,
+            ) -> Result<PaymentResult, PaymentError> {
+                Err(PaymentError::Unavailable("test".to_string()))
+            }
+            fn refund(
+                &self,
+                _transaction_id: &str,
+                _amount_units: u64,
+                _currency: &str,
+                _reference: &str,
+            ) -> Result<PaymentResult, PaymentError> {
+                Err(PaymentError::Unavailable("test".to_string()))
+            }
+        }
+        let adapter = BareAdapter;
+        assert_eq!(adapter.rail_id(), "payment");
+        // The default forces a fail-closed reconcile incident rather than a
+        // silent close for adapters that cannot answer the query.
+        match adapter.settlement_state("req-1", None) {
+            Err(PaymentError::Unavailable(_)) => {}
+            other => panic!("expected Unavailable, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn prepaid_adapters_answer_settlement_state_without_moving_funds() {
+        // The base URLs are never contacted: the prepaid state query is a
+        // pure read.
+        let x402 = X402PaymentAdapter::new("http://127.0.0.1:1");
+        let state = x402
+            .settlement_state("req-x", Some("auth-x"))
+            .expect("prepaid settlement state answers");
+        assert_eq!(state.transaction_id, "auth-x");
+        assert!(matches!(
+            state.settlement_status,
+            RailSettlementStatus::Settled
+        ));
+        // Answerable by the durable reference alone, for the crash window
+        // where no authorization id is durable yet.
+        let by_reference = x402
+            .settlement_state("req-x", None)
+            .expect("keyed by reference");
+        assert_eq!(by_reference.transaction_id, "req-x");
+
+        let acp = AcpPaymentAdapter::new("http://127.0.0.1:1");
+        assert_eq!(acp.rail_id(), "acp");
+        let acp_state = acp
+            .settlement_state("req-a", Some("auth-a"))
+            .expect("acp settlement state answers");
+        assert!(matches!(
+            acp_state.settlement_status,
+            RailSettlementStatus::Settled
+        ));
+    }
 
     #[test]
     fn rail_settlement_status_maps_to_canonical_receipt_states() {
