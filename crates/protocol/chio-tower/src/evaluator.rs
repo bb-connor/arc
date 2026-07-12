@@ -46,6 +46,20 @@ fn default_route_resolver(_method: &str, path: &str) -> String {
     path.to_string()
 }
 
+/// Durable sink for the outer HTTP receipts that [`crate::ChioService`] signs.
+///
+/// The embedded authorization kernel already persists its own receipts to a
+/// configured store, but the HTTP decision and final-response receipts are signed
+/// at the tower edge and would otherwise live only in the response extensions.
+/// When the evaluator is built with a durable receipt store, those HTTP receipts
+/// are converted to core receipts (re-signed with the kernel keypair) and
+/// appended here so the HTTP audit trail survives a restart.
+#[derive(Clone)]
+struct HttpReceiptSink {
+    keypair: std::sync::Arc<Keypair>,
+    store: std::sync::Arc<dyn chio_kernel::ReceiptStore>,
+}
+
 /// Chio request evaluator. Holds the shared HTTP authority and tower-specific hooks.
 pub struct ChioEvaluator {
     authority: HttpAuthority,
@@ -54,6 +68,9 @@ pub struct ChioEvaluator {
     /// When true, sidecar errors allow the request through (fail-open).
     /// Default is false (fail-closed).
     fail_open: bool,
+    /// Durable sink for the HTTP receipts signed at the tower edge. `Some` only
+    /// when the evaluator was built with a durable receipt store.
+    receipt_sink: Option<HttpReceiptSink>,
 }
 
 impl ChioEvaluator {
@@ -69,6 +86,7 @@ impl ChioEvaluator {
             identity_extractor: crate::identity::extract_identity,
             route_resolver: default_route_resolver,
             fail_open: false,
+            receipt_sink: None,
         }
     }
 
@@ -80,6 +98,7 @@ impl ChioEvaluator {
             identity_extractor: crate::identity::extract_identity,
             route_resolver: default_route_resolver,
             fail_open: false,
+            receipt_sink: None,
         }
     }
 
@@ -225,6 +244,37 @@ impl ChioEvaluator {
             .sign_transport_deny_receipt(input)
             .map_err(Into::into)
     }
+
+    /// Append an outer HTTP receipt to the durable receipt store when one is
+    /// configured. [`crate::ChioService`] signs decision, final-response, and
+    /// transport-deny receipts at the HTTP edge; without this they would live
+    /// only in the response extensions and vanish on restart, so a configured
+    /// durable store must receive them. A conversion or append failure is logged
+    /// rather than propagated: the receipt is still returned to the caller, and
+    /// the request outcome is never blocked by an audit-write error.
+    pub(crate) fn persist_http_receipt(&self, receipt: &HttpReceipt) {
+        let Some(sink) = &self.receipt_sink else {
+            return;
+        };
+        let chio_receipt = match receipt.to_chio_receipt_with_keypair(&sink.keypair) {
+            Ok(chio_receipt) => chio_receipt,
+            Err(error) => {
+                tracing::error!(
+                    target: "chio::tower",
+                    %error,
+                    "failed to convert HTTP receipt for durable storage"
+                );
+                return;
+            }
+        };
+        if let Err(error) = sink.store.append_chio_receipt(&chio_receipt) {
+            tracing::error!(
+                target: "chio::tower",
+                %error,
+                "failed to append HTTP receipt to durable receipt store"
+            );
+        }
+    }
 }
 
 fn extract_presented_capability<'a>(
@@ -304,6 +354,14 @@ impl ChioEvaluatorBuilder {
         let mut builder = HttpAuthority::builder()
             .allow_ephemeral_receipt_log(self.allow_ephemeral)
             .allow_ephemeral_revocation_store(self.allow_ephemeral);
+        // A configured durable receipt store backs both the embedded kernel and
+        // the tower edge: the store handle moves into the authority builder, and
+        // a clone (with the kernel keypair) stays on the evaluator so the outer
+        // HTTP receipts the service signs are appended to the same store.
+        let receipt_sink = self.receipt_store.as_ref().map(|store| HttpReceiptSink {
+            keypair: std::sync::Arc::new(self.keypair.clone()),
+            store: std::sync::Arc::clone(store),
+        });
         if let Some(store) = self.receipt_store {
             builder = builder.receipt_store(store);
         }
@@ -318,6 +376,7 @@ impl ChioEvaluatorBuilder {
             identity_extractor: self.identity_extractor,
             route_resolver: self.route_resolver,
             fail_open: self.fail_open,
+            receipt_sink,
         })
     }
 }
@@ -357,6 +416,7 @@ impl Clone for ChioEvaluator {
             identity_extractor: self.identity_extractor,
             route_resolver: self.route_resolver,
             fail_open: self.fail_open,
+            receipt_sink: self.receipt_sink.clone(),
         }
     }
 }

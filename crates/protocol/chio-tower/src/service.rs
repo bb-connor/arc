@@ -155,6 +155,7 @@ where
                 let receipt = evaluator
                     .finalize_receipt(&prepared, status.as_u16())
                     .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?;
+                evaluator.persist_http_receipt(&receipt);
 
                 let mut response = http::Response::new(ResBody::default());
                 *response.status_mut() = status;
@@ -172,6 +173,7 @@ where
             let receipt = evaluator
                 .finalize_receipt(&prepared, response.status().as_u16())
                 .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?;
+            evaluator.persist_http_receipt(&receipt);
 
             // Attach receipt ID to response.
             if let Ok(val) = http::HeaderValue::from_str(&receipt.id) {
@@ -252,6 +254,7 @@ where
     *response.status_mut() = status;
 
     if let Some(receipt) = receipt {
+        evaluator.persist_http_receipt(&receipt);
         if let Ok(val) = http::HeaderValue::from_str(&receipt.id) {
             response.headers_mut().insert("x-chio-receipt-id", val);
         }
@@ -985,5 +988,99 @@ mod tests {
             .get::<HttpReceipt>()
             .unwrap_or_else(|| panic!("missing receipt extension on 413"));
         assert_eq!(receipt.route_pattern, "/pets/{petId}");
+    }
+
+    /// A recording receipt store that captures every appended core receipt, used
+    /// to assert the tower service persists its outer HTTP receipts to a durable
+    /// store rather than leaving them only in the response extensions.
+    #[derive(Default)]
+    struct RecordingReceiptStore {
+        receipts: std::sync::Mutex<Vec<chio_core_types::receipt::body::ChioReceipt>>,
+    }
+
+    impl RecordingReceiptStore {
+        fn stored_ids(&self) -> Vec<String> {
+            let receipts = match self.receipts.lock() {
+                Ok(receipts) => receipts,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            receipts.iter().map(|receipt| receipt.id.clone()).collect()
+        }
+    }
+
+    impl chio_kernel::ReceiptStore for RecordingReceiptStore {
+        fn append_chio_receipt(
+            &self,
+            receipt: &chio_core_types::receipt::body::ChioReceipt,
+        ) -> Result<(), chio_kernel::ReceiptStoreError> {
+            match self.receipts.lock() {
+                Ok(mut receipts) => receipts.push(receipt.clone()),
+                Err(poisoned) => poisoned.into_inner().push(receipt.clone()),
+            }
+            Ok(())
+        }
+
+        fn append_child_receipt(
+            &self,
+            _receipt: &chio_core_types::receipt::lineage::ChildRequestReceipt,
+        ) -> Result<(), chio_kernel::ReceiptStoreError> {
+            Ok(())
+        }
+    }
+
+    /// Durable-by-default for tower embedders: when an evaluator is built with a
+    /// durable receipt store, the outer HTTP receipt the service signs for the
+    /// HTTP decision must be appended to that store, not just placed in the
+    /// response extensions where it vanishes on restart.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn service_persists_http_receipt_to_durable_store() {
+        let keypair = Keypair::generate();
+        let store = std::sync::Arc::new(RecordingReceiptStore::default());
+        let evaluator = ChioEvaluator::builder(keypair.clone(), "durable-policy".to_string())
+            .receipt_store(store.clone())
+            .allow_ephemeral(true)
+            .build()
+            .unwrap_or_else(|e| panic!("build failed: {e}"));
+
+        let inner = tower::service_fn(|_req: http::Request<TestBody>| async {
+            Ok::<http::Response<TestBody>, Box<dyn std::error::Error + Send + Sync>>(
+                http::Response::new(Full::new(Bytes::new())),
+            )
+        });
+        let mut service = ChioService::new(inner, evaluator);
+
+        let req = http::Request::builder()
+            .method("GET")
+            .uri("/pets")
+            .body(Full::new(Bytes::new()))
+            .unwrap_or_else(|e| panic!("build failed: {e}"));
+
+        let resp: http::Response<TestBody> = service
+            .ready()
+            .await
+            .unwrap_or_else(|e| panic!("ready failed: {e}"))
+            .call(req)
+            .await
+            .unwrap_or_else(|e| panic!("call failed: {e}"));
+
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let http_receipt = resp
+            .extensions()
+            .get::<HttpReceipt>()
+            .unwrap_or_else(|| panic!("missing receipt extension"))
+            .clone();
+
+        // Converting the signed HTTP receipt with the kernel keypair reproduces
+        // the exact core receipt the durable sink appended, so its id must be
+        // present in the store after the call.
+        let expected = http_receipt
+            .to_chio_receipt_with_keypair(&keypair)
+            .unwrap_or_else(|e| panic!("convert failed: {e}"));
+        let stored_ids = store.stored_ids();
+        assert!(
+            stored_ids.contains(&expected.id),
+            "durable store must contain the HTTP decision receipt {}; stored: {stored_ids:?}",
+            expected.id
+        );
     }
 }
