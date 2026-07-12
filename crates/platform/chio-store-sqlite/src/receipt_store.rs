@@ -910,10 +910,13 @@ fn handle_non_append_command(
             // and stamp a watermark the archive cannot back. The full chain audit
             // rejects exactly that. Rotation is off the append hot path, so the O(N)
             // rebuild is affordable here even in incremental mode.
-            if let Err(error) = verify_latest_checkpoint_integrity(&connection) {
-                let _ = response.send(Err(error));
-                return;
-            }
+            let verified_latest_checkpoint = match verify_checkpoint_chain_integrity(&connection) {
+                Ok(latest) => latest,
+                Err(error) => {
+                    let _ = response.send(Err(error));
+                    return;
+                }
+            };
             // The claim-log projection audit runs before EVERY rotation,
             // regardless of verification mode. A store in the drift shape (source
             // receipts deleted but their claim-log rows left behind, the shape
@@ -928,19 +931,27 @@ fn handle_non_append_command(
                 let _ = response.send(Err(error));
                 return;
             }
-            // In incremental mode the O(N) chain rebuild above is skipped, so the
-            // rotation must not archive past the checkpoint boundary this actor
-            // has actually verified: a second store instance or an operator
-            // import may have appended checkpoint rows since the head was seeded,
-            // and those are unaudited until a later append catches the head up.
-            // Cap the archival watermark at the verified boundary. Full
-            // verification already covered every persisted checkpoint in
-            // non-incremental mode, so no cap is needed there.
+            // In incremental mode the rotation trusts the per-append verified head
+            // rather than an O(N) rebuild on the append hot path, but that head can
+            // lag `kernel_checkpoints`: a second store instance or an operator
+            // import may have appended checkpoint rows this handle has not yet
+            // adopted, so `head.checkpointed_entry_seq()` stays at the boundary the
+            // head was seeded at until a later append catches it up. Capping the
+            // archival watermark at that stale boundary would make a quiet store
+            // archive nothing on every retention interval despite holding aged,
+            // checkpointed receipts. The full chain audit just above validated
+            // every persisted checkpoint, so cap instead at the freshest VERIFIED
+            // boundary: the latest persisted checkpoint's batch_end_seq (pinned
+            // from that audit, so a checkpoint appended after it cannot widen the
+            // cap). Non-incremental mode runs the same audit in its rotation path
+            // and computes the watermark from every persisted checkpoint, so it
+            // needs no cap.
             let verified_ceiling = if incremental_verification {
-                match head_state {
-                    WriterHeadState::Verified(head) => Some(head.checkpointed_entry_seq()),
-                    WriterHeadState::Poisoned(_) => Some(0),
-                }
+                Some(
+                    verified_latest_checkpoint
+                        .as_ref()
+                        .map_or(0, |checkpoint| checkpoint.body.batch_end_seq),
+                )
             } else {
                 None
             };

@@ -3425,16 +3425,18 @@ fn repair_rejects_archive_that_does_not_back_the_watermark(
     Ok(())
 }
 
-/// In incremental mode the rotation skips the O(N) chain rebuild and trusts the
-/// per-append verified head. That head can be stale relative to
+/// In incremental mode the rotation skips the O(N) chain rebuild on the append
+/// hot path and trusts the per-append verified head, which can lag
 /// `kernel_checkpoints` when a second store instance appends checkpoint rows
-/// after it was seeded, and computing the archival watermark from every
-/// persisted checkpoint would then prune up to an unaudited boundary. Rotation
-/// must cap the watermark at the checkpoint boundary the actor has actually
-/// verified, archiving only the audited prefix and leaving the newer checkpoint
-/// for a later, verified pass.
+/// this handle has not adopted. The rotation path itself still audits the FULL
+/// persisted checkpoint chain before pruning, so it must cap the archival
+/// watermark at the freshest VERIFIED boundary (the latest persisted checkpoint)
+/// rather than the possibly-stale in-memory head. Otherwise a quiet store that
+/// another instance advanced would archive nothing every interval despite
+/// holding aged, checkpointed receipts.
 #[test]
-fn rotation_caps_watermark_at_verified_head() -> Result<(), Box<dyn std::error::Error>> {
+fn rotation_archives_to_freshest_verified_checkpoint_despite_stale_head(
+) -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("rotation-verified-ceiling");
     let archive = unique_db_path("rotation-verified-ceiling-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
@@ -3474,12 +3476,13 @@ fn rotation_caps_watermark_at_verified_head() -> Result<(), Box<dyn std::error::
         assert!(store_b.load_checkpoint_by_seq(2)?.is_some());
     }
 
-    // Rotate through the stale instance A. Uncapped it would archive the whole
-    // aged [1,4]; capped at the verified boundary it archives only [1,2].
+    // Rotate through the stale instance A. Its cached head sits at boundary 2,
+    // but the rotation audits the full persisted chain and archives the whole
+    // aged, verified [1,4] instead of stalling at the stale head.
     let archived = store_a.archive_receipts_before(150, archive_path)?;
     assert_eq!(
-        archived, 2,
-        "rotation must cap at the verified checkpoint boundary"
+        archived, 4,
+        "rotation must archive to the freshest verified checkpoint boundary"
     );
 
     let conn = store_a.reader_connection_for_test()?;
@@ -3490,8 +3493,8 @@ fn rotation_caps_watermark_at_verified_head() -> Result<(), Box<dyn std::error::
     )?;
     assert_eq!(
         watermark,
-        Some(2),
-        "the watermark stays at the verified boundary"
+        Some(4),
+        "the watermark advances to the freshest verified boundary"
     );
     let survivors: i64 = conn.query_row(
         "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq IN (3, 4)",
@@ -3499,8 +3502,8 @@ fn rotation_caps_watermark_at_verified_head() -> Result<(), Box<dyn std::error::
         |r| r.get(0),
     )?;
     assert_eq!(
-        survivors, 2,
-        "the unaudited checkpoint's rows must not be pruned"
+        survivors, 0,
+        "the aged, verified checkpoint's rows are pruned once the chain is audited"
     );
 
     let _ = std::fs::remove_file(&path);
