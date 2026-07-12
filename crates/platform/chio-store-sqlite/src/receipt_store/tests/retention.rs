@@ -2331,6 +2331,114 @@ fn health_reports_checkpoint_error_without_probing_archived_rows(
     Ok(())
 }
 
+/// An authorization receipt in an aged checkpointed prefix whose consumer
+/// receipt is still live must not be archived-and-deleted: doing so would strand
+/// the live consumer's `chio_authorization_receipt_consumptions` binding. The
+/// watermark must stop below the authorization so the whole pair archives
+/// together on a later rotation, and the live binding survives in the meantime.
+#[test]
+fn rotation_preserves_binding_for_live_consumer_of_aged_authorization(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("live-consumer-binding");
+    let archive = unique_db_path("live-consumer-binding-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    // Checkpoints [1,2] and [3,4] are fully aged; [5,6] is fresh. The
+    // authorization sits at entry 3 (aged) and its consumer at entry 5 (fresh),
+    // so a naive cutoff would archive the authorization while the consumer stays
+    // live and split their binding.
+    for i in 0..4u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("lb-aged-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    for i in 4..6u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("lb-fresh-{i}"),
+            i + 1,
+            500,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(store.load_checkpoint_by_seq(3)?.is_some());
+
+    let receipt_id_at = |entry_seq: i64| -> Result<String, Box<dyn std::error::Error>> {
+        let connection = store.reader_connection_for_test()?;
+        Ok(connection.query_row(
+            "SELECT receipt_id FROM claim_receipt_log_entries WHERE entry_seq = ?1",
+            rusqlite::params![entry_seq],
+            |row| row.get::<_, String>(0),
+        )?)
+    };
+    let authorization_id = receipt_id_at(3)?;
+    let consumer_id = receipt_id_at(5)?;
+    store.writer_handle().run_write({
+        let authorization_id = authorization_id.clone();
+        let consumer_id = consumer_id.clone();
+        move |connection| {
+            connection.execute(
+                "INSERT INTO chio_authorization_receipt_consumptions \
+                 (authorization_receipt_id, consumer_receipt_id, request_id, session_id, tool_call_id, tenant_id, parameter_hash, consumed_at_unix_ms) \
+                 VALUES (?1, ?2, 'req-lb', 'sess-lb', 'call-lb', NULL, 'hash-lb', 1000)",
+                rusqlite::params![authorization_id, consumer_id],
+            )?;
+            Ok(())
+        }
+    })?;
+
+    // The watermark must stop at 2 (below the aged authorization at entry 3), not
+    // advance to 4 and strand the live consumer's binding.
+    let archived = store.archive_receipts_before(150, archive_path)?;
+    assert_eq!(
+        archived, 2,
+        "the watermark must stop below the authorization whose consumer is still live"
+    );
+
+    let live = store.reader_connection_for_test()?;
+    let surviving: i64 = live.query_row(
+        "SELECT COUNT(*) FROM chio_authorization_receipt_consumptions",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        surviving, 1,
+        "the live consumer's authorization-consumption binding must survive the rotation"
+    );
+    let binding: (String, String) = live.query_row(
+        "SELECT authorization_receipt_id, consumer_receipt_id \
+         FROM chio_authorization_receipt_consumptions",
+        [],
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+    )?;
+    assert_eq!(
+        binding,
+        (authorization_id.clone(), consumer_id),
+        "the surviving binding must still bind the live consumer to its authorization"
+    );
+    let authorization_live: i64 = live.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE receipt_id = ?1",
+        rusqlite::params![authorization_id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        authorization_live, 1,
+        "the authorization backing the live binding must remain live"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// `chio receipt flush` reads committed progress from `flush_report`. After a
 /// full-prefix rotation deletes every live claim-log row, the live MAX(entry_seq)
 /// is 0 while the checkpoint chain and retention watermark still sit at the

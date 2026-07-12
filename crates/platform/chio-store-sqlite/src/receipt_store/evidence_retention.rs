@@ -405,8 +405,18 @@ impl SqliteReceiptStore {
 }
 
 /// Largest checkpoint `batch_end_seq` whose entire covered prefix (in the
-/// entry_seq domain) has aged past `cutoff`. 0 when no whole checkpointed batch
-/// has fully aged (a no-op rotation).
+/// entry_seq domain) has aged past `cutoff` and never splits a live
+/// authorization-consumption pair. 0 when no whole checkpointed batch qualifies
+/// (a no-op rotation).
+///
+/// An authorization receipt and the consumer receipt that consumed it are bound
+/// by a `chio_authorization_receipt_consumptions` row keyed on the authorization
+/// (a RESTRICT foreign key). Archiving-and-deleting the authorization while its
+/// consumer is still live would either strand that row (dropping the live
+/// consumer's replay/audit binding) or fail closed on the RESTRICT delete. The
+/// watermark therefore never advances past an authorization whose bound consumer
+/// still sits above the boundary: the whole pair archives together on a later
+/// rotation once the consumer has also aged out.
 fn compute_archival_watermark(
     connection: &rusqlite::Connection,
     cutoff_unix_secs: u64,
@@ -420,6 +430,13 @@ fn compute_archival_watermark(
             SELECT 1 FROM claim_receipt_log_entries e
             WHERE e.entry_seq <= kc.batch_end_seq
               AND e.timestamp >= ?1
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM chio_authorization_receipt_consumptions ac
+            JOIN claim_receipt_log_entries ae ON ae.receipt_id = ac.authorization_receipt_id
+            JOIN claim_receipt_log_entries ce ON ce.receipt_id = ac.consumer_receipt_id
+            WHERE ae.entry_seq <= kc.batch_end_seq
+              AND ce.entry_seq > kc.batch_end_seq
         )
         "#,
         params![cutoff],
@@ -1340,6 +1357,12 @@ pub(super) fn delete_archived_prefix_in_tx(
         DELETE FROM metered_billing_reconciliations WHERE receipt_id IN (
             SELECT receipt_id FROM claim_receipt_log_entries
             WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
+        -- Safe to key this delete on the archived authorization alone:
+        -- `compute_archival_watermark` never advances W past an authorization
+        -- whose bound consumer is still live, so every consumption removed here
+        -- has both its authorization and (when the consumer is a live receipt)
+        -- its consumer inside the archived prefix. No live consumer loses its
+        -- binding, and the co-archived copy preserves the archived pair.
         DELETE FROM chio_authorization_receipt_consumptions WHERE authorization_receipt_id IN (
             SELECT receipt_id FROM claim_receipt_log_entries
             WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
