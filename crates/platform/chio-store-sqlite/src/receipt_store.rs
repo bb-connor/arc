@@ -890,21 +890,24 @@ fn handle_non_append_command(
                     return;
                 }
             };
-            // Fail-closed: rotation deletes evidence, so a non-verified head must
-            // not authorize it. On a non-incremental (suspect) store the Verified
-            // state is NOT proof of chain integrity: that mode seeds the head via
-            // `seed_head_snapshot`, which defers the full checkpoint-chain audit
-            // to the next append, so a metadata-only deployment could otherwise
-            // rotate and delete against an unaudited chain. Run the same
-            // checkpoint verification the non-incremental write pre-check runs
-            // before touching the store. Incremental stores maintain a per-append
-            // verified head, so their Verified state already proves the chain and
-            // this O(N) rebuild is skipped.
-            if !incremental_verification {
-                if let Err(error) = verify_latest_checkpoint_integrity(&connection) {
-                    let _ = response.send(Err(error));
-                    return;
-                }
+            // Fail-closed: rotation deletes evidence, so it must audit the FULL
+            // persisted checkpoint chain against the live claim log before pruning,
+            // in BOTH verification modes. A non-incremental store seeds its head
+            // via `seed_head_snapshot`, which defers the checkpoint-chain audit to
+            // the next append, so its Verified state is not proof of integrity. An
+            // incremental store maintains a per-append verified head, but that head
+            // only attests NEW appends: it never notices a retroactive deletion of
+            // a checkpoint-covered source row AND its claim-log projection row after
+            // the store was opened. That drift leaves the source and projection sets
+            // matching (so the projection audit below passes) while the covering
+            // checkpoint's claim-log range falls short of its signed tree_size, and
+            // rotating over it would co-archive only the survivors, delete the rest,
+            // and stamp a watermark the archive cannot back. The full chain audit
+            // rejects exactly that. Rotation is off the append hot path, so the O(N)
+            // rebuild is affordable here even in incremental mode.
+            if let Err(error) = verify_latest_checkpoint_integrity(&connection) {
+                let _ = response.send(Err(error));
+                return;
             }
             // The claim-log projection audit runs before EVERY rotation,
             // regardless of verification mode. A store in the drift shape (source

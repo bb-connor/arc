@@ -915,6 +915,88 @@ fn incremental_rotation_rejects_projection_drift() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+/// An incremental store's per-append verified head attests only NEW appends, so
+/// it never notices a retroactive deletion of BOTH a checkpoint-covered source
+/// row and its claim-log projection row. That drift leaves the source and
+/// projection sets matching (the projection audit passes) while the covering
+/// checkpoint's claim-log range falls short of its signed tree_size. Rotation
+/// must audit the live checkpoint chain before deleting even in incremental
+/// mode and fail closed, rather than co-archive only the survivors, delete the
+/// rest, and stamp a watermark the archive can never back (a bricked store with
+/// its remaining live evidence gone).
+#[test]
+fn incremental_rotation_audits_chain_before_deleting() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("incremental-chain-audit-rotation");
+    let archive = unique_db_path("incremental-chain-audit-rotation-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    // A default open() store runs incremental verification, so the per-append
+    // head is trusted and the O(N) chain rebuild would otherwise be skipped.
+    let store = SqliteReceiptStore::open(&path)?;
+    assert!(store.incremental_verification_enabled());
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for i in 0..4u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("id-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    store.flush_receipt_writes()?;
+    // Checkpoint [1,2] covers entry_seq 1 and 2 with a signed tree_size of 2.
+    assert!(store.load_checkpoint_by_seq(1)?.is_some());
+
+    // Retroactively delete BOTH the source row and its claim-log row for a
+    // checkpoint-[1,2]-covered receipt. The source and projection sets both lose
+    // the same receipt, so they stay in agreement and the projection audit
+    // passes; only the checkpoint chain audit notices the now-short covered range.
+    store.writer_handle().run_write(|connection| {
+        connection.execute_batch(
+            "DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
+             DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete; \
+             DELETE FROM main.chio_tool_receipts WHERE seq = 2; \
+             DELETE FROM main.claim_receipt_log_entries WHERE entry_seq = 2; \
+             CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
+               BEFORE DELETE ON chio_tool_receipts \
+               BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END; \
+             CREATE TRIGGER IF NOT EXISTS claim_receipt_log_entries_reject_delete \
+               BEFORE DELETE ON claim_receipt_log_entries \
+               BEGIN SELECT RAISE(ABORT, 'claim receipt log entries are immutable'); END;",
+        )?;
+        Ok(())
+    })?;
+
+    // The rotation must detect the short checkpoint range and fail closed BEFORE
+    // any archive-and-delete.
+    let error = store
+        .archive_receipts_before(150, archive_path)
+        .err()
+        .ok_or("rotation over an unaudited checkpoint chain must fail closed, not archive-and-delete")?;
+    assert!(
+        matches!(error, ReceiptStoreError::Conflict(_)),
+        "expected a fail-closed Conflict from the chain audit, got {error:?}"
+    );
+
+    // Fail-closed: the surviving live evidence for [1,2] was not deleted.
+    let live = store.reader_connection_for_test()?;
+    let live_log: i64 = live.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq <= 2",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        live_log, 1,
+        "the surviving covered claim-log row must not be deleted when the chain is unaudited"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// A store reopened through `open_existing` holds READ_WRITE-without-CREATE
 /// connection flags so that a missing main database fails closed. Because
 /// `ATTACH DATABASE` inherits those flags, the first retention rotation against
@@ -2972,8 +3054,12 @@ fn retention_tombstones_are_immutable() -> Result<(), Box<dyn std::error::Error>
 /// already committed to; the earlier prefix was deleted from the live store and
 /// survives nowhere else. If that archive is missing, recreating an empty file
 /// and co-archiving only the new suffix would advance the watermark while the
-/// earlier prefix is backed by no archive. Rotation must verify the recorded
-/// archive still backs the committed watermark and fail closed otherwise.
+/// earlier prefix is backed by no archive. Rotation must fail closed and leave
+/// the prefix intact. With the missing archive the committed watermark can no
+/// longer be trusted, so the pre-rotation chain audit sees the deleted `[1,2]`
+/// prefix as a live claim-log gap and refuses there; either that gap refusal or
+/// the archive-backing refusal is an acceptable fail-closed outcome, and neither
+/// may advance the watermark or delete the surviving suffix.
 #[test]
 fn rotation_refuses_when_prior_archive_missing() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("rotation-missing-prior-archive");
@@ -2993,7 +3079,8 @@ fn rotation_refuses_when_prior_archive_missing() -> Result<(), Box<dyn std::erro
         .ok_or("expected a fail-closed refusal; rotation stranded the prior prefix")?
         .to_string();
     assert!(
-        message.contains("no longer backs the committed watermark"),
+        message.contains("no longer backs the committed watermark")
+            || message.contains("gap in checkpoint signer binding"),
         "unexpected error: {message}"
     );
 
