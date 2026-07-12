@@ -94,6 +94,10 @@ jobs:
           python3 scripts/check-rust-public-surface.py
           bash scripts/tests/check-rust-public-surface.test.sh
           python3 scripts/check-architecture-docs.py
+          bash ./scripts/check-security-provenance.sh
+          bash ./scripts/check-security-dependencies.sh
+          bash ./scripts/tests/check-security-provenance.test.sh
+          bash ./scripts/tests/check-security-dependencies.test.sh
           bash ./scripts/check-sre-metrics-registry.sh
           bash ./scripts/check-log-redaction.sh
           bash ./scripts/check-http-egress-contract.sh

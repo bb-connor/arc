@@ -9,6 +9,10 @@ python3 scripts/check-review-slices.py
 python3 scripts/check-rust-public-surface.py
 bash scripts/tests/check-rust-public-surface.test.sh
 python3 scripts/check-architecture-docs.py
+./scripts/check-security-provenance.sh
+./scripts/check-security-dependencies.sh
+bash scripts/tests/check-security-provenance.test.sh
+bash scripts/tests/check-security-dependencies.test.sh
 ./scripts/check-formal-proofs.sh
 ./scripts/check-aeneas-pilot.sh
 ./scripts/check-aeneas-production.sh
