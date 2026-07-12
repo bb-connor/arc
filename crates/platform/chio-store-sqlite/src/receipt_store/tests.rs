@@ -28,3 +28,5 @@ mod support;
 mod underwriting_credit;
 #[path = "tests/verified_head.rs"]
 mod verified_head;
+#[path = "tests/dispatch_intent.rs"]
+mod dispatch_intent;

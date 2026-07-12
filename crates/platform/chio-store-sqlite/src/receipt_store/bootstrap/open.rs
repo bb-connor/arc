@@ -1130,6 +1130,29 @@ impl SqliteReceiptStore {
                 CHECK (archived_through_entry_seq >= 0)
             );
 
+            -- Non-audit operational journal: one durable row per in-flight
+            -- side-effecting or monetary dispatch, written before the effect
+            -- and consumed in the same transaction as the receipt append.
+            -- Never signed, never entered into chio_tool_receipts, and never
+            -- counted by checkpoints or retention.
+            CREATE TABLE IF NOT EXISTS chio_dispatch_intents (
+                request_id            TEXT PRIMARY KEY,
+                capability_id         TEXT NOT NULL,
+                tool_server           TEXT NOT NULL,
+                tool_name             TEXT NOT NULL,
+                parameter_hash        TEXT NOT NULL,
+                side_effect_class     TEXT NOT NULL,
+                monetary              INTEGER NOT NULL,
+                rail                  TEXT,
+                rail_authorization_id TEXT,
+                tenant_id             TEXT,
+                created_at_unix_ms    INTEGER NOT NULL,
+                state                 TEXT NOT NULL DEFAULT 'open',
+                resolution_detail     TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_chio_dispatch_intents_state
+                ON chio_dispatch_intents(state);
+
             "#,
         )?;
         connection.execute_batch(crate::IOU_ENVELOPE_MIGRATION)?;
