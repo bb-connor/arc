@@ -1434,6 +1434,18 @@ impl ChioKernel {
             ));
         };
 
+        self.validate_web3_evidence_receipt_store(supports_kernel_signed_checkpoints)
+    }
+
+    /// Validate a prospective receipt store before installing it.
+    pub fn validate_web3_evidence_receipt_store(
+        &self,
+        supports_kernel_signed_checkpoints: bool,
+    ) -> Result<(), KernelError> {
+        if !self.requires_web3_evidence() {
+            return Ok(());
+        }
+
         if self.checkpoint_batch_size == 0 {
             return Err(KernelError::Web3EvidenceUnavailable(
                 "web3-enabled deployments require checkpoint_batch_size > 0".to_string(),
