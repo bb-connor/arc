@@ -3,6 +3,7 @@ use chio_core::capability::token::CapabilityToken;
 use chio_core::credit::CreditBondRow;
 use chio_core::crypto::Keypair;
 use chio_core::receipt::{body::ChioReceipt, lineage::ChildRequestReceipt};
+use chio_log_redact::redacted;
 
 use crate::capability_lineage::CapabilitySnapshot;
 use crate::checkpoint::KernelCheckpoint;
@@ -90,7 +91,7 @@ impl RetentionMaintenanceHandle {
                     Ok(Err(error)) => {
                         tracing::warn!(
                             target: "chio::retention",
-                            %error,
+                            error = %redacted!(&error),
                             "receipt rotation failed; will retry next interval"
                         );
                     }
