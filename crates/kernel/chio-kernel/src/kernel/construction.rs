@@ -786,6 +786,23 @@ impl ChioKernel {
                 ));
         }
         self.receipt_store = Some(receipt_store);
+        // Before this store serves, resolve every dispatch intent that
+        // survived a restart: each one marks a call whose effect may have run
+        // with no receipt. The default posture dead-letters them into
+        // durable, health-flipping incidents (a side effect is never blindly
+        // replayed); a store without the journal reports an empty pass.
+        if let Some(store) = self.receipt_store.as_ref() {
+            let report =
+                store.reconcile_dispatch_intents(&crate::DefaultDispatchIntentReconciler)?;
+            if report.dead_lettered > 0 || report.monetary_reconciled > 0 {
+                tracing::warn!(
+                    open = report.open,
+                    dead_lettered = report.dead_lettered,
+                    monetary_reconciled = report.monetary_reconciled,
+                    "dispatch intents survived a restart; incidents recorded for operator review"
+                );
+            }
+        }
         Ok(())
     }
 

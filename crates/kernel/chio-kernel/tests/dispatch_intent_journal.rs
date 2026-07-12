@@ -791,6 +791,48 @@ fn monetary_intent_carries_rail_and_authorization_id_before_dispatch(
 }
 
 #[test]
+fn boot_reconciliation_dead_letters_a_surviving_orphan(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use std::sync::Arc;
+
+    // Simulate a crash: an intent is durably open in the store file with no
+    // receipt, and the process (the store handle) goes away.
+    let path = support::unique_kernel_db_path("chio-intent-boot-reconcile");
+    {
+        let store = chio_store_sqlite::SqliteReceiptStore::open(&path)?;
+        let mut orphan = sample_intent_record("orphan-boot");
+        orphan.side_effect_class = SideEffectClass::Monetary;
+        orphan.monetary = true;
+        orphan.rail = Some("x402".to_string());
+        orphan.rail_authorization_id = Some("auth-9".to_string());
+        store.record_dispatch_intent(&orphan)?;
+    }
+
+    // A fresh kernel attaching the same file must reconcile before serving:
+    // the orphan becomes a durable dead-letter incident and the store reads
+    // unhealthy until an operator resolves it.
+    let store = Arc::new(chio_store_sqlite::SqliteReceiptStore::open(&path)?);
+    let mut kernel = chio_kernel::ChioKernel::new(support::journal_config(Keypair::generate()));
+    kernel.set_receipt_store_handle(
+        Arc::clone(&store) as Arc<dyn chio_kernel::ReceiptStore>
+    )?;
+
+    assert_eq!(store.open_dispatch_intent_count()?, 0);
+    assert_eq!(store.dead_letter_dispatch_intent_count()?, 1);
+    let health = store.receipt_store_health()?;
+    assert!(!health.healthy, "a surviving orphan flips health");
+    assert_eq!(health.dead_letter_dispatch_intents, 1);
+
+    // The incident names the rail and its authorization id.
+    let store_for_detail = chio_store_sqlite::SqliteReceiptStore::open_existing(&path)?;
+    let report = store_for_detail.reconcile_dispatch_intents(&DeadLetterEverything)?;
+    assert_eq!(report.open, 0, "nothing is left open after boot");
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
 fn journal_trait_methods_fail_closed_by_default() {
     let store = UnsupportedStore;
 

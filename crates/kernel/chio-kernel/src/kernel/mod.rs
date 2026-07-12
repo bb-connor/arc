@@ -14,6 +14,7 @@ mod kernel_scopes;
 mod kernel_struct;
 
 pub use construction::KernelBuildError;
+pub use dispatch_intent::DefaultDispatchIntentReconciler;
 pub use error::{HotPathStage, KernelError, OverloadResource, StructuredErrorReport};
 pub use kernel_struct::{
     ChioKernel, HotPathDeadlineConfig, HybridSigningConfig, KernelConfig, MemoryBudgetConfig,

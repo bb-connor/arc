@@ -1,8 +1,36 @@
 use super::*;
 
 use crate::receipt_store::{
-    DispatchIntentHandle, DispatchIntentJournalMode, DispatchIntentRecord, SideEffectClass,
+    DispatchIntentHandle, DispatchIntentJournalMode, DispatchIntentReconciler,
+    DispatchIntentRecord, DispatchIntentResolution, ReceiptStoreError, SideEffectClass,
 };
+
+/// Boot-time reconciler for intents that survived a restart: every orphan
+/// becomes a durable dead-letter incident, because a side effect is never
+/// blindly re-executed. A monetary orphan's incident names its rail (and the
+/// rail authorization id when the crash happened after authorize) so an
+/// operator can reconcile against the rail; a rail-querying reconciler can
+/// replace this default to resolve monetary orphans automatically.
+pub struct DefaultDispatchIntentReconciler;
+
+impl DispatchIntentReconciler for DefaultDispatchIntentReconciler {
+    fn resolve(
+        &self,
+        intent: &DispatchIntentRecord,
+    ) -> Result<DispatchIntentResolution, ReceiptStoreError> {
+        let detail = match (&intent.rail, &intent.rail_authorization_id) {
+            (Some(rail), Some(authorization_id)) => format!(
+                "outcome unknown after restart; rail={rail}; \
+                 rail_authorization_id={authorization_id}"
+            ),
+            (Some(rail), None) => {
+                format!("outcome unknown after restart; rail={rail}; query the rail")
+            }
+            _ => "outcome unknown after restart".to_string(),
+        };
+        Ok(DispatchIntentResolution::DeadLetter { detail })
+    }
+}
 
 impl ChioKernel {
     /// Compute the side-effect class for this call and, unless it is

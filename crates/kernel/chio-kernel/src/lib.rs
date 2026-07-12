@@ -442,7 +442,8 @@ mod kernel;
 pub(crate) use kernel::{current_unix_timestamp, MatchingGrant, ReceiptContent};
 
 pub use kernel::{
-    AgentId, CapabilityId, ChildReceiptLog, ChioKernel, Guard, GuardContext, GuardDecision,
+    AgentId, CapabilityId, ChildReceiptLog, ChioKernel, DefaultDispatchIntentReconciler, Guard,
+    GuardContext, GuardDecision,
     HotPathDeadlineConfig, HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig,
     KernelError, MemoryBudgetConfig, OverloadResource, PromptProvider, ReceiptLog,
     ResourceProvider, RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
