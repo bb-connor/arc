@@ -37,6 +37,7 @@ pub enum BudgetMutationKind {
     ReverseExposure,
     ReleaseExposure,
     ReconcileSpend,
+    ExpireHold,
 }
 
 impl BudgetMutationKind {
@@ -47,6 +48,7 @@ impl BudgetMutationKind {
             Self::ReverseExposure => "reverse_exposure",
             Self::ReleaseExposure => "release_exposure",
             Self::ReconcileSpend => "reconcile_spend",
+            Self::ExpireHold => "expire_hold",
         }
     }
 
@@ -57,6 +59,7 @@ impl BudgetMutationKind {
             "reverse_exposure" => Some(Self::ReverseExposure),
             "release_exposure" => Some(Self::ReleaseExposure),
             "reconcile_spend" => Some(Self::ReconcileSpend),
+            "expire_hold" => Some(Self::ExpireHold),
             _ => None,
         }
     }
@@ -191,6 +194,17 @@ pub struct BudgetAuthorizeHoldRequest {
     /// before the rail is touched. `None` for non-monetary calls and for
     /// stores without the journal.
     pub payment_journal: Option<crate::payment::PaymentJournalRecord>,
+}
+
+/// Read model of an open budget hold, for the orphaned-hold sweeper and the
+/// operator CLI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenHoldSummary {
+    pub hold_id: String,
+    pub capability_id: String,
+    pub grant_index: u32,
+    pub remaining_exposure_units: u64,
+    pub created_at_unix_ms: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -510,6 +524,30 @@ pub trait BudgetStore: Send + Sync {
 
     fn budget_metering_profile(&self) -> BudgetMeteringProfile {
         BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual
+    }
+
+    /// Open holds created at or before `older_than_unix_ms`, oldest first.
+    /// Default: empty (stores without hold rows have nothing to sweep).
+    fn list_open_holds_older_than(
+        &self,
+        _older_than_unix_ms: u64,
+        _limit: usize,
+    ) -> Result<Vec<OpenHoldSummary>, BudgetStoreError> {
+        Ok(Vec::new())
+    }
+
+    /// Release the remaining exposure of an open hold, mark it expired, and
+    /// append an expire event. Idempotent: a non-open hold returns
+    /// `Ok(false)`. Default: unsupported.
+    fn expire_open_hold(&self, _hold_id: &str) -> Result<bool, BudgetStoreError> {
+        Err(BudgetStoreError::Invariant(
+            "open-hold sweep is not supported by this budget store".to_string(),
+        ))
+    }
+
+    /// Count of holds currently open, for the open-holds gauge. Default: 0.
+    fn open_hold_count(&self) -> Result<u64, BudgetStoreError> {
+        Ok(0)
     }
 
     /// Insert a fresh payment-journal row in `HoldPlaced`. Fails closed on

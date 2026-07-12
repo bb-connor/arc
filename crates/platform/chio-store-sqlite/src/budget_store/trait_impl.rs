@@ -81,6 +81,124 @@ impl BudgetStore for SqliteBudgetStore {
         )
     }
 
+    fn list_open_holds_older_than(
+        &self,
+        older_than_unix_ms: u64,
+        limit: usize,
+    ) -> Result<Vec<chio_kernel::budget_store::OpenHoldSummary>, BudgetStoreError> {
+        // Hold rows stamp created_at in unix seconds; the trait API speaks
+        // milliseconds, so convert at the boundary.
+        let cutoff_secs = (older_than_unix_ms / 1_000).min(i64::MAX as u64) as i64;
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            "SELECT hold_id, capability_id, grant_index, remaining_exposure_units, created_at \
+             FROM budget_authorization_holds \
+             WHERE disposition = 'open' AND created_at <= ?1 \
+             ORDER BY created_at ASC LIMIT ?2",
+        )?;
+        let rows = statement.query_map(
+            params![cutoff_secs, limit.min(i64::MAX as usize) as i64],
+            |row| {
+                Ok(chio_kernel::budget_store::OpenHoldSummary {
+                    hold_id: row.get::<_, String>(0)?,
+                    capability_id: row.get::<_, String>(1)?,
+                    grant_index: row.get::<_, i64>(2)?.clamp(0, i64::from(u32::MAX)) as u32,
+                    remaining_exposure_units: row.get::<_, i64>(3)?.max(0) as u64,
+                    created_at_unix_ms: (row.get::<_, i64>(4)?.max(0) as u64).saturating_mul(1_000),
+                })
+            },
+        )?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
+    fn expire_open_hold(&self, hold_id: &str) -> Result<bool, BudgetStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        // Read the open hold's remainder and owning grant inside the
+        // transaction; a non-open or absent hold is an idempotent no-op.
+        let row: Option<(String, i64, i64)> = transaction
+            .query_row(
+                "SELECT capability_id, grant_index, remaining_exposure_units \
+                 FROM budget_authorization_holds WHERE hold_id = ?1 AND disposition = 'open'",
+                params![hold_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?;
+        let Some((capability_id, grant_index, remaining)) = row else {
+            return Ok(false);
+        };
+        let remaining = remaining.max(0);
+        let now = unix_now();
+        // Release capacity by exactly the remainder. Never touch realized
+        // spend: an expired hold returns capacity without recording spend.
+        transaction.execute(
+            "UPDATE capability_grant_budgets \
+             SET total_cost_exposed = MAX(total_cost_exposed - ?1, 0), updated_at = ?2 \
+             WHERE capability_id = ?3 AND grant_index = ?4",
+            params![remaining, now, capability_id, grant_index],
+        )?;
+        transaction.execute(
+            "UPDATE budget_authorization_holds \
+             SET disposition = 'expired', remaining_exposure_units = 0, updated_at = ?1 \
+             WHERE hold_id = ?2",
+            params![now, hold_id],
+        )?;
+        let usage: Option<(u64, u32, u64, u64)> = transaction
+            .query_row(
+                "SELECT seq, invocation_count, total_cost_exposed, total_cost_realized_spend \
+                 FROM capability_grant_budgets WHERE capability_id = ?1 AND grant_index = ?2",
+                params![capability_id, grant_index],
+                |row| {
+                    Ok((
+                        budget_u64_from_row(row, 0, "seq")?,
+                        budget_u32_from_row(row, 1, "invocation_count")?,
+                        budget_u64_from_row(row, 2, "total_cost_exposed")?,
+                        budget_u64_from_row(row, 3, "total_cost_realized_spend")?,
+                    ))
+                },
+            )
+            .optional()?;
+        let (usage_seq, invocation_count_after, exposed_after, realized_after) =
+            usage.unwrap_or((0, 0, 0, 0));
+        let event_seq = allocate_budget_replication_seq(&transaction)?;
+        SqliteBudgetStore::append_mutation_event(
+            &transaction,
+            Some(&format!("{hold_id}:expire")),
+            Some(hold_id),
+            None,
+            &capability_id,
+            grant_index.max(0) as usize,
+            BudgetMutationKind::ExpireHold,
+            Some(true),
+            event_seq,
+            Some(usage_seq),
+            remaining as u64,
+            0,
+            None,
+            None,
+            None,
+            invocation_count_after,
+            exposed_after,
+            realized_after,
+        )?;
+        transaction.commit()?;
+        Ok(true)
+    }
+
+    fn open_hold_count(&self) -> Result<u64, BudgetStoreError> {
+        let connection = self.connection()?;
+        let count: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM budget_authorization_holds WHERE disposition = 'open'",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(count.max(0) as u64)
+    }
+
     fn authorize_budget_hold(
         &self,
         request: BudgetAuthorizeHoldRequest,

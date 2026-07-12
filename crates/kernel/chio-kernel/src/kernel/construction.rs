@@ -358,6 +358,7 @@ impl ChioKernel {
             settlement_observer: None,
             settlement_retry_store: None,
             settlement_retry_policy: chio_settle::RetryPolicy::default(),
+            budget_hold_sweep: None,
             revocation_view: None,
             budget_registry: Mutex::new(chio_kernel_core::InMemoryBudgetRegistry::new()),
             rss_shed: Arc::new(AtomicBool::new(false)),
@@ -986,6 +987,23 @@ impl ChioKernel {
         store: std::sync::Arc<dyn crate::settlement_retry::SettlementRetryStore>,
     ) {
         self.settlement_retry_store = Some(store);
+    }
+
+    /// Start the background sweeper for orphaned budget holds: once at
+    /// start, then every `interval_secs`, every open hold older than
+    /// `horizon_secs` is expired and its remaining exposure released (no
+    /// spend recorded), so a crash between a hold and its reconcile no
+    /// longer burns capacity forever. Use
+    /// [`DEFAULT_HOLD_SWEEP_INTERVAL_SECS`] and
+    /// [`DEFAULT_HOLD_EXPIRY_HORIZON_SECS`] unless the deployment has a
+    /// reason to deviate; the horizon must sit far above any legitimate
+    /// in-flight call. Restarting replaces (and joins) a previous sweeper.
+    pub fn start_budget_hold_sweeper(&mut self, interval_secs: u64, horizon_secs: u64) {
+        self.budget_hold_sweep = Some(super::budget_sweep::BudgetHoldSweepHandle::spawn(
+            Arc::clone(&self.budget_store),
+            interval_secs,
+            horizon_secs,
+        ));
     }
 
     /// Whether the durable payment journal is in force: a payment adapter is

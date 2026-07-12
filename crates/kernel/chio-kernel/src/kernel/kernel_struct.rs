@@ -722,6 +722,9 @@ pub struct ChioKernel {
     /// Retry policy the routing consumer classifies settlement outcomes
     /// against.
     pub(super) settlement_retry_policy: chio_settle::RetryPolicy,
+    /// Background sweeper for orphaned budget holds. `None` until an
+    /// operator opts in via `start_budget_hold_sweeper`; joined on drop.
+    pub(super) budget_hold_sweep: Option<super::budget_sweep::BudgetHoldSweepHandle>,
     /// Recursive-delegation oracle handle. When `Some`, the verifier consults this
     /// arc-swap-backed snapshot on every delegated dispatch and denies
     /// the capability if any link in the chain (or the leaf) is in the

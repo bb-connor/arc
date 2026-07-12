@@ -1454,6 +1454,21 @@ impl SqliteBudgetStore {
                     record.authority.as_ref(),
                 )
             }
+            BudgetMutationKind::ExpireHold => {
+                let authorized_exposure_units = Self::load_hold(transaction, hold_id)?
+                    .map(|hold| hold.authorized_exposure_units)
+                    .unwrap_or(record.exposure_units);
+                Self::upsert_hold(
+                    transaction,
+                    hold_id,
+                    &record.capability_id,
+                    record.grant_index as usize,
+                    authorized_exposure_units,
+                    0,
+                    HoldDisposition::Expired,
+                    record.authority.as_ref(),
+                )
+            }
         }
     }
 

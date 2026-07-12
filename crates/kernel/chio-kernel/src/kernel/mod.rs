@@ -7,6 +7,7 @@ use dashmap::DashMap;
 use crate::budget_store::BudgetCommitMetadata;
 use crate::*;
 
+mod budget_sweep;
 mod dispatch_intent;
 mod error;
 mod kernel_drop_guard;
@@ -14,6 +15,9 @@ mod kernel_scopes;
 mod kernel_struct;
 mod payment_reconcile;
 
+pub use budget_sweep::{
+    BudgetHoldSweepHandle, DEFAULT_HOLD_EXPIRY_HORIZON_SECS, DEFAULT_HOLD_SWEEP_INTERVAL_SECS,
+};
 pub use construction::KernelBuildError;
 pub use dispatch_intent::DefaultDispatchIntentReconciler;
 pub use error::{HotPathStage, KernelError, OverloadResource, StructuredErrorReport};

@@ -2866,3 +2866,71 @@ fn authorize_budget_hold_writes_journal_atomically() {
 
     let _ = std::fs::remove_file(&path);
 }
+
+#[test]
+fn expire_open_hold_releases_exposure_without_recording_spend() {
+    use chio_kernel::budget_store::{BudgetAuthorizeHoldRequest, BudgetMutationKind, BudgetStore};
+
+    let path = unique_db_path("hold-sweep");
+    let store = SqliteBudgetStore::open(&path).expect("open");
+    store
+        .authorize_budget_hold(BudgetAuthorizeHoldRequest {
+            capability_id: "cap".to_string(),
+            grant_index: 0,
+            max_invocations: Some(10),
+            requested_exposure_units: 70,
+            max_cost_per_invocation: Some(70),
+            max_total_cost_units: Some(500),
+            hold_id: Some("hold-sweep-1".to_string()),
+            event_id: Some("hold-sweep-1:authorize".to_string()),
+            authority: None,
+            payment_journal: None,
+        })
+        .expect("authorize hold");
+
+    let exposed_before = store
+        .get_usage("cap", 0)
+        .expect("usage")
+        .expect("record")
+        .total_cost_exposed;
+    assert_eq!(exposed_before, 70);
+    assert_eq!(store.open_hold_count().expect("count"), 1);
+
+    // Everything older than a huge horizon is eligible.
+    let open = store
+        .list_open_holds_older_than(u64::MAX, 100)
+        .expect("list open");
+    assert_eq!(open.len(), 1);
+    assert_eq!(open[0].hold_id, "hold-sweep-1");
+    assert_eq!(open[0].capability_id, "cap");
+    assert_eq!(open[0].remaining_exposure_units, 70);
+
+    // A hold younger than a zero-ms cutoff is not eligible.
+    assert!(store
+        .list_open_holds_older_than(0, 100)
+        .expect("list young")
+        .is_empty());
+
+    assert!(store.expire_open_hold("hold-sweep-1").expect("expire"));
+    // Idempotent: a second expire on a non-open hold changes nothing.
+    assert!(!store
+        .expire_open_hold("hold-sweep-1")
+        .expect("expire again"));
+
+    let usage = store.get_usage("cap", 0).expect("usage").expect("record");
+    // The exposure dropped by exactly the released remainder; no realized
+    // spend was recorded.
+    assert_eq!(usage.total_cost_exposed, 0);
+    assert_eq!(usage.total_cost_realized_spend, 0);
+
+    // The mutation log carries the expire event.
+    let events = store
+        .list_mutation_events(10, Some("cap"), Some(0))
+        .expect("events");
+    assert!(events
+        .iter()
+        .any(|event| event.kind == BudgetMutationKind::ExpireHold));
+    assert_eq!(store.open_hold_count().expect("count after"), 0);
+
+    let _ = std::fs::remove_file(&path);
+}
