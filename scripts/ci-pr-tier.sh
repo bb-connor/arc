@@ -23,8 +23,10 @@ python3 scripts/check-rust-public-surface.py
 bash scripts/tests/check-rust-public-surface.test.sh
 python3 scripts/check-architecture-docs.py
 ./scripts/check-security-provenance.sh
+python3 scripts/check-enterprise-provenance.py
 ./scripts/check-security-dependencies.sh
 bash scripts/tests/check-security-provenance.test.sh
+bash scripts/tests/check-enterprise-provenance.test.sh
 bash scripts/tests/check-security-dependencies.test.sh
 ./scripts/check-sre-metrics-registry.sh
 ./scripts/check-log-redaction.sh
