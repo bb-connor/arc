@@ -26,6 +26,13 @@ const RECEIPT_STORE_SCHEMA_KEY: &str = "receipt";
 const RECEIPT_STORE_LEGACY_ANCHOR_TABLES: &[&str] =
     &["chio_tool_receipts", "http_receipts", "tool_receipts"];
 
+/// The subset of legacy anchors whose names are generic enough that an unrelated
+/// SQLite database could carry them by coincidence. Adopting an unstamped
+/// database on one of these names alone would let a mistargeted path capture a
+/// foreign file, so each must also carry a receipt payload column before it is
+/// accepted. The Chio-specific `chio_tool_receipts` anchor needs no such check.
+const RECEIPT_STORE_GENERIC_LEGACY_ANCHOR_TABLES: &[&str] = &["http_receipts", "tool_receipts"];
+
 fn configure_sqlite_connection(connection: &mut Connection) -> Result<(), ReceiptStoreError> {
     connection.execute_batch(
         r#"
@@ -196,7 +203,11 @@ impl SqliteReceiptStore {
 
         // Validate provenance before configuring pragmas: an existing file that
         // is a foreign database must be refused before any write touches its
-        // header, so a mistargeted path is never mutated into WAL mode.
+        // header, so a mistargeted path is never mutated into WAL mode. The
+        // schema-version check adopts an unstamped database on a legacy anchor
+        // name alone, so first reject one whose generic anchor lacks the receipt
+        // shape, keeping a foreign file that merely reuses the name out.
+        reject_foreign_legacy_receipt_anchor(&connection)?;
         crate::check_schema_version(
             &connection,
             RECEIPT_STORE_SCHEMA_KEY,
@@ -1244,4 +1255,57 @@ fn require_existing_receipt_schema(
     }
 
     Ok(())
+}
+
+/// Refuse an unstamped database whose generic legacy anchor (`http_receipts` or
+/// `tool_receipts`) does not carry a receipt payload column. These names are
+/// generic enough that an unrelated SQLite database could hold one by
+/// coincidence; the schema-version check would otherwise adopt and stamp such a
+/// file as a receipt store. A database already carrying the Chio application_id
+/// is provably a Chio store and is left to the schema-version check.
+fn reject_foreign_legacy_receipt_anchor(connection: &Connection) -> Result<(), ReceiptStoreError> {
+    let application_id: i32 =
+        connection.query_row("PRAGMA application_id", [], |row| row.get(0))?;
+    if application_id != 0 {
+        return Ok(());
+    }
+    for anchor in RECEIPT_STORE_GENERIC_LEGACY_ANCHOR_TABLES {
+        if table_exists(connection, anchor)?
+            && !table_has_receipt_payload_column(connection, anchor)?
+        {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "database has a `{anchor}` table without a receipt payload column \
+                 (raw_json or receipt_json); refusing to adopt a foreign database as a receipt store"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn table_exists(connection: &Connection, table: &str) -> Result<bool, ReceiptStoreError> {
+    let present: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
+        [table],
+        |row| row.get(0),
+    )?;
+    Ok(present)
+}
+
+/// Whether `table` stores a receipt payload under a recognised JSON column:
+/// `raw_json` on the current store, `receipt_json` on the pre-stamping one. The
+/// table name is one of the store's own compile-time anchors, never caller
+/// input, and `PRAGMA table_info` takes no bound parameter for it.
+fn table_has_receipt_payload_column(
+    connection: &Connection,
+    table: &str,
+) -> Result<bool, ReceiptStoreError> {
+    let mut statement = connection.prepare(&format!("PRAGMA table_info({table})"))?;
+    let mut rows = statement.query([])?;
+    while let Some(row) = rows.next()? {
+        let column: String = row.get(1)?;
+        if column.eq_ignore_ascii_case("raw_json") || column.eq_ignore_ascii_case("receipt_json") {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
