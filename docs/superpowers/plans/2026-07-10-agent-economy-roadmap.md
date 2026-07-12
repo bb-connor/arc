@@ -10,8 +10,8 @@
 first, market capability lands on top of it, and every claim stays inside
 the bounded release posture.
 
-**Source specs:** `2026-07-10-agent-economy-program-design.md` plus the ten
-WS specs it indexes.
+**Source specs:** `2026-07-10-agent-economy-program-design.md`, the ten WS specs
+it indexes, and the shared FROST and economic-state continuity designs.
 
 ## Global Constraints (inherited by every per-phase plan)
 
@@ -20,10 +20,12 @@ WS specs it indexes.
   cargo fmt --all -- --check`.
 - No `.unwrap()` / `.expect()` in new code including tests (workspace lints
   deny them). No em dashes anywhere. Conventional commits.
-- All money is `MonetaryAmount` (u64 minor units, ISO-4217); shares and margins
-  are integer basis points, while discounts retain their owning consumer's
-  declared unit (including WS8 per-hundred discounts); commitment arithmetic is
-  checked and fails closed on overflow.
+- Every protocol-denominated commitment is `MonetaryAmount` (u64 minor units,
+  ISO-4217). Rail-native base units require an immutable asset/decimals binding,
+  checked exact conversion and round-trip proof; both representations are signed
+  and reconciled. Shares and margins are integer basis points, while discounts
+  retain their owning consumer's declared unit; commitment arithmetic is checked
+  and fails closed on overflow.
 - Fail-closed everywhere. Capabilities plus policy and guard decisions are
   pre-action authority; receipts are signed post-action evidence. Evidence
   classes never silently upgrade (program invariants 1-3).
@@ -40,11 +42,26 @@ WS specs it indexes.
   unknown-family/schema/version negatives, signed positive and tampered
   verifier fixtures, and reconciled claim/release-truth gates.
 - No wave exits with an unresolved Critical or High finding in its scope.
-- No `n_of_m` action activates without a production FROST verifier and a
-  trusted active roster, group key, key epoch, and rotation rules. `main` has no
-  such Rust verifier today; test signers and independent endorsements do not
-  satisfy this gate.
-- One branch and PR per workstream phase: `chio/ws<N>-<slug>`.
+- No `n_of_m` action activates before the owned FROST P1 verifier, P2 durable
+  signer, and P3 runtime qualification branches land with trusted active roster,
+  group key, externally anchored key epoch and authorization slot, exhaustive
+  domain/action mapping, and rollback-safe rotation. Each consumer must also
+  consume the verified authorization through a rollback-independent current
+  resource/effect gate. Test signers, independent endorsements and a local-only
+  resource CAS do not satisfy this gate.
+- WS4, WS5 and WS7 protected lifecycles require the shared external
+  `EconomicStateAnchor` batch contract and restore qualification. SQLite is only
+  staging/cache state; no protected capacity, release or dispatch may run while
+  its external resource heads are missing, unavailable or unreconciled. Each
+  protected target call additionally requires the one-time external
+  operation-bound effect-slot CAS after the matching `AdmissionOperation`
+  handoff state; a readable current head is not reusable dispatch authority.
+- Exactly one retained `AdmissionOperation` coordinates every configured
+  monetary or side-effecting call. Protocol-primitives Task 6 owns its store,
+  receipt projection, nested/top-level parity and SQLite serving fence. No
+  workstream creates a parallel dispatch journal.
+- One branch and PR per independently landable phase; exact branch names live in
+  each detailed plan.
 
 ## Tracks
 
@@ -53,16 +70,29 @@ hides the dependencies that govern release.
 
 ### Track A: release gates
 
-- RFC-0006 is on `main`. RFC-0003 must land before WS1 Phase 2; its durable
-  dispatch-intent and boot-recovery contract is not replaceable by a standalone
-  payment reconciler.
-- RFC-0013 Phase 2 money journal (inside WS1 phases 2-4): the claim "the
+- RFC-0006 base hot-path work is on `main`; its database-scoped serving-owner
+  amendment is pending. Protocol-primitives Task 6 owns that amendment and
+  corrected RFC-0003, and both must
+  land before WS1 Phase 2. Its retained operation, composable receipt projection,
+  shared dispatch boundary, serving fence and boot recovery are not replaceable
+  by a standalone payment reconciler.
+- RFC-0013 payment participant (inside WS1 phases 2-4): the claim "the
   production money loop is closed" is assertable only when the always-on
   end-to-end test enforces the RFC-0013 target invariant and F68-F74 are
-  closed, with the `Monetary` journal mode promoted to default after the
-  nightly kill-injection soak is green. Because the ladder class
+  closed. Qualification soaks cumulative `Off -> Monetary -> SideEffecting`,
+  then releases with compiled production default `SideEffecting`; `All` remains
+  opt-in and `Off` unsafe-dev only. Because the ladder class
   `settle.commitment` is `n_of_m`, that claim is also blocked until the global
   production FROST prerequisite is met and exercised by the end-to-end test.
+- FROST follows `chio/frost-p1-verifier-contract` ->
+  `chio/frost-p2-durable-signing` ->
+  `chio/frost-p3-runtime-qualification` under the 2026-07-12 executable plan.
+  P1 may run in parallel with the serving-owner work; P2 starts only after
+  protocol-primitives Task 6's database-UUID `open_serving` fence lands and reuses
+  it for every mutable FROST store.
+  P3 joins WS1 P4, WS4 P4 and WS5 P3; each join includes the consumer's exact
+  rollback-independent resource/effect gate. WS7 Phase 3 later registers and
+  qualifies its reserved action mapping before panel activation.
 - The web3 contract freeze and its external-assurance checklist are
   untouched by this program and continue to gate any on-chain promotion.
 
@@ -70,7 +100,9 @@ hides the dependencies that govern release.
 
 - Wave 1 (substrate): WS1 closes real fail-closed defects, then builds the
   RFC-0013 journal on landed RFC-0003; WS8 resolves governed parameters; WS10
-  ships the indexed read-only spend stream first.
+  ships the indexed read-only spend stream first. The shared economic-state
+  contract/adapter may begin in parallel; its SQLite cache waits for the serving
+  owner amendment.
 - Wave 2 (bounded market pilot): define and verify the canonical obligation
   and exclusive-disposition contract before any WS2-WS5 production
   integration. Pilot WS3 artifacts, pre-dispatch eligibility binding, and the
@@ -103,39 +135,53 @@ hides the dependencies that govern release.
 
 ### Wave 1
 
-Entry: specs approved on this branch; RFC-0006 confirmed on `main`.
+Entry: specs approved on this branch; RFC-0006 base work confirmed on `main`.
+Execute its pending serving-owner amendment with
+protocol-primitives Task 6 / corrected RFC-0003, FROST P1 and economic-continuity
+Tasks 1-2 as parallel foundation lanes. WS1 Phase 2, FROST P2 and
+economic-continuity Task 3 wait for the serving-owner amendment; FROST P3 follows
+P2.
 
 - WS1 phases: 1 only real fail-closed behavior (F68 routing consumer and F72
-  currency-mismatch deny); 2 durable money journal and sweeper (F70, F71,
-  F73, F74) behind the `Monetary` journal mode, starting only after RFC-0003
+  currency-mismatch deny); 2 RFC-0013 payment participant and sweeper (F70, F71,
+  F73, F74) behind `Monetary` qualification, starting only after the generic
+  operation substrate
   lands; 3 the configuration fields and `configure_*` functions together with
   the production settlement hook, async settlement runtime, credit IOU
-  driver, adapter, and oracle they actually install (F69); 4 always-on
-  end-to-end proof and journal default flip after soak. No Phase 1 no-op
+  driver, `AE-CREDIT-ADMISSION-1`, canonical obligation store, adapter, and oracle
+  they actually install (F69); 4 always-on end-to-end proof through FROST P3 and
+  release under fixed `SideEffecting` default after soak. No Phase 1 no-op
   configuration seam is an exit artifact.
 - WS8 phases: 1 artifact family, fixed-point money math, schemas, and parity; 2
-  amendment lifecycle and pure resolver; 3 persistence plus non-activating
+  currency-bound tier limits, required expiries, amendment lifecycle, fiscal
+  continuity checkpoint/anchor contract and pure resolver; 3 staged persistence,
+  independent anchor adapter and startup recovery plus non-activating
   propose/admit/approve/preview commands; 4 all five consumer adapters, both
-  open-market issuance gates, an atomic readiness record, then activation and
-  rotation plus ladder class `fiscal.amendment_activate`. No Phase 3 command may
-  set `ever_activated`.
+  open-market issuance gates, an atomic readiness record, then staged-local,
+  anchor-CAS, local-finalize activation and rotation plus ladder class
+  `fiscal.amendment_activate`. No Phase 3 command may set `ever_activated`, and
+  an anchor-unavailable or restored-old database never serves fallback.
 - WS10 phases: 1 pure contracts and schemas; 2 a full-`u64` order-preserving
   derived cost key, authenticated tenant sequence/time projections, index, and
-  read-only spend event stream; 3 exact-window burn-rate/anomaly reports and
-  deterministic underwriting merge; 4 tenant-admin, ordered, leased durable
+  read-only spend event stream; 3 exact-window burn-rate/anomaly reports, signed
+  anomaly/decision-policy lifecycle, external governance anchor, coordinated
+  policy-input-v2 and strict underwriting decision-v2 chain; 4 tenant-admin,
+  ordered, leased durable
   threshold webhooks. The cost index belongs to WS10 Phase 2 and is not deferred
   to WS1.
 
 Exit gate: WS1 Phase 4 green (release-gate claim assertable), including the
-canonical obligation and exclusive-disposition contract from Phase 3, with
-one receipt-writer transaction consuming any carried RFC-0003 intent and
-committing the receipt, applicable obligation sidecars, and attempt-zero observer work before
+  canonical obligation, credit-admission and exclusive-disposition contract from
+  Phase 3, with one `commit_admission_projection` transaction appending the
+  receipt, retaining the completed operation, and committing applicable
+  obligation sidecars and attempt-zero observer work before
 observers; WS1 Phase 3 settlement-reliability due-time/obligation indexes,
 signed same-cutoff checkpoints, range/boundary/absence proofs, and restart/tamper
 negatives green; WS8
   Phase 4 resolver live through all five adapters with fail-closed
   last-known-good tests and the activation-before-readiness negative green;
-WS10 indexed read-only stream green. Webhooks and detector-to-underwriting
+WS8 Phase 4 additionally passes old-snapshot restore, anchor-outage and every
+two-phase crash point; WS10 indexed read-only stream green. Webhooks and detector-to-underwriting
 wiring may follow without blocking the substrate exit.
 
 ### Wave 2
@@ -152,14 +198,34 @@ invented obligation type may land.
 - WS3: a bounded `chio_listing::outcome` artifact/evaluator pilot with
   `chio.outcome.eligibility.v1`, a small deterministic JSON Pointer vocabulary,
   verdict metadata, and kernel predicate evaluation. The eligibility record and
-  its digest commit atomically with the RFC-0003 dispatch intent. Capture/release
+  its digest attach to `AdmissionOperation::Prepared` before dispatch and finalize
+  through `AdmissionTerminalProjection::Completed`. Capture/release
   activation is not a Wave 2 exit artifact: `X402PaymentAdapter` is prepaid and
   `X402PaymentAdapter`/`AcpPaymentAdapter` capture/release is local bookkeeping.
   A real reversible rail must be implemented and pass idempotency, query,
   binding, release, and end-to-end qualification before the output-stage payment
   hook can activate. The provider path must independently pass durable enqueue,
-  signed acceptance, restart-query, acceptance-time index, and lost-ack
-  ambiguity qualification; neither gate substitutes for the other.
+  signed acceptance, and a rollback-independent external dispatch-slot anchor
+  whose monotonic checkpoints bind the exact operation, attempt, predecessor and
+  version. It must pass external status-query, acceptance-time index, lost-ack,
+  non-executable local staging, rollback-independent invocation-blob
+  availability, external executor lease/fencing, restore-after-enqueue and
+  restore-after-effect-before-completion qualification. Only a current
+  permanent external cancellation checkpoint proves nonacceptance; local queue
+  absence or a restored, behind, divergent or unavailable view freezes the hold.
+  Cancellation makes staged work permanently non-executable; an accepted,
+  executing or completed attempt can never cancel. Recovery may finish an
+  executing attempt only from authenticated tool-side status or qualified
+  same-key idempotent invocation.
+  A third independent receiver path must persist the exact final bytes in a
+  rollback-independent blob store before exposure and advance an external
+  monotonic delivery slot before signing the acknowledgement. It must pass local
+  snapshot restore, external status-query, anchor-outage and wrong
+  operation/output/receiver binding qualification.
+  Capture happens only after that durable acknowledgement. Missing or ambiguous
+  acknowledgement freezes the hold; only a receiver-signed current permanent
+  external cancellation checkpoint permits release. None of the three gates
+  substitutes for another.
 - WS2: direct `chio_credit::factor` CAS assignment; discount pricing over
   underwriting inputs; obligor acknowledgement; ladder class
   `factor.assignment_bind`. Venue and penalty integration are deferred.
@@ -167,11 +233,15 @@ invented obligation type may land.
   evidence, and shared non-equivocation.
 - WS4: `chio_credit::clearing` engine and artifacts; round orchestration endpoints;
   reconciliation binding through WS1 surfaces; ladder class
-  `clearing.round_finalize`. Its inputs are canonical obligations, not IOU or
-  exposure summaries counted beside their source rows. Finalization remains
-  disabled in this wave and while the production FROST prerequisite is absent.
-- WS6: `chio.fincred.*` credential family; issuance and passport bundling;
-  verifier policy and underwriting import path that preserves home-issued
+  `clearing.round_finalize`. Its inputs are an authoritative participant snapshot
+  with boundary-complete epoch/range proof over canonical obligations, not IOU or
+  exposure summaries counted beside their source rows. Finalize and abort share
+  one external lifecycle head. Finalization remains disabled in this wave and
+  until FROST P3 plus the exact anchored round/obligation batch is qualified.
+- WS6: `chio.fincred.*` credential family with stable credential IDs, signed
+  source manifest, exact selective-presentation digest, complete aggregate-source
+  proofs and rollback-pinned lifecycle; verifier policy and coordinated strict
+  underwriting input version that preserves home-issued
   facts as imported/asserted unless independently corroborated. Reliability VC
   issuance is gated on a fresh verified WS1 Phase 3 checkpoint/range proof; no
   bounded bundle or table scan satisfies the gate.
@@ -184,45 +254,61 @@ Critical or High finding remains unresolved.
 
 ### Wave 3
 
-Entry: Wave 2 exit gate.
+Entry: Wave 2 exit gate plus both production controls: WS1 Phase 3
+`CreditAdmissionStore::reserve_exposure` with its operation-owned exposure CAS,
+and protocol-primitives `AE-CUMULATIVE-APPROVAL-1` in the composite budget hold.
+Their race, restart and nested/top-level parity suites are green before any Wave
+3 activation work starts. Economic-continuity Tasks 1-4 and a
+production-qualified external adapter are also green; each WS4/WS5/WS7 path still
+must pass its consumer batch matrix in Task 5.
 
 - WS2: activate assignment and factoring over canonical obligations only after
   creditor binding, fresh outstanding evidence, and shared non-equivocation
   pass; route settlement through WS1 and preserve exclusive `assigned`
   disposition until resolution.
 - WS4: activate clearing rounds over obligations atomically reserved in the
-  `clearing_reserved` disposition only after the production FROST prerequisite;
-  enforce quorum-gated immutable settlement intents with separate reconciliation
+  `clearing_reserved` disposition only after snapshot completeness and FROST P3;
+  consume `chio.frost.clearing-round-finalize.v1` once in the externally anchored
+  `finalizing -> finalized` round-plus-obligation batch. First dispatch requires
+  that exact finalized head plus separate fresh WS1 settlement authority. Enforce
+  immutable settlement intents with separate reconciliation
   and reject any summary artifact
   counted beside its source obligations.
-- WS5: channel artifacts and state machine; pre-dispatch capacity reservation
-  and exclusive channel disposition; close and dispute handling over existing
-  windows and watchdogs; keep quorum-authorized close disabled until the same
-  production FROST prerequisite is met;
+- WS5: ship v1 only as a fully funded state machine over existing `ChioEscrow`:
+  block-pinned terms/event/operator proof, exact protocol amount to token-base-
+  unit round trip, pre-dispatch irrevocable payer reservation with no post-service
+  payer signature or per-call fallback, exclusive channel disposition, guarded
+  prepare/root publication/broadcast, event-bound reconciliation, and close/
+  dispute watchdogs. Quorum close consumes FROST P3 authorization under the exact
+  externally anchored channel/escrow-reservation state version/fence; every
+  service reservation is externally anchored before tool dispatch;
   family-v2 proposal document for atomic on-chain close (proposal only).
 - WS7: `chio.parametric.*` policy and trigger evaluation; auto-claim assembly;
-  deterministic claim identity, atomic contest lifecycle, aggregate policy
-  coverage reservation, unique payout intent and reconciliation binding;
-  single-adjudicator artifacts may land before FROST, but n-of-m
+  semantic trigger identity, atomic contest lifecycle, shared canonical
+  liability-coverage reservation across legacy and parametric claims, exact
+  beneficiary/destination/facility/amount payout binding, unique payout intent
+  and reconciliation binding, all through one external semantic-trigger/claim/
+  shared-coverage batch; single-adjudicator artifacts may land before
+  FROST, but n-of-m
   adjudication-panel supersession and settlement dispatch remain disabled until
   their production quorum prerequisites pass.
 - WS9: implement the six scenario classes as ordinary tests first. A thin
   deterministic runner may later emit project-signed internal qualification
   matrices; the advisory `ci-gates/` facet cannot launder them into external
-  evidence. Before Phase 3 or Wave 3 exit, `AE-CREDIT-ADMISSION-1` must land in
-  `chio-credit` plus the WS1 obligation store, and
-  `AE-CUMULATIVE-APPROVAL-1` must land in kernel budget/governed-intent
-  admission. WS9 owns their diagnostic reruns, not those production validators.
+  evidence. Both named controls are already entry gates. WS9 owns only their
+  diagnostic reruns, not those production validators.
 
 Exit gate: WS2 assignment and WS4 clearing production paths preserve exclusive
 obligation disposition and reconcile through WS1, with WS4 finalization proven
-through the production FROST verifier; channels ship a devnet-funded off-chain
+  through FROST P3 plus its round lifecycle CAS; channels ship the complete
+  devnet-funded off-chain
 state machine over the existing qualified escrow, with quorum close enabled
-  only through that verifier; the parametric tier is live against
-  completeness-proven replayed corpora with claim/contest CAS and aggregate
-  coverage non-equivocation, while panel supersession is optional and
-  remains disabled without its trusted roster/key epoch; both named admission
-  controls are live and their WS9 scenarios run rather than report `NotRun`;
+  only through that verifier and channel CAS; the parametric tier is live against
+  completeness-proven replayed corpora with semantic claim/contest CAS and
+  legacy-plus-parametric coverage non-equivocation, while panel supersession is
+  optional and remains disabled without FROST P3 and its claim CAS; both named
+  admission controls remain live and their WS9 scenarios run rather than report
+  `NotRun`;
   WS9 tests are green with no unresolved Critical or High finding. Scheduled
   project-signed matrices are
 optional internal artifacts, not an exit substitute.
@@ -230,9 +316,14 @@ optional internal artifacts, not an exit substitute.
 ## Cross-program checkpoints
 
 - RFC-0003 boot recovery: RFC-0013 registers its boot reconcile into
-  RFC-0003's orchestration. RFC-0006 is already on `main`; WS1 Phase 2 is
-  blocked until RFC-0003 lands. No standalone boot-reconcile entry point may
-  waive or replace that dependency.
+  RFC-0003's orchestration. RFC-0006 base is on `main`, but its serving-owner
+  amendment is not; protocol-primitives Task 6 owns and must land that amendment,
+  the retained operation, projection and path parity before WS1 Phase 2. No
+  standalone boot-reconcile entry point or
+  WS1-local coordinator may waive or replace that dependency.
+- FROST executes through the written 2026-07-12 P1-P3 plan. Shared P3 is
+  necessary but not sufficient: WS1, WS4, WS5 and WS7 each qualify their own
+  exact action domain and resource version/fence CAS.
 - Reliability plans already under `docs/superpowers/plans/` (rfc-0002,
   rfc-0006, rfc-0007, rfc-0011) share kernel surfaces with WS1; rebase WS1
   phase branches over their merges rather than the reverse.
@@ -256,40 +347,55 @@ optional internal artifacts, not an exit substitute.
   assumption.
 - WS3 rail and dispatch gates: artifacts, eligibility binding, and the pure
   evaluator may land first. No production outcome-priced payment path activates
-  until a real reversible rail and a provider-authenticated durable-acceptance
-  transport both pass their WS3 qualification matrices; no current in-tree
-  adapter or generic tool server does.
+  until a real reversible rail, provider-authenticated durable acceptance backed
+  by external rollback-independent attempt continuity, and
+  receiver-authenticated durable delivery backed by external
+  rollback-independent slot and blob continuity each pass their WS3
+  crash/restore and ambiguity qualification matrices; no current in-tree adapter
+  or generic tool server supplies all three.
 - WS4: clearing uses the sibling `chio.clearing.settlement-intent.v1` family.
   The existing commerce settlement packet is order/merchant/PSP-specific and
   carries mutable reconciliation fields, so it is not extended. PROTOCOL 6.3.4
   records the sibling intent plus separate reconciliation families in Phase 1.
-- FROST: a separately reviewed production verifier plus trusted roster, group
-  key, key epoch, and rotation semantics is a hard activation prerequisite for
-  `settle.commitment`, WS4 finalization, WS5 quorum close, and WS7 panel
-  supersession. No workstream silently implements or mocks that prerequisite.
+- FROST: P1 owns strict verifier/domain/roster contracts, P2 owns durable nonce,
+  share, session fencing, DKG, rotation and external monotonic epoch plus
+  authorization-slot checkpoints, and P3 owns crash, same-epoch restore, rotation,
+  exhaustive registered-action mapping and runtime qualification. WS7 adds its
+  reserved action mapping in Phase 3. Consumer rollback-independent resource
+  gating remains in each workstream. No workstream silently implements or mocks
+  that prerequisite.
 - WS7: rate-trigger corpus completeness needs an anchor-epoch attestation;
   design lands with the trigger evaluation phase, not after. Parametric claims
-  use deterministic identity, contest CAS, and one aggregate policy-coverage
-  ledger before any payout intent can dispatch; the shared panel schema is
-  `chio.adjudication.panel-decision.v1`.
+  use semantic policy/subject/window/evidence-range identity, contest CAS, exact
+  payout bindings and the same canonical liability-coverage ledger as legacy
+  claims before any payout intent can dispatch. Panel authority uses the shared
+  FROST schema and payout-instruction v2; v1 stays unchanged.
 - WS9: begin with ordinary tests in the owning validator crates. Add a runner
   or crate only when shared campaign code proves a distinct ownership and
   dependency boundary. Project-signed output remains internal qualification.
   Missing-target results are explicit `NotRun`; the two named production
-  admission controls must land before Wave 3 exits.
+  admission controls must land before Wave 3 entry.
 - WS10: a Rust-derived eight-byte big-endian cost key plus sequence/time indexes
   ships in WS10 Phase 2, preserving the full `u64` domain, and the stale claim in
   `docs/reference/AGENT_ECONOMY.md` 3.5.3 is corrected in the same PR.
   Exact-window analytics require the time-index proof; threshold delivery uses
   ordered authority cursors and a leased durable outbox. Webhook mutation
   requires tenant-admin/write authority plus operator-approved egress.
-- WS6: financial verification uses a sibling policy, local trust registry, and
-  explicit v1/v2 passport carriers; cross-org presentation stays asserted.
-- WS8: fiscal admission is signed and locally anchored; consumer adapters retain
+  Policy-input/decision activation additionally requires the externally anchored
+  policy and decision-head checkpoint; anchor outage leaves read-only analytics
+  available but denies underwriting current use.
+- WS6: financial verification uses a sibling policy, local trust registry,
+  stable source passport identity, exact presentation binding, complete
+  aggregate-source proofs and rollback-independent lifecycle pin; cross-org
+  presentation stays asserted. WS6 and WS10 coordinate one strict underwriting
+  input version before either new arm ships.
+- WS8: fiscal admission is signed and independently anchored; consumer adapters retain
   the declared live units and exact parity domains, with the documented
-  fixed-point precision correction. Activation remains unavailable until the
+  fixed-point precision correction. Tier limits bind currency and validity is
+  required. Activation remains unavailable until the
   current runtime registry proves every consumer and issuance gate installed,
-  preserving one active authority after migration.
+  preserving one active authority after migration. Snapshot rollback or anchor
+  outage fails startup rather than reopening fallback.
 - WS1: IOUs use a dedicated `economy.credit.issuer` backend distinct from the
   kernel receipt signer. Remote reconcile reuses the control-plane token and
   exact-authority egress seam.
@@ -298,8 +404,11 @@ optional internal artifacts, not an exit substitute.
 
 | Plan | Covers | Status |
 |------|--------|--------|
+| `2026-07-09-protocol-primitives.md` Task 6 plus corrected RFC-0003 and `2026-07-12-admission-operation-design.md` | Generic AdmissionOperation, projection, nested/top-level boundary, serving fence, cumulative approval participant | written |
+| `2026-07-12-frost-quorum-substrate.md` | FROST P1 verifier, P2 durable signing, P3 runtime qualification | written |
+| `2026-07-12-economic-state-continuity.md` | External multi-resource heads, adapter, recovery and WS4/WS5/WS7 activation gate | written |
 | `2026-07-10-ws1-first-light-phase1.md` | WS1 Phase 1 (real F68/F72 behavior) | written |
-| WS1 phases 2-4 | journal, drivers, e2e proof | at phase start |
+| WS1 phases 2-4 | RFC-0013 payment participant, drivers, credit admission, e2e proof | at phase start |
 | WS8, WS10 phase plans | Wave 1 | at workstream start |
 | WS2, WS3, WS4, WS6 phase plans | Wave 2 pilot and artifact contracts | at wave start |
 | WS2/WS4 production, WS5, WS7, WS9 phase plans | Wave 3 | at wave start |

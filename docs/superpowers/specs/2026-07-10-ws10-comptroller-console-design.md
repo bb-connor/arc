@@ -70,13 +70,16 @@ The substrate exists:
 4. New `UnderwritingReasonCode` and `UnderwritingEvidenceKind` variants plus a
    policy-gated spend-anomaly evidence input to `derive_underwriting_signals`,
    with explicit local and imported evidence classes.
-5. A `chio spend` CLI subcommand group mirroring the `chio receipt` and
+5. Signed anomaly-evidence and underwriting decision policies, strict shared
+   policy-input/decision v2, retained decision chains, and an external governance
+   anchor for current policy/decision heads.
+6. A `chio spend` CLI subcommand group mirroring the `chio receipt` and
    `chio trust <family> export` conventions.
-6. JSON schemas under `spec/schemas/chio-spend/`, schema-id constants, and
+7. JSON schemas under `spec/schemas/chio-spend/`, schema-id constants, and
    conformance coverage; a `spec/PROTOCOL.md` spend-family subsection; and all
    signed-schema registry, hash-manifest, known-schema, positive-fixture, and
    unknown-schema-negative gates.
-7. In phase 2, receipt-store currency and a full-`u64`, order-preserving derived
+8. In phase 2, receipt-store currency and a full-`u64`, order-preserving derived
    cost key plus a
    tenant/currency/cost/sequence index, with an atomic migration and query-parity
    verification for existing rows.
@@ -258,10 +261,15 @@ lineage, a partial window, or a retention gap emits
 On complete input, each detector emits a signed
 `chio.spend.anomaly-finding.v1` carrying the detector class, severity, subject,
 verified lineage refs, source checkpoint, digest-bound evidence receipt refs,
-and the statistic plus the threshold it crossed. Its deterministic `finding_id`
-is the SHA-256 digest of the canonical detector version and parameters, subject,
-window, source-checkpoint digest, evidence-root digest, statistic, and threshold.
-It is not keyed by any one evidence receipt.
+and the statistic plus the threshold it crossed. Each detector has a canonical
+`detector_config_digest` over its exact version, algorithm, window/baseline,
+thresholds and every other parameter. Severity is deterministically derived from
+that config and statistic, never supplied independently. `finding_id` is SHA-256
+over the complete canonical unsigned finding body excluding only `finding_id`
+and signature, so it includes detector config, severity, authority, subject,
+window, checkpoint, evidence roots and refs, statistic, threshold and resolved
+evidence classes. It is not keyed by any one evidence receipt. Storage retains a
+separate body digest and rejects the same ID with different bytes.
 
 - Delegation-chain cost amplification. Sum `cost_charged` for a child subtree
   selected by verified capability-lineage edges, using `root_budget_holder` and
@@ -281,13 +289,50 @@ It is not keyed by any one evidence receipt.
 ### Underwriting feedback loop
 
 Anomaly findings are eligible to become underwriting signals only through an
-opt-in `SpendAnomalyEvidencePolicy`. The policy names accepted local authority
-keys, detector schema ids and versions, tenant or subject scope, maximum finding
-age, minimum sample count and window, required complete-corpus schema, and
-allowed severity-to-signal mappings. The default policy accepts none. Verification
-checks the finding signature, source checkpoint, cursor-chain completeness,
-receipt refs, capability lineage, subject scope, freshness, and detector
-recomputation before policy evaluation.
+active signed `chio.spend.anomaly-evidence-policy.v1` artifact. Its canonical
+`SpendAnomalyEvidencePolicyV1` body contains `policy_id`, tenant, normalized
+subject/scope digest, monotonic sequence, optional predecessor policy id and
+digest, accepted finding-authority key ids, a sorted bounded detector-to-version
+map of accepted exact detector-config digests per version, maximum finding age,
+minimum sample count and window, required
+complete-corpus schema, a sorted bounded severity-to-signal mapping,
+`not_before`, `expires_at`, policy authority id, and key epoch. The policy ID is
+domain-separated RFC 8785 over all body fields except the ID. The signed envelope
+uses the normal signed-artifact schema gates.
+
+Local `SpendAnomalyPolicyTrust` resolves `(tenant, policy_authority_id,
+key_epoch)` to an active key and permitted scope. Embedded keys are never trust
+roots, and the policy's accepted finding-key set may only narrow the local
+finding-authority registry. Validation rejects empty or duplicate sets, unknown
+detector versions or config digests, invalid severity mappings, zero bounds, bad scope, inverted
+validity, lineage gaps, or a nonincrementing sequence.
+
+The policy store retains `Staged -> Active -> Superseded | Revoked` rows and one
+active head per `(tenant, scope_digest)`. Activation compare-and-swaps the exact
+current policy id, envelope digest, sequence, and row version; revocation retains
+a tombstone. The production resolver requires the authoritative current head and
+trusted clock on every evaluation. Missing, unavailable, expired, superseded, or
+revoked policy means no spend finding is admissible; the default accepts none.
+Tenant-admin APIs create, list, stage, activate, and revoke policies, while a
+read-only simulation may evaluate an explicitly supplied policy but cannot
+persist an active underwriting decision.
+
+Persisted underwriting decisions also require an active signed
+`chio.underwriting.decision-policy.v1`. Its
+`UnderwritingDecisionPolicyArtifactV1` body contains policy id, tenant/scope,
+sequence and exact predecessor, the complete strict serialized
+`UnderwritingDecisionPolicy` rules, evaluator compatibility range, `not_before`,
+`expires_at`, authority id and key epoch. Local `UnderwritingPolicyTrust`
+resolves that authority and scope; embedded keys are never roots. The lifecycle
+is the same retained `Staged -> Active -> Superseded | Revoked` CAS model. The
+live unsigned built-in default remains available only for read-only simulation
+or nonpersistent bootstrap diagnostics. It cannot authorize a persisted active
+decision.
+
+Verification checks the finding signature, source checkpoint, complete
+tenant-time-index range and predecessor/successor boundary proof, receipt refs,
+capability lineage, subject scope, freshness, and detector recomputation before
+policy evaluation. A cursor chain alone is not completeness proof.
 
 A finding records `derivation_class` separately from `evidence_class`. Local
 deterministic computation has derivation class `observed`, but the final evidence
@@ -324,19 +369,41 @@ this resolved class. WS10 therefore does not squeeze the new input into
 `UnderwritingSignalV2 { signal_id, tenant_id, subject_key, class, reason,
 resolved_evidence_class, source_binding, description, evidence_refs }`, a tagged
 `UnderwritingSignalSourceBindingV2`, and
-`chio.underwriting.policy-input.v2` with version-first strict decoding.
+`chio.underwriting.policy-input.v2` with version-first strict decoding. WS6 and
+WS10 coordinate this one v2 body before either integration ships so its optional
+imported-financial and spend-anomaly arms are both versioned; if v2 has already
+shipped, the later workstream uses v3 rather than mutating v2.
 The source binding is either
-`SpendAnomaly { evidence_policy_digest, finding_ids }` or
+`SpendAnomaly { evidence_policy_body_digest,
+evidence_policy_envelope_digest, finding_ids }` or
+`ImportedFinancial { source_manifest_digest, presentation_digest,
+credential_body_envelope_pairs, verifier_policy_id,
+verifier_policy_body_digest, verifier_policy_generation,
+lifecycle_generation_checkpoint_digests, lifecycle_source_index_proof_digests,
+lifecycle_result_digest, lifecycle_pin_digest,
+credential_evidence_class_bindings }` or
 `LegacyV1 { source_input_digest, signal_index }`.
-`evidence_policy_digest` is SHA-256 over the RFC 8785 canonical verified
-`SpendAnomalyEvidencePolicy` body, excluding its detached signature and any
-self-id field; it is required only for the spend-anomaly arm. Each of
+`evidence_policy_body_digest` is SHA-256 over the RFC 8785 canonical verified
+policy body and `evidence_policy_envelope_digest` binds the exact signed
+envelope. Both are required only for the spend-anomaly arm and must equal the
+active resolved policy head used for evaluation. Each of
 `SpendDelegationAmplification`, `SpendPatternDrift`, and
 `SpendVelocityClustering` requires `SpendAnomaly`; that arm requires a nonempty
 sorted-unique finding-id set exactly equal to the policy-selected group and an
 evidence-ref set exactly equal to the sorted union recomputed from those
 findings. A spend reason in `LegacyV1`, a non-spend reason in `SpendAnomaly`, or
 any missing/extra finding or evidence ref rejects.
+
+`ImportedFinancial` is valid only for the imported-trust reason emitted by WS6.
+Its sorted unique credential body/envelope pairs and per-credential source,
+presentation and resolved evidence classes, source manifest and exact
+presentation digest, operator-pinned verifier-policy identity/body/generation,
+issuer-global lifecycle checkpoint and source-index proof, and authenticated
+lifecycle result plus independently durable pin must equal one
+`VerifiedFinancialCredentialSet`. It cannot be constructed from counts or raw
+passport input. A financial signal in `LegacyV1` or `SpendAnomaly`, a spend
+signal in `ImportedFinancial`, or any omitted credential or lifecycle binding
+rejects.
 
 `LegacyV1` binds the SHA-256 digest of the complete canonical signed v1 policy
 input and the exact zero-based index in its `signals` array rather than
@@ -362,7 +429,93 @@ would be lost. Policy evaluation reads the signed v2 resolved class, and an
 organization-boundary verifier recomputes the asserted cap before accepting the
 input.
 
-### Artifacts and types (schema ids chio.spend.<artifact>.v1)
+### Versioned underwriting decision chain
+
+Policy-input v2 is persisted only through strict
+`chio.underwriting.decision-report.v2` and
+`chio.underwriting.decision.v2` families. `UnderwritingDecisionReportV2` binds
+the policy-input schema and exact signed-envelope digest, underwriting decision
+policy id, version, body and envelope digests, active anomaly-evidence-policy
+body and envelope digests when spend signals are present, sorted signal root and
+count, evaluator version, subject binding, outcome, reason codes, credit ceiling,
+and premium quote. A verifier recomputes every signal and policy binding before
+accepting the report.
+
+`UnderwritingDecisionArtifactV2` contains `decision_id`, stable
+`decision_chain_id`, sequence, optional predecessor schema/id/envelope digest and
+sequence, tenant and normalized subject/scope binding, input-envelope digest,
+decision-policy id, version, body digest and envelope digest, optional
+anomaly-evidence-policy body and envelope digests, evaluator version, issued
+time, required validity end, the
+complete report v2, and lifecycle state `Active | Superseded`. The chain ID is
+domain-separated RFC 8785 over underwriting authority, tenant, subject, and
+normalized scope only; mutable policy versions are excluded. The decision ID is
+derived over every body field except itself. The signed envelope digest and
+decision ID are distinct and both are retained.
+`valid_until` is the checked minimum of the input validity, active decision-policy
+expiry, active anomaly-policy expiry when present, and every imported-financial
+credential/presentation plus `FinancialVerifierPolicyV1` validity bound. An empty
+interval rejects. Lifecycle remains a current-status condition and is rechecked;
+it is not converted into a guessed expiry.
+
+The decision store enforces unique `(decision_chain_id, sequence)` and one active
+head. Appending a successor in one transaction verifies the expected active
+decision id, envelope digest, sequence, and row version; verifies that the
+resolved signed decision-policy and anomaly-evidence-policy heads still equal the
+digests used by evaluation; inserts the successor; and marks the predecessor
+superseded. Cross-tenant, cross-subject, cross-scope, skipped-sequence, expired,
+or arbitrary-predecessor chains reject. Rotating or revoking the anomaly policy
+makes an earlier WS10-bearing decision stale for current-use resolution and
+requires reevaluation; it does not rewrite history.
+Every current-use resolution rechecks the anchored current policy heads,
+decision-head inclusion, and `valid_until`. When an imported-financial arm is
+present it also resolves the currently active operator-pinned
+`FinancialVerifierPolicyV1` generation/body and trusted time, requires them to
+equal the bound policy and remain valid, reconciles the issuer-global lifecycle
+checkpoint for every issuer, verifies each current source-index proof, queries
+and pins every authenticated per-passport status before branching, and requires
+all sources still `Active`. Policy generation change, expiry, lifecycle
+suspension/revocation, anchor/pin outage, stale generation, or a restored resolver
+denies current use and requires reevaluation. Historical verification remains
+available but cannot authorize current use.
+
+V1 and v2 use version-first strict decoders. A v1 predecessor can enter a v2
+chain only through a trusted migration resolver that proves the same authority,
+tenant, subject, and scope and binds the exact v1 envelope; otherwise it remains
+a separate legacy chain. A v1-only runtime fails startup when the active head is
+v2. Downstream artifacts carry a tagged `VersionedUnderwritingDecisionRef` with
+schema, decision id, body digest, envelope digest, chain id when available, and
+sequence. They never store an untagged decision string. V2-to-v1 conversion
+rejects spend signals, imported-financial signals, resolved evidence classes, or
+any other field v1 cannot represent.
+
+### Underwriting governance continuity
+
+SQLite lifecycle and head rows are staging and cache state, not anti-rollback
+authority. Persisted WS10 underwriting requires an
+`UnderwritingGovernanceAnchor` outside the SQLite backup/restore domain. Its
+signed `chio.underwriting.governance-checkpoint.v1` binds tenant/scope,
+monotonic governance sequence and predecessor digest, active or terminal
+anomaly-policy head, active or terminal decision-policy head, a Merkle root and
+count over every active decision-chain head, and trusted-clock high-water.
+
+Pure verification constructs a private `VerifiedUnderwritingGovernanceAdvance`.
+It enforces sequence plus one, exact predecessor, nondecreasing time, legal
+policy lifecycle/sequence changes, retained revocation and supersession, and an
+authenticated Merkle update from exactly one verified decision append. No other
+head may change. The external anchor accepts only this verified type through a
+linearizable compare-and-swap; opaque signed successors reject.
+
+Policy activation/revocation and decision append use `DbStaged ->
+AnchorAdvanced -> DbActive`. Recovery completes an exact staged/anchored match,
+may discard an unanchored stage while retaining the anchored predecessor, and
+fails startup when the anchor is ahead, behind, divergent or unavailable.
+Current-use resolution reads the anchor, verifies the policy heads and the
+decision head's inclusion proof, and denies on any mismatch. Read-only spend
+streaming may remain available during an underwriting-anchor outage, but no
+spend signal or active decision is admitted or served.
+
+### Artifacts and types
 
 - `chio.spend.event.v1`: stream frame; digest-bound to a signed receipt, not
   independently signed.
@@ -381,11 +534,23 @@ input.
 - `chio.spend.anomaly-finding.v1`: signed; class, severity, statistic,
   threshold, deterministic finding id, evidence refs, verified lineage refs, and
   complete-corpus proof.
+- `chio.spend.anomaly-evidence-policy.v1`: signed governed admission policy with
+  authority/key epoch, tenant/scope, sequence and predecessor, validity,
+  detector/finding-authority allowlists, evidence bounds, severity mappings, and
+  retained lifecycle.
 - `chio.spend.incomplete-corpus.v1`: signed operational sidecar; requested
   window, detector or projection, cursor/checkpoint or time-index proof,
   gap/boundary or missing-lineage reason, and known missing refs. It cannot be
   deserialized as an anomaly
   finding and is never an underwriting input.
+- `chio.underwriting.policy-input.v2`: signed strict versioned input with exact
+  source bindings and optional jointly versioned WS6 and WS10 arms.
+- `chio.underwriting.decision-policy.v1`: signed governed decision rules with
+  trust, scope, sequence/predecessor, validity and retained lifecycle.
+- `chio.underwriting.decision-report.v2` and
+  `chio.underwriting.decision.v2`: signed strict decision chain described above.
+- `chio.underwriting.governance-checkpoint.v1`: externally anchored policy and
+  decision-head continuity checkpoint.
 
 All monetary fields are `MonetaryAmount` (u64 minor units, ISO-4217). Signed
 artifacts are canonical JSON (RFC 8785) with schema-id constants and JSON
@@ -399,7 +564,10 @@ fixtures, and unknown-schema negatives before any verifier accepts it.
 
 - `chio-control-plane` gains `/v1/spend/stream`, `/v1/spend/webhooks`
   (register and list), `GET /v1/reports/burn-rate`, and
-  `GET /v1/reports/spend-anomalies`, registered beside the existing report paths
+  `GET /v1/reports/spend-anomalies`, plus tenant-admin
+  `/v1/spend/anomaly-evidence-policies` create/list/stage/activate/revoke
+  operations and tenant-admin underwriting decision-policy lifecycle operations,
+  registered beside the existing report paths
   (paths.rs:117-190). Stream, reports, and webhook list use tenant read
   authority. Webhook create, rotate, disable, and delete require a distinct
   tenant-admin/write capability; the authenticated tenant is the stored owner
@@ -411,7 +579,9 @@ fixtures, and unknown-schema negatives before any verifier accepts it.
   that operator policy.
 - `chio-store-sqlite` persists webhook registrations and delivery attempts and
   the ordered authority cursor, threshold state, leased outbox, terminal
-  delivery/dead-letter history, incomplete-corpus signals, and emitted findings
+  delivery/dead-letter history, incomplete-corpus signals, emitted findings,
+  staged signed anomaly/decision-policy lifecycle and heads, underwriting
+  decision-v2 chain heads, governance-checkpoint bodies and Merkle proofs
   behind new traits. Signed receipts stay immutable. Crossing rows are keyed by
   deterministic `crossing_id` and deliveries by registration-bound
   `delivery_id`, so one receipt sequence may create several threshold rows and
@@ -420,6 +590,13 @@ fixtures, and unknown-schema negatives before any verifier accepts it.
   index represent their many-to-many source relationship. Neither artifact is
   forced into the one-sidecar-per-receipt settlement-reconciliation shape
   (AGENT_ECONOMY.md:753-760).
+- The production underwriting evaluator accepts only a verified signed
+  policy-input version and the resolver's exact active decision-policy and
+  anomaly-evidence-policy heads. The transaction that appends decision v2 CASes
+  both policy heads and the decision-chain head, stages the exact governance
+  advance, and finalizes only after external anchor CAS. The control-plane owns
+  the anchor adapter and startup recovery. Simulation endpoints may accept
+  caller-selected policies but cannot write an active decision.
 - Phase 2 rebuilds `chio_tool_receipts` with stored derived columns
   `cost_charged_be BLOB` and `cost_currency`, then adds an index ordered by
   tenant, currency, cost key, and sequence. Rust parses the canonical receipt
@@ -467,6 +644,13 @@ work and emit an operator-visible incident rather than acknowledging it.
 An underwriting input with missing/unknown resolved evidence class, subject or
 signal-id mismatch, ambiguous v1 upgrade, imported finding above `Asserted`, or
 unsorted/conflicting merged evidence rejects before policy evaluation.
+An absent, unavailable, expired, superseded, revoked, wrong-scope, stale-sequence,
+or untrusted anomaly-evidence or decision policy admits no spend signal or
+persisted decision. A missing, unavailable, behind or divergent underwriting
+governance anchor also denies those paths. A decision append
+with a stale policy head, stale chain head, wrong subject/scope, skipped sequence,
+arbitrary predecessor, mismatched report/input digest, unknown version, or lossy
+downgrade rejects atomically and leaves the prior active decision unchanged.
 
 ## Alternatives considered
 
@@ -509,6 +693,10 @@ asserted, and incomplete-corpus signals are never underwriting facts. The public
   across runs and platforms (insta-style snapshots with sorted maps). A
   mixed-currency corpus returns `null` totals with per-currency partitions and
   never a coerced sum.
+- Finding identity: exact detector-config digest and deterministic severity enter
+  the complete unsigned-body ID. Parameter, threshold, severity, authority,
+  evidence-ref and body-byte mutations change the ID; inserting different bytes
+  under one ID conflicts.
 - Velocity clustering: a fixture of sibling grants each just under the per-grant
   `VelocityGuard` ceiling produces exactly one aggregate finding only when the
   signed sibling lineage and complete range verify. Missing or forged lineage
@@ -547,13 +735,43 @@ asserted, and incomplete-corpus signals are never underwriting facts. The public
   of the same finding round-trip through v2 with respectively recomputed local
   floor and `Asserted` cap; changing only the signed resolved class changes the
   signal id and fails verification. Changing only `tenant_id`, the tagged source
-  arm, the verified spend evidence-policy body/digest, or a legacy source-input
+  arm, the verified spend evidence-policy body or envelope digest, or a legacy source-input
   digest/index also changes the signal id and fails verification. Spend reasons
   reject the legacy arm, and missing, extra, duplicate, or unsorted finding ids
   or evidence refs reject. Duplicate equal v1 signals upgrade by distinct exact
   array indexes. V1 upgrade requires an explicit trusted resolver for tenant,
   subject, evidence class, and source binding; downgrade rejects WS10 signals
   without dropping them.
+- Imported-financial source binding mutates each credential body/envelope pair,
+  source/presentation/resolved evidence class, source manifest, presentation,
+  pinned verifier-policy id/body/generation, issuer-global lifecycle checkpoint,
+  source-index proof, lifecycle result and lifecycle pin independently and
+  rejects every mismatch.
+  Count-only or raw-passport input cannot construct the v2 signal.
+- Evidence-policy lifecycle: unknown authority or epoch, embedded-key
+  substitution, wrong tenant/scope, duplicate detector versions, invalid
+  validity, stale predecessor, concurrent activation, expiry, supersession, and
+  revocation all deny. Exactly one policy-head CAS wins, tombstones remain, an
+  unavailable resolver admits no spend signal, and accepted finding keys cannot
+  widen local trust. The same suite covers signed decision-policy lifecycle; the
+  unsigned built-in default can simulate but cannot persist.
+- Decision v2 chain: strict v1/v2 dispatch, stable chain ID, exact sequence,
+  predecessor body and envelope digests, input/report/policy binding, and one
+  active head. Concurrent successors have one winner. Decision-policy or
+  anomaly-policy rotation racing append causes the stale append to fail.
+  Cross-tenant/subject/scope predecessor substitution, unknown version, v1-only
+  restart over active v2, and v2-to-v1 conversion with spend or financial signals
+  all reject. Downstream tagged references resolve the exact version and digest.
+- Governance continuity: crash before staging, after stage, after external anchor
+  CAS and after local finalize for policy activate/revoke and decision append.
+  Recovery completes exactly one transition or retains the anchored predecessor.
+  Old SQLite snapshot restore, anchor outage/divergence, policy rollback,
+  decision-head Merkle substitution and clock regression deny current-use
+  underwriting while the read-only spend stream remains available. Imported
+  financial current-use tests rotate or expire the verifier-policy generation,
+  advance/roll back issuer lifecycle generation, suspend/revoke a passport, and
+  fail the generation anchor or per-passport pin; every case denies a previously
+  favorable decision.
 - Store migration: old and indexed cost queries match across null, minimum,
   maximum, currency, and boundary fixtures through `i64::MAX`. Fixtures at
   `i64::MAX + 1` and `u64::MAX` are validated against the Rust-parsed reference
@@ -561,7 +779,7 @@ asserted, and incomplete-corpus signals are never underwriting facts. The public
   and lexicographic order matches unsigned numeric order. Row-count, root,
   extraction, in-range parity, tenant-time-index count/root mismatch, or
   reference-oracle mismatch aborts the transactional swap.
-- Conformance: `chio.spend.*` schema coverage plus registry, hash manifest,
+- Conformance: `chio.spend.*` and underwriting-v2 schema coverage plus registry, hash manifest,
   `KNOWN_SIGNED_ARTIFACT_SCHEMAS`, positive fixtures, and unknown-schema
   negatives; the workspace gate passes.
 
@@ -579,9 +797,16 @@ asserted, and incomplete-corpus signals are never underwriting facts. The public
 3. Analytics and underwriting loop. Add exact time-index range proofs,
    `GET /v1/reports/burn-rate`, `GET /v1/reports/spend-anomalies`,
    `chio spend burn-rate|anomalies`, incomplete-corpus signals, detector
-   sidecar persistence, `UnderwritingSignalV2` and policy-input-v2 resolved
-   evidence-class binding, explicit v1 conversion, and policy-gated
-   reason/evidence variants with deterministic strongest-signal merging.
+   sidecar persistence, signed anomaly-evidence-policy contract, trust resolver,
+   signed decision-policy contract, both lifecycle stores and tenant-admin APIs,
+   external underwriting-governance anchor, staged recovery and decision-head
+   Merkle proofs, the jointly coordinated
+   `UnderwritingSignalV2` and policy-input-v2 resolved evidence-class binding,
+   explicit v1 conversion, strict decision-report-v2 and decision-v2 chains,
+   tagged downstream references, and policy-gated reason/evidence variants with
+   deterministic strongest-signal merging. Phase exit requires policy-head,
+   decision-head, anchor crash/rollback and concurrency tests plus every
+   signed-schema gate.
 4. Durable webhooks. Add tenant-admin/write registration and operator-approved
    egress policy, ordered authority cursors, atomic threshold/crossing/delivery
    insertion, leased retry/ack/dead-letter workers, restart recovery, signed

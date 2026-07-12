@@ -434,18 +434,35 @@ no commutative interpretation: revocations of jointly-issued credentials,
 multi-party settlements, treaty-wide sanctions, passport invalidations
 that span issuing orgs.
 
-**Signature shape:** FROST-aggregated Ed25519 signature over canonical
-JSON of the action body, with `consistency_anchor: "frost-quorum"` and
-quorum scope declared in `co_sign_quorum`. Bilateral trees are
-**insufficient** and MUST be rejected for this model.
+**Signature shape:** FROST-aggregated Ed25519 signature over
+`CHIO-FROST-AUTHORIZATION-V1\0 || RFC8785(FrostAuthorizationBodyV1)`. The
+authorization body's `action_digest` binds the exact canonical consumer action
+body; it also binds domain, action class, authority scope, resource id, resource
+version, lifecycle fence, roster digest and key epoch. It additionally signs the
+canonical ladder-entry digest and exact quorum `n`, `m`, and scope. The active
+roster threshold/count and trusted scope classification MUST match that entry.
+The trusted roster commits
+the group key, and an external monotonic epoch checkpoint prevents a restored
+local roster database from reactivating an older key. A separate external
+authorization-slot checkpoint permanently binds the exact domain/action/message
+for one scope/resource/version/fence before any commitment is published. The
+verifier rejects a domain/action pair absent from its exhaustive registry. The manifest
+uses `consistency_anchor: "frost-quorum"` and declares quorum scope in
+`co_sign_quorum`. Bilateral trees are **insufficient** and MUST be rejected for
+this model.
 
-**Divergent co-sign handling:** structurally impossible: only one
-quorum-aggregated signature can succeed per body hash within a quorum
-epoch.
+**Divergent co-sign handling:** a valid group signature proves threshold-group
+authorization for one exact body. It does not prove the signer subset. Durable
+nonce/share sessions plus external epoch and same-epoch slot continuity prevent
+a second message for one authorization slot, including after local snapshot
+restore. The consumer MUST also verify the current rollback-independent resource
+head and consume the authorization through that resource/effect gate; a
+rollbackable local compare-and-swap is insufficient. Only that winner may
+execute, and an action class without such an owned gate remains disabled.
 
-**Residual:** operational overhead of FROST signing-key custody and the
-pre-handshake key-share ceremony. The opt-in is per-class precisely so
-this overhead is paid only where needed.
+**Residual:** FROST key custody, DKG and rotation overhead, signer availability,
+possible threshold equivocation, and correct consumer resource fencing. The
+opt-in is per class so this overhead is paid only where needed.
 
 A manifest MUST be rejected at handshake with
 `ladder.consistency_underspecified` if any `destructive: true` class
@@ -704,6 +721,30 @@ and [../crates/economy/chio-settle/src/lib.rs](../crates/economy/chio-settle/src
       "consistency_anchor": "chio-anchor"
     },
     {
+      "id": "clearing.round_finalize",
+      "title": "Clearing round finalization",
+      "mode": "receipt_backed",
+      "destructive": true,
+      "cross_org_visibility": "federated",
+      "evidence_required": ["trust_activation", "workflow_receipt", "anchor_epoch"],
+      "co_sign": "n_of_m",
+      "co_sign_quorum": { "n": 2, "m": 3, "scope": "treaty" },
+      "consistency_model": "quorum-required",
+      "consistency_anchor": "frost-quorum"
+    },
+    {
+      "id": "channel.close",
+      "title": "Escrow channel close",
+      "mode": "receipt_backed",
+      "destructive": true,
+      "cross_org_visibility": "federated",
+      "evidence_required": ["trust_activation", "workflow_receipt", "anchor_epoch"],
+      "co_sign": "n_of_m",
+      "co_sign_quorum": { "n": 2, "m": 3, "scope": "treaty" },
+      "consistency_model": "quorum-required",
+      "consistency_anchor": "frost-quorum"
+    },
+    {
       "id": "settle.commitment",
       "title": "SettlementCommitment dispatch",
       "mode": "receipt_backed",
@@ -843,6 +884,18 @@ and
       "destructive": true,
       "cross_org_visibility": "federated",
       "evidence_required": ["trust_activation", "registry_search", "operator_report", "anchor_epoch"],
+      "co_sign": "n_of_m",
+      "co_sign_quorum": { "n": 3, "m": 5, "scope": "treaty" },
+      "consistency_model": "quorum-required",
+      "consistency_anchor": "frost-quorum"
+    },
+    {
+      "id": "governance.roster_rotate",
+      "title": "FROST roster rotation",
+      "mode": "receipt_backed",
+      "destructive": true,
+      "cross_org_visibility": "federated",
+      "evidence_required": ["trust_activation", "registry_search", "anchor_epoch"],
       "co_sign": "n_of_m",
       "co_sign_quorum": { "n": 3, "m": 5, "scope": "treaty" },
       "consistency_model": "quorum-required",

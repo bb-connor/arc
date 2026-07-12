@@ -187,56 +187,117 @@ For single-node storage, `SqliteAdmissionCaptureAuthority` owns budget and revoc
 
 ### 4.6 Validation and consumption ordering
 
-State must not be consumed merely because an attacker submitted malformed authorization material. One durable `AdmissionOperation` coordinates the authorities:
+State must not be consumed merely because an attacker submitted malformed authorization material. One durable `AdmissionOperation` coordinates the authorities.
+RFC-0003 and the 2026-07-12 admission-operation correction extend this same
+coordinator to every configured monetary or side-effecting tool call, including
+calls without aggregate, broker, or threshold admission. They do not add a
+second dispatch-intent coordinator:
 
 ```text
-AdmissionOperation {
+AdmissionOperationV1 {
   kind,
   operation_id,
+  coordinator_authority_id,
+  request_namespace_digest,
   request_id,
   capability_id,
   authorization_capability_hash,
   request_binding_hash,
   policy_hash,
+  effect_class,
+  threshold_proposal_hash?,
+  supplemental_authorization_digest?,
   broker_attempt_id?,
-  budget_hold_id,
+  budget_hold_id?,
   approval_set_hash?,
   execution_nonce_id?,
+  outcome_eligibility_digest?,
+  tool_outcome_id?,
+  terminal_result_id?,
+  terminal_result_digest?,
   state,
   dispatch_state,
   coordinator_lease_epoch,
   version,
   last_error?,
+  terminal_receipt_id?,
+  terminal_incident_id?,
 }
 ```
 
-`AdmissionOperationKind` is `ToolDispatch` or `GovernedActiveResponse`. `operation_id` is `SHA256("chio.admission-operation.v1\0" || canonical_json({ kind, coordinator_authority_id, request_id, capability_id, authorization_capability_hash, request_binding_hash }))`. `request_binding_hash` covers the normalized canonical fields that can affect the governed operation, including arguments or response plan, governed intent, threshold-proposal hash, verified approval-set hash, supplemental authorization reference, and execution nonce reference when present. It uses sorted canonical approval-token digests rather than caller array order, so reordering one valid set cannot create a second operation identity.
+This `AdmissionOperationV1` field set is the one owned canonical schema used by
+the design, executable plan, RFC-0003 and extensions. Nullable late-binding
+fields compare-and-swap from null once; terminal receipt, incident, and mutation
+result references are mutually exclusive. An extension may add a typed field only through a versioned
+schema change, not an incompatible shadow struct.
 
-The operation is persisted before the first authoritative mutation. Budget, approval replay, nonce, and broker-attempt participants receive the same `operation_id` as their idempotency and ownership key. State advances use compare-and-swap on `version` under a fenced coordinator lease so an executor and recovery worker cannot both commit dispatch. The coordinator records each transition after the participant acknowledges it. If a crash occurs between a participant commit and the coordinator update, recovery queries that participant by `operation_id` and advances the saga without repeating a side effect. Missing operation storage denies before any reservation.
+`AdmissionOperationKind` is `ToolDispatch`, `GovernedActiveResponse`, or
+`GovernedEconomicMutation`. The last kind covers an authority-mediated durable
+state mutation such as WS2 direct assignment without pretending it is a tool
+dispatch or creating another coordinator. `operation_id` is `SHA256("chio.admission-operation.v1\0" || canonical_json({ kind, coordinator_authority_id, request_namespace_digest, request_id, capability_id, authorization_capability_hash, request_binding_hash }))`. The authenticated namespace is part of the global primary-key identity as well as the replay unique key. `request_binding_hash` covers only immutable normalized request fields that can change the governed effect: arguments or response plan, governed intent, policy requirements, destination, pricing selection, and settlement mode. It deliberately excludes the authority-generated threshold proposal, approval-set membership, supplemental authorization artifacts, execution nonce references, and other evidence learned or supplied after the operation is persisted. The proposal hash and verified participant bindings are compare-and-swap attached to their nullable operation fields exactly once before `ReadyToDispatch`, then become immutable. A retry may therefore add required evidence to the same operation, but cannot change the request, swap an attached proposal or approval set, or derive a second identity by reordering tokens.
+
+The operation is persisted before the first authoritative mutation. Budget,
+payment, approval replay, nonce, provider acceptance, and broker-attempt
+participants receive the same `operation_id` as their idempotency and ownership
+key. State advances use compare-and-swap on `version` under a fenced coordinator
+lease so an executor and recovery worker cannot both commit dispatch. The
+coordinator records each transition after the participant acknowledges it. If a
+crash occurs between a participant commit and the coordinator update, recovery
+queries that participant by `operation_id` and advances the saga without
+repeating a side effect. Missing operation storage denies before any reservation.
 
 The kernel order is:
 
 1. Parse with size and count limits.
 2. Validate token schema, signature, issuer trust, time, revocation, DPoP, delegation chain, and attenuation.
 3. Resolve the matching grants, derive the aggregate quota key, and build the canonical revocation set from the leaf and every verified delegation ancestor. If supplemental authorization is present, invoke the installed verifier, recheck its capability, subject, request, destination, expiry, and negotiation bindings, add all verified supplemental revocation ids, and bind the final set digest into the hold and operation before deriving its quota key.
-4. Verify governed intent, every presented approval signature and binding, runtime evidence, and policy threshold without mutating replay or budget state.
-5. Run pre-invocation guards and runtime admission.
-6. Persist `AdmissionOperation::Prepared`.
+4. Load by authenticated `(request_namespace_digest, request_id)`. For an
+   existing operation, verify the immutable request against its stored binding.
+   For a fresh request, verify governed intent and runtime evidence, evaluate
+   policy, run pre-invocation guards and runtime admission, and persist
+   `AdmissionOperationV1::Prepared` before any authority reservation.
+5. Verify any presented approval signatures against that stored proposal without
+   mutating replay or budget state. On retry, compare-and-swap each verified
+   supplemental authorization, approval-set, or nonce binding from null exactly
+   once; reject a mismatch with an existing binding.
+6. If approval is required but absent, reserve any cumulative-approval participant
+   under `operation_id`. Its durable result supplies the authoritative
+   `reserved_at`, threshold and budget epoch used to derive the proposal. CAS
+   attach the exact signed proposal/hash and persist operation-local
+   `ApprovalRequired`, then return it. A crash between participant reservation
+   and attachment queries by operation id and derives the same proposal from that
+   durable result; it never creates new timestamps or a second operation.
 7. For broker dispatch, call authenticated local `RegisterAttempt` with deterministic operation, attempt, hold, event, proof, and request digests. The broker validates non-secret request constraints, persists and fsyncs its pending intent, and returns an idempotent acknowledgement. This control IPC is not upstream execution and cannot materialize or transmit a credential. Persist `BrokerAttemptRegistered`. A failure consumes no budget.
 8. Atomically reserve the bounded grant, aggregate, broker, and monetary claims in `BudgetStore`; persist `BudgetAuthorized`.
 9. Reserve the approval set under `operation_id`; persist `ApprovalReserved`.
 10. Reserve the execution nonce under `operation_id`; persist `ReadyToDispatch`. The broker may now materialize and prepare the credentialed request but still cannot send it upstream.
 11. Persist `CapturePending`, then commit the approval and nonce reservations. Ordinary dispatch captures invocation reservations through the budget authority. Broker dispatch calls `AdmissionCaptureAuthority`, which rechecks the leaf, every delegation ancestor, and every supplemental revocation id and captures all invocation quotas in one linearizable commit. A denial compensates the still-authorized hold and tells the broker to terminate the pending attempt; approval and nonce tombstones remain consumed.
 12. After successful capture, persist `DispatchCommitted` and only then authorize the broker's upstream send or begin the ordinary tool-server side effect. A crash after capture but before this state write is recoverable by querying capture under `operation_id`, because code cannot send before the write. Once `DispatchCommitted` is durable, recovery does not resend without downstream idempotency and invocation quotas remain consumed even if the process crashed before the actual send or the response was lost.
-13. Release, capture, or reconcile monetary exposure independently when the outcome becomes known, then persist the terminal operation state and signed receipt.
+13. Release, capture, or reconcile monetary exposure independently when the
+outcome becomes known. Persist the exact settle action before a rail call. Then
+use RFC-0003's composable receipt-side transaction to append the receipt, retain
+the terminal operation, and apply every required local projection. Cross-database
+payment state remains an idempotent saga participant and is not part of that
+atomicity claim.
 
-Approval and nonce reservations use `reserved`, `committed`, and `cancelled` records. Compensation before dispatch reverses the budget hold and marks approval and nonce reservations cancelled, but retains replay tombstones. It never makes an approval token or nonce reusable. Compensation is idempotent by `operation_id`. After `DispatchCommitted`, recovery never reverses invocation quotas and never resends unless the downstream protocol proves the same operation ID is idempotent.
+Approval and nonce reservations use `reserved`, `committed`, and `cancelled` records. Compensation before dispatch reverses the budget hold and marks approval and nonce reservations cancelled, but retains replay tombstones. It never makes an approval token or nonce reusable. Compensation is idempotent by `operation_id`. After `DispatchCommitted`, recovery never reverses invocation quotas or automatically releases a monetary hold and never resends unless the downstream protocol proves the same operation ID is idempotent. `Completed`, `CompensatedBeforeDispatch`, `NotAcceptedAfterDispatchCommit`, and `OutcomeUnknownAfterDispatch` remain tool-dispatch replay tombstones; `EconomicMutationApplied` and `EconomicMutationNotApplied` are retained mutation tombstones. Receipt success never deletes the operation.
 
-This is a persisted saga, not a claimed cross-database transaction. Required recovery outcomes are `Completed`, `CompensatedBeforeDispatch`, or `OutcomeUnknownAfterDispatch`. Every crash point before and after each authority call and each saga-state write is tested.
+This is a persisted saga, not a claimed cross-database transaction. Required tool recovery outcomes are `Completed`, `CompensatedBeforeDispatch`, `NotAcceptedAfterDispatchCommit`, or `OutcomeUnknownAfterDispatch`; governed mutation recovery ends in `EconomicMutationApplied` or `EconomicMutationNotApplied`. Every crash point before and after each authority call and each saga-state write is tested.
 
 This preserves preverification before authoritative admission and avoids both free side-effect retries and budget exhaustion by invalid signatures.
 
 For `GovernedActiveResponse`, the verified operator capability occupies `capability_id` and `authorization_capability_hash`; budget, capture, and nonce participants are absent. After committing the approval reservation, the coordinator persists `DispatchCommitted` before any response effect. Effect ids are independently idempotent, so recovery resumes the same plan rather than creating a second admission. The control-plane exposes this through a trusted port to the active-defense executor rather than adding a `chio-quarantine -> chio-kernel` dependency.
+
+For `GovernedEconomicMutation`, the authoritative mutation service receives
+`operation_id` as its idempotency key. Its own transaction compare-and-swaps the
+resource version/fence and retains a versioned signed applied or
+permanently-not-applied result. It does not mark a separately stored local
+operation terminal. The admission coordinator looks up and private-verifies that
+result, then commits `EconomicMutationApplied` or
+`EconomicMutationNotApplied` through the local terminal projection, binding the
+canonical result id/digest plus audit event. Recovery repeats lookup, never the
+mutation, and makes no cross-store atomicity claim or workstream-local
+coordinator.
 
 ### 4.7 Receipt projection
 

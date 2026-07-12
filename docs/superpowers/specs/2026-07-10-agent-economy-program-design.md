@@ -2,8 +2,10 @@
 
 - Date: 2026-07-10
 - Program: agent-economy program (ten workstreams, three waves)
-- Normative anchors: `spec/PROTOCOL.md` (5.1-5.2, 6.3.4, 9, 14), `spec/CHIO_LADDER.md` 5.2, `spec/METERING.md`, `docs/reference/AGENT_ECONOMY.md`, `docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md`, `docs/architecture/reliability/RFC-0003-dispatch-intent-journal.md`, `docs/architecture/reliability/RFC-0013-money-path-durability.md`, `docs/adr/ADR-0006`, `docs/adr/ADR-0015`, `contracts/release/CHIO_WEB3_CONTRACT_RELEASE.json`
-- Branch strategy: one branch and PR per workstream phase (`chio/ws<N>-<slug>`), all off `main`
+- Normative anchors: `spec/PROTOCOL.md` (5.1-5.2, 6.3.4, 9, 14), `spec/CHIO_LADDER.md` 5.2, `spec/METERING.md`, `docs/reference/AGENT_ECONOMY.md`, `docs/standards/CHIO_BOUNDED_OPERATIONAL_PROFILE.md`, `docs/architecture/reliability/RFC-0003-dispatch-intent-journal.md`, `docs/architecture/reliability/RFC-0013-money-path-durability.md`, `2026-07-09-protocol-primitives-design.md`, `2026-07-12-admission-operation-design.md`, `2026-07-12-frost-quorum-substrate-design.md`, `2026-07-12-economic-state-continuity-design.md`, `docs/adr/ADR-0006`, `docs/adr/ADR-0015`, `contracts/release/CHIO_WEB3_CONTRACT_RELEASE.json`
+- Branch strategy: one branch and PR per independently landable phase, all off
+  current `main`; workstream branch names in spec headers are prefixes, and the
+  detailed plan owns the exact phase suffix
 
 ## Context
 
@@ -39,21 +41,29 @@ claim discipline.
 
 | WS | Title | Spec | One-line scope |
 |----|-------|------|----------------|
-| WS1 | First Light | `2026-07-10-ws1-first-light-design.md` | Production wiring for the money loop (settlement hook, payment adapters, price oracle, credit driver) plus the RFC-0013 durable money journal and an always-on kernel e2e test |
+| WS1 | First Light | `2026-07-10-ws1-first-light-design.md` | Production wiring for the money loop plus the RFC-0013 payment participant, canonical obligation/credit admission, and an always-on kernel e2e test over the shared AdmissionOperation |
 | WS2 | Chio Paper | `2026-07-10-ws2-chio-paper-design.md` | Direct CAS assignment of canonical obligations with obligor acknowledgement, fresh outstanding evidence, and underwriting-derived discount terms; venue trading is deferred |
-| WS3 | Verified-outcome pricing | `2026-07-10-ws3-outcome-pricing-design.md` | Deterministic JSON Pointer outcome artifacts and evaluator; activation waits for both a genuine reversible rail and a provider-authenticated durable-dispatch transport |
-| WS4 | Chio Clearinghouse | `2026-07-10-ws4-clearinghouse-design.md` | Deterministic multilateral netting over canonical obligations, signed net-position statements, and immutable settlement intents with separate reconciliation |
-| WS5 | Micro-escrow channels | `2026-07-10-ws5-micro-escrow-channels-design.md` | Payment channels with bounded pre-dispatch reservation, exclusive obligation routing, signed cumulative state, and dispute-window close |
-| WS6 | Agent credit bureau | `2026-07-10-ws6-credit-bureau-design.md` | Issuer-asserted financial credentials in passports: credit scorecards, exposure history, settlement reliability, premium history, selective disclosure |
-| WS7 | Parametric insurance | `2026-07-10-ws7-parametric-insurance-design.md` | Coverage bound to receipt-observable trigger events with auto-assembled claim evidence, plus opt-in n-of-m adjudication panels |
-| WS8 | Fiscal constitutions | `2026-07-10-ws8-fiscal-constitutions-design.md` | Live economic inputs (fee/bond schedules, tier limits, per-hundred discounts, and two premium schedules) as charter-scoped signed artifacts with amendment rules |
+| WS3 | Verified-outcome pricing | `2026-07-10-ws3-outcome-pricing-design.md` | Deterministic outcome artifacts; activation waits for a genuine reversible rail, provider durable acceptance, and receiver durable delivery acknowledgement |
+| WS4 | Chio Clearinghouse | `2026-07-10-ws4-clearinghouse-design.md` | Deterministic netting over completeness-proven canonical obligations, one fenced round lifecycle, FROST finalization, and separate reconciliation |
+| WS5 | Micro-escrow channels | `2026-07-10-ws5-micro-escrow-channels-design.md` | Fully funded devnet channels with pre-dispatch payer reservation, exact token-unit binding, signed cumulative state, and FROST-authorized close |
+| WS6 | Agent credit bureau | `2026-07-10-ws6-credit-bureau-design.md` | Issuer-asserted financial credentials with stable source identity, selective presentation binding, complete source proofs, and rollback-pinned lifecycle |
+| WS7 | Parametric insurance | `2026-07-10-ws7-parametric-insurance-design.md` | Semantic trigger claims sharing canonical liability coverage, exact payout binding, and opt-in FROST adjudication panels |
+| WS8 | Fiscal constitutions | `2026-07-10-ws8-fiscal-constitutions-design.md` | Currency-bound governed economic inputs with required validity and independently anchored activation/clock continuity |
 | WS9 | Economic wind tunnel | `2026-07-10-ws9-economic-wind-tunnel-design.md` | Adversarial economic tests and deterministic simulations emitting project-signed internal qualification matrices |
 | WS10 | Comptroller Console | `2026-07-10-ws10-comptroller-console-design.md` | Live spend observability: receipt-log cost streaming, budget webhooks, burn-rate projections, spend-anomaly findings feeding underwriting signals |
 
 ## Dependency graph and waves
 
 ```
-Reliability prerequisite: RFC-0006 (landed) -> RFC-0003 -> WS1 Phase 2
+Reliability: RFC-0006 base (landed) + serving-owner amendment (pending)
+             -> protocol-primitives Task 6 / corrected RFC-0003
+             -> WS1 Phase 2 RFC-0013 participant -> WS1 Phase 3
+
+Quorum:      FROST P1 verifier -> P2 durable signing -> P3 runtime qualification
+             -> WS1 P4, WS4 P4, WS5 P3, WS7 panel activation
+
+Continuity:  external economic-state contract -> adapter/recovery qualification
+             -> WS4 production, WS5 service/close, WS7 payout
 
 Wave 1 (substrate):      WS1 First Light    WS8 Fiscal constitutions    WS10 Comptroller Console
 
@@ -65,17 +75,36 @@ Wave 3 (advanced rails): WS2/WS4 production  WS5 Channels  WS7 Insurance  WS9 in
 
 Hard edges (blocking):
 
-- RFC-0006 is on `main`. RFC-0003 must land before WS1 Phase 2 starts.
+- RFC-0006's earlier hot-path work is on `main`; its new database-scoped
+  serving-owner amendment is pending and owned by protocol-primitives Task 6.
+  That task also owns the generic retained
+  `AdmissionOperation`, composable receipt projection, top-level/nested dispatch
+  parity, and SQLite serving fencing described by corrected RFC-0003. It must
+  land before WS1 Phase 2 starts; WS1 does not implement a second coordinator.
   RFC-0013 is a money-path specialization of RFC-0003 and must register its
   payment reconciliation with RFC-0003 recovery; a standalone replacement is
   not an allowed shortcut.
 - `spec/CHIO_LADDER.md` requires FROST for `settle.commitment` and every other
-  `n_of_m` action, but `main` has no production Rust FROST verifier. Activating
-  any such path is hard-gated on a separately reviewed production verifier plus
-  a trusted active roster, group key, key epoch, and rotation rules. This gate
-  applies to the WS1 release claim, WS4 finalization, WS5 quorum close, and WS7
-  panel supersession. Artifact construction and non-quorum paths may land
-  earlier; a test signer or endorsement set does not satisfy the gate.
+  `n_of_m` action. The owned substrate is
+  `2026-07-12-frost-quorum-substrate-design.md` and its executable plan:
+  `chio/frost-p1-verifier-contract` lands strict domains, roster epochs and
+  historical verification; `chio/frost-p2-durable-signing` lands DKG, encrypted
+  pre-commit nonce durability, share durability, fenced sessions and the external
+  monotonic roster-epoch plus same-epoch authorization-slot checkpoints;
+  `chio/frost-p3-runtime-qualification` qualifies P2's rotation and both
+  continuity layers across crash, restore and runtime behavior. P3 is a shared
+  prerequisite for WS1 P4, WS4 P4 and WS5 P3. WS7 Phase 3 later registers and
+  qualifies its reserved action mapping before panel activation. Each consumer
+  still owns the rollback-independent resource/effect gate that consumes
+  `VerifiedFrostAuthorization` under its exact resource version and fence. A test
+  signer, endorsement set, group signature, or rollbackable local CAS does not
+  satisfy the gate.
+- WS4, WS5 and WS7 irreversible lifecycles depend on the shared external
+  multi-resource contract in `2026-07-12-economic-state-continuity-design.md`.
+  Its linearizable batch CAS is outside the consumer SQLite restore domain and
+  owns the authoritative round/obligation, channel/reservation, and
+  trigger/claim/coverage heads. Local rows are staging/cache state. Missing,
+  unavailable or divergent continuity keeps the affected dispatcher disabled.
 - WS2, WS3, WS4 production money movement depends on WS1 (settlement hook,
   payment adapter wiring, durable journal). Their artifact families and
   offline verification land independently of WS1, in the established
@@ -89,20 +118,52 @@ Hard edges (blocking):
   land while that edge remains blocked.
 - No current generic in-tree tool server proves provider-owned durable
   acceptance for WS3. Outcome-priced dispatch also requires a provider-signed
-  acceptance after restart-safe queueing, exact idempotency/status query, local
-  acceptance-time persistence, and the RFC-0003 unresolved-handoff ambiguity
-  gate. Socket acceptance or in-memory enqueue does not satisfy this hard edge.
-- WS3 pre-dispatch eligibility depends on RFC-0003's additive nullable
-  `outcome_eligibility_digest` and typed intent-plus-eligibility actor command.
-  A digest-only intent, separately committed eligibility row, or post-dispatch
-  attachment is not an allowed intermediate implementation.
+  acceptance after restart-safe queueing and a rollback-independent external
+  dispatch-slot anchor. Its monotonic checkpoints bind the exact operation,
+  attempt, predecessor and version. Only a current permanent external
+  cancellation checkpoint proves nonacceptance; a missing local queue row or a
+  restored, behind, divergent or unavailable view stays unresolved and freezes
+  the hold. Local queue staging is non-executable until external acceptance and
+  executor-lease CAS; accepted invocation bytes have rollback-independent
+  availability, cancellation permanently fences staged work, and
+  accepted/executing/completed attempts cannot cancel. Exact idempotency,
+  authenticated tool-side status, external status query, local acceptance-time
+  persistence, restore-after-enqueue, restore-after-effect-before-completion and
+  the RFC-0003 unresolved-handoff ambiguity gate are mandatory. Socket acceptance
+  or in-memory enqueue does not satisfy this hard edge.
+- WS3 also requires a receiver-owned durable output store, exact final-byte
+  digest and a rollback-independent external delivery-slot anchor. Only its
+  current acknowledged checkpoint plus durable blob availability permits a
+  signed delivery acknowledgement, and only its current permanent cancelled
+  checkpoint permits nonacceptance. Restart, local snapshot restore, external
+  status query, anchor outage and wrong-binding qualification are mandatory.
+  Provider acceptance proves dispatch handoff, not caller delivery. Capture
+  occurs only after the receiver acknowledgement is persisted; ambiguity freezes
+  the hold.
+- WS3 pre-dispatch eligibility is a participant binding compare-and-swap attached
+  before `ReadyToDispatch`. It is persisted with `AdmissionOperation::Prepared`
+  and finalized through `AdmissionTerminalProjection::Completed`; a parallel intent actor or
+  post-dispatch attachment is not allowed.
 - WS2-WS5 production integration also depends on the canonical obligation and
   exclusive-disposition contract in invariant 11. Artifact-only work may not
   invent a parallel ownership, creditor, exposure, or routing model.
+- WS4 activation additionally requires an authoritative participant snapshot and
+  boundary-complete epoch/range proof before netting; finalization and abort use
+  one externally anchored lifecycle CAS. The `finalizing -> finalized` batch is
+  the single consumption point for the exact FROST authorization and persists
+  its digest. First dispatch consumes the exact anchored finalized tuple plus
+  separate fresh WS1 settlement authority; it does not consume the same FROST
+  proof a second time.
+- WS5 shipped v1 additionally requires fully funded existing `ChioEscrow`,
+  block-pinned terms/event/operator proofs, exact protocol-to-token conversion,
+  pre-dispatch payer reservation with no post-service payer signature or per-call
+  fallback, guarded prepare/root publication/broadcast and event-bound
+  reconciliation. Artifacts with close disabled are incomplete v1.
 - WS7 payout execution depends on WS4 or WS1 dispatch; its trigger and
   evidence machinery depends on WS3 (SLA breach events) only for the
   SLA-trigger class. Any payout activation also depends on its deterministic
-  claim/contest state and aggregate policy-coverage reservation store.
+  claim/contest state, semantic trigger uniqueness, exact beneficiary/destination
+  binding, and shared canonical liability-coverage reservation store.
 - WS6's settlement-reliability credential depends on WS1 obligation and
   reconciliation stores exposing authenticated, boundary-complete ranges at one
   cutoff. Other WS6 credential families may land without that metric; a bounded
@@ -110,11 +171,22 @@ Hard edges (blocking):
 - WS5 on-chain close depends on WS1 and on contract-freeze posture; any new
   contract surface is a family-v2 proposal gated on external assurance and
   is out of scope for the shipped wave.
+- WS6 and WS10 coordinate one strict underwriting policy-input version before
+  either new signal arm ships. This is a schema edge, not an implied data-flow
+  edge. WS6 cross-issuer activation also requires stable source-passport identity
+  and a rollback-independent lifecycle high-water pin.
+- WS8 activation requires an independently durable fiscal continuity anchor and
+  rollback-resistant clock. A local SQLite marker is not bootstrap proof.
+- WS10 may ship read-only spend analytics without underwriting activation, but
+  signed anomaly/decision policies and current decision heads require its
+  external underwriting-governance anchor. SQLite-only lifecycle heads cannot
+  admit signals or persisted decisions.
 - WS9 attacks the markets, so its ordinary regression scenarios follow the
   owning validators. A shared runner waits until Wave 2 interfaces stabilize
-  and shared campaign code proves a distinct boundary. Wave 3 exit additionally
-  depends on the separately owned `AE-CREDIT-ADMISSION-1` and
-  `AE-CUMULATIVE-APPROVAL-1` production controls and green WS9 reruns.
+  and shared campaign code proves a distinct boundary. Wave 3 entry requires the
+  separately owned `AE-CREDIT-ADMISSION-1` and
+  `AE-CUMULATIVE-APPROVAL-1` operation-owned production controls and their
+  concurrency gates; WS9 only reruns them.
 
 Soft edges (compounding, not blocking):
 
@@ -136,9 +208,14 @@ Soft edges (compounding, not blocking):
    PSP, and issuer-authored payloads remain subordinate digest-bound evidence.
    No artifact upgrades asserted provenance to observed or verified; evidence
    classes are preserved end to end.
-2. Money representation. All monetary values are
+2. Money representation. Every protocol-denominated monetary commitment is
    `chio_core_types::capability::scope::MonetaryAmount` (u64 minor units,
-   ISO-4217). Shares and margins are integer basis points. Exchange rates
+   ISO-4217). A rail-native token or ledger amount may also carry typed base
+   units only when an immutable asset-binding digest pins chain, contract/asset,
+   decimals and conversion rule; checked conversion must round-trip exactly to
+   the bound `MonetaryAmount`. Both representations enter signatures, resource
+   fences and reconciliation when both exist. Shares and margins are integer
+   basis points. Exchange rates
    are integer rationals with signed `OracleConversionEvidence`. No floats
    in money math; floats stay confined to risk coefficients. Arithmetic that
    creates or changes a monetary commitment is checked and fails closed on
@@ -208,15 +285,18 @@ Soft edges (compounding, not blocking):
     clearing packet may reference that obligation but may not mint a second
     economic claim for the same value. Each live obligation has exactly one
     durable disposition: `per_call`, `assigned`, `channelized`, or
-    `clearing_reserved`. For a journaled request, the receipt-writer transaction
-    also consumes the exact RFC-0003 dispatch intent; a read-only request has no
-    intent. Whenever a paired observer is installed it seeds
+    `clearing_reserved`. For an operation-covered request, RFC-0003's
+    `commit_admission_projection` transaction appends the receipt, compare-and-
+    swaps the exact retained operation to `Completed`, and commits all applicable
+    local projections. `DurableAdmissionMode::All` may also cover read-only
+    requests. Whenever a paired observer is installed it seeds
     durable attempt-zero work for every receipt; for positive outstanding value
     it additionally
     commits the immutable atom, initial disposition, and creation event. All
-    applicable rows commit atomically before any observer or downstream
-    settlement path runs. Any failure leaves every projection absent and the
-    dispatch intent open for recovery. Disposition changes
+    applicable receipt-side rows commit atomically before any observer or
+    downstream settlement path runs. Any failure leaves every projection absent
+    and the retained operation nonterminal for recovery. Cross-database payment
+    remains an idempotent saga participant. Disposition changes
     append an authenticated audit event
     and update the current projection by compare-and-swap in one transaction;
     the current creditor resolves only from that disposition (`per_call` uses
@@ -226,10 +306,42 @@ Soft edges (compounding, not blocking):
     remains a separate state dimension. Missing original or current creditor
     identity, fresh outstanding evidence, or exclusive disposition rejects fail
     closed.
+12. Durable admission. Exactly one fenced `AdmissionOperation` keyed by immutable
+    request identity coordinates budget, payment, approval, nonce, provider,
+    receipt, observer and obligation participants. `Prepared` precedes the first
+    authoritative mutation; every required late evidence binding attaches by
+    one-time CAS before `ReadyToDispatch`; `DispatchCommitted` precedes top-level
+    and nested tool handoff. Terminal operations remain replay tombstones. After
+    dispatch commitment, recovery never blindly redispatches or releases a hold
+    without authenticated no-effect or zero-charge proof. SQLite mutable serving
+    has one exclusive owner epoch.
+13. Quorum authorization. All `n_of_m` execution uses the shared strict
+    `FrostAuthorizationV1` verifier, durable signer sessions, active roster/group
+    epoch and same-epoch authorization slot reconciled to external monotonic
+    checkpoints, and the exhaustive exact domain/action registry.
+    A group signature proves threshold-group
+    authorization, not the signer subset. The external slot prevents a second
+    conflicting message for one resource version/fence. The consumer consumes
+    `VerifiedFrostAuthorization` through its rollback-independent current-resource
+    gate; a rollbackable local CAS alone cannot begin an effect. Registered
+    classes without that owned gate remain disabled.
+14. Anti-rollback state. A claim that bootstrap is permanently closed, a clock
+    only advances, or a lifecycle cannot regress requires an authenticated
+    monotonic anchor outside the protected SQLite backup/restore domain. Local
+    high-water rows are caches. Missing, unavailable, behind, ahead or divergent anchor
+    state fails closed before serving the affected authority. WS4 round plus
+    obligation heads, WS5 channel plus reservation heads, and WS7 trigger/claim
+    plus shared coverage heads advance through bounded external multi-key batches
+    before capacity, release, or dispatch becomes eligible. Every protected
+    external handoff also consumes a permanent operation-bound effect slot after
+    the matching `AdmissionOperation` handoff state commits. Recovery after that
+    slot can only query authenticated target status or use separately qualified
+    same-key idempotency; otherwise it stays unknown and locked without replay.
 
 ## Claim and release framing
 
-- Release gates. WS1 completes the RFC-0013 Phase 2 money journal; "the
+- Release gates. WS1 completes the RFC-0013 payment participant over the shared
+  durable admission substrate; "the
   production money loop is closed" becomes claimable only when the RFC-0013
   target invariant (moved funds imply an attested receipt or a
   reconciliation incident) is enforced by an always-on kernel e2e test and
@@ -261,8 +373,10 @@ Soft edges (compounding, not blocking):
   Mitigation: v1 is designed against an already funded `ChioEscrow`; anything
   requiring new Solidity is explicitly deferred to a family-v2 proposal
   document. WS3 lands artifact and evaluator contracts only until both a real
-  typed reversible rail and a provider-authenticated durable-acceptance
-  transport are implemented and qualified.
+  typed reversible rail, provider-authenticated transport with external
+  rollback-independent attempt continuity, and receiver-authenticated delivery
+  with external rollback-independent slot and blob continuity are implemented
+  and qualified.
 - Claim drift. Insurance, credit, and clearing vocabulary reads as regulated
   activity. Mitigation: every spec carries the "signed intent and evidence,
   not custody, not insurer-of-record, not a rail" boundary language, and
@@ -270,16 +384,21 @@ Soft edges (compounding, not blocking):
 - Parameter authority split. WS8 moves constants into governed artifacts;
   consumers may use built-in values only before the first activation. After
   activation, a missing, invalid, expired, or rolled-back artifact retains the
-  last-known-good schedule or denies; it never restores looser defaults.
-- Reliability-program coupling. RFC-0006 is on `main`; RFC-0003 is the hard
+  last-known-good schedule or denies; it never restores looser defaults. The
+  external fiscal anchor, not a restored SQLite marker, proves this continuity.
+- Reliability-program coupling. RFC-0006 base work is on `main`, while its
+  serving-owner amendment and RFC-0003 are hard
   prerequisite for WS1 Phase 2. RFC-0013's boot reconcile registers into
   RFC-0003's boot-recovery orchestration. No standalone reconcile substitute
   may satisfy the phase entry gate.
-- Quorum substrate. Ladder policy already requires FROST for settlement
-  commitments, while `main` has no production verifier. The release claim and
-  every quorum action remain disabled until the hard-edge prerequisite is met;
-  documentation, fixtures, or independent participant endorsements cannot be
-  treated as an implementation.
+- Quorum substrate. Ladder policy requires FROST for settlement commitments.
+  P1 verification may proceed in parallel, but P2 mutable signer/coordinator and
+  roster stores wait for protocol-primitives Task 6's shared database-UUID
+  serving-owner fence and reuse it without a second lock.
+  The release claim and every quorum action remain disabled until owned P1-P3
+  work, external authorization slot and consumer rollback-independent
+  resource/effect gate are qualified; documentation, fixtures, local-only CAS, or
+  independent participant endorsements cannot be treated as an implementation.
 - Qualification laundering. Project-generated synthetic corpora can be useful
   regressions but are not independent evidence. WS9 begins as ordinary tests
   and internal qualification, and no wave exits with an unresolved Critical or

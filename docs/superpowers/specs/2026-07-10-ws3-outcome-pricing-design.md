@@ -118,8 +118,12 @@ All artifacts are signed RFC 8785 canonical JSON with
   `eligibility_id`, `request_id`, capability id, tool server and tool name,
   provider id, listing id and digest, provider-binding digest, pricing id and
   digest, predicate id and digest, quote digest, optional SLA digest, exact
-  `outcome_price`, `HoldCapture`, pre-action authority digest, `issued_at`, and
-  `expires_at`. The kernel signs the RFC 8785 body only after validating every
+  `outcome_price`, `HoldCapture`, pre-action authority digest, exact post-guard
+  policy digest, and a trusted receiver-binding digest, `issued_at`, and
+  `expires_at`. The receiver binding resolves the kernel or edge key plus the
+  rollback-independent delivery-anchor identity/namespace authorized to own the
+  delivery slot; an embedded acknowledgement key or caller-selected anchor is
+  never a trust root. The kernel signs the RFC 8785 body only after validating every
   referenced artifact and before dispatch. The signed artifact envelope contains
   that body and its detached signature; `eligibility_digest` is SHA-256 over the
   RFC 8785 canonical envelope. `eligibility_id` is SHA-256 over the
@@ -129,51 +133,160 @@ All artifacts are signed RFC 8785 canonical JSON with
 - `chio.outcome.dispatch-acceptance.v1` is a provider-signed durable-queue
   acknowledgement binding `schema`, domain-separated `acceptance_id`, request
   id, eligibility digest, parameter hash, provider/listing binding, server queue
-  id, idempotency key, and provider key id/epoch. The provider key resolves from
+  id, idempotency key, provider key id/epoch, and exact externally anchored
+  `Accepted` dispatch-checkpoint sequence/digest. The provider key resolves from
   the trusted listing binding. It is valid only when the qualified server has
   durably assumed responsibility to execute exactly once or expose a terminal
   signed outcome through its restart-safe status query. Socket acceptance,
   in-memory enqueue, or synchronous function entry does not qualify.
+- `chio.outcome.dispatch-checkpoint.v1` is the provider attempt-slot continuity
+  record. Its `ProviderDispatchAnchor` lives outside the provider queue/database
+  backup domain and binds provider/anchor identity, namespace, operation/request,
+  eligibility and parameter digests, attempt/idempotency key, monotonic slot
+  version and predecessor, trusted clock, execution lease/fence, and state
+  `Pending | Accepted | Executing | Completed | Cancelled`. The anchor accepts
+  only private-verified legal CAS transitions: `Absent -> Pending`, `Pending ->
+  Accepted | Cancelled`, `Accepted -> Executing`, and `Executing -> Completed`.
+  `Accepted` requires the immutable staged queue row plus a content-addressed
+  invocation blob outside the queue restore domain, or a rollback-independent
+  availability receipt for that blob. `Executing` assigns one fenced executor.
+  `Completed` requires a durable authenticated terminal outcome reference.
+  `Cancelled` is permanent and proves the same key can never become accepted or
+  execute; `Accepted`, `Executing`, and `Completed` can never cancel.
+- `chio.outcome.dispatch-nonacceptance.v1` is provider-signed and binds the exact
+  current `Cancelled` dispatch checkpoint. Only that externally continuous proof
+  can construct `VerifiedTransportNotAccepted`. A local queue query, missing row,
+  timeout, old signed status, or restored/behind/divergent/unavailable anchor view
+  is `Unknown`, not no-effect authority.
+
+Provider handoff uses the cross-store protocol `LocalQueuedStaged ->
+DispatchAnchorAccepted -> LocalExecutable`. A staged row is permanently
+non-executable until a worker reads the exact current external `Accepted`
+checkpoint and wins its `Accepted -> Executing` lease/fence CAS. If
+`Pending -> Cancelled` wins, every matching staged row becomes permanently
+non-executable. Recovery reads the anchor before local queue state. An anchored
+`Accepted` row whose local queue was rolled back is reconstructed from the
+anchored invocation blob; it is never cancelled. After invocation, the provider
+stores the terminal result for authenticated lookup before `Executing ->
+Completed`. A crash after an effect but before `Completed` may resume only from
+authenticated tool-side status or through a separately qualified idempotent tool
+invocation keyed by the same operation, attempt, and execution fence. Without
+one of those proofs it remains `Executing`/unknown and does not rerun. Stale
+executors are fenced and cannot publish a terminal result.
+- `chio.outcome.delivery-acknowledgement.v1` is signed by the trusted receiver
+  kernel or edge only after the rollback-independent caller-owned delivery slot
+  stores the exact final bytes and atomically advances `Pending -> Acknowledged`,
+  and before it exposes them to the agent. It binds `ack_id`, request id,
+  eligibility and
+  dispatch-acceptance digests, final output digest, receiver-binding digest,
+  delivery id and idempotency key, receiver queue id, trusted accepted time, and
+  receiver key id/epoch plus exact delivery-checkpoint sequence/digest and durable
+  blob reference. The anchor retains restart-queryable retrieval by delivery id,
+  so a crash or local mailbox restore after acknowledgement cannot strand paid
+  output or reopen cancellation. The signer resolves from the pre-dispatch receiver
+  binding. A socket write, HTTP response completion, or caller-supplied key does
+  not qualify.
+- `chio.outcome.delivery-nonacceptance.v1` is a receiver-signed terminal
+  cancellation proof for the same exact request, eligibility, provider
+  acceptance, output digest, receiver binding, delivery id, idempotency key and
+  receiver queue. The receiver creates it only after the external delivery anchor
+  compare-and-swaps the slot from `Pending` to permanently `Cancelled`, proves no
+  blob was accepted or exposed, and makes every later write for that delivery key
+  reject. It binds the exact cancellation checkpoint sequence/digest. A private
+  verifier constructs `VerifiedReceiverNoDelivery`; missing, timed-out or
+  unreachable acknowledgement is not this proof.
+
+The `ReceiverDeliveryAnchor` is outside the receiver SQLite/mailbox backup and
+restore domain. Its signed `chio.outcome.delivery-checkpoint.v1` binds anchor and
+receiver identity, namespace, delivery slot/idempotency key, monotonic slot
+version and predecessor digest, state `Pending | Acknowledged | Cancelled`, exact
+request/eligibility/acceptance/output bindings, optional content-addressed blob
+reference/digest, trusted-clock high-water, and receiver key epoch. The anchor
+stores acknowledged blobs durably or verifies a rollback-independent blob-store
+availability receipt before advancing.
+
+A private `VerifiedReceiverDeliveryAdvance` enforces one legal transition
+(`Absent -> Pending`, `Pending -> Acknowledged`, or `Pending -> Cancelled`),
+exact predecessor, version plus one, nondecreasing clock, and unchanged bindings.
+`Pending -> Acknowledged` requires the exact durable blob and
+`Pending -> Cancelled` requires a blob-absence proof and cancellation fence. The
+anchor accepts only this verified type by linearizable compare-and-swap. Delivery
+uses `LocalStaged -> AnchorAdvanced -> LocalFinalized`; exposure is forbidden
+until the anchored `Acknowledged` state and local view agree. Recovery reads the
+anchor first. A local snapshot that is behind or divergent is repaired from the
+anchored blob or fails closed; it can never sign nonacceptance. Anchor outage or
+an unresolved staged transition is `delivery_unknown`, with no capture or
+release.
 - `chio.outcome.verdict.v1` receipt metadata binds:
   `listing_id`, `listing_digest`, `provider_id`,
   `provider_binding_digest`, `pricing_id`, `pricing_digest`,
   `predicate_id`, `predicate_digest`, `quote_digest`, `eligibility_digest`,
-  `dispatch_acceptance_digest`,
+  `dispatch_acceptance_digest`, tagged `delivery_disposition: acknowledged |
+  cancelled | not_attempted`, optional `delivery_acknowledgement_digest`, optional
+  `delivery_nonacceptance_digest`,
   optional `delivered_output_digest`, `verdict`, `reason_code`,
-  `charged_amount`, and `rail_authorization_ref`.
+  `sla_attribution: provider | caller_policy | platform`, `charged_amount`, and
+  `rail_authorization_ref`.
 
 The provider binding identifies the trusted key that must sign the listing,
 predicate, and pricing artifacts. The request quote digest covers the entire
 canonical `MeteredBillingQuote` and its verified-outcome references. A matching
 identifier without a matching digest rejects. Receipt metadata is part of the
 kernel-signed receipt and cannot be filled from a tool-server self-report.
+`acknowledged` requires only the acknowledgement digest, `cancelled` requires only
+the verified nonacceptance digest, and `not_attempted` requires both absent and a
+terminal pre-delivery zero-charge reason. `delivery_unknown` emits no success
+receipt and cannot be encoded as one of these dispositions.
 
 For an outcome-priced request, the same receipt-store transaction that creates
-the RFC-0003 dispatch intent also persists the canonical signed eligibility
-record and writes its digest into a nullable
-`outcome_eligibility_digest` intent extension. The digest is mandatory for this
+the RFC-0003 `AdmissionOperation::Prepared` row also persists the canonical
+signed eligibility record and writes its digest into the canonical request
+binding. The digest is mandatory for this
 request class and null for unrelated calls. A duplicate request id with
 different eligibility bytes, a missing record, a digest mismatch, an unknown
 schema or version, or an untrusted kernel signer denies before dispatch. The
-intent and record commit together, so a crash can leave both or neither, never
-an unattributed outcome-pricing intent. The RFC-0003 eligibility record starts
+operation and record commit together, so a crash can leave both or neither,
+never an unattributed outcome-pricing operation. The eligibility record starts
 `prepared`. After authorization and every pre-tool check succeeds, the kernel
 must durably compare-and-swap it to `dispatch_started` immediately before the
 qualified transport handoff. This is platform state, not provider SLA evidence.
 Only a verified durable acknowledgement may transition the row to
 `dispatch_accepted`, recording its digest and a trusted local acceptance time.
 Receipt commit must supply its digest in the typed
-`DispatchIntentKey`, match the same digest in signed
+`AdmissionTerminalProjection::Completed`, match the same digest in signed
 `chio.outcome.verdict.v1` metadata, and atomically move the record to
-`receipt_bound` with the receipt id while consuming the intent, and the signed
+`receipt_bound` with the receipt id while retaining the completed operation, and the signed
 verdict must bind the same acceptance digest. Terminal crash reconciliation from
 `dispatch_accepted` becomes a provider incident; `dispatch_started` without a
 recoverable acknowledgement creates a platform incident but remains unresolved
 and makes SLA proof incomplete. Only an authenticated server `NotAccepted`
-result may terminate it as `not_dispatched`. A pre-tool abort or recovery moves `prepared` to
+result carrying the current external permanent `Cancelled` checkpoint may
+terminate it as `not_dispatched`. A pre-tool abort or recovery moves `prepared` to
 `not_dispatched`; that proof is retained but excluded from provider SLA math.
-The resolved record's lack of an open intent is expected, not an integrity
-error.
+The resolved record and retained terminal operation must agree.
+
+WS3 further extends the operation-owned eligibility lifecycle after provider
+acceptance:
+
+```text
+dispatch_accepted -> output_ready -> delivery_started
+delivery_started -> delivery_acknowledged -> receipt_bound
+delivery_started -> delivery_cancelled -> receipt_bound
+delivery_started -> delivery_unknown
+```
+
+`output_ready` binds the immutable final post-guard bytes and digest.
+`delivery_started` binds the exact externally anchored `Pending` slot checkpoint.
+`delivery_acknowledged` stores and verifies the canonical receiver
+acknowledgement. Only that state may commit a capture action.
+`delivery_cancelled` requires `VerifiedReceiverNoDelivery` and commits a release
+action plus zero-charge receipt. Missing, expired, ambiguous or unqueryable
+acknowledgement moves to `delivery_unknown`, records an incident, freezes the
+hold and emits no success receipt; if recovery later declares it irrecoverable,
+the retained operation is `OutcomeUnknownAfterDispatch` and the hold remains
+frozen. Such ambiguity is neither capture nor release authority. A crash
+after acknowledgement but before capture reuses the same operation, delivery id,
+and rail idempotency key and captures at most once.
 
 ### Exact output-stage ordering
 
@@ -182,45 +295,72 @@ The only valid order is:
 1. Verify the listing, provider binding, predicate, pricing, and quote digests
    and validity windows.
 2. Build and verify `chio.outcome.eligibility.v1`. Atomically persist it with
-   WS1's RFC-0003 pre-movement intent and bind its digest into the intent
-   extension. Require `MeteredSettlementMode::HoldCapture` and a qualifying
+   RFC-0003's `AdmissionOperation::Prepared` and bind its digest into the
+   canonical request binding. Require `MeteredSettlementMode::HoldCapture` and a qualifying
    rail, authorize an unsettled hold for exactly
    `outcome_price`, and durably record that authorization before dispatch.
-3. After every pre-tool check succeeds, durably compare-and-swap the eligibility
-   record from `prepared` to `dispatch_started`, append its immutable lifecycle
+3. After every pre-tool check succeeds, capture invocation admission and durably
+   persist `AdmissionOperation::DispatchCommitted`. Compare-and-swap eligibility
+   from `prepared` to `dispatch_started`, append its immutable lifecycle
    event, then invoke only the qualified durable-acceptance transport. If that
    commit fails, do not invoke transport; reconcile the hold and terminate as
    `not_dispatched`.
 4. Verify the provider-bound `chio.outcome.dispatch-acceptance.v1` returned only
-   after durable server enqueue. Persist its bytes and digest, assign the trusted
-   local acceptance time, and compare-and-swap `dispatch_started` to
-   `dispatch_accepted`. If the acknowledgement is lost, recovery queries the
-   server by exact idempotency key and eligibility digest. Until acceptance is
-   proven, any terminal incident is platform-owned and excluded from provider
-   SLA math.
-5. Await the accepted execution's terminal output and retain the raw bytes.
+   after immutable local staging, rollback-independent invocation-blob
+   availability and external `Accepted` checkpoint CAS. Persist
+   its bytes/checkpoint digest, assign the trusted local acceptance time, and
+   compare-and-swap `dispatch_started` to `dispatch_accepted`. If the
+   acknowledgement is lost, recovery queries the external provider slot by exact
+   idempotency key and eligibility digest. Only a current permanent `Cancelled`
+   checkpoint proves nonacceptance; anchor outage, local restore, or any
+   behind/divergent view remains unresolved. Until acceptance is proven, any
+   terminal incident is platform-owned and excluded from provider SLA math.
+5. The provider worker reads the current external `Accepted` checkpoint, wins
+   `Accepted -> Executing` with a fresh execution lease/fence, and only then may
+   invoke the tool. Await its authenticated terminal output and retain the raw
+   bytes before advancing the anchor to `Completed`. A crash in `Executing`
+   queries the exact tool-side idempotency key; absent qualified status or
+   idempotent replay, it remains unknown and does not invoke again.
 6. Run the complete post-invocation guard pipeline. A block or escalation sets
    `delivered_output_digest = None` and
    `Unevaluable { reason: output_blocked }`, then proceeds to zero-charge
-   release. A redaction produces the final output bytes.
+   release with `sla_attribution = caller_policy`. A redaction produces the final
+   output bytes and also uses `caller_policy`. Guard/evaluator/store/ordering
+   failures use `platform`; no free-form guard label can assign provider fault.
 7. For an allowed output, freeze those final bytes as `delivered_output`. Compute
    `delivered_output_digest` and evaluate the predicate over the JSON parsed
    from those same bytes.
 8. Run no output mutation after predicate evaluation. Any component that would
-   transform the output after this point is an ordering violation and the hold
-   is released.
-9. Set `reported_cost` to the full outcome price only for `Passed`; otherwise
-   set it to zero. Capture or release through the WS1 durable path, recording
-   the exact rail operation and lifecycle transition atomically.
-10. Build and sign one receipt whose financial charge, all bound digests,
-   output digest, verdict, and rail reference agree, then persist it before
-   delivery completes. In that same writer transaction, verify the eligibility
-   envelope and verdict digest again, transition its record from
-   `dispatch_accepted` to
-   `receipt_bound`, consume the exact digest-bound intent, and append the
-   receipt. Any mismatch rolls back all three changes.
+   transform the output after this point is an ordering violation. It persists a
+   contractual zero-charge outcome before release and never starts delivery.
+9. Persist `output_ready` with the final output digest and start the qualified
+   two-stage delivery. The receiver verifies the binding, creates the exact
+   external `Pending` slot, stages the bytes, advances the delivery anchor to
+   `Acknowledged` with rollback-independent blob availability, finalizes its local
+   view, signs and durably stores `chio.outcome.delivery-acknowledgement.v1`, and
+   only then exposes bytes retrieved from that slot to the agent. The delivery
+   remains retrievable by id across restart or local snapshot restore.
+10. Persist and verify the acknowledgement, compare-and-swap to
+    `delivery_acknowledged`, and set `reported_cost` to the full outcome price
+    only for `Passed`. Persist an exact `Capture` settle action. If the
+    receiver instead returns a valid anchored delivery-nonacceptance artifact, construct
+    `VerifiedReceiverNoDelivery`, transition to `delivery_cancelled`, set cost to
+    zero, and persist `Release`. If acknowledgement or nonacceptance is missing,
+    expired, ambiguous, or unqueryable, transition to `delivery_unknown`, freeze
+    the hold, persist an incident and stop without a success receipt.
+11. Execute only that durable rail action through WS1. Pending remains
+    recoverable; an incompatible result incidents and never produces success.
+12. Build and sign one receipt whose financial charge, all bound digests, output
+    digest, delivery acknowledgement or verified nonacceptance, attribution,
+    verdict, and rail reference agree.
+13. Use RFC-0003's `commit_admission_projection` to verify the eligibility,
+    acceptance, delivery, verdict, and payment evidence, transition eligibility
+    to `receipt_bound`, append the receipt, and retain the operation as
+    `Completed` in one receipt-side transaction. Any mismatch rolls back every
+    local projection.
 
-The bytes hashed for predicate evaluation are byte-for-byte the bytes returned to the caller.
+The bytes hashed for predicate evaluation are byte-for-byte the bytes durably
+accepted at the receiver boundary. Capture cannot precede that acknowledgement.
 The predicate never evaluates a pre-redaction output while charging for a
 different delivered result.
 
@@ -258,9 +398,11 @@ It contains:
   append-only lifecycle-event consistency proof, and the complete global
   provider-acceptance-time range for the declared interval with boundary
   leaves. The proof includes each signed `chio.outcome.eligibility.v1` envelope,
-  signed dispatch-acceptance envelope, stable eligibility sequence, every
+  signed dispatch-acceptance and acknowledgement or nonacceptance delivery
+  envelope when present,
+  stable eligibility sequence, every
   required lifecycle version and incident class, and bound
-  receipt or incident id, plus corresponding open or dead-letter intent state,
+  receipt or incident id, plus the corresponding retained admission-operation state,
   so a crash after dispatch cannot vanish from the denominator merely because no
   normal receipt was appended. The verifier, not the submitter, applies the
   provider selector to this complete range;
@@ -271,9 +413,11 @@ It contains:
 - the fixed eligibility selector
   (`provider_binding_digest`, `listing_digest`, `pricing_digest`, and
   `predicate_digest`);
-- the complete eligibility-record root and count, `eligible_count`,
-  `failed_or_unevaluable_count`, and the references for every eligible receipt
-  or terminal incident; and
+- the complete eligibility-record root and count, `accepted_count`,
+  `provider_attributable_count`, `caller_policy_excluded_count`,
+  `platform_excluded_count`, `provider_failure_count`, and references for every
+  accepted receipt or terminal incident. The three attribution partitions must
+  sum exactly to `accepted_count`; and
 - `failure_bps`.
 
 The verifier pins the checkpoint signer and epoch from trusted configuration,
@@ -287,54 +431,65 @@ provider-acceptance-time leaf. Terminal `not_dispatched` records are excluded;
 an unresolved `dispatch_started` record makes any potentially overlapping proof
 incomplete; v1 enforces this as a global zero-count gate. They remain visible in the record/event roots so exclusion cannot
 hide an accepted request. A
-`dispatch_accepted` record must have its exact digest-bound open intent and makes
+`dispatch_accepted` record must have its exact digest-bound nonterminal operation and makes
 the corpus incomplete until terminal. A
 `receipt_bound` record must resolve its recorded receipt id and
 the receipt's signed verdict metadata must carry the same eligibility and
-acceptance digests. A provider-class `incident_bound` record must resolve its
-recorded terminal incident, signed acceptance, and matching dead-letter intent.
+  acceptance and delivery digests. A provider-class `incident_bound` record must resolve its
+  recorded terminal incident, signed acceptance, and retained operation incident.
 A platform-class incident cannot enter the acceptance index. It joins by request
 id and digest without double counting,
 then replays the selector from the eligibility bodies and
-recomputes both counts. A missing, tampered,
+recomputes every partition and count. A missing, tampered,
 unknown-schema, expired-at-dispatch, or
 selector-mismatched eligibility record makes the corpus incomplete and rejects
 the breach artifact; it is never silently excluded. The denominator is
-every matching request the provider durably accepted in the declared window, including
-passed, failed, unevaluable, output-blocked, and recovered outcome-unknown
-incidents. An unresolved open intent makes the corpus incomplete; a terminal
+every provider-attributable matching request in the declared window. Provider
+attribution is limited to an unmodified delivered provider output that passes or
+fails the predicate, invalid provider JSON, or a post-acceptance provider
+incident. Guard block or byte-changing redaction is `caller_policy`; delivery,
+guard-runtime, evaluator, store, and ordering failures are `platform`. Those
+rows remain visible and counted in their excluded partitions but enter neither
+the provider numerator nor denominator. An unresolved operation or delivery
+state makes the corpus incomplete; a provider-attributable terminal
 outcome-unknown incident counts as failed rather than disappearing. Failure
 receipts alone are never a valid denominator. An unavailable range proof,
 untrusted checkpoint authority, gap, duplicate request or position, zero or
 below-minimum denominator, SLA/window mismatch, or ineligible receipt rejects
 the artifact.
 
-`failure_bps = failed_or_unevaluable_count * 10_000 / eligible_count` uses
+`failure_bps = provider_failure_count * 10_000 /
+provider_attributable_count` uses
 checked `u128` arithmetic and must be at most 10,000. It is a display value and
 never saturates. Breach authority uses the exact checked cross-product, not the
 floored display value:
 
 ```text
-failed_or_unevaluable_count * 10_000 > max_failure_bps * eligible_count
+provider_failure_count * 10_000 > max_failure_bps * provider_attributable_count
 ```
 
 The artifact is a breach only when that inequality holds and
-`eligible_count >= minimum_sample_count`. Thus one failure in three requests
+`provider_attributable_count >= minimum_sample_count`. Thus one provider failure in three attributable requests
 breaches a 3,333 bps maximum, while one in four does not breach an exact 2,500
 bps maximum.
 
 ### Fail-closed errors
 
 Missing or expired artifacts, missing or tampered outcome eligibility, untrusted
-eligibility signer, intent/eligibility mismatch, untrusted or mismatched provider
+eligibility signer, operation/eligibility mismatch, untrusted or mismatched provider
 signatures, identifier/digest mismatch, quote mismatch, non-`HoldCapture` mode,
 prepaid or unproven rail semantics, authorization mismatch, unknown comparator,
-invalid pointer, invalid JSON, output-stage reordering, charge above the hold,
+invalid pointer, invalid JSON, output-stage reordering, missing or untrusted
+receiver binding, missing/stale/replayed/mismatched delivery acknowledgement,
+invalid delivery-nonacceptance or cancellation fence, capture before
+acknowledgement, release on delivery ambiguity, charge above the hold,
 mixed currency, arithmetic failure, a second dispatch for an in-flight capture,
 incomplete SLA range, untrusted checkpoint authority, insufficient sample,
 threshold mismatch, and disposition conflict all reject. A runtime predicate
-evaluation error after dispatch requests release through the durable path and
-records `Unevaluable`; until release is proven, reconciliation stays Pending or
+evaluation error after dispatch requests release only after the post-return
+journal durably records terminal `Unevaluable` and constructs
+`VerifiedContractualZeroCharge`; an ambiguous or non-replayable evaluation
+freezes the hold. Until release is proven, reconciliation stays Pending or
 Failed. It never records a full charge.
 
 ## Alternatives considered
@@ -362,7 +517,9 @@ declared deterministic predicate. It does not prove objective value or factual
 correctness. The verdict is kernel-observed receipt evidence. Escrow and payment
 payloads remain subordinate rail evidence. No production outcome-priced payment
 claim exists until a real reversible rail passes the activation qualification;
-the current in-tree adapters do not.
+the current in-tree adapters do not. It also requires a qualified two-stage
+receiver path; returning output and receipt in one `ToolCallResponse` is not
+durable delivery acknowledgement.
 
 ## Testing strategy
 
@@ -372,21 +529,22 @@ the current in-tree adapters do not.
 - Eligibility: signed canonical positive; mutate each provider/listing/pricing/
   predicate/quote/authority digest independently; reject unknown
   family/schema/version, untrusted signer, duplicate request with different
-  bytes, missing intent digest, missing record, and a record committed separately
-  from its intent. Creation assigns stable record/event sequences and a
+  bytes, missing operation binding, missing record, and a record committed separately
+  from its operation. Creation assigns stable record/event sequences and a
   version-zero `prepared` event. Tool dispatch cannot run before the durable
   `dispatch_started` CAS, but that state alone is platform-owned. Only a signed,
   provider-bound, restart-queryable durable acknowledgement produces
-  `dispatch_accepted`. Receipt commit with the right eligibility and acceptance
-  digests atomically produces `receipt_bound` and deletes the intent; a missing or wrong
+  `dispatch_accepted`. Receipt commit with the right eligibility, acceptance, and
+  delivery digests atomically produces `receipt_bound` and retains the completed
+  operation; a missing or wrong
   verdict/key digest, stale version/lifecycle, or changed envelope rolls back
   both plus the receipt append. Pre-tool failures produce retained
   `not_dispatched` evidence and never enter the SLA numerator or denominator;
   terminal reconciliation after acceptance atomically produces a provider-class
   `incident_bound`; pre-acceptance handoff failures produce platform incidents,
   and ambiguous acceptance remains unresolved until a trusted query resolves it.
-  Resolved records remain queryable without open intents; only creation of a
-  `prepared` record without its intent rejects.
+  Resolved records remain queryable with the terminal operation; only creation of
+  a `prepared` record without its operation rejects.
 - Rail matrix: no current in-tree adapter activates WS3. A future genuine
   unsettled hold passes only after networked authorize/capture/release,
   idempotent replay/query, expiry, amount, payer, payee, currency, and durable
@@ -395,21 +553,55 @@ the current in-tree adapters do not.
   authorization, and binding mismatch reject before dispatch.
 - Provider transport matrix: no generic in-tree tool server activates WS3. A
   future server passes only after durable enqueue before acknowledgement,
-  exact-once/idempotency-key enforcement, provider-key binding, restart-safe
-  status query, acknowledgement-loss recovery, and terminal outcome
-  qualification. In-memory enqueue, socket acceptance, unsigned acknowledgement,
-  wrong provider/eligibility/parameter digest, and status-query outage cannot
-  create provider SLA evidence.
+  exact-once/idempotency-key enforcement, provider-key binding, and a
+  rollback-independent `ProviderDispatchAnchor` whose signed slot checkpoints
+  bind the exact operation, attempt, predecessor, version and terminal outcome.
+  Local queue staging must be non-executable until the external `Accepted ->
+  Executing` lease/fence CAS, and external `Cancelled` must permanently fence the
+  staged row. Accepted invocation bytes remain reconstructible outside the local
+  queue restore domain.
+  Acceptance-loss recovery must read the current external `Accepted` or
+  `Completed` checkpoint. Nonacceptance requires the current permanent external
+  `Cancelled` checkpoint and its cancellation fence. In-memory enqueue, socket
+  acceptance, unsigned acknowledgement, wrong
+  provider/eligibility/parameter digest, local queue absence, an old checkpoint,
+  and a behind, divergent or unavailable anchor cannot create acceptance or
+  no-effect evidence. Race staged enqueue against cancellation and executor claim
+  against cancellation; exactly one external CAS wins and a cancelled row never
+  executes. Crash and restore the provider before and after local stage, external
+  acceptance, executor claim, tool effect, terminal-result persistence and
+  completion CAS. After an effect but before `Completed`, only authenticated
+  tool-side status or qualified idempotent invocation may finish the same
+  attempt; otherwise the operation remains `OutcomeUnknownAfterDispatch` with
+  its hold frozen and is not rerun. A restored local database can never
+  manufacture `NotAccepted`.
+- Receiver delivery matrix: the receiver kernel durably stores the exact bytes
+  in the rollback-independent anchored slot before acknowledgement and exposure.
+  Wrong receiver key/epoch, anchor identity/namespace, checkpoint predecessor,
+  slot version, request,
+  eligibility, acceptance, output digest, delivery id, or replayed acknowledgement
+  rejects. A crash after acknowledgement but before capture resumes one capture;
+  a lost, expired, or unqueryable acknowledgement freezes the hold and remains
+  unresolved. Only a receiver-signed no-delivery result created atomically with a
+  permanent anchored cancellation tombstone releases. Forged, stale, wrong-key,
+  wrong-delivery, post-acceptance and replaceable cancellation proofs reject.
+  Crash and restore the receiver to every point before and after blob stage,
+  anchor CAS, local finalize, signed ack, and exposure. A restored pre-ack local
+  snapshot observes the anchored acknowledgement and cannot cancel; an anchor
+  outage/behind/divergent view remains delivery-unknown.
 - Ordering: predicates see redacted delivered bytes; a post-predicate mutation
-  releases and rejects; the receipt output digest equals the returned bytes.
-- Pricing: pass captures exactly the quoted price; fail and unevaluable release
-  the entire hold; no code path emits an attempt fee. A settled capture creates
+  releases and rejects; the receipt output digest equals the acknowledged bytes.
+- Pricing: an acknowledged pass captures exactly the quoted price; fail,
+  unevaluable, and verified cancelled delivery release the entire hold;
+  delivery-unknown freezes it and emits no success receipt. No code path emits an
+  attempt fee. A settled capture creates
   no outstanding atom, and a pending capture can only reconcile its original
   idempotency key.
 - Binding: mutate each of listing, provider, pricing, predicate, or quote digest
   independently and assert denial.
 - SLA: omit, duplicate, or reorder one receipt or eligibility position and
-  assert rejection; prove numerator and denominator recomputation and the 0 and
+  assert rejection; prove the attribution partitions sum to `accepted_count`,
+  provider numerator and denominator recomputation, and the 0 and
   10,000 basis-point boundaries. Wrong checkpoint signer/epoch, cherry-picked window, insufficient
   sample, and an exact rate at or below the declared maximum are not breaches.
   Fractional boundaries prove the cross-product rule: 1/3 breaches 3,333 bps,
@@ -421,9 +613,13 @@ the current in-tree adapters do not.
   and confirmed release before `dispatch_started` remain visible as
   `not_dispatched` but do not change the denominator. A crash immediately after
   `dispatch_started` becomes a platform incident and blocks SLA proof until an
-  authenticated acceptance or `NotAccepted` query resolves it; a crash
+  external current `Accepted`, `Completed`, or permanently `Cancelled` dispatch
+  checkpoint resolves it. A restored local `NotAccepted`, missing provider row,
+  or unavailable, behind or divergent anchor leaves it unresolved; a crash
   after verified durable `dispatch_accepted` is incomplete until terminally
-  reconciled, then counts as a provider failure. A request prepared in one SLA
+  reconciled. Guard block/redaction and platform/delivery failures remain visible
+  in excluded partitions; only a provider-attributable incident counts as a
+  provider failure. Omitting any partition leaf rejects. A request prepared in one SLA
   window and accepted in the next belongs only to the latter.
 - Exclusive routing, schema registry parity, public verifier positives,
   unknown-schema negatives, and the workspace gate.
@@ -431,15 +627,23 @@ the current in-tree adapters do not.
 ## Implementation phases
 
 1. Land the pure `chio_listing::outcome` predicate, pricing, eligibility,
-   dispatch-acceptance, verdict, and SLA validators with schemas, runtime/CLI registry parity,
+   dispatch-acceptance, delivery-checkpoint, delivery-acknowledgement,
+   delivery-nonacceptance, verdict,
+   attribution, and SLA validators with schemas, runtime/CLI registry parity,
    signed/tampered fixtures, and unknown-schema negatives.
-2. Add the atomic RFC-0003 intent/eligibility binding and pure exact-output
+2. Add the atomic RFC-0003 operation/eligibility binding and pure exact-output
    evaluator. Keep the output-stage payment hook disabled.
 3. Only after a real rail passes genuine reversible-rail qualification and a
    provider transport passes durable enqueue, signed acceptance, exact
-   idempotency/status-query, restart, and lost-ack qualification, enable the
-   hook. Wire full-capture/zero-release through WS1's durable journal plus the
-   RFC-0003 acceptance lifecycle, and add the always-on
-   receipt/output/rail/acceptance proof. No current in-tree adapter or generic
-   tool server satisfies this phase entry.
+   idempotency, non-executable local staging, rollback-independent invocation
+   blob and dispatch-slot continuity, executor lease/fencing, external
+   acceptance/completion/cancellation status query, restart-after-enqueue,
+   restart-after-execution, and lost-ack qualification, and a receiver path
+   passes rollback-independent slot/blob continuity,
+   durable-store-before-expose, signed acknowledgement/nonacceptance, status-query,
+   crash/restore, anchor-outage, and wrong-binding qualification, enable the hook. Wire
+   full-capture/zero-release through WS1's durable participant plus the RFC-0003
+   acceptance/delivery lifecycle, and add the always-on
+   receipt/output/rail/acceptance/delivery proof. No current in-tree adapter,
+   generic tool server, or one-stage `ToolCallResponse` satisfies this phase entry.
 4. Add SLA aggregation only after complete checkpoint range proofs exist.

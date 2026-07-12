@@ -2,9 +2,11 @@
 
 - Date: 2026-07-10
 - Program: agent-economy program, wave 1 (see 2026-07-10-agent-economy-program-design.md)
-- Depends on: RFC-0003 before Phase 2 (RFC-0006 is already merged); a production
-  FROST verifier and trusted roster/group-key epoch before the Phase 4 release
-  claim; Phase 1 is independent
+- Depends on: protocol-primitives Task 6 / corrected RFC-0003 before Phase 2
+  (RFC-0006 base is merged, but its serving-owner amendment is part of that
+  prerequisite); the 2026-07-12 FROST quorum substrate through
+  Phase 3 plus the settlement resource CAS before the Phase 4 release claim;
+  Phase 1 is independent
 - Claim track: implementation + release gate (RFC-0013 Phase 2)
 - Branch: chio/ws1-first-light off main
 
@@ -101,8 +103,9 @@ constructs a deliberately isolated kernel.
    CAS-owned `chio_credit::obligation::ObligationDisposition` (`per_call`,
    `assigned`, `channelized`, or `clearing_reserved`). One obligation may have
    only one active disposition. For a positive outstanding debt, the source
-   receipt, RFC-0003 intent consumption, atom, initial disposition, creation
-   event, and attempt-zero work commit through one receipt-writer transaction
+   receipt, retained RFC-0003 operation terminal transition, atom, initial
+   disposition, creation event, and attempt-zero work commit through one
+   `commit_admission_projection` receipt-writer transaction
    before any observer runs, and one source receipt cannot mint duplicate
    obligations for the same value. The deterministic id preimage and
    source-claim uniqueness key are fixed in the design below.
@@ -129,10 +132,11 @@ constructs a deliberately isolated kernel.
   (`docs/adr/ADR-0006-monetary-budget-semantics.md:86`) keeps `total_cost_charged`
   monotone; the journal records and reconciles rail movement without inventing a
   refund the kernel does not own.
-- RFC-0003's generic dispatch-intent journal. WS1 owns only the monetary
-  specialization; the `receipt XOR open_intent` safety predicate stays with
-  RFC-0003. RFC-0003 is a hard prerequisite for WS1 Phase 2, not an optional
-  boot-orchestration integration.
+- RFC-0003's generic retained `AdmissionOperation`, receipt projection, shared
+  top-level/nested dispatch boundary, and serving ownership. Protocol-primitives
+  Task 6 owns that substrate; WS1 owns only the RFC-0013 payment participant and
+  money-specific recovery. RFC-0003 is a hard prerequisite for WS1 Phase 2, not
+  an optional boot-orchestration integration.
 - Distributed-linearizable spend truth (the ADR-0006 HA overrun bound at `:67`
   stands), and new market artifact families (WS2-WS10). WS1 is substrate only.
 
@@ -212,7 +216,9 @@ constructs a deliberately isolated kernel.
   `POST /v1/settlements/reconcile` (`docs/reference/AGENT_ECONOMY.md:753`).
   On-chain dispatch is never on this path. Unsigned, untrusted-signer, or
   zero-price receipts mint nothing (`crates/economy/chio-credit/src/hook.rs:132`).
-- Durability layer: the corrected RFC-0013 `payment_journal` state machine
+- Durability layer: the existing protocol-primitives `AdmissionOperation`,
+  extended by corrected RFC-0003, is the sole request coordinator. RFC-0013's
+  `payment_journal` is its operation-keyed payment participant with state
   (`HoldPlaced -> Authorized -> Settling -> Settled -> Closed` for reversible
   holds, `HoldPlaced -> Settled -> Closed` for final prepayment, or
   `ReconcileFailed`), boot
@@ -224,10 +230,21 @@ constructs a deliberately isolated kernel.
   These follow RFC-0013's normative invariants; the illustrative F68
   read-then-upsert sequence is tightened into one atomic transaction. The
   bounded dead-letter v1 body is the sole pre-release shape; obsolete unbounded
-  bodies and unknown schema tags fail closed. The receipt store advertises
-  the atomic projection only when its live SQLite schema and complete trigger set
-  match the reference manifest, and verifies the inserted attempt-zero row before
-  committing a new receipt.
+  bodies and unknown schema tags fail closed. The receipt store advertises a
+  typed `AdmissionProjectionCapabilities` set only when its live SQLite schema
+  and complete trigger set match the reference manifest. Its one
+  `commit_admission_projection` transaction retains the operation terminal row,
+  appends the receipt, and applies every required local sidecar. Budget and
+  payment participants remain a persisted saga across the separately configured
+  budget database; WS1 makes no cross-database atomicity claim.
+  Each SQLite database is independently provisioned through RFC-0006's shared
+  `SqliteServingOwner`; every mutation/recovery transaction checks that file's
+  `(store_uuid, lease_id, owner_epoch)`. The v1 operation, receipt, observer, and
+  obligation projection tables must be co-located under the receipt database's
+  one writer for the stated atomic projection. A configuration that points an
+  obligation projection at another database fails startup. The separate budget
+  and payment database has its own serving owner/fence and remains a saga
+  participant.
 - Economic obligation and disposition: `chio_credit::obligation` owns the atom,
   disposition, authenticated transition event, and store trait;
   `chio-store-sqlite` owns the durable implementation. The projector verifies
@@ -242,17 +259,16 @@ constructs a deliberately isolated kernel.
   requires fresh `credit.facility_bind` authority and exact party/currency/amount
   agreement; it is never inferred from positive price, pending settlement,
   issuer key, or tool identity. For positive unsettled value, the SQLite receipt
-  writer appends the receipt, consumes the matching RFC-0003 dispatch intent,
-  inserts the atom, initial disposition, authenticated creation event, and due
+  writer appends the receipt, compare-and-swaps the matching operation to
+  `Completed`, inserts the atom, initial disposition, authenticated creation event, and due
   attempt-zero observer-outbox row in one `Immediate` transaction. Positive
-  already-settled value appends the receipt, consumes the intent, and inserts the
+  already-settled value appends the receipt, completes the operation, and inserts the
   observer-outbox row in that transaction but creates no live obligation.
   Denied, non-economic, and zero-charge receipts still receive attempt-zero work
   when an observer is installed so the router can durably commit their legitimate
-  pre-hook skip; they add no obligation sidecar. A journaled request consumes its intent,
-  while a read-only request has no intent to consume. If any required insert,
-  verification, or intent-consumption step fails, all writes roll back and the
-  dispatch intent remains open for recovery.
+  pre-hook skip; they add no obligation sidecar. If any required insert,
+  verification, or terminal compare-and-swap fails, all receipt-side writes roll
+  back and the retained operation remains recoverable.
   A later durable compare-and-swap transition appends its audit event and selects
   exactly one downstream settlement mode in one transaction.
   The current creditor resolves only from that disposition; the immutable atom is
@@ -266,29 +282,42 @@ constructs a deliberately isolated kernel.
 1. Quote. A cross-currency draft resolves a rate through the installed
    `PriceOracle` (`resolve_cross_currency_cost`, `validation.rs:1216`), attaching
    `OracleConversionEvidence`. Same-currency drafts skip the oracle.
-2. Governed commit. Capability, policy, and guard validation succeed;
-   `authorize_budget_hold`
+2. Governed commit. Capability, policy, and guard validation succeed. The kernel
+   derives and persists `AdmissionOperationV1::Prepared` before any authoritative
+   participant mutation. `authorize_budget_hold`
    durably debits the worst-case hold (`validation.rs:810`) and, in the same
    `Immediate` transaction, writes the `payment_journal` row in `HoldPlaced`.
    The selected rail profile must support the requested settlement mode before
    `adapter.authorize` runs. A typed held result advances to `Authorized`; a
    typed final-prepayment result advances directly to `Settled`, using its
    authorization id as the stable payment reference, and can never enter release
-   recovery.
-3. Metered execution. The tool runs and reports actual cost via
-  `invoke_with_cost` (`runtime.rs:355`).
-4. Reconcile. For a reversible hold, `reconcile_budget_charge` closes the hold at
+   recovery. Every participant stores the same `operation_id`.
+3. Dispatch commit and metered execution. After every participant and pre-tool
+   check succeeds, the shared evaluator helper captures invocation reservations
+   and durably persists `DispatchCommitted`. Only then may either top-level or
+   nested-flow code call `invoke`/`invoke_stream`. The tool reports actual cost
+   via `invoke_with_cost` (`runtime.rs:355`).
+4. Reconcile. The shared coordinator durably writes the content-addressed raw
+   output and insert-once `ToolOutcomeRecordV1`, then compare-and-swaps the exact
+   guarded output, reported cost, pricing verdict and settlement disposition.
+   For a reversible hold, `reconcile_budget_charge` closes the hold at
    the realized amount (`validation.rs:1025`); the journal advances to `Settling`
    carrying the exact settle intent, the adapter capture/release runs
    (`:1038-1046`), and the journal advances to `Settled`. Final prepayment is
-   fixed-price, already `Settled`, and invokes neither capture nor release.
+   fixed-price, already `Settled`, and invokes neither capture nor release. A
+   crash after tool completion but before `Settling` leaves
+   `DispatchCommitted`; recovery queries the transport or freezes the hold as
+   `OutcomeUnknownAfterDispatch`. If the outcome record committed, recovery uses
+   its exact bytes and cost; otherwise it cannot infer them. It never uses
+   `Authorized` alone to release.
 5. Durable receipt and obligation. `FinancialReceiptMetadata` is assembled
    (`validation.rs:1114`) and the receipt is signed. The authorized economic
    intent binds the debtor, original creditor/payee, quoted amount, currency,
    requested settlement mode, and pre-action authority digest; the receipt binds
    realized amount and intent digest as post-action evidence. For positive
-   receipt, one SQLite writer transaction commits it, consumes the exact RFC-0003
-   dispatch intent when the request carries one, and, whenever an observer is
+   receipt, one closed terminal-projection transaction verifies the outcome,
+   commits the receipt, compare-and-swaps the exact
+   operation to a retained `Completed` tombstone, and, whenever an observer is
    installed, inserts a due
    `pending_observation` attempt-zero row. For economy value the transaction
    additionally verifies the authorized intent and receipt bindings. When the
@@ -298,10 +327,12 @@ constructs a deliberately isolated kernel.
    zero-charge value has no obligation. The transaction completes before the
    mediated `Allow` returns
    (ADR-0013 durable-before-allow,
-   `docs/adr/ADR-0013-async-receipt-durability.md:17`), then the journal closes.
+   `docs/adr/ADR-0013-async-receipt-durability.md:17`). The payment participant
+   then closes idempotently; either crash ordering is recoverable by
+   `operation_id`.
    A projection failure leaves the receipt, obligation sidecars, and outbox row
-   absent and the RFC-0003 dispatch intent open; recovery resolves that intent to
-   a receipt or incident.
+   absent and the operation nonterminal; recovery resolves it to a receipt or
+   retained incident without redispatch.
    A byte-identical duplicate receipt append is a no-op and does not recreate an
    outbox row already removed by a completed observer transition.
 6. Settlement observation. After commit, `record_chio_receipt` claims the seeded
@@ -321,8 +352,10 @@ constructs a deliberately isolated kernel.
 ### Configuration surface
 
 An absent `--economy-config` installs no observer, adapter, oracle, or driver and
-yields byte-identical receipts. One shared `configure_economy_runtime` assembler
-in `chio-control-plane` validates the atomic receipt/obligation projector and
+yields byte-identical receipts. Effecting production calls still use RFC-0003's
+durable admission default. One shared `configure_economy_runtime` assembler
+in `chio-control-plane` validates the operation store and required receipt-side
+projection capabilities and
 atomically installs the hook, outcome store, retry policy, payment adapter,
 oracle, credit worker, and background-task handles. Phase 3 migrates every live
 builder in `cli/runtime.rs`, the strict MCP wrapper in `cli/mcp/wrap.rs`, and both
@@ -337,8 +370,10 @@ a new path cannot silently skip the decision.
 `driver = ops` requires local durable persistence; an optional remote reconcile
 URL additionally requires a token resolved from its configured environment
 variable. Payment and oracle endpoints must compile into dispatchable
-exact-authority egress contracts. The RFC-0013 `Monetary` journal mode gates
-journal writes and defaults off until the soak is green.
+exact-authority egress contracts. Pre-release qualification first enables
+`DurableAdmissionMode::Monetary`; production uses RFC-0003's cumulative
+`SideEffecting` default. WS1 does not define an independent journal mode or
+default.
 
 ### Error handling (fail-closed)
 
@@ -372,8 +407,10 @@ journal writes and defaults off until the soak is green.
   at installation, and accepted/skipped cleanup-store errors are warning-visible
   and counted because stale retry work may remain.
 - An old budget hold remains frozen until RFC-0003/payment recovery derives and
-  validates a qualifying terminal no-movement
-  `RecoveredHoldResolution::{NoAuthorization, Released}`. Age,
+  validates a qualifying terminal `RecoveredHoldResolution` carrying the closed
+  `MonetaryReleaseAuthority::{NoEffect, ContractualZeroCharge}` and exact durable
+  evidence binding. A diagnostic rail status such as `NoAuthorization` or
+  `Released` is not independently release authority. Age,
   `ReconcileFailed`, unknown rail state, or a nonterminal journal never reopens
   capacity.
 - Missing or conflicting original/current creditor identity, a duplicate active disposition, or
@@ -399,13 +436,13 @@ journal writes and defaults off until the soak is green.
    bounded (the slot must not block dispatch, `construction.rs:568`). A is rejected
    by program invariant 4 (no new kernel business logic); B adds receipt re-read and
    signing latency before the `Allow` returns.
-3. Journal rollout. (A) Ship the money journal enabled unconditionally. (B) Ship
-   behind the RFC-0013 `Monetary` journal mode, default off, promoted to default
-   after the nightly kill-injection soak. (C) Ship only the F68 routing consumer
-   and defer the journal. Recommendation: B. It matches RFC-0013's own staged
-   rollout, bounds the added per-call latency behind the highest-consequence class
-   first, and keeps the release-gate claim honest until the soak proves crash
-   recovery.
+3. Durability rollout. (A) Limit durability to monetary calls permanently. (B)
+   qualify RFC-0003 under `Monetary`, then release with cumulative
+   `SideEffecting` as the fixed production default. (C) Ship only the F68 routing
+   consumer and defer the operation coordinator. Recommendation: B. It exercises
+   the highest-consequence class first while preventing non-monetary effects from
+   bypassing request tombstones in production. `All` remains opt-in for read-only
+   replay protection.
 4. Configuration timing and owner. (A) Add an economy field to `ChioConfig`,
    which no production CLI kernel builder currently loads. (B) add the
    control-plane runtime config and real shared assembler together in Phase 3,
@@ -440,7 +477,8 @@ and live capital remains a separate product track. All money is
   with a mock rail endpoint and static oracle drives quote, governed commit,
   metered execution, and settlement observation. It runs the production FROST
   verifier against a fixture trusted roster/group-key epoch and rejects a
-  missing, stale, or mismatched quorum. It asserts the RFC-0003 intent is consumed
+  missing, stale, or mismatched quorum. It asserts `DispatchCommitted` precedes
+  tool invocation and the operation becomes a retained `Completed` tombstone
   with the receipt and attempt-zero outbox row before observation, the
   reconciliation row exists, the
   `payment_journal` is `Closed`, the hold reconciles to realized amount, and no
@@ -460,7 +498,7 @@ and live capital remains a separate product track. All money is
   receipt produces at most one debtor-original-creditor atom and one active
   disposition under concurrent assignment, channel, and clearing attempts. A
   forced writer failure leaves neither the receipt nor a partial obligation and
-  leaves the dispatch intent open; an
+  leaves the admission operation nonterminal; an
   observer can see the receipt only after the full receipt/atom/disposition/
   creation/outbox transaction commits.
 - Observer crash property: kill after the receipt transaction but before inline
@@ -475,8 +513,14 @@ and live capital remains a separate product track. All money is
   and a loom model of the routing consumer (no lost attempt row, no double
   dead-letter).
 - Crash and soak (load-chaos program, nightly and weekly): SIGKILL between
-  `authorize` and receipt commit, and between `authorize_budget_hold` and reconcile;
+  `authorize` and receipt commit, after tool return but before `Settling`, and
+  between `authorize_budget_hold` and reconcile;
   assert attested-or-incident and swept capacity per RFC-0013's acceptance criteria.
+- Path parity and replay: the top-level and nested evaluators produce the same
+  operation transitions. Replaying an identical or conflicting completed
+  request id returns or rejects from its tombstone without invoking the tool.
+- SQLite ownership: a second mutable server open fails, a stale owner epoch
+  cannot mutate or recover, and a read-only CLI open starts no worker.
 
 ## Implementation phases
 
@@ -490,25 +534,33 @@ Each phase is an independently landable PR ending green at the workspace gate
   `CHIO_SETTLEMENT_UNRESOLVED_TOTAL`. No economy config or no-op installer lands.
   The paired observer installer and durable routing close F68's silent-drop
   defect; the production driver remains F69.
-- Phase 2 (durable money journal and sweeper, RFC-0013 F70/F71; hard-gated on
-  RFC-0003). The
-  `payment_journal` table, `PaymentJournalState`/`PaymentJournalRecord`, the
+- Phase 2 (durable admission and money participant, RFC-0013 F70/F71;
+  hard-gated on corrected RFC-0003 and the protocol-primitives
+  `AdmissionOperation`). Protocol-primitives Task 6 owns and lands the retained
+  operation store, composable receipt projection, top-level/nested shared
+  dispatch boundary, and exclusive SQLite serving lease and epoch fencing.
+  WS1 does not reimplement them. This phase adds the RFC-0013
+  `payment_journal` participant, `PaymentJournalState`/`PaymentJournalRecord`, the
   defaulted `BudgetStore` journal methods, the `validation.rs` state-machine
   wiring, typed held-versus-final-prepayment authorization,
   `PaymentAdapter` `rail_id`/`settlement_state` additions and boot reconcile, the
   recovery-proven open-hold sweeper (`HoldDisposition::Expired`, sweep task,
   CLI `chio budget holds` review commands, metrics), plus F73
   atomically capacity-bounded `SqliteEip3009NonceStore` and
-  F74 `BudgetEnforcer` caveat and snapshot. Gated behind the `Monetary` journal
-  mode, default off.
+  F74 `BudgetEnforcer` caveat and snapshot. Qualification begins under
+  `DurableAdmissionMode::Monetary`; it does not create another default.
 - Phase 3 (production configuration, obligation model, settlement and credit
   driver, RFC-0013 F69). The control-plane-owned `EconomyRuntimeConfig`, explicit
   live-command input, shared assembler, and replay-off constructor inventory;
   the `chio-credit` obligation/disposition contract and
-  `chio-store-sqlite` atomic intent-consumption/receipt/atom/
+  `chio-store-sqlite` atomic operation-terminal/receipt/atom/
   initial-disposition/observer-outbox implementation; identical configuration
   for CLI, MCP wrapper, and remote MCP
   spawn/restore constructors; the observer-slot `SettlementHook` (routing only);
+  `AE-CREDIT-ADMISSION-1` in `chio_credit::obligation` and the same SQLite
+  obligation store, with operation-owned reservation, authoritative
+  facility/tier exposure CAS, and atomic commit through
+  `commit_admission_projection`;
   the async `SettlementRuntime` minting only explicitly authorized v2 credit IOUs
   and writing reconciliation records over persisted receipts, with optional
   trust-control dispatch, behind `settlement.driver = { none, ops }` default
@@ -523,11 +575,15 @@ Each phase is an independently landable PR ending green at the workspace gate
   proof generation and verification. Restart, gap, duplicate, signer/epoch,
   index-root, and tamper negatives must pass before the substrate advertises
   readiness; a table scan or bounded bundle is not a substitute.
-- Phase 4 (end-to-end proof and gate flip). The always-on end-to-end test with
-  full production wiring and the production FROST verifier; promotion of the
-  `Monetary` journal to default after the nightly soak is green; F68-F74 closed.
+- Phase 4 (end-to-end proof and release gate). The always-on end-to-end test with
+  full production wiring and FROST Phase 3, consuming the exact
+  `settle.commitment` authorization in the settlement resource version/fence CAS;
+  RFC-0003's
+  `SideEffecting` production default and the nightly crash/replay/ownership soak;
+  F68-F74 closed.
   This phase and the "production money loop is closed" release-gate claim remain
-  blocked until the trusted roster/group-key epoch prerequisite is live.
+  blocked until that consumer qualification and trusted roster/group-key epoch
+  are live.
 
 ## Resolved implementation choices
 
@@ -552,6 +608,7 @@ Each phase is an independently landable PR ending green at the workspace gate
    egress contract. It does not introduce a second token source.
 4. Checkpoint boundary in the end-to-end test. The journal and holds live in the
    budget-store database while receipts and checkpoints live in the receipt-store
-   database, so the test forces a low `checkpoint_interval`
+   database. `AdmissionOperation` is the persisted saga across those participants;
+   only the receipt-side projection claims one transaction. The test forces a low `checkpoint_interval`
    (`crates/platform/chio-config/src/schema.rs:118`) and crosses a checkpoint
    boundary to prove durable-before-allow holds under checkpointing.

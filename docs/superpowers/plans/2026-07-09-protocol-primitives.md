@@ -111,19 +111,34 @@ pub struct VerifiedApprovalSetBody {
     pub proposal_deadline: u64,
 }
 
-pub struct AdmissionOperation {
+pub struct AdmissionOperationV1 {
     pub kind: AdmissionOperationKind,
     pub operation_id: String,
-    pub request_binding_hash: String,
+    pub coordinator_authority_id: String,
+    pub request_namespace_digest: String,
+    pub request_id: String,
+    pub capability_id: String,
     pub authorization_capability_hash: String,
+    pub request_binding_hash: String,
+    pub policy_hash: String,
+    pub effect_class: SideEffectClass,
+    pub threshold_proposal_hash: Option<String>,
+    pub supplemental_authorization_digest: Option<String>,
     pub broker_attempt_id: Option<String>,
     pub budget_hold_id: Option<String>,
     pub approval_set_hash: Option<String>,
     pub execution_nonce_id: Option<String>,
+    pub outcome_eligibility_digest: Option<String>,
+    pub tool_outcome_id: Option<String>,
+    pub terminal_result_id: Option<String>,
+    pub terminal_result_digest: Option<String>,
     pub state: AdmissionOperationState,
     pub dispatch_state: AdmissionDispatchState,
     pub coordinator_lease_epoch: u64,
     pub version: u64,
+    pub last_error: Option<String>,
+    pub terminal_receipt_id: Option<String>,
+    pub terminal_incident_id: Option<String>,
 }
 ```
 
@@ -176,6 +191,7 @@ Commit: `test(security): lock budget and governed approval baseline`
 - Modify `crates/core/chio-core-types/src/capability/token.rs`
 - Modify `crates/core/chio-core-types/src/capability/attenuation.rs`
 - Modify `crates/core/chio-core-types/src/capability/validation.rs`
+- Modify `crates/core/chio-core-types/src/capability/scope.rs`
 - Modify `crates/core/chio-core-types/src/delegation_receipt.rs` if needed for the attenuation projection
 - Modify capability-authority issuance in `crates/kernel/chio-kernel/` and `crates/platform/chio-control-plane/`
 - Modify every `CapabilityTokenBody` constructor reported by the compiler
@@ -183,6 +199,16 @@ Commit: `test(security): lock budget and governed approval baseline`
 **Work:**
 
 - [ ] Add `AggregateInvocationBudget`, `AggregateInvocationScope`, `AggregateBudgetRootBindingBody`, and `AggregateBudgetRootBinding` with strict serde shapes.
+- [ ] Add a domain-separated `CumulativeApprovalRootBinding` for delegable
+  `RequireApprovalAbove`. It binds the CA-authenticated family root, root subject
+  and scope, approval budget id/epoch, currency, threshold and expiry. Every
+  descendant preserves its canonical bytes; a delegated cumulative constraint
+  without that binding rejects.
+- [ ] Add `cumulative_approval_root_binding: Option<...>` to the strict capability
+  body and signing/attenuation projections. It is absent for a nondelegable direct
+  constraint and required for every delegable root or descendant. Attenuation may
+  narrow threshold/expiry only as the signed binding permits and never replace
+  family, budget id/epoch, currency, subject, or scope.
 - [ ] Add `aggregate_invocation_budget: Option<...>` to both `CapabilityToken` and `CapabilityTokenBody`. `CapabilityTokenSigningBody` and `CapabilityTokenAttenuationBody` receive it through their flattened `CapabilityTokenBody`; do not add a second serialized field.
 - [ ] Update `CapabilityToken::body()`, `sign`, `sign_with_backend`, `sign_attenuated`, token reconstruction, verification, and every issuance constructor. This is required because the public sign APIs accept `CapabilityTokenBody`.
 - [ ] Use `skip_serializing_if = "Option::is_none"` in the body and prove an absent field preserves the exact prior canonical signing bytes. Disable legacy-body fallback whenever the field is present.
@@ -209,6 +235,8 @@ Commit: `test(security): lock budget and governed approval baseline`
 - family-budget omission rejected
 - capability-scoped budget with delegate authority rejected
 - root and descendants derive the same family owner
+- cumulative-approval siblings derive the same bound family owner; omission,
+  mutation or delegated creation of the binding rejects
 - forged root capability ID rejected
 - forged root commitment hash rejected
 - wrong root issuer or signature rejected
@@ -238,6 +266,12 @@ Commit: `feat(core-types): add aggregate invocation budget`
 **Work:**
 
 - [ ] Add `aggregate_invocation_budget` as a string-keyed feature.
+- [ ] Add `cumulative_approval_budget` as a string-keyed feature and a strict
+  versioned `RequireApprovalAbove { threshold: MonetaryAmount,
+  approval_budget_id, approval_budget_epoch,
+  cumulative_approval_root_binding: Option<CumulativeApprovalRootBinding> }` wire
+  form with conditional root-binding requirements. An old per-request
+  threshold never silently claims cumulative enforcement.
 - [ ] Keep `v1_default()` disabled. Enable only in the rollout profile after storage is ready.
 - [ ] Reject a token carrying the aggregate field when the negotiated intersection does not enable it.
 - [ ] Apply the same check in browser, mobile, FFI, federation, and direct kernel entry points.
@@ -260,6 +294,15 @@ Commit: `feat(core-types): negotiate aggregate invocation budgets`
 
 - [ ] Add structured `BudgetQuotaKey` and `BudgetInvocationQuota` types.
 - [ ] Define explicit profiles for grant invocation, aggregate capability invocation, aggregate family invocation, and supplemental broker-capability execution.
+- [ ] Add the authority-derived cumulative-approval account key and
+  `PendingApproval -> Authorized -> Captured | ReversedBeforeDispatch`
+  operation-owned substate specified by `AE-CUMULATIVE-APPROVAL-1` in the WS9
+  design. Bind issuer/family owner, budget id/epoch, delegation-family root, and
+  currency.
+- [ ] In the same composite-hold lock, checked-add reserved and captured
+  authorized units. At or above the threshold reserve `PendingApproval` even
+  when the request has no approval set, so concurrent sub-threshold calls cannot
+  bypass the policy.
 - [ ] Define a kernel-owned `SupplementalQuotaVerifier` port over opaque signed extension bytes and a kernel-built verification context. Its installed trusted implementation returns a request-bound `VerifiedSupplementalQuotaClaim`; no request field directly supplies a quota key or maximum.
 - [ ] Recheck capability digest, subject, request, destination, arguments, expiry, supplemental revocation ids, artifact digest, and negotiated profile on the verifier result before deriving the broker quota key. Missing verifier, unknown profile, or mismatched context denies.
 - [ ] Build a canonical sorted revocation set from the leaf capability id, every verified delegation-chain ancestor capability id, and every supplemental revocation id. Bind its digest into the hold and `AdmissionOperation`; reject duplicates, omissions, additions, and post-verification mutation.
@@ -297,6 +340,9 @@ Invocation `captured` and `reversed` are terminal only for the invocation substa
 - either quota exhausted changes neither quota
 - exhaustion of any one among three quotas changes none
 - two threads contending for the last unit admit exactly one
+- concurrent 60+60 requests against a cumulative threshold of 100 cannot both
+  dispatch without the required approval
+- sibling delegated grants share the authenticated family-root accumulator
 - duplicate key rejected
 - existing key with changed maximum rejected
 - nine quota claims rejected
@@ -327,6 +373,9 @@ Commit: `feat(kernel): authorize composite invocation quotas atomically`
 - [ ] Make the structured quota key itself primary or unique. Store `max_invocations` as an immutable checked column on that one row; never use `(quota_key, max_invocations)` as the uniqueness constraint because that permits multiple maxima for one key.
 - [ ] Use one `BEGIN IMMEDIATE` transaction to load, compare, reserve, and append all rows.
 - [ ] Persist invocation and monetary substates plus every quota member so crash recovery can finish, compensate, or reconcile deterministically.
+- [ ] Persist cumulative-approval authority accounts and operation reservations
+  in the same transaction. Enforce immutable budget id/epoch, threshold, root
+  grant, and currency; expose lookup by `operation_id`.
 - [ ] Return counts, authority lease, guarantee level, and commit index from the same transaction.
 - [ ] Extend remote request and response DTOs without dropping authority metadata.
 - [ ] Let the kernel include only the installed supplemental verifier's result in the same composite request. Do not accept a caller-built broker claim, add a broker-only counter endpoint, or make the broker reserve that key a second time.
@@ -346,6 +395,8 @@ Commit: `feat(kernel): authorize composite invocation quotas atomically`
 - restart after invocation capture preserves exhaustion and unresolved monetary exposure
 - restart after monetary reconciliation preserves captured invocation counts
 - restart after reversal preserves capacity
+- restart in `PendingApproval` returns the same operation reservation; approval
+  attachment versus timeout has one CAS winner
 - an existing key cannot be reopened with a different maximum after restart
 - direct SQL or API insertion of a second maximum for the same quota key fails the unique-key invariant
 - imported mutation cannot regress sequence, authority epoch, or count
@@ -366,17 +417,42 @@ Commit: `feat(store-sqlite): persist composite invocation holds`
 **Files:**
 
 - Create `crates/kernel/chio-kernel/src/admission_operation.rs`
+- Create `crates/kernel/chio-kernel/src/tool_outcome.rs`
+- Create `crates/kernel/chio-kernel/src/dispatch_status.rs` for the closed status
+  provider API and private verified attempt-lifecycle results
+- Create `crates/core/chio-core-types/src/provider_attempt.rs` for canonical
+  provider checkpoint and invocation-blob bindings
+- Create `crates/core/chio-core-types/src/store_fence.rs` and export the
+  backend-neutral `StoreMutationFence`
 - Create `crates/platform/chio-store-sqlite/src/admission_operation_store.rs`
+- Create `crates/platform/chio-store-sqlite/src/tool_outcome_store.rs`
+- Create `crates/platform/chio-store-sqlite/src/{serving_owner,provision}.rs`
+- Create `crates/platform/chio-store-sqlite/src/obligation_store.rs`
 - Create or extend the kernel `AdmissionCaptureAuthority` port used by combined broker capture
 - Modify admission-operation service DTOs and handlers under `crates/platform/chio-control-plane/src/trust_control/`
 - Modify `crates/kernel/chio-kernel/src/kernel/validation.rs`
-- Modify `crates/kernel/chio-kernel/src/kernel/evaluation.rs`
+- Modify `crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs`
+- Modify `crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs`
+- Modify `crates/kernel/chio-kernel/src/kernel/evaluation/mod.rs`
 - Modify `crates/kernel/chio-kernel/src/kernel/governed_validation.rs`
-- Modify `crates/kernel/chio-kernel/src/kernel/responses.rs`
+- Modify `crates/kernel/chio-kernel/src/kernel/responses/finalization.rs`
+- Modify `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs`
+- Modify `crates/kernel/chio-kernel/src/runtime.rs`
+- Modify `crates/kernel/chio-kernel/src/transport.rs`
+- Modify `crates/kernel/chio-kernel/src/receipt_store.rs`
 - Modify `crates/kernel/chio-kernel/src/execution_nonce.rs`
 - Modify `crates/kernel/chio-kernel/src/revocation_runtime.rs`
 - Modify `crates/platform/chio-store-sqlite/src/approval_store.rs`
 - Modify `crates/platform/chio-store-sqlite/src/execution_nonce_store.rs`
+- Modify `crates/platform/chio-store-sqlite/src/receipt_store.rs`
+- Modify `crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/open.rs`
+- Modify `crates/platform/chio-store-sqlite/src/receipt_store/tests/single_writer.rs`
+- Modify `crates/platform/chio-store-sqlite/src/budget_store.rs`
+- Modify `crates/platform/chio-store-sqlite/src/budget_store/store.rs`
+- Modify `crates/platform/chio-store-sqlite/src/budget_store/trait_impl.rs`
+- Modify `crates/platform/chio-store-sqlite/src/lib.rs`
+- Modify `crates/products/chio-cli/src/cli/types.rs` and runtime wiring for the
+  privileged `chio store provision` command or configured lock-broker client
 - Modify receipt tests in `crates/kernel/chio-kernel/src/kernel/tests/`
 
 **Work:**
@@ -384,27 +460,119 @@ Commit: `feat(store-sqlite): persist composite invocation holds`
 - [ ] Split pure validation from authoritative state reservation.
 - [ ] Complete schema, signature, trust, time, revocation, delegation, request binding, governed-token signature, runtime evidence, guard, and runtime-admission checks before the aggregate hold.
 - [ ] Resolve the matching grant before building quota keys. For supplemental authorization, invoke only the installed trusted `SupplementalQuotaVerifier`, recheck its request context, and derive the key from its verified result. Do not import `chio-secret-broker` into kernel or accept a caller-built claim.
-- [ ] Define `AdmissionOperationKind::{ToolDispatch, GovernedActiveResponse}`. Derive `operation_id = SHA256("chio.admission-operation.v1\0" || canonical_json({ kind, coordinator_authority_id, request_id, capability_id, authorization_capability_hash, request_binding_hash }))`. The request hash covers arguments or response plan, governed intent, threshold-proposal hash, verified approval-set hash, supplemental authorization reference, and nonce reference when present. Normalize approval membership as sorted canonical token digests so caller array order cannot change operation identity. Persist `AdmissionOperation::Prepared` before any authority mutation.
-- [ ] Require a durable `AdmissionOperationStore` whenever aggregate, broker, or threshold admission is active. Missing or unavailable storage denies before any reservation.
+- [ ] Define `AdmissionOperationKind::{ToolDispatch, GovernedActiveResponse,
+  GovernedEconomicMutation}`. The last kind covers authority-mediated state
+  mutation such as WS2 assignment without inventing another coordinator. Derive
+  `operation_id = SHA256("chio.admission-operation.v1\0" || canonical_json({ kind, coordinator_authority_id, request_namespace_digest, request_id, capability_id, authorization_capability_hash, request_binding_hash }))`. The authenticated namespace is part of both the global primary-key identity and replay unique key. The request hash covers only immutable request and effect fields: arguments or response plan, governed intent, policy requirements, destination, pricing selection, and settlement mode. It excludes the authority-generated threshold proposal, approval-set membership, supplemental authorization artifacts, and nonce references so an `ApprovalRequired` result can resume under the same operation. Persist `AdmissionOperationV1::Prepared` before any authority mutation.
+- [ ] Compare-and-swap each authority-generated proposal hash, verified approval-set hash, supplemental authorization digest, and execution nonce reference from null exactly once before `ReadyToDispatch`. Normalize approval membership as sorted canonical token digests. A matching retry is idempotent; a different value after attachment denies.
+- [ ] Require a durable `AdmissionOperationStore` whenever aggregate, broker,
+  threshold, monetary, or side-effecting admission is active. Bind a unique
+  authenticated `(request_namespace_digest, request_id)` replay key. Missing or
+  unavailable storage denies before any reservation.
+- [ ] Look up that replay key and persist a fresh `Prepared` operation before any
+  authority mutation. Reserve any cumulative `PendingApproval` participant by
+  operation id; derive proposal time, threshold and budget epoch from its durable
+  result; then CAS-attach the exact proposal bytes/digest and persist
+  `ApprovalRequired` before returning. A crash between reservation and attachment
+  queries the participant and derives the same proposal; a matching retry returns
+  the stored proposal.
 - [ ] Advance saga state with compare-and-swap on `version` under a fenced coordinator lease so an executor and recovery worker cannot both commit dispatch.
+- [ ] Implement RFC-0006's pending shared serving-owner amendment. Privileged
+  provisioning initializes the durable store UUID and creates/fsyncs the
+  protected UUID lock inode; serving only opens and verifies an existing inode.
+  Return one clonable `SqliteServingOwner` and
+  `StoreMutationFence { store_uuid, lease_id, owner_epoch }`. Receipt,
+  budget/payment, obligation, outcome, operation and later FROST stores all reuse
+  it and check the fence inside every mutation/recovery transaction. Reject
+  missing/partial provisioning, wrong owner/mode/link count, symlink/hardlink/
+  rename/copy aliases, lock replacement, independent mutable reopen and stale
+  recovery owners before actors start.
 - [ ] Use SQLite only for single-node saga authority. Multi-worker deployment requires a shared linearizable operation store and fenced lease; configuration that combines multiple dispatch workers with a local-only store fails startup.
 - [ ] For supplemental broker authorization, call authenticated local `RegisterAttempt` after `Prepared` but before the remote budget call. It receives deterministic operation, attempt, hold, event, proof, and request digests, validates non-secret constraints, persists and fsyncs the broker intent, and returns an idempotent acknowledgement. Persist `BrokerAttemptRegistered`; failure consumes no budget.
 - [ ] Authorize the bounded grant, aggregate, broker, and monetary claims in one hold under `operation_id`; persist `BudgetAuthorized`.
 - [ ] Extend approval replay and nonce authorities with operation-owned `reserved`, `committed`, and `cancelled` states plus lookup by `operation_id`. A cancelled record remains a replay tombstone.
 - [ ] Reserve approval state, persist `ApprovalReserved`, reserve the execution nonce, then persist `ReadyToDispatch`. Only then may the registered broker attempt materialize and prepare credentials; it still cannot send upstream.
+- [ ] When cumulative approval is required, return only the stored proposal after
+  retaining the same immutable operation and `PendingApproval` reservation. On retry,
+  verify and compare-and-swap attach the approval set exactly once before
+  `ReadyToDispatch`; never derive a new operation from the approval membership.
 - [ ] Persist `CapturePending`, commit approval and nonce reservations, then perform the applicable capture. Ordinary dispatch calls `capture_invocation_reservations`; broker dispatch calls `AdmissionCaptureAuthority` with the hold, operation, canonical leaf-plus-ancestor-plus-supplemental revocation set and digest, and verified authorization-artifact digest. A capture denial compensates before dispatch while retaining replay tombstones.
 - [ ] After successful capture, persist `DispatchCommitted` and only then authorize the broker's upstream send or begin the ordinary tool-server side effect. Recovery may complete the state write after discovering a capture under `operation_id`, because code cannot send while the operation remains `CapturePending`. After `DispatchCommitted`, never resend without downstream idempotency. The enterprise broker performs no second reservation.
+- [ ] Make both exact invoke sites call one shared coordinator and immediately
+  persist the content-addressed output plus `ToolOutcomeRecordV1` before
+  post-return guards or settlement. Add `PostReturnEvaluationRecordV1`: persist
+  exact pipeline/policy versions, trusted time and inputs before evaluation,
+  persist every external/stateful result, and finalize output, cost, verdict and
+  disposition by CAS. Pure replay uses only frozen inputs; external replay requires
+  authenticated idempotent lookup. Ambiguity freezes rather than reevaluating
+  current state. Expose side-effect-free lookup by operation.
+- [ ] Add optional `DispatchStatusProvider` over exact operation and attempt.
+  Without it, ambiguous committed handoff is incident-only and freezes holds;
+  with it, accept only verified `NotAccepted`, `Pending`, `Accepted {
+  acceptance_ref }`, `Completed { tool_outcome_ref }`, or `Unknown`. Bind
+  transport identity/key epoch and the current external monotonic attempt
+  checkpoint. `Accepted` requires authenticated retrieval of its exact envelope
+  and proves only that cancellation is impossible. `Completed` requires
+  authenticated `fetch_completed_outcome` returning the exact bound bytes, cost
+  and terminal evidence, which must be persisted locally before evaluation. A
+  bare or unavailable ref remains outcome-unknown.
+- [ ] Make `VerifiedTransportNotAccepted` constructible only from a qualified
+  external provider-attempt lifecycle. Local queue work begins
+  `LocalQueuedStaged` and is non-executable. External `Pending -> Accepted |
+  Cancelled` is one linearizable race; `Cancelled` permanently disables the
+  staged row, while `Accepted` binds rollback-independent invocation-blob
+  availability and can never cancel. A worker may invoke only after reading the
+  current external checkpoint and winning `Accepted -> Executing` with an
+  execution lease/fence. It stores an authenticated terminal outcome before
+  `Executing -> Completed`. Recovery reads the anchor first and reconstructs
+  accepted work from the bound blob. After a possible effect it uses
+  authenticated tool-side status or separately qualified same-key idempotent
+  invocation; otherwise it remains unknown without rerun. Task 6 owns these core
+  types, verifier boundaries, and fail-closed default. WS3 Phase 3 owns a concrete
+  provider/anchor adapter and cannot activate until its qualification matrix
+  passes; no current generic tool server is treated as qualified.
 - [ ] Reverse only when dispatch provably did not begin.
-- [ ] Reconcile, capture, or release monetary exposure independently of invocation capture.
+- [ ] Reconcile, capture, or release monetary exposure independently of invocation
+  capture. For release, atomically persist a bounded immutable canonical
+  `MonetaryReleaseEvidenceV1` bundle plus its kind/id/digest/version with the
+  settle action before the rail call; a pointer to mutable proof state is
+  insufficient. Recovery reconstructs the private verified authority from that
+  exact bundle. `HoldPlaced + NoAuthorization` likewise needs a persisted
+  `VerifiedPreDispatchNoEffect` bundle before local exposure release. After
+  `DispatchCommitted`, an absent settle action or evidence bundle never
+  authorizes release.
 - [ ] Make compensation idempotent: before dispatch, reverse the budget hold and cancel approval and nonce reservations without deleting their tombstones. After dispatch commitment, never reverse invocation quotas.
 - [ ] On recovery, query each authority by `operation_id` when its commit may have preceded the saga-state write. Never repeat a side effect merely because the coordinator row is stale.
 - [ ] Permit resend after `DispatchCommitted` only when the downstream protocol verifies `operation_id` as an idempotency key. Otherwise finish as `OutcomeUnknownAfterDispatch`.
 - [ ] Apply identical ordering to top-level and nested session flows.
+- [ ] Add RFC-0003's typed `commit_admission_projection` transaction for the
+  closed `AdmissionTerminalProjection`: completed receipt plus optional local
+  sidecars, pre-dispatch compensation with verified no-effect evidence,
+  post-commit verified non-acceptance, or outcome-unknown incident. Enforce legal
+  source states and atomically bind the receipt or incident plus terminal
+  operation. Add `EconomicMutationApplied` and `EconomicMutationNotApplied`
+  variants that bind a typed signed terminal result plus audit event without a
+  `ChioReceipt`. Retain every terminal operation as a request replay tombstone. Do
+  not claim cross-database atomicity for the payment participant.
+- [ ] Define closed `VerifiedNoEffectProof` with distinct private-constructor
+  `VerifiedPreDispatchNoEffect` and cancellation-fenced
+  `VerifiedTransportNotAccepted` payloads. Make the two terminal projections
+  accept only their matching payload. Define `VerifiedContractualZeroCharge` and
+  closed `MonetaryReleaseAuthority`; reject caller-built proof bytes and missing
+  receipts as release authority.
 - [ ] Add aggregate details to `budget_authority` receipt metadata: keys, immutable maxima, invocation and monetary substates, verified root-binding digest, broker key, event IDs, authority, guarantee, and commit index.
 - [ ] Add operation ID, saga state, dispatch state, and compensation status to signed receipt metadata.
 - [ ] Do not emit a separate `Burn` receipt subtype.
 - [ ] Add a kernel-owned reservation entry point for broker-mediated execution that uses the same composite hold and capture contract without giving the broker direct database access.
 - [ ] Add a generic approval-only coordinator entry point for `GovernedActiveResponse`. It verifies the operator capability, persists prepared and approval-reserved states, commits the approval set, writes `DispatchCommitted` before the first idempotent response effect, omits budget, capture, and nonce participants, and exposes a trusted control-plane port without creating an active-defense dependency.
+- [ ] Add a generic `GovernedEconomicMutation` entry point. The authoritative
+  mutation service is an idempotent saga participant keyed by `operation_id` and
+  returns a versioned signed applied or permanently-not-applied result binding
+  resource version/fence. Add private verified result types plus canonical
+  `terminal_result_id`/digest bindings. Recovery queries that participant and
+  terminalizes the local operation through the matching mutation projection;
+  never claim a cross-store transaction or repeat the mutation from stale local
+  state.
 
 **Security tests:**
 
@@ -426,7 +594,43 @@ Commit: `feat(store-sqlite): persist composite invocation holds`
 - crash after `DispatchCommitted` never reopens invocation quotas or resends without downstream idempotency
 - crash after invocation capture but before broker send does not resend without downstream idempotency
 - crash after broker send but before response records `OutcomeUnknownAfterDispatch`
+- crash after tool return but before settle-action persistence never releases a
+  reversible hold and never redispatches the operation
+- completed operation replay returns the retained receipt or conflicts without
+  invoking the tool, including after terminal compaction
+- receipt-side projection fault injection leaves no partial receipt, terminal
+  operation, observer row, authorization consumption, eligibility transition, or
+  obligation
+- tool-outcome blob/row and resolved-outcome crash points either recover exact
+  bytes/cost/disposition or freeze unknown; none infer release
+- provider-completed refs require authenticated fetch of exact bytes/cost/evidence
+  and local persistence; bare, unavailable, or mismatched refs freeze unknown
+- provider staging is non-executable before external acceptance; race
+  `Pending -> Accepted` against `Pending -> Cancelled`, then race executor claim
+  against cancellation and prove exactly one legal external CAS wins
+- kill and restore before/after local stage, external acceptance, executor claim,
+  tool effect, terminal-result persistence and completion CAS; a cancelled slot
+  never executes, accepted/executing/completed never cancels, and post-effect
+  recovery without authenticated status or qualified same-key idempotency never
+  reruns
+- post-return evaluation crashes use frozen pure inputs or idempotent authenticated
+  result lookup; a time-varying/stateful ambiguity never reruns or changes the
+  settlement disposition
+- each tool terminal projection commits operation plus receipt or incident
+  atomically; each mutation projection commits operation plus typed terminal
+  result/audit event locally; all reject illegal source states
+- remote mutation acknowledgement loss queries by operation and binds one result;
+  it never repeats the resource CAS or claims cross-store atomicity
 - revocation and broker capture races serialize through one combined commit; no sequential-check implementation passes
+- cumulative approval behavior and recovery are identical in top-level and
+  nested evaluation paths
+- a parity test fails if either `async_evaluation_core.rs` or
+  `nested_flow_evaluation.rs` reaches `invoke`/`invoke_stream` without the shared
+  `DispatchCommitted` helper and immediate durable outcome recorder
+- UUID ownership tests cover privileged/partial provisioning, wrong lock
+  owner/mode/link count, symlink, hardlink, renamed and copied-same-UUID databases,
+  lock replacement, stale external recovery owners, and stale/cross-database
+  receipt, budget/payment, obligation, outcome and FROST mutations
 - revoking any delegation ancestor between validation and capture denies; omitting that ancestor from the capture set is an invariant failure
 - missing or malicious supplemental verifier, caller-built quota key, wrong context binding, and kernel-to-broker dependency fail their respective tests or architecture gate
 - approval-only active-response crash after reservation or dispatch commitment recovers one operation and applies at most once
@@ -581,15 +785,23 @@ Commit: `docs(protocol): define runtime evidence authorization boundary`
 - Modify `spec/schemas/chio-wire/v1/capability/token.schema.json`
 - Modify `spec/schemas/chio-wire/v1/kernel/capability_list.schema.json`
 - Modify `spec/schemas/chio-wire/v1/agent/tool_call_request.schema.json`
-- Modify other embedded token shapes found by `rg 'budget_share_bps|max_invocations' spec/schemas/chio-wire/v1`
-- Add schemas for the aggregate root binding, opaque supplemental-authorization carrier, threshold proposal, governed approval token extension, verified approval-set body, active-response governed intent body, and combined capture metadata
+- Modify other embedded token shapes found by
+  `rg 'budget_share_bps|max_invocations|RequireApprovalAbove|approval_budget_id' spec/schemas/chio-wire/v1`
+- Add schemas for the aggregate and cumulative-approval root bindings, opaque supplemental-authorization carrier, threshold proposal, governed approval token extension, verified approval-set body, active-response governed intent body, and combined capture metadata
 - Modify `spec/schemas/chio-wire/v1/capability/capabilities.schema.json`
-- Register `chio.aggregate-budget-root.v1` and `chio.threshold-approval-proposal.v1` in `spec/schemas/registry.json` and the runtime known-schema set
+- Register `chio.aggregate-budget-root.v1`, `chio.cumulative-approval-root.v1` and `chio.threshold-approval-proposal.v1` in `spec/schemas/registry.json` and the runtime known-schema set
 - Regenerate `spec/schemas/MANIFEST.sha256`
 
 **Schema requirements:**
 
 - `aggregate_invocation_budget` has `additionalProperties: false`, required `scope` and `max_invocations`, scope enum, nonnegative integer maximum, and conditional family-root binding requirements.
+- `RequireApprovalAbove` has one strict negotiated definition with amount,
+  currency, budget id/epoch, and conditional
+  `cumulative_approval_root_binding`. Every duplicated capability/token schema
+  references it. Delegable shapes require the signed binding; nondelegable direct
+  shapes require it absent. The binding schema covers family root, root subject,
+  scope, threshold, currency, budget id/epoch, expiry, signer/key epoch, and
+  `additionalProperties: false`.
 - Root binding and threshold proposal signatures use their domain-separated verifier contracts, not schema validation as a substitute for signature verification.
 - Approval token arrays have an explicit maximum item count and reference one canonical token definition including `threshold_proposal_hash`.
 - Threshold proposal and verified-set schemas require policy, eligible-set, request, intent, subject, authorizing-capability digest, creation-time, and deadline bindings.

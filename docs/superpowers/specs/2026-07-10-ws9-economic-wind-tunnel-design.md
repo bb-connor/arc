@@ -173,10 +173,103 @@ The missing controls have named owners outside WS9:
   admission, must consume an authority-bound cumulative approved-spend ledger so
   a sequence of sub-threshold calls cannot bypass `RequireApprovalAbove`.
 
-Both controls require their own design, implementation, concurrency tests, and
-owning-crate review. WS9 only diagnoses and reruns them. They are hard
-dependencies of WS9 Phase 3 and the Wave 3 exit; a scheduled matrix, waiver, or
+Both controls use the contracts below and require implementation, concurrency
+tests, and owning-crate review. WS9 only diagnoses and reruns them. They are hard
+Wave 3 entry dependencies, not late exit checks; a scheduled matrix, waiver, or
 advisory facet cannot substitute.
+
+### Required production control contracts
+
+`AE-CREDIT-ADMISSION-1` is a participant in the shared `AdmissionOperation`,
+owned by `chio_credit::obligation` with its durable implementation in the WS1
+`chio-store-sqlite` obligation store:
+
+```rust
+pub struct CreditExposureReservationRequest {
+    pub operation_id: String,
+    pub obligation_id: String,
+    pub debtor_id: String,
+    pub amount: MonetaryAmount,
+    pub authorities: VerifiedCreditAuthoritySet,
+}
+
+pub trait CreditAdmissionStore {
+    fn reserve_exposure(
+        &self,
+        request: &CreditExposureReservationRequest,
+    ) -> Result<CreditExposureReservation, CreditAdmissionError>;
+
+    fn lookup_by_operation(
+        &self,
+        operation_id: &str,
+    ) -> Result<Option<CreditExposureReservation>, CreditAdmissionError>;
+
+    fn release_before_dispatch(
+        &self,
+        operation_id: &str,
+        proof: &VerifiedNoEffectProof,
+    ) -> Result<(), CreditAdmissionError>;
+}
+```
+
+`VerifiedCreditAuthoritySet` has a private constructor. The configured credit
+resolver enumerates every applicable signed v1 facility and capability ceiling
+for the authenticated debtor, scope and currency, rejects an incomplete or
+conflicting set, and sets `effective_ceiling` to the minimum. WS8 tier adoption
+is not an active program edge and is not a v1 authority source. A caller cannot
+select one favorable reference or omit a stricter authority.
+
+An authoritative `(debtor_id, scope_digest, currency)` account stores open units,
+reserved units, the complete authority-set digest and epochs, and row version.
+One `Immediate` transaction re-resolves that set, verifies debtor, scope,
+currency and expiry, and checked-adds
+`open_units + reserved_units + proposed.units <= effective_ceiling.units`.
+Reservations are unique by `operation_id` and transition `Reserved -> Committed
+| ReleasedBeforeDispatch | OutcomeUnknown`. The admission receipt projection
+atomically moves `Reserved -> Committed` with the canonical obligation. Only a
+pre-dispatch `VerifiedNoEffectProof` can release; post-dispatch ambiguity remains counted.
+Settlement, authority supersession, and new admission compare-and-swap the same
+account version, so derived exposure reports are never admission truth.
+
+`AE-CUMULATIVE-APPROVAL-1` is owned by protocol-primitives and the kernel's
+existing composite `BudgetStore` hold. Its versioned signed constraint is:
+
+```rust
+RequireApprovalAbove {
+    threshold: MonetaryAmount,
+    approval_budget_id: String,
+    approval_budget_epoch: u64,
+    family_root_binding: Option<CumulativeApprovalRootBinding>,
+}
+```
+
+The authority-derived account key binds the authenticated constraint issuer and
+family owner, signed budget id and epoch, root grant identity, and currency. A
+delegated capability requires the byte-preserved CA-signed
+`CumulativeApprovalRootBinding`; a nondelegable capability requires no family
+binding. Sibling grants therefore cannot reset the accumulator, and delegation
+without the binding rejects. The account stores
+`reserved_authorized_units`, monotonic `captured_authorized_units`, threshold,
+and version. In the same transaction that reserves the composite hold, the store
+checks the prospective cumulative total. At or above the threshold it records
+`PendingApproval` under the already persisted operation, including when no token
+was presented, so concurrent sub-threshold requests cannot both pass.
+
+The operation-owned state is `PendingApproval -> Authorized -> Captured |
+ReversedBeforeDispatch`. The threshold proposal hash is derived from the durable
+`PendingApproval` result and compare-and-swap attached once; the verified
+approval set then attaches to the existing operation and reservation once. Both
+are excluded from immutable operation identity. Capture never decrements cumulative authorized units. Reversal is
+allowed only before dispatch with `VerifiedNoEffectProof`; committed approvals remain
+replay tombstones. Missing or stale budget authority, currency mismatch, epoch
+change, unavailable storage, or arithmetic overflow denies.
+
+Required race tests cover concurrent 60+60 against a 100-unit ceiling,
+settlement versus admission, facility or capability supersession versus
+admission, omission of a stricter applicable authority, cross-debtor isolation, sibling
+delegation aggregation, concurrent sub-threshold calls, approval attachment
+versus timeout, restart in `PendingApproval`, and top-level/nested evaluator
+parity.
 
 ### Simulation harness (deterministic)
 
@@ -349,9 +442,11 @@ campaign and a separately reviewed evidence policy.
    determinism helpers and add the thin internal-matrix driver plus
    signed-schema gates. No new crate in this phase.
 2. Control-gap dependency. `AE-CREDIT-ADMISSION-1` and
-   `AE-CUMULATIVE-APPROVAL-1` land in their owning crates with atomic
-   concurrency tests; WS9 reruns both scenarios against the named production
-   functions. Until then the runner remains nonzero and no matrix is signed.
+   `AE-CUMULATIVE-APPROVAL-1` land through WS1 Phase 3 and protocol-primitives
+   Tasks 3-6 respectively, with the exact operation-owned APIs, atomic account
+   state, and races above. WS9 reruns both scenarios against those named
+   production functions. Until then the runner remains nonzero, Wave 3 cannot
+   enter, and no matrix is signed.
 3. Suite breadth (wave 3). Expand all six classes with seeded multi-step
    populations, reference corpora, and `chio-conformance` assertions. Any breach
    is filed as a finding and High or Critical findings keep the runner red.

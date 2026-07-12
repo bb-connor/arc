@@ -81,6 +81,29 @@ available end to end.
 
 ## Design
 
+### Canonical operation preimage
+
+`NormalizedAssignmentRequestV1` is the only assignment request body hashed into
+`AdmissionOperationV1.request_binding_hash`. Its strict RFC 8785 body contains
+schema, obligation id and atom digest, claim and offer digests, seller, buyer and
+buyer settlement destination, agreed price/currency and discount, expected
+disposition and settlement-lifecycle versions, action nonce, effective time, due
+time, and request expiry. It excludes `operation_id`, status-proof and assignment
+authorization artifacts, agreement/party signatures, result/acknowledgement, and
+every other value derived or learned after `Prepared`.
+
+The generic operation id is derived from kind, coordinator/namespace/request,
+the already verified base capability id/hash, and the domain-separated digest of
+this normalized body. That base capability does not contain the derived operation
+id. The coordinator persists `Prepared` first. The fresh
+`factor.assignment_bind` authorization and both signatures over
+`chio.factor.assignment-agreement.v1` are then verified to bind the derived
+operation id and exact normalized-request digest. A canonical
+`VerifiedAssignmentAuthorizationSetV1` binds both exact artifact/envelope digests,
+and its digest compare-and-swaps once into
+`supplemental_authorization_digest`. A mismatch or attempted replacement denies. No implementation hashes a
+self-containing signed agreement.
+
 ### Eligibility contract
 
 An obligation is assignable only when all of these checks pass at the same
@@ -88,7 +111,9 @@ authoritative version:
 
 1. A fresh capability/policy decision authorizes
    `factor.assignment_bind` and binds the atom digest, seller, buyer, action
-   nonce, and expiry.
+   nonce, expiry, normalized-assignment-request digest, and a shared
+   `AdmissionOperationKind::GovernedEconomicMutation` operation id already
+   derived and persisted as described above.
 2. The Chio receipt and IOU signatures verify under trusted kernel keys and
    bind the same `receipt_id`, amount, currency, debtor, content hash, and policy
    hash.
@@ -109,6 +134,31 @@ authoritative version:
    `assigned { agreement_id, creditor_id: buyer_id }`. Any intervening
    settlement, assignment, channel reservation, clearing reservation, or
    version change makes the compare-and-swap fail.
+
+The assignment store uses `operation_id` as its idempotency key and supports
+lookup by operation. It is the authoritative
+`GovernedEconomicMutation` saga participant and retains a versioned signed
+`chio.factor.assignment-acknowledgement.v1` as its applied terminal result, or a
+signed `chio.factor.assignment-not-applied.v1` result. The acknowledgement binds
+operation, agreement/normalized-request digest, obligor authority/key epoch,
+obligation id, expected and resulting disposition version/fence, and its own
+acknowledgement id; the terminal result id is that acknowledgement id and its
+result digest is the exact signed acknowledgement-envelope digest. The
+not-applied family binds the same request/resource identities, prior version/fence,
+closed reason, and no-mutation proof. The successful disposition CAS,
+acknowledgement envelope, and participant audit event commit in that service's
+one transaction. The local AdmissionOperation is not claimed atomic with a
+remote or separately stored disposition service.
+
+The coordinator persists `Prepared`, invokes apply once by `operation_id`, and
+queries the participant after any ambiguous response. It verifies the signed
+result into `VerifiedEconomicMutationApplied` or
+`VerifiedEconomicMutationNotApplied`, then uses the matching admission terminal
+projection to bind `terminal_result_id`/digest, append the local audit event, and
+retain `EconomicMutationApplied` or `EconomicMutationNotApplied`. A matching
+retry returns the exact acknowledgement or not-applied envelope bytes. A conflict rejects, and recovery never repeats the
+assignment merely because the local operation row is stale. WS2 defines no
+parallel coordinator.
 
 The compare-and-swap, not a private history presented by the seller, prevents
 double assignment. Of two concurrent agreements for one `obligation_id`, at
@@ -146,14 +196,22 @@ a signature over the canonical body.
 - `chio.factor.assignment-agreement.v1` binds the offer and claim digests,
   seller, buyer, agreed discount and price, buyer settlement destination,
   `assignment_authority_digest`, expected disposition and
-  settlement-lifecycle versions, `effective_at`, and `due_at`. Seller and
+  settlement-lifecycle versions, normalized-assignment-request digest,
+  `operation_id`, `effective_at`, and `due_at`. Seller and
   buyer signatures are both required.
 - `chio.factor.assignment-acknowledgement.v1` is emitted only after the
   obligor-authorized compare-and-swap succeeds and is signed by that configured
-  authority. It binds `obligation_id`, agreement digest, old and new
+  authority. It binds `acknowledgement_id`, `obligation_id`, agreement and
+  normalized-assignment-request digests, old and new
   disposition versions, prior `per_call` disposition, new `assigned`
   disposition, buyer creditor and destination, `assignment_authority_digest`,
-  `status_proof_digest`, `effective_at`, and `due_at`.
+  `status_proof_digest`, `operation_id`, resource fence, obligor authority/key
+  epoch, `effective_at`, and `due_at`. The acknowledgement id is
+  domain-separated RFC 8785 over the complete body except itself.
+- `chio.factor.assignment-not-applied.v1` is the signed terminal no-mutation
+  result. It binds result id, normalized request/agreement/operation,
+  obligation/resource version and fence, authority/key epoch, a closed reason,
+  and the exact proof that the disposition did not change.
 - `chio.factor.discount-quote.v1` binds the claim, underwriting decision, and
   scorecard digests, `resolved_discount_bps`, quoted price, and an optional
   refusal reason.
@@ -256,6 +314,17 @@ transfer.
   reject.
 - Non-equivocation: two concurrent agreements use the same expected version;
   exactly one compare-and-swap succeeds and exactly one acknowledgement exists.
+- Operation identity: canonical normalized-request round trip; changing each
+  economic term changes the request/operation digest, while adding operation id,
+  authorization, status proof, agreement signature, or acknowledgement cannot
+  enter the preimage. Late authorization/agreement must match and attach once;
+  circular or replacement bindings reject.
+- Operation recovery: acknowledgement-loss retry returns the exact stored
+  acknowledgement id, envelope digest, and bytes by `operation_id`; crashes before and after the disposition
+  CAS yield either one signed not-applied result or one completed assignment.
+  Crash between participant commit and local terminal projection queries and
+  binds the same result; it never repeats the mutation or claims cross-store
+  atomicity.
 - Exclusive routing: `channelized`, `clearing_reserved`, and already
   `assigned` dispositions reject; an acknowledged obligation is skipped by
   every non-assigned settlement path.
@@ -271,6 +340,8 @@ transfer.
 ## Implementation phases
 
 1. Prerequisite gate: land
+   protocol-primitives `GovernedEconomicMutation`,
+   `NormalizedAssignmentRequestV1` and its non-circular operation derivation,
    `chio_credit::obligation::ObligationAtom`,
    `chio_credit::obligation::ObligationDisposition`, the SQLite store contract
    implementation, payee-bound producer, and
@@ -278,7 +349,8 @@ transfer.
    schema, configured-authority signer/verifier, runtime and CLI registry
    entries, signed and tampered fixtures, unknown-schema negatives, fresh
    snapshot producer, and matching `spec/PROTOCOL.md` registry text, then
-   compare-and-swap and signed obligor acknowledgement. WS2 stops here if any
+   operation-owned compare-and-swap, signed obligor acknowledgement/not-applied
+   terminal results, and lookup/replay recovery. WS2 stops here if any
    piece is unavailable.
 2. Land the pure `chio_credit::factor` claim, offer, agreement,
    acknowledgement, and quote validators with schemas, verifiers, and the

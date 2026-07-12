@@ -1,9 +1,9 @@
 # RFC-0013: Money-path durability: payment journal, hold sweeper, settlement routing, fail-closed caps
 
-- Status: Draft (proposed, wave-3 reliability program)
+- Status: Draft, corrected 2026-07-12
 - Date: 2026-07-04
 - Extends: ADR-0006 (monetary budget semantics), ADR-0015 (predeclared escrow circuit breakers)
-- Depends on: RFC-0003 (durable dispatch-intent journal)
+- Depends on: RFC-0003 (durable admission-operation recovery)
 - Closes findings: F70, F71, F68, F69, F72, F73, F74 (see ./README.md and the wave-3 readiness review)
 
 ## Summary
@@ -11,7 +11,7 @@
 The economy subsystem moves external funds before it writes any durable, attested
 record of the movement, leaks budget capacity on every crash, and drops the
 settlement outcome on the floor at its only production call site. This RFC makes the
-money path crash-safe and fail-closed. It adds a durable `payment_journal` co-located
+money path crash-safe and fail-closed. It adds a durable payment participant co-located
 with the budget holds (written before `adapter.authorize`, advanced around
 capture/release, closed after the receipt persists, reconciled on boot via an
 idempotent adapter query); a boot-plus-periodic sweeper for orphaned budget holds; a
@@ -20,9 +20,11 @@ existing `classify_attempt` retry envelope and `SqliteDeadLetterStore`; the inte
 production `SettlementHook` driver seam; a fail-closed `Deny(CurrencyMismatch)` in
 `BudgetTree` instead of a silent skip; a durable SQLite EIP-3009 nonce store; and a
 durability caveat plus snapshot seam for the process-local `BudgetEnforcer`. It is the
-money-path specialization of RFC-0003: RFC-0003 owns the generic
-`receipt XOR open_intent` guarantee and delegates monetary orphans to the reconciler
-specified here.
+money-path specialization of RFC-0003. One `AdmissionOperation` is durable before
+the hold or payment participant and supplies the shared `operation_id`, dispatch
+truth, recovery fence, and retained request tombstone. This RFC owns payment
+participant state and rail reconciliation; it does not create another coordinator
+or claim that the budget database commits atomically with the receipt database.
 
 ## Motivation
 
@@ -185,8 +187,9 @@ default" that does not exist. At `DEFAULT_MAX_EIP3009_NONCE_ENTRIES = 65_536`
 
 ## Design
 
-The money path gains one durable state machine (`payment_journal`), one recovery
-sweep, and one routing consumer, plus four smaller fail-closed corrections. All new
+The money path gains one durable payment participant, one recovery sweep, and one
+routing consumer, plus four smaller fail-closed corrections. The RFC-0003
+`AdmissionOperation` is the sole saga coordinator. All new
 code uses `?` or explicit typed-error `match`; no `unwrap`/`expect`. Fail-closed is the
 posture throughout: on any ambiguity the change denies, dead-letters, or raises a loud
 operator incident rather than silently proceeding.
@@ -198,9 +201,20 @@ hold write and the journal write share one `TransactionBehavior::Immediate`
 transaction), added in `crates/platform/chio-store-sqlite/src/budget_store/store.rs`
 beside the `budget_authorization_holds` DDL:
 
+The budget database is provisioned and opened through RFC-0006's shared
+`SqliteServingOwner`, even when it is a different file from the receipt database.
+`authorize_budget_hold`, capture/release/expiry, every payment-journal transition,
+and every recovery claim carry that database's
+`StoreMutationFence { store_uuid, lease_id, owner_epoch }` and compare it with
+`chio_serving_owner` inside the same transaction as the economic mutation. A
+receipt-database fence, stale epoch, or independently reopened budget handle
+returns `Fenced` before changing exposure.
+
 ```sql
 CREATE TABLE IF NOT EXISTS payment_journal (
-    request_id        TEXT PRIMARY KEY,
+    operation_id      TEXT PRIMARY KEY,
+    request_namespace_digest TEXT NOT NULL,
+    request_id        TEXT NOT NULL,
     capability_id     TEXT NOT NULL,
     grant_index       INTEGER NOT NULL,
     hold_id           TEXT,
@@ -211,13 +225,43 @@ CREATE TABLE IF NOT EXISTS payment_journal (
     amount_units      INTEGER NOT NULL,       -- preauthorized (hold) amount
     settle_action     TEXT,                   -- capture|release; NULL for final prepayment
     settle_amount_units INTEGER,              -- exact capture amount; NULL for release
+    release_authority_kind TEXT,              -- required only for release
+    release_authority_evidence_id TEXT,
+    release_authority_evidence_digest TEXT,
+    release_authority_operation_version INTEGER,
     currency          TEXT NOT NULL,
     state             TEXT NOT NULL,          -- see PaymentJournalState
     created_at        INTEGER NOT NULL,
     updated_at        INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_payment_journal_state ON payment_journal(state);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_journal_request
+    ON payment_journal(request_namespace_digest, request_id);
+
+CREATE TABLE IF NOT EXISTS payment_release_evidence (
+    operation_id      TEXT PRIMARY KEY,
+    evidence_id       TEXT UNIQUE NOT NULL,
+    evidence_kind     TEXT NOT NULL,
+    operation_version INTEGER NOT NULL,
+    canonical_bundle  BLOB NOT NULL,
+    bundle_digest     TEXT NOT NULL,
+    created_at        INTEGER NOT NULL,
+    FOREIGN KEY(operation_id) REFERENCES payment_journal(operation_id)
+);
 ```
+
+`payment_release_evidence` stores one bounded immutable canonical
+`MonetaryReleaseEvidenceV1` bundle. The bundle is produced only by a private
+verified `MonetaryReleaseAuthority` and contains the exact signed source
+envelopes/checkpoints, participant-query snapshot or terminal outcome/pricing
+record, verifier-policy digest, operation/version binding, evidence id, and every
+digest needed to reproduce verification. It is not a pointer to mutable current
+state. In the same transaction that advances `Authorized -> Settling(Release)`,
+the store inserts this bundle, verifies its digest, and copies its
+kind/id/digest/version into the journal row. Capture requires no evidence row.
+Release fails before the rail call if insertion or cross-binding fails. The row
+is retained through operation checkpoint finality, not deleted when the journal
+first reaches `Closed`.
 
 New types in `crates/kernel/chio-kernel/src/payment.rs` (kernel-owned, mirrored into
 the store crate):
@@ -262,18 +306,34 @@ pub enum PaymentSettleAction {
     Release,
 }
 
-/// The committed settle decision, stamped atomically with the advance to
-/// `Settling` so reconciliation replays the exact operation rather than guessing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PaymentSettleIntent {
-    pub action: PaymentSettleAction,
-    /// Exact capture amount for `Capture`; `None` for `Release`.
-    pub amount_units: Option<u64>,
+/// The verified settle decision supplied to the journal transition. The store
+/// derives and persists the release binding; callers cannot submit its bytes.
+pub enum PaymentSettleIntent<'a> {
+    Capture { amount_units: u64 },
+    Release { authority: &'a MonetaryReleaseAuthority },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct PaymentReleaseAuthorityBinding {
+    pub kind: PaymentReleaseAuthorityKind,
+    pub operation_id: String,
+    pub operation_version: u64,
+    pub evidence_id: String,
+    pub evidence_digest: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum PaymentReleaseAuthorityKind {
+    PreDispatchNoEffect,
+    TransportNotAccepted,
+    ContractualZeroCharge,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PaymentJournalRecord {
+    pub operation_id: String,
+    pub request_namespace_digest: String,
     pub request_id: String,
     pub capability_id: String,
     pub grant_index: u32,
@@ -293,6 +353,10 @@ pub struct PaymentJournalRecord {
     /// Exact capture amount recorded with `Capture`; None for `Release`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settle_amount_units: Option<u64>,
+    /// Required exactly when settle_action is Release. Derived only from a
+    /// private-constructor MonetaryReleaseAuthority.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub release_authority: Option<PaymentReleaseAuthorityBinding>,
     pub currency: String,
     pub state: PaymentJournalState,
     pub created_at_unix_ms: u64,
@@ -303,9 +367,12 @@ New `BudgetStore` methods (`crates/kernel/chio-kernel/src/budget_store.rs`, defa
 so non-SQLite stores stay compilable and fail closed if a monetary call reaches them):
 
 ```rust
-/// Insert a fresh journal row in `HoldPlaced`. Collides fail-closed on a reused
-/// request_id (INSERT ... ON CONFLICT(request_id) DO NOTHING; zero rows -> Conflict).
-fn record_payment_journal(&self, _entry: &PaymentJournalRecord)
+use chio_core_types::StoreMutationFence;
+
+/// Insert a fresh participant row in `HoldPlaced`. Collides fail-closed on a reused
+/// operation_id. The matching AdmissionOperation must already be Prepared.
+fn record_payment_journal(&self, _entry: &PaymentJournalRecord,
+    _serving_fence: &StoreMutationFence)
     -> Result<(), BudgetStoreError> {
     Err(BudgetStoreError::Invariant(
         "payment journal is not supported by this budget store".to_string(),
@@ -315,23 +382,44 @@ fn record_payment_journal(&self, _entry: &PaymentJournalRecord)
 /// Compare-and-set state advance. `expected` must match the current row state or the
 /// call returns Conflict (fail-closed); optional fields are attached when present. When
 /// advancing `Authorized -> Settling` the caller MUST pass `settle` (the committed
-/// action and, for a capture, the exact amount) so boot reconciliation can replay the
-/// exact operation; the store stamps `settle_action`/`settle_amount_units` atomically
+/// capture amount or a verified release authority) so boot reconciliation can replay
+/// the exact operation; the store persists the immutable release-evidence bundle and
+/// stamps action, amount, and release binding atomically
 /// with the state change. `settle` MUST be None for every other transition, including
 /// the `PrepaidFinal` direct `HoldPlaced -> Settled` transition. The implementation
 /// validates the transition, rail mode, settle intent, and attached references as one
 /// compare-and-set operation rather than accepting arbitrary state pairs.
-fn advance_payment_journal(&self, _request_id: &str, _expected: PaymentJournalState,
+fn advance_payment_journal(&self, _operation_id: &str, _expected: PaymentJournalState,
     _next: PaymentJournalState, _authorization_id: Option<&str>,
-    _transaction_id: Option<&str>, _settle: Option<PaymentSettleIntent>)
+    _transaction_id: Option<&str>, _settle: Option<PaymentSettleIntent<'_>>,
+    _serving_fence: &StoreMutationFence)
     -> Result<(), BudgetStoreError> {
     Err(BudgetStoreError::Invariant(
         "payment journal is not supported by this budget store".to_string(),
     ))
 }
 
+/// Resolve the only legal HoldPlaced -> Closed recovery path. The private
+/// resolution must prove pre-dispatch no effect plus authenticated rail
+/// NoAuthorization. One transaction persists its immutable evidence bundle,
+/// closes the exact journal row, releases the bound local hold, and appends the
+/// exposure event. Idempotent by the derived resolution digest.
+fn resolve_hold_placed_no_authorization(
+    &self,
+    _operation_id: &str,
+    _hold_id: &str,
+    _expected_hold_version: u64,
+    _resolution: &RecoveredHoldResolution,
+    _serving_fence: &StoreMutationFence,
+) -> Result<bool, BudgetStoreError> {
+    Err(BudgetStoreError::Invariant(
+        "payment recovery is not supported by this budget store".to_string(),
+    ))
+}
+
 /// Move the row to Closed. Idempotent: already-Closed returns Ok(false).
-fn close_payment_journal(&self, _request_id: &str) -> Result<bool, BudgetStoreError> {
+fn close_payment_journal(&self, _operation_id: &str,
+    _serving_fence: &StoreMutationFence) -> Result<bool, BudgetStoreError> {
     Err(BudgetStoreError::Invariant(
         "payment journal is not supported by this budget store".to_string(),
     ))
@@ -351,13 +439,15 @@ fn list_incomplete_payment_journal(&self, _older_than_unix_ms: u64)
 }
 ```
 
-Kernel control-flow changes in `validation.rs`, all keyed on `request.request_id`:
+Kernel control-flow changes in `validation.rs` are keyed on the RFC-0003
+`operation_id`; `request_id` remains bound metadata, not the participant key:
 
-1. Before `adapter.authorize` at `validation.rs:1274`, write the journal row with
+1. Require a durable `AdmissionOperation::Prepared`, then, before
+   `adapter.authorize` at `validation.rs:1274`, write the participant row with
    `state = HoldPlaced`, `rail = adapter.rail_id()`, `authorization_id = None`. The
    kernel sets `PaymentAuthorizeRequest.reference` (payment.rs:91) to this same
-   `request_id`, so authorize's idempotency key is durable before the external call
-   and the HoldPlaced row is recoverable through `settlement_state(request_id, None)`
+   `operation_id`, so authorize's idempotency key is durable before the external call
+   and the HoldPlaced row is recoverable through `settlement_state(operation_id, None)`
    if the process dies before step 2.
    Atomicity note: every SQLite `BudgetStore` method opens its own
    `TransactionBehavior::Immediate` transaction
@@ -379,16 +469,20 @@ Kernel control-flow changes in `validation.rs`, all keyed on `request.request_id
    its authorization id and no settle intent; a `prepaid_final` authorization
    must return `PrepaidFinal` and advances directly `HoldPlaced -> Settled`, attaching
    its authorization id while leaving `transaction_id`, `settle_action`, and
-   `settle_amount_units` NULL. A held result from a final-prepayment profile or a
+   `settle_amount_units` and every release-authority field NULL. A held result from a final-prepayment profile or a
    final-prepayment result from a reversible-hold profile is a typed invariant failure
    and enters reconciliation. Final prepayment is never represented as a releasable
    hold or as a synthetic capture.
 3. For `reversible_hold`, before `adapter.capture`/`adapter.release` at
    `validation.rs:1013-1015`, advance to
    `Settling` PASSING the terminal settle intent
-   (`Some(PaymentSettleIntent { action, amount_units })`): `Capture` with the exact
-   post-execution cost (which may differ from the preauthorized `amount_units`), or
-   `Release` with `None`. The intended rail call and its amount are thus durable
+   (`PaymentSettleIntent::Capture { amount_units }` or
+   `PaymentSettleIntent::Release { authority }`): capture carries the exact
+   post-execution cost (which may differ from the preauthorized `amount_units`);
+   release carries the private verified no-effect or contractual-zero-charge
+   authority. The store derives and persists its exact kind/id/digest/version.
+   Capture requires every release field null, while Release requires all of them.
+   The intended rail call, amount, and authority are thus durable
    BEFORE any money can move, so a crash inside the rail call is replayable without
    guessing. Validate the returned `PaymentResult` against the committed action before
    advancing: `Capture` accepts only `Captured` or `Settled`, and `Release` accepts only
@@ -399,10 +493,13 @@ Kernel control-flow changes in `validation.rs`, all keyed on `request.request_id
    A `prepaid_final` row is already `Settled`; finalization
    performs no capture or release and must charge the fixed prepaid amount. It is
    ineligible for outcome-contingent or refundable modes.
-4. After `record_chio_receipt` commits the signed receipt, call
-   `close_payment_journal(request_id)` (best-effort-durable). A crash between the
-   receipt commit and the close leaves a `Settled` row that boot reconcile closes,
-   because the matching attested receipt exists.
+4. After a compatible terminal rail result, supply its canonical
+   `PaymentTerminalEvidence` to RFC-0003's `commit_admission_projection`. That one
+   receipt-side transaction appends the receipt, commits required local sidecars,
+   and retains the operation as `Completed`. The payment participant remains in
+   the budget database and is closed idempotently by `operation_id`. A crash in
+   either ordering is recovered by querying both participants; the design does
+   not claim a cross-database commit.
 
 The `PaymentAdapter` trait is amended to make replay-based recovery sound. Three
 additions (the idempotency contract plus two defaulted methods, both fail-closed):
@@ -433,13 +530,13 @@ pub trait PaymentAdapter: Send + Sync {
     // ... authorize / capture / release / refund unchanged in signature ...
 
     /// CONTRACT: authorize MUST be idempotent keyed on `request.reference`
-    /// (payment.rs:91), which the kernel sets to the durable `request_id` written
+    /// (payment.rs:91), which the kernel sets to the durable `operation_id` written
     /// into the journal BEFORE the call. A repeated authorize with the same
     /// reference returns the same authorization and places AT MOST ONE rail-side
     /// hold. This closes the HoldPlaced crash window: if the process dies after
     /// authorize succeeds but before the post-call journal advance (step 2 below),
     /// no `authorization_id` is durable yet, but reconciliation can still discover
-    /// or release the hold via `settlement_state(request_id, None)` because the
+    /// or release the hold via `settlement_state(operation_id, None)` because the
     /// reference is durable.
 
     /// CONTRACT: capture and release MUST be idempotent keyed on
@@ -447,7 +544,7 @@ pub trait PaymentAdapter: Send + Sync {
     /// equivalent PaymentResult and moves money AT MOST ONCE. Boot reconciliation
     /// relies on this to replay a Settling journal row without double-charging.
 
-    /// Stable rail identifier recorded in the payment journal before authorize
+    /// Stable rail identifier recorded in the payment participant before authorize
     /// runs (in-tree: "x402", "acp"). Needed because the kernel holds only a
     /// boxed trait object (set_payment_adapter, construction.rs:429) with no
     /// other name for the rail. Defaulted so third-party adapters compile; an
@@ -459,7 +556,7 @@ pub trait PaymentAdapter: Send + Sync {
 
     /// Query the current rail-side settlement state for a prior authorization WITHOUT
     /// moving funds. Idempotent and side-effect-free. Keyed on `reference` (the durable
-    /// `request_id` written into the journal before authorize), so it stays answerable
+    /// `operation_id` written into the participant before authorize), so it stays answerable
     /// in the HoldPlaced crash window where no `authorization_id` is durable yet;
     /// `authorization_id` is an optional refinement passed once known. Returns a
     /// `RailSettlementState` that explicitly carries the rail-assigned `authorization_id`
@@ -478,16 +575,34 @@ pub trait PaymentAdapter: Send + Sync {
 }
 ```
 
-Boot reconciliation (registered into RFC-0003's boot recovery orchestration and
-serving RFC-0003's `MonetaryReconciled` resolution) iterates
+Boot reconciliation is a payment-participant step claimed by RFC-0003's fenced
+`AdmissionOperation` recovery owner. It iterates
 `list_incomplete_payment_journal(now - horizon)` and, per row, is deterministic (no
 discretion, mirroring ADR-0015 D3/D5):
 
+Recovery first loads and lease-claims the exact `AdmissionOperation`. A payment
+row without its operation, an operation owned by another epoch, or an impossible
+operation/payment pair is an invariant incident and permits no automatic hold
+mutation. The operation's dispatch truth is authoritative for whether a
+reversible release is safe.
+
 - `HoldPlaced`: authorize may or may not have fired, and no `authorization_id` is
-  durable. Query `settlement_state(request_id, None)` by the durable reference.
-  `NoAuthorization` closes the journal and releases local exposure because funds never
-  moved. For `ReversibleHold`, `Held { authorization_id }` records the returned id,
-  advances to `Authorized`, and completes through the release branch below; an already
+  durable. Query `settlement_state(operation_id, None)` by the durable reference.
+  `NoAuthorization` is only one input to private construction of
+  `VerifiedPreDispatchNoEffect`; recovery must also prove the operation is before
+  `DispatchCommitted`, no transport handoff exists, and no final prepayment moved.
+  It calls `resolve_hold_placed_no_authorization`, which in one fenced budget
+  transaction verifies the exact private `RecoveredHoldResolution`, inserts its
+  immutable `MonetaryReleaseEvidenceV1` bundle, copies the evidence binding into
+  the journal, compare-and-swaps `HoldPlaced -> Closed`, compare-and-swaps the
+  exact bound open hold/version to `Released`, subtracts its remaining exposure,
+  and appends the digest-keyed `ReleaseExposure` mutation event. The general
+  `close_payment_journal` and `release_recovered_hold` methods cannot perform or
+  split this transition. A duplicate exact resolution is a no-op; a diagnostic
+  status alone changes nothing, and any failure rolls back all rows. A later
+  operation state is an invariant incident. For `ReversibleHold`,
+  `Held { authorization_id }` records the returned id,
+  advances to `Authorized`, and enters the operation-aware branch below; an already
   settled result before a terminal action was committed is unexpected movement and
   becomes `ReconcileFailed`. For `PrepaidFinal`, only a rail result whose status is
   exactly `Settled` may advance directly to `Settled`, using `authorization_id` as the
@@ -495,20 +610,36 @@ discretion, mirroring ADR-0015 D3/D5):
   `ReconcileFailed`. An `Unavailable` error is `ReconcileFailed`, never a silent close.
   Because the id is carried by the return type, recovery never guesses or reconstructs
   it from ad hoc metadata.
-- `Authorized`: authorize succeeded but no terminal action was ever committed (the crash
-  predates step 3, so `settle_action` is NULL). No capture amount was chosen, so the only
-  sound, price-free completion is to `release` the hold (idempotent) and close; funds
-  were only held. Validation treats an `Authorized` row whose `rail_mode` is not
-  `reversible_hold` as corrupt and marks it `ReconcileFailed`; a final prepayment
-  can never take this release branch.
-- `Settling`: a terminal action IS durable. Replay exactly the recorded `settle_action`
-  and `settle_amount_units` (idempotent by the amended contract): `Capture` re-captures
-  the recorded amount, `Release` releases the hold. This is a predeclared, price-free
+- `Authorized`: query the owning `AdmissionOperation` before choosing an action.
+  If the operation is provably before `DispatchCommitted`, the rail mode is
+  `reversible_hold`, and every handoff participant proves no acceptance, an
+  authenticated `VerifiedNoEffectProof::BeforeDispatch` permits idempotent release and
+  `CompensatedBeforeDispatch`. At `DispatchCommitted`, only a cancellation-fenced
+  `VerifiedNoEffectProof::NotAcceptedAfterDispatch` may persist `Release` and terminate as
+  `NotAcceptedAfterDispatchCommit`; invocation capture remains consumed. A
+  terminal `ToolOutcomeRecordV1` whose exact pricing contract produces
+  `VerifiedContractualZeroCharge` may also persist `Release`. `Finalizing`,
+  `OutcomeUnknownAfterDispatch`, missing, stale, unavailable, or unqueryable
+  outcome freezes the hold and binds an incident. A tool may have completed even
+  though `settle_action` is NULL. Recovery therefore never treats `Authorized`
+  alone as release authority. A final prepayment can never take either release
+  branch.
+- `Settling`: a terminal action IS durable. Replay exactly the recorded
+  `settle_action` and `settle_amount_units` (idempotent by the amended contract):
+  `Capture` re-captures the recorded amount. Before `Release`, load the stored
+  immutable canonical evidence bundle by exact id/digest, reconstruct the private
+  verified type from those bytes, and recheck its source signatures/checkpoints,
+  operation/version, participant status, cancellation fence or terminal
+  zero-charge outcome. Recovery never re-derives the proof from mutable current
+  participant state. Missing, stale, unavailable or mismatched
+  evidence becomes `ReconcileFailed` without calling the rail. A valid binding
+  releases the hold. This is a predeclared, price-free
   terminal state (ADR-0015 D2): it never selects a new amount, only completes the
   committed one. Apply the same action/status matrix as the live path: a compatible
   terminal result advances to `Settled`, `Pending` remains recoverable, and
   `Failed`/incompatible results become `ReconcileFailed`. A `Settling` row missing its
-  `settle_action` is corrupt and is never completed by guessing.
+  `settle_action`, or a `Release` row missing its authority binding, is corrupt
+  and is never completed by guessing.
 - `Settled`: inspect the durable mode and action before deciding what happened.
   `PrepaidFinal` and `Capture` mean funds moved; if the request receipt is absent, emit
   the signed reconciliation receipt for the recorded amount before closing. `Release`
@@ -535,33 +666,39 @@ fn release_recovered_hold(
     &self,
     hold_id: &str,
     expected_hold_version: u64,
-    request_id: &str,
+    operation_id: &str,
     resolution: RecoveredHoldResolution,
     recovery_resolution_digest: &str,
+    serving_fence: &StoreMutationFence,
 ) -> Result<bool, BudgetStoreError>;
 ```
 
-`OpenHoldSummary` is a new read-model struct carrying `hold_id`, `request_id`,
+`OpenHoldSummary` is a new read-model struct carrying `hold_id`, `operation_id`,
+`request_id`,
 hold version, `capability_id`, `grant_index`, `remaining_exposure_units`, and
-`created_at_unix_ms`. The hold table gains `request_id` and a monotonic version
-for all new rows. Legacy rows without a request id are investigation-only and
+`created_at_unix_ms`. The hold table gains `operation_id`, `request_id`, and a
+monotonic version for all new rows. Legacy rows without an operation id are
+investigation-only and
 cannot be auto-expired.
 
 Age is a scan trigger, never release authority. There is no second recovery-
-authorization table. `RecoveredHoldResolution` is a closed typed input limited to
-`NoAuthorization` and `Released`; captured, settled-prepayment, pending, failed, and
-unknown outcomes are not representable as release authority. The registered recovery
-coordinator serializes work by `request_id`, reconciles the payment journal first, and
-verifies that RFC-0003 has neither an open intent nor a dead-lettered outcome-unknown
-intent before it calls `release_recovered_hold`. It derives
-`recovery_resolution_digest` from the canonical terminal rail/intent evidence and uses
+authorization table. `RecoveredHoldResolution` carries the closed verified
+`MonetaryReleaseAuthority::{NoEffect, ContractualZeroCharge}` plus the exact
+terminal participant bindings; captured, settled-prepayment, pending, failed,
+and unknown outcomes are not representable as release authority. The registered recovery
+coordinator serializes work by `operation_id`, reconciles the operation, tool
+outcome and payment participant, and verifies that release authority before it
+calls `release_recovered_hold`. It derives
+`recovery_resolution_digest` from the canonical terminal rail/operation evidence and uses
 that digest as the budget mutation event id. A `Settling`, moved-funds `Settled`,
-`ReconcileFailed`, open or outcome-unknown dispatch intent, unknown rail state, legacy
-hold without `request_id`, or missing resolution never reaches the mutation call.
+`ReconcileFailed`, unproved `DispatchCommitted`, `OutcomeUnknownAfterDispatch`, unknown
+rail state, legacy hold without `operation_id`, or missing resolution never reaches
+the mutation call.
 
 `release_recovered_hold` runs one `Immediate` transaction that rechecks the hold's
-request binding and expected version, requires it still be open, verifies that no
-nonterminal or `ReconcileFailed` payment-journal row exists, rejects a resolution that
+operation/request binding and expected version, requires it still be open,
+verifies the private-constructor release authority and terminal payment
+participant, and rejects a resolution that
 does not match the terminal local journal state, and inserts the digest-derived mutation
 event id before changing exposure. A duplicate event id returns `Ok(false)` without a
 second mutation. A fresh valid call subtracts `remaining_exposure_units` from
@@ -569,6 +706,10 @@ second mutation. A fresh valid call subtracts `remaining_exposure_units` from
 `disposition = 'expired'`, and appends the `expire_hold` mutation event in that same
 transaction. Any stale, missing, or conflicting proof leaves exposure unchanged. It
 never touches `total_cost_realized_spend`.
+
+This generic sweeper method excludes a `HoldPlaced` payment journal. That state
+is resolved only by `resolve_hold_placed_no_authorization`, so evidence insert,
+journal closure and exposure release cannot be split across APIs or crashes.
 
 A kernel sweep task (boot-once, then periodic on `hold_sweep_interval`, default
 `300s`) first runs RFC-0003 and payment-journal reconciliation, then calls
@@ -843,7 +984,8 @@ adopter persist and restore counters instead of silently losing them.
   already defines; the journal and reconciliation never rewrite a signed receipt.
 - New non-audit SQLite tables: `payment_journal`, `settle_attempts`, and
   `eip3009_nonces`, all created idempotently at store open (`CREATE TABLE IF NOT
-  EXISTS`). The existing `settle_dead_letters`, `iou_envelope`, and
+  EXISTS`). `payment_journal.operation_id` binds the RFC-0003 coordinator and is
+  the participant idempotency key. The existing `settle_dead_letters`, `iou_envelope`, and
   `settlement_reconciliations` tables are now populated by production code
   (F68/F69), not only tests.
 - `PaymentJournalRecord`, `DeadLetterRecord` (existing, schema `chio.settle.dead-letter.v1`),
@@ -861,13 +1003,13 @@ adopter persist and restore counters instead of silently losing them.
   treat unknown mutation kinds/dispositions as opaque. The unshipped dead-letter
   body is a deliberate pre-release replacement, not a compatibility promise.
 - There are no historical journal, attempt, or nonce rows. Existing holds lack a
-  trustworthy `request_id` and terminal recovery proof, so they are never
+  trustworthy `operation_id` and terminal recovery proof, so they are never
   auto-expired merely because they predate the migration. They appear in the
   review command and require an explicit reconciled resolution.
 - The bounded `chio.settle.dead-letter.v1` shape is the sole pre-release
   dead-letter contract. Rows that do not match it fail closed.
-- Staged rollout. The payment journal is the money-path specialization of RFC-0003's
-  `DispatchIntentJournalMode`; enable it with the `Monetary` class first (highest
+- Staged rollout. The payment participant is the money-path specialization of RFC-0003's
+  `DurableAdmissionMode`; enable it with the `Monetary` class first (highest
   consequence), gated behind the same config. The F68 routing consumer ships enabled
   (it only adds logging, metrics, and dead-letter rows). The F69 driver ships behind
   `settlement.driver = none` by default. The durable EIP-3009 store becomes the wired
@@ -879,13 +1021,27 @@ adopter persist and restore counters instead of silently losing them.
 
 ## Test and verification plan
 
-- Unit: journal insert collision on a reused `request_id` fails closed;
+- Unit: payment participant collision on a reused `operation_id` fails closed;
   `advance_payment_journal` with a wrong `expected` state returns `Conflict`;
+  every receipt, budget/payment, and obligation mutation rejects a stale,
+  cross-database, wrong-lease, or wrong-UUID `StoreMutationFence`; missing or
+  partial privileged lock provisioning fails before workers start;
   final prepayment transitions directly to `Settled` and cannot enter the
   `Authorized -> release` recovery branch; capture/release reject `Pending`, `Failed`,
-  and action-incompatible terminal statuses; `release_recovered_hold` rejects a
-  nonterminal journal, moved-funds resolution, missing/stale recovery digest, open or
-  outcome-unknown RFC-0003 intent, and wrong hold version and is idempotent by event id;
+  and action-incompatible terminal statuses; a Release settle intent cannot be
+  constructed without a private verified authority, persists its exact
+  immutable canonical evidence bundle plus kind/id/digest/version in one
+  transaction, and recovery rejects missing, pointer-only, mutated, unavailable,
+  or stale authority evidence before calling the rail. `HoldPlaced +
+  NoAuthorization` also requires `VerifiedPreDispatchNoEffect` and the stored
+  bundle. Inject failure before and after evidence insert, journal CAS, hold CAS,
+  exposure subtraction, and event insert inside
+  `resolve_hold_placed_no_authorization`; every failure rolls back the whole
+  transaction, exact replay is a no-op, and a stale hold/version or operation
+  proof rejects. `release_recovered_hold` rejects a
+  nonterminal participant, moved-funds resolution, missing/stale recovery digest,
+  `DispatchCommitted` or `OutcomeUnknownAfterDispatch` operation, and wrong hold
+  version and is idempotent by event id;
   `close_payment_journal` is idempotent;
   `settlement_state` default returns `Unavailable`.
 - Property: for a random interleaving of authorize/capture/release/crash, after boot
@@ -909,8 +1065,12 @@ adopter persist and restore counters instead of silently losing them.
   prepayment is never released, held state replays only its durable action, and
   every killed request ends attested-or-incident. F71's proof SIGKILLs between
   `authorize_budget_hold` and reconcile and asserts that the hold remains frozen
-  while its journal/intent is nonterminal, then expires exactly once only after
+  while its payment participant or admission operation is nonterminal, then
+  expires exactly once only after
   the coordinator proves and applies a terminal no-movement resolution.
+- Regression: SIGKILL after tool completion but before `Authorized -> Settling`;
+  restart observes `DispatchCommitted`, never releases the hold, and either
+  resumes a queryable outcome or retains `OutcomeUnknownAfterDispatch`.
 - Soak: sustained priced load with periodic kills; assert every old open hold is
   either terminally proven no-movement and expired or paired with a named
   nonterminal incident, `settle_attempts` drains, and no journal row is silently
@@ -918,7 +1078,7 @@ adopter persist and restore counters instead of silently losing them.
 - Formal-methods tie-in: the money-path invariant `moved_funds(request_id) ->
   eventually(attested_receipt XOR reconciliation_incident)` is stated as a liveness
   predicate in the formal-methods plan; the property and crash tests are its executable
-  witnesses. It composes with RFC-0003's `receipt XOR open_intent` safety predicate.
+  witnesses. It composes with RFC-0003's retained-operation safety predicate.
 
 ## Acceptance criteria
 
@@ -926,6 +1086,9 @@ adopter persist and restore counters instead of silently losing them.
   yields, for every in-flight priced request, exactly one durable terminal outcome: an
   attested receipt, a reconciliation receipt, or a `ReconcileFailed` operator incident
   naming the `rail` and `authorization_id`. Never a charge with no record.
+- Killing the kernel after tool completion but before settle-intent persistence
+  never takes an `Authorized -> release` shortcut. The hold stays frozen until a
+  queryable outcome or authenticated no-effect proof determines its disposition.
 - After a clean run's reconcile, `list_incomplete_payment_journal` returns empty
   and every remaining open hold has a named, nonterminal incident.
 - An old open hold is swept to `disposition='expired'` only after a matching
@@ -950,7 +1113,8 @@ adopter persist and restore counters instead of silently losing them.
 - Added latency on priced calls: one extra durable write before authorize and one
   compare-and-set per state transition. Each rides the existing budget-store `Immediate`
   transaction and is dwarfed by the external rail call; the `Monetary`-class gate bounds
-  the cost, and the soak measures it before the journal becomes default.
+  the cost. The soak qualifies `Monetary`, then `SideEffecting`; the compiled
+  production default remains RFC-0003's fixed `SideEffecting` mode.
 - Idempotency is a contract, not enforcement: the amended `PaymentAdapter` doc requires
   idempotent capture/release, but an adapter that violates it could double-charge on
   replay. Mitigation: reconciliation prefers the side-effect-free `settlement_state`
@@ -961,11 +1125,12 @@ adopter persist and restore counters instead of silently losing them.
   cannot reclaim a live hold. The sweep requires a terminal no-movement recovery
   proof and atomically excludes every nonterminal journal; the `3600s`
   default controls alert timing only.
-- Alternative considered and rejected: putting the payment journal in the receipt-store
-  database beside RFC-0003's `chio_dispatch_intents`. Rejected because the earliest
-  durable pre-execution write is the budget hold, and co-locating lets the hold and
-  journal commit in one transaction; RFC-0003's generic intent remains the complementary
-  `receipt XOR open_intent` record.
+- Alternative considered: putting the payment participant in the receipt database.
+  A unified local file can make more projections atomic, but it is a breaking
+  migration from independently configured budget and receipt stores and still
+  cannot include the external rail. V1 keeps the journal beside its budget hold,
+  keys it by `operation_id`, and uses the persisted RFC-0003 saga. Documentation
+  makes no cross-database atomicity claim.
 - Alternative considered and rejected: reversing the budget charge automatically on
   settlement failure. Rejected because ADR-0006's no-refund model makes
   `total_cost_charged` monotone; the journal records and reconciles the rail movement
@@ -977,14 +1142,15 @@ adopter persist and restore counters instead of silently losing them.
 
 ## Rollout and sequencing
 
-1. RFC-0003 lands first: it provides the boot recovery orchestration, the operator
-   incident sink, and the `rail`/`rail_authorization_id` substrate plus the
-   `MonetaryReconciled` resolution that this RFC's reconciler satisfies.
+1. RFC-0003 lands first: it provides the durable operation, dispatch truth,
+   retained request tombstone, fenced recovery owner, composable receipt
+   projection, and incident binding used by this payment participant.
 2. F72 and the F68 routing consumer land next: both are small, self-contained,
    fail-closed corrections with no dependency on the journal.
-3. The payment journal (F70) + hold sweeper (F71) land together, gated behind the
-   `Monetary` journal mode, promoted to default after the nightly kill-injection soak is
-   green.
+3. The payment participant (F70) and hold sweeper (F71) land together under
+   `DurableAdmissionMode::Monetary`. RFC-0003 later releases with cumulative
+   `SideEffecting` as the compiled production default after the kill-injection
+   soak is green; RFC-0013 does not define a competing default.
 4. The durable EIP-3009 store (F73) and the `BudgetEnforcer` caveat/snapshot (F74) land
    as independent hardening; the EIP-3009 store becomes the wired default only when the
    lane is exercised.

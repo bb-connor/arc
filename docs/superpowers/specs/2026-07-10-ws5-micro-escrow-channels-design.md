@@ -3,8 +3,9 @@
 - Date: 2026-07-10
 - Program: agent-economy program, wave 3 (see `2026-07-10-agent-economy-program-design.md`)
 - Depends on: WS1, `chio_credit::obligation`, existing ChioEscrow devnet
-  qualification, and a production FROST verifier plus trusted roster/group-key
-  epoch before quorum-authorized close
+  qualification, and the 2026-07-12 FROST quorum substrate through Phase 3 plus
+  authorization-slot continuity and the external economic-state continuity
+  substrate before service admission or quorum-authorized close
 - Claim track: implementation (devnet-funded v1, no mainnet claim)
 - Branch: `chio/ws5-micro-escrow-channels` off `main`
 
@@ -111,14 +112,22 @@ and canonical inclusion/finality evidence. It contains:
   confirmations, observed confirmations, and finality status; and
 - a block-pinned identity-registry observation proving the named operator is
   active and its current key hash equals the escrow's immutable key hash.
+- a trusted `ChannelAssetBinding` containing ISO currency and minor-unit
+  decimals, chain id, token address and symbol, pinned token decimals, settlement
+  policy digest, and binding digest. Token decimals resolve from the configured
+  allowlist and a pinned ERC-20 metadata read; caller input is not authoritative.
 
 Open validation then requires:
 
-- `terms.maxAmount == deposited == channel bound`;
+- `bound_token_base_units =
+  chio_settle::evm::scale_chio_amount_to_token_minor_units(bound, policy)` succeeds
+  exactly, and `terms.maxAmount == deposited == bound_token_base_units`;
 - no amount has already been released or refunded;
 - beneficiary equals the channel payee;
 - refund owner equals the channel payer;
-- token, currency, chain id, and contract address match;
+- token, currency, both decimal scales, policy digest, chain id, and contract
+  address match. Converting `bound_token_base_units` back through the paired
+  checked function must reproduce the exact `MonetaryAmount`;
 - `close_submission_cutoff = escrow_deadline -
   fixed_finality_broadcast_margin` is checked, strictly before escrow expiry,
   and no earlier than `channel_expiry + dispute_window`; and
@@ -134,10 +143,12 @@ operator, or rotated key.
 
 Both parties first sign the open intent. The configured channel settlement
 authority owns one durable funding-reservation registry in
-`platform/chio-store-sqlite`. It atomically compare-and-swaps the escrow
-reference from unreserved to `open_intent_digest` and emits a signed funding
-acknowledgement with the old and new store versions. Both parties accept only
-that configured authority, then sign the final open binding both prior digests.
+`platform/chio-store-sqlite` as a local staging/cache projection. It stages the
+escrow reference from unreserved to `open_intent_digest`, advances the external
+channel/escrow `EconomicStateAnchor` batch, then finalizes locally and emits a
+signed funding acknowledgement with the old/new versions and anchored head
+digest. Both parties accept only that configured authority, then sign the final
+open binding both prior digests.
 A private channel-open artifact cannot replace this serialization point or
 reuse one deposit for two channels. Missing, stale, or unfinalized funding
 evidence rejects open.
@@ -145,14 +156,15 @@ evidence rejects open.
 The same registry is the exclusive off-chain lifecycle for the escrow reference:
 `unreserved -> opening(open_intent_digest) -> open(channel_id) ->
 closing(close_digest) -> released | refunded | incident`. Every transition is a
-versioned compare-and-swap. An `incident` remains reserved until an authenticated
+versioned external head compare-and-swap followed by exact local finalization.
+An `incident` remains reserved until an authenticated
 operator resolution proves the escrow is canonically released or refunded; age
 or a failed worker never returns it to `unreserved`.
 
 The final open must be signed before the funding acknowledgement expires. If it
-is not, the authority may compare-and-swap that unused reservation back to
+is not, the authority may externally compare-and-swap that unused reservation back to
 unreserved; an expired acknowledgement can never open a channel.
-After both open signatures verify, the authority must compare-and-swap the exact
+After both open signatures verify, the authority must externally compare-and-swap the exact
 `opening(open_intent_digest)` version to `open(channel_id)`. No request-level
 capacity reservation or tool dispatch is allowed while the escrow remains only
 `opening`.
@@ -180,14 +192,17 @@ All artifacts are RFC 8785 canonical JSON with `deny_unknown_fields`,
 versioned schema identifiers, and signatures over immutable bodies.
 
 - `chio.channel.open-intent.v1` binds `open_intent_id`, payer and payee
-  identities and keys, currency, bound, expiry, immutable dispute tier and
+  identities and keys, trusted settlement-authority scope id, currency, bound,
+  exact `ChannelAssetBinding` and
+  `bound_token_base_units`, expiry, immutable dispute tier and
   duration, fixed finality/broadcast margin, close-submission cutoff,
   original web3 dispatch digest, ChioEscrow reference, funding-evidence digest,
   original operator and operator-key hash, participant-snapshot digest, and both
   party signatures.
 - `chio.channel.funding-evidence.v1` is the block-pinned evidence described
   above. Its digest covers the complete escrow terms and state, creation event,
-  identity-registry observation, block identity, observation time, and finality
+  identity-registry observation, asset binding and pinned decimals, block
+  identity, observation time, and finality
   assessment. The configured funding authority signs only after reproducing
   those checks. It is evidence, not authority to reserve or release the escrow.
 - `chio.channel.funding-acknowledgement.v1` is signed by the configured funding
@@ -203,27 +218,35 @@ versioned schema identifiers, and signatures over immutable bodies.
   acknowledgement, initial state, and final consent.
 - `chio.channel.reservation.v1` binds `reservation_id`, channel and open
   digests, stable request reference, exact next sequence, expected prior state
-  digest, maximum charge, expiry, disposition-store expected version, and the
-  payer/channel-authority signature. It is signed and durably persisted before
-  tool dispatch.
+  digest, quote digest, trusted receipt-authority digest, maximum
+  `MonetaryAmount`, exact maximum token base units, expiry, disposition-store
+  expected version, expected channel state version and lifecycle fence, and the
+  payer plus channel-authority signatures. It is the
+  payer's irrevocable one-shot authorization for the exact receipt-derived next
+  state and is durably persisted before tool dispatch. V1 permits one live
+  reservation per channel.
 - `chio.channel.state.v1` binds `channel_id`, exact `seq`,
   `prev_state_digest`, `cumulative_owed`, ordered receipt-id root and count,
-  the new receipt and `chio_credit::obligation::ObligationAtom` digests,
-  reservation digest, and payer signature. A payee countersignature marks
-  acceptance.
+  the new trusted-kernel receipt and
+  `chio_credit::obligation::ObligationAtom` digests, reservation digest, actual
+  charge, cumulative token base units, asset-binding digest, and payee signature.
+  It requires no post-service payer signature: the consumed pre-dispatch
+  reservation is that authority.
 - `chio.channel.close.v1` binds the open digest, close kind, final state digest
   and sequence, intended payee allocation (`final_cumulative_owed`), expected
-  refund only if that intended release succeeds, immutable dispute duration, and
-  required signatures. It records no mutable rail result and never labels an
+  token-base-unit release, expected refund only if that intended release succeeds,
+  immutable dispute duration, lifecycle fence, and required payee/FROST
+  authorization. It records no mutable rail result and never labels an
   expected remainder as an observed refund.
 - `chio.channel.dispute.v1` binds the close digest, the competing state and
   chain proof, reason, and submitter signature.
 - `chio.channel.release-authorization.v1` is a single-use, durable off-chain
   publisher record signed by the configured publisher authority. It binds the
   escrow reservation and version, open and close digests, intended release
-  amount, final state, verified FROST proof digest, trusted roster, group-key
+  `MonetaryAmount` and exact token base units, final state, verified FROST proof
+  digest, trusted roster, group-key
   epoch, original operator/key hash, publication root, and close-submission
-  cutoff. It is consumed by compare-and-swap at broadcast; it is not an on-chain
+  cutoff. Its anchored publisher head is consumed by compare-and-swap at broadcast; it is not an on-chain
   authorization recognized by ChioEscrow.
 
 Rail release and refund observations are separate reconciliation artifacts
@@ -232,67 +255,107 @@ validation below. No channel artifact duplicates or mutates the immutable
 `chio_credit::obligation::ObligationAtom` or embeds mutable settlement
 lifecycle as atom state.
 
-### Sequence and fork rules
+### Sequence and reservation rules
 
 The open artifact commits a sequence-zero state digest with zero cumulative
 amount and an empty receipt root. Every later state must satisfy all of:
 
-- `seq == prior.seq + 1`;
+- `seq == prior.seq + 1` and the payer-signed reservation names that exact next
+  sequence and prior digest;
 - `prev_state_digest == digest(prior_state)`;
-- the ordered receipt set appends exactly the reserved receipt;
+- the ordered receipt set appends exactly the reservation-bound trusted-kernel
+  receipt;
 - `cumulative_owed == prior.cumulative_owed + receipt.cost_charged` using
   checked arithmetic;
-- the charge does not exceed the signed reservation; and
-- cumulative amount does not exceed the immutable bound.
+- the actual charge and its exact token-base-unit conversion do not exceed the
+  signed reservation;
+- cumulative protocol and token amounts round-trip exactly and do not exceed the
+  immutable bound; and
+- one authority-fenced external batch compare-and-swap consumes the reservation and
+  admits the new state.
 
 The same sequence and same digest is idempotent. The same sequence with a
-different digest is equivocation, but signature strength determines its effect.
-If exactly one branch is mutually signed and the conflicting branch is only
-payer-signed, freeze new calls and preserve both proofs, but keep the mutually
-signed branch as the closeable state. A unilateral payer fork cannot erase an
-accepted balance. If two conflicting branches are both mutually signed, block
-cooperative close and make their last common mutually signed ancestor the
-highest automatically closeable state unless both parties later co-sign one
-resolution branch. If neither branch is mutually signed, neither advances the
-closeable prefix. A higher sequence does not win unless every intermediate state
-and digest link verifies. There is no "latest integer wins" shortcut.
+different digest is equivocation and freezes the channel. It cannot replace the
+already admitted state. Because v1 permits one live reservation and the store
+serializes reservation consumption, there is no payer-selected post-service fork
+and no "latest integer wins" rule. A higher sequence is closeable only when every
+intermediate reservation, receipt, payee signature, digest link, and authority
+transition verifies.
+
+One `ChannelLifecycleRecord` is the concurrency fence for both service admission
+and close. It contains channel id, `Open | ClosePending | Closing | Released |
+Refunded | Incident`, latest admitted state digest and sequence, checked
+`state_version`, monotonic `lifecycle_fence`, and optional `live_reservation_id`
+plus owning `operation_id`. The channel reservation, state, and escrow-reservation
+tables are co-located behind the same v1 SQLite writer as staging/cache state and
+store the current external continuity-head digest. Every transition below stages
+one bounded external batch covering the channel, escrow reservation and optional
+live service reservation, advances that batch, then finalizes locally. A second
+coordinator or restored database cannot validate one head and mutate another.
 
 ### Pre-dispatch reservation and exclusive disposition
 
 For each request:
 
 1. Select channel mode before any tool execution.
-2. Verify the funded open and current state, then transactionally reserve the
-   quoted maximum from
-   `bound - cumulative_owed - pending_reservations` using checked arithmetic.
-3. Sign and durably persist `chio.channel.reservation.v1`. A reservation failure
-   denies this channel attempt before dispatch.
-4. Dispatch the tool only after the kernel request context carries the
-   reservation and open digests.
-5. Build the signed receipt with a channel binding containing `channel_id`,
+2. Verify the funded open and current state, derive the quoted maximum from
+   `bound - cumulative_owed` with checked arithmetic, verify exact token-base-unit
+   conversion, and freeze the canonical unsigned reservation proposal and digest.
+3. Persist RFC-0003 `AdmissionOperation::Prepared` with the channel/open/
+   reservation-proposal digest and complete typed channel projection payload
+   before the first external authorization or channel-store mutation.
+4. Obtain and verify payer and channel-authority signatures over that exact stored
+   proposal. A timeout or mismatch terminalizes before dispatch without reserving
+   capacity.
+5. In one local transaction, stage the exact lifecycle tuple
+   `(Open, state_version, lifecycle_fence, live_reservation_id = None)` to the next
+   version/fence with `live_reservation_id = reservation_id`, reserve the quoted
+   capacity under `operation_id`, and persist `chio.channel.reservation.v1` as the
+   one-shot authority for the exact next receipt-derived state. Advance the exact
+   external channel/escrow/service-reservation batch, create that operation's
+   effect slot as `Ready`, and finalize locally. A CAS, anchor or reservation
+   failure compensates before dispatch.
+6. The shared admission coordinator reaches `DispatchCommitted`, then
+   compare-and-swaps the exact external effect slot `Ready -> DispatchCommitted`.
+   Only that one-time CAS winner dispatches the tool. A crash after the slot CAS
+   uses authenticated tool status or a separately qualified same-key idempotent
+   target; otherwise it records unknown, leaves channel capacity locked and never
+   invokes again. A failure before local `DispatchCommitted` uses
+   `VerifiedPreDispatchNoEffect`. A failure after local commit but before external
+   handoff races `Ready -> NoEffect` against `Ready -> DispatchCommitted`; a
+   cancellation win constructs `VerifiedTransportNotAccepted`, retains invocation
+   capture, releases only reversible exposure and releases the service reservation
+   through the same external channel batch. A handoff win cannot cancel.
+7. Build the signed receipt with a channel binding containing `channel_id`,
    open digest, reservation digest, exact sequence, and settlement mode
    `channelized`.
-6. Before any settlement observer can enqueue work, one durable transaction
-   persists the receipt, produces the immutable
+8. Before any settlement observer can enqueue work, stage the exact terminal
+   projection payload, verify the trusted receipt, actual charge,
+   asset conversion, reservation, prior state, and payee signature. One durable
+   external batch consumes the live reservation, advances the admitted channel
+   state and binds the effect slot `Completed` to the exact durable tool outcome.
+   Then RFC-0003's `commit_admission_projection` locally retains the
+   completed operation, persists the receipt, consumes
+   the reservation, admits the exact next channel state, produces the immutable
    `chio_credit::obligation::ObligationAtom` once, and creates its authenticated
    disposition as `channelized { channel_id, reservation_id }`. The per-call,
    assignment, and clearing paths must skip it. A receipt carrying a channel
    binding is never eligible for per-call dispatch even when the disposition
    projection is temporarily unavailable.
-7. Convert the capacity reservation to the next cumulative state. Release only
-   the unused difference between reserved maximum and actual receipt charge.
+   The local transaction requires the exact anchored live reservation, advances the latest
+   admitted state and lifecycle version/fence, and clears
+   `live_reservation_id`. If the anchor committed but this transaction did not,
+   recovery reconstructs and commits the exact staged payload without dispatch.
+   A post-dispatch unknown outcome cannot clear the anchored reservation.
+9. Release only the unused difference between reserved maximum and actual
+   receipt charge after that transaction commits.
 
-If the durable receipt/atom/disposition transaction cannot commit after
-dispatch, RFC-0003 records an outcome-unknown incident bound to the channel,
-request, and reservation. The capacity reservation and escrow reservation stay
-locked. V1 does not claim that WS1 or RFC-0003 can replay this channel projection:
-the current journals do not carry an idempotent channel-projection payload, and
-their default post-effect recovery is incident/dead-letter. No observer,
-receipt scan, or retry worker may synthesize the missing atom or state. An
-explicit future repair path must first define a durable idempotency key and
-complete projection payload; until then resolution is operator-reviewed evidence
-only. If the receipt did commit, its channel binding remains exclusive even when
-a later channel-state projection fails. Neither case falls back to per-call
+If the receipt-side transaction cannot commit after dispatch, the complete
+operation-owned projection payload remains recoverable by `operation_id` and
+`reservation_id`; retry is a local idempotent projection, never another tool
+dispatch. If the tool outcome itself is unknown, RFC-0003 retains
+`OutcomeUnknownAfterDispatch` and the capacity and escrow reservations stay
+locked for operator reconciliation. Neither case falls back to per-call
 settlement.
 
 A caller may choose a new per-call attempt only when channel selection or
@@ -300,21 +363,35 @@ reservation failed before dispatch and a separate per-call authorization
 succeeds before that new dispatch.
 
 Zero-charge or denied calls consume no
-`chio_credit::obligation::ObligationAtom`; their capacity reservation is
-released through the authenticated reservation audit.
+`chio_credit::obligation::ObligationAtom`; their signed receipt consumes the
+one-shot reservation, may advance the receipt chain with unchanged cumulative
+owed, and releases all reserved capacity through the same authenticated
+projection.
 
 ### Close and dispute
 
-A cooperative close requires both parties to sign over the newest contiguous
-mutually signed state. A contested close posts the best valid contiguous state
-and opens the exact duration committed in `chio.channel.open.v1`. A dispute can
-replace it only with a valid descendant chain. An equal-sequence different
-digest with exactly one mutually signed branch proves unilateral equivocation but
-does not invalidate that branch. Two conflicting mutually signed branches may
-finalize automatically only at their last common mutually signed ancestor unless
-both parties later co-sign one branch. The `channel_close` n-of-m decision cannot
-pick an arbitrary branch or amount; arbitrary arrival order never resolves a
-fork.
+The payee may close unilaterally over the newest contiguous reservation-backed,
+trusted-receipt-derived state. A payer signature after service is neither
+required nor consulted. An optional payer close signature can acknowledge the
+same state but cannot reduce the closeable amount. A contested close posts the
+best valid contiguous state and opens the exact duration committed in
+`chio.channel.open.v1`. A dispute can replace it only with a valid descendant
+chain. An equal-sequence different digest is equivocation and cannot replace the
+authority-admitted state. The `channel_close` FROST authorization binds the exact
+state digest, sequence, lifecycle fence, and token-base-unit release; it cannot
+pick an arbitrary branch or amount.
+
+Before collecting a close quorum, `begin_close` loads the newest externally
+anchored admitted state and advances the channel/escrow batch for the exact lifecycle tuple
+`(Open, state_version, lifecycle_fence, live_reservation_id = None)` to
+`ClosePending` with the next version and fence, binding the proposed close body,
+state digest, sequence, and amounts. New service reservations require `Open` and
+therefore fail after this transition. A pre-dispatch reservation may be cancelled
+through its authenticated no-effect projection and then retried; a post-dispatch
+live reservation blocks close until receipt projection or incident resolution.
+Failure to obtain quorum may return `ClosePending -> Open` only through an
+authenticated zero-dispatch external batch that burns the FROST slot and advances
+the fence.
 
 Finalization and release broadcast must complete no later than the immutable
 `close_submission_cutoff`, leaving the fixed margin before escrow expiry for
@@ -322,11 +399,18 @@ chain inclusion/finality. Missing the cutoff blocks release, emits a
 reconciliation incident, and leaves the escrow remainder for the contract's
 post-deadline refund. The runtime never attempts a release after expiry.
 
-The ladder class for a settlement commitment is `n_of_m`. Until the production
-FROST verifier and configured trusted active roster, group key, key epoch, and
-rotation rules exist, all channel close finalization and release dispatch remain
-disabled. Party signatures and independent endorsements cannot substitute for
-that aggregate authorization.
+The registered ladder action class is `channel.close`; its co-sign mode is
+`n_of_m` and its consistency model is `quorum-required`. The FROST verifier uses
+the trusted settlement-authority scope id committed by `chio.channel.open.v1`,
+`resource_id = channel_id`, and the exact `ClosePending` state version and
+lifecycle fence. Until the production
+FROST substrate in `2026-07-12-frost-quorum-substrate-design.md` and configured
+  trusted active roster, group key, key epoch, nonce durability, session fencing,
+   authorization-slot continuity, external channel/escrow resource continuity and
+  rotation rules exist, all channel close finalization and release dispatch
+remain disabled. The proof domain is `chio.frost.channel-close.v1`. Party
+signatures and independent endorsements cannot substitute for that group
+authorization.
 
 The release path is one reservation-aware Rust publisher boundary, not a
 channel-only helper beside bypassable generic functions:
@@ -334,30 +418,51 @@ channel-only helper beside bypassable generic functions:
 1. Before calldata preparation, the boundary loads the durable reservation by
    `(chain_id, escrow_contract, escrow_id)`. A reserved escrow requires the exact
    open, close, final-state, and reservation versions plus a production-verified
-   FROST proof over the close digest and intended amount. It revalidates the
+   `VerifiedFrostAuthorization` over the close action digest, intended protocol
+   and token-base-unit amounts, lifecycle fence, and publisher fence. It revalidates the
    funding evidence, cutoff, canonical pinned escrow state, and original active
-   operator/key, then compare-and-swaps `open -> closing` and writes one
-   `chio.channel.release-authorization.v1`.
+   operator/key. It derives and persists separate exact
+   `AdmissionOperation::Prepared { kind: GovernedEconomicMutation }` rows for root
+   publication and release broadcast, binding their request/calldata, chain,
+   target, nonce/idempotency, resource version and close authorization. Only then
+   does it stage the exact
+   `ChannelLifecycleRecord` in `ClosePending` with no live service reservation,
+   then one external channel/escrow batch consumes the completed authorization
+   slot, advances it to `Closing`, compare-and-swaps the escrow reservation `open
+   -> closing`, binds the exact release idempotency/calldata digest, and writes one
+   `chio.channel.release-authorization.v1` plus separate `Ready` root-publication
+   and release effect slots before local finalization. Failure changes no
+   authoritative head.
 2. `prepare_merkle_release` and
    `prepare_merkle_release_root_publication` must require that same verified
    authorization context for a reserved escrow. The prepared release and root
-   publication bind its digest, close digest, intended amount, and expected
+   publication bind its digest, close digest, both intended amount
+   representations, and expected
    reservation version. An ordinary generic preparation call for a reserved
-   escrow rejects.
+   escrow rejects. Root publication first advances its exact prepared operation
+   to `MutationSubmitted` and wins its own external effect-slot CAS; recovery uses its exact
+   transaction hash/nonce and chain status rather than blind rebroadcast.
 3. The broadcast boundary decodes ChioEscrow release calldata, looks up its
-   escrow reservation again, rechecks the pinned operator/key and cutoff, and
-   compare-and-swaps the exact authorization to consumed before calling
-   `submit_call`. A reserved escrow cannot use the ordinary signature-release
-   path or a prepared call whose close, amount, root, receipt hash, or
+   external escrow/channel heads again, rechecks the pinned operator/key and
+   cutoff, persists the governed `AdmissionOperation::MutationSubmitted`, and
+   compare-and-swaps the exact release effect slot `Ready -> DispatchCommitted`.
+   Only that winner calls `submit_call`. A crash afterward recovers by exact
+   transaction hash/nonce and canonical chain status; without qualified
+   idempotent rebroadcast it remains unknown and never submits again. A reserved
+   escrow cannot use the ordinary signature-release
+   path or a prepared call whose close, amount, asset binding, root, receipt hash, or
    authorization digest differs. Failed submission leaves `closing` reserved
    and records an incident; it never unlocks ordinary reuse.
-4. Root publication and release broadcast use separate successful transaction
-   receipts and canonical finality evidence. Publishing a root is not evidence
-   that ChioEscrow released funds.
+4. Root publication and release broadcast use separate operation-bound effect
+   slots. Canonical successful transaction evidence advances the matching slot to
+   `Completed` in the same external batch as the channel/escrow projection;
+   canonical failed/no-acceptance evidence may advance it to `NoEffect`, and
+   unresolved submission advances or retains `Unknown` without retry. Publishing
+   a root is not evidence that ChioEscrow released funds.
 
-Preparation, root publication, and broadcast each reload the durable registry;
+Preparation, root publication, and broadcast each reload the external current heads;
 passing a previously loaded object is not a substitute. Preparation performs the
-`open -> closing` compare-and-swap, root publication requires that exact
+`open -> closing` external compare-and-swap, root publication requires that exact
 `closing` version and authorization digest, and broadcast consumes that same
 version. Any intervening state or version change rejects.
 
@@ -372,7 +477,8 @@ devnet claim.
 At finalization and reconciliation:
 
 1. The quorum-authorized close decision produces a signed, anchored Chio
-   receipt binding the close digest and `final_cumulative_owed`. For a non-zero
+   receipt binding the close digest, `final_cumulative_owed`, exact asset binding,
+   and `final_token_base_units`. For a non-zero
    amount below the bound, its inclusion proof is passed to existing
    `prepare_merkle_release` with `EscrowExecutionAmount::Partial`, which
    prepares `partialReleaseWithProofDetailed` for the escrow beneficiary. The
@@ -419,6 +525,19 @@ execution from aggregate escrow state. Release and refund projections require:
   signature. A byte-identical replay is a no-op; conflicting evidence is an
   incident.
 
+If the Chio runtime submits a post-deadline refund, it first derives and persists
+an exact `AdmissionOperation::Prepared { kind: GovernedEconomicMutation }`
+binding the current anchored escrow/channel heads, refund owner, contract-derived
+amount, chain/contract, calldata and nonce policy. One external batch then creates
+that operation's `Ready` refund effect slot. The coordinator advances the
+operation to `MutationSubmitted`, and only the winner of `Ready ->
+DispatchCommitted` may call the chain adapter. Canonical transaction/event/state
+evidence advances the slot and escrow/channel heads to `Completed`/`Refunded`;
+canonical failed/no-acceptance proof advances it to `NoEffect`; ambiguity becomes
+`Unknown` and never resubmits. A refund independently submitted by the contract's
+refund owner is reconciled as an observed canonical external outcome, not claimed
+as a Chio-dispatched effect.
+
 A successful transaction with a missing, duplicate, wrong-contract, wrong-id,
 wrong-receipt-hash, or amount-mismatched event is not settlement evidence. A
 failed transaction, floating-latest snapshot, caller-provided amount, or
@@ -426,23 +545,25 @@ caller-provided observation time, non-final block, or reorged block cannot
 advance realized allocation; observed time comes from the pinned block. Once a
 canonical refund event and `refunded = true` state are recorded, refund is
 terminal and recovery returns no `ExecuteRefund` or retry action. A failed refund
-submission may be retried only while pinned state still proves
-`refunded = false`; release or refund ambiguity freezes the reservation and emits
-an incident.
+submission is `NoEffect` only when its operation-bound refund effect slot binds a
+canonical failed transaction receipt and pinned state still proves
+`refunded = false`; a fresh authorized operation/slot may then attempt. A
+submitted slot without authenticated terminal status is unknown and is never
+blindly retried. Release or refund ambiguity freezes the reservation and emits an
+incident.
 
-### Un-countersigned tail and per-call behavior
+### Payer availability and per-call behavior
 
-The closeable automatic balance is the newest contiguous mutually signed state.
-Later payer-signed states form an un-countersigned tail. They remain
-`channelized`, keep their reservations locked, and are retried for
-countersignature until channel expiry. They do not enter per-call settlement.
+The closeable automatic balance is the newest contiguous state backed by a
+pre-dispatch payer reservation, trusted receipt, payee signature, and successful
+authority-fenced reservation consumption. Payer disappearance after dispatch
+cannot remove that balance. There is no un-countersigned tail in v1.
 
-At expiry, a contested close may finalize only the last valid mutually signed
-prefix. Every tail receipt becomes an explicit reconciliation incident, and
-its reserved escrow remainder follows the refund leg. This v1 liveness limit is
-visible and testable: it can underpay a non-responsive payee, but it cannot
-double-charge the payer. A future protocol may add an authority-backed
-receipt-only tail proof; v1 does not invent one.
+At expiry, close includes every valid contiguous reservation-backed state.
+Refund applies only to `deposited_token_base_units - actual_released_token_base_units`
+after exact checked reconciliation. An invalid, outcome-unknown, or unconsumed
+reservation remains an explicit incident and cannot be silently paid or refunded
+until its disposition is proven.
 
 New calls after a channel is full, frozen, closing, or expired use per-call mode
 only if that mode is selected and authorized before their own dispatch.
@@ -450,10 +571,12 @@ only if that mode is selected and authorized before their own dispatch.
 ### Fail-closed errors
 
 Unfunded or reused escrow, stale funding proof, payer/payee/token/chain mismatch,
+asset-binding, token-decimal, settlement-policy, or exact-conversion mismatch,
 deadline too short, missing open signature, reservation conflict, insufficient
 capacity, stale disposition version, post-dispatch route change, sequence gap,
 prior-digest mismatch, equal-sequence fork, receipt-root mismatch, unbound
-receipt, currency drift, checked-arithmetic failure, cumulative above bound,
+receipt or receipt-authority mismatch, reused reservation, currency drift,
+checked-arithmetic failure, cumulative above bound,
 mutable dispute tier, invalid state signature, missing close authority, missing
 or stale FROST proof, unguarded reserved-escrow publication/broadcast, operator
 rotation, failed transaction status, missing or conflicting contract event,
@@ -467,12 +590,15 @@ mismatch all deny or freeze as specified.
    only when a second genuinely funded non-web3 rail requires it.
 2. A post-persist metering driver with per-call fallback was rejected. It
    selects the route after value delivery and can settle one receipt twice.
-3. EIP-3009 was rejected as a v1 bound. An authorization is not funded custody,
+3. A payer signature on every post-service state was rejected. It lets a payer
+   consume service, refuse the update, and recover value at expiry. The bounded
+   one-shot reservation moves that consent before dispatch.
+4. EIP-3009 was rejected as a v1 bound. An authorization is not funded custody,
    and a payer can withhold the close authorization.
-4. X402 and generic adapter holds were rejected because the current
+5. X402 and generic adapter holds were rejected because the current
    implementations do not prove partial refundable funding. Add a rail only
    when its real semantics satisfy the same open and close invariants.
-5. A new channel contract was rejected under the freeze. The existing escrow's
+6. A new channel contract was rejected under the freeze. The existing escrow's
    partial release plus delayed refund is sufficient for a devnet v1, with the
    non-atomic boundary stated.
 
@@ -497,37 +623,54 @@ boundary plus external assurance.
   or key mismatch, failed/mismatched creation event, floating-latest or reorged
   state, stale proof, missing funding acknowledgement, and short deadline or
   finality margin each reject open. A block-pinned happy path verifies the full
-  terms, event, identity-registry state, observation time, and finality fields.
+  terms, event, identity-registry state, asset binding, pinned decimals, exact
+  protocol-to-token conversion, round trip, observation time, and finality fields.
 - Open digest graph: intent, funding acknowledgement, and final open verify in
   one direction with the derived channel id and no circular hash.
 - Pre-dispatch gate: no tool execution occurs before a signed durable
-  reservation; reservation failure can start only a separate newly authorized
-  per-call attempt.
+  one-shot payer reservation for the exact next sequence; a second live
+  reservation rejects. Reservation failure can start only a separate newly
+  authorized per-call attempt. Payer disappearance immediately after dispatch
+  does not prevent the receipt-derived state from closing.
+- Reservation/close race: reservation creation, terminal reservation consumption,
+  and `begin_close` race on the same lifecycle version, live-reservation field,
+  and external head. Exactly one service admission or close batch wins. Close cannot begin
+  while a post-dispatch operation is unresolved, and acquiring `ClosePending`
+  blocks a later service reservation before quorum collection.
 - Persistence ordering: receipt, immutable atom, and `channelized` disposition
-  commit before observers run. A post-dispatch projection failure creates an
-  outcome-unknown incident and leaves both capacity and escrow reservations
-  locked; no journal, observer, or scan automatically replays it or triggers
-  per-call dispatch.
+  plus reservation consumption and channel state commit before observers run.
+  A post-dispatch local projection failure retries the operation-owned payload
+  idempotently without tool dispatch. An unknown tool outcome incidents and
+  leaves capacity and escrow reservations locked; neither triggers per-call
+  dispatch.
+- Anti-rollback: restore same-active-epoch channel/escrow SQLite snapshots after
+  funding reservation, service admission, receipt-backed state advance,
+  `ClosePending`, `Closing`, release and refund. Startup repairs to the external
+  batch heads or remains unready; it never reuses capacity, admits service after
+  close or rebroadcasts without exact chain/idempotency status.
 - Exclusive routing: a channelized atom is skipped by per-call, assignment, and
   clearing paths; a post-dispatch failure remains channelized.
 - Capacity and arithmetic: reserved maximum, actual-cost release, bound edge,
-  overflow, intended versus realized allocation, release failure/partial
+  overflow, token/policy/decimal drift, exact `150 USD` cents to `1_500_000`
+  six-decimal token base units, non-round-trippable rail amount, intended versus
+  realized allocation, release failure/partial
   release, `actual_refund = deposited - actual_released`, unpaid-payee
   shortfall, over-release incident, and exact actual-release-plus-refund equality
   after canonical refund.
 - Sequence: skipped state, wrong previous digest, reordered receipts,
-  same-digest retry, equal-sequence fork, and disconnected higher sequence. A
-  payer-only fork against a mutually signed state freezes new calls but cannot
-  roll the closeable balance back; two mutually signed forks close no later than
-  their last common mutually signed ancestor.
+  same-digest retry, reused/wrong reservation, wrong receipt signer/currency/cost,
+  equal-sequence conflict, and disconnected higher sequence. A conflict freezes
+  new calls but cannot roll the authority-admitted closeable balance back.
 - Dispute: low and high submitted cumulative amounts produce the same
-  bound-derived window; a fork closes no later than the last common mutually
-  signed ancestor. Release after the close-submission cutoff rejects without a
-  broadcast attempt.
-- Tail: missing countersignature never triggers per-call settlement; expiry
-  closes the signed prefix and emits incidents for the tail.
+  bound-derived window; only a verified descendant of the authority-admitted
+  chain can replace the proposed state. Release after the close-submission cutoff
+  rejects without a broadcast attempt.
+- Payer availability: no post-service payer signature is requested. Expiry closes
+  every contiguous reservation-backed state and refunds only the exact
+  token-base-unit remainder; an unresolved reservation incidents.
 - Devnet rail: fund ChioEscrow, prepare and broadcast the existing partial
-  release from an anchored close receipt through the production FROST verifier,
+  release from an anchored close receipt through the production FROST verifier
+  under `chio.frost.channel-close.v1`,
   wait through the fixed deadline, refund the contract-derived actual remainder,
   and reconcile both immutable outcomes. Missing or stale roster/group-key
   epochs reject before preparation, root publication, and broadcast.
@@ -549,13 +692,17 @@ boundary plus external assurance.
 
 ## Implementation phases
 
-1. Land pure `chio_settle::channel` artifacts and validators, including exact
-   sequence/fork rules and the immutable bound-derived dispute window.
-2. Land pre-dispatch capacity reservation and shared
-   `chio_credit::obligation::ObligationDisposition` routing and SQLite audit.
-   Prove that no post-dispatch fallback exists and that projection failure
-   creates an incident with locked reservations rather than unsupported replay.
-3. After the production FROST prerequisite is live, reuse the existing
+1. Land pure `chio_settle::channel` artifacts and validators, including the
+   pre-dispatch payer-authorized next-state contract, exact asset conversion,
+   sequence rules, and immutable bound-derived dispute window.
+2. Land one-live-reservation capacity, shared
+   `chio_credit::obligation::ObligationDisposition` routing, and the typed
+   RFC-0003 channel projection plus staged SQLite cache and shared external
+   channel/escrow/reservation batch. Prove no post-dispatch payer signature or
+   per-call fallback exists and local projection retry never dispatches again.
+3. After FROST Phase 3, authorization-slot continuity and the qualified external
+   resource anchor are live, consume the exact channel-close action under the
+   anchored channel state version/fence and reuse the existing
    ChioEscrow partial-release and refund paths behind the reservation-aware
    prepare/root-publication/broadcast gate. Add the complete block-pinned funding
    reader and event-bound reconciliation, then run the funded devnet end-to-end
