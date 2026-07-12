@@ -271,10 +271,8 @@ fn straddling_intent_commit_is_cleared_after_a_timeout_deny(
 
     // The caller's own insert job is queued behind the parked writer; its
     // bounded wait expires and the evaluator will deny before dispatch.
-    let error = store.record_dispatch_intent_with_timeout(
-        &intent,
-        std::time::Duration::from_millis(100),
-    );
+    let error =
+        store.record_dispatch_intent_with_timeout(&intent, std::time::Duration::from_millis(100));
     assert!(
         matches!(
             error,
