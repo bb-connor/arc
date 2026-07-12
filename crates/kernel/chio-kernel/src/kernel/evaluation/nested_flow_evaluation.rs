@@ -641,24 +641,25 @@ impl ChioKernel {
                 Err(error) => Err(error),
             }
         };
-        // Bound the nested tool-server call by the dispatch budget. On expiry the
-        // buffered child receipts recorded so far are still persisted below, and
-        // the abort arm unwinds like a cancellation.
+        // Bound the nested tool-server call by the dispatch budget on the same
+        // hot path the top-level dispatch enforces, so a blocking nested
+        // `invoke_stream`/`invoke` cannot slip past the deadline. The shared
+        // helper isolates a connection that blocks synchronously before its
+        // first `.await` from the async worker pool via `block_in_place` (the
+        // nested-flow bridge borrows the caller's client and session state, so
+        // the future cannot be moved onto `spawn_blocking` like the top-level
+        // path). On expiry the buffered child receipts recorded so far are still
+        // persisted below, and the abort arm unwinds like a cancellation.
         let tool_output_result = match self
             .config
             .deadlines
             .dispatch_budget_for(&request.server_id)
         {
-            Some(budget) if crate::kernel::dispatch::dispatch_timer_available() => {
-                match tokio::time::timeout(budget, dispatch_call).await {
-                    Ok(result) => result,
-                    Err(_elapsed) => Err(KernelError::HotPathDeadlineExceeded {
-                        stage: HotPathStage::Dispatch,
-                        budget_ms: budget.as_millis().min(u128::from(u64::MAX)) as u64,
-                    }),
-                }
+            Some(budget) => {
+                crate::kernel::dispatch::dispatch_nested_call_within_budget(dispatch_call, budget)
+                    .await
             }
-            _ => dispatch_call.await,
+            None => dispatch_call.await,
         };
         // Persist the buffered child receipts while the guard is still armed,
         // draining each from the guard only once it durably lands. If the commit

@@ -105,6 +105,16 @@ fn budget_ms_saturating(budget: std::time::Duration) -> u64 {
     budget.as_millis().min(u128::from(u64::MAX)) as u64
 }
 
+/// The fail-closed error returned when a tool-server call outruns its dispatch
+/// budget. Shared by every dispatch path (top-level and nested-flow) so the
+/// timeout verdict is byte-identical wherever the deadline fires.
+fn dispatch_deadline_exceeded(budget: std::time::Duration) -> KernelError {
+    KernelError::HotPathDeadlineExceeded {
+        stage: HotPathStage::Dispatch,
+        budget_ms: budget_ms_saturating(budget),
+    }
+}
+
 thread_local! {
     /// Cached probe of whether the currently entered Tokio runtime has a timer
     /// driver, keyed by that runtime's id. Timer availability is a property of the
@@ -172,6 +182,67 @@ pub(crate) fn dispatch_timer_available() -> bool {
 /// degrade to running the guards inline rather than panicking.
 pub(crate) fn dispatch_runtime_available() -> bool {
     tokio::runtime::Handle::try_current().is_ok()
+}
+
+/// Bound a nested-flow tool-server call by its dispatch `budget`.
+///
+/// The top-level dispatch path moves a budgeted call onto `spawn_blocking` so a
+/// connection that blocks synchronously before its first `.await` cannot pin an
+/// async worker. A nested-flow call cannot use that mechanism: its future
+/// borrows the nested-flow bridge (the caller's `&mut` client, the session map,
+/// and the child-receipt buffer), so it is neither `Send` nor `'static`; it can
+/// be moved to no other thread, nor detached after a deadline without leaving
+/// those borrows dangling.
+///
+/// On a multi-thread runtime the call is therefore driven under
+/// [`tokio::task::block_in_place`], which requires neither bound: Tokio promotes
+/// a replacement worker while this thread blocks, so a nested connection that
+/// blocks synchronously before its first `.await` no longer starves the async
+/// worker pool, and the inner timeout still fails a *cooperating* call closed at
+/// the budget. A call wedged in a synchronous poll cannot be interrupted (the
+/// timer cannot be polled on the blocked thread); with a borrowed bridge that
+/// cannot be handed to a detachable task this is inherent, and it stays confined
+/// to the one blocked thread rather than the whole pool.
+///
+/// On a current-thread runtime there is no spare worker to promote, and with no
+/// timer driver the timeout wrapper would panic, so the call runs inline: under
+/// the timeout when a timer is present, and directly otherwise.
+pub(crate) async fn dispatch_nested_call_within_budget<F>(
+    call: F,
+    budget: std::time::Duration,
+) -> Result<ToolServerOutput, KernelError>
+where
+    F: std::future::Future<Output = Result<ToolServerOutput, KernelError>>,
+{
+    async fn bounded<F>(
+        call: F,
+        budget: std::time::Duration,
+        timer_available: bool,
+    ) -> Result<ToolServerOutput, KernelError>
+    where
+        F: std::future::Future<Output = Result<ToolServerOutput, KernelError>>,
+    {
+        if timer_available {
+            match tokio::time::timeout(budget, call).await {
+                Ok(result) => result,
+                Err(_elapsed) => Err(dispatch_deadline_exceeded(budget)),
+            }
+        } else {
+            call.await
+        }
+    }
+
+    let timer_available = dispatch_timer_available();
+    let multi_thread = matches!(
+        tokio::runtime::Handle::try_current().map(|handle| handle.runtime_flavor()),
+        Ok(tokio::runtime::RuntimeFlavor::MultiThread)
+    );
+    if multi_thread {
+        let handle = tokio::runtime::Handle::current();
+        tokio::task::block_in_place(|| handle.block_on(bounded(call, budget, timer_available)))
+    } else {
+        bounded(call, budget, timer_available).await
+    }
 }
 
 impl ChioKernel {
@@ -890,10 +961,7 @@ impl ChioKernel {
             if timer_available {
                 return match tokio::time::timeout(budget, call).await {
                     Ok(result) => result,
-                    Err(_elapsed) => Err(KernelError::HotPathDeadlineExceeded {
-                        stage: HotPathStage::Dispatch,
-                        budget_ms: budget_ms_saturating(budget),
-                    }),
+                    Err(_elapsed) => Err(dispatch_deadline_exceeded(budget)),
                 };
             }
             return call.await;
@@ -934,10 +1002,7 @@ impl ChioKernel {
                 handle.block_on(async move {
                     match tokio::time::timeout(budget, call).await {
                         Ok(result) => result,
-                        Err(_elapsed) => Err(KernelError::HotPathDeadlineExceeded {
-                            stage: HotPathStage::Dispatch,
-                            budget_ms: budget_ms_saturating(budget),
-                        }),
+                        Err(_elapsed) => Err(dispatch_deadline_exceeded(budget)),
                     }
                 })
             } else {
@@ -951,10 +1016,7 @@ impl ChioKernel {
                 Ok(Err(join_error)) => Err(KernelError::Internal(format!(
                     "dispatch task join failed: {join_error}"
                 ))),
-                Err(_elapsed) => Err(KernelError::HotPathDeadlineExceeded {
-                    stage: HotPathStage::Dispatch,
-                    budget_ms: budget_ms_saturating(budget),
-                }),
+                Err(_elapsed) => Err(dispatch_deadline_exceeded(budget)),
             }
         } else {
             match join.await {

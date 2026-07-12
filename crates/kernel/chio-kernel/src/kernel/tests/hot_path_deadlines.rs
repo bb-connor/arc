@@ -763,6 +763,82 @@ fn always_offload_runs_guards_inline_without_a_tokio_runtime(
 }
 
 #[test]
+fn nested_dispatch_isolates_a_synchronously_blocking_call_from_the_async_pool(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // A nested-flow tool-server call that blocks synchronously before its first
+    // `.await` must not starve the async worker pool. The nested path cannot
+    // move the call onto `spawn_blocking` (its future borrows the flow bridge),
+    // so it drives budgeted calls under `block_in_place`, which promotes a
+    // replacement worker. A bare inline `timeout` (what the nested path used
+    // before) pins the polling worker instead. On a single-worker runtime the
+    // difference is stark: a concurrent heartbeat keeps ticking under the helper
+    // but stalls under the inline timeout.
+    let budget = Duration::from_millis(50);
+    let block = Duration::from_millis(400);
+    const HEARTBEAT_MS: u64 = 5;
+
+    async fn count_heartbeats_while<F, Fut>(make_call: F) -> u64
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = ()> + Send + 'static,
+    {
+        let ticks = Arc::new(AtomicU64::new(0));
+        let ticks_beat = Arc::clone(&ticks);
+        let beat = tokio::spawn(async move {
+            loop {
+                ticks_beat.fetch_add(1, Ordering::SeqCst);
+                tokio::time::sleep(Duration::from_millis(HEARTBEAT_MS)).await;
+            }
+        });
+        let blocking = tokio::spawn(make_call());
+        let _ = blocking.await;
+        beat.abort();
+        ticks.load(Ordering::SeqCst)
+    }
+
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()?;
+
+    // The inline timeout the nested path used before: it pins the sole worker.
+    let inline_ticks = runtime.block_on(count_heartbeats_while(|| async move {
+        let _ = tokio::time::timeout(budget, async {
+            std::thread::sleep(block);
+            Ok::<_, KernelError>(ToolServerOutput::Value(serde_json::json!({ "ok": true })))
+        })
+        .await;
+    }));
+
+    // The shared helper: `block_in_place` keeps the async pool alive, and the
+    // borrowed-bridge call still runs to completion on this thread.
+    let helper_ticks = runtime.block_on(count_heartbeats_while(|| async move {
+        let call = async {
+            std::thread::sleep(block);
+            Ok::<_, KernelError>(ToolServerOutput::Value(serde_json::json!({ "ok": true })))
+        };
+        let output = crate::kernel::dispatch::dispatch_nested_call_within_budget(call, budget).await;
+        assert!(
+            matches!(output, Ok(ToolServerOutput::Value(_))),
+            "the blocking nested call completes through the helper"
+        );
+    }));
+
+    // The heartbeat sleeps `HEARTBEAT_MS` between ticks, so a pool that keeps
+    // running for the whole `block` records roughly `block / HEARTBEAT_MS` ticks.
+    let expected_live = block.as_millis() as u64 / HEARTBEAT_MS;
+    assert!(
+        inline_ticks <= 2,
+        "the inline timeout pins the sole worker, starving the heartbeat (ticks={inline_ticks})"
+    );
+    assert!(
+        helper_ticks >= expected_live / 4,
+        "block_in_place must keep the async pool alive while the nested call blocks (ticks={helper_ticks}, expected ~{expected_live})"
+    );
+    Ok(())
+}
+
+#[test]
 fn watchdog_does_not_start_without_a_timer() -> Result<(), Box<dyn std::error::Error>> {
     // Starting the watchdog in a runtime with no time driver would panic when its
     // poll interval is constructed. It must degrade to not starting instead, and
