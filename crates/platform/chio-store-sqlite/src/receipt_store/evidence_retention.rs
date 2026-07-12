@@ -838,7 +838,9 @@ fn archive_range(
 /// schema, the archive versions carry no `REFERENCES` clauses: the archive is
 /// a write-once evidence copy, not a live database enforcing FK-cascade
 /// invariants.
-fn create_archive_schema(connection: &rusqlite::Connection) -> Result<(), ReceiptStoreError> {
+pub(super) fn create_archive_schema(
+    connection: &rusqlite::Connection,
+) -> Result<(), ReceiptStoreError> {
     connection.execute_batch(
         r#"
         CREATE TABLE IF NOT EXISTS archive.chio_tool_receipts (
@@ -921,7 +923,7 @@ fn create_archive_schema(connection: &rusqlite::Connection) -> Result<(), Receip
 
 /// Idempotent copy of the [1, W] prefix into the archive (INSERT OR IGNORE).
 /// Returns the number of newly archived tool-receipt rows.
-fn copy_archived_prefix(
+pub(super) fn copy_archived_prefix(
     connection: &rusqlite::Connection,
     w: i64,
 ) -> Result<u64, ReceiptStoreError> {
@@ -1204,7 +1206,7 @@ fn verify_co_archival_complete(
 /// the claim-log projection intact would make the next projection validation
 /// see set drift (the expected set shrank, the projection did not) and brick
 /// the store on the following rotation.
-fn delete_archived_prefix_in_tx(
+pub(super) fn delete_archived_prefix_in_tx(
     connection: &mut rusqlite::Connection,
     w: i64,
     cutoff_unix_secs: u64,
@@ -1215,6 +1217,17 @@ fn delete_archived_prefix_in_tx(
         .map(|d| d.as_secs())
         .unwrap_or(0);
     let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+    // The archive copy and its completeness check ran before this transaction
+    // took the write lock, so a second store handle or process could have
+    // committed a new dependent row (a reconciliation or authorization-
+    // consumption upsert) into the archived prefix in that window. Such a row
+    // is not in the archive, and the deletes below would remove it un-archived.
+    // Re-check co-archival completeness now that BEGIN IMMEDIATE holds the write
+    // lock and no further writer can interleave, and fail closed on any
+    // shortfall so a delete never outruns the archive. The rollback on error
+    // leaves the prefix intact and re-runnable; a later rotation re-copies the
+    // new row and completes.
+    verify_co_archival_complete(&tx, w)?;
     tx.execute_batch(&format!(
         r#"
         DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete;
