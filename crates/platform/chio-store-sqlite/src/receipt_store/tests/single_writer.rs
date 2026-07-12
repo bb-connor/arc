@@ -2,6 +2,123 @@ use super::super::*;
 use super::support::*;
 use chio_kernel::ReceiptStore;
 
+#[test]
+fn receipt_commit_actor_channel_has_fixed_capacity() -> Result<(), Box<dyn std::error::Error>> {
+    let (sender, _receiver) = receipt_commit_channel();
+    for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
+        let (response, _result) = mpsc::sync_channel(1);
+        sender.try_send(ReceiptCommitCommand::Flush(response))?;
+    }
+
+    let (response, _result) = mpsc::sync_channel(1);
+    match sender.try_send(ReceiptCommitCommand::Flush(response)) {
+        Err(mpsc::TrySendError::Full(_)) => Ok(()),
+        Err(mpsc::TrySendError::Disconnected(_)) => {
+            Err("commit actor channel disconnected unexpectedly".into())
+        }
+        Ok(()) => Err("commit actor channel accepted beyond fixed capacity".into()),
+    }
+}
+
+#[test]
+fn receipt_commit_actor_append_fails_closed_when_queue_is_full(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (sender, _receiver) = receipt_commit_channel();
+    let health = Arc::new(ReceiptCommitWriterHealth::default());
+    for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
+        let (response, _result) = mpsc::sync_channel(1);
+        sender.try_send(ReceiptCommitCommand::Flush(response))?;
+    }
+    let actor = ReceiptCommitActor {
+        sender,
+        health,
+        worker: Arc::new(ReceiptCommitWorker { join: None }),
+    };
+
+    let receipt = sample_receipt_with_id("rcpt-actor-queue-full");
+    let error = actor.append(receipt, "{}".to_string(), false);
+
+    assert!(error
+        .err()
+        .ok_or("expected queue saturation error")?
+        .to_string()
+        .contains("sqlite receipt commit queue saturated"));
+    Ok(())
+}
+
+#[test]
+fn writer_handle_keeps_actor_alive_until_last_owner_drops() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("chio-writer-drop");
+    let wal_path = std::path::PathBuf::from(format!("{}-wal", path.display()));
+    let shm_path = std::path::PathBuf::from(format!("{}-shm", path.display()));
+
+    let writer = {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.append_chio_receipt_returning_seq(&sample_receipt())?;
+        store.writer_handle()
+    };
+
+    writer.run_write(|connection| {
+        connection.execute_batch("CREATE TABLE actor_lifetime_probe (id INTEGER PRIMARY KEY)")?;
+        Ok(())
+    })?;
+    drop(writer);
+
+    assert!(!wal_path.exists());
+    assert!(!shm_path.exists());
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn last_owner_drop_drains_queued_append() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-writer-drain");
+    let store = SqliteReceiptStore::open(&path)?;
+    let blocker = store.writer_handle();
+    let queued = store.writer_handle();
+    let (started_tx, started_rx) = mpsc::sync_channel(1);
+    let (release_tx, release_rx) = mpsc::sync_channel(1);
+
+    let blocked = thread::spawn(move || {
+        blocker.run_write(move |_| {
+            let _ = started_tx.send(());
+            let _ = release_rx.recv();
+            Ok(())
+        })
+    });
+    started_rx.recv()?;
+
+    let receipt = sample_receipt_with_id("rcpt-drain-on-last-owner-drop");
+    let raw_json = serde_json::to_string(&receipt)?;
+    let (response, result) = mpsc::sync_channel(1);
+    queued
+        .sender
+        .try_send(ReceiptCommitCommand::Append(Box::new(
+            ReceiptCommitRequest {
+                receipt,
+                raw_json,
+                ensure_lineage: false,
+                response,
+            },
+        )))?;
+
+    drop(queued);
+    drop(store);
+    release_tx.send(())?;
+    blocked
+        .join()
+        .map_err(|_| "blocking writer thread panicked")??;
+    assert_eq!(result.recv()??, 1);
+
+    let reopened = SqliteReceiptStore::open(&path)?;
+    assert_eq!(reopened.receipts_canonical_bytes_range(1, 1)?.len(), 1);
+    drop(reopened);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
 /// A panic inside a Write-routed job (one of
 /// the ~30 rerouted write families: lineage, liability, underwriting,
 /// reconciliation, capability, federated, IOU, checkpoint, reseed) must not
@@ -132,6 +249,7 @@ fn run_write_fails_closed_when_queue_is_full() -> Result<(), Box<dyn std::error:
     let handle = WriterHandle {
         sender,
         health: Arc::clone(&health),
+        _worker: Arc::new(ReceiptCommitWorker { join: None }),
         settlement_store_binding: None,
     };
 

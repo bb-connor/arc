@@ -130,6 +130,11 @@ const RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY: usize = RECEIPT_GROUP_COMMIT_MAX_BA
 struct ReceiptCommitActor {
     sender: mpsc::SyncSender<ReceiptCommitCommand>,
     health: Arc<ReceiptCommitWriterHealth>,
+    worker: Arc<ReceiptCommitWorker>,
+}
+
+struct ReceiptCommitWorker {
+    join: Option<thread::JoinHandle<()>>,
 }
 
 #[derive(Default)]
@@ -226,10 +231,14 @@ impl ReceiptCommitActor {
         let (sender, receiver) = receipt_commit_channel();
         let health = Arc::new(ReceiptCommitWriterHealth::default());
         let actor_health = Arc::clone(&health);
-        thread::spawn(move || {
+        let worker = thread::spawn(move || {
             receipt_commit_actor_loop(pool, receiver, actor_health, incremental_verification)
         });
-        Self { sender, health }
+        Self {
+            sender,
+            health,
+            worker: Arc::new(ReceiptCommitWorker { join: Some(worker) }),
+        }
     }
 
     fn append(
@@ -338,6 +347,17 @@ impl ReceiptCommitActor {
     }
 }
 
+impl Drop for ReceiptCommitWorker {
+    fn drop(&mut self) {
+        let Some(join) = self.join.take() else {
+            return;
+        };
+        if join.thread().id() != thread::current().id() {
+            let _ = join.join();
+        }
+    }
+}
+
 /// Cloneable handle for running arbitrary write transactions on the single
 /// writer connection. Closures MUST NOT call back into `SqliteReceiptStore`
 /// methods that enqueue writer commands (that would deadlock the actor on
@@ -345,6 +365,7 @@ impl ReceiptCommitActor {
 pub(crate) struct WriterHandle {
     sender: mpsc::SyncSender<ReceiptCommitCommand>,
     health: Arc<ReceiptCommitWriterHealth>,
+    _worker: Arc<ReceiptCommitWorker>,
     settlement_store_binding: Option<chio_settle::SettlementStoreBinding>,
 }
 
@@ -1926,6 +1947,7 @@ impl SqliteReceiptStore {
         WriterHandle {
             sender: self.receipt_commit_actor.sender.clone(),
             health: Arc::clone(&self.receipt_commit_actor.health),
+            _worker: Arc::clone(&self.receipt_commit_actor.worker),
             settlement_store_binding: self.settlement_store_binding,
         }
     }
@@ -2804,84 +2826,15 @@ fn canonical_receipt_json(canonical: &CanonicalBytes) -> Result<&str, ReceiptSto
 mod receipt_commit_actor_tests {
     use super::*;
 
-    fn actor_test_receipt() -> Result<ChioReceipt, ReceiptStoreError> {
-        let keypair = chio_core::crypto::Keypair::generate();
-        ChioReceipt::sign(
-            chio_core::receipt::body::ChioReceiptBody {
-                id: "rcpt-actor-test".to_string(),
-                timestamp: 1,
-                capability_id: "cap-actor".to_string(),
-                tool_server: "shell".to_string(),
-                tool_name: "bash".to_string(),
-                action: chio_core::receipt::decision::ToolCallAction::from_parameters(
-                    serde_json::json!({}),
-                )
-                .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?,
-                decision: Some(Decision::Allow),
-                receipt_kind: Default::default(),
-                boundary_class: Default::default(),
-                observation_outcome: None,
-                tool_origin: Default::default(),
-                redaction_mode: Default::default(),
-                actor_chain: Vec::new(),
-                content_hash: "content".to_string(),
-                policy_hash: "policy".to_string(),
-                evidence: Vec::new(),
-                metadata: None,
-                trust_level: chio_core::receipt::kinds::TrustLevel::default(),
-                tenant_id: None,
-                kernel_key: keypair.public_key(),
-                bbs_projection_version: None,
-            },
-            &keypair,
-        )
-        .map_err(|error| ReceiptStoreError::CryptoDecode(error.to_string()))
-    }
-
-    #[test]
-    fn receipt_commit_actor_channel_has_fixed_capacity() -> Result<(), Box<dyn std::error::Error>> {
-        let (sender, _receiver) = receipt_commit_channel();
-        for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
-            let (response, _result) = mpsc::sync_channel(1);
-            sender.try_send(ReceiptCommitCommand::Flush(response))?;
-        }
-
-        let (response, _result) = mpsc::sync_channel(1);
-        match sender.try_send(ReceiptCommitCommand::Flush(response)) {
-            Err(mpsc::TrySendError::Full(_)) => Ok(()),
-            Err(mpsc::TrySendError::Disconnected(_)) => {
-                Err("commit actor channel disconnected unexpectedly".into())
-            }
-            Ok(()) => Err("commit actor channel accepted beyond fixed capacity".into()),
-        }
-    }
-
-    #[test]
-    fn receipt_commit_actor_append_fails_closed_when_queue_is_full(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let (sender, _receiver) = receipt_commit_channel();
-        let health = Arc::new(ReceiptCommitWriterHealth::default());
-        for _ in 0..RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY {
-            let (response, _result) = mpsc::sync_channel(1);
-            sender.try_send(ReceiptCommitCommand::Flush(response))?;
-        }
-        let actor = ReceiptCommitActor { sender, health };
-
-        let error = actor.append(actor_test_receipt()?, "{}".to_string(), false);
-
-        assert!(error
-            .err()
-            .ok_or("expected queue saturation error")?
-            .to_string()
-            .contains("sqlite receipt commit queue saturated"));
-        Ok(())
-    }
-
     #[test]
     fn receipt_commit_actor_flush_honors_timeout() -> Result<(), Box<dyn std::error::Error>> {
         let (sender, _receiver) = receipt_commit_channel();
         let health = Arc::new(ReceiptCommitWriterHealth::default());
-        let actor = ReceiptCommitActor { sender, health };
+        let actor = ReceiptCommitActor {
+            sender,
+            health,
+            worker: Arc::new(ReceiptCommitWorker { join: None }),
+        };
 
         let error = actor.flush_with_timeout(Duration::from_millis(1));
 
