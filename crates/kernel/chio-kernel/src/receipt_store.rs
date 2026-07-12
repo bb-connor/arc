@@ -252,6 +252,16 @@ pub struct ReceiptStoreHealthReport {
     /// writer fault, even once the writer recovers.
     #[serde(default)]
     pub writer_restart_total: u64,
+    /// Dispatch intents still open in the journal: calls in flight, or orphans
+    /// awaiting boot reconciliation. Persistent rows, so visible to any reader
+    /// of the database, not only the serving kernel.
+    #[serde(default)]
+    pub open_dispatch_intents: u64,
+    /// Orphaned dispatch intents reconciled into outcome-unknown incidents. A
+    /// nonzero count means an effect may have occurred with no receipt;
+    /// `healthy` is `false` while any remain unresolved.
+    #[serde(default)]
+    pub dead_letter_dispatch_intents: u64,
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq, Eq)]

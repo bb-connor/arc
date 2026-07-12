@@ -3406,13 +3406,25 @@ impl SqliteReceiptStore {
         // Healthy and no batch recorded a `last_error` yet every append is already
         // rejected. A persistently failing background retention rotation also
         // forces unhealthy so a silently unenforced retention policy is not masked.
+        let (open_dispatch_intents, dead_letter_dispatch_intents) = {
+            let connection = self.connection()?;
+            (
+                open_dispatch_intent_count_query(&connection)?,
+                dead_letter_dispatch_intent_count_query(&connection)?,
+            )
+        };
+        // A dead-letter intent means an effect may have occurred with no
+        // receipt: the store must read loudly unhealthy until an operator
+        // resolves the incident. Open intents alone are in-flight work, not
+        // incidents, and do not affect health.
         let healthy = receipt_store_healthy(
             status.healthy,
             writer_counters.last_error.as_deref(),
             writer_liveness,
         ) && !self.receipt_commit_actor.writer_serving_closed()
             && matches!(writer_level, HealthLevel::Healthy)
-            && retention_error.is_none();
+            && retention_error.is_none()
+            && dead_letter_dispatch_intents == 0;
         let (uncheckpointed_start_seq, uncheckpointed_end_seq) = uncheckpointed_range(
             status.latest_checkpointed_entry_seq,
             status.latest_committed_entry_seq,
@@ -3432,7 +3444,21 @@ impl SqliteReceiptStore {
             retention_error,
             writer_level,
             writer_restart_total,
+            open_dispatch_intents,
+            dead_letter_dispatch_intents,
         })
+    }
+
+    /// Count of open (in-flight or unreconciled) dispatch intents.
+    pub fn open_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
+        let connection = self.connection()?;
+        open_dispatch_intent_count_query(&connection)
+    }
+
+    /// Count of dead-letter (orphaned, outcome-unknown) dispatch intents.
+    pub fn dead_letter_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
+        let connection = self.connection()?;
+        dead_letter_dispatch_intent_count_query(&connection)
     }
 
     /// Whether the commit writer can no longer be trusted to persist receipts, so
@@ -3495,6 +3521,11 @@ impl SqliteReceiptStore {
         // emits a large-backlog gauge (checkpointed defaults to 0 -> the
         // uncheckpointed range spans the whole committed log) with the
         // checkpoint_error attached.
+        //
+        // Dead-letter intents are durable rows, so this read-only observer
+        // sees them and folds them into health exactly like the owning store.
+        let open_dispatch_intents = open_dispatch_intent_count_query(&connection)?;
+        let dead_letter_dispatch_intents = dead_letter_dispatch_intent_count_query(&connection)?;
         match verify_checkpoint_chain_integrity(&connection) {
             Ok(latest) => {
                 let latest_checkpoint_seq = latest
@@ -3506,7 +3537,8 @@ impl SqliteReceiptStore {
                 let (uncheckpointed_start_seq, uncheckpointed_end_seq) =
                     uncheckpointed_range(latest_checkpointed_entry_seq, latest_committed_entry_seq);
                 Ok(ReceiptStoreHealthReport {
-                    healthy: latest_committed_entry_seq >= latest_checkpointed_entry_seq,
+                    healthy: latest_committed_entry_seq >= latest_checkpointed_entry_seq
+                        && dead_letter_dispatch_intents == 0,
                     writer: ReceiptWriterCounters::default(),
                     // A read-only observer cannot see the owning writer's
                     // in-memory liveness, so it is reported as unknown.
@@ -3528,6 +3560,8 @@ impl SqliteReceiptStore {
                     // A read-only observer cannot see the owning writer's supervisor.
                     writer_level: HealthLevel::default(),
                     writer_restart_total: 0,
+                    open_dispatch_intents,
+                    dead_letter_dispatch_intents,
                 })
             }
             Err(error) => {
@@ -3550,6 +3584,8 @@ impl SqliteReceiptStore {
                     retention_error: None,
                     writer_level: HealthLevel::default(),
                     writer_restart_total: 0,
+                    open_dispatch_intents,
+                    dead_letter_dispatch_intents,
                 })
             }
         }

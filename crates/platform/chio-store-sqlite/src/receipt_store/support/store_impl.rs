@@ -413,6 +413,14 @@ impl ReceiptStore for SqliteReceiptStore {
         SqliteReceiptStore::reconcile_dispatch_intents(self, reconciler)
     }
 
+    fn open_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
+        SqliteReceiptStore::open_dispatch_intent_count(self)
+    }
+
+    fn dead_letter_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
+        SqliteReceiptStore::dead_letter_dispatch_intent_count(self)
+    }
+
     fn receipts_canonical_bytes_range(
         &self,
         start_seq: u64,

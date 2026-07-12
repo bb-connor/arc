@@ -249,6 +249,36 @@ fn reconcile_dead_letters_orphans_and_reports_counts() -> Result<(), Box<dyn std
 }
 
 #[test]
+fn dead_letter_intent_flips_store_unhealthy() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-intents-health");
+    let store = SqliteReceiptStore::open(&path)?;
+
+    // A clean store is healthy with zero intent counts.
+    let clean = store.receipt_store_health()?;
+    assert!(clean.healthy);
+    assert_eq!(clean.open_dispatch_intents, 0);
+    assert_eq!(clean.dead_letter_dispatch_intents, 0);
+
+    // An open intent alone does not flip health: it is in flight, not
+    // orphaned.
+    store.record_dispatch_intent(&sample_intent("open-1"))?;
+    let with_open = store.receipt_store_health()?;
+    assert_eq!(with_open.open_dispatch_intents, 1);
+    assert!(with_open.healthy, "an in-flight intent is not an incident");
+
+    // Reconciling it into a dead-letter incident flips the store unhealthy.
+    store.reconcile_dispatch_intents(&RecordingReconciler)?;
+    let after = store.receipt_store_health()?;
+    assert_eq!(after.dead_letter_dispatch_intents, 1);
+    assert!(!after.healthy, "a dead-letter incident flips health to false");
+    assert_eq!(store.open_dispatch_intent_count()?, 0);
+    assert_eq!(store.dead_letter_dispatch_intent_count()?, 1);
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
 fn open_creates_dispatch_intents_table_and_open_existing_tolerates_absence(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::receipt_store::support::dispatch_intents_table_exists;

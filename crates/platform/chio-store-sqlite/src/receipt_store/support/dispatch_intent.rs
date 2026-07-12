@@ -173,6 +173,37 @@ pub(crate) fn dead_letter_dispatch_intent_tx(
     Ok(())
 }
 
+/// Count of open (in-flight or unreconciled) dispatch intents, tolerant of a
+/// missing table on a pre-journal database.
+pub(crate) fn open_dispatch_intent_count_query(
+    connection: &rusqlite::Connection,
+) -> Result<u64, ReceiptStoreError> {
+    dispatch_intent_count_by_state(connection, "open")
+}
+
+/// Count of dead-letter (orphaned, outcome-unknown) dispatch intents,
+/// tolerant of a missing table on a pre-journal database.
+pub(crate) fn dead_letter_dispatch_intent_count_query(
+    connection: &rusqlite::Connection,
+) -> Result<u64, ReceiptStoreError> {
+    dispatch_intent_count_by_state(connection, "dead_letter")
+}
+
+fn dispatch_intent_count_by_state(
+    connection: &rusqlite::Connection,
+    state: &str,
+) -> Result<u64, ReceiptStoreError> {
+    if !dispatch_intents_table_exists(connection)? {
+        return Ok(0);
+    }
+    let count: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM chio_dispatch_intents WHERE state = ?1",
+        rusqlite::params![state],
+        |row| row.get(0),
+    )?;
+    Ok(count.max(0) as u64)
+}
+
 /// True if the non-audit `chio_dispatch_intents` journal table exists. A store
 /// opened via `open_existing` on a pre-journal database runs no DDL, so a
 /// missing table is reported as `false`; callers treat that as zero
