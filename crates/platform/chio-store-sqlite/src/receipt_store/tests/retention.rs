@@ -2678,6 +2678,240 @@ fn rotation_preserves_live_child_lineage_parent() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
+/// A receipt whose settlement reconciliation is still `open` hosts the only live
+/// row the reconciliation upsert and operator reports can act on, and the upsert
+/// requires that receipt to still exist in `chio_tool_receipts`. Rotation must
+/// not advance the watermark past an aged receipt with a nonterminal
+/// reconciliation, or the actionable item vanishes and the next reconciliation
+/// attempt fails NotFound. Once the reconciliation reaches a terminal state a
+/// later rotation archives the receipt and its reconciliation together.
+#[test]
+fn rotation_preserves_receipt_with_open_settlement_reconciliation(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("open-settlement-preserve");
+    let archive = unique_db_path("open-settlement-preserve-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    // Checkpoints [1,2] and [3,4] are fully aged; [5,6] is fresh. The receipt at
+    // entry 3 (aged) carries an open settlement reconciliation, so a naive cutoff
+    // would archive it and strand its only live, actionable reconciliation row.
+    for i in 0..4u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("os-aged-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    for i in 4..6u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("os-fresh-{i}"),
+            i + 1,
+            500,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(store.load_checkpoint_by_seq(3)?.is_some());
+
+    let receipt_id_at = |entry_seq: i64| -> Result<String, Box<dyn std::error::Error>> {
+        let connection = store.reader_connection_for_test()?;
+        Ok(connection.query_row(
+            "SELECT receipt_id FROM claim_receipt_log_entries WHERE entry_seq = ?1",
+            rusqlite::params![entry_seq],
+            |row| row.get::<_, String>(0),
+        )?)
+    };
+    let receipt_id = receipt_id_at(3)?;
+    store.writer_handle().run_write({
+        let receipt_id = receipt_id.clone();
+        move |connection| {
+            connection.execute(
+                "INSERT INTO settlement_reconciliations (receipt_id, reconciliation_state, note, updated_at) \
+                 VALUES (?1, 'open', NULL, 500)",
+                rusqlite::params![receipt_id],
+            )?;
+            Ok(())
+        }
+    })?;
+
+    // The watermark must stop at 2 (below the aged receipt at entry 3), not
+    // advance to 4 and delete the only live row the reconciliation can update.
+    let archived = store.archive_receipts_before(150, archive_path)?;
+    assert_eq!(
+        archived, 2,
+        "the watermark must stop below a receipt whose settlement reconciliation is still open"
+    );
+
+    let live = store.reader_connection_for_test()?;
+    let settlement_live: i64 = live.query_row(
+        "SELECT COUNT(*) FROM settlement_reconciliations WHERE receipt_id = ?1",
+        rusqlite::params![receipt_id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        settlement_live, 1,
+        "the open reconciliation row must survive so a later reconciliation can update it"
+    );
+    let receipt_live: i64 = live.query_row(
+        "SELECT COUNT(*) FROM chio_tool_receipts WHERE receipt_id = ?1",
+        rusqlite::params![receipt_id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        receipt_live, 1,
+        "the receipt backing the open reconciliation must remain live for the upsert path"
+    );
+    drop(live);
+
+    // The reconciliation reaches a terminal state; a later rotation now archives
+    // the receipt and its reconciliation together.
+    store.writer_handle().run_write({
+        let receipt_id = receipt_id.clone();
+        move |connection| {
+            connection.execute(
+                "UPDATE settlement_reconciliations SET reconciliation_state = 'reconciled', updated_at = 600 \
+                 WHERE receipt_id = ?1",
+                rusqlite::params![receipt_id],
+            )?;
+            Ok(())
+        }
+    })?;
+    let archived_again = store.archive_receipts_before(150, archive_path)?;
+    assert_eq!(
+        archived_again, 2,
+        "once the reconciliation is terminal the later rotation archives the [3,4] pair"
+    );
+    let live = store.reader_connection_for_test()?;
+    let settlement_after: i64 = live.query_row(
+        "SELECT COUNT(*) FROM settlement_reconciliations WHERE receipt_id = ?1",
+        rusqlite::params![receipt_id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        settlement_after, 0,
+        "the terminal reconciliation archives with its receipt on the later rotation"
+    );
+
+    drop(live);
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
+/// The same pin applies to metered-billing reconciliations and to the
+/// `retry_scheduled` state: an aged receipt whose metered-billing reconciliation
+/// is still awaiting a scheduled retry must not be archived out from under the
+/// row a later reconciliation attempt needs to resolve. Once the reconciliation
+/// is terminal a later rotation archives the pair.
+#[test]
+fn rotation_preserves_receipt_with_scheduled_metered_reconciliation(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("scheduled-metered-preserve");
+    let archive = unique_db_path("scheduled-metered-preserve-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for i in 0..4u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("sm-aged-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    for i in 4..6u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("sm-fresh-{i}"),
+            i + 1,
+            500,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    store.flush_receipt_writes()?;
+    assert!(store.load_checkpoint_by_seq(3)?.is_some());
+
+    let receipt_id_at = |entry_seq: i64| -> Result<String, Box<dyn std::error::Error>> {
+        let connection = store.reader_connection_for_test()?;
+        Ok(connection.query_row(
+            "SELECT receipt_id FROM claim_receipt_log_entries WHERE entry_seq = ?1",
+            rusqlite::params![entry_seq],
+            |row| row.get::<_, String>(0),
+        )?)
+    };
+    let receipt_id = receipt_id_at(3)?;
+    store.writer_handle().run_write({
+        let receipt_id = receipt_id.clone();
+        move |connection| {
+            connection.execute(
+                "INSERT INTO metered_billing_reconciliations \
+                 (receipt_id, adapter_kind, evidence_id, observed_units, billed_cost_units, billed_cost_currency, evidence_sha256, recorded_at, reconciliation_state, note, updated_at) \
+                 VALUES (?1, 'test', 'ev-sm', 1, 1, 'usd', NULL, 500, 'retry_scheduled', NULL, 500)",
+                rusqlite::params![receipt_id],
+            )?;
+            Ok(())
+        }
+    })?;
+
+    let archived = store.archive_receipts_before(150, archive_path)?;
+    assert_eq!(
+        archived, 2,
+        "the watermark must stop below a receipt whose metered-billing reconciliation is scheduled"
+    );
+    let live = store.reader_connection_for_test()?;
+    let metered_live: i64 = live.query_row(
+        "SELECT COUNT(*) FROM metered_billing_reconciliations WHERE receipt_id = ?1",
+        rusqlite::params![receipt_id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        metered_live, 1,
+        "the scheduled reconciliation row must survive for the pending retry"
+    );
+    drop(live);
+
+    store.writer_handle().run_write({
+        let receipt_id = receipt_id.clone();
+        move |connection| {
+            connection.execute(
+                "UPDATE metered_billing_reconciliations SET reconciliation_state = 'ignored', updated_at = 600 \
+                 WHERE receipt_id = ?1",
+                rusqlite::params![receipt_id],
+            )?;
+            Ok(())
+        }
+    })?;
+    let archived_again = store.archive_receipts_before(150, archive_path)?;
+    assert_eq!(
+        archived_again, 2,
+        "once the reconciliation is terminal the later rotation archives the [3,4] pair"
+    );
+    let live = store.reader_connection_for_test()?;
+    let metered_after: i64 = live.query_row(
+        "SELECT COUNT(*) FROM metered_billing_reconciliations WHERE receipt_id = ?1",
+        rusqlite::params![receipt_id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        metered_after, 0,
+        "the terminal reconciliation archives with its receipt on the later rotation"
+    );
+
+    drop(live);
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// `chio receipt flush` reads committed progress from `flush_report`. After a
 /// full-prefix rotation deletes every live claim-log row, the live MAX(entry_seq)
 /// is 0 while the checkpoint chain and retention watermark still sit at the

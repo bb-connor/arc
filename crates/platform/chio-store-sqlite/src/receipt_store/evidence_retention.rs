@@ -406,8 +406,9 @@ impl SqliteReceiptStore {
 
 /// Largest checkpoint `batch_end_seq` whose entire covered prefix (in the
 /// entry_seq domain) has aged past `cutoff`, never splits a live
-/// authorization-consumption pair, and never strands a live receipt from its
-/// lineage parent. 0 when no whole checkpointed batch qualifies (a no-op
+/// authorization-consumption pair, never strands a live receipt from its
+/// lineage parent, and never archives a receipt whose reconciliation is still
+/// nonterminal. 0 when no whole checkpointed batch qualifies (a no-op
 /// rotation).
 ///
 /// An authorization receipt and the consumer receipt that consumed it are bound
@@ -428,6 +429,20 @@ impl SqliteReceiptStore {
 /// The watermark therefore also never advances past a lineage parent whose child
 /// is still live; the parent is preserved until the child ages out and the whole
 /// lineage archives together on a later rotation.
+///
+/// Reconciliation rows carry the hazard in the receipt itself. A receipt's
+/// settlement or metered-billing reconciliation lives in
+/// `settlement_reconciliations` / `metered_billing_reconciliations`, keyed on the
+/// receipt, and both upsert paths require that receipt to still exist in
+/// `chio_tool_receipts` before they can record progress. While a reconciliation
+/// is nonterminal (`open` or `retry_scheduled`) it is an actionable item that
+/// live operator reports display and a later reconciliation attempt must be able
+/// to update. Archiving-and-deleting the receipt drops the only live row those
+/// paths can find, so the actionable item disappears and the next reconciliation
+/// returns NotFound. The watermark therefore never advances past a receipt with a
+/// nonterminal reconciliation row; that receipt and its reconciliation archive
+/// together on a later rotation once the reconciliation reaches a terminal state
+/// (`reconciled` or `ignored`).
 fn compute_archival_watermark(
     connection: &rusqlite::Connection,
     cutoff_unix_secs: u64,
@@ -455,6 +470,18 @@ fn compute_archival_watermark(
             JOIN claim_receipt_log_entries ce ON ce.receipt_id = ls.receipt_id
             WHERE pe.entry_seq <= kc.batch_end_seq
               AND ce.entry_seq > kc.batch_end_seq
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM settlement_reconciliations sr
+            JOIN claim_receipt_log_entries e ON e.receipt_id = sr.receipt_id
+            WHERE e.entry_seq <= kc.batch_end_seq
+              AND sr.reconciliation_state IN ('open', 'retry_scheduled')
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM metered_billing_reconciliations mbr
+            JOIN claim_receipt_log_entries e ON e.receipt_id = mbr.receipt_id
+            WHERE e.entry_seq <= kc.batch_end_seq
+              AND mbr.reconciliation_state IN ('open', 'retry_scheduled')
         )
         "#,
         params![cutoff],
@@ -1390,6 +1417,11 @@ pub(super) fn delete_archived_prefix_in_tx(
             SELECT receipt_id, receipt_kind, {w}, {now}
             FROM claim_receipt_log_entries WHERE entry_seq <= {w};
 
+        -- `compute_archival_watermark` never advances W past a receipt whose
+        -- settlement or metered-billing reconciliation is still nonterminal, so
+        -- every reconciliation row removed here has already reached a terminal
+        -- state and its co-archived copy preserves the closed record. No live,
+        -- actionable reconciliation loses the receipt its upsert path resolves.
         DELETE FROM settlement_reconciliations WHERE receipt_id IN (
             SELECT receipt_id FROM claim_receipt_log_entries
             WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
