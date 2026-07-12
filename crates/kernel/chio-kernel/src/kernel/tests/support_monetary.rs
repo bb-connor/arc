@@ -246,9 +246,11 @@ fn make_monetary_config() -> KernelConfig {
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
         memory_budget: crate::MemoryBudgetConfig::defaults(),
+        deadlines: crate::HotPathDeadlineConfig::default(),
     }
 }
 
@@ -1217,9 +1219,11 @@ fn make_dpop_kernel_and_cap(
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
         memory_budget: crate::MemoryBudgetConfig::defaults(),
+        deadlines: crate::HotPathDeadlineConfig::default(),
     };
     let mut kernel = make_kernel(config);
     kernel.register_tool_server(Box::new(EchoServer::new(server, vec![tool])));

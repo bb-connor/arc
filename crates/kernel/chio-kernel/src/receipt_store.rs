@@ -140,8 +140,20 @@ pub struct ReceiptWriterCounters {
     pub failed_total: u64,
     pub saturated_total: u64,
     pub inflight: u64,
+    /// Commands still queued in the commit-actor channel, not yet pulled for
+    /// processing. Unlike `inflight`, this excludes work the actor has already
+    /// drained and is committing, so it is the honest saturation signal: the
+    /// channel is full only once this reaches its capacity.
+    #[serde(default)]
+    pub queue_depth: u64,
     #[serde(default)]
     pub last_commit_unix_ms: Option<u64>,
+    /// Wall-clock (unix-ms) of the first append this writer ever accepted, set
+    /// once. It anchors the stall clock before the first successful commit, so a
+    /// writer that wedges before ever committing is still measured against the
+    /// stall threshold instead of appearing to make progress forever.
+    #[serde(default)]
+    pub first_accept_unix_ms: Option<u64>,
     #[serde(default)]
     pub last_error: Option<String>,
 }
@@ -204,6 +216,11 @@ pub struct ReceiptCheckpointStatusReport {
 pub struct ReceiptStoreHealthReport {
     pub healthy: bool,
     pub writer: ReceiptWriterCounters,
+    /// Current writer-liveness label ("healthy", "wedged", "dead", ...).
+    /// Serialized so an operator health surface can distinguish a slow-but-live
+    /// writer from a wedged one. Optional for backward compatibility.
+    #[serde(default = "receipt_writer_liveness_unknown_label")]
+    pub writer_liveness: String,
     pub latest_committed_entry_seq: u64,
     #[serde(default)]
     pub latest_checkpoint_seq: Option<u64>,
@@ -229,6 +246,14 @@ pub struct ReceiptStoreHealthReport {
     /// operators and automation can alert on a silently-failing background task.
     #[serde(default)]
     pub retention_error: Option<String>,
+    /// Supervised health of the commit-writer thread. A durable store reports this
+    /// so a dead or degraded writer can never be masked by a last-batch success.
+    #[serde(default)]
+    pub writer_level: chio_supervisor::HealthLevel,
+    /// Cumulative writer restarts observed by the supervisor. Non-zero after any
+    /// writer fault, even once the writer recovers.
+    #[serde(default)]
+    pub writer_restart_total: u64,
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -315,6 +340,46 @@ pub enum ReceiptStoreError {
 
     #[error("tenant-scoped retention is not expressible as a prefix watermark and is unsupported; no data was modified")]
     RetentionTenantScopeUnsupported,
+
+    #[error("receipt commit writer is not serving after {restarts} restart(s): {last_error}")]
+    WriterDead { restarts: u64, last_error: String },
+}
+
+/// Point-in-time liveness of a receipt store's commit writer. `Unknown` keeps
+/// stores with no async writer behaving exactly as they did before liveness
+/// existed: the pre-dispatch readiness gate treats it as permissive. A store
+/// that does have an async writer reports a concrete verdict, which the gate
+/// samples directly even when no background watchdog is running.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReceiptWriterLiveness {
+    Healthy,
+    Saturated,
+    Wedged,
+    Dead,
+    Unknown,
+}
+
+impl ReceiptWriterLiveness {
+    /// Whether the pre-dispatch gate may admit while the writer is in this
+    /// state. Only a proven-healthy or not-yet-probed writer is permissive; a
+    /// saturated, wedged, or dead writer denies.
+    pub fn healthy(self) -> bool {
+        matches!(self, Self::Healthy | Self::Unknown)
+    }
+
+    pub fn as_label(self) -> &'static str {
+        match self {
+            Self::Healthy => "healthy",
+            Self::Saturated => "saturated",
+            Self::Wedged => "wedged",
+            Self::Dead => "dead",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+fn receipt_writer_liveness_unknown_label() -> String {
+    ReceiptWriterLiveness::Unknown.as_label().to_string()
 }
 
 pub trait ReceiptStore: Send + Sync {
@@ -363,6 +428,25 @@ pub trait ReceiptStore: Send + Sync {
         self.append_chio_receipt(receipt)?;
         Ok(None)
     }
+    /// Append a receipt, failing closed with `ReceiptStoreError::Timeout` if the
+    /// commit round trip exceeds `budget`. The default ignores the budget and
+    /// keeps the unbounded behavior for stores without an async writer; a store
+    /// with a commit actor overrides this so a wedged writer cannot pin the
+    /// kernel-wide receipt write lock indefinitely.
+    fn append_chio_receipt_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        _budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        self.append_chio_receipt_returning_seq(receipt)
+    }
+    /// Point-in-time writer liveness, assessed against the operator-configured
+    /// stall threshold. Default `Unknown` keeps stores with no async writer, or
+    /// no watchdog wired, permissive at the pre-dispatch gate; such stores
+    /// ignore the threshold.
+    fn writer_liveness(&self, _stall_threshold: std::time::Duration) -> ReceiptWriterLiveness {
+        ReceiptWriterLiveness::Unknown
+    }
     fn append_chio_receipt_consuming_authorization(
         &self,
         _receipt: &ChioReceipt,
@@ -380,6 +464,18 @@ pub trait ReceiptStore: Send + Sync {
     ) -> Result<Option<u64>, ReceiptStoreError> {
         self.append_child_receipt(receipt)?;
         Ok(None)
+    }
+    /// Append a child receipt, failing closed with `ReceiptStoreError::Timeout`
+    /// if the commit round trip exceeds `budget`. The default ignores the budget
+    /// and keeps the unbounded behavior for stores without an async writer; a
+    /// store with a commit actor overrides this so a wedged writer cannot pin the
+    /// kernel-wide receipt write lock while nested-flow child receipts drain.
+    fn append_child_receipt_with_timeout(
+        &self,
+        receipt: &ChildRequestReceipt,
+        _budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        self.append_child_receipt_returning_seq(receipt)
     }
 
     fn receipts_canonical_bytes_range(
@@ -409,6 +505,17 @@ pub trait ReceiptStore: Send + Sync {
         Err(ReceiptStoreError::Conflict(
             "receipt store health is not supported by this receipt store".to_string(),
         ))
+    }
+
+    /// Whether the store's commit writer has degraded to the point that durable
+    /// persistence can no longer be trusted, so evaluations must fail closed before
+    /// dispatch rather than after executing a tool with no receipt path.
+    ///
+    /// The default is `false`: a store with no supervised background writer has
+    /// nothing to trip. Stores that supervise a writer thread override this to read
+    /// the writer's health flag.
+    fn writer_serving_closed(&self) -> bool {
+        false
     }
 
     fn latest_committed_entry_seq(&self) -> Result<u64, ReceiptStoreError> {
@@ -553,6 +660,21 @@ pub trait ReceiptStore: Send + Sync {
         _parent_capability_id: Option<&str>,
     ) -> Result<(), ReceiptStoreError> {
         Ok(())
+    }
+
+    /// Record a capability snapshot, failing closed with
+    /// `ReceiptStoreError::Timeout` if the writer round trip exceeds `budget`.
+    /// The default ignores the budget and keeps the unbounded behavior for stores
+    /// without an async writer; a store with a commit actor overrides this so a
+    /// writer that stalls after the pre-dispatch liveness check cannot hang the
+    /// evaluation hot path inside the snapshot write.
+    fn record_capability_snapshot_with_timeout(
+        &self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+        _budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        self.record_capability_snapshot(token, parent_capability_id)
     }
 
     fn get_capability_snapshot(

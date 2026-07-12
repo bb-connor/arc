@@ -4226,7 +4226,11 @@ mod state_machine {
                 }
             }
             // Invariant (2): reopen succeeds (open-time seed re-verifies).
+            // The verified-head seed runs on the commit-writer thread, so flush
+            // to drain it before sampling health; until the seed completes the
+            // head reads poisoned and the writer serves closed.
             let reopened = SqliteReceiptStore::open(&path).map_err(map_err)?;
+            reopened.flush_receipt_writes().map_err(map_err)?;
             prop_assert!(reopened.receipt_store_health().map_err(map_err)?.healthy);
 
             // Invariant (4): the archived and live receipt-id sets partition

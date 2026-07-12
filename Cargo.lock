@@ -2637,6 +2637,7 @@ dependencies = [
  "axum 0.8.8",
  "chio-core-types",
  "chio-http-core",
+ "chio-http-serve",
  "chio-kernel",
  "chio-metrics-spec",
  "chio-openapi",
@@ -2650,6 +2651,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "subtle",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tower 0.5.3",
@@ -2868,6 +2870,7 @@ dependencies = [
  "chio-guard-registry",
  "chio-guards",
  "chio-hosted-mcp",
+ "chio-http-serve",
  "chio-kernel",
  "chio-lineage",
  "chio-listing",
@@ -2972,6 +2975,8 @@ name = "chio-config"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
+ "chio-core",
+ "chio-kernel",
  "regex",
  "serde",
  "serde_yml",
@@ -3063,6 +3068,7 @@ dependencies = [
  "chio-errors",
  "chio-external-guards",
  "chio-guards",
+ "chio-http-serve",
  "chio-kernel",
  "chio-link",
  "chio-mcp-adapter",
@@ -3094,6 +3100,7 @@ dependencies = [
  "subtle",
  "thiserror 1.0.69",
  "tokio",
+ "tower 0.5.3",
  "tower-http",
  "tracing",
  "ureq 2.12.1",
@@ -3603,6 +3610,7 @@ dependencies = [
  "chio-egress-contract",
  "chio-kernel",
  "chio-metrics-spec",
+ "chio-store-sqlite",
  "chio-test-support",
  "chrono",
  "hex",
@@ -3610,9 +3618,22 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "chio-http-serve"
+version = "0.1.0"
+dependencies = [
+ "axum 0.8.8",
+ "thiserror 1.0.69",
+ "tokio",
+ "tower 0.5.3",
+ "tower-http",
+ "tracing",
 ]
 
 [[package]]
@@ -3648,6 +3669,7 @@ dependencies = [
  "chio-metrics-spec",
  "chio-settle",
  "chio-store-sqlite",
+ "chio-supervisor",
  "chio-test-support",
  "chio-tool-call-fabric",
  "chio-underwriting",
@@ -3866,6 +3888,7 @@ dependencies = [
  "chio-control-plane",
  "chio-core-types",
  "chio-egress-contract",
+ "chio-http-serve",
  "chio-kernel",
  "chio-mcp-adapter",
  "chio-metrics-spec",
@@ -4052,6 +4075,7 @@ dependencies = [
  "axum 0.8.8",
  "chio-core-types",
  "chio-federation",
+ "chio-http-serve",
  "chio-pheromone",
  "chio-pheromone-runtime",
  "reqwest 0.13.2",
@@ -4114,6 +4138,7 @@ dependencies = [
  "chio-disclosure-lineage",
  "chio-egress-contract",
  "chio-enterprise-export",
+ "chio-http-serve",
  "chio-risk-comptroller",
  "chio-runtime-proof-parity",
  "chio-selective-disclosure",
@@ -4407,6 +4432,7 @@ dependencies = [
  "chio-credit",
  "chio-kernel",
  "chio-settle",
+ "chio-supervisor",
  "chio-test-support",
  "criterion",
  "loom",
@@ -4421,6 +4447,17 @@ dependencies = [
  "tracing",
  "uuid",
  "zeroize",
+]
+
+[[package]]
+name = "chio-supervisor"
+version = "0.1.0"
+dependencies = [
+ "loom",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -4511,6 +4548,7 @@ dependencies = [
  "chio-http-core",
  "chio-kernel",
  "chio-metrics-spec",
+ "chio-store-sqlite",
  "chrono",
  "hex",
  "http 1.4.0",
@@ -4520,6 +4558,7 @@ dependencies = [
  "hyper-util",
  "serde_json",
  "sha2 0.10.9",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tower 0.5.3",
