@@ -41,7 +41,10 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 use uuid::Uuid;
 
+use crate::admission_operation::ReplayReservationState;
 use crate::KernelError;
+
+const MAX_NONCE_RESERVATION_IDENTIFIER_BYTES: usize = 512;
 
 /// Schema identifier for Chio execution nonces.
 pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v1";
@@ -163,6 +166,104 @@ impl Default for ExecutionNonceConfig {
 // ExecutionNonceStore trait
 // ---------------------------------------------------------------------------
 
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ExecutionNonceReservationError {
+    #[error("invalid execution nonce reservation: {0}")]
+    Invalid(String),
+    #[error("execution nonce reservation conflict: {0}")]
+    Conflict(String),
+    #[error("execution nonce reservation not found: {0}")]
+    NotFound(String),
+    #[error("execution nonce reservation store unavailable: {0}")]
+    Store(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExecutionNonceReservation {
+    operation_id: String,
+    nonce_id: String,
+    signed_expires_at: i64,
+    state: ReplayReservationState,
+}
+
+impl ExecutionNonceReservation {
+    pub fn new(
+        operation_id: String,
+        nonce_id: String,
+        signed_expires_at: i64,
+    ) -> Result<Self, ExecutionNonceReservationError> {
+        validate_nonce_operation_id(&operation_id)?;
+        validate_nonce_reservation_identifier(&nonce_id, "nonce_id")?;
+        if signed_expires_at <= 0 {
+            return Err(ExecutionNonceReservationError::Invalid(
+                "signed_expires_at must be positive".to_string(),
+            ));
+        }
+        Ok(Self {
+            operation_id,
+            nonce_id,
+            signed_expires_at,
+            state: ReplayReservationState::Reserved,
+        })
+    }
+
+    pub fn from_persisted_parts(
+        operation_id: String,
+        nonce_id: String,
+        signed_expires_at: i64,
+        state: ReplayReservationState,
+    ) -> Result<Self, ExecutionNonceReservationError> {
+        let mut reservation = Self::new(operation_id, nonce_id, signed_expires_at)?;
+        reservation.state = state;
+        Ok(reservation)
+    }
+
+    pub fn operation_id(&self) -> &str {
+        &self.operation_id
+    }
+
+    pub fn nonce_id(&self) -> &str {
+        &self.nonce_id
+    }
+
+    pub fn signed_expires_at(&self) -> i64 {
+        self.signed_expires_at
+    }
+
+    pub fn state(&self) -> ReplayReservationState {
+        self.state
+    }
+}
+
+fn validate_nonce_reservation_identifier(
+    value: &str,
+    label: &'static str,
+) -> Result<(), ExecutionNonceReservationError> {
+    if value.is_empty()
+        || value.len() > MAX_NONCE_RESERVATION_IDENTIFIER_BYTES
+        || value.bytes().any(|byte| byte == 0)
+        || value.trim() != value
+    {
+        return Err(ExecutionNonceReservationError::Invalid(format!(
+            "{label} is empty, oversized, padded, or contains NUL"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_nonce_operation_id(value: &str) -> Result<(), ExecutionNonceReservationError> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        return Err(ExecutionNonceReservationError::Invalid(
+            "operation_id must be lowercase SHA-256 hex".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// Persistence boundary for replay-prevention of execution nonces.
 ///
 /// Implementations MUST ensure that `reserve(nonce_id)` returns `true`
@@ -195,6 +296,46 @@ pub trait ExecutionNonceStore: Send + Sync {
     fn reserve_until(&self, nonce_id: &str, _nonce_expires_at: i64) -> Result<bool, KernelError> {
         self.reserve(nonce_id)
     }
+
+    /// Atomically bind a nonce and its signed expiry to one operation.
+    /// The default fails closed and never delegates to immediate consumption.
+    fn reserve_nonce_for_operation(
+        &self,
+        _operation_id: &str,
+        _nonce_id: &str,
+        _signed_expires_at: i64,
+    ) -> Result<ExecutionNonceReservation, ExecutionNonceReservationError> {
+        Err(ExecutionNonceReservationError::Store(
+            "operation-owned execution nonce reservations are unavailable".to_string(),
+        ))
+    }
+
+    fn commit_nonce_reservation(
+        &self,
+        _operation_id: &str,
+    ) -> Result<ExecutionNonceReservation, ExecutionNonceReservationError> {
+        Err(ExecutionNonceReservationError::Store(
+            "operation-owned execution nonce reservations are unavailable".to_string(),
+        ))
+    }
+
+    fn cancel_nonce_reservation(
+        &self,
+        _operation_id: &str,
+    ) -> Result<ExecutionNonceReservation, ExecutionNonceReservationError> {
+        Err(ExecutionNonceReservationError::Store(
+            "operation-owned execution nonce reservations are unavailable".to_string(),
+        ))
+    }
+
+    fn get_nonce_reservation(
+        &self,
+        _operation_id: &str,
+    ) -> Result<Option<ExecutionNonceReservation>, ExecutionNonceReservationError> {
+        Err(ExecutionNonceReservationError::Store(
+            "operation-owned execution nonce reservations are unavailable".to_string(),
+        ))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -206,8 +347,14 @@ pub trait ExecutionNonceStore: Send + Sync {
 /// Mirrors the shape of `dpop::DpopNonceStore` but keys on the nonce_id
 /// alone because the full binding lives inside the signed body and is
 /// checked separately by `verify_execution_nonce`.
+struct InMemoryExecutionNonceState {
+    consumed: LruCache<String, Instant>,
+    reservations_by_operation: std::collections::HashMap<String, ExecutionNonceReservation>,
+    nonce_owners: std::collections::HashMap<String, String>,
+}
+
 pub struct InMemoryExecutionNonceStore {
-    inner: Mutex<LruCache<String, Instant>>,
+    inner: Mutex<InMemoryExecutionNonceState>,
     ttl: Duration,
 }
 
@@ -224,7 +371,11 @@ impl InMemoryExecutionNonceStore {
             NonZeroUsize::new(DEFAULT_EXECUTION_NONCE_STORE_CAPACITY).unwrap_or(NonZeroUsize::MIN)
         });
         Self {
-            inner: Mutex::new(LruCache::new(nz)),
+            inner: Mutex::new(InMemoryExecutionNonceState {
+                consumed: LruCache::new(nz),
+                reservations_by_operation: std::collections::HashMap::new(),
+                nonce_owners: std::collections::HashMap::new(),
+            }),
             ttl,
         }
     }
@@ -258,9 +409,117 @@ impl ExecutionNonceStore for InMemoryExecutionNonceStore {
             .map_or(self.ttl, |remaining| remaining.max(self.ttl));
         self.reserve_with_retention(nonce_id, retention)
     }
+
+    fn reserve_nonce_for_operation(
+        &self,
+        operation_id: &str,
+        nonce_id: &str,
+        signed_expires_at: i64,
+    ) -> Result<ExecutionNonceReservation, ExecutionNonceReservationError> {
+        let requested = ExecutionNonceReservation::new(
+            operation_id.to_string(),
+            nonce_id.to_string(),
+            signed_expires_at,
+        )?;
+        let mut state = self.inner.lock().map_err(|_| {
+            ExecutionNonceReservationError::Store(
+                "execution nonce reservation map poisoned".to_string(),
+            )
+        })?;
+        if let Some(existing) = state.reservations_by_operation.get(operation_id) {
+            if existing.nonce_id == requested.nonce_id
+                && existing.signed_expires_at == requested.signed_expires_at
+            {
+                return Ok(existing.clone());
+            }
+            return Err(ExecutionNonceReservationError::Conflict(format!(
+                "operation `{operation_id}` is already bound to a different nonce"
+            )));
+        }
+        if let Some(owner) = state.nonce_owners.get(nonce_id) {
+            return Err(ExecutionNonceReservationError::Conflict(format!(
+                "nonce `{nonce_id}` is already owned by operation `{owner}`"
+            )));
+        }
+        let now = Instant::now();
+        if let Some(retain_until) = state.consumed.peek(nonce_id) {
+            if *retain_until > now {
+                return Err(ExecutionNonceReservationError::Conflict(format!(
+                    "nonce `{nonce_id}` was already consumed"
+                )));
+            }
+            state.consumed.pop(nonce_id);
+        }
+        state
+            .nonce_owners
+            .insert(nonce_id.to_string(), operation_id.to_string());
+        state
+            .reservations_by_operation
+            .insert(operation_id.to_string(), requested.clone());
+        Ok(requested)
+    }
+
+    fn commit_nonce_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<ExecutionNonceReservation, ExecutionNonceReservationError> {
+        self.transition_nonce_reservation(operation_id, ReplayReservationState::Committed)
+    }
+
+    fn cancel_nonce_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<ExecutionNonceReservation, ExecutionNonceReservationError> {
+        self.transition_nonce_reservation(operation_id, ReplayReservationState::Cancelled)
+    }
+
+    fn get_nonce_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<Option<ExecutionNonceReservation>, ExecutionNonceReservationError> {
+        validate_nonce_operation_id(operation_id)?;
+        let state = self.inner.lock().map_err(|_| {
+            ExecutionNonceReservationError::Store(
+                "execution nonce reservation map poisoned".to_string(),
+            )
+        })?;
+        Ok(state.reservations_by_operation.get(operation_id).cloned())
+    }
 }
 
 impl InMemoryExecutionNonceStore {
+    fn transition_nonce_reservation(
+        &self,
+        operation_id: &str,
+        target: ReplayReservationState,
+    ) -> Result<ExecutionNonceReservation, ExecutionNonceReservationError> {
+        validate_nonce_operation_id(operation_id)?;
+        let mut state = self.inner.lock().map_err(|_| {
+            ExecutionNonceReservationError::Store(
+                "execution nonce reservation map poisoned".to_string(),
+            )
+        })?;
+        let reservation = state
+            .reservations_by_operation
+            .get_mut(operation_id)
+            .ok_or_else(|| ExecutionNonceReservationError::NotFound(operation_id.to_string()))?;
+        match (reservation.state, target) {
+            (current, requested) if current == requested => Ok(reservation.clone()),
+            (
+                ReplayReservationState::Reserved,
+                ReplayReservationState::Committed | ReplayReservationState::Cancelled,
+            ) => {
+                reservation.state = target;
+                Ok(reservation.clone())
+            }
+            (current, requested) => Err(ExecutionNonceReservationError::Conflict(format!(
+                "operation `{operation_id}` nonce reservation cannot transition from {} to {}",
+                current.as_str(),
+                requested.as_str()
+            ))),
+        }
+    }
+
     fn reserve_with_retention(
         &self,
         nonce_id: &str,
@@ -271,13 +530,16 @@ impl InMemoryExecutionNonceStore {
             KernelError::Internal("execution nonce store mutex poisoned; fail-closed".to_string())
         })?;
 
+        if cache.nonce_owners.contains_key(nonce_id) {
+            return Ok(false);
+        }
         let key = nonce_id.to_string();
         let now = Instant::now();
-        if let Some(retain_until) = cache.peek(&key) {
+        if let Some(retain_until) = cache.consumed.peek(&key) {
             if *retain_until > now {
                 return Ok(false);
             }
-            cache.pop(&key);
+            cache.consumed.pop(&key);
         }
         let Some(retain_until) = now.checked_add(retention) else {
             error!("execution nonce retention overflow; denying fail-closed");
@@ -285,7 +547,7 @@ impl InMemoryExecutionNonceStore {
                 "execution nonce retention overflow; fail-closed".to_string(),
             ));
         };
-        cache.put(key, retain_until);
+        cache.consumed.put(key, retain_until);
         Ok(true)
     }
 }
@@ -483,6 +745,10 @@ mod tests {
     use super::*;
     use std::thread;
 
+    fn operation_id(hex_pair: &str) -> String {
+        hex_pair.repeat(32)
+    }
+
     fn sample_binding() -> NonceBinding {
         NonceBinding {
             subject_id: "subject-abc".to_string(),
@@ -635,5 +901,86 @@ mod tests {
         for h in handles {
             assert!(h.join().unwrap());
         }
+    }
+
+    #[test]
+    fn in_memory_nonce_reservations_are_operation_owned_and_terminal() {
+        let store = InMemoryExecutionNonceStore::default();
+        assert!(matches!(
+            store.reserve_nonce_for_operation("not-a-digest", "nonce-invalid", 10_000),
+            Err(ExecutionNonceReservationError::Invalid(_))
+        ));
+        let reserved = store
+            .reserve_nonce_for_operation(operation_id("01").as_str(), "nonce-1", 10_000)
+            .unwrap();
+        assert_eq!(reserved.operation_id(), operation_id("01").as_str());
+        assert_eq!(reserved.nonce_id(), "nonce-1");
+        assert_eq!(reserved.signed_expires_at(), 10_000);
+        assert_eq!(reserved.state(), ReplayReservationState::Reserved);
+        assert_eq!(
+            store
+                .reserve_nonce_for_operation(operation_id("01").as_str(), "nonce-1", 10_000)
+                .unwrap(),
+            reserved
+        );
+        assert!(matches!(
+            store.reserve_nonce_for_operation(operation_id("01").as_str(), "nonce-1", 10_001),
+            Err(ExecutionNonceReservationError::Conflict(_))
+        ));
+        assert!(matches!(
+            store.reserve_nonce_for_operation(operation_id("02").as_str(), "nonce-1", 10_000),
+            Err(ExecutionNonceReservationError::Conflict(_))
+        ));
+
+        let committed = store
+            .commit_nonce_reservation(operation_id("01").as_str())
+            .unwrap();
+        assert_eq!(committed.state(), ReplayReservationState::Committed);
+        assert_eq!(
+            store
+                .commit_nonce_reservation(operation_id("01").as_str())
+                .unwrap(),
+            committed
+        );
+        assert!(matches!(
+            store.cancel_nonce_reservation(operation_id("01").as_str()),
+            Err(ExecutionNonceReservationError::Conflict(_))
+        ));
+
+        let cancelled = store
+            .reserve_nonce_for_operation(operation_id("03").as_str(), "nonce-3", 20_000)
+            .and_then(|_| store.cancel_nonce_reservation(operation_id("03").as_str()))
+            .unwrap();
+        assert_eq!(cancelled.state(), ReplayReservationState::Cancelled);
+        assert_eq!(
+            store
+                .cancel_nonce_reservation(operation_id("03").as_str())
+                .unwrap(),
+            cancelled
+        );
+        assert_eq!(
+            store
+                .get_nonce_reservation(operation_id("03").as_str())
+                .unwrap(),
+            Some(cancelled)
+        );
+        assert!(!store.reserve("nonce-3").unwrap());
+
+        let legacy_expiry = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            .saturating_add(30);
+        assert!(store
+            .reserve_until("legacy-consumed", i64::try_from(legacy_expiry).unwrap())
+            .unwrap());
+        assert!(matches!(
+            store.reserve_nonce_for_operation(
+                operation_id("04").as_str(),
+                "legacy-consumed",
+                30_000
+            ),
+            Err(ExecutionNonceReservationError::Conflict(_))
+        ));
     }
 }

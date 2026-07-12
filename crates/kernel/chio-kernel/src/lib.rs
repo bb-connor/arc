@@ -353,9 +353,9 @@ pub use evidence_export::{
 };
 pub use execution_nonce::{
     is_supported_execution_nonce_schema, mint_execution_nonce, verify_execution_nonce,
-    ExecutionNonce, ExecutionNonceConfig, ExecutionNonceError, ExecutionNonceStore,
-    InMemoryExecutionNonceStore, NonceBinding, SignedExecutionNonce,
-    DEFAULT_EXECUTION_NONCE_STORE_CAPACITY, DEFAULT_EXECUTION_NONCE_TTL_SECS,
+    ExecutionNonce, ExecutionNonceConfig, ExecutionNonceError, ExecutionNonceReservation,
+    ExecutionNonceReservationError, ExecutionNonceStore, InMemoryExecutionNonceStore, NonceBinding,
+    SignedExecutionNonce, DEFAULT_EXECUTION_NONCE_STORE_CAPACITY, DEFAULT_EXECUTION_NONCE_TTL_SECS,
     EXECUTION_NONCE_SCHEMA,
 };
 pub use memory_provenance::{
