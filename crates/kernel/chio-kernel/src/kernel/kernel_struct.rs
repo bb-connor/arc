@@ -712,6 +712,16 @@ pub struct ChioKernel {
     /// blocks dispatch; failures are surfaced through the retry/dead-
     /// letter machinery, not through this option.
     pub(super) settlement_observer: Option<std::sync::Arc<dyn chio_settle::SettlementHook>>,
+    /// Durable sink for unresolved settlement outcomes. When `Some`, the
+    /// observer routing consumer persists a bounded attempt row for
+    /// retryable outcomes and an idempotent dead-letter row for terminal
+    /// failures. When `None`, unresolved outcomes are logged loud and
+    /// counted, never silently dropped.
+    pub(super) settlement_retry_store:
+        Option<std::sync::Arc<dyn crate::settlement_retry::SettlementRetryStore>>,
+    /// Retry policy the routing consumer classifies settlement outcomes
+    /// against.
+    pub(super) settlement_retry_policy: chio_settle::RetryPolicy,
     /// Recursive-delegation oracle handle. When `Some`, the verifier consults this
     /// arc-swap-backed snapshot on every delegated dispatch and denies
     /// the capability if any link in the chain (or the leaf) is in the

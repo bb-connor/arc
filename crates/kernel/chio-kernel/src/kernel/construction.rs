@@ -356,6 +356,8 @@ impl ChioKernel {
             federation_local_kernel_id: ArcSwap::from_pointee(Option::<String>::None),
             signing_task,
             settlement_observer: None,
+            settlement_retry_store: None,
+            settlement_retry_policy: chio_settle::RetryPolicy::default(),
             revocation_view: None,
             budget_registry: Mutex::new(chio_kernel_core::InMemoryBudgetRegistry::new()),
             rss_shed: Arc::new(AtomicBool::new(false)),
@@ -924,12 +926,26 @@ impl ChioKernel {
     /// MUST NOT block the dispatch path on its own latency. Hook
     /// failures are surfaced through
     /// [`Self::run_settlement_observer`]'s return value and are routed
-    /// through the retry/dead-letter machinery.
+    /// through the retry/dead-letter machinery when a settlement retry
+    /// store is installed (see [`Self::set_settlement_retry_store`]);
+    /// without one they are logged loud and counted via
+    /// `chio_settlement_unresolved_total`.
     pub fn set_settlement_observer(
         &mut self,
         hook: std::sync::Arc<dyn chio_settle::SettlementHook>,
     ) {
         self.settlement_observer = Some(hook);
+    }
+
+    /// Install the durable settlement retry/dead-letter sink the observer
+    /// routing consumer writes to. Without one, unresolved settlement
+    /// outcomes still fail loud (a warning plus the
+    /// `chio_settlement_unresolved_total` counter), never silently dropped.
+    pub fn set_settlement_retry_store(
+        &mut self,
+        store: std::sync::Arc<dyn crate::settlement_retry::SettlementRetryStore>,
+    ) {
+        self.settlement_retry_store = Some(store);
     }
 
     /// Return a clone of the active settlement observer, or `None` when
@@ -955,6 +971,118 @@ impl ChioKernel {
             receipt,
             &[self.public_key()],
         )
+    }
+
+    /// Route the settlement-observer outcome into the retry/dead-letter
+    /// machinery. Fail-loud and fail-closed: an outcome that cannot be
+    /// persisted is warned and counted, never silently dropped.
+    pub(crate) fn route_settlement_observer_status(
+        &self,
+        receipt: &chio_core::receipt::body::ChioReceipt,
+        status: &settlement_observer::SettlementObserverStatus,
+    ) {
+        use settlement_observer::SettlementObserverStatus as Status;
+        let (reason, retryable) = match status {
+            // Steady state: no hook, or the receipt is outside the
+            // marketplace surface. Nothing is owed downstream.
+            Status::NotRegistered | Status::Skipped { .. } => return,
+            Status::Observed { outcome } => match self.classify_and_persist(receipt, outcome) {
+                Ok(()) => return,
+                Err(error) => (error.to_string(), true),
+            },
+            Status::HookFailed { error } => (error.clone(), true),
+        };
+        tracing::warn!(
+            receipt_id = %receipt.id,
+            retryable,
+            reason = %reason,
+            "settlement outcome unresolved"
+        );
+        chio_metrics_spec::runtime::families::SETTLEMENT_UNRESOLVED.incr(&[]);
+    }
+
+    /// Classify an observed settlement outcome against the retry policy and
+    /// persist the decision: retryable outcomes upsert a bounded attempt row,
+    /// terminal failures land an idempotent dead-letter row, and resolved
+    /// outcomes clear the envelope.
+    pub(crate) fn classify_and_persist(
+        &self,
+        receipt: &chio_core::receipt::body::ChioReceipt,
+        outcome: &chio_settle::SettlementOutcome,
+    ) -> Result<(), crate::settlement_retry::SettlementRetryError> {
+        use crate::settlement_retry::{SettleAttemptRecord, SettlementRetryError};
+        use chio_settle::RetryDecision;
+
+        let store = self.settlement_retry_store.as_deref();
+        let prior_attempts = match store {
+            Some(store) => store
+                .load_attempt(&receipt.id)?
+                .map(|attempt| attempt.attempts)
+                .unwrap_or(0),
+            None => 0,
+        };
+        match chio_settle::classify_attempt(&self.settlement_retry_policy, prior_attempts, outcome)
+        {
+            RetryDecision::Skip { .. } => {
+                // Resolved (accepted or skipped): the receipt owes nothing
+                // downstream, so any bounded envelope for it is cleared.
+                if let Some(store) = store {
+                    store.clear_attempt(&receipt.id)?;
+                }
+                Ok(())
+            }
+            RetryDecision::Retry { attempt, backoff } => {
+                let Some(store) = store else {
+                    return Err(SettlementRetryError::Backend(
+                        "no settlement retry store installed".to_string(),
+                    ));
+                };
+                let reason = match outcome {
+                    chio_settle::SettlementOutcome::Retryable { reason, .. } => reason.clone(),
+                    other => format!("{other:?}"),
+                };
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|elapsed| elapsed.as_secs())
+                    .unwrap_or(0);
+                store.upsert_attempt(&SettleAttemptRecord {
+                    receipt_id: receipt.id.clone(),
+                    finalized_at: receipt.timestamp,
+                    attempts: attempt,
+                    next_visible_at: now.saturating_add(backoff.as_secs().max(1)),
+                    last_reason: Some(reason),
+                })
+            }
+            RetryDecision::DeadLetter { reason } => {
+                let Some(store) = store else {
+                    return Err(SettlementRetryError::Backend(
+                        "no settlement retry store installed".to_string(),
+                    ));
+                };
+                let record = chio_settle::DeadLetterRecord::new(
+                    receipt.id.clone(),
+                    receipt.timestamp,
+                    prior_attempts.saturating_add(1),
+                    reason,
+                );
+                match store.insert_dead_letter(&record) {
+                    Ok(_) => store.clear_attempt(&receipt.id),
+                    Err(SettlementRetryError::Conflict(message)) => {
+                        // A divergent dead-letter row already exists. Keep the
+                        // original row (operators clear it explicitly) and
+                        // surface the divergence loud.
+                        tracing::warn!(
+                            receipt_id = %receipt.id,
+                            %message,
+                            "dead-letter insert conflicted with a divergent row"
+                        );
+                        chio_metrics_spec::runtime::families::SETTLEMENT_UNRESOLVED.incr(&[]);
+                        Ok(())
+                    }
+                    Err(other) => Err(other),
+                }
+            }
+        }
     }
 
     /// Install a memory-provenance chain.

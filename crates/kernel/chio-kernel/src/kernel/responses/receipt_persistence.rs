@@ -272,7 +272,8 @@ impl ChioKernel {
             }
             self.append_chio_receipt_to_local_log(receipt.clone());
         }
-        let _settlement_status = self.run_settlement_observer(receipt);
+        let settlement_status = self.run_settlement_observer(receipt);
+        self.route_settlement_observer_status(receipt, &settlement_status);
         Ok(())
     }
 
