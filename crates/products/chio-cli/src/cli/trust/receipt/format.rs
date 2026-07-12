@@ -106,6 +106,14 @@ pub(crate) fn render_receipt_health_human(report: &chio_kernel::ReceiptStoreHeal
         "retention_watermark_entry_seq: {}",
         optional_u64(report.retention_watermark_entry_seq)
     ));
+    lines.push(format!(
+        "open_dispatch_intents: {}",
+        report.open_dispatch_intents
+    ));
+    lines.push(format!(
+        "dead_letter_dispatch_intents: {}",
+        report.dead_letter_dispatch_intents
+    ));
     if let Some(error) = report.checkpoint_error.as_deref() {
         lines.push(format!("checkpoint_error: {error}"));
     }

@@ -568,6 +568,25 @@ mod receipt_operator_tests {
     /// and checkpoint-status output, not only in the JSON payload, so operators
     /// on the plain CLI can see committed progress floored by an archived prefix.
     #[test]
+    fn receipt_human_output_surfaces_dispatch_intent_counts() {
+        let health = chio_kernel::ReceiptStoreHealthReport {
+            healthy: false,
+            open_dispatch_intents: 2,
+            dead_letter_dispatch_intents: 1,
+            ..chio_kernel::ReceiptStoreHealthReport::default()
+        };
+        let rendered = render_receipt_health_human(&health);
+        assert!(
+            rendered.contains("open_dispatch_intents: 2"),
+            "health human output must surface open intents: {rendered}"
+        );
+        assert!(
+            rendered.contains("dead_letter_dispatch_intents: 1"),
+            "health human output must surface dead-letter incidents: {rendered}"
+        );
+    }
+
+    #[test]
     fn receipt_human_output_surfaces_retention_watermark() {
         let health = chio_kernel::ReceiptStoreHealthReport {
             healthy: true,
