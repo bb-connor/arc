@@ -1508,6 +1508,27 @@ fn classify_writer_liveness(
     Liveness::Healthy
 }
 
+/// Fold the writer-liveness verdict into the store's top-level health boolean.
+/// A wedged, saturated, or dead writer makes the store unhealthy even when the
+/// checkpoint chain is intact and no error has been recorded yet: the
+/// pre-dispatch gate is already denying tool calls against that writer, so a
+/// health surface that stayed green would contradict it. `Healthy` and the
+/// permissive `Unknown` (no async writer, or a read-only observer that cannot
+/// see writer liveness) do not downgrade health.
+fn receipt_store_healthy(
+    checkpoint_healthy: bool,
+    writer_last_error: Option<&str>,
+    writer_liveness: chio_kernel::ReceiptWriterLiveness,
+) -> bool {
+    use chio_kernel::ReceiptWriterLiveness as Liveness;
+    checkpoint_healthy
+        && writer_last_error.is_none()
+        && !matches!(
+            writer_liveness,
+            Liveness::Wedged | Liveness::Saturated | Liveness::Dead
+        )
+}
+
 #[cfg(test)]
 mod writer_liveness_classifier_tests {
     use super::*;
@@ -1667,6 +1688,32 @@ mod writer_liveness_classifier_tests {
             classify_writer_liveness(&counters, STALL_MS, CAPACITY, None, NOW),
             Liveness::Healthy
         );
+    }
+
+    #[test]
+    fn a_non_healthy_writer_makes_the_store_unhealthy() {
+        // Checkpoint chain intact and no recorded error, but the writer is not
+        // making progress: the pre-dispatch gate is denying tool calls, so the
+        // top-level health boolean must not stay green.
+        assert!(!receipt_store_healthy(true, None, Liveness::Wedged));
+        assert!(!receipt_store_healthy(true, None, Liveness::Saturated));
+        assert!(!receipt_store_healthy(true, None, Liveness::Dead));
+    }
+
+    #[test]
+    fn healthy_and_unknown_writers_do_not_downgrade_store_health() {
+        assert!(receipt_store_healthy(true, None, Liveness::Healthy));
+        // Unknown is the permissive verdict (no async writer, or a read-only
+        // observer that cannot see writer liveness).
+        assert!(receipt_store_healthy(true, None, Liveness::Unknown));
+        // A recorded writer error or an unhealthy checkpoint chain still fails
+        // closed regardless of a healthy liveness verdict.
+        assert!(!receipt_store_healthy(false, None, Liveness::Healthy));
+        assert!(!receipt_store_healthy(
+            true,
+            Some("checkpoint build failed"),
+            Liveness::Healthy
+        ));
     }
 }
 
@@ -2643,29 +2690,26 @@ impl SqliteReceiptStore {
                 status.latest_committed_entry_seq,
             )?;
         }
-        let healthy = status.healthy
-            && self
-                .receipt_commit_actor
-                .writer_counters()
-                .last_error
-                .is_none();
+        let writer_counters = self.receipt_commit_actor.writer_counters();
+        // The authoritative pre-dispatch gate reads the watchdog verdict against
+        // the operator-configured stall threshold; this report has no config in
+        // scope, so it both labels and folds health against the shipped default.
+        let writer_liveness = self.writer_liveness(std::time::Duration::from_millis(
+            chio_kernel::DEFAULT_RECEIPT_WRITER_STALL_MS,
+        ));
+        let healthy = receipt_store_healthy(
+            status.healthy,
+            writer_counters.last_error.as_deref(),
+            writer_liveness,
+        );
         let (uncheckpointed_start_seq, uncheckpointed_end_seq) = uncheckpointed_range(
             status.latest_checkpointed_entry_seq,
             status.latest_committed_entry_seq,
         );
         Ok(ReceiptStoreHealthReport {
             healthy,
-            writer: self.receipt_commit_actor.writer_counters(),
-            // Informational label for the operator health surface. The
-            // authoritative pre-dispatch gate reads the watchdog verdict, which
-            // uses the operator-configured stall threshold; this report has no
-            // config in scope, so it labels against the shipped default.
-            writer_liveness: self
-                .writer_liveness(std::time::Duration::from_millis(
-                    chio_kernel::DEFAULT_RECEIPT_WRITER_STALL_MS,
-                ))
-                .as_label()
-                .to_string(),
+            writer: writer_counters,
+            writer_liveness: writer_liveness.as_label().to_string(),
             latest_committed_entry_seq: status.latest_committed_entry_seq,
             latest_checkpoint_seq: status.latest_checkpoint_seq,
             latest_checkpointed_entry_seq: status.latest_checkpointed_entry_seq,
