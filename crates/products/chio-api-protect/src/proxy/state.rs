@@ -1,5 +1,30 @@
 use super::*;
 
+use chio_http_serve::{
+    apply_server_hygiene, run_until_drained, ServeError, ServeHygieneConfig, ShutdownController,
+};
+use std::time::Duration;
+
+/// Extra window the drain holds open beyond the upstream hop ceiling so a hop
+/// that trips its own deadline still has time to record its receipt before the
+/// forced drain closes the connection.
+const PROXY_DRAIN_MARGIN: Duration = Duration::from_secs(5);
+
+/// Drain window for the proxy serve site, derived from the configured upstream
+/// hop ceiling.
+///
+/// The proxy records its receipt inside the request handler, after the upstream
+/// call returns (success or failure), and runs with no generic request timeout:
+/// that outer layer would drop the handler mid-hop and skip the receipt entirely.
+/// Bounding the upstream call is what keeps a stalled upstream from becoming an
+/// unbounded handler, and holding the drain a margin above that ceiling is what
+/// lets an in-flight hop resolve and record its receipt before a shutdown
+/// force-closes the connection. Deriving the drain from the (configurable) hop
+/// ceiling preserves that ordering for any configured value, not just the default.
+fn proxy_drain_timeout(upstream_request_timeout: Duration) -> Duration {
+    upstream_request_timeout.saturating_add(PROXY_DRAIN_MARGIN)
+}
+
 /// Stored receipts for inspection and querying.
 pub(crate) struct ReceiptLog {
     pub(crate) receipts: Vec<HttpReceipt>,
@@ -9,6 +34,10 @@ pub(crate) struct ReceiptLog {
 pub(crate) struct ToolReceiptLog {
     pub(crate) receipts: Vec<ChioReceipt>,
 }
+
+/// Reserved primary key the readiness probe writes and immediately rolls back,
+/// so exercising the receipt write path never leaves a durable row.
+const RECEIPT_READINESS_PROBE_ID: &str = "__chio_readiness_probe__";
 
 pub(crate) struct SqliteReceiptStore {
     connection: Connection,
@@ -36,6 +65,30 @@ impl SqliteReceiptStore {
             )
             .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
         Ok(Self { connection })
+    }
+
+    /// Reachability check of the receipt write path, for the readiness probe.
+    /// A bare `SELECT 1` answers even when the receipt tables have been dropped or
+    /// the database has gone read-only or full, so it would keep an instance in
+    /// rotation while every append fails after an already-allowed upstream call.
+    /// This exercises the real receipt tables and the write path inside a
+    /// transaction that is always rolled back: a dropped table, a read-only mount,
+    /// or a full disk fails readiness, and no probe row is ever persisted.
+    pub(crate) fn is_reachable(&self) -> bool {
+        self.probe_receipt_write_path().is_ok()
+    }
+
+    fn probe_receipt_write_path(&self) -> Result<(), rusqlite::Error> {
+        let tx = self.connection.unchecked_transaction()?;
+        tx.execute(
+            "INSERT OR REPLACE INTO http_receipts (id, receipt_json) VALUES (?1, ?2)",
+            params![RECEIPT_READINESS_PROBE_ID, "{}"],
+        )?;
+        tx.execute(
+            "INSERT OR REPLACE INTO tool_receipts (id, receipt_json) VALUES (?1, ?2)",
+            params![RECEIPT_READINESS_PROBE_ID, "{}"],
+        )?;
+        tx.rollback()
     }
 
     pub(crate) fn load_receipts(&self) -> Result<Vec<HttpReceipt>, ProtectError> {
@@ -149,6 +202,25 @@ pub(crate) struct ProxyState {
     pub(crate) trusted_capability_issuers: Vec<PublicKey>,
     pub(crate) trusted_receipt_signers: Vec<PublicKey>,
     pub(crate) sidecar_control_token: Option<String>,
+}
+
+impl ProxyState {
+    /// Dependency-aware readiness for the `/chio/health` probe.
+    ///
+    /// Unlike liveness, this reports the state of the runtime dependencies the
+    /// sidecar needs to serve honestly. When the durable receipt store's supervised
+    /// commit writer has stopped serving, every mediated call would be denied fail
+    /// closed, so readiness reports unhealthy and a platform probe pulls the instance
+    /// from rotation rather than routing traffic to a sidecar that can only deny.
+    pub(crate) async fn readiness_status(&self) -> SidecarStatus {
+        if let Some(store) = &self.receipt_store {
+            let store = store.lock().await;
+            if !store.is_reachable() {
+                return SidecarStatus::Unhealthy;
+            }
+        }
+        SidecarStatus::Healthy
+    }
 }
 
 /// The protect proxy.
@@ -284,7 +356,9 @@ impl ProtectProxy {
             };
 
         let egress_contract = default_upstream_egress_contract(&self.config.upstream)?;
-        let http_client = client_builder_with_contract(&egress_contract).build()?;
+        let http_client = client_builder_with_contract(&egress_contract)
+            .timeout(self.config.upstream_request_timeout)
+            .build()?;
         let state = Arc::new(ProxyState {
             evaluator,
             signer_keypair: keypair,
@@ -320,12 +394,45 @@ impl ProtectProxy {
 
         observer(local_addr);
 
-        axum::serve(
+        // No generic request timeout: every proxied call writes its receipt
+        // synchronously in the handler after the upstream hop returns, and that
+        // hop is already bounded by the configured upstream timeout. An outer
+        // timeout layer would drop the handler while it awaits the upstream,
+        // skipping receipt finalization for a call that may already have reached
+        // the upstream. The drain window is held a margin above that upstream
+        // ceiling so an in-flight hop is receipted before a forced drain closes
+        // it. Body size, concurrency, and the connection cap still apply.
+        let hygiene = ServeHygieneConfig {
+            request_timeout: None,
+            drain_timeout: proxy_drain_timeout(self.config.upstream_request_timeout),
+            ..ServeHygieneConfig::default()
+        };
+        let app = apply_server_hygiene(app, &hygiene);
+        let controller = ShutdownController::install();
+        // Cap simultaneously accepted connections at the accept loop so a slow or
+        // idle connection flood cannot exhaust file descriptors before any request
+        // reaches the concurrency limit. The peer address stays available to the
+        // sidecar-control loopback/bearer checks via `CappedPeerAddr`.
+        let listener =
+            MaxConnListener::new(listener, hygiene.max_connections.unwrap_or(usize::MAX));
+        let server = axum::serve(
             listener,
-            app.into_make_service_with_connect_info::<SocketAddr>(),
+            app.into_make_service_with_connect_info::<CappedPeerAddr>(),
+        )
+        .with_graceful_shutdown(controller.signalled());
+
+        // Every proxied call writes its receipt synchronously inside the request
+        // handler, so completing the in-flight requests during the drain is the
+        // whole durability guarantee: there is nothing queued to flush afterward.
+        run_until_drained(
+            server,
+            controller.subscribe(),
+            hygiene.drain_timeout,
+            async { Ok::<(), String>(()) },
         )
         .await
-        .map_err(ProtectError::Io)?;
+        .map(|_outcome| ())
+        .map_err(protect_serve_error)?;
 
         Ok(())
     }
@@ -333,5 +440,46 @@ impl ProtectProxy {
     /// Build routes from spec content for testing.
     pub fn routes_from_spec(spec_content: &str) -> Result<Vec<RouteEntry>, ProtectError> {
         Self::build_routes(spec_content)
+    }
+}
+
+fn protect_serve_error(error: ServeError) -> ProtectError {
+    match error {
+        ServeError::Io(source) => ProtectError::Io(source),
+        ServeError::Flush(message) => ProtectError::Io(std::io::Error::other(message)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{proxy_drain_timeout, PROXY_DRAIN_MARGIN};
+    use crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT;
+    use chio_http_serve::DEFAULT_DRAIN_TIMEOUT;
+    use std::time::Duration;
+
+    /// The drain window must always outlast the upstream hop ceiling so a hop that
+    /// is still in flight at shutdown resolves and records its receipt before the
+    /// forced drain closes the connection. This must hold for any configured
+    /// timeout, including values raised above the default drain window.
+    #[test]
+    fn drain_window_always_outlasts_the_configured_upstream_timeout() {
+        for secs in [1u64, 20, 30, 60, 300] {
+            let upstream = Duration::from_secs(secs);
+            assert!(
+                proxy_drain_timeout(upstream) > upstream,
+                "drain window must outlast a {secs}s upstream timeout"
+            );
+            assert_eq!(proxy_drain_timeout(upstream), upstream + PROXY_DRAIN_MARGIN);
+        }
+    }
+
+    /// The default configuration keeps the historical 20s hop / 25s drain pairing,
+    /// so making the timeout configurable does not shift default behavior.
+    #[test]
+    fn default_upstream_timeout_preserves_the_default_drain_window() {
+        assert_eq!(
+            proxy_drain_timeout(DEFAULT_UPSTREAM_REQUEST_TIMEOUT),
+            DEFAULT_DRAIN_TIMEOUT
+        );
     }
 }
