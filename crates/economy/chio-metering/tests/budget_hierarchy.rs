@@ -523,10 +523,11 @@ fn disabled_ancestor_propagates_to_leaf() {
 }
 
 #[test]
-fn spend_dimension_denies_currency_mismatch() {
+fn spend_dimension_denies_on_currency_mismatch() {
     // A currency-denominated cap fails closed on a positive spend it
-    // cannot convert: an EUR draft against a USD cap is denied, not
-    // silently skipped. A zero-spend draft carries no money and passes.
+    // cannot compare: an EUR draft against a USD cap is denied with a
+    // typed reason, not silently skipped. A zero-spend draft carries no
+    // money and passes.
     let mut tree = BudgetTree::new();
     tree.insert(org("org/usd", usd(1_000), BudgetWindow::Daily))
         .expect("org");
@@ -534,13 +535,23 @@ fn spend_dimension_denies_currency_mismatch() {
     let id = BudgetNodeId::from("org/usd");
     let snap = SpendSnapshot::new();
 
-    // Matching currency over cap denies.
+    // Matching currency over cap denies on the spend dimension.
     let dec = tree.evaluate(&id, AggregateSpend::with_spend(2_000, "USD"), &snap);
-    assert!(matches!(dec, BudgetDecision::Deny { .. }));
+    assert!(matches!(
+        dec,
+        BudgetDecision::Deny {
+            reason: BudgetDenyReason::DimensionExceeded { .. }
+        }
+    ));
 
-    // Mismatched currency with positive spend fails closed (denies).
-    let dec = tree.evaluate(&id, AggregateSpend::with_spend(2_000, "EUR"), &snap);
-    assert!(matches!(dec, BudgetDecision::Deny { .. }));
+    // An EUR draft denies as uncomparable, even under the numeric cap.
+    let dec = tree.evaluate(&id, AggregateSpend::with_spend(500, "EUR"), &snap);
+    assert!(matches!(
+        dec,
+        BudgetDecision::Deny {
+            reason: BudgetDenyReason::CurrencyMismatch { .. }
+        }
+    ));
 
     // Matching currency under cap allows.
     let dec = tree.evaluate(&id, AggregateSpend::with_spend(500, "USD"), &snap);
