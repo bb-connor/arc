@@ -17,6 +17,7 @@ use super::service_runtime::budget::{
 };
 use super::*;
 use chio_store_sqlite::{SqliteBudgetAuthorizationAuthority, SqliteBudgetCurrentAuthority};
+use serde::de::DeserializeOwned;
 
 pub(crate) async fn handle_list_budgets(
     State(state): State<TrustServiceState>,
@@ -384,76 +385,33 @@ pub(crate) async fn handle_authorize_composite_budget_hold(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    if let Err(response) = require_remote_composite_linearizability(&state) {
-        return response;
-    }
-    match forward_post_to_leader(&state, BUDGET_AUTHORIZE_HOLD_PATH, &payload).await {
-        Ok(Some(response)) => return response,
-        Ok(None) => {}
-        Err(response) => return response,
-    }
-    let store = match open_budget_store(&state.config) {
-        Ok(store) => store,
-        Err(response) => return response,
-    };
-    let authority_source = match store
-        .authorization_authority_source(Some(payload.hold_id.as_str()), payload.event_id.as_str())
-    {
-        Ok(source) => source,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-        }
-    };
-    let authority = match remote_composite_authority(&state, authority_source) {
-        Ok(authority) => authority,
-        Err(response) => return response,
-    };
-    let input = match sqlite_composite_authorize_input(&payload, authority.clone()) {
-        Ok(input) => input,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    let decision = match store.authorize_composite_hold(input) {
-        Ok(decision) => decision,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-        }
-    };
-    let event = match load_persisted_composite_authorize_event(&store, &payload, &decision) {
-        Ok(event) => event,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-        }
-    };
-    let write = match budget_write_token(
-        &store,
-        event.authority.as_ref(),
-        Some(payload.event_id.as_str()),
+    if let Err(error) = sqlite_composite_authorize_input(
+        &payload,
+        BudgetEventAuthority {
+            authority_id: "pure-validation".to_string(),
+            lease_id: "pure-validation".to_string(),
+            lease_epoch: 1,
+        },
     ) {
-        Ok(write) => write,
+        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+    }
+    let result = match super::cluster::propose_admission_command(
+        &state,
+        payload.event_id.clone(),
+        AdmissionCommandKind::CompositeAuthorize,
+        &payload,
+    )
+    .await
+    {
+        Ok(result) => result,
         Err(response) => return response,
     };
-    drop(store);
-    let budget_commit = match wait_for_budget_write_quorum_commit(&state, write).await {
-        Ok(Some(commit)) => commit,
-        Ok(None) => {
-            return plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "remote composite budget authorization requires HA-linearizable quorum commit",
-            );
-        }
-        Err(response) => return response,
-    };
-    let Some(budget_authority) =
-        persisted_budget_authority_metadata_view(&state, &event, Some(budget_commit.commit_index))
-    else {
-        return plain_http_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "remote composite budget authorization could not preserve its persisted authority",
-        );
-    };
-    match composite_authorize_response_view(&payload, decision, budget_authority, budget_commit) {
+    match serde_json::from_str::<CompositeBudgetAuthorizeResponse>(&result.response_json) {
         Ok(response) => Json(response).into_response(),
-        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+        Err(error) => plain_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("persisted composite authorize result is invalid: {error}"),
+        ),
     }
 }
 
@@ -465,151 +423,77 @@ pub(crate) async fn handle_capture_invocation_reservations(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    if let Err(response) = require_remote_composite_linearizability(&state) {
-        return response;
-    }
-    match forward_post_to_leader(&state, BUDGET_CAPTURE_INVOCATIONS_PATH, &payload).await {
-        Ok(Some(response)) => return response,
-        Ok(None) => {}
-        Err(response) => return response,
-    }
-    let Some(requested_authority) =
-        budget_event_authority_from_view(payload.budget_authority.as_ref())
-    else {
+    let Some(authority) = payload.budget_authority.as_ref() else {
         return plain_http_error(
             StatusCode::BAD_REQUEST,
             "invocation capture requires the exact persisted budget authority",
         );
     };
-    let store = match open_budget_store(&state.config) {
-        Ok(store) => store,
-        Err(response) => return response,
-    };
-    let resolved_authority = match resolve_budget_hold_authority(
-        "invocation capture",
-        &state,
-        &store,
-        Some(payload.hold_id.as_str()),
-    ) {
-        Ok(authority) => authority,
-        Err(response) => return response,
-    };
-    let authority = match verify_requested_budget_authority(
-        "invocation capture",
-        Some(&requested_authority),
-        resolved_authority,
-    ) {
-        Ok(Some(authority)) => authority,
-        Ok(None) => {
-            return plain_http_error(
-                StatusCode::BAD_REQUEST,
-                "invocation capture requires a persisted budget authority",
-            );
-        }
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
-    };
-    let decision = match store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
-        capability_id: payload.capability_id.clone(),
-        grant_index: payload.grant_index,
-        hold_id: Some(payload.hold_id.clone()),
-        event_id: Some(payload.event_id.clone()),
-        authority: Some(authority),
-    }) {
-        Ok(decision) => decision,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-        }
-    };
-    if decision.invocation_state != BudgetInvocationReservationState::Captured {
+    if authority.authority_id.is_empty()
+        || authority.lease_id.is_empty()
+        || authority.lease_epoch == 0
+    {
         return plain_http_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "budget backend returned a non-captured invocation state",
+            StatusCode::BAD_REQUEST,
+            "invocation capture authority is incomplete",
         );
     }
-    let event = match load_persisted_invocation_capture_event(&store, &payload, &decision) {
-        Ok(event) => event,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-        }
-    };
-    let write = match budget_write_token(
-        &store,
-        event.authority.as_ref(),
-        Some(payload.event_id.as_str()),
-    ) {
-        Ok(write) => write,
+    let result = match super::cluster::propose_admission_command(
+        &state,
+        payload.event_id.clone(),
+        AdmissionCommandKind::CaptureInvocations,
+        &payload,
+    )
+    .await
+    {
+        Ok(result) => result,
         Err(response) => return response,
     };
-    drop(store);
-    let budget_commit = match wait_for_budget_write_quorum_commit(&state, write).await {
-        Ok(Some(commit)) => commit,
-        Ok(None) => {
-            return plain_http_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "remote invocation capture requires HA-linearizable quorum commit",
-            );
-        }
-        Err(response) => return response,
-    };
-    let Some(budget_authority) =
-        persisted_budget_authority_metadata_view(&state, &event, Some(budget_commit.commit_index))
-    else {
-        return plain_http_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "remote invocation capture could not preserve its persisted authority",
-        );
-    };
-    match invocation_capture_response_view(&payload, decision, budget_authority, budget_commit) {
+    match serde_json::from_str::<CaptureInvocationReservationsResponse>(&result.response_json) {
         Ok(response) => Json(response).into_response(),
-        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+        Err(error) => plain_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("persisted invocation capture result is invalid: {error}"),
+        ),
     }
 }
 
-pub(crate) async fn handle_combined_admission_capture_unavailable(
+pub(crate) async fn handle_combined_admission_capture(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
-    Json(_payload): Json<CombinedAdmissionCaptureRequest>,
+    Json(payload): Json<CombinedAdmissionCaptureRequest>,
 ) -> Response {
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    plain_http_error(
-        StatusCode::SERVICE_UNAVAILABLE,
-        "combined admission capture is unavailable because budget and revocation writes do not share one linearizable consensus log",
+    if state.cluster.is_none()
+        || state.config.budget_db_path.is_none()
+        || state.config.revocation_db_path.is_none()
+    {
+        return plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "combined admission capture requires configured HA consensus storage",
+        );
+    }
+    let operation_id = payload.operation_id.clone();
+    let result = match super::cluster::propose_admission_command(
+        &state,
+        operation_id,
+        AdmissionCommandKind::CombinedCapture,
+        &payload,
     )
-}
-
-fn remote_composite_authority(
-    state: &TrustServiceState,
-    source: SqliteBudgetAuthorizationAuthority,
-) -> Result<BudgetEventAuthority, Response> {
-    match source {
-        SqliteBudgetAuthorizationAuthority::Persisted(Some(authority)) => Ok(authority),
-        SqliteBudgetAuthorizationAuthority::Persisted(None) => Err(plain_http_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "persisted composite budget authorization has no HA authority",
-        )),
-        SqliteBudgetAuthorizationAuthority::Current => current_budget_event_authority(state)?
-            .ok_or_else(|| {
-                plain_http_error(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "remote composite budget authorization requires an HA authority lease",
-                )
-            }),
+    .await
+    {
+        Ok(result) => result,
+        Err(response) => return response,
+    };
+    match serde_json::from_str::<CombinedAdmissionCaptureResponse>(&result.response_json) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     }
 }
 
-fn require_remote_composite_linearizability(state: &TrustServiceState) -> Result<(), Response> {
-    if budget_authority_guarantee_level(state, Some(1)) != "ha_linearizable" {
-        return Err(plain_http_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "remote hard composite budgets are unavailable because the current quorum/pull lane is not HA-linearizable",
-        ));
-    }
-    Ok(())
-}
-
-fn sqlite_composite_authorize_input(
+pub(crate) fn sqlite_composite_authorize_input(
     payload: &CompositeBudgetAuthorizeRequest,
     authority: BudgetEventAuthority,
 ) -> Result<SqliteCompositeAuthorizeInput, BudgetStoreError> {
@@ -679,7 +563,7 @@ fn validate_admission_digest(value: &str, label: &str) -> Result<(), BudgetStore
     Ok(())
 }
 
-fn composite_authorize_response_view(
+pub(crate) fn composite_authorize_response_view(
     payload: &CompositeBudgetAuthorizeRequest,
     decision: BudgetAuthorizeHoldDecision,
     budget_authority: BudgetAuthorityMetadataView,
@@ -753,7 +637,7 @@ fn composite_authorize_response_view(
     })
 }
 
-fn invocation_capture_response_view(
+pub(crate) fn invocation_capture_response_view(
     payload: &CaptureInvocationReservationsRequest,
     decision: BudgetHoldMutationDecision,
     budget_authority: BudgetAuthorityMetadataView,
@@ -830,6 +714,7 @@ fn monetary_state_view(state: BudgetMonetaryHoldState) -> BudgetMonetaryHoldStat
     }
 }
 
+#[cfg(test)]
 fn load_persisted_composite_authorize_event(
     store: &SqliteBudgetStore,
     payload: &CompositeBudgetAuthorizeRequest,
@@ -903,6 +788,7 @@ fn load_persisted_composite_authorize_event(
     Ok(event)
 }
 
+#[cfg(test)]
 fn load_persisted_invocation_capture_event(
     store: &SqliteBudgetStore,
     payload: &CaptureInvocationReservationsRequest,
@@ -940,6 +826,7 @@ fn load_persisted_invocation_capture_event(
     Ok(event)
 }
 
+#[cfg(test)]
 fn load_mutation_event_by_id(
     store: &SqliteBudgetStore,
     event_id: &str,
@@ -993,6 +880,26 @@ pub(crate) async fn handle_reverse_charge_cost(
 ) -> Response {
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
+    }
+    match admission_consensus_terminal_event(
+        &state,
+        "reverse",
+        payload.hold_id.as_deref(),
+        payload.event_id.as_deref(),
+        payload.budget_authority.as_ref(),
+    ) {
+        Ok(Some(event_id)) => {
+            return propose_admission_terminal_command::<_, ReverseChargeCostResponse>(
+                &state,
+                event_id,
+                AdmissionCommandKind::ReverseExposure,
+                &payload,
+                "reverse exposure",
+            )
+            .await;
+        }
+        Ok(None) => {}
+        Err(response) => return response,
     }
     match forward_post_to_leader(&state, BUDGET_RELEASE_EXPOSURE_PATH, &payload).await {
         Ok(Some(response)) => return response,
@@ -1095,6 +1002,30 @@ pub(crate) async fn handle_reduce_charge_cost(
         return response;
     }
     let released_exposure_units = payload.release_units();
+    let (operation, admission_kind) = match classify_reduce_command(&payload) {
+        Ok(classification) => classification,
+        Err(response) => return response,
+    };
+    match admission_consensus_terminal_event(
+        &state,
+        operation,
+        payload.hold_id.as_deref(),
+        payload.event_id.as_deref(),
+        payload.budget_authority.as_ref(),
+    ) {
+        Ok(Some(event_id)) => {
+            return propose_admission_terminal_command::<_, ReduceChargeCostResponse>(
+                &state,
+                event_id,
+                admission_kind,
+                &payload,
+                operation,
+            )
+            .await;
+        }
+        Ok(None) => {}
+        Err(response) => return response,
+    }
     match forward_post_to_leader(&state, BUDGET_RECONCILE_SPEND_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
@@ -1103,11 +1034,6 @@ pub(crate) async fn handle_reduce_charge_cost(
     let store = match open_budget_store(&state.config) {
         Ok(store) => store,
         Err(response) => return response,
-    };
-    let operation = if payload.exposure_units.is_some() && payload.realized_spend_units.is_some() {
-        "reconcile"
-    } else {
-        "release"
     };
     let resolved_authority = match resolve_budget_hold_authority(
         operation,
@@ -1253,6 +1179,26 @@ pub(crate) async fn handle_capture_budget_hold(
             );
         }
     };
+    match admission_consensus_terminal_event(
+        &state,
+        "capture",
+        payload.hold_id.as_deref(),
+        payload.event_id.as_deref(),
+        payload.budget_authority.as_ref(),
+    ) {
+        Ok(Some(event_id)) => {
+            return propose_admission_terminal_command::<_, ReduceChargeCostResponse>(
+                &state,
+                event_id,
+                AdmissionCommandKind::CaptureExposure,
+                &payload,
+                "capture exposure",
+            )
+            .await;
+        }
+        Ok(None) => {}
+        Err(response) => return response,
+    }
     match forward_post_to_leader(&state, BUDGET_CAPTURE_EXPOSURE_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
@@ -1345,6 +1291,127 @@ pub(crate) async fn handle_capture_budget_hold(
     .await
 }
 
+fn classify_reduce_command(
+    payload: &ReduceChargeCostRequest,
+) -> Result<(&'static str, AdmissionCommandKind), Response> {
+    match (payload.exposure_units, payload.realized_spend_units) {
+        (None, None) => Ok(("release", AdmissionCommandKind::ReleaseExposure)),
+        (Some(exposure_units), Some(realized_spend_units))
+            if exposure_units.checked_sub(realized_spend_units) == Some(payload.cost_units) =>
+        {
+            Ok(("reconcile", AdmissionCommandKind::ReconcileSpend))
+        }
+        (Some(_), Some(_)) => Err(plain_http_error(
+            StatusCode::BAD_REQUEST,
+            "budget reconcile reduction must equal exposure minus realized spend",
+        )),
+        _ => Err(plain_http_error(
+            StatusCode::BAD_REQUEST,
+            "budget reconcile requires both exposure and realized spend",
+        )),
+    }
+}
+
+fn admission_consensus_terminal_event<'a>(
+    state: &TrustServiceState,
+    operation: &str,
+    hold_id: Option<&'a str>,
+    event_id: Option<&'a str>,
+    authority: Option<&BudgetMutationAuthorityView>,
+) -> Result<Option<&'a str>, Response> {
+    let persisted_authority = if let Some(hold_id) = hold_id {
+        let store = open_budget_store(&state.config)?;
+        match store.hold_authority(hold_id) {
+            Ok(authority) => authority,
+            Err(error) => {
+                return Err(plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &error.to_string(),
+                ));
+            }
+        }
+    } else {
+        None
+    };
+    let persisted_is_admission = persisted_authority
+        .as_ref()
+        .is_some_and(is_admission_consensus_event_authority);
+    let requested_is_admission = authority.is_some_and(is_admission_consensus_authority_view);
+    if !persisted_is_admission && !requested_is_admission {
+        return Ok(None);
+    }
+    if persisted_is_admission && budget_event_authority_from_view(authority) != persisted_authority
+    {
+        return Err(plain_http_error(
+            StatusCode::BAD_REQUEST,
+            &format!("budget {operation} requires the exact persisted admission authority"),
+        ));
+    }
+    if hold_id.is_none() {
+        return Err(plain_http_error(
+            StatusCode::BAD_REQUEST,
+            &format!("budget {operation} requires hold_id under admission consensus"),
+        ));
+    }
+    event_id.map(Some).ok_or_else(|| {
+        plain_http_error(
+            StatusCode::BAD_REQUEST,
+            &format!("budget {operation} requires event_id under admission consensus"),
+        )
+    })
+}
+
+fn is_admission_consensus_authority_view(authority: &BudgetMutationAuthorityView) -> bool {
+    authority.lease_epoch > 0
+        && !authority.authority_id.is_empty()
+        && authority.lease_id
+            == format!(
+                "{}#admission-term-{}",
+                authority.authority_id, authority.lease_epoch
+            )
+}
+
+fn is_admission_consensus_event_authority(authority: &BudgetEventAuthority) -> bool {
+    authority.lease_epoch > 0
+        && !authority.authority_id.is_empty()
+        && authority.lease_id
+            == format!(
+                "{}#admission-term-{}",
+                authority.authority_id, authority.lease_epoch
+            )
+}
+
+async fn propose_admission_terminal_command<T, R>(
+    state: &TrustServiceState,
+    event_id: &str,
+    command_kind: AdmissionCommandKind,
+    command: &T,
+    label: &str,
+) -> Response
+where
+    T: Serialize,
+    R: DeserializeOwned + Serialize,
+{
+    let result = match super::cluster::propose_admission_command(
+        state,
+        event_id.to_string(),
+        command_kind,
+        command,
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(response) => return response,
+    };
+    match serde_json::from_str::<R>(&result.response_json) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => plain_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("persisted {label} consensus result is invalid: {error}"),
+        ),
+    }
+}
+
 fn persisted_budget_authority_metadata_view(
     state: &TrustServiceState,
     event: &BudgetMutationRecord,
@@ -1370,7 +1437,7 @@ fn budget_authority_metadata_matches_event(
         && metadata.lease_epoch == authority.lease_epoch
 }
 
-fn budget_event_authority_from_view(
+pub(crate) fn budget_event_authority_from_view(
     authority: Option<&BudgetMutationAuthorityView>,
 ) -> Option<BudgetEventAuthority> {
     authority.map(|authority| BudgetEventAuthority {

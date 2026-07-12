@@ -96,21 +96,23 @@ use chio_kernel::{
     build_open_market_penalty_artifact_with_trusted_signers,
     ensure_generic_listing_namespace_consistency, evaluate_generic_governance_case,
     evaluate_generic_trust_activation, evaluate_open_market_penalty_with_trusted_signers,
-    normalize_namespace, GenericGovernanceCaseEvaluation, GenericGovernanceCaseEvaluationRequest,
-    GenericGovernanceCaseIssueRequest, GenericGovernanceCharterIssueRequest,
-    GenericListingActorKind, GenericListingArtifact, GenericListingBoundary,
-    GenericListingCompatibilityReference, GenericListingFreshnessWindow, GenericListingQuery,
-    GenericListingReport, GenericListingSearchPolicy, GenericListingStatus, GenericListingSubject,
-    GenericListingSummary, GenericNamespaceArtifact, GenericNamespaceLifecycleState,
-    GenericNamespaceOwnership, GenericRegistryPublisher, GenericRegistryPublisherRole,
-    GenericTrustActivationEvaluation, GenericTrustActivationEvaluationRequest,
-    GenericTrustActivationIssueRequest, OpenMarketFeeScheduleIssueRequest,
-    OpenMarketPenaltyEvaluation, OpenMarketPenaltyEvaluationRequest, OpenMarketPenaltyIssueRequest,
-    SignedGenericGovernanceCase, SignedGenericGovernanceCharter, SignedGenericListing,
-    SignedGenericNamespace, SignedGenericTrustActivation, SignedOpenMarketFeeSchedule,
-    SignedOpenMarketPenalty, DEFAULT_GENERIC_LISTING_REPORT_MAX_AGE_SECS,
-    GENERIC_LISTING_ARTIFACT_SCHEMA, GENERIC_LISTING_REPORT_SCHEMA,
-    GENERIC_NAMESPACE_ARTIFACT_SCHEMA,
+    normalize_namespace, AdmissionCaptureAuthority, AdmissionCaptureDecision,
+    AdmissionCaptureDenial, AdmissionCaptureError, AdmissionCaptureMetadata,
+    AdmissionCaptureRequest, GenericGovernanceCaseEvaluation,
+    GenericGovernanceCaseEvaluationRequest, GenericGovernanceCaseIssueRequest,
+    GenericGovernanceCharterIssueRequest, GenericListingActorKind, GenericListingArtifact,
+    GenericListingBoundary, GenericListingCompatibilityReference, GenericListingFreshnessWindow,
+    GenericListingQuery, GenericListingReport, GenericListingSearchPolicy, GenericListingStatus,
+    GenericListingSubject, GenericListingSummary, GenericNamespaceArtifact,
+    GenericNamespaceLifecycleState, GenericNamespaceOwnership, GenericRegistryPublisher,
+    GenericRegistryPublisherRole, GenericTrustActivationEvaluation,
+    GenericTrustActivationEvaluationRequest, GenericTrustActivationIssueRequest,
+    OpenMarketFeeScheduleIssueRequest, OpenMarketPenaltyEvaluation,
+    OpenMarketPenaltyEvaluationRequest, OpenMarketPenaltyIssueRequest, SignedGenericGovernanceCase,
+    SignedGenericGovernanceCharter, SignedGenericListing, SignedGenericNamespace,
+    SignedGenericTrustActivation, SignedOpenMarketFeeSchedule, SignedOpenMarketPenalty,
+    DEFAULT_GENERIC_LISTING_REPORT_MAX_AGE_SECS, GENERIC_LISTING_ARTIFACT_SCHEMA,
+    GENERIC_LISTING_REPORT_SCHEMA, GENERIC_NAMESPACE_ARTIFACT_SCHEMA,
 };
 use chio_kernel::{
     AuthoritySnapshot, AuthorityStatus, AuthorizationContextReport, BehavioralFeedDecisionSummary,
@@ -218,7 +220,8 @@ use chio_kernel::{
 };
 use chio_store_sqlite::budget_store::SqliteCompositeAuthorizeInput;
 use chio_store_sqlite::{
-    SqliteBudgetStore, SqliteCapabilityAuthority, SqliteReceiptStore, SqliteRevocationStore,
+    SqliteAdmissionCaptureAuthority, SqliteBudgetStore, SqliteCapabilityAuthority,
+    SqliteReceiptStore, SqliteRevocationStore,
 };
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};

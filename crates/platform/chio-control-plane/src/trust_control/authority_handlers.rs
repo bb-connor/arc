@@ -247,6 +247,24 @@ pub(crate) async fn handle_scim_delete_user(
     for capability_id in &record.tracked_capability_ids {
         match revocation_store.is_revoked(capability_id) {
             Ok(true) => {}
+            Ok(false) if state.cluster.is_some() => {
+                let revoked_at = match i64::try_from(now) {
+                    Ok(revoked_at) => revoked_at,
+                    Err(_) => {
+                        return scim_error_response(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "revocation timestamp exceeds the supported range",
+                        );
+                    }
+                };
+                match apply_cluster_revocation(&state, capability_id, revoked_at).await {
+                    Ok(response) if response.newly_revoked => {
+                        revoked_capability_ids.push(capability_id.clone());
+                    }
+                    Ok(_) => {}
+                    Err(response) => return response,
+                }
+            }
             Ok(false) => match revocation_store.revoke(capability_id) {
                 Ok(_) => revoked_capability_ids.push(capability_id.clone()),
                 Err(error) => {
@@ -546,6 +564,21 @@ pub(crate) async fn handle_revoke_capability(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
+    if state.cluster.is_some() {
+        let revoked_at = match i64::try_from(unix_timestamp_now()) {
+            Ok(revoked_at) => revoked_at,
+            Err(_) => {
+                return plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "revocation timestamp exceeds the supported range",
+                );
+            }
+        };
+        return match apply_cluster_revocation(&state, &payload.capability_id, revoked_at).await {
+            Ok(response) => Json(response).into_response(),
+            Err(response) => return response,
+        };
+    }
     match forward_post_to_leader(&state, REVOCATIONS_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
@@ -585,6 +618,38 @@ pub(crate) async fn handle_revoke_capability(
         }
         Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
     }
+}
+
+async fn apply_cluster_revocation(
+    state: &TrustServiceState,
+    capability_id: &str,
+    revoked_at: i64,
+) -> Result<RevokeCapabilityResponse, Response> {
+    let command = ConsensusRevocationProposal {
+        capability_id: capability_id.to_string(),
+    };
+    let result = super::cluster::propose_admission_command(
+        state,
+        cluster_revocation_operation_id(capability_id),
+        AdmissionCommandKind::Revoke,
+        &command,
+    )
+    .await?;
+    let response = serde_json::from_str::<RevokeCapabilityResponse>(&result.response_json)
+        .map_err(|error| {
+            plain_http_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("persisted revocation consensus result is invalid: {error}"),
+            )
+        })?;
+    if response.newly_revoked {
+        super::cluster::observe_capability_revocation_lag(revoked_at);
+    }
+    Ok(response)
+}
+
+pub(super) fn cluster_revocation_operation_id(capability_id: &str) -> String {
+    format!("revocation:sha256:{}", sha256_hex(capability_id.as_bytes()))
 }
 
 #[cfg(test)]

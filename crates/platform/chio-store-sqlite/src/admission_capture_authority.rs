@@ -86,6 +86,59 @@ pub struct SqliteAdmissionCaptureAuthority {
     connection: Mutex<Connection>,
 }
 
+fn with_revocation_savepoint<T>(
+    transaction: &Transaction<'_>,
+    apply: impl FnOnce() -> Result<T, RevocationStoreError>,
+) -> Result<T, RevocationStoreError> {
+    const NAME: &str = "chio_upsert_revocation";
+    transaction.execute_batch(&format!("SAVEPOINT {NAME}"))?;
+    match apply() {
+        Ok(value) => {
+            transaction.execute_batch(&format!("RELEASE {NAME}"))?;
+            Ok(value)
+        }
+        Err(error) => {
+            if let Err(rollback_error) =
+                transaction.execute_batch(&format!("ROLLBACK TO {NAME}; RELEASE {NAME}"))
+            {
+                return Err(RevocationStoreError::Sync(format!(
+                    "revocation savepoint rollback failed after `{error}`: {rollback_error}"
+                )));
+            }
+            Err(error)
+        }
+    }
+}
+
+fn with_capture_savepoint<T>(
+    transaction: &Transaction<'_>,
+    apply: impl FnOnce() -> Result<T, AdmissionCaptureError>,
+) -> Result<T, AdmissionCaptureError> {
+    const NAME: &str = "chio_capture_admission";
+    transaction
+        .execute_batch(&format!("SAVEPOINT {NAME}"))
+        .map_err(BudgetStoreError::from)?;
+    match apply() {
+        Ok(value) => {
+            transaction
+                .execute_batch(&format!("RELEASE {NAME}"))
+                .map_err(BudgetStoreError::from)?;
+            Ok(value)
+        }
+        Err(error) => {
+            if let Err(rollback_error) =
+                transaction.execute_batch(&format!("ROLLBACK TO {NAME}; RELEASE {NAME}"))
+            {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "admission capture savepoint rollback failed after `{error}`: {rollback_error}"
+                ))
+                .into());
+            }
+            Err(error)
+        }
+    }
+}
+
 impl SqliteAdmissionCaptureAuthority {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, AdmissionCaptureError> {
         let path = path.as_ref();
@@ -258,14 +311,32 @@ impl SqliteAdmissionCaptureAuthority {
         &self,
         record: &chio_kernel::RevocationRecord,
     ) -> Result<SqliteRevocationWriteOutcome, RevocationStoreError> {
-        validate_revocation_identifier(&record.capability_id)?;
         let mut connection = self.revocation_connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let outcome = Self::upsert_revocation_in_transaction(&transaction, record)?;
+        transaction.commit()?;
+        Ok(outcome)
+    }
+
+    pub fn upsert_revocation_in_transaction(
+        transaction: &Transaction<'_>,
+        record: &chio_kernel::RevocationRecord,
+    ) -> Result<SqliteRevocationWriteOutcome, RevocationStoreError> {
+        with_revocation_savepoint(transaction, || {
+            Self::upsert_revocation_in_transaction_unchecked(transaction, record)
+        })
+    }
+
+    fn upsert_revocation_in_transaction_unchecked(
+        transaction: &Transaction<'_>,
+        record: &chio_kernel::RevocationRecord,
+    ) -> Result<SqliteRevocationWriteOutcome, RevocationStoreError> {
+        validate_authority_state(transaction)?;
+        validate_revocation_identifier(&record.capability_id)?;
 
         if let Some(outcome) =
-            load_revocation_upsert_outcome(&transaction, &record.capability_id, record.revoked_at)?
+            load_revocation_upsert_outcome(transaction, &record.capability_id, record.revoked_at)?
         {
-            transaction.rollback()?;
             return Ok(outcome);
         }
 
@@ -307,7 +378,7 @@ impl SqliteAdmissionCaptureAuthority {
         let effective_revoked_at =
             existing_revoked_at.map_or(record.revoked_at, |stored| stored.max(record.revoked_at));
         let (authority_commit_index, allocated_revocation_index) =
-            allocate_authority_indices(&transaction, !was_present)?;
+            allocate_authority_indices(transaction, !was_present)?;
         let revocation_commit_index = if was_present {
             revocation_commit_index
         } else {
@@ -316,7 +387,7 @@ impl SqliteAdmissionCaptureAuthority {
         let recorded_at = unix_now();
 
         insert_authority_commit(
-            &transaction,
+            transaction,
             authority_commit_index,
             "revocation-upsert",
             None,
@@ -376,13 +447,12 @@ impl SqliteAdmissionCaptureAuthority {
             authority_commit_index,
         };
         persist_revocation_upsert_outcome(
-            &transaction,
+            transaction,
             &record.capability_id,
             record.revoked_at,
             &outcome,
             recorded_at,
         )?;
-        transaction.commit()?;
         Ok(outcome)
     }
 
@@ -459,16 +529,35 @@ impl AdmissionCaptureAuthority for SqliteAdmissionCaptureAuthority {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(BudgetStoreError::from)?;
+        let decision = Self::capture_admission_in_transaction(&transaction, request)?;
+        transaction.commit().map_err(BudgetStoreError::from)?;
+        Ok(decision)
+    }
+}
 
-        if let Some(stored) = load_admission_event(&transaction, request.operation_id())? {
+impl SqliteAdmissionCaptureAuthority {
+    pub fn capture_admission_in_transaction(
+        transaction: &Transaction<'_>,
+        request: AdmissionCaptureRequest,
+    ) -> Result<AdmissionCaptureDecision, AdmissionCaptureError> {
+        with_capture_savepoint(transaction, || {
+            Self::capture_admission_in_transaction_unchecked(transaction, request)
+        })
+    }
+
+    fn capture_admission_in_transaction_unchecked(
+        transaction: &Transaction<'_>,
+        request: AdmissionCaptureRequest,
+    ) -> Result<AdmissionCaptureDecision, AdmissionCaptureError> {
+        validate_authority_state(transaction)?;
+        if let Some(stored) = load_admission_event(transaction, request.operation_id())? {
             if !stored.matches(&request)? {
                 return Err(AdmissionCaptureError::InvalidRequest(format!(
                     "operation_id `{}` was reused for a different admission capture",
                     request.operation_id()
                 )));
             }
-            let decision = restore_admission_decision(&transaction, &request, &stored)?;
-            transaction.commit().map_err(BudgetStoreError::from)?;
+            let decision = restore_admission_decision(transaction, &request, &stored)?;
             return Ok(decision);
         }
 
@@ -491,8 +580,8 @@ impl AdmissionCaptureAuthority for SqliteAdmissionCaptureAuthority {
             )));
         }
 
-        validate_authorization_bindings(&transaction, &request)?;
-        let (_, revocation_head) = load_authority_heads(&transaction)?;
+        validate_authorization_bindings(transaction, &request)?;
+        let (_, revocation_head) = load_authority_heads(transaction)?;
         if request
             .last_observed_revocation_index()
             .is_some_and(|observed| observed > revocation_head)
@@ -502,18 +591,18 @@ impl AdmissionCaptureAuthority for SqliteAdmissionCaptureAuthority {
             )));
         }
 
-        let revoked_ids = load_revoked_ids(&transaction, request.revocation_set().ids())?;
+        let revoked_ids = load_revoked_ids(transaction, request.revocation_set().ids())?;
         let now = unix_now();
         if !revoked_ids.is_empty() {
             let (authority_commit_index, checked_revocation_index) =
-                allocate_authority_indices(&transaction, false)?;
+                allocate_authority_indices(transaction, false)?;
             if checked_revocation_index != revocation_head {
                 return Err(AdmissionCaptureError::Unavailable(
                     "revocation head changed inside one immediate transaction".to_string(),
                 ));
             }
             insert_authority_commit(
-                &transaction,
+                transaction,
                 authority_commit_index,
                 "capture-denied",
                 Some(request.operation_id()),
@@ -524,7 +613,7 @@ impl AdmissionCaptureAuthority for SqliteAdmissionCaptureAuthority {
                 now,
             )?;
             persist_admission_event(
-                &transaction,
+                transaction,
                 &request,
                 "denied-revoked",
                 Some(&revoked_ids),
@@ -545,28 +634,28 @@ impl AdmissionCaptureAuthority for SqliteAdmissionCaptureAuthority {
                 revoked_ids,
                 metadata,
             )?);
-            transaction.commit().map_err(BudgetStoreError::from)?;
             return Ok(decision);
         }
 
-        let budget = SqliteBudgetStore::capture_composite_invocation_reservations_in_transaction(
-            &transaction,
-            request.budget(),
-        )?;
+        let budget =
+            SqliteBudgetStore::capture_composite_invocation_reservations_in_transaction_unchecked(
+                transaction,
+                request.budget(),
+            )?;
         let budget_commit_index = budget.metadata.budget_commit_index.ok_or_else(|| {
             BudgetStoreError::Invariant(
                 "composite capture did not persist a budget commit index".to_string(),
             )
         })?;
         let (authority_commit_index, checked_revocation_index) =
-            allocate_authority_indices(&transaction, false)?;
+            allocate_authority_indices(transaction, false)?;
         if checked_revocation_index != revocation_head {
             return Err(AdmissionCaptureError::Unavailable(
                 "revocation head changed inside one immediate transaction".to_string(),
             ));
         }
         insert_authority_commit(
-            &transaction,
+            transaction,
             authority_commit_index,
             "capture",
             Some(request.operation_id()),
@@ -577,7 +666,7 @@ impl AdmissionCaptureAuthority for SqliteAdmissionCaptureAuthority {
             now,
         )?;
         persist_admission_event(
-            &transaction,
+            transaction,
             &request,
             "captured",
             None,
@@ -597,7 +686,6 @@ impl AdmissionCaptureAuthority for SqliteAdmissionCaptureAuthority {
             budget: Box::new(budget),
             metadata,
         };
-        transaction.commit().map_err(BudgetStoreError::from)?;
         Ok(decision)
     }
 }
@@ -1385,7 +1473,7 @@ fn restore_admission_decision(
     match stored.outcome.as_str() {
         "captured" => {
             let budget =
-                SqliteBudgetStore::capture_composite_invocation_reservations_in_transaction(
+                SqliteBudgetStore::capture_composite_invocation_reservations_in_transaction_unchecked(
                     transaction,
                     request.budget(),
                 )?;

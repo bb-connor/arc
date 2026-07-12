@@ -1,4 +1,6 @@
-use super::super::super::report_validation::cluster_peer_auth_signature;
+use super::super::super::report_validation::{
+    cluster_peer_auth_signature, cluster_peer_auth_signature_with_body,
+};
 use super::super::*;
 
 impl TrustControlClient {
@@ -39,6 +41,7 @@ impl TrustControlClient {
         url: &str,
         endpoint: &str,
         term: Option<u64>,
+        body_digest: Option<&str>,
     ) -> Result<ureq::Request, CliError> {
         let Some(cluster_peer_auth) = self.cluster_peer_auth.as_ref() else {
             return Ok(client
@@ -46,12 +49,13 @@ impl TrustControlClient {
                 .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token)));
         };
         let issued_at = unix_timestamp_now() as i64;
-        let signature = cluster_peer_auth_signature(
+        let signature = cluster_peer_auth_signature_with_body(
             &self.token,
             cluster_peer_auth.node_id.as_ref(),
             endpoint,
             issued_at,
             term,
+            body_digest,
         )?;
         let mut request = client
             .post(url)
@@ -60,6 +64,9 @@ impl TrustControlClient {
             .set(CLUSTER_AUTH_SIGNATURE_HEADER, &signature);
         if let Some(term) = term {
             request = request.set(CLUSTER_AUTH_TERM_HEADER, &term.to_string());
+        }
+        if let Some(body_digest) = body_digest {
+            request = request.set(CLUSTER_AUTH_BODY_DIGEST_HEADER, body_digest);
         }
         Ok(request)
     }

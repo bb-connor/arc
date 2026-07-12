@@ -43,6 +43,11 @@ pub(crate) fn normalize_cluster_config_url(
             )));
         }
     }
+    if parsed.scheme() != "https" && !allow_local {
+        return Err(CliError::cli_other_error(
+            "cluster URL must use HTTPS unless --allow-local-peer-urls is enabled".to_string(),
+        ));
+    }
     if !parsed.username().is_empty() || parsed.password().is_some() {
         return Err(CliError::cli_other_error(
             "cluster URL must not contain username or password material".to_string(),
@@ -209,6 +214,34 @@ pub(crate) fn cluster_peer_auth_signature(
     Ok(sha256_hex(&payload))
 }
 
+pub(crate) fn cluster_peer_auth_signature_with_body(
+    service_token: &str,
+    node_id: &str,
+    endpoint: &str,
+    issued_at: i64,
+    term: Option<u64>,
+    body_digest: Option<&str>,
+) -> Result<String, CliError> {
+    let Some(body_digest) = body_digest else {
+        return cluster_peer_auth_signature(service_token, node_id, endpoint, issued_at, term);
+    };
+    let payload = canonical_json_bytes(&json!({
+        "scheme": CLUSTER_AUTH_SCHEME,
+        "serviceToken": service_token,
+        "nodeId": node_id,
+        "endpoint": endpoint,
+        "issuedAt": issued_at,
+        "term": term,
+        "bodyDigest": body_digest,
+    }))
+    .map_err(|error| {
+        CliError::cli_other_error(format!(
+            "failed to encode cluster peer auth payload: {error}"
+        ))
+    })?;
+    Ok(sha256_hex(&payload))
+}
+
 pub(crate) fn validate_cluster_peer_auth(
     headers: &HeaderMap,
     config: &TrustServiceConfig,
@@ -238,6 +271,20 @@ pub(crate) fn validate_cluster_peer_auth(
             })
         })
         .transpose()?;
+    let body_digest = headers
+        .get(CLUSTER_AUTH_BODY_DIGEST_HEADER)
+        .and_then(|value| value.to_str().ok());
+    if body_digest.is_some_and(|digest| {
+        digest.len() != 64
+            || !digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    }) {
+        return Err(plain_http_error(
+            StatusCode::UNAUTHORIZED,
+            "invalid cluster peer body digest",
+        ));
+    }
     let unverified_failure_key = cluster_peer_auth_unverified_failure_key(&node_id, endpoint);
     let allowlisted = config
         .peer_urls
@@ -251,11 +298,15 @@ pub(crate) fn validate_cluster_peer_auth(
         ));
     }
     let now = unix_timestamp_now() as i64;
-    let expected =
-        cluster_peer_auth_signature(&config.service_token, &node_id, endpoint, issued_at, term)
-            .map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-            })?;
+    let expected = cluster_peer_auth_signature_with_body(
+        &config.service_token,
+        &node_id,
+        endpoint,
+        issued_at,
+        term,
+        body_digest,
+    )
+    .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
     if !bool::from(signature.as_bytes().ct_eq(expected.as_bytes())) {
         if cluster_peer_auth_is_rate_limited(&unverified_failure_key, now as u64) {
             let mut response = plain_http_error(

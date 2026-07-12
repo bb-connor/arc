@@ -1966,6 +1966,69 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
+    fn admission_managed_budget_projection_rejects_legacy_replication_writes() {
+        let source_budget_db = unique_temp_path("cluster-managed-source-budget", "sqlite3");
+        let managed_db = unique_temp_path("cluster-managed-target-budget", "sqlite3");
+        let source_state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b"],
+            None,
+            None,
+            Some(source_budget_db.clone()),
+        );
+        let managed_state = state_with_cluster(
+            "http://node-b",
+            &["http://node-a"],
+            None,
+            Some(managed_db.clone()),
+            Some(managed_db.clone()),
+        );
+        SqliteBudgetStore::open(&source_budget_db)
+            .test_unwrap()
+            .try_charge_cost_with_ids(
+                "legacy-capability",
+                0,
+                Some(4),
+                0,
+                None,
+                None,
+                Some("legacy-hold"),
+                Some("legacy-event"),
+            )
+            .test_unwrap();
+        let snapshot = build_cluster_state_snapshot(&source_state).test_unwrap();
+        let _authority = SqliteAdmissionCaptureAuthority::open(&managed_db).test_unwrap();
+
+        apply_cluster_snapshot(&managed_state, "http://node-a", snapshot).test_unwrap();
+
+        let managed_store = SqliteBudgetStore::open(&managed_db).test_unwrap();
+        assert!(managed_store
+            .list_usages_after(MAX_LIST_LIMIT, None)
+            .test_unwrap()
+            .is_empty());
+        assert!(managed_store
+            .list_mutation_events(MAX_LIST_LIMIT, None, None)
+            .test_unwrap()
+            .is_empty());
+        assert!(peer_budget_cursor(&managed_state, "http://node-a").is_none());
+
+        let client = service_runtime::client::build_cluster_peer_client(
+            "http://127.0.0.1:9",
+            "token",
+            "http://node-b",
+        )
+        .test_unwrap();
+        let pulled = sync_peer_budgets(
+            &managed_state,
+            &client,
+            "http://node-a",
+            &mut PullRoundBudget::new(),
+        )
+        .test_unwrap();
+        assert_eq!(pulled, 0);
+    }
+
+    #[test]
     fn cluster_snapshot_round_trip_preserves_denied_budget_events_without_usage_rows() {
         let source_budget_db = unique_temp_path("cluster-source-denied-budgets", "sqlite3");
         let target_budget_db = unique_temp_path("cluster-target-denied-budgets", "sqlite3");

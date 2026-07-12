@@ -209,11 +209,13 @@ pub(crate) fn apply_cluster_snapshot(
 
     if let Some(path) = state.config.revocation_db_path.as_deref() {
         let store = SqliteRevocationStore::open(path)?;
-        for record in &revocations {
-            store.upsert_revocation(&RevocationRecord {
-                capability_id: record.capability_id.clone(),
-                revoked_at: record.revoked_at,
-            })?;
+        if !store.is_admission_authority_managed() {
+            for record in &revocations {
+                store.upsert_revocation(&RevocationRecord {
+                    capability_id: record.capability_id.clone(),
+                    revoked_at: record.revoked_at,
+                })?;
+            }
         }
     }
 
@@ -237,36 +239,38 @@ pub(crate) fn apply_cluster_snapshot(
     let mut budget_cursor = None;
     if let Some(path) = state.config.budget_db_path.as_deref() {
         let store = SqliteBudgetStore::open(path)?;
-        let usage_records = budgets
-            .iter()
-            .map(budget_usage_record_from_view)
-            .collect::<Vec<_>>();
-        let mutation_records = budget_mutation_events
-            .iter()
-            .map(budget_mutation_record_from_view)
-            .collect::<Result<Vec<_>, _>>()?;
-        store
-            .import_snapshot_records(&usage_records, &mutation_records)
-            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-        store
-            .record_budget_import_floors(&mutation_records)
-            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-        // Learn the leader's abandoned/tombstoned seqs so a fresh follower's
-        // contiguous ack head treats those holes as filled instead of stalling at
-        // them. Carried range-encoded and expanded in SQL, so a rollback-storm run
-        // is never materialized as a huge in-memory list here.
-        let abandoned_ranges = budget_abandoned_seq_ranges
-            .iter()
-            .map(|range| (range.start, range.end))
-            .collect::<Vec<_>>();
-        store
-            .record_abandoned_event_seq_ranges(&abandoned_ranges)
-            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-        for event in &budget_mutation_events {
-            budget_cursor = Some(merge_budget_cursor(
-                budget_cursor,
-                budget_cursor_from_event(event),
-            ));
+        if !store.is_admission_authority_managed()? {
+            let usage_records = budgets
+                .iter()
+                .map(budget_usage_record_from_view)
+                .collect::<Vec<_>>();
+            let mutation_records = budget_mutation_events
+                .iter()
+                .map(budget_mutation_record_from_view)
+                .collect::<Result<Vec<_>, _>>()?;
+            store
+                .import_snapshot_records(&usage_records, &mutation_records)
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+            store
+                .record_budget_import_floors(&mutation_records)
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+            // Learn the leader's abandoned/tombstoned seqs so a fresh follower's
+            // contiguous ack head treats those holes as filled instead of stalling at
+            // them. Carried range-encoded and expanded in SQL, so a rollback-storm run
+            // is never materialized as a huge in-memory list here.
+            let abandoned_ranges = budget_abandoned_seq_ranges
+                .iter()
+                .map(|range| (range.start, range.end))
+                .collect::<Vec<_>>();
+            store
+                .record_abandoned_event_seq_ranges(&abandoned_ranges)
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+            for event in &budget_mutation_events {
+                budget_cursor = Some(merge_budget_cursor(
+                    budget_cursor,
+                    budget_cursor_from_event(event),
+                ));
+            }
         }
     }
 

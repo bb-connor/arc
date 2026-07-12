@@ -1,9 +1,11 @@
 use super::super::cluster::{
-    handle_internal_authority_snapshot, handle_internal_budgets_delta,
-    handle_internal_child_receipts_delta, handle_internal_cluster_partition,
-    handle_internal_cluster_snapshot, handle_internal_cluster_status,
-    handle_internal_lineage_delta, handle_internal_revocations_delta,
-    handle_internal_tool_receipts_delta,
+    handle_internal_admission_append_entries, handle_internal_admission_proposal,
+    handle_internal_admission_request_vote, handle_internal_admission_snapshot,
+    handle_internal_admission_snapshot_install, handle_internal_authority_snapshot,
+    handle_internal_budgets_delta, handle_internal_child_receipts_delta,
+    handle_internal_cluster_partition, handle_internal_cluster_snapshot,
+    handle_internal_cluster_status, handle_internal_lineage_delta,
+    handle_internal_revocations_delta, handle_internal_tool_receipts_delta,
 };
 use super::super::*;
 use axum::extract::DefaultBodyLimit;
@@ -296,7 +298,7 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         )
         .route(
             ADMISSION_CAPTURE_PATH,
-            post(handle_combined_admission_capture_unavailable),
+            post(handle_combined_admission_capture),
         )
         .route(
             BUDGET_RELEASE_EXPOSURE_PATH,
@@ -318,6 +320,23 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         .route(
             INTERNAL_CLUSTER_PARTITION_PATH,
             post(handle_internal_cluster_partition),
+        )
+        .route(
+            INTERNAL_ADMISSION_REQUEST_VOTE_PATH,
+            post(handle_internal_admission_request_vote),
+        )
+        .route(
+            INTERNAL_ADMISSION_APPEND_ENTRIES_PATH,
+            post(handle_internal_admission_append_entries),
+        )
+        .route(
+            INTERNAL_ADMISSION_PROPOSAL_PATH,
+            post(handle_internal_admission_proposal),
+        )
+        .route(
+            INTERNAL_ADMISSION_SNAPSHOT_PATH,
+            get(handle_internal_admission_snapshot)
+                .post(handle_internal_admission_snapshot_install),
         )
         .route(
             INTERNAL_AUTHORITY_SNAPSHOT_PATH,
@@ -767,6 +786,11 @@ mod tests {
             assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED, "{path}");
         }
 
+        let revocation_ids = vec!["cap-1".to_string()];
+        let canonical_ids = canonical_json_bytes(&revocation_ids).test_unwrap();
+        let mut revocation_digest_input = b"chio.revocation-set.v1\0".to_vec();
+        revocation_digest_input.extend_from_slice(&canonical_ids);
+        let revocation_digest = sha256_hex(&revocation_digest_input);
         let composite_requests = [
             (
                 BUDGET_AUTHORIZE_HOLD_PATH,
@@ -787,7 +811,7 @@ mod tests {
                         }],
                         "revocationSet": {
                             "ids": ["cap-1"],
-                            "digest": "11".repeat(32)
+                            "digest": revocation_digest.clone()
                         }
                     }
                 }),
@@ -836,9 +860,9 @@ mod tests {
                     "eventId": "event-1",
                     "revocationSet": {
                         "ids": ["cap-1"],
-                        "digest": "11".repeat(32)
+                        "digest": revocation_digest.clone()
                     },
-                    "boundRevocationSetDigest": "11".repeat(32),
+                    "boundRevocationSetDigest": revocation_digest,
                     "authorizationArtifactDigests": []
                 })
                 .to_string(),

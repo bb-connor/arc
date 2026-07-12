@@ -537,6 +537,9 @@ fn sync_peer_revocations(
         return Ok(0);
     };
     let store = SqliteRevocationStore::open(path).map_err(CliError::from)?;
+    if store.is_admission_authority_managed() {
+        return Ok(0);
+    }
     let mut applied = 0u64;
     loop {
         // Check the shared round budget BEFORE the next blocking fetch so an
@@ -690,7 +693,7 @@ fn sync_peer_child_receipts(
     Ok(applied)
 }
 
-fn sync_peer_budgets(
+pub(crate) fn sync_peer_budgets(
     state: &TrustServiceState,
     client: &TrustControlClient,
     peer_url: &str,
@@ -700,6 +703,12 @@ fn sync_peer_budgets(
         return Ok(0);
     };
     let mut store = SqliteBudgetStore::open(path).map_err(CliError::from)?;
+    if store
+        .is_admission_authority_managed()
+        .map_err(CliError::from)?
+    {
+        return Ok(0);
+    }
     let cursor = peer_budget_cursor(state, peer_url);
     drain_budget_delta_pages(
         &mut store,

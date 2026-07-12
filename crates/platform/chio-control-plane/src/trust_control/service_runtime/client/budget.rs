@@ -35,6 +35,13 @@ impl TrustControlClient {
         self.post_json(BUDGET_CAPTURE_INVOCATIONS_PATH, request)
     }
 
+    pub(crate) fn capture_admission(
+        &self,
+        request: &CombinedAdmissionCaptureRequest,
+    ) -> Result<CombinedAdmissionCaptureResponse, CliError> {
+        self.post_json(ADMISSION_CAPTURE_PATH, request)
+    }
+
     pub(crate) fn try_charge_cost(
         &self,
         capability_id: &str,

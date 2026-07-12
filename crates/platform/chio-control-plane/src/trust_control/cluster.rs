@@ -9,6 +9,8 @@ use super::report_validation::{
 };
 use super::*;
 
+#[path = "cluster/admission_consensus.rs"]
+mod admission_consensus;
 #[path = "cluster/consensus.rs"]
 mod consensus;
 #[path = "cluster/deltas.rs"]
@@ -20,6 +22,12 @@ mod pull_budget;
 #[path = "cluster/snapshots.rs"]
 mod snapshots;
 
+pub(crate) use admission_consensus::{
+    handle_internal_admission_append_entries, handle_internal_admission_proposal,
+    handle_internal_admission_request_vote, handle_internal_admission_snapshot,
+    handle_internal_admission_snapshot_install, initialize_admission_consensus,
+    propose_admission_command,
+};
 pub(crate) use consensus::{
     budget_authority_guarantee_level, budget_authority_metadata_view, build_cluster_state,
     cluster_authority_lease_view, cluster_consensus_view, cluster_self_url,
@@ -61,6 +69,7 @@ pub(crate) use deltas::{
     budget_write_progress_closed_outcome, budget_write_quorum_commit_view,
     collect_budget_mutation_event_views_after_seq, finalize_peer_sync_round,
     import_budget_delta_response, notify_cluster_progress, peer_was_demoted, route_pull,
+    sync_peer_budgets,
 };
 
 // Non-test: peer_was_demoted (in deltas) reads peer health via with_peer_state.

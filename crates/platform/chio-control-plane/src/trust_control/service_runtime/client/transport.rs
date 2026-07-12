@@ -238,12 +238,35 @@ impl TrustControlClient {
     where
         T: for<'de> Deserialize<'de>,
     {
+        let body_digest = matches!(
+            path,
+            INTERNAL_ADMISSION_REQUEST_VOTE_PATH
+                | INTERNAL_ADMISSION_APPEND_ENTRIES_PATH
+                | INTERNAL_ADMISSION_SNAPSHOT_PATH
+                | INTERNAL_ADMISSION_PROPOSAL_PATH
+        )
+        .then(|| {
+            canonical_json_bytes(&body)
+                .map(|body_bytes| sha256_hex(&body_bytes))
+                .map_err(|error| {
+                    CliError::cli_other_error(format!(
+                        "failed to canonicalize internal request body: {error}"
+                    ))
+                })
+        })
+        .transpose()?;
         let endpoint_order = self.endpoint_order();
         let mut last_error = None;
         for index in endpoint_order {
             let url = format!("{}{}", self.endpoints[index], path);
             let request = if self.cluster_peer_auth.is_some() {
-                self.build_internal_post_request(&self.http, &url, path, term)?
+                self.build_internal_post_request(
+                    &self.http,
+                    &url,
+                    path,
+                    term,
+                    body_digest.as_deref(),
+                )?
             } else {
                 self.http
                     .post(&url)

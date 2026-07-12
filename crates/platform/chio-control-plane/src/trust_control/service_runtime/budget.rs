@@ -13,6 +13,60 @@ pub fn build_remote_budget_store(
     }))
 }
 
+pub fn build_remote_admission_capture_authority(
+    control_url: &str,
+    control_token: &str,
+) -> Result<Box<dyn AdmissionCaptureAuthority>, CliError> {
+    Ok(Box::new(RemoteAdmissionCaptureAuthority {
+        client: build_client(control_url, control_token)?,
+    }))
+}
+
+impl AdmissionCaptureAuthority for RemoteAdmissionCaptureAuthority {
+    fn capture_admission(
+        &self,
+        request: AdmissionCaptureRequest,
+    ) -> Result<AdmissionCaptureDecision, AdmissionCaptureError> {
+        let budget = request.budget();
+        let hold_id = budget.hold_id.as_ref().ok_or_else(|| {
+            AdmissionCaptureError::InvalidRequest(
+                "remote admission capture requires hold_id".to_string(),
+            )
+        })?;
+        let event_id = budget.event_id.as_ref().ok_or_else(|| {
+            AdmissionCaptureError::InvalidRequest(
+                "remote admission capture requires event_id".to_string(),
+            )
+        })?;
+        let authority = budget.authority.as_ref().ok_or_else(|| {
+            AdmissionCaptureError::InvalidRequest(
+                "remote admission capture requires persisted authority".to_string(),
+            )
+        })?;
+        let wire_request = CombinedAdmissionCaptureRequest {
+            operation_id: request.operation_id().to_string(),
+            capability_id: budget.capability_id.clone(),
+            grant_index: budget.grant_index,
+            hold_id: hold_id.clone(),
+            event_id: event_id.clone(),
+            budget_authority: Some(BudgetMutationAuthorityView {
+                authority_id: authority.authority_id.clone(),
+                lease_id: authority.lease_id.clone(),
+                lease_epoch: authority.lease_epoch,
+            }),
+            revocation_set: canonical_revocation_set_view(request.revocation_set()),
+            bound_revocation_set_digest: request.bound_revocation_set_digest().to_string(),
+            authorization_artifact_digests: request.authorization_artifact_digests().to_vec(),
+            last_observed_revocation_index: request.last_observed_revocation_index(),
+        };
+        let response = self
+            .client
+            .capture_admission(&wire_request)
+            .map_err(|error| AdmissionCaptureError::Unavailable(error.to_string()))?;
+        validate_remote_admission_capture_response(&request, response)
+    }
+}
+
 impl BudgetStore for RemoteBudgetStore {
     fn try_increment(
         &self,
@@ -1550,6 +1604,141 @@ pub(crate) fn validate_invocation_capture_response(
     })
 }
 
+fn validate_remote_admission_capture_response(
+    request: &AdmissionCaptureRequest,
+    response: CombinedAdmissionCaptureResponse,
+) -> Result<AdmissionCaptureDecision, AdmissionCaptureError> {
+    let budget_request = request.budget();
+    let hold_id = budget_request.hold_id.as_deref().ok_or_else(|| {
+        AdmissionCaptureError::InvalidRequest(
+            "remote admission capture request omitted hold_id".to_string(),
+        )
+    })?;
+    let event_id = budget_request.event_id.as_deref().ok_or_else(|| {
+        AdmissionCaptureError::InvalidRequest(
+            "remote admission capture request omitted event_id".to_string(),
+        )
+    })?;
+    if response.operation_id != request.operation_id()
+        || response.capability_id != budget_request.capability_id
+        || response.grant_index != budget_request.grant_index
+        || response.hold_id != hold_id
+        || response.event_id != event_id
+        || response.metadata.operation_id != request.operation_id()
+        || response.metadata.hold_id != hold_id
+        || response.metadata.event_id != event_id
+        || response.metadata.checked_revocation_set_digest != request.bound_revocation_set_digest()
+        || response.metadata.authorization_artifact_digests
+            != request.authorization_artifact_digests()
+        || response.metadata.guarantee_level != BudgetGuaranteeLevelView::HaLinearizable
+        || response.metadata.leader_epoch.is_none_or(|term| term == 0)
+        || response.metadata.authority_commit_index == 0
+    {
+        return Err(AdmissionCaptureError::InvalidRequest(
+            "remote admission capture response changed its bound identity or authority evidence"
+                .to_string(),
+        ));
+    }
+    let revocation_set = canonical_revocation_set_from_view(&response.revocation_set)?;
+    if &revocation_set != request.revocation_set() {
+        return Err(AdmissionCaptureError::InvalidRequest(
+            "remote admission capture response changed the canonical revocation set".to_string(),
+        ));
+    }
+    let requested_authority = budget_request.authority.as_ref().ok_or_else(|| {
+        AdmissionCaptureError::InvalidRequest(
+            "remote admission capture request omitted persisted authority".to_string(),
+        )
+    })?;
+    let response_authority = response.metadata.authority.as_ref().ok_or_else(|| {
+        AdmissionCaptureError::InvalidRequest(
+            "remote admission capture response omitted persisted authority".to_string(),
+        )
+    })?;
+    if response_authority.authority_id != requested_authority.authority_id
+        || response_authority.lease_id != requested_authority.lease_id
+        || response_authority.lease_epoch != requested_authority.lease_epoch
+    {
+        return Err(AdmissionCaptureError::InvalidRequest(
+            "remote admission capture response changed the persisted authority".to_string(),
+        ));
+    }
+    let quotas = response
+        .metadata
+        .invocation_quotas
+        .iter()
+        .map(invocation_quota_from_view)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    match (response.outcome, response.budget) {
+        (AdmissionCaptureOutcomeView::Captured, Some(budget_response)) => {
+            if !response.revoked_capability_ids.is_empty() {
+                return Err(AdmissionCaptureError::InvalidRequest(
+                    "captured admission response contains revoked IDs".to_string(),
+                ));
+            }
+            let monetary_state = monetary_state_from_view(budget_response.monetary_state);
+            let budget = validate_invocation_capture_response(
+                budget_request,
+                &quotas,
+                request.revocation_set(),
+                monetary_state,
+                budget_response,
+            )?;
+            if response.metadata.budget_commit_index != budget.metadata.budget_commit_index {
+                return Err(AdmissionCaptureError::InvalidRequest(
+                    "remote admission metadata changed the budget commit index".to_string(),
+                ));
+            }
+            let metadata = AdmissionCaptureMetadata::new(
+                request.operation_id().to_string(),
+                response.metadata.checked_revocation_set_digest,
+                budget.metadata.clone(),
+                response.metadata.revocation_commit_index,
+                response.metadata.authority_commit_index,
+            )?;
+            Ok(AdmissionCaptureDecision::Captured {
+                budget: Box::new(budget),
+                metadata,
+            })
+        }
+        (AdmissionCaptureOutcomeView::DeniedRevoked, None) => {
+            if response.revoked_capability_ids.iter().any(|id| {
+                request
+                    .revocation_set()
+                    .ids()
+                    .binary_search_by(|candidate| candidate.as_bytes().cmp(id.as_bytes()))
+                    .is_err()
+            }) {
+                return Err(AdmissionCaptureError::InvalidRequest(
+                    "remote admission denial contains an unbound revoked ID".to_string(),
+                ));
+            }
+            let budget_commit = BudgetCommitMetadata {
+                authority: Some(requested_authority.clone()),
+                guarantee_level: BudgetGuaranteeLevel::HaLinearizable,
+                budget_profile: BudgetAuthorityProfile::AuthoritativeHoldEvent,
+                metering_profile: BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
+                budget_commit_index: response.metadata.budget_commit_index,
+                event_id: Some(event_id.to_string()),
+            };
+            let metadata = AdmissionCaptureMetadata::new(
+                request.operation_id().to_string(),
+                response.metadata.checked_revocation_set_digest,
+                budget_commit,
+                response.metadata.revocation_commit_index,
+                response.metadata.authority_commit_index,
+            )?;
+            Ok(AdmissionCaptureDecision::Denied(
+                AdmissionCaptureDenial::revoked(response.revoked_capability_ids, metadata)?,
+            ))
+        }
+        _ => Err(AdmissionCaptureError::InvalidRequest(
+            "remote admission capture outcome contradicts its budget body".to_string(),
+        )),
+    }
+}
+
 #[derive(Debug, Clone)]
 struct ValidatedRemoteBudgetEvidence {
     authority: Option<BudgetEventAuthority>,
@@ -1640,9 +1829,9 @@ fn validate_remote_budget_evidence(
                     "remote budget commit authority identity is incomplete".to_string(),
                 ));
             }
-            if commit.budget_seq != commit.commit_index {
+            if commit.budget_seq == 0 || commit.commit_index == 0 {
                 return Err(BudgetStoreError::Invariant(
-                    "remote budget commit index does not match its budget sequence".to_string(),
+                    "remote budget commit omitted its budget cursor or consensus index".to_string(),
                 ));
             }
             if !commit.quorum_committed {
@@ -1745,7 +1934,7 @@ fn validate_remote_budget_evidence(
 
     let response_authority = metadata_authority.or(commit_authority);
     let commit_index = commit
-        .map(|commit| commit.commit_index)
+        .map(|commit| commit.budget_seq)
         .or_else(|| authority.and_then(|authority| authority.budget_commit_index));
     if commit.is_none()
         && authority.is_some_and(|authority| authority.budget_commit_index.is_some())

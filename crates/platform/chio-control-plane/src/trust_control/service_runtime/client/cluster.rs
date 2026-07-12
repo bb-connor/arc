@@ -1,6 +1,39 @@
 use super::super::*;
 
 impl TrustControlClient {
+    pub(crate) fn admission_request_vote(
+        &self,
+        request: &AdmissionRequestVoteRequest,
+    ) -> Result<AdmissionRequestVoteResponse, CliError> {
+        self.post_internal_json(
+            INTERNAL_ADMISSION_REQUEST_VOTE_PATH,
+            request,
+            Some(request.term),
+        )
+    }
+
+    pub(crate) fn admission_append_entries(
+        &self,
+        request: &AdmissionAppendEntriesRequest,
+    ) -> Result<AdmissionAppendEntriesResponse, CliError> {
+        self.post_internal_json(
+            INTERNAL_ADMISSION_APPEND_ENTRIES_PATH,
+            request,
+            Some(request.term),
+        )
+    }
+
+    pub(crate) fn admission_proposal(
+        &self,
+        request: &AdmissionProposalRequest,
+    ) -> Result<AdmissionConsensusResult, CliError> {
+        self.post_internal_json(INTERNAL_ADMISSION_PROPOSAL_PATH, request, None)
+    }
+
+    pub(crate) fn admission_snapshot(&self) -> Result<AdmissionConsensusSnapshot, CliError> {
+        self.get_internal_json(INTERNAL_ADMISSION_SNAPSHOT_PATH, None)
+    }
+
     pub(crate) fn cluster_status(&self) -> Result<ClusterStatusResponse, CliError> {
         self.get_internal_json(INTERNAL_CLUSTER_STATUS_PATH, None)
     }

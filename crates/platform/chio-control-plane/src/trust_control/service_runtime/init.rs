@@ -35,6 +35,7 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
         cluster,
         cluster_progress,
     };
+    super::super::cluster::initialize_admission_consensus(&state)?;
     let controller = ShutdownController::install();
     let cluster_sync_task = state
         .cluster

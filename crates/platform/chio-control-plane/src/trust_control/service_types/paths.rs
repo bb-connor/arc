@@ -109,6 +109,14 @@ pub(crate) const AGGREGATE_FAMILY_ROOT_LOOKUP_PATH: &str =
 pub(crate) const INTERNAL_CLUSTER_STATUS_PATH: &str = "/v1/internal/cluster/status";
 pub(crate) const INTERNAL_CLUSTER_SNAPSHOT_PATH: &str = "/v1/internal/cluster/snapshot";
 pub(crate) const INTERNAL_CLUSTER_PARTITION_PATH: &str = "/v1/internal/cluster/partition";
+pub(crate) const INTERNAL_ADMISSION_REQUEST_VOTE_PATH: &str =
+    "/v1/internal/admission-consensus/request-vote";
+pub(crate) const INTERNAL_ADMISSION_APPEND_ENTRIES_PATH: &str =
+    "/v1/internal/admission-consensus/append-entries";
+pub(crate) const INTERNAL_ADMISSION_PROPOSAL_PATH: &str =
+    "/v1/internal/admission-consensus/proposal";
+pub(crate) const INTERNAL_ADMISSION_SNAPSHOT_PATH: &str =
+    "/v1/internal/admission-consensus/snapshot";
 pub(crate) const INTERNAL_AUTHORITY_SNAPSHOT_PATH: &str = "/v1/internal/authority/snapshot";
 pub(crate) const INTERNAL_REVOCATIONS_DELTA_PATH: &str = "/v1/internal/revocations/delta";
 pub(crate) const INTERNAL_TOOL_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/tools/delta";
@@ -119,6 +127,7 @@ pub(crate) const CLUSTER_NODE_ID_HEADER: &str = "x-chio-cluster-node-id";
 pub(crate) const CLUSTER_AUTH_ISSUED_AT_HEADER: &str = "x-chio-cluster-auth-issued-at";
 pub(crate) const CLUSTER_AUTH_SIGNATURE_HEADER: &str = "x-chio-cluster-auth-signature";
 pub(crate) const CLUSTER_AUTH_TERM_HEADER: &str = "x-chio-cluster-auth-term";
+pub(crate) const CLUSTER_AUTH_BODY_DIGEST_HEADER: &str = "x-chio-cluster-body-digest";
 pub(crate) const CLUSTER_AUTH_SCHEME: &str = "chio.cluster.peer.v1";
 pub(crate) const CLUSTER_AUTH_MAX_SKEW_SECS: i64 = 60;
 pub(crate) const CLUSTER_AUTH_FAILURE_WINDOW_SECS: u64 = 60;

@@ -83,6 +83,10 @@ pub(crate) struct RemoteBudgetStore {
     pub(crate) composite_holds: Mutex<HashMap<String, RemoteCompositeHoldEvidence>>,
 }
 
+pub(crate) struct RemoteAdmissionCaptureAuthority {
+    pub(crate) client: TrustControlClient,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct RemoteCompositeHoldEvidence {
     pub(crate) capability_id: String,
