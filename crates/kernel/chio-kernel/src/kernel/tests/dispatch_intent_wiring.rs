@@ -172,6 +172,51 @@ fn nested_flow_dispatch_journals_a_durable_intent_and_consumes_it_on_allow(
     Ok(())
 }
 
+/// Minimal append-only store whose boot reconciliation always fails.
+struct ReconcileFailingStore;
+
+impl crate::receipt_store::ReceiptStore for ReconcileFailingStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn reconcile_dispatch_intents(
+        &self,
+        _reconciler: &dyn crate::receipt_store::DispatchIntentReconciler,
+    ) -> Result<crate::receipt_store::DispatchIntentReconcileReport, ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "boot reconciliation failed".to_string(),
+        ))
+    }
+}
+
+#[test]
+fn failed_boot_reconciliation_leaves_no_store_attached() -> Result<(), Box<dyn std::error::Error>>
+{
+    // Boot reconciliation must complete BEFORE the store serves: if it
+    // fails, the attach is refused and the kernel keeps no store handle, so
+    // no new dispatch can interleave with (or run ahead of) an incomplete
+    // reconcile pass.
+    let mut kernel = make_kernel(make_config());
+    let result = kernel.set_receipt_store_handle(std::sync::Arc::new(ReconcileFailingStore));
+    assert!(
+        result.is_err(),
+        "a failed boot reconcile must refuse the attach"
+    );
+    assert!(
+        kernel.with_receipt_store(|_| Ok(()))?.is_none(),
+        "the store must not serve after a failed boot reconciliation"
+    );
+    Ok(())
+}
+
 /// Tool server whose dispatch always requires URL elicitations, so the
 /// evaluation returns to the caller WITHOUT any tool side effect and without
 /// recording a terminal receipt.

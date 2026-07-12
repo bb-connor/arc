@@ -689,6 +689,26 @@ impl ChioKernel {
         &mut self,
         receipt_store: Arc<dyn ReceiptStore>,
     ) -> Result<(), KernelError> {
+        // Before anything else, resolve every dispatch intent that survived
+        // a restart: each one marks a call whose effect may have run with no
+        // receipt. Reconciliation runs strictly BEFORE the store is attached
+        // or any background worker starts, so no new dispatch can journal an
+        // intent that interleaves with the boot pass, and a reconcile
+        // failure refuses the attach outright (fail-closed) instead of
+        // leaving a store serving with unresolved open intents. The default
+        // posture dead-letters orphans into durable, health-flipping
+        // incidents (a side effect is never blindly replayed); a store
+        // without the journal reports an empty pass.
+        let report =
+            receipt_store.reconcile_dispatch_intents(&crate::DefaultDispatchIntentReconciler)?;
+        if report.dead_lettered > 0 || report.monetary_reconciled > 0 {
+            tracing::warn!(
+                open = report.open,
+                dead_lettered = report.dead_lettered,
+                monetary_reconciled = report.monetary_reconciled,
+                "dispatch intents survived a restart; incidents recorded for operator review"
+            );
+        }
         match receipt_store.load_latest_checkpoint() {
             Ok(Some(checkpoint)) => {
                 self.checkpoint_seq_counter
@@ -793,23 +813,6 @@ impl ChioKernel {
                 ));
         }
         self.receipt_store = Some(receipt_store);
-        // Before this store serves, resolve every dispatch intent that
-        // survived a restart: each one marks a call whose effect may have run
-        // with no receipt. The default posture dead-letters them into
-        // durable, health-flipping incidents (a side effect is never blindly
-        // replayed); a store without the journal reports an empty pass.
-        if let Some(store) = self.receipt_store.as_ref() {
-            let report =
-                store.reconcile_dispatch_intents(&crate::DefaultDispatchIntentReconciler)?;
-            if report.dead_lettered > 0 || report.monetary_reconciled > 0 {
-                tracing::warn!(
-                    open = report.open,
-                    dead_lettered = report.dead_lettered,
-                    monetary_reconciled = report.monetary_reconciled,
-                    "dispatch intents survived a restart; incidents recorded for operator review"
-                );
-            }
-        }
         Ok(())
     }
 
