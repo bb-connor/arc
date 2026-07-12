@@ -26,6 +26,7 @@ python3 scripts/check-architecture-docs.py
 ./scripts/check-log-redaction.sh
 ./scripts/check-http-egress-contract.sh
 bash scripts/tests/check-http-egress-contract.test.sh
+bash scripts/tests/check-protocol-primitives-concurrency.test.sh
 
 ./scripts/check-anchor-batch-async-witness.sh
 
@@ -51,6 +52,7 @@ bash scripts/tests/provider-fixture-claims.test.sh
 cargo clippy --workspace --lib --bins --examples -- -D warnings
 cargo build --workspace
 cargo test --workspace --exclude chio-wasm-guards
+./scripts/check-protocol-primitives-concurrency.sh
 cargo test -p chio-wasm-guards --lib
 
 RUSTFLAGS="${CHIO_CI_RUSTFLAGS} -C debuginfo=0 --cfg tokio_unstable" \

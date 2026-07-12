@@ -104,6 +104,7 @@ jobs:
           bash ./scripts/tests/check-chio-schema-registry.test.sh
           bash ./scripts/check-agent-web-proof-envelope-schema.sh
           bash ./scripts/tests/check-agent-web-proof-envelope-schema.test.sh
+          bash ./scripts/tests/check-protocol-primitives-concurrency.test.sh
 
       - name: Anchor batch async witness lint
         run: bash ./scripts/check-anchor-batch-async-witness.sh
@@ -186,6 +187,12 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: cargo test --workspace --exclude chio-wasm-guards
+
+      - name: Protocol-primitives production Loom gate
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+        run: ./scripts/check-protocol-primitives-concurrency.sh
 
       - name: Wasm guards library tests
         env:
