@@ -10,6 +10,11 @@ spec_anchor = "spec/PROTOCOL.md#55-verified-core-boundary"
 primary_toolchain = ["lean4", "creusot", "kani", "aeneas"]
 pilot_toolchain = []
 
+apalache_models = [
+  "positive|InformationFlowLattice|formal/tla/InformationFlowLattice.tla|formal/tla/MCInformationFlowLattice.cfg|SafetyInv",
+  "negative|InformationFlowLatticeReaderDirectionBroken|formal/tla/_negative_tests/InformationFlowLatticeReaderDirectionBroken.tla|formal/tla/_negative_tests/MCInformationFlowLatticeReaderDirectionBroken.cfg|SafetyInv",
+]
+
 root_modules = [
   "formal/lean4/Chio/Chio.lean",
   "formal/lean4/Chio/Chio/Core/Capability.lean",
@@ -35,6 +40,7 @@ root_modules = [
 ]
 
 gate_commands = [
+  "python3 scripts/check-apalache-formal-slice.py",
   "./scripts/check-formal-proofs.sh",
   "./scripts/check-aeneas-pilot.sh",
   "./scripts/check-aeneas-production.sh",

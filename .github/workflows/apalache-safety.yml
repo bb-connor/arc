@@ -6,8 +6,14 @@ on:
     - cron: "23 7 * * *"
   pull_request:
     paths:
+      - "crates/security/chio-flow/**"
+      - "crates/security/chio-security-types/**"
       - "formal/apalache/**"
       - "formal/tla/**"
+      - "formal/MAPPING.md"
+      - "formal/proof-manifest.toml"
+      - "formal/theorem-inventory.json"
+      - "spec/schemas/chio-wire/v1/security/**"
       - "scripts/check-apalache-formal-slice.py"
       - "tools/install-apalache.sh"
       - ".github/workflows/apalache-safety.yml"
@@ -68,6 +74,24 @@ jobs:
           formal/apalache/MCRevocationCutCompleteness.cfg|formal/apalache/RevocationCutCompleteness.tla
           formal/apalache/MCReceiptBeforeAllow.cfg|formal/apalache/ReceiptBeforeAllow.tla
           formal/apalache/MCKernelTransitionCancelSafe.cfg|formal/apalache/KernelTransitionCancelSafe.tla
+          formal/tla/MCInformationFlowLattice.cfg|formal/tla/InformationFlowLattice.tla
           formal/tla/MCRevocationPropagation.cfg|formal/tla/RevocationPropagation.tla
           formal/tla/MCDelegationDepthBound.cfg|formal/tla/DelegationDepthBound.tla
           EOF
+
+      - name: Apalache information-flow mutation check
+        shell: bash
+        run: |
+          set -euo pipefail
+          negative_log="$(mktemp)"
+          trap 'rm -f "${negative_log}"' EXIT
+          if apalache-mc check \
+            --length=6 \
+            --config=formal/tla/_negative_tests/MCInformationFlowLatticeReaderDirectionBroken.cfg \
+            formal/tla/_negative_tests/InformationFlowLatticeReaderDirectionBroken.tla \
+            2>&1 | tee "${negative_log}"; then
+            echo "reader-direction mutation unexpectedly satisfied SafetyInv" >&2
+            exit 1
+          fi
+          grep -Eq "state invariant [0-9]+ violated" "${negative_log}"
+          grep -Fq "The outcome is: Error" "${negative_log}"

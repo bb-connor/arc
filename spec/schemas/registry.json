@@ -1504,6 +1504,12 @@
       "artifactKind": "risk_adjudication_jurisdiction_receipt",
       "introducedBy": "trust-market-v1",
       "schemaFile": "spec/schemas/chio-risk/v1/adjudication-jurisdiction-receipt.schema.json"
+    },
+    {
+      "schema": "chio.security.information-label.v1",
+      "artifactKind": "security_information_label",
+      "introducedBy": "active-defense-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/security/information-label.schema.json"
     }
   ]
 }

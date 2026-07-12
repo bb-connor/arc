@@ -152,12 +152,86 @@ def check_safety_workflow_paths() -> None:
     )
 
 
+def check_information_flow_lattice() -> None:
+    positive = read("formal/tla/InformationFlowLattice.tla")
+    negative = read(
+        "formal/tla/_negative_tests/InformationFlowLatticeReaderDirectionBroken.tla"
+    )
+    workflow = read(".github/workflows/apalache-safety.yml")
+    proof_manifest = read("formal/proof-manifest.toml")
+    inventory = read("formal/theorem-inventory.json")
+    mapping = read("formal/MAPPING.md")
+
+    require(
+        "ReadersFor(destination, owner) \\subseteq ReadersFor(source, owner)"
+        in positive,
+        "InformationFlowLattice must use the restrictive destination-reader subset",
+    )
+    require(
+        "ReadersFor(source, owner) \\subseteq ReadersFor(destination, owner)"
+        in negative,
+        "the information-flow negative must reverse the reader subset direction",
+    )
+    require(
+        "ReadersFor(source, owner) \\subseteq ReadersFor(destination, owner)"
+        not in positive,
+        "the production information-flow model contains the broken reader relation",
+    )
+    for invariant in (
+        "Reflexive",
+        "Antisymmetric",
+        "Transitive",
+        "JoinUpperBound",
+        "JoinLeastUpperBound",
+        "JoinAlgebra",
+        "TopEgressDenied",
+    ):
+        require(
+            f"/\\ {invariant}" in body(positive, "InformationFlowLattice"),
+            f"InformationFlowLattice must include {invariant}",
+        )
+    require(
+        "formal/tla/MCInformationFlowLattice.cfg|formal/tla/InformationFlowLattice.tla"
+        in workflow,
+        "apalache-safety must run the positive information-flow model",
+    )
+    require(
+        "MCInformationFlowLatticeReaderDirectionBroken.cfg" in workflow
+        and "state invariant [0-9]+ violated" in workflow
+        and "The outcome is: Error" in workflow,
+        "apalache-safety must require a semantic counterexample from the reader mutant",
+    )
+    for watched_path in (
+        "crates/security/chio-flow/**",
+        "crates/security/chio-security-types/**",
+        "formal/MAPPING.md",
+        "formal/proof-manifest.toml",
+        "formal/theorem-inventory.json",
+        "spec/schemas/chio-wire/v1/security/**",
+    ):
+        require(
+            f'- "{watched_path}"' in workflow,
+            f"apalache-safety pull-request paths must include {watched_path}",
+        )
+    for registry, text in (
+        ("proof manifest", proof_manifest),
+        ("theorem inventory", inventory),
+        ("formal mapping", mapping),
+    ):
+        require(
+            "InformationFlowLattice" in text
+            and "InformationFlowLatticeReaderDirectionBroken" in text,
+            f"{registry} must register both information-flow models",
+        )
+
+
 def main() -> int:
     checks = (
         check_receipt_before_allow,
         check_revocation_cut,
         check_temporal_workflow,
         check_safety_workflow_paths,
+        check_information_flow_lattice,
     )
     failures: list[str] = []
     for check in checks:

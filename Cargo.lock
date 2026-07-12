@@ -3469,6 +3469,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-flow"
+version = "0.1.0"
+dependencies = [
+ "chio-security-types",
+ "proptest",
+ "serde_json",
+]
+
+[[package]]
 name = "chio-formal-diff-tests"
 version = "0.1.0"
 dependencies = [
@@ -4329,6 +4338,15 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-security-types"
+version = "0.1.0"
+dependencies = [
+ "jsonschema",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

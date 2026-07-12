@@ -8,6 +8,9 @@ members = [
     "crates/core/chio-adversarial-suite",
     "crates/core/chio-arena",
     "crates/core/chio-bounded",
+    # Portable active-defense security
+    "crates/security/chio-security-types",
+    "crates/security/chio-flow",
     #
     # Kernel variants
     "crates/kernel/chio-kernel",
@@ -387,6 +390,7 @@ chio-disclosure-lineage = { path = "crates/trust/chio-disclosure-lineage" }
 chio-edge-metrics = { path = "crates/protocol/chio-edge-metrics" }
 chio-egress-contract = { path = "crates/protocol/chio-egress-contract" }
 chio-errors = { path = "crates/core/chio-errors" }
+chio-flow = { path = "crates/security/chio-flow" }
 chio-enterprise-export = { path = "crates/platform/chio-enterprise-export" }
 chio-eval-receipt = { path = "crates/sdk/chio-eval-receipt" }
 chio-external-guards = { path = "crates/guards/chio-external-guards" }
@@ -442,6 +446,7 @@ chio-runtime-harness = { path = "crates/kernel/chio-runtime-harness" }
 chio-runtime-proof-parity = { path = "crates/kernel/chio-runtime-proof-parity" }
 chio-selective-disclosure = { path = "crates/trust/chio-selective-disclosure" }
 chio-settle = { path = "crates/economy/chio-settle" }
+chio-security-types = { path = "crates/security/chio-security-types" }
 chio-siem = { path = "crates/observability/chio-siem" }
 chio-spec-codegen = { path = "crates/tooling/chio-spec-codegen" }
 chio-spec-validate = { path = "crates/tooling/chio-spec-validate" }

@@ -37,6 +37,7 @@ Directory layout:
 - `jsonrpc/` - JSON-RPC framing used by the hosted MCP HTTP edge.
 - `provenance/` - provenance and attestation records emitted by the kernel.
 - `receipt/` - signed receipts produced after tool calls complete.
+- `security/` - portable information-flow and active-defense records.
 - `trust-control/` - trust-control plane messages (policy, allowlist, audit).
 
 Source-of-truth pointers:
