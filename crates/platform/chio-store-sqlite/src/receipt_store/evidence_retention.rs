@@ -987,8 +987,25 @@ pub(super) fn create_archive_schema(
     Ok(())
 }
 
-/// Idempotent copy of the [1, W] prefix into the archive (INSERT OR IGNORE).
-/// Returns the number of newly archived tool-receipt rows.
+/// Idempotent copy of the [1, W] prefix into the archive. Returns the number of
+/// newly archived tool-receipt rows.
+///
+/// Append-only evidence (the receipt tables, the claim-log projection, the
+/// signed checkpoints, the write-once authorization consumptions) copies with
+/// `INSERT OR IGNORE`: those rows never change once written, so a pre-existing
+/// archive row that diverges from the live row signals a reused or corrupt
+/// archive and must be caught fail-closed by `verify_co_archival_complete`, not
+/// silently overwritten.
+///
+/// The settlement and metered reconciliation rows, by contrast, are mutated in
+/// place by ongoing reconciliation upserts, including for a receipt already in
+/// the archival prefix. A rotation copies the reconciliation row, a later
+/// reconciliation update changes it, and the write-locked co-archival re-verify
+/// then aborts because the archive holds the pre-update bytes. An `INSERT OR
+/// IGNORE` retry would keep the stale archive row on every rotation and leave
+/// the prefix permanently unrotatable. These two tables therefore refresh their
+/// archived copy from the current live row (`INSERT OR REPLACE`) so a retry
+/// converges on the latest committed reconciliation state instead of stalling.
 pub(super) fn copy_archived_prefix(
     connection: &rusqlite::Connection,
     w: i64,
@@ -1028,11 +1045,15 @@ pub(super) fn copy_archived_prefix(
             WHERE r.seq IN (
                 SELECT source_seq FROM main.claim_receipt_log_entries
                 WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
-        INSERT OR IGNORE INTO archive.settlement_reconciliations
+        -- Refresh (not IGNORE) the mutable reconciliation rows: an earlier copy
+        -- may hold pre-update bytes for a receipt whose reconciliation state has
+        -- since advanced, and only replacing it lets a retried rotation pass the
+        -- write-locked co-archival re-verify instead of stalling on stale bytes.
+        INSERT OR REPLACE INTO archive.settlement_reconciliations
             SELECT * FROM main.settlement_reconciliations WHERE receipt_id IN (
                 SELECT receipt_id FROM main.claim_receipt_log_entries
                 WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
-        INSERT OR IGNORE INTO archive.metered_billing_reconciliations
+        INSERT OR REPLACE INTO archive.metered_billing_reconciliations
             SELECT * FROM main.metered_billing_reconciliations WHERE receipt_id IN (
                 SELECT receipt_id FROM main.claim_receipt_log_entries
                 WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');

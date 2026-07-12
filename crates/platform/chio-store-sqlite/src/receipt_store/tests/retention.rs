@@ -503,6 +503,131 @@ fn settlement_and_metered_rows_are_archived_not_cascaded() -> Result<(), Box<dyn
     Ok(())
 }
 
+/// Settlement and metered reconciliation rows are mutated in place by ongoing
+/// reconciliation upserts, so a rotation can copy a reconciliation row, have a
+/// later update change it, and then abort under the write-locked co-archival
+/// re-verify because the archive holds the pre-update bytes. The archive copy of
+/// these mutable tables must REFRESH a conflicting stale row from the current
+/// live row; an `INSERT OR IGNORE` retry would keep the stale bytes and leave
+/// the prefix permanently unrotatable.
+#[test]
+fn rotation_refreshes_stale_reconciliation_archive_rows() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("recon-refresh");
+    let archive = unique_db_path("recon-refresh-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for i in 0..2u64 {
+        let receipt = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("recon-refresh-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    // The current (already reconciled) live rows for the first archived receipt.
+    let receipt_id = super::support::first_tool_receipt_id(&store)?;
+    store.writer_handle().run_write({
+        let receipt_id = receipt_id.clone();
+        move |connection| {
+            connection.execute(
+                "INSERT INTO settlement_reconciliations (receipt_id, reconciliation_state, note, updated_at) \
+                 VALUES (?1, 'settled-final', 'live-note', 200)",
+                rusqlite::params![receipt_id],
+            )?;
+            connection.execute(
+                "INSERT INTO metered_billing_reconciliations \
+                 (receipt_id, adapter_kind, evidence_id, observed_units, billed_cost_units, billed_cost_currency, evidence_sha256, recorded_at, reconciliation_state, note, updated_at) \
+                 VALUES (?1, 'test', 'ev-final', 42, 42, 'usd', NULL, 200, 'reconciled', 'live-note', 200)",
+                rusqlite::params![receipt_id],
+            )?;
+            Ok(())
+        }
+    })?;
+
+    // Simulate the archive an earlier rotation left behind: a copy of the
+    // reconciliation rows captured BEFORE the update above, so the archived
+    // bytes are now stale. The bulk evidence tables are created and copied
+    // faithfully by the rotation itself.
+    {
+        let seed = rusqlite::Connection::open(&archive)?;
+        seed.execute_batch(
+            r#"
+            CREATE TABLE settlement_reconciliations (
+                receipt_id TEXT PRIMARY KEY, reconciliation_state TEXT NOT NULL,
+                note TEXT, updated_at INTEGER NOT NULL
+            );
+            CREATE TABLE metered_billing_reconciliations (
+                receipt_id TEXT PRIMARY KEY, adapter_kind TEXT NOT NULL,
+                evidence_id TEXT NOT NULL, observed_units INTEGER NOT NULL,
+                billed_cost_units INTEGER NOT NULL, billed_cost_currency TEXT NOT NULL,
+                evidence_sha256 TEXT, recorded_at INTEGER NOT NULL,
+                reconciliation_state TEXT NOT NULL, note TEXT, updated_at INTEGER NOT NULL
+            );
+            "#,
+        )?;
+        seed.execute(
+            "INSERT INTO settlement_reconciliations (receipt_id, reconciliation_state, note, updated_at) \
+             VALUES (?1, 'settled-pending', 'stale-note', 100)",
+            rusqlite::params![receipt_id],
+        )?;
+        seed.execute(
+            "INSERT INTO metered_billing_reconciliations \
+             (receipt_id, adapter_kind, evidence_id, observed_units, billed_cost_units, billed_cost_currency, evidence_sha256, recorded_at, reconciliation_state, note, updated_at) \
+             VALUES (?1, 'test', 'ev-stale', 1, 1, 'usd', NULL, 100, 'pending', 'stale-note', 100)",
+            rusqlite::params![receipt_id],
+        )?;
+    }
+
+    // Rotation must refresh the stale archive rows and complete, not stall on
+    // the pre-update bytes.
+    let archived = store.archive_receipts_before(150, archive_path)?;
+    assert_eq!(
+        archived, 2,
+        "rotation must refresh the stale archived reconciliation rows and complete"
+    );
+
+    // The archive now holds the current live reconciliation state.
+    let archive_store = SqliteReceiptStore::open_existing(&archive)?;
+    let arch = archive_store.reader_connection_for_test()?;
+    let settled_state: String = arch.query_row(
+        "SELECT reconciliation_state FROM settlement_reconciliations WHERE receipt_id = ?1",
+        rusqlite::params![receipt_id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        settled_state, "settled-final",
+        "the archived settlement row must refresh to the current live state"
+    );
+    let metered_units: i64 = arch.query_row(
+        "SELECT observed_units FROM metered_billing_reconciliations WHERE receipt_id = ?1",
+        rusqlite::params![receipt_id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        metered_units, 42,
+        "the archived metered row must refresh to the current live units"
+    );
+
+    // The live rows are gone (co-archived, not cascaded).
+    let live = store.reader_connection_for_test()?;
+    let live_settlement: i64 = live.query_row(
+        "SELECT COUNT(*) FROM settlement_reconciliations",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(live_settlement, 0, "settlement row absent from live");
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 #[test]
 fn size_rotation_converges_below_threshold() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("size-converges");
