@@ -180,6 +180,57 @@ fn consume_intent_parameter_hash_mismatch_aborts_and_keeps_intent(
     Ok(())
 }
 
+#[test]
+fn timed_out_intent_write_does_not_land_after_the_writer_drains(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-intents-timeout-abandon");
+    let store = SqliteReceiptStore::open(&path)?;
+
+    // Occupy the single writer with a job that parks until released, so the
+    // bounded intent write below times out while its own job is still queued
+    // behind it.
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    let blocker_handle = store.writer_handle();
+    let blocker = std::thread::spawn(move || {
+        blocker_handle.run_write(move |_connection| {
+            let _ = started_tx.send(());
+            let _ = release_rx.recv_timeout(std::time::Duration::from_secs(30));
+            Ok(())
+        })
+    });
+    started_rx.recv_timeout(std::time::Duration::from_secs(5))?;
+
+    let error = store.record_dispatch_intent_with_timeout(
+        &sample_intent("req-timeout-abandon"),
+        std::time::Duration::from_millis(100),
+    );
+    assert!(
+        matches!(
+            error,
+            Err(chio_kernel::receipt_store::ReceiptStoreError::Timeout { .. })
+        ),
+        "the bounded intent write must fail closed on a stalled writer"
+    );
+
+    // Unblock the writer and drain the queue past the abandoned job.
+    release_tx.send(())?;
+    blocker.join().map_err(|_| "blocker thread panicked")??;
+    store.writer_handle().run_write(|_connection| Ok(()))?;
+
+    // The caller already denied before dispatch, so the queued insert must
+    // not land afterwards: a row here would dead-letter at the next boot as
+    // a false orphan for a call that never executed.
+    assert_eq!(
+        open_intent_row_count(&store)?,
+        0,
+        "a timed-out intent write must not land after the caller denied"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 struct RecordingReconciler;
 
 impl chio_kernel::receipt_store::DispatchIntentReconciler for RecordingReconciler {

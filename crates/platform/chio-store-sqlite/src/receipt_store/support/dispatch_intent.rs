@@ -54,8 +54,7 @@ pub(crate) fn insert_dispatch_intent_tx(
 }
 
 /// Writer job that durably inserts one dispatch intent in its own immediate
-/// transaction. Shared by the bounded and unbounded write paths so both commit
-/// through identical statements.
+/// transaction. Used by the unbounded write path.
 pub(crate) fn dispatch_intent_insert_job(
     intent: &DispatchIntentRecord,
 ) -> impl FnOnce(&mut SqliteStoreConnection) -> Result<(), ReceiptStoreError> + Send + 'static {
@@ -63,6 +62,41 @@ pub(crate) fn dispatch_intent_insert_job(
     move |connection| {
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         insert_dispatch_intent_tx(&tx, &intent)?;
+        tx.commit()?;
+        Ok(())
+    }
+}
+
+/// Bounded-path variant of [`dispatch_intent_insert_job`]: the caller marks
+/// `abandoned` when its response wait times out, and the job refuses to
+/// commit once marked. Without the marker, an insert queued behind a slow
+/// (but alive) writer could land AFTER the caller already denied before
+/// dispatch, and the stale row would dead-letter at the next boot as a false
+/// orphan for a call that never executed. The marker is checked both before
+/// the transaction (cheap skip) and again immediately before commit, so the
+/// unguarded window is only the commit itself; a write racing that window is
+/// honored by the caller instead of reported as a timeout.
+pub(crate) fn dispatch_intent_insert_job_unless_abandoned(
+    intent: &DispatchIntentRecord,
+    abandoned: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> impl FnOnce(&mut SqliteStoreConnection) -> Result<(), ReceiptStoreError> + Send + 'static {
+    let intent = intent.clone();
+    move |connection| {
+        let abandoned_error = |request_id: &str| {
+            ReceiptStoreError::Conflict(format!(
+                "dispatch intent write for request `{request_id}` was abandoned by its \
+                 timed-out caller; refusing to land a stale intent"
+            ))
+        };
+        if abandoned.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(abandoned_error(&intent.request_id));
+        }
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        insert_dispatch_intent_tx(&tx, &intent)?;
+        if abandoned.load(std::sync::atomic::Ordering::SeqCst) {
+            // Dropping the transaction rolls the insert back.
+            return Err(abandoned_error(&intent.request_id));
+        }
         tx.commit()?;
         Ok(())
     }

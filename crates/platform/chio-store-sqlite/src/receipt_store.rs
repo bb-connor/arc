@@ -679,6 +679,49 @@ impl WriterHandle {
         self.run_write_kind_with_timeout(job, false, timeout)
     }
 
+    /// Bounded metadata write whose queued job must NOT take effect once the
+    /// caller has timed out. On expiry the shared `abandoned` marker is set
+    /// BEFORE reporting the timeout; a cooperating job (see
+    /// `dispatch_intent_insert_job_unless_abandoned`) rechecks the marker
+    /// inside its transaction and refuses to commit once marked. A job that
+    /// finished in the instant between the deadline expiring and the marker
+    /// landing already answered, so that answer is returned instead of a
+    /// timeout for a write that committed.
+    pub(crate) fn run_write_abandoning_on_timeout<T, F>(
+        &self,
+        job: F,
+        timeout: Duration,
+        abandoned: Arc<std::sync::atomic::AtomicBool>,
+    ) -> Result<T, ReceiptStoreError>
+    where
+        F: FnOnce(&mut SqliteStoreConnection) -> Result<T, ReceiptStoreError> + Send + 'static,
+        T: Send + 'static,
+    {
+        let result = self.enqueue_write_job(job, false)?;
+        match result.recv_timeout(timeout) {
+            Ok(outcome) => outcome,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                abandoned.store(true, Ordering::SeqCst);
+                if let Ok(outcome) = result.try_recv() {
+                    return outcome;
+                }
+                self.health.failed_total.fetch_add(1, Ordering::SeqCst);
+                if let Ok(mut last_error) = self.health.last_error.lock() {
+                    *last_error = Some("sqlite receipt commit write timed out".to_string());
+                }
+                Err(receipt_actor_write_timeout_error(timeout))
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                atomic_saturating_sub(&self.health.inflight, 1);
+                self.health.failed_total.fetch_add(1, Ordering::SeqCst);
+                if let Ok(mut last_error) = self.health.last_error.lock() {
+                    *last_error = Some("sqlite receipt commit actor is unavailable".to_string());
+                }
+                Err(receipt_actor_unavailable_error())
+            }
+        }
+    }
+
     fn run_write_kind_with_timeout<T, F>(
         &self,
         job: F,
@@ -3054,14 +3097,20 @@ impl SqliteReceiptStore {
     /// Bounded variant of [`Self::record_dispatch_intent`]: identical up to
     /// the response wait, which is capped at `budget` so a writer that wedges
     /// after the pre-dispatch liveness check fails this caller closed instead
-    /// of hanging the evaluation inside the intent write.
+    /// of hanging the evaluation inside the intent write. A timed-out write
+    /// is also ABANDONED: the caller denies before dispatch on timeout, so
+    /// the job still queued on a slow-but-alive writer must not land a stale
+    /// row that would dead-letter at the next boot as a false orphan for a
+    /// call that never executed.
     pub fn record_dispatch_intent_with_timeout(
         &self,
         intent: &chio_kernel::receipt_store::DispatchIntentRecord,
         budget: Duration,
     ) -> Result<(), ReceiptStoreError> {
+        let abandoned = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let job = dispatch_intent_insert_job_unless_abandoned(intent, Arc::clone(&abandoned));
         self.writer_handle()
-            .run_write_with_timeout(dispatch_intent_insert_job(intent), budget)
+            .run_write_abandoning_on_timeout(job, budget, abandoned)
     }
 
     /// Append a receipt and, in the SAME immediate transaction, consume the
