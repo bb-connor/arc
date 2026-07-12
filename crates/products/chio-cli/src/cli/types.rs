@@ -476,6 +476,13 @@ pub(crate) enum Commands {
         command: SettleCommands,
     },
 
+    /// Inspect and release capability budget holds in the durable budget
+    /// store (see the global `--budget-db`).
+    Budget {
+        #[command(subcommand)]
+        command: BudgetCommands,
+    },
+
     /// Query, diff, or list anchored roots in the lineage DAG.
     ///
     /// Surfaces the lineage graph (`chio-lineage`):

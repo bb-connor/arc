@@ -266,6 +266,50 @@ pub(crate) enum SettleCommands {
     },
 }
 
+/// `chio budget` subcommands.
+#[derive(Subcommand)]
+pub(crate) enum BudgetCommands {
+    /// Inspect and release open budget holds.
+    Holds {
+        #[command(subcommand)]
+        command: BudgetHoldsCommands,
+    },
+}
+
+/// `chio budget holds` subcommands, over the same store methods the
+/// orphaned-hold sweeper uses.
+#[derive(Subcommand)]
+pub(crate) enum BudgetHoldsCommands {
+    /// List open budget holds (optionally only those older than a horizon).
+    List {
+        /// Budget-store database path (overrides the global `--budget-db`).
+        #[arg(long, value_name = "PATH")]
+        store: Option<PathBuf>,
+
+        /// Only list holds older than this many seconds.
+        #[arg(long)]
+        older_than_secs: Option<u64>,
+
+        /// Emit structured JSON instead of the text summary.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Release (expire) an open budget hold by id, returning its remaining
+    /// exposure to the grant without recording spend.
+    Release {
+        /// Budget-store database path (overrides the global `--budget-db`).
+        #[arg(long, value_name = "PATH")]
+        store: Option<PathBuf>,
+
+        /// The hold id to release.
+        hold_id: String,
+
+        /// Emit structured JSON instead of the text summary.
+        #[arg(long)]
+        json: bool,
+    },
+}
+
 /// `chio lineage` subcommands. Surfaces three verbs that the underlying
 /// library and tests share.
 #[derive(Subcommand)]
