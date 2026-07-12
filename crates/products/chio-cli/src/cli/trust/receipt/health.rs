@@ -169,12 +169,28 @@ pub(crate) fn cmd_receipt_retention_repair(
     let store = local_receipt_store(&backend, "receipt retention repair")?;
     let removed = store.retention_repair(archive)?;
     if backend.json_output {
-        // The removed count is the accurate JSON contract regardless of
-        // whether the reseed cleared the head: the rows were removed.
+        // `retention_repair` returns Ok as soon as the extra rows are removed,
+        // but on a mixed-drift store the follow-up head reseed leaves the head
+        // poisoned (the next append is still rejected). Automation reads only the
+        // JSON, so it must carry the ACTUAL post-repair writability, not just the
+        // removed count, and the command must fail-closed when the store is still
+        // not writable. A health error or an unhealthy report both mean the drift
+        // survived the extra-shape repair.
+        let health = store.receipt_store_health();
+        let writable = matches!(&health, Ok(report) if report.healthy);
         print_receipt_operator_json(
             CHIO_CLI_RECEIPT_RETENTION_REPAIR_SCHEMA,
-            &serde_json::json!({ "removed_extra_claim_log_rows": removed }),
+            &serde_json::json!({
+                "removed_extra_claim_log_rows": removed,
+                "writable": writable,
+            }),
         )?;
+        if !writable {
+            return Err(match health {
+                Ok(report) => receipt_health_report_error(&report),
+                Err(error) => CliError::from(error),
+            });
+        }
     } else {
         // `retention_repair` returns Ok as soon as the extra rows are removed,
         // but on a mixed-drift store the follow-up head reseed leaves the head
@@ -241,9 +257,16 @@ mod receipt_operator_tests {
     fn operator_sample_receipt_with_keypair(
         keypair: &chio_core::crypto::Keypair,
     ) -> Result<chio_core::receipt::body::ChioReceipt, chio_core::Error> {
+        operator_sample_receipt_with_id_and_keypair("receipt-operator-1", keypair)
+    }
+
+    fn operator_sample_receipt_with_id_and_keypair(
+        id: &str,
+        keypair: &chio_core::crypto::Keypair,
+    ) -> Result<chio_core::receipt::body::ChioReceipt, chio_core::Error> {
         chio_core::receipt::body::ChioReceipt::sign(
             chio_core::receipt::body::ChioReceiptBody {
-                id: "receipt-operator-1".to_string(),
+                id: id.to_string(),
                 timestamp: 1_775_137_626,
                 capability_id: "cap-operator-1".to_string(),
                 tool_server: "operator".to_string(),
@@ -348,6 +371,59 @@ mod receipt_operator_tests {
         assert!(not_writable.contains("removed 3 extra claim-log row(s)"));
         assert!(not_writable.contains("not writable"));
         assert!(not_writable.contains("further recovery is required"));
+    }
+
+    /// `chio receipt retention repair --json` must fail closed and surface the
+    /// post-repair writability, not just the removed-row count: on a store that
+    /// stays not writable after the repair, automation reading only the JSON has
+    /// to see a non-zero exit rather than a silent success.
+    #[test]
+    fn retention_repair_json_fails_closed_when_store_not_writable(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let path = unique_temp_path("retention-repair-json", "sqlite3");
+        let archive = unique_temp_path("retention-repair-json-archive", "sqlite3");
+        let keypair = chio_core::crypto::Keypair::generate();
+
+        // Build a store, then corrupt it into a state that health rejects but
+        // retention repair cannot fix: delete a projection row whose source
+        // receipt still exists (source-without-projection drift). No rows are
+        // orphaned, so `retention_repair` returns Ok(0) while the store stays not
+        // writable.
+        {
+            let store = chio_store_sqlite::SqliteReceiptStore::open(&path)?;
+            for i in 0..2u64 {
+                let receipt =
+                    operator_sample_receipt_with_id_and_keypair(&format!("rr-json-{i}"), &keypair)?;
+                store.append_chio_receipt_returning_seq(&receipt)?;
+            }
+            store.flush_receipt_writes()?;
+        }
+        {
+            let connection = rusqlite::Connection::open(&path)?;
+            connection.execute_batch(
+                "DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete; \
+                 DELETE FROM claim_receipt_log_entries WHERE entry_seq = 1;",
+            )?;
+        }
+
+        // Precondition: the corrupted store is genuinely not writable.
+        let store = chio_store_sqlite::SqliteReceiptStore::open_existing(&path)?;
+        assert!(
+            !matches!(store.receipt_store_health(), Ok(report) if report.healthy),
+            "the corrupted store must report not-writable"
+        );
+        drop(store);
+
+        // JSON mode must fail closed, matching the human path.
+        let result = cmd_receipt_retention_repair(&archive, backend(Some(&path), None));
+        assert!(
+            result.is_err(),
+            "json retention repair must fail closed on a not-writable store"
+        );
+
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(&archive);
+        Ok(())
     }
 
     #[test]
