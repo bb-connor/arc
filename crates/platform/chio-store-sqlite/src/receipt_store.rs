@@ -1713,6 +1713,22 @@ fn record_write_job_outcome(health: &ReceiptCommitWriterHealth, committed: bool)
         health
             .last_commit_unix_ms
             .store(current_unix_ms(), Ordering::SeqCst);
+        // A committed write proves the writer drained again, so clear a stale
+        // bounded-timeout marker exactly as a committed append batch resets
+        // `last_error`. A write-dominated store never runs an append batch, so
+        // without this the "timed out" marker left by an earlier bounded write
+        // lingers and the liveness classifier reports every later merely
+        // in-flight write Wedged on that stale marker alone. A genuine writer
+        // fault (poisoned head, checkpoint-build failure) does not carry the
+        // timeout marker and is left untouched.
+        if let Ok(mut last_error) = health.last_error.lock() {
+            if last_error
+                .as_deref()
+                .is_some_and(|error| error.contains("timed out"))
+            {
+                *last_error = None;
+            }
+        }
     } else {
         health.failed_total.fetch_add(1, Ordering::SeqCst);
     }
@@ -3510,6 +3526,46 @@ mod receipt_commit_actor_tests {
             health.backlog_started_unix_ms.load(Ordering::SeqCst),
             1,
             "a fresh backlog after draining must restamp the start"
+        );
+    }
+
+    #[test]
+    fn committed_write_clears_a_stale_bounded_timeout_marker() {
+        let health = ReceiptCommitWriterHealth::default();
+        // An earlier bounded writer-routed op timed out and left the marker set
+        // while its work was still in flight.
+        if let Ok(mut last_error) = health.last_error.lock() {
+            *last_error = Some("sqlite receipt commit write timed out".to_string());
+        }
+        // The writer catches up and a later write commits.
+        record_write_job_outcome(&health, true);
+        let cleared = match health.last_error.lock() {
+            Ok(guard) => guard.is_none(),
+            Err(_) => false,
+        };
+        assert!(
+            cleared,
+            "a committed write must clear the stale timeout marker so a later merely in-flight write is not misclassified Wedged"
+        );
+        assert_eq!(health.committed_total.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn committed_write_preserves_a_genuine_writer_error() {
+        let health = ReceiptCommitWriterHealth::default();
+        // A poisoned-head / checkpoint fault is not a stall marker and must
+        // survive a later commit so the store keeps reporting the real fault.
+        if let Ok(mut last_error) = health.last_error.lock() {
+            *last_error = Some("receipt store verified head is unavailable".to_string());
+        }
+        record_write_job_outcome(&health, true);
+        let preserved = match health.last_error.lock() {
+            Ok(guard) => guard.as_deref() == Some("receipt store verified head is unavailable"),
+            Err(_) => false,
+        };
+        assert!(
+            preserved,
+            "a committed write must not clear an unrelated writer error"
         );
     }
 
