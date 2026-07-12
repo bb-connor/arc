@@ -280,21 +280,33 @@ impl ChioEvaluator {
     /// durable store must receive them.
     ///
     /// With no durable sink attached the append is a no-op: an ephemeral or
-    /// store-less evaluator keeps its receipts best-effort. When a durable store
-    /// IS attached a conversion or append failure is propagated so the caller
-    /// can fail the request closed, matching durable-by-default: a protected
-    /// effect must not complete while its audit record is silently dropped.
+    /// store-less evaluator keeps its receipts best-effort.
+    ///
+    /// Only a receipt that converts into a verifiable core receipt may enter the
+    /// durable audit log; the store rejects anything it cannot re-verify. An
+    /// HTTP receipt that cannot be represented as a verifiable core receipt
+    /// (for example one whose embedded kernel key does not match the durable sink
+    /// keypair, so no well-formed signed receipt can be produced) is skipped
+    /// rather than failing the request closed or writing a record the store could
+    /// never verify. A record that IS verifiable but that the store then fails to
+    /// persist still propagates the error so the caller can fail the request
+    /// closed, matching durable-by-default: a protected effect must not complete
+    /// while a valid audit record is silently dropped.
     pub(crate) fn persist_http_receipt(&self, receipt: &HttpReceipt) -> Result<(), ChioTowerError> {
         let Some(sink) = &self.receipt_sink else {
             return Ok(());
         };
-        let chio_receipt = receipt
-            .to_chio_receipt_with_keypair(&sink.keypair)
-            .map_err(|error| {
-                ChioTowerError::ReceiptPersist(format!(
-                    "failed to convert HTTP receipt for durable storage: {error}"
-                ))
-            })?;
+        let chio_receipt = match receipt.to_chio_receipt_with_keypair(&sink.keypair) {
+            Ok(chio_receipt) => chio_receipt,
+            Err(error) => {
+                tracing::warn!(
+                    %error,
+                    receipt_id = %receipt.id,
+                    "skipping durable persistence of an HTTP receipt that cannot be converted into a verifiable core receipt"
+                );
+                return Ok(());
+            }
+        };
         sink.store
             .append_chio_receipt(&chio_receipt)
             .map_err(|error| {
@@ -577,6 +589,108 @@ mod tests {
         assert!(
             result.verdict.is_allowed(),
             "a durable-backed evaluator must allow a safe request"
+        );
+        Ok(())
+    }
+
+    /// A receipt store that counts appends without verifying, so a test can
+    /// observe whether `persist_http_receipt` reached the append at all.
+    #[derive(Default)]
+    struct CountingReceiptStore {
+        appended: std::sync::atomic::AtomicUsize,
+    }
+
+    impl CountingReceiptStore {
+        fn append_count(&self) -> usize {
+            self.appended.load(std::sync::atomic::Ordering::SeqCst)
+        }
+    }
+
+    impl chio_kernel::ReceiptStore for CountingReceiptStore {
+        fn append_chio_receipt(
+            &self,
+            _receipt: &chio_core_types::receipt::body::ChioReceipt,
+        ) -> Result<(), chio_kernel::ReceiptStoreError> {
+            self.appended
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        }
+
+        fn append_child_receipt(
+            &self,
+            _receipt: &chio_core_types::receipt::lineage::ChildRequestReceipt,
+        ) -> Result<(), chio_kernel::ReceiptStoreError> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn persists_a_well_formed_http_receipt_to_a_verifying_store(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // A real durable store recomputes the action parameter hash and rejects a
+        // receipt whose hash does not match its parameters. The outer HTTP receipt
+        // must convert into a core receipt that this verification accepts, or a
+        // durable deployment fails closed on every request instead of serving with
+        // persistence.
+        let dir = tempfile::tempdir()?;
+        let keypair = Keypair::generate();
+        let store: std::sync::Arc<dyn chio_kernel::ReceiptStore> = std::sync::Arc::new(
+            chio_store_sqlite::SqliteReceiptStore::open(dir.path().join("receipts.db"))?,
+        );
+        let evaluator = ChioEvaluator::builder(keypair, "durable-policy".to_string())
+            .receipt_store(store)
+            .allow_ephemeral(true)
+            .build()?;
+
+        let result = evaluate(
+            &evaluator,
+            "GET",
+            "/pets",
+            &HashMap::new(),
+            CallerIdentity::anonymous(),
+            &http::HeaderMap::new(),
+        )?;
+
+        // The verifying durable store must accept the converted HTTP receipt.
+        evaluator.persist_http_receipt(&result.receipt)?;
+        Ok(())
+    }
+
+    #[test]
+    fn skips_an_http_receipt_that_cannot_convert_to_a_verifiable_record(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // A receipt whose embedded kernel key does not match the durable sink
+        // keypair cannot be re-signed into a well-formed core receipt. It must be
+        // skipped, never appended, and must not fail the request closed: the
+        // durable audit log only ever receives verifiable records, and a record
+        // that cannot be made verifiable is dropped rather than forcing a
+        // fail-closed on every request.
+        let store = std::sync::Arc::new(CountingReceiptStore::default());
+        let sink_store: std::sync::Arc<dyn chio_kernel::ReceiptStore> = store.clone();
+        let evaluator = ChioEvaluator::builder(Keypair::generate(), "durable-policy".to_string())
+            .receipt_store(sink_store)
+            .allow_ephemeral(true)
+            .build()?;
+
+        // A receipt signed by a different kernel keypair carries a foreign
+        // kernel_key, so converting it under the sink keypair cannot produce a
+        // signed core receipt.
+        let foreign_evaluator =
+            ChioEvaluator::new_ephemeral(Keypair::generate(), "foreign-policy".to_string());
+        let foreign = evaluate(
+            &foreign_evaluator,
+            "GET",
+            "/pets",
+            &HashMap::new(),
+            CallerIdentity::anonymous(),
+            &http::HeaderMap::new(),
+        )?;
+
+        evaluator.persist_http_receipt(&foreign.receipt)?;
+        assert_eq!(
+            store.append_count(),
+            0,
+            "an HTTP receipt that cannot be converted into a verifiable core receipt must not be appended"
         );
         Ok(())
     }
