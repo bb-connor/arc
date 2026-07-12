@@ -542,7 +542,20 @@ pub(crate) fn validate_adopted_claim_log_delta(
     floor_entry_seq: u64,
     max_entry_seq: u64,
 ) -> Result<(), ReceiptStoreError> {
-    let effective_floor = floor_entry_seq.max(trusted_retention_watermark(connection)?);
+    // `trusted_retention_watermark` opens the archive and re-hashes every
+    // covered checkpoint, so calling it on every append would make steady-state
+    // appends O(archived history) once the store has ever rotated. The trusted
+    // watermark is always bounded above by the raw ledger watermark (a cheap
+    // indexed read), so it can only raise the floor when the raw watermark
+    // exceeds `floor_entry_seq`. Gate the archive scan on that fast check: when
+    // the floor already sits at or above the raw watermark the trusted value
+    // cannot move it, and the hot path skips the archive entirely.
+    let raw_watermark = retention_watermark(connection)?.unwrap_or(0);
+    let effective_floor = if raw_watermark > floor_entry_seq {
+        floor_entry_seq.max(trusted_retention_watermark(connection)?)
+    } else {
+        floor_entry_seq
+    };
     if max_entry_seq <= effective_floor {
         return Ok(());
     }
