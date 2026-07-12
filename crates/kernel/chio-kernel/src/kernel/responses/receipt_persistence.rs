@@ -218,6 +218,11 @@ impl ChioKernel {
                             receipt, &key, budget,
                         )?)
                     })?;
+                    // The consuming append deleted the durable row; drop the
+                    // request-scoped handle under the same write lock so any
+                    // later receipt for this request appends plainly instead
+                    // of retrying the consume against the missing row.
+                    self.mark_dispatch_intent_consumed(&key.request_id);
                 }
                 None => {
                     self.with_receipt_store(|store| {

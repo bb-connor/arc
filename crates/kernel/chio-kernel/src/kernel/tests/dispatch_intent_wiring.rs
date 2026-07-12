@@ -352,6 +352,87 @@ fn nested_flow_url_elicitation_exit_clears_the_journaled_intent(
 }
 
 #[test]
+fn a_second_cleanup_fault_receipt_persists_after_the_first_consumes_the_intent(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // A URL-elicitation unwind can legitimately record more than one signed
+    // fault receipt for the same request (here: a failed runtime-admission
+    // release followed by a failed budget reversal). With the journal
+    // enabled, the first fault receipt consumes the dispatch intent inside
+    // its own append; the later fault receipt must then append plainly
+    // instead of retrying the consume against the deleted row and losing its
+    // audit record.
+    let path = unique_receipt_db_path("chio-intent-second-fault-receipt");
+    let mut config = make_config();
+    config.dispatch_intent_journal = crate::DispatchIntentJournalMode::SideEffecting;
+    let mut kernel = make_kernel(config);
+    let store = std::sync::Arc::new(SqliteReceiptStore::open(&path)?);
+    kernel.set_receipt_store_handle(
+        std::sync::Arc::clone(&store) as std::sync::Arc<dyn crate::receipt_store::ReceiptStore>
+    )?;
+    let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
+        "srv-chio-runtime",
+        vec!["destructive_update"],
+        std::sync::Arc::clone(&stream_attempts),
+    )));
+    kernel.set_budget_store_handle(std::sync::Arc::new(FailingReverseBudgetStore::new()));
+    let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
+    let releases = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(FailingReleaseRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-second-fault-receipt",
+        admission_id: "adm-second-fault-receipt",
+        lease_id: "lease-second-fault-receipt",
+    }));
+
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_invocation_limited_grant(
+            "srv-chio-runtime",
+            "destructive_update",
+            1,
+        )]),
+        300,
+    );
+    let request = make_request_with_arguments(
+        "req-second-fault-receipt",
+        &cap,
+        "destructive_update",
+        "srv-chio-runtime",
+        serde_json::json!({"record": "vendor-ledger-7", "value": "closed"}),
+    );
+
+    let result = kernel.evaluate_tool_call_blocking(&request);
+    assert!(
+        matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
+        "the cleanup faults must not mask the elicitation error: {result:?}"
+    );
+    // First fault: the failed runtime-admission release. Its receipt lands
+    // while the intent row is still open, so its append consumes the intent.
+    assert_url_elicitation_release_fault_recorded(&kernel, "lease-second-fault-receipt")?;
+    // Second fault: the failed budget reversal, recorded for the SAME request
+    // after the intent row is already gone. It must persist as a plain
+    // append, not vanish behind a missing-intent conflict.
+    assert_url_elicitation_budget_cleanup_fault_recorded(
+        &kernel,
+        "url_elicitation_budget_reversal",
+        &cap.id,
+    )?;
+    store.flush_receipt_writes()?;
+    assert_eq!(
+        store.open_dispatch_intent_count()?,
+        0,
+        "the first fault receipt consumed the intent exactly once"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
 fn intent_and_receipt_tenant_ignore_a_foreign_thread_scope(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // A tenant-scoped sibling task can hold its thread-local scope guard
