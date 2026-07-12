@@ -136,7 +136,8 @@ capabilities:
 
         let agent_kp = Keypair::generate();
         let cap = {
-            let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+            let mut kernel =
+                build_kernel_with_receipt_store(load_test_policy_runtime(&policy), &kp);
             configure_revocation_store(&mut kernel, Some(&revocation_db_path), None, None).unwrap();
             kernel.register_tool_server(Box::new(StubToolServer {
                 id: "*".to_string(),
@@ -147,7 +148,8 @@ capabilities:
             cap
         };
 
-        let mut restarted = build_kernel(load_test_policy_runtime(&policy), &kp);
+        let mut restarted =
+            build_kernel_with_receipt_store(load_test_policy_runtime(&policy), &kp);
         configure_revocation_store(&mut restarted, Some(&revocation_db_path), None, None).unwrap();
         restarted.register_tool_server(Box::new(StubToolServer {
             id: "*".to_string(),
