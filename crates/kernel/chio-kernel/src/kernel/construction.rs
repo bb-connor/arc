@@ -948,6 +948,68 @@ impl ChioKernel {
         self.settlement_retry_store = Some(store);
     }
 
+    /// Whether the durable payment journal is in force: a payment adapter is
+    /// installed and the dispatch-intent journal covers the monetary class.
+    pub(crate) fn payment_journal_active(&self) -> bool {
+        self.payment_adapter.is_some()
+            && !matches!(
+                self.config.dispatch_intent_journal,
+                crate::receipt_store::DispatchIntentJournalMode::Off
+            )
+    }
+
+    /// Advance the payment journal for a monetary call. Fail-closed: an
+    /// advance that cannot commit surfaces an error so the caller denies or
+    /// unwinds rather than moving money without a recoverable record. No-op
+    /// when the journal is not in force.
+    pub(crate) fn advance_payment_journal_if_active(
+        &self,
+        request_id: &str,
+        expected: crate::payment::PaymentJournalState,
+        next: crate::payment::PaymentJournalState,
+        authorization_id: Option<&str>,
+        transaction_id: Option<&str>,
+        settle: Option<crate::payment::PaymentSettleIntent>,
+    ) -> Result<(), KernelError> {
+        if !self.payment_journal_active() {
+            return Ok(());
+        }
+        self.with_budget_store(|store| {
+            store
+                .advance_payment_journal(
+                    request_id,
+                    expected,
+                    next,
+                    authorization_id,
+                    transaction_id,
+                    settle,
+                )
+                .map_err(KernelError::from)
+        })
+    }
+
+    /// Close the payment journal after the receipt commits. A crash before
+    /// the close leaves a Settled row that boot reconciliation closes
+    /// against the attested receipt, so a close failure here is warned, not
+    /// fatal.
+    pub(crate) fn close_payment_journal_best_effort(&self, request_id: &str) {
+        if !self.payment_journal_active() {
+            return;
+        }
+        let closed = self.with_budget_store(|store| {
+            store
+                .close_payment_journal(request_id)
+                .map_err(KernelError::from)
+        });
+        if let Err(error) = closed {
+            tracing::warn!(
+                request_id = %request_id,
+                error = %error,
+                "payment journal close failed; boot reconciliation will close the row"
+            );
+        }
+    }
+
     /// Return a clone of the active settlement observer, or `None` when
     /// no hook has been installed. Useful for integration tests that
     /// want to assert observer state directly.

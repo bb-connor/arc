@@ -404,6 +404,13 @@ mod support {
         }));
         if monetary {
             kernel.set_payment_adapter(Box::new(RecordingRail));
+            // With the journal enabled and a payment adapter installed, the
+            // money path requires a journal-capable budget store; the
+            // default in-memory store fails closed.
+            let budget_db_path = unique_kernel_db_path("chio-intent-journal-budget");
+            kernel.set_budget_store_handle(Arc::new(chio_store_sqlite::SqliteBudgetStore::open(
+                &budget_db_path,
+            )?));
         }
         if reject_first_intent_write {
             kernel.set_receipt_store_handle(Arc::new(IntentRejectingStore {

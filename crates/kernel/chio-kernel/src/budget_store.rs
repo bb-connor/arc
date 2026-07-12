@@ -564,6 +564,15 @@ pub trait BudgetStore: Send + Sync {
         &self,
         request: BudgetAuthorizeHoldRequest,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        if let Some(journal) = request.payment_journal.as_ref() {
+            // Stores that do not co-commit the journal with the hold must
+            // still persist it (or fail closed) BEFORE any capacity is
+            // debited, so the money path never runs with a silently dropped
+            // recoverable record. An orphan journal row from a crash between
+            // the two writes reconciles to a release; the reverse order
+            // would leave an unrecoverable hold.
+            self.record_payment_journal(journal)?;
+        }
         let allowed = self.try_charge_cost_with_ids_and_authority(
             &request.capability_id,
             request.grant_index,
