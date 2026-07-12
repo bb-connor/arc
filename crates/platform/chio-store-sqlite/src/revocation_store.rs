@@ -5,6 +5,8 @@ use std::sync::{Mutex, MutexGuard};
 use chio_kernel::{RevocationRecord, RevocationStore, RevocationStoreError};
 use rusqlite::{params, Connection, OptionalExtension};
 
+pub(crate) const ADMISSION_AUTHORITY_META_TABLE: &str = "admission_authority_meta";
+
 pub struct SqliteRevocationStore {
     connection: Mutex<Connection>,
 }
@@ -17,21 +19,9 @@ impl SqliteRevocationStore {
         }
 
         let connection = Connection::open(path)?;
-        connection.execute_batch(
-            r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            PRAGMA busy_timeout = 5000;
-
-            CREATE TABLE IF NOT EXISTS revoked_capabilities (
-                capability_id TEXT PRIMARY KEY,
-                revoked_at INTEGER NOT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_revoked_capabilities_revoked_at
-                ON revoked_capabilities(revoked_at);
-            "#,
-        )?;
+        reject_combined_managed_database(&connection)?;
+        configure_revocation_connection(&connection)?;
+        ensure_revocation_schema(&connection)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -128,6 +118,61 @@ impl SqliteRevocationStore {
             .optional()?;
         Ok(row)
     }
+}
+
+pub(crate) fn configure_revocation_connection(
+    connection: &Connection,
+) -> Result<(), RevocationStoreError> {
+    connection.execute_batch(
+        r#"
+        PRAGMA journal_mode = WAL;
+        PRAGMA synchronous = FULL;
+        PRAGMA busy_timeout = 5000;
+        PRAGMA foreign_keys = ON;
+        "#,
+    )?;
+    Ok(())
+}
+
+pub(crate) fn ensure_revocation_schema(
+    connection: &Connection,
+) -> Result<(), RevocationStoreError> {
+    connection.execute_batch(
+        r#"
+            CREATE TABLE IF NOT EXISTS revoked_capabilities (
+                capability_id TEXT PRIMARY KEY,
+                revoked_at INTEGER NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_revoked_capabilities_revoked_at
+                ON revoked_capabilities(revoked_at);
+            "#,
+    )?;
+    Ok(())
+}
+
+fn reject_combined_managed_database(connection: &Connection) -> Result<(), RevocationStoreError> {
+    let marker_exists = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
+        params![ADMISSION_AUTHORITY_META_TABLE],
+        |row| row.get::<_, i64>(0),
+    )? != 0;
+    if !marker_exists {
+        return Ok(());
+    }
+    let mode = connection
+        .query_row(
+            "SELECT mode FROM admission_authority_meta WHERE singleton = 1",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    Err(RevocationStoreError::Sync(match mode {
+        Some(mode) => {
+            format!("revocation database is managed by the `{mode}` admission capture authority")
+        }
+        None => "revocation database has incomplete admission authority metadata".to_string(),
+    }))
 }
 
 impl RevocationStore for SqliteRevocationStore {
