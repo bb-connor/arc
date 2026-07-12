@@ -94,6 +94,36 @@ impl ChioKernel {
         }
     }
 
+    pub(crate) fn scope_dispatch_intent_for_request(
+        &self,
+        request_id: &str,
+        handle: Option<crate::receipt_store::DispatchIntentHandle>,
+    ) -> ScopedKernelDispatchIntent {
+        let previous = match handle {
+            Some(handle) => self.dispatch_intents.insert(request_id.to_string(), handle),
+            None => self
+                .dispatch_intents
+                .remove(request_id)
+                .map(|(_, previous)| previous),
+        };
+        ScopedKernelDispatchIntent {
+            request_id: request_id.to_string(),
+            intents: Arc::clone(&self.dispatch_intents),
+            previous,
+        }
+    }
+
+    pub(crate) fn dispatch_intent_for_request(
+        &self,
+        request_id: Option<&str>,
+    ) -> Option<crate::receipt_store::DispatchIntentHandle> {
+        request_id.and_then(|request_id| {
+            self.dispatch_intents
+                .get(request_id)
+                .map(|entry| entry.value().clone())
+        })
+    }
+
     pub(crate) fn receipt_tenant_id_for_request(&self, request_id: Option<&str>) -> Option<String> {
         request_id.and_then(|request_id| {
             self.receipt_tenant_ids

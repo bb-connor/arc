@@ -57,6 +57,25 @@ impl Drop for ScopedKernelReceiptTenantId {
     }
 }
 
+/// Request-keyed dispatch-intent registration, dropped when the evaluation
+/// future finishes. Restores any previously registered handle (nested
+/// evaluations under one request id keep their outer binding).
+pub(crate) struct ScopedKernelDispatchIntent {
+    pub(super) request_id: String,
+    pub(super) intents: Arc<DashMap<String, crate::receipt_store::DispatchIntentHandle>>,
+    pub(super) previous: Option<crate::receipt_store::DispatchIntentHandle>,
+}
+
+impl Drop for ScopedKernelDispatchIntent {
+    fn drop(&mut self) {
+        if let Some(previous) = self.previous.take() {
+            self.intents.insert(self.request_id.clone(), previous);
+        } else {
+            self.intents.remove(&self.request_id);
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct ReceiptFederationAdmission {
     pub remote_kernel_id: Option<String>,

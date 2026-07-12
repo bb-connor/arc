@@ -593,6 +593,53 @@ impl ChioKernel {
             });
         }
 
+        // For a side-effecting or monetary call, durably journal a dispatch
+        // intent BEFORE the earliest possible effect (the prepaid authorize
+        // below, or tool dispatch), so a crash in the effect-to-receipt window
+        // leaves a durable trace to reconcile at the next boot. On failure,
+        // reverse every pre-execution hold through the same pre-dispatch
+        // unwind the admission and authorize arms use, then deny before any
+        // effect. Read-only calls return None here and pay nothing.
+        let has_monetary = budget_mutation.charge_result().is_some();
+        let intent_tenant = current_scoped_receipt_tenant_id();
+        let dispatch_intent = match self.record_dispatch_intent_if_side_effecting(
+            request,
+            has_monetary,
+            intent_tenant.as_deref(),
+            now_unix_ms,
+        ) {
+            Ok(handle) => handle,
+            Err(error) => {
+                let msg = error.to_string();
+                warn!(
+                    request_id = %request.request_id,
+                    reason = %redacted!(&msg),
+                    "dispatch intent write failed; denying before dispatch"
+                );
+                return self.with_pre_invocation_guard_evidence(
+                    &pre_invocation_guard_evidence,
+                    || {
+                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
+                            request,
+                            reason: &msg,
+                            timestamp: now,
+                            matched_grant_index,
+                            cap,
+                            budget_mutation: &budget_mutation,
+                            payment_authorization: None,
+                            runtime_admission_metadata: extra_metadata.clone(),
+                            budget_lease_acquired,
+                        })
+                    },
+                );
+            }
+        };
+        // Register the handle for the whole evaluation so whichever terminal
+        // receipt commits first consumes the intent; the guard clears the
+        // registration when this future finishes (or is dropped).
+        let _dispatch_intent_scope =
+            self.scope_dispatch_intent_for_request(&request.request_id, dispatch_intent);
+
         let payment_authorization = match self
             .authorize_payment_if_needed(request, budget_mutation.charge_result())
         {
@@ -638,7 +685,6 @@ impl ChioKernel {
         }
 
         let tool_started_at = Instant::now();
-        let has_monetary = budget_mutation.charge_result().is_some();
         let mut post_admission_drop_guard = PostAdmissionDropGuard::new(
             self,
             request,

@@ -13,6 +13,309 @@ use chio_kernel::receipt_store::{
     ReceiptStore, ReceiptStoreError, SideEffectClass,
 };
 
+mod support {
+    #![allow(clippy::expect_used, clippy::unwrap_used)]
+
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use chio_core::capability::{
+        scope::{ChioScope, Operation, ToolGrant},
+        token::CapabilityToken,
+    };
+    use chio_core::crypto::Keypair;
+    use chio_kernel::{
+        ChioKernel, DispatchIntentJournalMode, KernelConfig, KernelError, NestedFlowBridge,
+        ReceiptStore, ToolCallRequest, ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE,
+        DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    };
+    use chio_store_sqlite::SqliteReceiptStore;
+
+    pub fn unique_kernel_db_path(prefix: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time after epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("{prefix}-{}-{nonce}.sqlite3", std::process::id()))
+    }
+
+    /// Tool server that probes the journal from INSIDE `invoke`, capturing the
+    /// open-intent count at the moment the effect runs. The pre-dispatch write
+    /// must be durable before dispatch, so a side-effecting invoke observes
+    /// its own intent row and a read-only invoke observes none.
+    pub struct ProbeServer {
+        store: Arc<SqliteReceiptStore>,
+        pub invoked: Arc<AtomicUsize>,
+        pub open_intents_seen_at_invoke: Arc<Mutex<Vec<u64>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl ToolServerConnection for ProbeServer {
+        fn server_id(&self) -> &str {
+            "srv"
+        }
+
+        fn tool_names(&self) -> Vec<String> {
+            vec!["write_file".to_string(), "read_file".to_string()]
+        }
+
+        fn tool_is_read_only(&self, tool_name: &str) -> bool {
+            tool_name == "read_file"
+        }
+
+        async fn invoke(
+            &self,
+            _tool_name: &str,
+            _arguments: serde_json::Value,
+            _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+        ) -> Result<serde_json::Value, KernelError> {
+            self.invoked.fetch_add(1, Ordering::SeqCst);
+            let open = self
+                .store
+                .open_dispatch_intent_count()
+                .expect("count open intents from inside the tool");
+            self.open_intents_seen_at_invoke
+                .lock()
+                .expect("probe lock")
+                .push(open);
+            Ok(serde_json::json!({ "ok": true }))
+        }
+    }
+
+    /// Store decorator whose intent writes fail while `reject_intent_writes`
+    /// is set; everything else delegates to the real SQLite store so deny
+    /// receipts still persist durably.
+    pub struct IntentRejectingStore {
+        pub inner: Arc<SqliteReceiptStore>,
+        pub reject_intent_writes: AtomicBool,
+    }
+
+    impl ReceiptStore for IntentRejectingStore {
+        fn append_chio_receipt(
+            &self,
+            receipt: &chio_core::receipt::body::ChioReceipt,
+        ) -> Result<(), chio_kernel::ReceiptStoreError> {
+            self.inner.as_ref().append_chio_receipt(receipt)
+        }
+
+        fn append_chio_receipt_returning_seq(
+            &self,
+            receipt: &chio_core::receipt::body::ChioReceipt,
+        ) -> Result<Option<u64>, chio_kernel::ReceiptStoreError> {
+            ReceiptStore::append_chio_receipt_returning_seq(self.inner.as_ref(), receipt)
+        }
+
+        fn append_chio_receipt_with_timeout(
+            &self,
+            receipt: &chio_core::receipt::body::ChioReceipt,
+            budget: std::time::Duration,
+        ) -> Result<Option<u64>, chio_kernel::ReceiptStoreError> {
+            self.inner
+                .as_ref()
+                .append_chio_receipt_with_timeout(receipt, budget)
+        }
+
+        fn append_child_receipt(
+            &self,
+            receipt: &chio_core::receipt::lineage::ChildRequestReceipt,
+        ) -> Result<(), chio_kernel::ReceiptStoreError> {
+            self.inner.as_ref().append_child_receipt(receipt)
+        }
+
+        fn record_dispatch_intent(
+            &self,
+            intent: &chio_kernel::DispatchIntentRecord,
+        ) -> Result<(), chio_kernel::ReceiptStoreError> {
+            if self.reject_intent_writes.load(Ordering::SeqCst) {
+                self.reject_intent_writes.store(false, Ordering::SeqCst);
+                return Err(chio_kernel::ReceiptStoreError::Pool(
+                    "intent writer wedged".to_string(),
+                ));
+            }
+            self.inner.as_ref().record_dispatch_intent(intent)
+        }
+
+        fn record_dispatch_intent_with_timeout(
+            &self,
+            intent: &chio_kernel::DispatchIntentRecord,
+            budget: std::time::Duration,
+        ) -> Result<(), chio_kernel::ReceiptStoreError> {
+            if self.reject_intent_writes.load(Ordering::SeqCst) {
+                self.reject_intent_writes.store(false, Ordering::SeqCst);
+                return Err(chio_kernel::ReceiptStoreError::Pool(
+                    "intent writer wedged".to_string(),
+                ));
+            }
+            self.inner
+                .as_ref()
+                .record_dispatch_intent_with_timeout(intent, budget)
+        }
+
+        fn append_chio_receipt_consuming_intent(
+            &self,
+            receipt: &chio_core::receipt::body::ChioReceipt,
+            intent: &chio_kernel::DispatchIntentKey,
+        ) -> Result<Option<u64>, chio_kernel::ReceiptStoreError> {
+            self.inner
+                .as_ref()
+                .append_chio_receipt_consuming_intent(receipt, intent)
+        }
+
+        fn append_chio_receipt_consuming_intent_with_timeout(
+            &self,
+            receipt: &chio_core::receipt::body::ChioReceipt,
+            intent: &chio_kernel::DispatchIntentKey,
+            budget: std::time::Duration,
+        ) -> Result<Option<u64>, chio_kernel::ReceiptStoreError> {
+            self.inner
+                .as_ref()
+                .append_chio_receipt_consuming_intent_with_timeout(receipt, intent, budget)
+        }
+
+        fn reconcile_dispatch_intents(
+            &self,
+            reconciler: &dyn chio_kernel::DispatchIntentReconciler,
+        ) -> Result<chio_kernel::DispatchIntentReconcileReport, chio_kernel::ReceiptStoreError>
+        {
+            self.inner.as_ref().reconcile_dispatch_intents(reconciler)
+        }
+
+        fn open_dispatch_intent_count(&self) -> Result<u64, chio_kernel::ReceiptStoreError> {
+            self.inner.as_ref().open_dispatch_intent_count()
+        }
+
+        fn dead_letter_dispatch_intent_count(
+            &self,
+        ) -> Result<u64, chio_kernel::ReceiptStoreError> {
+            self.inner.as_ref().dead_letter_dispatch_intent_count()
+        }
+    }
+
+    pub struct JournalHarness {
+        pub kernel: ChioKernel,
+        pub store: Arc<SqliteReceiptStore>,
+        pub capability: CapabilityToken,
+        pub invoked: Arc<AtomicUsize>,
+        pub open_intents_seen_at_invoke: Arc<Mutex<Vec<u64>>>,
+        pub db_path: std::path::PathBuf,
+    }
+
+    impl JournalHarness {
+        pub fn request(&self, tool_name: &str) -> ToolCallRequest {
+            self.request_with_id(tool_name, &format!("req-{tool_name}"))
+        }
+
+        pub fn request_with_id(&self, tool_name: &str, request_id: &str) -> ToolCallRequest {
+            ToolCallRequest {
+                request_id: request_id.to_string(),
+                capability: self.capability.clone(),
+                tool_name: tool_name.to_string(),
+                server_id: "srv".to_string(),
+                agent_id: self.capability.subject.to_hex(),
+                arguments: serde_json::json!({ "payload": "hello" }),
+                dpop_proof: None,
+                execution_nonce: None,
+                governed_intent: None,
+                approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
+            }
+        }
+    }
+
+    pub fn journal_config(keypair: Keypair) -> KernelConfig {
+        KernelConfig {
+            keypair,
+            ca_public_keys: vec![],
+            max_delegation_depth: 5,
+            policy_hash: "test-policy-hash".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: false,
+            allow_ephemeral_revocation_store: true,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            dispatch_intent_journal: DispatchIntentJournalMode::SideEffecting,
+        }
+    }
+
+    fn tool_scope(max_invocations: Option<u32>) -> ChioScope {
+        let grant = |tool_name: &str| ToolGrant {
+            server_id: "srv".to_string(),
+            tool_name: tool_name.to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![],
+            max_invocations,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        };
+        ChioScope {
+            grants: vec![grant("write_file"), grant("read_file")],
+            ..ChioScope::default()
+        }
+    }
+
+    pub fn journal_harness(prefix: &str) -> Result<JournalHarness, Box<dyn std::error::Error>> {
+        journal_harness_with(prefix, None, false)
+    }
+
+    pub fn journal_harness_rejecting_first_intent_write(
+        prefix: &str,
+        max_invocations: Option<u32>,
+    ) -> Result<JournalHarness, Box<dyn std::error::Error>> {
+        journal_harness_with(prefix, max_invocations, true)
+    }
+
+    fn journal_harness_with(
+        prefix: &str,
+        max_invocations: Option<u32>,
+        reject_first_intent_write: bool,
+    ) -> Result<JournalHarness, Box<dyn std::error::Error>> {
+        let db_path = unique_kernel_db_path(prefix);
+        let store = Arc::new(SqliteReceiptStore::open(&db_path)?);
+        let invoked = Arc::new(AtomicUsize::new(0));
+        let open_intents_seen_at_invoke = Arc::new(Mutex::new(Vec::new()));
+
+        let mut kernel = ChioKernel::new(journal_config(Keypair::generate()));
+        kernel.register_tool_server(Box::new(ProbeServer {
+            store: Arc::clone(&store),
+            invoked: Arc::clone(&invoked),
+            open_intents_seen_at_invoke: Arc::clone(&open_intents_seen_at_invoke),
+        }));
+        if reject_first_intent_write {
+            kernel.set_receipt_store_handle(Arc::new(IntentRejectingStore {
+                inner: Arc::clone(&store),
+                reject_intent_writes: AtomicBool::new(true),
+            }))?;
+        } else {
+            kernel.set_receipt_store_handle(Arc::clone(&store) as Arc<dyn ReceiptStore>)?;
+        }
+
+        let agent_keypair = Keypair::generate();
+        let capability = kernel.issue_capability(
+            &agent_keypair.public_key(),
+            tool_scope(max_invocations),
+            300,
+        )?;
+        Ok(JournalHarness {
+            kernel,
+            store,
+            capability,
+            invoked,
+            open_intents_seen_at_invoke,
+            db_path,
+        })
+    }
+}
+
 /// A minimal append-only store: every journal method must fail closed (or
 /// no-op empty for reconciliation and counts) by default, so a store that
 /// never opted into the journal can never silently accept an intent.
@@ -196,6 +499,99 @@ fn unannotated_tools_read_as_side_effecting_and_rails_name_themselves() {
         chio_kernel::AcpPaymentAdapter::new("http://localhost:9").rail_id(),
         "acp"
     );
+}
+
+#[test]
+fn side_effecting_dispatch_sees_durable_intent_and_read_only_pays_nothing(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::Verdict;
+
+    let harness = support::journal_harness("chio-intent-classgate")?;
+
+    // Side-effecting call: by the time the tool runs, its intent row is
+    // already durably committed (the write happens strictly before dispatch).
+    let response = harness
+        .kernel
+        .evaluate_tool_call_blocking(&harness.request("write_file"))?;
+    assert!(matches!(response.verdict, Verdict::Allow));
+    let seen = harness
+        .open_intents_seen_at_invoke
+        .lock()
+        .expect("probe lock")
+        .clone();
+    assert_eq!(
+        seen,
+        vec![1],
+        "the side-effecting tool must observe its own durable intent"
+    );
+
+    // Read-only call: no intent row exists at invoke time, and none is ever
+    // written for it.
+    let response = harness
+        .kernel
+        .evaluate_tool_call_blocking(&harness.request("read_file"))?;
+    assert!(matches!(response.verdict, Verdict::Allow));
+    let seen = harness
+        .open_intents_seen_at_invoke
+        .lock()
+        .expect("probe lock")
+        .clone();
+    assert!(
+        seen.len() == 2 && seen[1] <= 1,
+        "a read-only call must not add an intent row (saw {seen:?})"
+    );
+
+    let _ = std::fs::remove_file(&harness.db_path);
+    Ok(())
+}
+
+#[test]
+fn intent_write_failure_denies_before_dispatch_without_leaking_hold(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::Verdict;
+
+    // The store rejects exactly the FIRST intent write. The capability grants
+    // a single invocation, so a leaked pre-execution hold would starve the
+    // retry: the second call succeeding proves the deny reversed everything.
+    let harness = support::journal_harness_rejecting_first_intent_write(
+        "chio-intent-write-failure",
+        Some(1),
+    )?;
+
+    let denied = harness
+        .kernel
+        .evaluate_tool_call_blocking(&harness.request_with_id("write_file", "req-denied"))?;
+    assert!(
+        matches!(denied.verdict, Verdict::Deny),
+        "an intent-write failure must deny before dispatch"
+    );
+    assert_eq!(
+        harness.invoked.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "the tool must not run when its intent could not be journaled"
+    );
+    let reason = denied.reason.unwrap_or_default();
+    assert!(
+        reason.contains("dispatch intent"),
+        "deny names the intent-write failure: {reason}"
+    );
+
+    let retried = harness
+        .kernel
+        .evaluate_tool_call_blocking(&harness.request_with_id("write_file", "req-retried"))?;
+    assert!(
+        matches!(retried.verdict, Verdict::Allow),
+        "the denied call must not burn the single invocation slot: {:?}",
+        retried.reason
+    );
+    assert_eq!(
+        harness.invoked.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the retry dispatches exactly once"
+    );
+
+    let _ = std::fs::remove_file(&harness.db_path);
+    Ok(())
 }
 
 #[test]
