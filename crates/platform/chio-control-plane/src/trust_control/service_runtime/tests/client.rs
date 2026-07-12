@@ -787,6 +787,46 @@ fn trust_control_post_wrappers_send_json_bodies_and_encoded_paths() {
     );
 }
 
+#[test]
+fn remote_receipt_store_append_fails_closed_at_the_configured_budget() {
+    // A control plane that accepts the connection but never answers must not let
+    // a --control-url receipt append block past the configured append budget.
+    // The bounded override fails closed at the budget instead of waiting on the
+    // coarse control-client network timeout.
+    let listener =
+        std::net::TcpListener::bind("127.0.0.1:0").test_expect("bind stalling control plane");
+    let addr = listener.local_addr().test_expect("stalling server addr");
+    // Hold the accepted connection open without responding so the append blocks
+    // reading the response. Detached: the test never joins it.
+    std::thread::spawn(move || {
+        if let Ok((stream, _)) = listener.accept() {
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            drop(stream);
+        }
+    });
+
+    let store = super::super::remote_stores::build_remote_receipt_store(
+        &format!("http://{addr}"),
+        "secret",
+    )
+    .test_expect("build remote receipt store");
+    let receipt = sample_tool_receipt("receipt-budget");
+
+    let budget = std::time::Duration::from_millis(250);
+    let start = std::time::Instant::now();
+    let result = store.append_chio_receipt_with_timeout(&receipt, budget);
+    let elapsed = start.elapsed();
+
+    assert!(
+        matches!(result, Err(chio_kernel::ReceiptStoreError::Timeout { .. })),
+        "remote append must fail closed at the budget, got {result:?}"
+    );
+    assert!(
+        elapsed < std::time::Duration::from_secs(2),
+        "remote append must return near the budget, took {elapsed:?}"
+    );
+}
+
 fn sample_tool_receipt(id: &str) -> ChioReceipt {
     let keypair = Keypair::generate();
     ChioReceipt::sign(

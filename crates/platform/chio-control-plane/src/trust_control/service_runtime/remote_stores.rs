@@ -11,6 +11,36 @@ pub fn build_remote_receipt_store(
     }))
 }
 
+/// Enforce a wall-clock `budget` around one blocking control-plane append.
+///
+/// The control client carries only a coarse network-level request timeout, not
+/// the operator's per-eval receipt-append budget. Running the blocking append on
+/// a detached worker and waiting only `budget` for its result lets a
+/// `--control-url` deployment fail closed at the configured budget instead of
+/// pinning the kernel-wide receipt write lock on a slow control plane. A worker
+/// that outlives the budget completes (or hits the client timeout) on its own;
+/// the caller has already failed closed, so its result is discarded.
+fn append_within_budget<F>(
+    budget: std::time::Duration,
+    operation: &str,
+    append: F,
+) -> Result<Option<u64>, ReceiptStoreError>
+where
+    F: FnOnce() -> Result<Option<u64>, ReceiptStoreError> + Send + 'static,
+{
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    std::thread::spawn(move || {
+        let _ = sender.send(append());
+    });
+    match receiver.recv_timeout(budget) {
+        Ok(result) => result,
+        Err(_) => Err(ReceiptStoreError::Timeout {
+            operation: operation.to_string(),
+            timeout_ms: u64::try_from(budget.as_millis()).unwrap_or(u64::MAX),
+        }),
+    }
+}
+
 pub fn build_remote_revocation_store(
     control_url: &str,
     control_token: &str,
@@ -56,6 +86,42 @@ impl ReceiptStore for RemoteReceiptStore {
         self.client
             .append_child_receipt(receipt)
             .map_err(into_receipt_store_error)
+    }
+
+    /// Bounded tool-receipt append for the mediation hot path. The base trait
+    /// default drops the budget and blocks on the control client's own timeout,
+    /// so this override enforces the operator-configured append budget over the
+    /// remote round trip, failing closed on expiry.
+    fn append_chio_receipt_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        let client = self.client.clone();
+        let receipt = receipt.clone();
+        append_within_budget(budget, "remote tool receipt append", move || {
+            client
+                .append_tool_receipt(&receipt)
+                .map_err(into_receipt_store_error)?;
+            Ok(None)
+        })
+    }
+
+    /// Bounded child-receipt append (same budget rationale as
+    /// [`Self::append_chio_receipt_with_timeout`]) for nested-flow drains.
+    fn append_child_receipt_with_timeout(
+        &self,
+        receipt: &ChildRequestReceipt,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        let client = self.client.clone();
+        let receipt = receipt.clone();
+        append_within_budget(budget, "remote child receipt append", move || {
+            client
+                .append_child_receipt(&receipt)
+                .map_err(into_receipt_store_error)?;
+            Ok(None)
+        })
     }
 
     /// Point-load a tool receipt by id over the control-plane remote protocol so
