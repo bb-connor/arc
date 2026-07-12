@@ -10,6 +10,48 @@ impl ChioKernel {
         cap: &CapabilityToken,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.build_monetary_deny_response_with_recording(
+            request,
+            reason,
+            timestamp,
+            matching_grants,
+            cap,
+            extra_metadata,
+            ReceiptRecordMode::WithFederation,
+        )
+    }
+
+    pub(crate) fn build_runtime_admission_monetary_deny_response_with_metadata(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        matching_grants: &[MatchingGrant<'_>],
+        cap: &CapabilityToken,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.build_monetary_deny_response_with_recording(
+            request,
+            reason,
+            timestamp,
+            matching_grants,
+            cap,
+            extra_metadata,
+            ReceiptRecordMode::LocalOnly,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn build_monetary_deny_response_with_recording(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        matching_grants: &[MatchingGrant<'_>],
+        cap: &CapabilityToken,
+        extra_metadata: Option<serde_json::Value>,
+        record_mode: ReceiptRecordMode,
+    ) -> Result<ToolCallResponse, KernelError> {
         // Look for a monetary grant among the matching candidates to populate metadata.
         let monetary_grant = matching_grants.iter().find(|m| {
             m.grant.max_cost_per_invocation.is_some() || m.grant.max_total_cost.is_some()
@@ -28,6 +70,11 @@ impl ChioKernel {
                 .as_ref()
                 .map(|m| m.units)
                 .unwrap_or(u64::MAX);
+            let committed_cost_units = self
+                .with_budget_store(|store| Ok(store.get_usage(&cap.id, mg.index)?))?
+                .map(|usage| usage.committed_cost_units())
+                .transpose()?
+                .unwrap_or(0);
             let attempted_cost = grant
                 .max_cost_per_invocation
                 .as_ref()
@@ -42,7 +89,7 @@ impl ChioKernel {
                 grant_index: mg.index as u32,
                 cost_charged: 0,
                 currency,
-                budget_remaining: 0,
+                budget_remaining: budget_total.saturating_sub(committed_cost_units),
                 budget_total,
                 delegation_depth,
                 root_budget_holder,
@@ -94,7 +141,7 @@ impl ChioKernel {
                 tenant_id: None,
             })?;
 
-            self.record_chio_receipt_with_federation(request, &receipt)?;
+            self.record_chio_receipt_with_mode(request, &receipt, record_mode)?;
 
             return Ok(ToolCallResponse {
                 request_id: request.request_id.clone(),
@@ -108,7 +155,14 @@ impl ChioKernel {
         }
 
         // No monetary grant -- standard deny.
-        self.build_deny_response_with_metadata(request, reason, timestamp, None, extra_metadata)
+        self.build_deny_response_with_recording(
+            request,
+            reason,
+            timestamp,
+            None,
+            extra_metadata,
+            record_mode,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -135,28 +189,6 @@ impl ChioKernel {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn build_runtime_admission_pre_execution_monetary_deny_response_with_metadata(
-        &self,
-        request: &ToolCallRequest,
-        reason: &str,
-        timestamp: u64,
-        charge: &BudgetChargeResult,
-        committed_cost_after_release: u64,
-        cap: &CapabilityToken,
-        extra_metadata: Option<serde_json::Value>,
-    ) -> Result<ToolCallResponse, KernelError> {
-        self.build_pre_execution_monetary_deny_response_with_recording(
-            request,
-            reason,
-            timestamp,
-            charge,
-            committed_cost_after_release,
-            cap,
-            extra_metadata,
-            ReceiptRecordMode::LocalOnly,
-        )
-    }
-
     #[allow(clippy::too_many_arguments)]
     fn build_pre_execution_monetary_deny_response_with_recording(
         &self,
@@ -437,24 +469,6 @@ impl ChioKernel {
             matched_grant_index,
             extra_metadata,
             ReceiptRecordMode::WithFederation,
-        )
-    }
-
-    pub(crate) fn build_runtime_admission_deny_response_with_metadata(
-        &self,
-        request: &ToolCallRequest,
-        reason: &str,
-        timestamp: u64,
-        matched_grant_index: Option<usize>,
-        extra_metadata: Option<serde_json::Value>,
-    ) -> Result<ToolCallResponse, KernelError> {
-        self.build_deny_response_with_recording(
-            request,
-            reason,
-            timestamp,
-            matched_grant_index,
-            extra_metadata,
-            ReceiptRecordMode::LocalOnly,
         )
     }
 

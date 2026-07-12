@@ -239,7 +239,7 @@ fn budgets_are_tracked_per_matching_grant() {
 }
 
 #[test]
-fn pre_dispatch_guard_denial_reverses_invocation_budget() {
+fn pre_dispatch_guard_denial_does_not_mutate_invocation_budget() {
     struct DenyOnce {
         denied: AtomicBool,
     }
@@ -284,8 +284,7 @@ fn pre_dispatch_guard_denial_reverses_invocation_budget() {
         .unwrap();
     assert_eq!(denied.verdict, Verdict::Deny);
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    let reversed = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
-    assert_eq!(reversed.invocation_count, 0);
+    assert!(kernel.budget_store.get_usage(&cap.id, 0).unwrap().is_none());
 
     let allowed = kernel
         .evaluate_tool_call_blocking(&make_request(

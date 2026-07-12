@@ -189,7 +189,7 @@ impl ChioKernel {
         Ok(())
     }
 
-    fn validate_governed_approval_token(
+    fn verify_governed_approval_token(
         &self,
         request: &ToolCallRequest,
         cap: &CapabilityToken,
@@ -245,15 +245,17 @@ impl ChioKernel {
             )));
         }
 
-        // Step 8: Single-use replay check. An approval token must not be
-        // consumed more than once. The replay store TTL is set to
-        // MAX_APPROVAL_TTL_SECS, which is >= any valid token's lifetime
-        // (enforced by step 7). This guarantees a token can never be replayed
-        // after cache eviction because the token itself will have expired
-        // before eviction occurs.
+        Ok(())
+    }
+
+    pub(crate) fn reserve_governed_approval_replay(
+        &self,
+        request_id: &str,
+        intent_hash: &str,
+    ) -> Result<(), KernelError> {
         if let Some(ref replay_store) = self.approval_replay_store {
             let is_fresh = replay_store
-                .check_and_insert(&approval_token.request_id, intent_hash)
+                .check_and_insert(request_id, intent_hash)
                 .map_err(|_| {
                     KernelError::GovernedTransactionDenied(
                         "approval replay store unavailable; denying as fail-closed".to_string(),
@@ -275,7 +277,7 @@ impl ChioKernel {
 
     fn validate_metered_billing_context(
         intent: &chio_core::capability::governance::GovernedTransactionIntent,
-        charge_result: Option<&BudgetChargeResult>,
+        grant: &ToolGrant,
         now: u64,
     ) -> Result<(), KernelError> {
         let Some(metered) = intent.metered_billing.as_ref() else {
@@ -339,8 +341,18 @@ impl ChioKernel {
                 ));
             }
         }
-        if let Some(charge) = charge_result {
-            if charge.currency != quote.quoted_cost.currency {
+        let grant_currency = grant
+            .max_cost_per_invocation
+            .as_ref()
+            .map(|amount| amount.currency.as_str())
+            .or_else(|| {
+                grant
+                    .max_total_cost
+                    .as_ref()
+                    .map(|amount| amount.currency.as_str())
+            });
+        if let Some(grant_currency) = grant_currency {
+            if grant_currency != quote.quoted_cost.currency {
                 return Err(KernelError::GovernedTransactionDenied(
                     "metered billing quote currency does not match the grant currency".to_string(),
                 ));
@@ -934,7 +946,6 @@ impl ChioKernel {
         request: &ToolCallRequest,
         cap: &CapabilityToken,
         grant: &ToolGrant,
-        charge_result: Option<&BudgetChargeResult>,
         parent_context: Option<&OperationContext>,
         now: u64,
     ) -> Result<Option<ValidatedGovernedAdmission>, KernelError> {
@@ -1031,15 +1042,31 @@ impl ChioKernel {
             now,
         )?;
 
-        Self::validate_metered_billing_context(intent, charge_result, now)?;
+        Self::validate_metered_billing_context(intent, grant, now)?;
 
-        if let (Some(intent_amount), Some(charge)) = (intent.max_amount.as_ref(), charge_result) {
-            if intent_amount.currency != charge.currency {
+        let provisional_cost_units = grant
+            .max_cost_per_invocation
+            .as_ref()
+            .map_or(0, |amount| amount.units);
+        let grant_currency = grant
+            .max_cost_per_invocation
+            .as_ref()
+            .map(|amount| amount.currency.as_str())
+            .or_else(|| {
+                grant
+                    .max_total_cost
+                    .as_ref()
+                    .map(|amount| amount.currency.as_str())
+            });
+        if let (Some(intent_amount), Some(grant_currency)) =
+            (intent.max_amount.as_ref(), grant_currency)
+        {
+            if intent_amount.currency != grant_currency {
                 return Err(KernelError::GovernedTransactionDenied(
                     "governed intent currency does not match the grant currency".to_string(),
                 ));
             }
-            if intent_amount.units < charge.cost_charged {
+            if intent_amount.units < provisional_cost_units {
                 return Err(KernelError::GovernedTransactionDenied(
                     "governed intent amount is lower than the provisional invocation charge"
                         .to_string(),
@@ -1047,26 +1074,32 @@ impl ChioKernel {
             }
         }
 
-        let requested_units = charge_result
-            .map(|charge| charge.cost_charged)
-            .or_else(|| intent.max_amount.as_ref().map(|amount| amount.units))
-            .unwrap_or(0);
+        let requested_units =
+            if grant.max_cost_per_invocation.is_some() || grant.max_total_cost.is_some() {
+                provisional_cost_units
+            } else {
+                intent.max_amount.as_ref().map_or(0, |amount| amount.units)
+            };
         let approval_required = approval_threshold_units
             .map(|threshold_units| requested_units >= threshold_units)
             .unwrap_or(false);
 
-        if let Some(approval_token) = request.approval_token.as_ref() {
-            self.validate_governed_approval_token(request, cap, &intent_hash, approval_token, now)?;
+        let approval_replay_key = if let Some(approval_token) = request.approval_token.as_ref() {
+            self.verify_governed_approval_token(request, cap, &intent_hash, approval_token, now)?;
+            Some((approval_token.request_id.clone(), intent_hash))
         } else if approval_required {
             return Err(KernelError::GovernedTransactionDenied(format!(
                 "approval token required for governed transaction intent {}",
                 intent.id
             )));
-        }
+        } else {
+            None
+        };
 
         Ok(Some(ValidatedGovernedAdmission {
             call_chain_proof: validated_upstream_call_chain_proof,
             verified_runtime_attestation,
+            approval_replay_key,
         }))
     }
 

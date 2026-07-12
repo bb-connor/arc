@@ -161,31 +161,31 @@ fn denying_guard_evidence_is_signed_into_deny_receipt() {
 }
 
 #[test]
-fn unlimited_grant_guard_denial_does_not_reverse_budget_store() {
-    struct NoopUnlimitedBudgetStore {
+fn guard_denial_precedes_every_budget_store_mutation() {
+    struct ObservingBudgetStore {
         inner: InMemoryBudgetStore,
+        increment_calls: std::sync::atomic::AtomicUsize,
         reverse_calls: std::sync::atomic::AtomicUsize,
     }
 
-    impl NoopUnlimitedBudgetStore {
+    impl ObservingBudgetStore {
         fn new() -> Self {
             Self {
                 inner: InMemoryBudgetStore::new(),
+                increment_calls: std::sync::atomic::AtomicUsize::new(0),
                 reverse_calls: std::sync::atomic::AtomicUsize::new(0),
             }
         }
     }
 
-    impl BudgetStore for NoopUnlimitedBudgetStore {
+    impl BudgetStore for ObservingBudgetStore {
         fn try_increment(
             &self,
             capability_id: &str,
             grant_index: usize,
             max_invocations: Option<u32>,
         ) -> Result<bool, BudgetStoreError> {
-            if max_invocations.is_none() {
-                return Ok(true);
-            }
+            self.increment_calls.fetch_add(1, Ordering::SeqCst);
             self.inner
                 .try_increment(capability_id, grant_index, max_invocations)
         }
@@ -263,7 +263,7 @@ fn unlimited_grant_guard_denial_does_not_reverse_budget_store() {
     }
 
     let mut kernel = make_kernel(make_config());
-    let budget_store = std::sync::Arc::new(NoopUnlimitedBudgetStore::new());
+    let budget_store = std::sync::Arc::new(ObservingBudgetStore::new());
     kernel.set_budget_store_handle(budget_store.clone());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["dangerous"])));
 
@@ -279,18 +279,16 @@ fn unlimited_grant_guard_denial_does_not_reverse_budget_store() {
     kernel.add_guard(Box::new(DenyAll));
 
     let agent_kp = make_keypair();
-    let cap = make_capability(
-        &kernel,
-        &agent_kp,
-        make_scope(vec![make_grant("srv-a", "dangerous")]),
-        300,
-    );
+    let mut grant = make_grant("srv-a", "dangerous");
+    grant.max_invocations = Some(1);
+    let cap = make_capability(&kernel, &agent_kp, make_scope(vec![grant]), 300);
     let request = make_request("req-unlimited-deny", &cap, "dangerous", "srv-a");
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.as_deref().unwrap_or("");
     assert!(reason.contains("deny-all"), "reason was: {reason}");
+    assert_eq!(budget_store.increment_calls.load(Ordering::SeqCst), 0);
     assert_eq!(budget_store.reverse_calls.load(Ordering::SeqCst), 0);
     assert!(budget_store.get_usage(&cap.id, 0).unwrap().is_none());
 }

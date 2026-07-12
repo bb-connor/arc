@@ -280,45 +280,20 @@ impl ChioKernel {
             );
         }
 
-        let (matched_grant_index, budget_mutation) = match self.check_and_increment_budget(
-            &request.request_id,
-            cap,
-            &matching_grants,
-        ) {
-            Ok(result) => result,
-            Err(e) => {
-                let msg = e.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
-                // For monetary budget exhaustion, build a denial receipt with financial metadata.
-                return self.build_monetary_deny_response_with_metadata(
-                    request,
-                    &msg,
-                    now,
-                    &matching_grants,
-                    cap,
-                    self.merge_budget_receipt_metadata(
-                        extra_metadata.clone(),
-                        self.budget_backend_receipt_metadata()?,
-                    ),
-                );
-            }
-        };
-
-        let matched_grant = matching_grants
-            .iter()
-            .find(|matching| matching.index == matched_grant_index)
-            .map(|matching| matching.grant)
-            .ok_or_else(|| {
-                KernelError::Internal(format!(
-                    "matched grant index {matched_grant_index} missing from candidate set"
-                ))
-            })?;
+        // Select the most-specific matching grant before any authoritative
+        // mutation. Falling through from an exhausted specific grant to a
+        // broader grant would also change the governance and guard contract
+        // after those checks ran, so admission is pinned to this candidate.
+        let matched = matching_grants.first().copied().ok_or_else(|| {
+            KernelError::Internal("matching grant set unexpectedly empty".to_string())
+        })?;
+        let matched_grant_index = matched.index;
+        let matched_grant = matched.grant;
 
         let validated_governed_admission = match self.validate_governed_transaction(
             request,
             cap,
             matched_grant,
-            budget_mutation.charge_result(),
             None,
             now,
         ) {
@@ -326,31 +301,12 @@ impl ChioKernel {
             Err(error) => {
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed transaction denied");
-                let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
-                if let (Some(charge), Some(reverse)) =
-                    (budget_mutation.charge_result(), reverse.as_ref())
-                {
-                    return self.build_pre_execution_monetary_deny_response_with_metadata(
-                        request,
-                        &msg,
-                        now,
-                        charge,
-                        reverse.committed_cost_units_after,
-                        cap,
-                        self.merge_budget_receipt_metadata(
-                            extra_metadata.clone(),
-                            self.budget_execution_receipt_metadata(
-                                charge,
-                                Some(("reversed", reverse)),
-                            ),
-                        ),
-                    );
-                }
-                return self.build_deny_response_with_metadata(
+                return self.build_monetary_deny_response_with_metadata(
                     request,
                     &msg,
                     now,
-                    Some(matched_grant_index),
+                    std::slice::from_ref(&matched),
+                    cap,
                     extra_metadata.clone(),
                 );
             }
@@ -361,12 +317,8 @@ impl ChioKernel {
                     .as_ref()
                     .and_then(|admission| admission.verified_runtime_attestation.clone()),
             );
-        // A receipt-store read error while resolving the parent call-chain
-        // receipt fails closed, but check_and_increment_budget above already
-        // consumed the pre-execution budget (invocation count / monetary hold).
-        // Route the error through the same reversal + deny path the governed and
-        // guard denial branches use so a transient store failure never burns
-        // quota or holds funds for a call that never dispatches.
+        // Resolve all call-chain receipt evidence before authoritative
+        // admission. A failed durable lookup cannot consume quota.
         let governed_call_chain_receipt_evidence = match self.governed_call_chain_receipt_evidence(
             request,
             cap,
@@ -379,31 +331,12 @@ impl ChioKernel {
             Err(error) => {
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed call-chain evidence lookup failed");
-                let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
-                if let (Some(charge), Some(reverse)) =
-                    (budget_mutation.charge_result(), reverse.as_ref())
-                {
-                    return self.build_pre_execution_monetary_deny_response_with_metadata(
-                        request,
-                        &msg,
-                        now,
-                        charge,
-                        reverse.committed_cost_units_after,
-                        cap,
-                        self.merge_budget_receipt_metadata(
-                            extra_metadata.clone(),
-                            self.budget_execution_receipt_metadata(
-                                charge,
-                                Some(("reversed", reverse)),
-                            ),
-                        ),
-                    );
-                }
-                return self.build_deny_response_with_metadata(
+                return self.build_monetary_deny_response_with_metadata(
                     request,
                     &msg,
                     now,
-                    Some(matched_grant_index),
+                    std::slice::from_ref(&matched),
+                    cap,
                     extra_metadata.clone(),
                 );
             }
@@ -421,34 +354,13 @@ impl ChioKernel {
             Err(e) => {
                 let msg = e.error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "guard denied");
-                let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
-                if let (Some(charge), Some(reverse)) =
-                    (budget_mutation.charge_result(), reverse.as_ref())
-                {
-                    return self.with_pre_invocation_guard_evidence(&e.evidence, || {
-                        self.build_pre_execution_monetary_deny_response_with_metadata(
-                            request,
-                            &msg,
-                            now,
-                            charge,
-                            reverse.committed_cost_units_after,
-                            cap,
-                            self.merge_budget_receipt_metadata(
-                                extra_metadata.clone(),
-                                self.budget_execution_receipt_metadata(
-                                    charge,
-                                    Some(("reversed", reverse)),
-                                ),
-                            ),
-                        )
-                    });
-                }
                 return self.with_pre_invocation_guard_evidence(&e.evidence, || {
-                    self.build_deny_response_with_metadata(
+                    self.build_monetary_deny_response_with_metadata(
                         request,
                         &msg,
                         now,
-                        Some(matched_grant_index),
+                        std::slice::from_ref(&matched),
+                        cap,
                         extra_metadata.clone(),
                     )
                 });
@@ -469,40 +381,101 @@ impl ChioKernel {
                 .reason
                 .unwrap_or_else(|| "runtime admission denied".to_string());
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied");
-            let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
-            if let (Some(charge), Some(reverse)) =
-                (budget_mutation.charge_result(), reverse.as_ref())
-            {
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_runtime_admission_pre_execution_monetary_deny_response_with_metadata(
-                        request,
-                        &msg,
-                        now,
-                        charge,
-                        reverse.committed_cost_units_after,
-                        cap,
-                        self.merge_budget_receipt_metadata(
-                            extra_metadata,
-                            self.budget_execution_receipt_metadata(
-                                charge,
-                                Some(("reversed", reverse)),
-                            ),
-                        ),
-                    )
-                    },
-                );
-            }
             return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_runtime_admission_deny_response_with_metadata(
+                self.build_runtime_admission_monetary_deny_response_with_metadata(
                     request,
                     &msg,
                     now,
-                    Some(matched_grant_index),
+                    std::slice::from_ref(&matched),
+                    cap,
                     extra_metadata,
                 )
             });
+        }
+
+        let (authorized_grant_index, budget_mutation) = match self.check_and_increment_budget(
+            &request.request_id,
+            cap,
+            std::slice::from_ref(&matched),
+        ) {
+            Ok(result) => result,
+            Err(error) => {
+                let msg = error.to_string();
+                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
+                let deny_metadata = self
+                    .release_runtime_admission_reservations_for_pre_dispatch_denial(extra_metadata);
+                return self.with_pre_invocation_guard_evidence(
+                    &pre_invocation_guard_evidence,
+                    || {
+                        self.build_monetary_deny_response_with_metadata(
+                            request,
+                            &msg,
+                            now,
+                            std::slice::from_ref(&matched),
+                            cap,
+                            self.merge_budget_receipt_metadata(
+                                deny_metadata,
+                                self.budget_backend_receipt_metadata()?,
+                            ),
+                        )
+                    },
+                );
+            }
+        };
+        if authorized_grant_index != matched_grant_index {
+            return Err(KernelError::Internal(
+                "budget authority admitted a grant other than the validated grant".to_string(),
+            ));
+        }
+
+        if let Some((approval_request_id, intent_hash)) = validated_governed_admission
+            .as_ref()
+            .and_then(|admission| admission.approval_replay_key.as_ref())
+        {
+            if let Err(error) =
+                self.reserve_governed_approval_replay(approval_request_id, intent_hash)
+            {
+                let msg = error.to_string();
+                let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
+                let deny_metadata = self
+                    .release_runtime_admission_reservations_for_pre_dispatch_denial(extra_metadata);
+                if let (Some(charge), Some(reverse)) =
+                    (budget_mutation.charge_result(), reverse.as_ref())
+                {
+                    return self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            self.build_pre_execution_monetary_deny_response_with_metadata(
+                                request,
+                                &msg,
+                                now,
+                                charge,
+                                reverse.committed_cost_units_after,
+                                cap,
+                                self.merge_budget_receipt_metadata(
+                                    deny_metadata,
+                                    self.budget_execution_receipt_metadata(
+                                        charge,
+                                        Some(("reversed", reverse)),
+                                    ),
+                                ),
+                            )
+                        },
+                    );
+                }
+                return self.with_pre_invocation_guard_evidence(
+                    &pre_invocation_guard_evidence,
+                    || {
+                        self.build_deny_response_with_metadata(
+                            request,
+                            &msg,
+                            now,
+                            Some(matched_grant_index),
+                            deny_metadata,
+                        )
+                    },
+                );
+            }
         }
 
         // Capture whether THIS evaluation acquired a sibling-sum child-budget

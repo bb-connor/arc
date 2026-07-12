@@ -134,6 +134,7 @@ pub(crate) struct ValidatedGovernedCallChainProof {
 pub(crate) struct ValidatedGovernedAdmission {
     call_chain_proof: Option<ValidatedGovernedCallChainProof>,
     verified_runtime_attestation: Option<VerifiedRuntimeAttestationRecord>,
+    approval_replay_key: Option<(String, String)>,
 }
 
 #[derive(Debug, Clone)]

@@ -60,13 +60,7 @@ fn governed_monetary_denial_without_required_runtime_assurance_releases_budget()
         .and_then(|metadata| metadata.get("financial"))
         .expect("deny receipt should carry financial metadata");
     assert_eq!(financial["budget_remaining"].as_u64(), Some(1000));
-    let usage = kernel
-
-        .budget_store
-        .get_usage(&cap.id, 0)
-        .unwrap()
-        .unwrap();
-    assert_eq!(usage.committed_cost_units().unwrap(), 0);
+    assert!(kernel.budget_store.get_usage(&cap.id, 0).unwrap().is_none());
 }
 
 #[test]
@@ -881,14 +875,7 @@ fn governed_monetary_denial_without_approval_releases_budget_and_records_intent(
     assert_eq!(financial["budget_remaining"].as_u64(), Some(1000));
     assert_eq!(financial["settlement_status"], "not_applicable");
 
-    let usage = kernel
-
-        .budget_store
-        .get_usage(&cap.id, 0)
-        .unwrap()
-        .unwrap();
-    assert_eq!(usage.invocation_count, 0);
-    assert_eq!(usage.committed_cost_units().unwrap(), 0);
+    assert!(kernel.budget_store.get_usage(&cap.id, 0).unwrap().is_none());
 }
 
 #[test]
@@ -1417,12 +1404,5 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
     assert_eq!(governed["intent_id"], intent.id);
     assert_eq!(governed["commerce"]["seller"], "wrong-merchant.example");
 
-    let usage = kernel
-
-        .budget_store
-        .get_usage(&cap.id, 0)
-        .unwrap()
-        .unwrap();
-    assert_eq!(usage.invocation_count, 0);
-    assert_eq!(usage.committed_cost_units().unwrap(), 0);
+    assert!(kernel.budget_store.get_usage(&cap.id, 0).unwrap().is_none());
 }
