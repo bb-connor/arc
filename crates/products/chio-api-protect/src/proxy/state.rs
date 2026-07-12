@@ -25,6 +25,23 @@ fn proxy_drain_timeout(upstream_request_timeout: Duration) -> Duration {
     upstream_request_timeout.saturating_add(PROXY_DRAIN_MARGIN)
 }
 
+/// Derive the revocation store path that sits beside a receipt store path.
+///
+/// The revocation store lives in a sibling database so a revoked capability
+/// survives a restart. When the receipt path is a SQLite URI carrying query
+/// parameters (for example `file:/var/lib/chio/receipts.db?mode=rwc`), the
+/// `.revocations` suffix must land on the database filename, not inside the
+/// query string, or the revocation store opens the wrong URI. Split any URI
+/// query off first and re-attach it after the suffix, matching how the receipt
+/// store itself interprets the path, so a plain filesystem path and a URI both
+/// resolve to a distinct sibling database.
+fn revocation_sibling_path(receipt_path: &str) -> String {
+    match receipt_path.split_once('?') {
+        Some((base, query)) => format!("{base}.revocations?{query}"),
+        None => format!("{receipt_path}.revocations"),
+    }
+}
+
 /// Stored receipts for inspection and querying.
 pub(crate) struct ReceiptLog {
     pub(crate) receipts: Vec<HttpReceipt>,
@@ -345,7 +362,7 @@ impl ProtectProxy {
         let durable_revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>> =
             match &self.config.receipt_db {
                 Some(path) => Some(Arc::new(
-                    chio_store_sqlite::SqliteRevocationStore::open(format!("{path}.revocations"))
+                    chio_store_sqlite::SqliteRevocationStore::open(revocation_sibling_path(path))
                         .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
                 )),
                 None => None,
@@ -491,8 +508,27 @@ fn protect_serve_error(error: ServeError) -> ProtectError {
 
 #[cfg(test)]
 mod durability_tests {
-    use super::SqliteReceiptStore;
+    use super::{revocation_sibling_path, SqliteReceiptStore};
     use chio_test_support::prelude::*;
+
+    #[test]
+    fn revocation_sibling_path_appends_suffix_to_a_plain_path() {
+        assert_eq!(
+            revocation_sibling_path("/var/lib/chio/receipts.db"),
+            "/var/lib/chio/receipts.db.revocations"
+        );
+    }
+
+    #[test]
+    fn revocation_sibling_path_keeps_the_uri_query_after_the_suffix() {
+        // The suffix must land on the database filename, not inside the query,
+        // so the revocation store opens a distinct sibling database rather than
+        // a bad `mode=rwc.revocations` URI or the receipt database itself.
+        assert_eq!(
+            revocation_sibling_path("file:/var/lib/chio/receipts.db?mode=rwc"),
+            "file:/var/lib/chio/receipts.db.revocations?mode=rwc"
+        );
+    }
 
     #[test]
     fn http_receipt_store_open_configures_wal_and_a_busy_timeout() {
