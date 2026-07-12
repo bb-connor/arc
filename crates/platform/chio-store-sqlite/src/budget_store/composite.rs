@@ -28,6 +28,13 @@ struct StagedQuota {
     exists: bool,
 }
 
+#[derive(Debug)]
+struct StoredCompositeHold {
+    invocation_state: BudgetInvocationReservationState,
+    monetary_state: BudgetMonetaryHoldState,
+    revocation_set: CanonicalRevocationSet,
+}
+
 impl StoredCompositeAuthorization {
     fn matches(&self, request: &SqliteCompositeAuthorizeInput) -> bool {
         self.hold_id == request.hold_id
@@ -77,6 +84,237 @@ impl StoredCompositeAuthorization {
                 metadata,
             })
         }
+    }
+}
+
+impl SqliteBudgetStore {
+    pub(super) fn capture_composite_invocation_reservations(
+        &self,
+        request: BudgetCaptureInvocationRequest,
+    ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
+        let hold_id = request.hold_id.as_deref().ok_or_else(|| {
+            BudgetStoreError::Invariant("invocation capture requires hold_id".to_string())
+        })?;
+        let event_id = request.event_id.as_deref().ok_or_else(|| {
+            BudgetStoreError::Invariant("invocation capture requires event_id".to_string())
+        })?;
+        if hold_id.is_empty() || event_id.is_empty() {
+            return Err(BudgetStoreError::Invariant(
+                "invocation capture requires non-empty hold_id and event_id".to_string(),
+            ));
+        }
+
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if let Some(decision) = load_composite_capture_decision(&transaction, event_id, &request)? {
+            transaction.rollback()?;
+            return Ok(decision);
+        }
+
+        let authorization =
+            load_composite_authorization(&transaction, hold_id)?.ok_or_else(|| {
+                BudgetStoreError::Invariant(format!(
+                    "missing composite budget authorization for hold `{hold_id}`"
+                ))
+            })?;
+        if !authorization.allowed {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` was not authorized"
+            )));
+        }
+        if authorization.capability_id != request.capability_id
+            || authorization.grant_index != request.grant_index
+        {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` does not match capability/grant"
+            )));
+        }
+        if authorization.authority.as_ref() != request.authority.as_ref() {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` authority does not match invocation capture"
+            )));
+        }
+        let base_hold = SqliteBudgetStore::ensure_open_hold(
+            &transaction,
+            hold_id,
+            &request.capability_id,
+            request.grant_index,
+        )?;
+        SqliteBudgetStore::validate_hold_authority(
+            hold_id,
+            base_hold.authority.as_ref(),
+            request.authority.as_ref(),
+        )?;
+        let current_hold = load_composite_hold(&transaction, hold_id)?;
+        if current_hold.invocation_state != BudgetInvocationReservationState::Authorized {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` invocation reservation is not authorized"
+            )));
+        }
+        if current_hold.revocation_set != authorization.revocation_set {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` revocation evidence diverged from authorization"
+            )));
+        }
+
+        let mut staged = Vec::with_capacity(authorization.invocation_counts_after.len());
+        for snapshot in &authorization.invocation_counts_after {
+            let quota = &snapshot.quota;
+            let (profile, owner_id, grant_index_key) = quota_storage_key(quota.key())?;
+            let (maximum, reserved, captured) = transaction
+                .query_row(
+                    r#"
+                    SELECT max_invocations, reserved_invocations, captured_invocations
+                    FROM budget_invocation_quota_usage
+                    WHERE profile = ?1 AND owner_id = ?2 AND grant_index_key = ?3
+                    "#,
+                    params![profile, owner_id, grant_index_key],
+                    |row| {
+                        Ok((
+                            budget_u32_from_row(row, 0, "quota max_invocations")?,
+                            budget_u32_from_row(row, 1, "quota reserved_invocations")?,
+                            budget_u32_from_row(row, 2, "quota captured_invocations")?,
+                        ))
+                    },
+                )
+                .optional()?
+                .ok_or_else(|| {
+                    BudgetStoreError::Invariant(format!(
+                        "missing invocation quota row for `{}`",
+                        quota.key().owner_id()
+                    ))
+                })?;
+            if maximum != quota.max_invocations() || reserved == 0 {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "invocation quota `{}` does not contain the reserved hold unit",
+                    quota.key().owner_id()
+                )));
+            }
+            staged.push(StagedQuota {
+                quota: quota.clone(),
+                reserved: reserved - 1,
+                captured: captured.checked_add(1).ok_or_else(|| {
+                    BudgetStoreError::Overflow(
+                        "captured invocation count overflowed u32".to_string(),
+                    )
+                })?,
+                exists: true,
+            });
+        }
+        let invocation_counts_after = staged
+            .iter()
+            .map(|entry| BudgetInvocationQuotaUsage {
+                quota: entry.quota.clone(),
+                reserved_invocations_after: entry.reserved,
+                captured_invocations_after: entry.captured,
+            })
+            .collect::<Vec<_>>();
+        for usage in &invocation_counts_after {
+            usage.validate()?;
+        }
+        let primary_key = BudgetQuotaKey::grant(&request.capability_id, request.grant_index)?;
+        let primary_count_after = invocation_counts_after
+            .iter()
+            .find(|usage| usage.quota.key() == &primary_key)
+            .ok_or_else(|| {
+                BudgetStoreError::Invariant("missing primary quota snapshot".to_string())
+            })?
+            .invocation_count_after()?;
+        let legacy_usage = load_legacy_usage_for_identity(
+            &transaction,
+            &request.capability_id,
+            request.grant_index,
+        )?;
+        if legacy_usage.0 != primary_count_after {
+            return Err(BudgetStoreError::Invariant(
+                "grant usage projection diverged from composite quota".to_string(),
+            ));
+        }
+
+        let event_seq = allocate_budget_replication_seq(&transaction)?;
+        let now = unix_now();
+        persist_quota_rows(&transaction, &staged, event_seq, now)?;
+        let updated_projection = transaction.execute(
+            r#"
+            UPDATE capability_grant_budgets
+            SET updated_at = ?3, seq = ?4
+            WHERE capability_id = ?1 AND grant_index = ?2
+            "#,
+            params![
+                request.capability_id,
+                request.grant_index as i64,
+                now,
+                sqlite_integer_from_u64(event_seq, "composite projection sequence")?,
+            ],
+        )?;
+        if updated_projection != 1 {
+            return Err(BudgetStoreError::Invariant(
+                "missing composite budget usage row".to_string(),
+            ));
+        }
+        let updated_hold = transaction.execute(
+            r#"
+            UPDATE budget_composite_holds
+            SET invocation_state = ?2, updated_at = ?3
+            WHERE hold_id = ?1 AND invocation_state = ?4
+            "#,
+            params![
+                hold_id,
+                BudgetInvocationReservationState::Captured.as_str(),
+                now,
+                BudgetInvocationReservationState::Authorized.as_str(),
+            ],
+        )?;
+        if updated_hold != 1 {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` invocation state changed during capture"
+            )));
+        }
+        SqliteBudgetStore::append_mutation_event(
+            &transaction,
+            Some(event_id),
+            Some(hold_id),
+            request.authority.as_ref(),
+            &request.capability_id,
+            request.grant_index,
+            BudgetMutationKind::CaptureInvocations,
+            None,
+            event_seq,
+            Some(event_seq),
+            0,
+            0,
+            None,
+            None,
+            None,
+            primary_count_after,
+            legacy_usage.1,
+            legacy_usage.2,
+        )?;
+        persist_composite_mutation_snapshot(
+            &transaction,
+            event_id,
+            BudgetInvocationReservationState::Captured,
+            current_hold.monetary_state,
+            &current_hold.revocation_set,
+            &invocation_counts_after,
+        )?;
+        transaction.commit()?;
+
+        Ok(BudgetHoldMutationDecision {
+            hold_id: request.hold_id,
+            exposure_units: 0,
+            realized_spend_units: 0,
+            committed_cost_units_after: checked_committed_cost_units(
+                legacy_usage.1,
+                legacy_usage.2,
+            )?,
+            invocation_count_after: primary_count_after,
+            invocation_counts_after,
+            invocation_state: BudgetInvocationReservationState::Captured,
+            monetary_state: current_hold.monetary_state,
+            revocation_set: Some(current_hold.revocation_set),
+            metadata: composite_metadata(request.authority, Some(event_seq), event_id.to_string()),
+        })
     }
 }
 
@@ -516,6 +754,14 @@ fn load_legacy_usage(
     transaction: &rusqlite::Transaction<'_>,
     request: &SqliteCompositeAuthorizeInput,
 ) -> Result<(u32, u64, u64), BudgetStoreError> {
+    load_legacy_usage_for_identity(transaction, &request.capability_id, request.grant_index)
+}
+
+fn load_legacy_usage_for_identity(
+    transaction: &rusqlite::Transaction<'_>,
+    capability_id: &str,
+    grant_index: usize,
+) -> Result<(u32, u64, u64), BudgetStoreError> {
     Ok(transaction
         .query_row(
             r#"
@@ -523,7 +769,7 @@ fn load_legacy_usage(
             FROM capability_grant_budgets
             WHERE capability_id = ?1 AND grant_index = ?2
             "#,
-            params![request.capability_id, request.grant_index as i64],
+            params![capability_id, grant_index as i64],
             |row| {
                 Ok((
                     budget_u32_from_row(row, 0, "invocation_count")?,
@@ -769,6 +1015,207 @@ fn persist_composite_authorization(
     Ok(())
 }
 
+fn persist_composite_mutation_snapshot(
+    transaction: &rusqlite::Transaction<'_>,
+    event_id: &str,
+    invocation_state: BudgetInvocationReservationState,
+    monetary_state: BudgetMonetaryHoldState,
+    revocation_set: &CanonicalRevocationSet,
+    usages: &[BudgetInvocationQuotaUsage],
+) -> Result<(), BudgetStoreError> {
+    let revocation_ids_json = serde_json::to_string(revocation_set.ids()).map_err(|error| {
+        BudgetStoreError::Invariant(format!(
+            "failed to encode canonical revocation set: {error}"
+        ))
+    })?;
+    transaction.execute(
+        r#"
+        INSERT INTO budget_composite_mutation_snapshots (
+            event_id, invocation_state, monetary_state,
+            revocation_set_digest, revocation_ids_json
+        ) VALUES (?1, ?2, ?3, ?4, ?5)
+        "#,
+        params![
+            event_id,
+            invocation_state.as_str(),
+            monetary_state.as_str(),
+            revocation_set.digest(),
+            revocation_ids_json,
+        ],
+    )?;
+    for (position, usage) in usages.iter().enumerate() {
+        usage.validate()?;
+        let (profile, owner_id, grant_index_key) = quota_storage_key(usage.quota.key())?;
+        transaction.execute(
+            r#"
+            INSERT INTO budget_composite_mutation_quota_snapshots (
+                event_id, position, profile, owner_id, grant_index_key,
+                max_invocations, reserved_invocations_after,
+                captured_invocations_after
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            "#,
+            params![
+                event_id,
+                position as i64,
+                profile,
+                owner_id,
+                grant_index_key,
+                i64::from(usage.quota.max_invocations()),
+                i64::from(usage.reserved_invocations_after),
+                i64::from(usage.captured_invocations_after),
+            ],
+        )?;
+    }
+    Ok(())
+}
+
+fn load_composite_capture_decision(
+    transaction: &rusqlite::Transaction<'_>,
+    event_id: &str,
+    request: &BudgetCaptureInvocationRequest,
+) -> Result<Option<BudgetHoldMutationDecision>, BudgetStoreError> {
+    let Some(record) = SqliteBudgetStore::load_mutation_event(transaction, event_id)? else {
+        return Ok(None);
+    };
+    if record.kind != BudgetMutationKind::CaptureInvocations
+        || record.hold_id != request.hold_id
+        || record.capability_id != request.capability_id
+        || record.grant_index as usize != request.grant_index
+        || record.authority != request.authority
+        || record.allowed.is_some()
+        || record.exposure_units != 0
+        || record.realized_spend_units != 0
+    {
+        return Err(BudgetStoreError::Invariant(format!(
+            "budget event_id `{event_id}` was reused for a different invocation capture"
+        )));
+    }
+    let state = load_composite_mutation_state(transaction, event_id)?;
+    if state.invocation_state != BudgetInvocationReservationState::Captured {
+        return Err(BudgetStoreError::Invariant(format!(
+            "budget event_id `{event_id}` has a non-captured invocation snapshot"
+        )));
+    }
+    let invocation_counts_after = load_mutation_quota_snapshots(transaction, event_id)?;
+    let primary_key = BudgetQuotaKey::grant(&request.capability_id, request.grant_index)?;
+    let primary_count_after = invocation_counts_after
+        .iter()
+        .find(|usage| usage.quota.key() == &primary_key)
+        .ok_or_else(|| BudgetStoreError::Invariant("missing primary quota snapshot".to_string()))?
+        .invocation_count_after()?;
+    if primary_count_after != record.invocation_count_after {
+        return Err(BudgetStoreError::Invariant(format!(
+            "budget event_id `{event_id}` primary quota snapshot diverged"
+        )));
+    }
+    Ok(Some(BudgetHoldMutationDecision {
+        hold_id: record.hold_id,
+        exposure_units: record.exposure_units,
+        realized_spend_units: record.realized_spend_units,
+        committed_cost_units_after: checked_committed_cost_units(
+            record.total_cost_exposed_after,
+            record.total_cost_realized_spend_after,
+        )?,
+        invocation_count_after: record.invocation_count_after,
+        invocation_counts_after,
+        invocation_state: state.invocation_state,
+        monetary_state: state.monetary_state,
+        revocation_set: Some(state.revocation_set),
+        metadata: composite_metadata(record.authority, Some(record.event_seq), record.event_id),
+    }))
+}
+
+fn load_composite_hold(
+    transaction: &rusqlite::Transaction<'_>,
+    hold_id: &str,
+) -> Result<StoredCompositeHold, BudgetStoreError> {
+    let row = transaction
+        .query_row(
+            r#"
+            SELECT invocation_state, monetary_state,
+                   revocation_set_digest, revocation_ids_json
+            FROM budget_composite_holds
+            WHERE hold_id = ?1
+            "#,
+            params![hold_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            },
+        )
+        .optional()?
+        .ok_or_else(|| {
+            BudgetStoreError::Invariant(format!("missing composite budget hold `{hold_id}`"))
+        })?;
+    stored_composite_state(row.0, row.1, row.2, row.3)
+}
+
+fn load_composite_mutation_state(
+    transaction: &rusqlite::Transaction<'_>,
+    event_id: &str,
+) -> Result<StoredCompositeHold, BudgetStoreError> {
+    let row = transaction
+        .query_row(
+            r#"
+            SELECT invocation_state, monetary_state,
+                   revocation_set_digest, revocation_ids_json
+            FROM budget_composite_mutation_snapshots
+            WHERE event_id = ?1
+            "#,
+            params![event_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            },
+        )
+        .optional()?
+        .ok_or_else(|| {
+            BudgetStoreError::Invariant(format!(
+                "missing composite state snapshot for event `{event_id}`"
+            ))
+        })?;
+    stored_composite_state(row.0, row.1, row.2, row.3)
+}
+
+fn stored_composite_state(
+    invocation_state: String,
+    monetary_state: String,
+    revocation_set_digest: String,
+    revocation_ids_json: String,
+) -> Result<StoredCompositeHold, BudgetStoreError> {
+    let invocation_state =
+        BudgetInvocationReservationState::parse(&invocation_state).ok_or_else(|| {
+            BudgetStoreError::Invariant("unknown persisted invocation state".to_string())
+        })?;
+    let monetary_state = BudgetMonetaryHoldState::parse(&monetary_state).ok_or_else(|| {
+        BudgetStoreError::Invariant("unknown persisted monetary state".to_string())
+    })?;
+    let ids = serde_json::from_str::<Vec<String>>(&revocation_ids_json).map_err(|error| {
+        BudgetStoreError::Invariant(format!(
+            "invalid persisted canonical revocation members: {error}"
+        ))
+    })?;
+    let revocation_set = CanonicalRevocationSet::from_persisted_parts(ids, revocation_set_digest)
+        .map_err(|error| {
+        BudgetStoreError::Invariant(format!(
+            "invalid persisted canonical revocation set: {error}"
+        ))
+    })?;
+    Ok(StoredCompositeHold {
+        invocation_state,
+        monetary_state,
+        revocation_set,
+    })
+}
+
 fn load_composite_authorization(
     transaction: &rusqlite::Transaction<'_>,
     hold_id: &str,
@@ -898,6 +1345,83 @@ fn load_authorization_quota_snapshots(
     if rows.is_empty() || rows.len() > MAX_INVOCATION_QUOTAS_PER_ADMISSION {
         return Err(BudgetStoreError::Invariant(
             "persisted composite authorization has an invalid quota count".to_string(),
+        ));
+    }
+    rows.into_iter()
+        .enumerate()
+        .map(
+            |(
+                expected_position,
+                (position, profile, owner_id, grant_index_key, maximum, reserved, captured),
+            )| {
+                if position != expected_position as i64 {
+                    return Err(BudgetStoreError::Invariant(
+                        "persisted composite quota positions are not contiguous".to_string(),
+                    ));
+                }
+                let profile = BudgetQuotaProfile::parse(&profile).ok_or_else(|| {
+                    BudgetStoreError::Invariant("unknown persisted quota profile".to_string())
+                })?;
+                let grant_index = if grant_index_key == -1 {
+                    None
+                } else {
+                    Some(u32::try_from(grant_index_key).map_err(|_| {
+                        BudgetStoreError::Invariant(
+                            "persisted quota grant index is out of range".to_string(),
+                        )
+                    })?)
+                };
+                let key = BudgetQuotaKey::from_persisted_parts(profile, owner_id, grant_index)?;
+                let quota = BudgetInvocationQuota::from_persisted_parts(key, maximum)?;
+                let usage = BudgetInvocationQuotaUsage {
+                    quota,
+                    reserved_invocations_after: reserved,
+                    captured_invocations_after: captured,
+                };
+                usage.validate()?;
+                Ok(usage)
+            },
+        )
+        .collect()
+}
+
+fn load_mutation_quota_snapshots(
+    transaction: &rusqlite::Transaction<'_>,
+    event_id: &str,
+) -> Result<Vec<BudgetInvocationQuotaUsage>, BudgetStoreError> {
+    type QuotaRow = (i64, String, String, i64, u32, u32, u32);
+    let mut statement = transaction.prepare(
+        r#"
+        SELECT position, profile, owner_id, grant_index_key, max_invocations,
+               reserved_invocations_after, captured_invocations_after
+        FROM budget_composite_mutation_quota_snapshots
+        WHERE event_id = ?1
+        ORDER BY position ASC
+        "#,
+    )?;
+    let rows = statement
+        .query_map(params![event_id], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                budget_u32_from_row(row, 4, "snapshot max_invocations")?,
+                budget_u32_from_row(row, 5, "snapshot reserved_invocations_after")?,
+                budget_u32_from_row(row, 6, "snapshot captured_invocations_after")?,
+            ))
+        })?
+        .collect::<Result<Vec<QuotaRow>, _>>()?;
+    drop(statement);
+    hydrate_quota_snapshot_rows(rows)
+}
+
+fn hydrate_quota_snapshot_rows(
+    rows: Vec<(i64, String, String, i64, u32, u32, u32)>,
+) -> Result<Vec<BudgetInvocationQuotaUsage>, BudgetStoreError> {
+    if rows.is_empty() || rows.len() > MAX_INVOCATION_QUOTAS_PER_ADMISSION {
+        return Err(BudgetStoreError::Invariant(
+            "persisted composite mutation has an invalid quota count".to_string(),
         ));
     }
     rows.into_iter()

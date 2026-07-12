@@ -1,7 +1,7 @@
 use super::*;
 use chio_kernel::budget_store::{
-    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetInvocationQuota,
-    BudgetInvocationReservationState, BudgetQuotaKey, BudgetQuotaProfile,
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest,
+    BudgetInvocationQuota, BudgetInvocationReservationState, BudgetQuotaKey, BudgetQuotaProfile,
     BudgetReconcileHoldRequest, BudgetReleaseHoldRequest, BudgetReverseHoldRequest,
 };
 use chio_kernel::supplemental_quota::CanonicalRevocationSet;
@@ -352,6 +352,61 @@ fn concurrent_composite_authorizations_admit_exactly_one_final_unit() {
             .invocation_count,
         1
     );
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn composite_invocation_capture_is_atomic_idempotent_and_restart_durable() {
+    let path = unique_db_path("chio-composite-budget-capture");
+    let capture_request = BudgetCaptureInvocationRequest {
+        capability_id: "leaf".to_string(),
+        grant_index: 0,
+        hold_id: Some("hold-capture-1".to_string()),
+        event_id: Some("event-capture-1".to_string()),
+        authority: None,
+    };
+    let captured = {
+        let store = SqliteBudgetStore::open(&path).unwrap();
+        assert!(store
+            .authorize_composite_hold(composite_authorize_input(
+                "hold-capture-1",
+                "event-authorize-capture-1",
+                2,
+            ))
+            .unwrap()
+            .is_authorized());
+        store
+            .capture_invocation_reservations(capture_request.clone())
+            .unwrap()
+    };
+    assert_eq!(
+        captured.invocation_state,
+        BudgetInvocationReservationState::Captured
+    );
+    assert_eq!(captured.monetary_state, BudgetMonetaryHoldState::Exposed);
+    assert!(captured
+        .invocation_counts_after
+        .iter()
+        .all(
+            |usage| usage.reserved_invocations_after == 0 && usage.captured_invocations_after == 1
+        ));
+
+    let reopened = SqliteBudgetStore::open(&path).unwrap();
+    assert_eq!(
+        reopened
+            .capture_invocation_reservations(capture_request)
+            .unwrap(),
+        captured
+    );
+    assert_eq!(
+        reopened
+            .get_usage("leaf", 0)
+            .unwrap()
+            .unwrap()
+            .invocation_count,
+        1
+    );
+
     let _ = fs::remove_file(path);
 }
 

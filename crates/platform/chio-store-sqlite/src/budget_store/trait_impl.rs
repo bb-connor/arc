@@ -1317,6 +1317,13 @@ impl BudgetStore for SqliteBudgetStore {
         load_authorize_decision_for_event(self, &event_id)
     }
 
+    fn capture_invocation_reservations(
+        &self,
+        request: BudgetCaptureInvocationRequest,
+    ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
+        self.capture_composite_invocation_reservations(request)
+    }
+
     fn reverse_budget_hold(
         &self,
         request: BudgetReverseHoldRequest,
