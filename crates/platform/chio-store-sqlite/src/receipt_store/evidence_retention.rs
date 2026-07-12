@@ -813,8 +813,10 @@ fn archive_range(
 /// Create the archive schema. The archive gains the receipt tables, the
 /// checkpoint rows, capability lineage, the claim-log projection (with
 /// `entry_seq` preserved: `INTEGER PRIMARY KEY`, no `AUTOINCREMENT`, so copied
-/// values insert verbatim), settlement/metered reconciliations and
-/// authorization consumptions. The archive `chio_tool_receipts` mirrors the
+/// values insert verbatim), settlement/metered reconciliations,
+/// authorization consumptions, and the governed-receipt lineage statements
+/// (keyed by `receipt_id`) that carry each archived receipt's call-chain
+/// provenance. The archive `chio_tool_receipts` mirrors the
 /// live column layout exactly, including the `tenant_id` column added to the
 /// live table by the attribution migration (`ensure_tool_receipt_attribution_columns`),
 /// so a global rotation over a mixed-tenant store preserves tenant attribution
@@ -896,6 +898,18 @@ pub(super) fn create_archive_schema(
             request_id TEXT NOT NULL, session_id TEXT NOT NULL, tool_call_id TEXT NOT NULL,
             tenant_id TEXT, parameter_hash TEXT NOT NULL, consumed_at_unix_ms INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS archive.receipt_lineage_statements (
+            receipt_id TEXT PRIMARY KEY, statement_id TEXT, request_id TEXT,
+            session_id TEXT, session_anchor_id TEXT, chain_id TEXT,
+            parent_request_id TEXT, parent_receipt_id TEXT, evidence_class TEXT,
+            evidence_sources_json TEXT,
+            verified_session_anchor INTEGER NOT NULL DEFAULT 0,
+            verified_parent_request INTEGER NOT NULL DEFAULT 0,
+            verified_parent_receipt INTEGER NOT NULL DEFAULT 0,
+            replay_protected INTEGER NOT NULL DEFAULT 0,
+            recorded_at INTEGER NOT NULL, source_kind TEXT NOT NULL,
+            json_sha256 TEXT NOT NULL, raw_json TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS archive.checkpoint_tree_heads (
             checkpoint_seq INTEGER PRIMARY KEY, batch_start_seq INTEGER NOT NULL,
             batch_end_seq INTEGER NOT NULL, tree_size INTEGER NOT NULL,
@@ -974,6 +988,19 @@ pub(super) fn copy_archived_prefix(
             SELECT * FROM main.chio_authorization_receipt_consumptions WHERE authorization_receipt_id IN (
                 SELECT receipt_id FROM main.claim_receipt_log_entries
                 WHERE entry_seq <= {w} AND receipt_kind = 'tool_receipt');
+        INSERT OR IGNORE INTO archive.receipt_lineage_statements
+            (receipt_id, statement_id, request_id, session_id, session_anchor_id,
+             chain_id, parent_request_id, parent_receipt_id, evidence_class,
+             evidence_sources_json, verified_session_anchor, verified_parent_request,
+             verified_parent_receipt, replay_protected, recorded_at, source_kind,
+             json_sha256, raw_json)
+            SELECT receipt_id, statement_id, request_id, session_id, session_anchor_id,
+                   chain_id, parent_request_id, parent_receipt_id, evidence_class,
+                   evidence_sources_json, verified_session_anchor, verified_parent_request,
+                   verified_parent_receipt, replay_protected, recorded_at, source_kind,
+                   json_sha256, raw_json
+            FROM main.receipt_lineage_statements WHERE receipt_id IN (
+                SELECT receipt_id FROM main.claim_receipt_log_entries WHERE entry_seq <= {w});
         "#
     ))?;
     let after: i64 = connection.query_row(
@@ -1014,7 +1041,7 @@ fn verify_co_archival_complete(
     connection: &rusqlite::Connection,
     w: i64,
 ) -> Result<(), ReceiptStoreError> {
-    let checks: [(&'static str, String, String); 8] = [
+    let checks: [(&'static str, String, String); 9] = [
         (
             // Present AND every column identical: `archive_sql` counts only live
             // prefix rows whose archive row matches on the `seq` primary key and
@@ -1177,6 +1204,40 @@ fn verify_co_archival_complete(
                  AND a.issued_at IS m.issued_at AND a.expires_at IS m.expires_at \
                  AND a.grants_json IS m.grants_json AND a.delegation_depth IS m.delegation_depth \
                  AND a.parent_capability_id IS m.parent_capability_id)"
+            ),
+        ),
+        (
+            // Identity keyed on receipt_id (PK). Governed receipts persist a
+            // lineage statement carrying their call-chain provenance and the
+            // stored verification flags. The delete removes the receipts but not
+            // the live lineage rows, so the archive becomes the ONLY standalone
+            // copy of an archived receipt's lineage evidence, read back by
+            // `receipt_lineage_verification` / lineage-link queries. The
+            // idempotent `INSERT OR IGNORE` copy keeps a pre-existing archive row
+            // on a receipt_id conflict, so a reused archive holding the same
+            // receipt under divergent lineage bytes would misattribute its
+            // provenance. Verify every lineage row for an archived receipt matches
+            // the live row before the delete.
+            "receipt_lineage_statements",
+            format!(
+                "SELECT COUNT(*) FROM main.receipt_lineage_statements WHERE receipt_id IN \
+                 (SELECT receipt_id FROM main.claim_receipt_log_entries WHERE entry_seq <= {w})"
+            ),
+            format!(
+                "SELECT COUNT(*) FROM main.receipt_lineage_statements m WHERE m.receipt_id IN \
+                 (SELECT receipt_id FROM main.claim_receipt_log_entries WHERE entry_seq <= {w}) \
+                 AND EXISTS (SELECT 1 FROM archive.receipt_lineage_statements a WHERE a.receipt_id = m.receipt_id \
+                 AND a.statement_id IS m.statement_id AND a.request_id IS m.request_id \
+                 AND a.session_id IS m.session_id AND a.session_anchor_id IS m.session_anchor_id \
+                 AND a.chain_id IS m.chain_id AND a.parent_request_id IS m.parent_request_id \
+                 AND a.parent_receipt_id IS m.parent_receipt_id AND a.evidence_class IS m.evidence_class \
+                 AND a.evidence_sources_json IS m.evidence_sources_json \
+                 AND a.verified_session_anchor IS m.verified_session_anchor \
+                 AND a.verified_parent_request IS m.verified_parent_request \
+                 AND a.verified_parent_receipt IS m.verified_parent_receipt \
+                 AND a.replay_protected IS m.replay_protected AND a.recorded_at IS m.recorded_at \
+                 AND a.source_kind IS m.source_kind AND a.json_sha256 IS m.json_sha256 \
+                 AND a.raw_json IS m.raw_json)"
             ),
         ),
     ];

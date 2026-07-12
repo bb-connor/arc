@@ -3289,3 +3289,86 @@ fn delete_fails_closed_when_a_dependent_row_escapes_the_copy(
     let _ = std::fs::remove_file(&archive);
     Ok(())
 }
+
+/// A governed receipt's lineage statement must travel into the archive with the
+/// receipt. The delete leaves the live lineage row in place (like capability
+/// lineage), so the archive becomes the standalone copy: opening it must still
+/// surface the archived receipt's call-chain provenance.
+#[test]
+fn governed_receipt_lineage_is_co_archived() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("lineage-archived");
+    let archive = unique_db_path("lineage-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for i in 0..2u64 {
+        let receipt = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("lineage-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    // Persist a lineage statement for the first receipt, the shape a governed
+    // call-chain receipt records on append. It sits in the archived range
+    // because its receipt does.
+    let receipt_id = super::support::first_tool_receipt_id(&store)?;
+    store.writer_handle().run_write({
+        let receipt_id = receipt_id.clone();
+        move |connection| {
+            connection.execute(
+                "INSERT INTO receipt_lineage_statements \
+                 (receipt_id, statement_id, request_id, session_id, session_anchor_id, chain_id, \
+                  parent_request_id, parent_receipt_id, evidence_class, evidence_sources_json, \
+                  verified_session_anchor, verified_parent_request, verified_parent_receipt, \
+                  replay_protected, recorded_at, source_kind, json_sha256, raw_json) \
+                 VALUES (?1, 'stmt-lineage-0', NULL, NULL, NULL, 'chain-lineage-0', NULL, \
+                         'parent-receipt-lineage-0', 'delegated', NULL, 0, 0, 1, 0, 100, 'test', \
+                         'sha-lineage-0', '{\"schema\":\"lineage\"}')",
+                rusqlite::params![receipt_id],
+            )?;
+            Ok(())
+        }
+    })?;
+
+    let archived = store.archive_receipts_before(150, archive_path)?;
+    assert_eq!(archived, 2);
+
+    // The live lineage row survives (not cascaded away).
+    let live = store.reader_connection_for_test()?;
+    let live_lineage: i64 = live.query_row(
+        "SELECT COUNT(*) FROM receipt_lineage_statements WHERE receipt_id = ?1",
+        rusqlite::params![receipt_id],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        live_lineage, 1,
+        "the live lineage row must survive rotation"
+    );
+
+    // The archive holds a faithful copy, so the archived receipt keeps its
+    // provenance when the archive is opened standalone.
+    let archive_store = SqliteReceiptStore::open_existing(&archive)?;
+    let arch = archive_store.reader_connection_for_test()?;
+    let (arch_lineage, arch_chain, arch_parent): (i64, Option<String>, Option<String>) = arch
+        .query_row(
+            "SELECT COUNT(*), MAX(chain_id), MAX(parent_receipt_id) \
+             FROM receipt_lineage_statements WHERE receipt_id = ?1",
+            rusqlite::params![receipt_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
+    assert_eq!(
+        arch_lineage, 1,
+        "the governed receipt's lineage statement must be co-archived"
+    );
+    assert_eq!(arch_chain.as_deref(), Some("chain-lineage-0"));
+    assert_eq!(arch_parent.as_deref(), Some("parent-receipt-lineage-0"));
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
