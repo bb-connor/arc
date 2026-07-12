@@ -95,6 +95,7 @@ fn composite_authorize_input(
             "baaba5816d4ef1572cfbb26a183f273ea200681234cdd767ab965b9efbaeb12f".to_string(),
         )
         .unwrap(),
+        authorization_artifact_digests: Vec::new(),
     }
 }
 

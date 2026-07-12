@@ -1280,6 +1280,11 @@ impl BudgetStore for SqliteBudgetStore {
                 ));
             }
             let invocation_quotas = request.invocation_quotas().to_vec();
+            let authorization_artifact_digests = request
+                .invocation_admission_evidence()
+                .and_then(|evidence| evidence.supplemental_artifact_digest())
+                .map(|digest| vec![digest.to_string()])
+                .unwrap_or_default();
             let revocation_set = request.revocation_set().cloned().ok_or_else(|| {
                 BudgetStoreError::Invariant(
                     "composite budget hold requires a canonical revocation set".to_string(),
@@ -1302,6 +1307,7 @@ impl BudgetStore for SqliteBudgetStore {
                 authority: request.authority,
                 invocation_quotas,
                 revocation_set,
+                authorization_artifact_digests,
             });
         }
         let event_id = effective_hold_event_id(

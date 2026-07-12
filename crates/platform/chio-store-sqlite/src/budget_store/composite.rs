@@ -18,6 +18,7 @@ struct StoredCompositeAuthorization {
     invocation_count_after: u32,
     event_seq: u64,
     invocation_counts_after: Vec<BudgetInvocationQuotaUsage>,
+    authorization_artifact_digests: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -46,6 +47,7 @@ impl StoredCompositeAuthorization {
             && self.max_total_cost_units == request.max_total_cost_units
             && self.authority == request.authority
             && self.revocation_set == request.revocation_set
+            && self.authorization_artifact_digests == request.authorization_artifact_digests
             && self
                 .invocation_counts_after
                 .iter()
@@ -92,6 +94,18 @@ impl SqliteBudgetStore {
         &self,
         request: BudgetCaptureInvocationRequest,
     ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let decision =
+            Self::capture_composite_invocation_reservations_in_transaction(&transaction, &request)?;
+        transaction.commit()?;
+        Ok(decision)
+    }
+
+    pub(crate) fn capture_composite_invocation_reservations_in_transaction(
+        transaction: &rusqlite::Transaction<'_>,
+        request: &BudgetCaptureInvocationRequest,
+    ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
         let hold_id = request.hold_id.as_deref().ok_or_else(|| {
             BudgetStoreError::Invariant("invocation capture requires hold_id".to_string())
         })?;
@@ -104,15 +118,12 @@ impl SqliteBudgetStore {
             ));
         }
 
-        let mut connection = self.connection()?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        if let Some(decision) = load_composite_capture_decision(&transaction, event_id, &request)? {
-            transaction.rollback()?;
+        if let Some(decision) = load_composite_capture_decision(transaction, event_id, request)? {
             return Ok(decision);
         }
 
         let authorization =
-            load_composite_authorization(&transaction, hold_id)?.ok_or_else(|| {
+            load_composite_authorization(transaction, hold_id)?.ok_or_else(|| {
                 BudgetStoreError::Invariant(format!(
                     "missing composite budget authorization for hold `{hold_id}`"
                 ))
@@ -135,7 +146,7 @@ impl SqliteBudgetStore {
             )));
         }
         let base_hold = SqliteBudgetStore::ensure_open_hold(
-            &transaction,
+            transaction,
             hold_id,
             &request.capability_id,
             request.grant_index,
@@ -145,7 +156,7 @@ impl SqliteBudgetStore {
             base_hold.authority.as_ref(),
             request.authority.as_ref(),
         )?;
-        let current_hold = load_composite_hold(&transaction, hold_id)?;
+        let current_hold = load_composite_hold(transaction, hold_id)?;
         if current_hold.invocation_state != BudgetInvocationReservationState::Authorized {
             return Err(BudgetStoreError::Invariant(format!(
                 "budget hold `{hold_id}` invocation reservation is not authorized"
@@ -221,7 +232,7 @@ impl SqliteBudgetStore {
             })?
             .invocation_count_after()?;
         let legacy_usage = load_legacy_usage_for_identity(
-            &transaction,
+            transaction,
             &request.capability_id,
             request.grant_index,
         )?;
@@ -231,9 +242,9 @@ impl SqliteBudgetStore {
             ));
         }
 
-        let event_seq = allocate_budget_replication_seq(&transaction)?;
+        let event_seq = allocate_budget_replication_seq(transaction)?;
         let now = unix_now();
-        persist_quota_rows(&transaction, &staged, event_seq, now)?;
+        persist_quota_rows(transaction, &staged, event_seq, now)?;
         let updated_projection = transaction.execute(
             r#"
             UPDATE capability_grant_budgets
@@ -271,7 +282,7 @@ impl SqliteBudgetStore {
             )));
         }
         SqliteBudgetStore::append_mutation_event(
-            &transaction,
+            transaction,
             Some(event_id),
             Some(hold_id),
             request.authority.as_ref(),
@@ -291,17 +302,15 @@ impl SqliteBudgetStore {
             legacy_usage.2,
         )?;
         persist_composite_mutation_snapshot(
-            &transaction,
+            transaction,
             event_id,
             BudgetInvocationReservationState::Captured,
             current_hold.monetary_state,
             &current_hold.revocation_set,
             &invocation_counts_after,
         )?;
-        transaction.commit()?;
-
         Ok(BudgetHoldMutationDecision {
-            hold_id: request.hold_id,
+            hold_id: request.hold_id.clone(),
             exposure_units: 0,
             realized_spend_units: 0,
             committed_cost_units_after: checked_committed_cost_units(
@@ -313,7 +322,11 @@ impl SqliteBudgetStore {
             invocation_state: BudgetInvocationReservationState::Captured,
             monetary_state: current_hold.monetary_state,
             revocation_set: Some(current_hold.revocation_set),
-            metadata: composite_metadata(request.authority, Some(event_seq), event_id.to_string()),
+            metadata: composite_metadata(
+                request.authority.clone(),
+                Some(event_seq),
+                event_id.to_string(),
+            ),
         })
     }
 
@@ -1427,6 +1440,23 @@ fn validate_composite_input(
         .max_total_cost_units
         .map(|value| sqlite_integer_from_u64(value, "composite total maximum"))
         .transpose()?;
+    if request.authorization_artifact_digests.len()
+        > MAX_AUTHORIZATION_ARTIFACT_DIGESTS_PER_ADMISSION
+        || request.authorization_artifact_digests.iter().any(|digest| {
+            digest.len() != 64
+                || !digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+        })
+        || request
+            .authorization_artifact_digests
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
+    {
+        return Err(BudgetStoreError::Invariant(
+            "authorization artifact digests are invalid, unsorted, or duplicated".to_string(),
+        ));
+    }
     if let Some(authority) = &request.authority {
         sqlite_integer_from_u64(authority.lease_epoch, "composite lease epoch")?;
     }
@@ -1741,6 +1771,16 @@ fn persist_composite_authorization(
                 i64::from(usage.reserved_invocations_after),
                 i64::from(usage.captured_invocations_after),
             ],
+        )?;
+    }
+    for (position, digest) in request.authorization_artifact_digests.iter().enumerate() {
+        transaction.execute(
+            r#"
+            INSERT INTO budget_composite_authorization_artifacts (
+                hold_id, position, artifact_digest
+            ) VALUES (?1, ?2, ?3)
+            "#,
+            params![request.hold_id, position as i64, digest],
         )?;
     }
     transaction.execute(
@@ -2124,6 +2164,7 @@ fn load_composite_authorization(
             ))
         })?;
     let invocation_counts_after = load_authorization_quota_snapshots(transaction, hold_id)?;
+    let authorization_artifact_digests = load_authorization_artifact_digests(transaction, hold_id)?;
     Ok(Some(StoredCompositeAuthorization {
         hold_id: row.0,
         event_id: row.1,
@@ -2141,7 +2182,53 @@ fn load_composite_authorization(
         invocation_count_after: row.14,
         event_seq: row.15,
         invocation_counts_after,
+        authorization_artifact_digests,
     }))
+}
+
+fn load_authorization_artifact_digests(
+    transaction: &rusqlite::Transaction<'_>,
+    hold_id: &str,
+) -> Result<Vec<String>, BudgetStoreError> {
+    let mut statement = transaction.prepare(
+        r#"
+        SELECT position, artifact_digest
+        FROM budget_composite_authorization_artifacts
+        WHERE hold_id = ?1
+        ORDER BY position ASC
+        "#,
+    )?;
+    let rows = statement
+        .query_map(params![hold_id], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(statement);
+    if rows.len() > MAX_AUTHORIZATION_ARTIFACT_DIGESTS_PER_ADMISSION {
+        return Err(BudgetStoreError::Invariant(
+            "persisted authorization artifact count exceeds the limit".to_string(),
+        ));
+    }
+    let mut digests = Vec::with_capacity(rows.len());
+    for (expected_position, (position, digest)) in rows.into_iter().enumerate() {
+        if position != expected_position as i64
+            || digest.len() != 64
+            || !digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+        {
+            return Err(BudgetStoreError::Invariant(
+                "persisted authorization artifacts are malformed".to_string(),
+            ));
+        }
+        digests.push(digest);
+    }
+    if digests.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(BudgetStoreError::Invariant(
+            "persisted authorization artifact digests are unsorted or duplicated".to_string(),
+        ));
+    }
+    Ok(digests)
 }
 
 fn load_authorization_quota_snapshots(

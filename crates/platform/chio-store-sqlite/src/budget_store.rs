@@ -13,7 +13,10 @@ use chio_kernel::budget_store::{
     BudgetReverseHoldRequest, DeniedBudgetHold, MAX_INVOCATION_QUOTAS_PER_ADMISSION,
 };
 use chio_kernel::supplemental_quota::CanonicalRevocationSet;
-use chio_kernel::{BudgetStore, BudgetStoreError, BudgetUsageRecord};
+use chio_kernel::{
+    BudgetStore, BudgetStoreError, BudgetUsageRecord,
+    MAX_AUTHORIZATION_ARTIFACT_DIGESTS_PER_ADMISSION,
+};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 mod composite;
@@ -55,6 +58,7 @@ pub struct SqliteCompositeAuthorizeInput {
     pub authority: Option<BudgetEventAuthority>,
     pub invocation_quotas: Vec<BudgetInvocationQuota>,
     pub revocation_set: CanonicalRevocationSet,
+    pub authorization_artifact_digests: Vec<String>,
 }
 
 /// Result of one durable SQLite authorization attempt.

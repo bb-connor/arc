@@ -73,6 +73,16 @@ pub(super) fn ensure_composite_budget_schema(
             )
         );
 
+        CREATE TABLE IF NOT EXISTS budget_composite_authorization_artifacts (
+            hold_id TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            artifact_digest TEXT NOT NULL,
+            PRIMARY KEY (hold_id, position),
+            UNIQUE (hold_id, artifact_digest),
+            CHECK (position >= 0 AND position < 8),
+            CHECK (length(artifact_digest) = 64)
+        );
+
         CREATE TABLE IF NOT EXISTS budget_composite_holds (
             hold_id TEXT PRIMARY KEY,
             invocation_state TEXT NOT NULL,
@@ -147,6 +157,18 @@ pub(super) fn ensure_composite_budget_schema(
         BEFORE DELETE ON budget_composite_authorization_quotas
         BEGIN
             SELECT RAISE(ABORT, 'immutable composite authorization quota snapshot');
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS budget_composite_authorization_artifact_immutable
+        BEFORE UPDATE ON budget_composite_authorization_artifacts
+        BEGIN
+            SELECT RAISE(ABORT, 'immutable composite authorization artifact');
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS budget_composite_authorization_artifact_delete_forbidden
+        BEFORE DELETE ON budget_composite_authorization_artifacts
+        BEGIN
+            SELECT RAISE(ABORT, 'immutable composite authorization artifact');
         END;
         "#,
     )?;
