@@ -85,6 +85,35 @@ pub(crate) fn attach_dispatch_intent_rail_ref_tx(
     Ok(())
 }
 
+/// Delete the intent matching `key` inside the receipt-append transaction.
+/// Guarded on `request_id` + `parameter_hash` (+ `tenant_id`): a mismatch or
+/// missing row returns `Conflict` from inside the transaction, aborting the
+/// whole commit (no partial state). The `parameter_hash` guard proves the
+/// consumed intent matches the exact call the receipt attests.
+pub(crate) fn finalize_dispatch_intent_tx(
+    tx: &rusqlite::Transaction<'_>,
+    key: &chio_kernel::receipt_store::DispatchIntentKey,
+) -> Result<(), ReceiptStoreError> {
+    let changed = tx.execute(
+        "DELETE FROM chio_dispatch_intents \
+         WHERE request_id = ?1 AND parameter_hash = ?2 \
+           AND ((tenant_id IS NULL AND ?3 IS NULL) OR tenant_id = ?3)",
+        rusqlite::params![
+            key.request_id.as_str(),
+            key.parameter_hash.as_str(),
+            key.tenant_id.as_deref(),
+        ],
+    )?;
+    if changed == 0 {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "dispatch intent for request `{}` not found with matching parameter_hash; \
+             refusing to commit the receipt",
+            key.request_id
+        )));
+    }
+    Ok(())
+}
+
 /// True if the non-audit `chio_dispatch_intents` journal table exists. A store
 /// opened via `open_existing` on a pre-journal database runs no DDL, so a
 /// missing table is reported as `false`; callers treat that as zero

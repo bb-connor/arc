@@ -91,6 +91,96 @@ fn attach_rail_ref_updates_open_intent_and_notfound_when_absent(
 }
 
 #[test]
+fn consume_intent_removes_row_and_persists_receipt_atomically(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::receipt_store::{DispatchIntentKey, ReceiptStore};
+
+    let path = unique_db_path("chio-intents-consume");
+    let keypair = super::support::receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+
+    let receipt = super::support::sample_receipt_with_keypair("consume-ok", 1, &keypair);
+    let mut intent = sample_intent("req-C");
+    intent.capability_id = receipt.capability_id.clone();
+    intent.tool_server = receipt.tool_server.clone();
+    intent.tool_name = receipt.tool_name.clone();
+    intent.parameter_hash = receipt.action.parameter_hash.clone();
+    intent.tenant_id = receipt.tenant_id.clone();
+    store.record_dispatch_intent(&intent)?;
+
+    let key = DispatchIntentKey {
+        request_id: "req-C".to_string(),
+        parameter_hash: receipt.action.parameter_hash.clone(),
+        tenant_id: receipt.tenant_id.clone(),
+    };
+    let seq = store.append_chio_receipt_consuming_intent(&receipt, &key)?;
+    assert!(seq.is_some(), "receipt persisted, returns its entry seq");
+    store.flush_receipt_writes()?;
+
+    // Intent gone, receipt present: the two shared one commit.
+    assert_eq!(open_intent_row_count(&store)?, 0);
+    assert!(store.load_chio_receipt(&receipt.id)?.is_some());
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn consume_intent_parameter_hash_mismatch_aborts_and_keeps_intent(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::receipt_store::{DispatchIntentKey, ReceiptStore};
+
+    let path = unique_db_path("chio-intents-consume-mismatch");
+    let keypair = super::support::receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+
+    let receipt = super::support::sample_receipt_with_keypair("consume-bad", 1, &keypair);
+
+    // A key whose parameter_hash disagrees with the receipt is rejected before
+    // any write reaches the transaction.
+    let mut intent = sample_intent("req-X");
+    intent.parameter_hash = receipt.action.parameter_hash.clone();
+    intent.tenant_id = receipt.tenant_id.clone();
+    store.record_dispatch_intent(&intent)?;
+    let disagreeing_key = DispatchIntentKey {
+        request_id: "req-X".to_string(),
+        parameter_hash: "wrong-hash".to_string(),
+        tenant_id: receipt.tenant_id.clone(),
+    };
+    assert!(store
+        .append_chio_receipt_consuming_intent(&receipt, &disagreeing_key)
+        .is_err());
+
+    // A key that matches the receipt but not the STORED intent row (the intent
+    // was journaled for different parameters) must abort the whole
+    // transaction: the receipt must not persist and the intent must stay open.
+    let mut stale_intent = sample_intent("req-Y");
+    stale_intent.parameter_hash = "journaled-for-other-parameters".to_string();
+    store.record_dispatch_intent(&stale_intent)?;
+    let key_for_y = DispatchIntentKey {
+        request_id: "req-Y".to_string(),
+        parameter_hash: receipt.action.parameter_hash.clone(),
+        tenant_id: receipt.tenant_id.clone(),
+    };
+    let result = store.append_chio_receipt_consuming_intent(&receipt, &key_for_y);
+    assert!(result.is_err(), "stored-intent mismatch must abort");
+    store.flush_receipt_writes()?;
+
+    assert_eq!(
+        open_intent_row_count(&store)?,
+        2,
+        "both intents remain open after the aborted consumes"
+    );
+    assert!(
+        store.load_chio_receipt(&receipt.id)?.is_none(),
+        "receipt must not persist when the consume aborts"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
 fn open_creates_dispatch_intents_table_and_open_existing_tolerates_absence(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::receipt_store::support::dispatch_intents_table_exists;

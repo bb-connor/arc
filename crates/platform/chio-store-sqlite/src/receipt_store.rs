@@ -3064,6 +3064,81 @@ impl SqliteReceiptStore {
             .run_write_with_timeout(dispatch_intent_insert_job(intent), budget)
     }
 
+    /// Append a receipt and, in the SAME immediate transaction, consume the
+    /// matching dispatch intent: a crash before commit leaves the intent open
+    /// and the receipt absent, and a successful commit removes the intent and
+    /// persists the receipt, so exactly one of the two states survives.
+    pub fn append_chio_receipt_consuming_intent(
+        &self,
+        receipt: &ChioReceipt,
+        key: &chio_kernel::receipt_store::DispatchIntentKey,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        self.writer_handle()
+            .run_write_receipt(self.dispatch_intent_consuming_append_job(receipt, key)?)
+    }
+
+    /// Bounded variant of [`Self::append_chio_receipt_consuming_intent`]: the
+    /// response wait is capped at `budget` so a wedged writer cannot pin the
+    /// kernel-wide receipt write lock through the consuming append.
+    pub fn append_chio_receipt_consuming_intent_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        key: &chio_kernel::receipt_store::DispatchIntentKey,
+        budget: Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        self.writer_handle().run_write_receipt_with_timeout(
+            self.dispatch_intent_consuming_append_job(receipt, key)?,
+            budget,
+        )
+    }
+
+    /// Validate the receipt/key binding and build the writer job that deletes
+    /// the intent and inserts the receipt inside one immediate transaction.
+    fn dispatch_intent_consuming_append_job(
+        &self,
+        receipt: &ChioReceipt,
+        key: &chio_kernel::receipt_store::DispatchIntentKey,
+    ) -> Result<
+        impl FnOnce(&mut SqliteStoreConnection) -> Result<Option<u64>, ReceiptStoreError>
+            + Send
+            + 'static,
+        ReceiptStoreError,
+    > {
+        ensure_chio_receipt_verified(receipt)?;
+        if receipt.action.parameter_hash != key.parameter_hash {
+            return Err(ReceiptStoreError::Conflict(
+                "dispatch intent key parameter_hash does not match appended receipt".to_string(),
+            ));
+        }
+        if receipt.tenant_id.as_deref() != key.tenant_id.as_deref() {
+            return Err(ReceiptStoreError::Conflict(
+                "dispatch intent key tenant id does not match appended receipt".to_string(),
+            ));
+        }
+        sqlite_i64(receipt.timestamp, "receipt timestamp")?;
+        let raw_json = canonical_json_bytes(receipt)
+            .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;
+        let raw_json = std::str::from_utf8(raw_json.as_slice())
+            .map_err(|error| {
+                ReceiptStoreError::Canonical(format!(
+                    "canonical receipt bytes are not UTF-8: {error}"
+                ))
+            })?
+            .to_string();
+        let receipt = receipt.clone();
+        let key = key.clone();
+        Ok(move |connection: &mut SqliteStoreConnection| {
+            ensure_checkpoint_transparency_guards(connection)?;
+            let tx =
+                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            finalize_dispatch_intent_tx(&tx, &key)?;
+            let seq = append_chio_receipt_tx(&tx, &receipt, &raw_json)?;
+            ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
+            tx.commit()?;
+            Ok(Some(seq))
+        })
+    }
+
     /// Attach a rail authorization id to the open monetary intent for
     /// `request_id`. Best-effort from the caller's perspective (`NotFound`
     /// when the intent was already consumed or never written), but the update
