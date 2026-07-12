@@ -126,7 +126,7 @@ fn aggregate_invocation_enforcement_disabled_denies_before_hosted_dispatch() {
     );
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(response.reason.as_deref().is_some_and(|reason| reason
-        .contains("aggregate invocation budget enforcement is disabled")));
+        .contains("aggregate invocation budget is not negotiated")));
     assert!(
         kernel
             .budget_store

@@ -18,6 +18,12 @@ pub const ACCEPTS_HYBRID_SIGNATURES: &str = "accepts_hybrid_signatures";
 /// Peers enforce delegation-chain binding for attenuated capability tokens.
 pub const DELEGATION_CHAIN_BINDING: &str = "delegation_chain_binding";
 
+/// Peers understand and enforce the signed aggregate invocation-budget semantic.
+///
+/// This feature is intentionally absent from both baseline profiles until the
+/// durable composite quota authority is installed by the rollout composition.
+pub const AGGREGATE_INVOCATION_BUDGET: &str = "aggregate_invocation_budget";
+
 fn capabilities_schema() -> String {
     CHIO_CAPABILITIES_SCHEMA.to_string()
 }

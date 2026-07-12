@@ -20,6 +20,7 @@
 //! checks over an in-memory capability token. Revocation stores, delegation
 //! lineage joins, and transport-bound subject proof remain excluded surfaces.
 
+use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
@@ -147,7 +148,8 @@ pub fn verify_capability_with_floor(
     crypto_floor: CapabilityCryptoFloor,
     budgets: &mut dyn BudgetRegistry,
 ) -> Result<VerifiedCapability, CapabilityError> {
-    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor)?;
+    let peer = CapabilityNegotiation::v1_default();
+    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor, &peer)?;
     admit_delegated_budget(token, budgets)?;
     Ok(verified)
 }
@@ -157,6 +159,7 @@ fn verify_capability_base(
     trusted_issuers: &[PublicKey],
     clock: &dyn Clock,
     crypto_floor: CapabilityCryptoFloor,
+    peer: &CapabilityNegotiation,
 ) -> Result<VerifiedCapability, CapabilityError> {
     // Issuer trust check. The full kernel also trusts its own public key
     // and the set returned by the capability authority; callers must
@@ -180,15 +183,7 @@ fn verify_capability_base(
         }
     }
 
-    // Aggregate limits are signed and structurally valid, but no production
-    // quota authority enforces them yet. Deny after signature authentication
-    // and before any admission-side mutation so callers cannot mistake the
-    // wire field for an active security guarantee.
-    if token.aggregate_invocation_budget.is_some() {
-        return Err(CapabilityError::AttenuationViolation(
-            "aggregate invocation budget enforcement is disabled".to_string(),
-        ));
-    }
+    verify_negotiated_capability_semantics(token, peer)?;
 
     // Time-bound check.
     let now = clock.now_unix_secs();
@@ -207,6 +202,32 @@ fn verify_capability_base(
         expires_at: token.expires_at,
         evaluated_at: now,
     })
+}
+
+fn verify_negotiated_capability_semantics(
+    token: &CapabilityToken,
+    peer: &CapabilityNegotiation,
+) -> Result<(), CapabilityError> {
+    peer.validate().map_err(|error| {
+        CapabilityError::AttenuationViolation(format!(
+            "invalid capability negotiation profile: {error}"
+        ))
+    })?;
+
+    if token.aggregate_invocation_budget.is_none() {
+        return Ok(());
+    }
+    if !peer.supports(chio_core_types::capability::features::AGGREGATE_INVOCATION_BUDGET) {
+        return Err(CapabilityError::AttenuationViolation(
+            "aggregate invocation budget is not negotiated".to_string(),
+        ));
+    }
+
+    // The signed semantic is negotiated but remains latched off until the
+    // durable composite quota and admission authorities are installed.
+    Err(CapabilityError::AttenuationViolation(
+        "aggregate invocation budget enforcement is disabled".to_string(),
+    ))
 }
 
 pub(crate) fn admit_delegated_budget(
@@ -253,10 +274,12 @@ pub fn verify_capability_with_negotiated_floor(
     trusted_issuers: &[PublicKey],
     clock: &dyn Clock,
     crypto_floor: CapabilityCryptoFloor,
-    _peer: &CapabilityNegotiation,
+    peer: &CapabilityNegotiation,
 ) -> Result<VerifiedCapability, CapabilityError> {
     let mut budgets = NoopBudgetRegistry;
-    verify_capability_with_floor(token, trusted_issuers, clock, crypto_floor, &mut budgets)
+    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor, peer)?;
+    admit_delegated_budget(token, &mut budgets)?;
+    Ok(verified)
 }
 
 /// Convenience wrapper around [`verify_capability`] that returns the
@@ -333,7 +356,8 @@ pub fn verify_capability_with_floor_and_trust_root(
     crypto_floor: CapabilityCryptoFloor,
     trust_root_scope_hash: &ScopeHash,
 ) -> Result<VerifiedCapability, CapabilityError> {
-    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor)?;
+    let peer = CapabilityNegotiation::v1_default();
+    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor, &peer)?;
     verify_delegation_chain_shape(token)?;
     verify_chain_binding_with_trust_root(token, trust_root_scope_hash)?;
 
@@ -352,7 +376,8 @@ pub fn verify_capability_with_floor_and_resolver(
     crypto_floor: CapabilityCryptoFloor,
     trust_root: &dyn TrustRootResolver,
 ) -> Result<VerifiedCapability, CapabilityError> {
-    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor)?;
+    let peer = CapabilityNegotiation::v1_default();
+    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor, &peer)?;
     verify_delegation_chain_shape(token)?;
     verify_chain_binding_with_resolver(token, trust_root)?;
 
@@ -369,7 +394,7 @@ pub fn verify_capability_full(
     trust_root: &dyn TrustRootResolver,
     budgets: &mut dyn BudgetRegistry,
 ) -> Result<VerifiedCapability, CapabilityError> {
-    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor)?;
+    let verified = verify_capability_base(token, trusted_issuers, clock, crypto_floor, peer)?;
     verify_delegation_chain_shape(token)?;
     verify_chain_binding_with_negotiation(token, peer, trust_root)?;
     admit_delegated_budget(token, budgets)?;
@@ -510,11 +535,11 @@ mod tests {
         .expect("sign structurally valid aggregate capability")
     }
 
-    fn assert_aggregate_enforcement_disabled(error: CapabilityError) {
+    fn assert_aggregate_not_negotiated(error: CapabilityError) {
         assert_eq!(
             error,
             CapabilityError::AttenuationViolation(
-                "aggregate invocation budget enforcement is disabled".to_string()
+                "aggregate invocation budget is not negotiated".to_string()
             )
         );
     }
@@ -534,7 +559,7 @@ mod tests {
 
             let portable_error = verify_capability(&token, &[issuer.public_key()], &clock)
                 .expect_err("portable verification must deny unenforced aggregate budgets");
-            assert_aggregate_enforcement_disabled(portable_error);
+            assert_aggregate_not_negotiated(portable_error);
 
             let mut budgets = NoopBudgetRegistry;
             let full_error = verify_capability_full(
@@ -547,7 +572,30 @@ mod tests {
                 &mut budgets,
             )
             .expect_err("full verification must deny unenforced aggregate budgets");
-            assert_aggregate_enforcement_disabled(full_error);
+            assert_aggregate_not_negotiated(full_error);
+
+            let mut rollout_peer = CapabilityNegotiation::t1_default();
+            rollout_peer.features.insert(
+                chio_core_types::capability::features::AGGREGATE_INVOCATION_BUDGET.to_string(),
+                true,
+            );
+            let mut budgets = NoopBudgetRegistry;
+            let rollout_error = verify_capability_full(
+                &token,
+                &[issuer.public_key()],
+                &clock,
+                CapabilityCryptoFloor::AllowClassical,
+                &rollout_peer,
+                &trust_roots,
+                &mut budgets,
+            )
+            .expect_err("feature negotiation alone must not enable aggregate enforcement");
+            assert_eq!(
+                rollout_error,
+                CapabilityError::AttenuationViolation(
+                    "aggregate invocation budget enforcement is disabled".to_string()
+                )
+            );
         }
 
         let mut tampered = aggregate_budget_token(&issuer, 0);

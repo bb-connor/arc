@@ -677,6 +677,24 @@ fn capability_negotiation_preserves_explicit_disabled_features() {
 }
 
 #[test]
+fn aggregate_invocation_budget_feature_is_opt_in_and_intersected() {
+    let baseline = CapabilityNegotiation::v1_default();
+    let current = CapabilityNegotiation::t1_default();
+    assert!(!baseline.supports(features::AGGREGATE_INVOCATION_BUDGET));
+    assert!(!current.supports(features::AGGREGATE_INVOCATION_BUDGET));
+
+    let mut rollout = CapabilityNegotiation::t1_default();
+    rollout
+        .features
+        .insert(features::AGGREGATE_INVOCATION_BUDGET.to_string(), true);
+    let mixed = rollout.negotiated_with(&baseline).unwrap();
+    assert!(!mixed.supports(features::AGGREGATE_INVOCATION_BUDGET));
+
+    let negotiated = rollout.negotiated_with(&rollout).unwrap();
+    assert!(negotiated.supports(features::AGGREGATE_INVOCATION_BUDGET));
+}
+
+#[test]
 fn chain_binding_disabled_does_not_reject_v1_tokens() {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();

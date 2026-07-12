@@ -1,7 +1,9 @@
 use super::*;
 use chio_core_types::canonical_json_bytes;
 use chio_core_types::capability::{
+    aggregate_budget::{AggregateInvocationBudget, AggregateInvocationScope},
     attenuation::{DelegationLink, DelegationLinkBody},
+    features::{self, CapabilityNegotiation},
     scope::{ChioScope, Operation, ToolGrant},
     token::CapabilityTokenBody,
 };
@@ -48,6 +50,17 @@ fn make_capability_at(
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
     };
+    CapabilityToken::sign(body, issuer).unwrap()
+}
+
+fn make_aggregate_capability(subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
+    let mut body = make_capability_at(subject, issuer, ISSUED_AT, EXPIRES_AT).body();
+    body.id = "cap-aggregate-ffi".to_string();
+    body.aggregate_invocation_budget = Some(AggregateInvocationBudget {
+        scope: AggregateInvocationScope::Capability,
+        max_invocations: 1,
+        root_binding: None,
+    });
     CapabilityToken::sign(body, issuer).unwrap()
 }
 
@@ -277,6 +290,55 @@ fn verify_capability_honors_epoch_zero_clock() {
     assert_eq!(value["evaluated_at"], 0);
     assert_eq!(value["issued_at"], 0);
     assert_eq!(value["expires_at"], 10);
+}
+
+#[test]
+fn verify_capability_context_denies_mixed_version_aggregate_budget_and_preserves_latch() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_aggregate_capability(&subject, &issuer);
+
+    let mut rollout_peer = CapabilityNegotiation::t1_default();
+    rollout_peer
+        .features
+        .insert(features::AGGREGATE_INVOCATION_BUDGET.to_string(), true);
+    let mixed_peer = rollout_peer
+        .negotiated_with(&CapabilityNegotiation::v1_default())
+        .expect("mixed-version feature intersection");
+    assert!(!mixed_peer.supports(features::AGGREGATE_INVOCATION_BUDGET));
+
+    let mixed_envelope = json!({
+        "token": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "now_secs": ISSUED_AT as i64 + 1,
+        "peer_capabilities": mixed_peer,
+    });
+    let mixed_error = verify_capability_with_context_json_str(&mixed_envelope.to_string())
+        .expect_err("mixed-version peer must deny an unnegotiated aggregate budget");
+    match mixed_error {
+        KernelFfiError::InvalidCapability(message) => assert!(
+            message.contains("aggregate invocation budget is not negotiated"),
+            "message: {message}"
+        ),
+        other => panic!("expected InvalidCapability, got {other:?}"),
+    }
+
+    assert!(rollout_peer.supports(features::AGGREGATE_INVOCATION_BUDGET));
+    let rollout_envelope = json!({
+        "token": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "now_secs": ISSUED_AT as i64 + 1,
+        "peer_capabilities": rollout_peer,
+    });
+    let rollout_error = verify_capability_with_context_json_str(&rollout_envelope.to_string())
+        .expect_err("feature negotiation alone must not enable aggregate enforcement");
+    match rollout_error {
+        KernelFfiError::InvalidCapability(message) => assert!(
+            message.contains("aggregate invocation budget enforcement is disabled"),
+            "message: {message}"
+        ),
+        other => panic!("expected InvalidCapability, got {other:?}"),
+    }
 }
 
 #[test]

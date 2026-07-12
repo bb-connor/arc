@@ -14,7 +14,9 @@
 
 use chio_core_types::canonical_json_bytes;
 use chio_core_types::capability::{
+    aggregate_budget::{AggregateInvocationBudget, AggregateInvocationScope},
     attenuation::{DelegationLink, DelegationLinkBody},
+    features::{self, CapabilityNegotiation},
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
@@ -62,6 +64,17 @@ fn make_capability(subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
     };
+    CapabilityToken::sign(body, issuer).unwrap()
+}
+
+fn make_aggregate_capability(subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
+    let mut body = make_capability(subject, issuer).body();
+    body.id = "cap-aggregate-ffi".to_string();
+    body.aggregate_invocation_budget = Some(AggregateInvocationBudget {
+        scope: AggregateInvocationScope::Capability,
+        max_invocations: 1,
+        root_binding: None,
+    });
     CapabilityToken::sign(body, issuer).unwrap()
 }
 
@@ -509,6 +522,57 @@ fn verify_capability_happy_path() {
     assert!(verified.scope_json.contains("srv-a"));
     assert_eq!(verified.issued_at, 1_000_000_000);
     assert_eq!(verified.expires_at, 5_000_000_000);
+}
+
+#[test]
+fn verify_capability_with_context_denies_mixed_version_aggregate_budget_and_preserves_latch() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_aggregate_capability(&subject, &issuer);
+
+    let mut rollout_peer = CapabilityNegotiation::t1_default();
+    rollout_peer
+        .features
+        .insert(features::AGGREGATE_INVOCATION_BUDGET.to_string(), true);
+    let mixed_peer = rollout_peer
+        .negotiated_with(&CapabilityNegotiation::v1_default())
+        .expect("mixed-version feature intersection");
+    assert!(!mixed_peer.supports(features::AGGREGATE_INVOCATION_BUDGET));
+
+    let mixed_request = serde_json::json!({
+        "token": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "now_secs": EVAL_TIME as i64,
+        "peer_capabilities": mixed_peer,
+    })
+    .to_string();
+    let mixed_error = verify_capability_with_context(mixed_request)
+        .expect_err("mixed-version peer must deny an unnegotiated aggregate budget");
+    match mixed_error {
+        ChioMobileError::InvalidCapability { message } => assert!(
+            message.contains("aggregate invocation budget is not negotiated"),
+            "message: {message}"
+        ),
+        other => panic!("expected InvalidCapability, got {other:?}"),
+    }
+
+    assert!(rollout_peer.supports(features::AGGREGATE_INVOCATION_BUDGET));
+    let rollout_request = serde_json::json!({
+        "token": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "now_secs": EVAL_TIME as i64,
+        "peer_capabilities": rollout_peer,
+    })
+    .to_string();
+    let rollout_error = verify_capability_with_context(rollout_request)
+        .expect_err("feature negotiation alone must not enable aggregate enforcement");
+    match rollout_error {
+        ChioMobileError::InvalidCapability { message } => assert!(
+            message.contains("aggregate invocation budget enforcement is disabled"),
+            "message: {message}"
+        ),
+        other => panic!("expected InvalidCapability, got {other:?}"),
+    }
 }
 
 #[test]
