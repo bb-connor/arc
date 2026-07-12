@@ -647,6 +647,43 @@ fn ensure_archive_path_matches_ledger(
     Ok(())
 }
 
+/// Confirm the archive the ledger already committed to still re-derives the
+/// signed checkpoint roots for the committed prefix `[1, current]`.
+///
+/// A subsequent rotation only ever appends the newer suffix to that same
+/// archive; the earlier `[1, current]` prefix was deleted from the live store
+/// and survives nowhere else. If that archive was deleted, replaced, or emptied
+/// since, extending it would advance the watermark while the earlier prefix is
+/// backed by no archive at all, splitting one logical archive across a live
+/// store that no longer holds the prefix and a file that never did. Fail closed
+/// so the deleted prefix can never be stranded. A never-archived store (no
+/// watermark, or a zero watermark) is vacuously backed.
+fn ensure_committed_prefix_still_backed(
+    connection: &rusqlite::Connection,
+) -> Result<(), ReceiptStoreError> {
+    let Some(current) = super::support::retention_watermark(connection)? else {
+        return Ok(());
+    };
+    if current == 0 {
+        return Ok(());
+    }
+    let backed = match super::support::latest_watermark_archive_path(connection)? {
+        Some(ledger_path) => {
+            super::support::archive_path_backs_prefix(connection, &ledger_path, current)?
+        }
+        None => false,
+    };
+    if !backed {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "retention archive no longer backs the committed watermark {current}; the prior \
+             archive is missing, unreadable, or does not re-derive the signed checkpoint roots. \
+             Refusing to rotate and strand the deleted prefix; restore the archive before \
+             rotating again"
+        )));
+    }
+    Ok(())
+}
+
 /// True when `archive_path` names the same on-disk file as the live database:
 /// an identical path string, the same file after resolving symlinks and
 /// `.`/`..`, or (on Unix) the same device+inode as a hard link.
@@ -751,31 +788,6 @@ fn archive_range(
         if watermark <= current {
             return Ok(0);
         }
-        // A subsequent rotation only ever appends the newer suffix to the
-        // archive the ledger already committed to; the earlier `[1, current]`
-        // prefix was deleted from the live store and survives nowhere else. If
-        // that archive was deleted or replaced, `ensure_archive_file_exists`
-        // below would recreate an empty file, co-archive only the new suffix,
-        // and advance the watermark while the earlier prefix is backed by no
-        // archive at all. Verify the recorded archive still re-derives the
-        // signed checkpoint roots for `[1, current]` before touching the file,
-        // and fail closed otherwise so the deleted prefix can never be stranded.
-        if current > 0 {
-            let backed = match super::support::latest_watermark_archive_path(connection)? {
-                Some(ledger_path) => {
-                    super::support::archive_path_backs_prefix(connection, &ledger_path, current)?
-                }
-                None => false,
-            };
-            if !backed {
-                return Err(ReceiptStoreError::Conflict(format!(
-                    "retention archive no longer backs the committed watermark {current}; the \
-                     prior archive is missing, unreadable, or does not re-derive the signed \
-                     checkpoint roots. Refusing to rotate and strand the deleted prefix; restore \
-                     the archive before rotating again"
-                )));
-            }
-        }
     }
     let w = sqlite_i64(watermark, "archival watermark")?;
 
@@ -785,7 +797,12 @@ fn archive_range(
     // reader (a restart, a CLI health check) resolves the same file regardless
     // of its working directory.
     let archive_path = absolute_archive_path(archive_path)?;
+    // Pre-lock fast fail: reject a path split or a moved/emptied backing archive
+    // before doing any copy work. Both reads are re-run under the write lock in
+    // `delete_archived_prefix_in_tx`, which is the authoritative check: a
+    // concurrent rotation can still commit between here and that locked delete.
     ensure_archive_path_matches_ledger(connection, &archive_path)?;
+    ensure_committed_prefix_still_backed(connection)?;
     let escaped_path = archive_path.replace('\'', "''");
     connection.execute_batch(&format!("ATTACH DATABASE '{escaped_path}' AS archive"))?;
 
@@ -1289,6 +1306,20 @@ pub(super) fn delete_archived_prefix_in_tx(
     // leaves the prefix intact and re-runnable; a later rotation re-copies the
     // new row and completes.
     verify_co_archival_complete(&tx, w)?;
+    // The archive-path pin and the backing check also ran before this
+    // transaction took the write lock, so a concurrent rotation could have
+    // committed the shared prefix to a DIFFERENT archive, or moved/emptied the
+    // pinned archive, in that window: one rotation commits `[1, W1]` to archive
+    // A after the outer check, and this rotation would then copy only the
+    // surviving suffix to archive B and record a higher watermark naming B,
+    // leaving the ledger pointing at a file that lacks the earlier prefix.
+    // Re-read the ledger under BEGIN IMMEDIATE (the same TOCTOU class as the
+    // co-archival re-check above) and re-enforce both, so a rotation never
+    // advances a watermark that splits the archived prefix or extends an archive
+    // that no longer backs the committed prefix. The rollback on error leaves the
+    // prefix intact and re-runnable.
+    ensure_archive_path_matches_ledger(&tx, archive_path)?;
+    ensure_committed_prefix_still_backed(&tx)?;
     tx.execute_batch(&format!(
         r#"
         DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete;
