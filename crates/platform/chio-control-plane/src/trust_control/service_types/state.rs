@@ -80,6 +80,17 @@ pub(crate) struct RemoteReceiptStore {
 pub(crate) struct RemoteBudgetStore {
     pub(crate) client: TrustControlClient,
     pub(crate) cached_usage: Mutex<HashMap<(String, u32), BudgetUsageRecord>>,
+    pub(crate) composite_holds: Mutex<HashMap<String, RemoteCompositeHoldEvidence>>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct RemoteCompositeHoldEvidence {
+    pub(crate) capability_id: String,
+    pub(crate) grant_index: usize,
+    pub(crate) invocation_quotas: Vec<BudgetInvocationQuota>,
+    pub(crate) revocation_set: CanonicalRevocationSet,
+    pub(crate) monetary_state: BudgetMonetaryHoldState,
+    pub(crate) authority: BudgetEventAuthority,
 }
 
 impl TrustServiceState {

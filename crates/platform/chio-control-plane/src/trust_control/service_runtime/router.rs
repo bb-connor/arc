@@ -287,6 +287,18 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         .route(BUDGET_INCREMENT_PATH, post(handle_try_increment_budget))
         .route(BUDGET_AUTHORIZE_EXPOSURE_PATH, post(handle_try_charge_cost))
         .route(
+            BUDGET_AUTHORIZE_HOLD_PATH,
+            post(handle_authorize_composite_budget_hold),
+        )
+        .route(
+            BUDGET_CAPTURE_INVOCATIONS_PATH,
+            post(handle_capture_invocation_reservations),
+        )
+        .route(
+            ADMISSION_CAPTURE_PATH,
+            post(handle_combined_admission_capture_unavailable),
+        )
+        .route(
             BUDGET_RELEASE_EXPOSURE_PATH,
             post(handle_reverse_charge_cost),
         )
@@ -730,6 +742,113 @@ mod tests {
             body.contains("chio_capability_revocation_lag_seconds"),
             "the capability-revocation-lag family must be present after building the serve router: {body}"
         );
+    }
+
+    #[tokio::test]
+    async fn composite_budget_and_admission_capture_routes_are_distinct_and_fail_closed() {
+        use axum::body::Body;
+        use axum::http::Request;
+        use tower::ServiceExt;
+
+        for path in [
+            BUDGET_AUTHORIZE_HOLD_PATH,
+            BUDGET_CAPTURE_INVOCATIONS_PATH,
+            ADMISSION_CAPTURE_PATH,
+        ] {
+            let request = Request::builder()
+                .method("GET")
+                .uri(path)
+                .body(Body::empty())
+                .test_unwrap();
+            let response = super::build_router(metrics_state("secret"))
+                .oneshot(request)
+                .await
+                .test_unwrap();
+            assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED, "{path}");
+        }
+
+        let composite_requests = [
+            (
+                BUDGET_AUTHORIZE_HOLD_PATH,
+                serde_json::json!({
+                    "capabilityId": "cap-1",
+                    "grantIndex": 0,
+                    "requestedExposureUnits": 0,
+                    "holdId": "hold-1",
+                    "eventId": "event-1",
+                    "admissionEvidence": {
+                        "invocationQuotas": [{
+                            "key": {
+                                "profile": "chio.grant-invocation.v1",
+                                "ownerId": "cap-1",
+                                "grantIndex": 0
+                            },
+                            "maxInvocations": 1
+                        }],
+                        "revocationSet": {
+                            "ids": ["cap-1"],
+                            "digest": "11".repeat(32)
+                        }
+                    }
+                }),
+            ),
+            (
+                BUDGET_CAPTURE_INVOCATIONS_PATH,
+                serde_json::json!({
+                    "capabilityId": "cap-1",
+                    "grantIndex": 0,
+                    "holdId": "hold-1",
+                    "eventId": "event-2",
+                    "budgetAuthority": {
+                        "authorityId": "leader-1",
+                        "leaseId": "lease-1",
+                        "leaseEpoch": 1
+                    }
+                }),
+            ),
+        ];
+        for (path, body) in composite_requests {
+            let request = Request::builder()
+                .method("POST")
+                .uri(path)
+                .header("content-type", "application/json")
+                .header(AUTHORIZATION, "Bearer secret")
+                .body(Body::from(body.to_string()))
+                .test_unwrap();
+            let response = super::build_router(metrics_state("secret"))
+                .oneshot(request)
+                .await
+                .test_unwrap();
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE, "{path}");
+        }
+
+        let request = Request::builder()
+            .method("POST")
+            .uri(ADMISSION_CAPTURE_PATH)
+            .header("content-type", "application/json")
+            .header(AUTHORIZATION, "Bearer secret")
+            .body(Body::from(
+                serde_json::json!({
+                    "operationId": "operation-1",
+                    "capabilityId": "cap-1",
+                    "grantIndex": 0,
+                    "holdId": "hold-1",
+                    "eventId": "event-1",
+                    "revocationSet": {
+                        "ids": ["cap-1"],
+                        "digest": "11".repeat(32)
+                    },
+                    "boundRevocationSetDigest": "11".repeat(32),
+                    "authorizationArtifactDigests": []
+                })
+                .to_string(),
+            ))
+            .test_unwrap();
+        let response = super::build_router(metrics_state("secret"))
+            .oneshot(request)
+            .await
+            .test_unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 
     /// A stream receipt embeds one digest per retained chunk, so a valid receipt

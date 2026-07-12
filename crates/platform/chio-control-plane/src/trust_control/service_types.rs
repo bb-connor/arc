@@ -177,6 +177,6 @@ pub use self::state::TrustControlClient;
 pub(crate) use self::state::{
     BudgetCursor, ClusterConsensusView, ClusterPeerClientAuth, ClusterProgress,
     ClusterRuntimeState, FederationAdmissionRateLimiter, PeerHealth, PeerSyncState,
-    RemoteBudgetStore, RemoteCapabilityAuthority, RemoteReceiptStore, RemoteRevocationStore,
-    RevocationCursor, TrustServiceState,
+    RemoteBudgetStore, RemoteCapabilityAuthority, RemoteCompositeHoldEvidence, RemoteReceiptStore,
+    RemoteRevocationStore, RevocationCursor, TrustServiceState,
 };

@@ -21,6 +21,20 @@ impl TrustControlClient {
         )
     }
 
+    pub(crate) fn authorize_composite_budget_hold(
+        &self,
+        request: &CompositeBudgetAuthorizeRequest,
+    ) -> Result<CompositeBudgetAuthorizeResponse, CliError> {
+        self.post_json(BUDGET_AUTHORIZE_HOLD_PATH, request)
+    }
+
+    pub(crate) fn capture_invocation_reservations(
+        &self,
+        request: &CaptureInvocationReservationsRequest,
+    ) -> Result<CaptureInvocationReservationsResponse, CliError> {
+        self.post_json(BUDGET_CAPTURE_INVOCATIONS_PATH, request)
+    }
+
     pub(crate) fn try_charge_cost(
         &self,
         capability_id: &str,

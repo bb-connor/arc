@@ -11,6 +11,10 @@ use super::report_rendering::{
     forward_post_to_leader, json_response_with_leader_visibility_and_budget_commit,
 };
 use super::report_validation::{budget_visibility_matches, validate_service_auth};
+use super::service_runtime::budget::{
+    canonical_revocation_set_from_view, canonical_revocation_set_view, invocation_quota_from_view,
+    invocation_quota_view,
+};
 use super::*;
 use chio_store_sqlite::{SqliteBudgetAuthorizationAuthority, SqliteBudgetCurrentAuthority};
 
@@ -370,6 +374,597 @@ pub(crate) async fn handle_try_charge_cost(
             },
         )
     }
+}
+
+pub(crate) async fn handle_authorize_composite_budget_hold(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(payload): Json<CompositeBudgetAuthorizeRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    if let Err(response) = require_remote_composite_linearizability(&state) {
+        return response;
+    }
+    match forward_post_to_leader(&state, BUDGET_AUTHORIZE_HOLD_PATH, &payload).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
+    }
+    let store = match open_budget_store(&state.config) {
+        Ok(store) => store,
+        Err(response) => return response,
+    };
+    let authority_source = match store
+        .authorization_authority_source(Some(payload.hold_id.as_str()), payload.event_id.as_str())
+    {
+        Ok(source) => source,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
+    };
+    let authority = match remote_composite_authority(&state, authority_source) {
+        Ok(authority) => authority,
+        Err(response) => return response,
+    };
+    let input = match sqlite_composite_authorize_input(&payload, authority.clone()) {
+        Ok(input) => input,
+        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+    };
+    let decision = match store.authorize_composite_hold(input) {
+        Ok(decision) => decision,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
+    };
+    let event = match load_persisted_composite_authorize_event(&store, &payload, &decision) {
+        Ok(event) => event,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
+    };
+    let write = match budget_write_token(
+        &store,
+        event.authority.as_ref(),
+        Some(payload.event_id.as_str()),
+    ) {
+        Ok(write) => write,
+        Err(response) => return response,
+    };
+    drop(store);
+    let budget_commit = match wait_for_budget_write_quorum_commit(&state, write).await {
+        Ok(Some(commit)) => commit,
+        Ok(None) => {
+            return plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "remote composite budget authorization requires HA-linearizable quorum commit",
+            );
+        }
+        Err(response) => return response,
+    };
+    let Some(budget_authority) =
+        persisted_budget_authority_metadata_view(&state, &event, Some(budget_commit.commit_index))
+    else {
+        return plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "remote composite budget authorization could not preserve its persisted authority",
+        );
+    };
+    match composite_authorize_response_view(&payload, decision, budget_authority, budget_commit) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
+pub(crate) async fn handle_capture_invocation_reservations(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(payload): Json<CaptureInvocationReservationsRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    if let Err(response) = require_remote_composite_linearizability(&state) {
+        return response;
+    }
+    match forward_post_to_leader(&state, BUDGET_CAPTURE_INVOCATIONS_PATH, &payload).await {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(response) => return response,
+    }
+    let Some(requested_authority) =
+        budget_event_authority_from_view(payload.budget_authority.as_ref())
+    else {
+        return plain_http_error(
+            StatusCode::BAD_REQUEST,
+            "invocation capture requires the exact persisted budget authority",
+        );
+    };
+    let store = match open_budget_store(&state.config) {
+        Ok(store) => store,
+        Err(response) => return response,
+    };
+    let resolved_authority = match resolve_budget_hold_authority(
+        "invocation capture",
+        &state,
+        &store,
+        Some(payload.hold_id.as_str()),
+    ) {
+        Ok(authority) => authority,
+        Err(response) => return response,
+    };
+    let authority = match verify_requested_budget_authority(
+        "invocation capture",
+        Some(&requested_authority),
+        resolved_authority,
+    ) {
+        Ok(Some(authority)) => authority,
+        Ok(None) => {
+            return plain_http_error(
+                StatusCode::BAD_REQUEST,
+                "invocation capture requires a persisted budget authority",
+            );
+        }
+        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+    };
+    let decision = match store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+        capability_id: payload.capability_id.clone(),
+        grant_index: payload.grant_index,
+        hold_id: Some(payload.hold_id.clone()),
+        event_id: Some(payload.event_id.clone()),
+        authority: Some(authority),
+    }) {
+        Ok(decision) => decision,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
+    };
+    if decision.invocation_state != BudgetInvocationReservationState::Captured {
+        return plain_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "budget backend returned a non-captured invocation state",
+        );
+    }
+    let event = match load_persisted_invocation_capture_event(&store, &payload, &decision) {
+        Ok(event) => event,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
+    };
+    let write = match budget_write_token(
+        &store,
+        event.authority.as_ref(),
+        Some(payload.event_id.as_str()),
+    ) {
+        Ok(write) => write,
+        Err(response) => return response,
+    };
+    drop(store);
+    let budget_commit = match wait_for_budget_write_quorum_commit(&state, write).await {
+        Ok(Some(commit)) => commit,
+        Ok(None) => {
+            return plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "remote invocation capture requires HA-linearizable quorum commit",
+            );
+        }
+        Err(response) => return response,
+    };
+    let Some(budget_authority) =
+        persisted_budget_authority_metadata_view(&state, &event, Some(budget_commit.commit_index))
+    else {
+        return plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "remote invocation capture could not preserve its persisted authority",
+        );
+    };
+    match invocation_capture_response_view(&payload, decision, budget_authority, budget_commit) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
+pub(crate) async fn handle_combined_admission_capture_unavailable(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(_payload): Json<CombinedAdmissionCaptureRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    plain_http_error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "combined admission capture is unavailable because budget and revocation writes do not share one linearizable consensus log",
+    )
+}
+
+fn remote_composite_authority(
+    state: &TrustServiceState,
+    source: SqliteBudgetAuthorizationAuthority,
+) -> Result<BudgetEventAuthority, Response> {
+    match source {
+        SqliteBudgetAuthorizationAuthority::Persisted(Some(authority)) => Ok(authority),
+        SqliteBudgetAuthorizationAuthority::Persisted(None) => Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "persisted composite budget authorization has no HA authority",
+        )),
+        SqliteBudgetAuthorizationAuthority::Current => current_budget_event_authority(state)?
+            .ok_or_else(|| {
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "remote composite budget authorization requires an HA authority lease",
+                )
+            }),
+    }
+}
+
+fn require_remote_composite_linearizability(state: &TrustServiceState) -> Result<(), Response> {
+    if budget_authority_guarantee_level(state, Some(1)) != "ha_linearizable" {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "remote hard composite budgets are unavailable because the current quorum/pull lane is not HA-linearizable",
+        ));
+    }
+    Ok(())
+}
+
+fn sqlite_composite_authorize_input(
+    payload: &CompositeBudgetAuthorizeRequest,
+    authority: BudgetEventAuthority,
+) -> Result<SqliteCompositeAuthorizeInput, BudgetStoreError> {
+    if let Some(digest) = payload
+        .admission_evidence
+        .aggregate_binding_digest
+        .as_deref()
+    {
+        validate_admission_digest(digest, "aggregate binding digest")?;
+    }
+    let authorization_artifact_digests = payload
+        .admission_evidence
+        .supplemental_binding
+        .as_ref()
+        .map(|binding| {
+            validate_admission_digest(&binding.artifact_digest, "supplemental artifact digest")?;
+            validate_admission_digest(
+                &binding.request_binding_hash,
+                "supplemental request binding hash",
+            )?;
+            validate_admission_digest(
+                &binding.negotiated_features_digest,
+                "supplemental negotiated-features digest",
+            )?;
+            if binding.verifier_id.is_empty() || binding.verifier_id.bytes().any(|byte| byte == 0) {
+                return Err(BudgetStoreError::Invariant(
+                    "supplemental verifier id is empty or contains NUL".to_string(),
+                ));
+            }
+            Ok(binding.artifact_digest.clone())
+        })
+        .transpose()?
+        .into_iter()
+        .collect();
+    Ok(SqliteCompositeAuthorizeInput {
+        capability_id: payload.capability_id.clone(),
+        grant_index: payload.grant_index,
+        requested_exposure_units: payload.requested_exposure_units,
+        max_cost_per_invocation: payload.max_exposure_per_invocation,
+        max_total_cost_units: payload.max_total_exposure_units,
+        hold_id: payload.hold_id.clone(),
+        event_id: payload.event_id.clone(),
+        authority: Some(authority),
+        invocation_quotas: payload
+            .admission_evidence
+            .invocation_quotas
+            .iter()
+            .map(invocation_quota_from_view)
+            .collect::<Result<Vec<_>, _>>()?,
+        revocation_set: canonical_revocation_set_from_view(
+            &payload.admission_evidence.revocation_set,
+        )?,
+        authorization_artifact_digests,
+    })
+}
+
+fn validate_admission_digest(value: &str, label: &str) -> Result<(), BudgetStoreError> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        return Err(BudgetStoreError::Invariant(format!(
+            "{label} must be lowercase SHA-256 hex"
+        )));
+    }
+    Ok(())
+}
+
+fn composite_authorize_response_view(
+    payload: &CompositeBudgetAuthorizeRequest,
+    decision: BudgetAuthorizeHoldDecision,
+    budget_authority: BudgetAuthorityMetadataView,
+    budget_commit: BudgetWriteCommitView,
+) -> Result<CompositeBudgetAuthorizeResponse, BudgetStoreError> {
+    let (
+        allowed,
+        hold_id,
+        authorized_exposure_units,
+        attempted_exposure_units,
+        committed_cost_units_after,
+        invocation_count_after,
+        invocation_counts_after,
+        invocation_state,
+        monetary_state,
+        revocation_set,
+    ) = match decision {
+        BudgetAuthorizeHoldDecision::Authorized(authorized) => (
+            true,
+            authorized.hold_id,
+            Some(authorized.authorized_exposure_units),
+            None,
+            authorized.committed_cost_units_after,
+            authorized.invocation_count_after,
+            authorized.invocation_counts_after,
+            authorized.invocation_state,
+            authorized.monetary_state,
+            authorized.revocation_set,
+        ),
+        BudgetAuthorizeHoldDecision::Denied(denied) => (
+            false,
+            denied.hold_id,
+            None,
+            Some(denied.attempted_exposure_units),
+            denied.committed_cost_units_after,
+            denied.invocation_count_after,
+            denied.invocation_counts_after,
+            denied.invocation_state,
+            denied.monetary_state,
+            denied.revocation_set,
+        ),
+    };
+    if hold_id.as_deref() != Some(payload.hold_id.as_str())
+        || revocation_set.as_ref().map(canonical_revocation_set_view)
+            != Some(payload.admission_evidence.revocation_set.clone())
+    {
+        return Err(BudgetStoreError::Invariant(
+            "composite authorization decision does not match request identity or revocation set"
+                .to_string(),
+        ));
+    }
+    Ok(CompositeBudgetAuthorizeResponse {
+        capability_id: payload.capability_id.clone(),
+        grant_index: payload.grant_index,
+        hold_id: payload.hold_id.clone(),
+        event_id: payload.event_id.clone(),
+        allowed,
+        authorized_exposure_units,
+        attempted_exposure_units,
+        committed_cost_units_after,
+        invocation_count_after,
+        invocation_counts_after: invocation_counts_after
+            .iter()
+            .map(invocation_quota_usage_view)
+            .collect(),
+        invocation_state: invocation_state_view(invocation_state),
+        monetary_state: monetary_state_view(monetary_state),
+        admission_evidence: payload.admission_evidence.clone(),
+        budget_authority: Some(budget_authority),
+        budget_commit: Some(budget_commit),
+    })
+}
+
+fn invocation_capture_response_view(
+    payload: &CaptureInvocationReservationsRequest,
+    decision: BudgetHoldMutationDecision,
+    budget_authority: BudgetAuthorityMetadataView,
+    budget_commit: BudgetWriteCommitView,
+) -> Result<CaptureInvocationReservationsResponse, BudgetStoreError> {
+    if decision.hold_id.as_deref() != Some(payload.hold_id.as_str()) {
+        return Err(BudgetStoreError::Invariant(
+            "invocation capture decision does not match the requested hold".to_string(),
+        ));
+    }
+    let revocation_set = decision.revocation_set.as_ref().ok_or_else(|| {
+        BudgetStoreError::Invariant(
+            "invocation capture decision omitted its canonical revocation set".to_string(),
+        )
+    })?;
+    Ok(CaptureInvocationReservationsResponse {
+        capability_id: payload.capability_id.clone(),
+        grant_index: payload.grant_index,
+        hold_id: payload.hold_id.clone(),
+        event_id: payload.event_id.clone(),
+        exposure_units: decision.exposure_units,
+        realized_spend_units: decision.realized_spend_units,
+        committed_cost_units_after: decision.committed_cost_units_after,
+        invocation_count_after: decision.invocation_count_after,
+        invocation_counts_after: decision
+            .invocation_counts_after
+            .iter()
+            .map(invocation_quota_usage_view)
+            .collect(),
+        invocation_state: invocation_state_view(decision.invocation_state),
+        monetary_state: monetary_state_view(decision.monetary_state),
+        revocation_set: canonical_revocation_set_view(revocation_set),
+        budget_authority: Some(budget_authority),
+        budget_commit: Some(budget_commit),
+    })
+}
+
+fn invocation_quota_usage_view(
+    usage: &BudgetInvocationQuotaUsage,
+) -> BudgetInvocationQuotaUsageView {
+    BudgetInvocationQuotaUsageView {
+        quota: invocation_quota_view(&usage.quota),
+        reserved_invocations_after: usage.reserved_invocations_after,
+        captured_invocations_after: usage.captured_invocations_after,
+    }
+}
+
+fn invocation_state_view(
+    state: BudgetInvocationReservationState,
+) -> BudgetInvocationReservationStateView {
+    match state {
+        BudgetInvocationReservationState::Absent => BudgetInvocationReservationStateView::Absent,
+        BudgetInvocationReservationState::Authorized => {
+            BudgetInvocationReservationStateView::Authorized
+        }
+        BudgetInvocationReservationState::Captured => {
+            BudgetInvocationReservationStateView::Captured
+        }
+        BudgetInvocationReservationState::Reversed => {
+            BudgetInvocationReservationStateView::Reversed
+        }
+        BudgetInvocationReservationState::Denied => BudgetInvocationReservationStateView::Denied,
+    }
+}
+
+fn monetary_state_view(state: BudgetMonetaryHoldState) -> BudgetMonetaryHoldStateView {
+    match state {
+        BudgetMonetaryHoldState::None => BudgetMonetaryHoldStateView::None,
+        BudgetMonetaryHoldState::Exposed => BudgetMonetaryHoldStateView::Exposed,
+        BudgetMonetaryHoldState::Released => BudgetMonetaryHoldStateView::Released,
+        BudgetMonetaryHoldState::Reconciled => BudgetMonetaryHoldStateView::Reconciled,
+        BudgetMonetaryHoldState::Captured => BudgetMonetaryHoldStateView::Captured,
+        BudgetMonetaryHoldState::Reversed => BudgetMonetaryHoldStateView::Reversed,
+    }
+}
+
+fn load_persisted_composite_authorize_event(
+    store: &SqliteBudgetStore,
+    payload: &CompositeBudgetAuthorizeRequest,
+    decision: &BudgetAuthorizeHoldDecision,
+) -> Result<BudgetMutationRecord, BudgetStoreError> {
+    let event = load_mutation_event_by_id(store, &payload.event_id)?;
+    let (
+        allowed,
+        hold_id,
+        committed_cost_units_after,
+        invocation_count_after,
+        invocation_state,
+        monetary_state,
+        metadata,
+    ) = match decision {
+        BudgetAuthorizeHoldDecision::Authorized(authorized) => (
+            true,
+            authorized.hold_id.as_deref(),
+            authorized.committed_cost_units_after,
+            authorized.invocation_count_after,
+            authorized.invocation_state,
+            authorized.monetary_state,
+            &authorized.metadata,
+        ),
+        BudgetAuthorizeHoldDecision::Denied(denied) => (
+            false,
+            denied.hold_id.as_deref(),
+            denied.committed_cost_units_after,
+            denied.invocation_count_after,
+            denied.invocation_state,
+            denied.monetary_state,
+            &denied.metadata,
+        ),
+    };
+    let committed_from_event = event
+        .total_cost_exposed_after
+        .checked_add(event.total_cost_realized_spend_after)
+        .ok_or_else(|| {
+            BudgetStoreError::Overflow(
+                "persisted composite authorization committed cost overflowed u64".to_string(),
+            )
+        })?;
+    let usage_seq_matches = if allowed {
+        event.usage_seq == Some(event.event_seq)
+    } else {
+        event.usage_seq.is_none()
+    };
+    if event.kind != BudgetMutationKind::ReserveInvocations
+        || event.allowed != Some(allowed)
+        || !usage_seq_matches
+        || event.capability_id != payload.capability_id
+        || usize::try_from(event.grant_index).ok() != Some(payload.grant_index)
+        || event.hold_id.as_deref() != Some(payload.hold_id.as_str())
+        || hold_id != Some(payload.hold_id.as_str())
+        || event.exposure_units != payload.requested_exposure_units
+        || event.realized_spend_units != 0
+        || event.max_invocations.is_some()
+        || event.max_cost_per_invocation != payload.max_exposure_per_invocation
+        || event.max_total_cost_units != payload.max_total_exposure_units
+        || event.invocation_count_after != invocation_count_after
+        || event.invocation_state != invocation_state
+        || event.monetary_state != monetary_state
+        || event.authority != metadata.authority
+        || committed_from_event != committed_cost_units_after
+    {
+        return Err(BudgetStoreError::Invariant(format!(
+            "persisted composite authorization event `{}` does not match its frozen decision",
+            payload.event_id
+        )));
+    }
+    Ok(event)
+}
+
+fn load_persisted_invocation_capture_event(
+    store: &SqliteBudgetStore,
+    payload: &CaptureInvocationReservationsRequest,
+    decision: &BudgetHoldMutationDecision,
+) -> Result<BudgetMutationRecord, BudgetStoreError> {
+    let event = load_mutation_event_by_id(store, &payload.event_id)?;
+    let committed_from_event = event
+        .total_cost_exposed_after
+        .checked_add(event.total_cost_realized_spend_after)
+        .ok_or_else(|| {
+            BudgetStoreError::Overflow(
+                "persisted invocation capture committed cost overflowed u64".to_string(),
+            )
+        })?;
+    if event.kind != BudgetMutationKind::CaptureInvocations
+        || event.allowed.is_some()
+        || event.usage_seq != Some(event.event_seq)
+        || event.capability_id != payload.capability_id
+        || usize::try_from(event.grant_index).ok() != Some(payload.grant_index)
+        || event.hold_id.as_deref() != Some(payload.hold_id.as_str())
+        || decision.hold_id.as_deref() != Some(payload.hold_id.as_str())
+        || event.exposure_units != decision.exposure_units
+        || event.realized_spend_units != decision.realized_spend_units
+        || event.invocation_count_after != decision.invocation_count_after
+        || event.invocation_state != decision.invocation_state
+        || event.authority != decision.metadata.authority
+        || committed_from_event != decision.committed_cost_units_after
+        || decision.metadata.budget_commit_index != Some(event.event_seq)
+    {
+        return Err(BudgetStoreError::Invariant(format!(
+            "persisted invocation capture event `{}` does not match its frozen decision",
+            payload.event_id
+        )));
+    }
+    Ok(event)
+}
+
+fn load_mutation_event_by_id(
+    store: &SqliteBudgetStore,
+    event_id: &str,
+) -> Result<BudgetMutationRecord, BudgetStoreError> {
+    let event_seq = store
+        .mutation_event_seq_for_event_id(event_id)?
+        .ok_or_else(|| {
+            BudgetStoreError::Invariant(format!("budget event `{event_id}` is not persisted"))
+        })?;
+    let after_seq = event_seq.checked_sub(1).ok_or_else(|| {
+        BudgetStoreError::Invariant("budget event sequence must be greater than zero".to_string())
+    })?;
+    let event = store
+        .list_mutation_events_after_seq(1, after_seq)?
+        .into_iter()
+        .next()
+        .ok_or_else(|| {
+            BudgetStoreError::Invariant(format!("budget event `{event_id}` is not readable"))
+        })?;
+    if event.event_id != event_id || event.event_seq != event_seq {
+        return Err(BudgetStoreError::Invariant(format!(
+            "budget event `{event_id}` resolved to a different persisted row"
+        )));
+    }
+    Ok(event)
 }
 
 fn compensate_authorize_after_quorum_failure(
@@ -1028,15 +1623,24 @@ mod budget_handlers_tests {
         budget_authority_metadata_matches_event, compensate_authorize_after_quorum_failure,
         generated_budget_event_id, load_persisted_authorize_event,
         load_persisted_budget_transition, load_persisted_capture_event,
-        resolve_live_terminal_authority, verify_requested_budget_authority,
-        BudgetAuthorityMetadataView, BudgetMutationKind, TryChargeCostRequest,
+        load_persisted_composite_authorize_event, load_persisted_invocation_capture_event,
+        resolve_live_terminal_authority, sqlite_composite_authorize_input,
+        verify_requested_budget_authority, BudgetAuthorityMetadataView,
+        BudgetAuthorizeHoldDecision, BudgetInvocationAdmissionEvidenceView,
+        BudgetInvocationQuotaView, BudgetInvocationReservationState, BudgetMonetaryHoldState,
+        BudgetMutationAuthorityView, BudgetMutationKind, BudgetQuotaKeyView,
+        BudgetQuotaProfileView, CanonicalRevocationSetView, CaptureInvocationReservationsRequest,
+        CompositeBudgetAuthorizeRequest, TryChargeCostRequest,
     };
     use std::collections::HashSet;
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use chio_kernel::budget_store::{BudgetCaptureHoldRequest, BudgetEventAuthority};
+    use chio_core::{canonical_json_bytes, sha256_hex};
+    use chio_kernel::budget_store::{
+        BudgetCaptureHoldRequest, BudgetCaptureInvocationRequest, BudgetEventAuthority,
+    };
     use chio_kernel::BudgetStore;
     use chio_store_sqlite::SqliteBudgetStore;
     use chio_test_support::prelude::*;
@@ -1062,6 +1666,109 @@ mod budget_handlers_tests {
         // the monotonic counter.
         let ids: HashSet<String> = (0..10_000).map(|_| generated_budget_event_id()).collect();
         assert_eq!(ids.len(), 10_000, "all minted ids must be unique");
+    }
+
+    #[test]
+    fn composite_handler_conversion_preserves_persisted_quota_and_capture_evidence() {
+        let path = test_budget_path("chio-handler-composite-wire");
+        let store = SqliteBudgetStore::open(&path).test_unwrap();
+        let ids = vec!["cap-composite".to_string(), "cap-root".to_string()];
+        let canonical = canonical_json_bytes(&ids).test_unwrap();
+        let mut digest_input = b"chio.revocation-set.v1\0".to_vec();
+        digest_input.extend_from_slice(&canonical);
+        let payload = CompositeBudgetAuthorizeRequest {
+            capability_id: "cap-composite".to_string(),
+            grant_index: 0,
+            requested_exposure_units: 10,
+            max_exposure_per_invocation: Some(20),
+            max_total_exposure_units: Some(100),
+            hold_id: "hold-composite".to_string(),
+            event_id: "hold-composite:authorize".to_string(),
+            admission_evidence: BudgetInvocationAdmissionEvidenceView {
+                invocation_quotas: vec![
+                    BudgetInvocationQuotaView {
+                        key: BudgetQuotaKeyView {
+                            profile: BudgetQuotaProfileView::GrantInvocation,
+                            owner_id: "cap-composite".to_string(),
+                            grant_index: Some(0),
+                        },
+                        max_invocations: 3,
+                    },
+                    BudgetInvocationQuotaView {
+                        key: BudgetQuotaKeyView {
+                            profile: BudgetQuotaProfileView::AggregateFamilyInvocation,
+                            owner_id: "22".repeat(32),
+                            grant_index: None,
+                        },
+                        max_invocations: 2,
+                    },
+                ],
+                revocation_set: CanonicalRevocationSetView {
+                    ids,
+                    digest: sha256_hex(&digest_input),
+                },
+                aggregate_binding_digest: Some("44".repeat(32)),
+                supplemental_binding: None,
+            },
+        };
+        let authority = BudgetEventAuthority {
+            authority_id: "budget-primary".to_string(),
+            lease_id: "lease-7".to_string(),
+            lease_epoch: 7,
+        };
+        let input = sqlite_composite_authorize_input(&payload, authority.clone()).test_unwrap();
+        assert_eq!(input.authority.as_ref(), Some(&authority));
+        assert_eq!(input.invocation_quotas.len(), 2);
+        assert_eq!(
+            input.revocation_set.digest(),
+            payload.admission_evidence.revocation_set.digest
+        );
+        let decision = store.authorize_composite_hold(input).test_unwrap();
+        let event =
+            load_persisted_composite_authorize_event(&store, &payload, &decision).test_unwrap();
+        assert_eq!(event.kind, BudgetMutationKind::ReserveInvocations);
+        let BudgetAuthorizeHoldDecision::Authorized(authorized) = &decision else {
+            panic!("expected composite authorization");
+        };
+        assert_eq!(authorized.invocation_counts_after.len(), 2);
+        assert_eq!(
+            event.invocation_state,
+            BudgetInvocationReservationState::Authorized
+        );
+        assert_eq!(event.monetary_state, BudgetMonetaryHoldState::Exposed);
+
+        let capture_payload = CaptureInvocationReservationsRequest {
+            capability_id: payload.capability_id.clone(),
+            grant_index: payload.grant_index,
+            hold_id: payload.hold_id.clone(),
+            event_id: "hold-composite:capture-invocations".to_string(),
+            budget_authority: Some(BudgetMutationAuthorityView {
+                authority_id: authority.authority_id.clone(),
+                lease_id: authority.lease_id.clone(),
+                lease_epoch: authority.lease_epoch,
+            }),
+        };
+        let captured = store
+            .capture_invocation_reservations(BudgetCaptureInvocationRequest {
+                capability_id: capture_payload.capability_id.clone(),
+                grant_index: capture_payload.grant_index,
+                hold_id: Some(capture_payload.hold_id.clone()),
+                event_id: Some(capture_payload.event_id.clone()),
+                authority: Some(authority),
+            })
+            .test_unwrap();
+        let capture_event =
+            load_persisted_invocation_capture_event(&store, &capture_payload, &captured)
+                .test_unwrap();
+        assert_eq!(capture_event.kind, BudgetMutationKind::CaptureInvocations);
+        assert_eq!(
+            capture_event.invocation_state,
+            BudgetInvocationReservationState::Captured
+        );
+        assert_eq!(captured.monetary_state, BudgetMonetaryHoldState::Exposed);
+
+        drop(store);
+        let _ = fs::remove_file(path);
     }
 
     #[test]

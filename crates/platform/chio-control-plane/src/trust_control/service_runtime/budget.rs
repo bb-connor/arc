@@ -9,6 +9,7 @@ pub fn build_remote_budget_store(
     Ok(Box::new(RemoteBudgetStore {
         client: build_client(control_url, control_token)?,
         cached_usage: Mutex::new(HashMap::new()),
+        composite_holds: Mutex::new(HashMap::new()),
     }))
 }
 
@@ -393,9 +394,13 @@ impl BudgetStore for RemoteBudgetStore {
         &self,
         request: BudgetAuthorizeHoldRequest,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        if request.invocation_admission_evidence().is_some() {
+            return self.authorize_remote_composite_budget_hold(request);
+        }
         if !request.invocation_quotas().is_empty() || request.revocation_set().is_some() {
             return Err(BudgetStoreError::Invariant(
-                "remote composite budget holds are not installed".to_string(),
+                "remote composite budget request contains incomplete admission evidence"
+                    .to_string(),
             ));
         }
         let response = self
@@ -474,6 +479,13 @@ impl BudgetStore for RemoteBudgetStore {
                 metadata,
             }))
         }
+    }
+
+    fn capture_invocation_reservations(
+        &self,
+        request: BudgetCaptureInvocationRequest,
+    ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
+        self.capture_remote_invocation_reservations(request)
     }
 
     fn reverse_budget_hold(
@@ -796,6 +808,177 @@ impl BudgetStore for RemoteBudgetStore {
 }
 
 impl RemoteBudgetStore {
+    fn authorize_remote_composite_budget_hold(
+        &self,
+        request: BudgetAuthorizeHoldRequest,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        if request.max_invocations.is_some() {
+            return Err(BudgetStoreError::Invariant(
+                "remote composite budget hold must not include legacy max_invocations".to_string(),
+            ));
+        }
+        let hold_id = request.hold_id.clone().ok_or_else(|| {
+            BudgetStoreError::Invariant("remote composite budget hold requires hold_id".to_string())
+        })?;
+        let event_id = request.event_id.clone().ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "remote composite budget hold requires event_id".to_string(),
+            )
+        })?;
+        let admission = request.invocation_admission_evidence().ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "remote composite budget hold requires verified admission evidence".to_string(),
+            )
+        })?;
+        let invocation_quotas = request.invocation_quotas().to_vec();
+        let revocation_set = request.revocation_set().cloned().ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "remote composite budget hold requires a canonical revocation set".to_string(),
+            )
+        })?;
+        let wire_request = CompositeBudgetAuthorizeRequest {
+            capability_id: request.capability_id.clone(),
+            grant_index: request.grant_index,
+            requested_exposure_units: request.requested_exposure_units,
+            max_exposure_per_invocation: request.max_cost_per_invocation,
+            max_total_exposure_units: request.max_total_cost_units,
+            hold_id: hold_id.clone(),
+            event_id,
+            admission_evidence: admission_evidence_view(admission)?,
+        };
+        let response = self
+            .client
+            .authorize_composite_budget_hold(&wire_request)
+            .map_err(into_budget_store_error)?;
+        let decision = validate_composite_authorize_response(&wire_request, response)?;
+
+        match &decision {
+            BudgetAuthorizeHoldDecision::Authorized(authorized) => {
+                let authority = authorized.metadata.authority.clone().ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "remote composite authorization omitted its persisted authority"
+                            .to_string(),
+                    )
+                })?;
+                self.remember_composite_hold(
+                    hold_id,
+                    RemoteCompositeHoldEvidence {
+                        capability_id: request.capability_id.clone(),
+                        grant_index: request.grant_index,
+                        invocation_quotas,
+                        revocation_set,
+                        monetary_state: authorized.monetary_state,
+                        authority,
+                    },
+                );
+            }
+            BudgetAuthorizeHoldDecision::Denied(_) => {
+                self.forget_composite_hold(&hold_id);
+            }
+        }
+        self.cache_usage(
+            &request.capability_id,
+            request.grant_index,
+            None,
+            None,
+            None,
+            None,
+        );
+        Ok(decision)
+    }
+
+    fn capture_remote_invocation_reservations(
+        &self,
+        request: BudgetCaptureInvocationRequest,
+    ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
+        let hold_id = request.hold_id.as_deref().ok_or_else(|| {
+            BudgetStoreError::Invariant("remote invocation capture requires hold_id".to_string())
+        })?;
+        let event_id = request.event_id.as_deref().ok_or_else(|| {
+            BudgetStoreError::Invariant("remote invocation capture requires event_id".to_string())
+        })?;
+        let expected = self.cached_composite_hold(hold_id).ok_or_else(|| {
+            BudgetStoreError::Invariant(format!(
+                "remote invocation capture has no exact cached evidence for hold `{hold_id}`"
+            ))
+        })?;
+        if expected.capability_id != request.capability_id
+            || expected.grant_index != request.grant_index
+        {
+            return Err(BudgetStoreError::Invariant(
+                "remote invocation capture does not match the cached capability/grant".to_string(),
+            ));
+        }
+        if request.authority.as_ref() != Some(&expected.authority) {
+            return Err(BudgetStoreError::Invariant(
+                "remote invocation capture must carry the exact persisted authorization authority"
+                    .to_string(),
+            ));
+        }
+        let wire_request = CaptureInvocationReservationsRequest {
+            capability_id: request.capability_id.clone(),
+            grant_index: request.grant_index,
+            hold_id: hold_id.to_string(),
+            event_id: event_id.to_string(),
+            budget_authority: request.authority.as_ref().map(|authority| {
+                BudgetMutationAuthorityView {
+                    authority_id: authority.authority_id.clone(),
+                    lease_id: authority.lease_id.clone(),
+                    lease_epoch: authority.lease_epoch,
+                }
+            }),
+        };
+        let response = self
+            .client
+            .capture_invocation_reservations(&wire_request)
+            .map_err(into_budget_store_error)?;
+        let decision = validate_invocation_capture_response(
+            &request,
+            &expected.invocation_quotas,
+            &expected.revocation_set,
+            expected.monetary_state,
+            response,
+        )?;
+        self.cache_usage(
+            &request.capability_id,
+            request.grant_index,
+            None,
+            None,
+            None,
+            None,
+        );
+        Ok(decision)
+    }
+
+    fn remember_composite_hold(&self, hold_id: String, evidence: RemoteCompositeHoldEvidence) {
+        match self.composite_holds.lock() {
+            Ok(mut holds) => {
+                holds.insert(hold_id, evidence);
+            }
+            Err(poisoned) => {
+                poisoned.into_inner().insert(hold_id, evidence);
+            }
+        }
+    }
+
+    fn forget_composite_hold(&self, hold_id: &str) {
+        match self.composite_holds.lock() {
+            Ok(mut holds) => {
+                holds.remove(hold_id);
+            }
+            Err(poisoned) => {
+                poisoned.into_inner().remove(hold_id);
+            }
+        }
+    }
+
+    fn cached_composite_hold(&self, hold_id: &str) -> Option<RemoteCompositeHoldEvidence> {
+        match self.composite_holds.lock() {
+            Ok(holds) => holds.get(hold_id).cloned(),
+            Err(poisoned) => poisoned.into_inner().get(hold_id).cloned(),
+        }
+    }
+
     fn cache_terminal_response(
         &self,
         capability_id: &str,
@@ -945,6 +1128,426 @@ impl RemoteBudgetStore {
             event_id,
         }
     }
+}
+
+fn admission_evidence_view(
+    evidence: BudgetInvocationAdmissionEvidence<'_>,
+) -> Result<BudgetInvocationAdmissionEvidenceView, BudgetStoreError> {
+    let supplemental_binding = match (
+        evidence.supplemental_artifact_digest(),
+        evidence.supplemental_verifier_id(),
+        evidence.supplemental_request_binding_hash(),
+        evidence.supplemental_negotiated_features_digest(),
+    ) {
+        (None, None, None, None) => None,
+        (
+            Some(artifact_digest),
+            Some(verifier_id),
+            Some(request_binding_hash),
+            Some(negotiated_features_digest),
+        ) => Some(BudgetSupplementalQuotaBindingView {
+            artifact_digest: artifact_digest.to_string(),
+            verifier_id: verifier_id.to_string(),
+            request_binding_hash: request_binding_hash.to_string(),
+            negotiated_features_digest: negotiated_features_digest.to_string(),
+        }),
+        _ => {
+            return Err(BudgetStoreError::Invariant(
+                "kernel supplemental admission evidence is incomplete".to_string(),
+            ));
+        }
+    };
+    Ok(BudgetInvocationAdmissionEvidenceView {
+        invocation_quotas: evidence
+            .quotas()
+            .iter()
+            .map(invocation_quota_view)
+            .collect(),
+        revocation_set: canonical_revocation_set_view(evidence.revocation_set()),
+        aggregate_binding_digest: evidence.aggregate_binding_digest().map(ToOwned::to_owned),
+        supplemental_binding,
+    })
+}
+
+fn quota_profile_view(profile: BudgetQuotaProfile) -> BudgetQuotaProfileView {
+    match profile {
+        BudgetQuotaProfile::GrantInvocation => BudgetQuotaProfileView::GrantInvocation,
+        BudgetQuotaProfile::AggregateCapabilityInvocation => {
+            BudgetQuotaProfileView::AggregateCapabilityInvocation
+        }
+        BudgetQuotaProfile::AggregateFamilyInvocation => {
+            BudgetQuotaProfileView::AggregateFamilyInvocation
+        }
+        BudgetQuotaProfile::SupplementalBrokerExecution => {
+            BudgetQuotaProfileView::SupplementalBrokerExecution
+        }
+    }
+}
+
+fn quota_profile_from_view(profile: BudgetQuotaProfileView) -> BudgetQuotaProfile {
+    match profile {
+        BudgetQuotaProfileView::GrantInvocation => BudgetQuotaProfile::GrantInvocation,
+        BudgetQuotaProfileView::AggregateCapabilityInvocation => {
+            BudgetQuotaProfile::AggregateCapabilityInvocation
+        }
+        BudgetQuotaProfileView::AggregateFamilyInvocation => {
+            BudgetQuotaProfile::AggregateFamilyInvocation
+        }
+        BudgetQuotaProfileView::SupplementalBrokerExecution => {
+            BudgetQuotaProfile::SupplementalBrokerExecution
+        }
+    }
+}
+
+pub(crate) fn invocation_quota_view(quota: &BudgetInvocationQuota) -> BudgetInvocationQuotaView {
+    BudgetInvocationQuotaView {
+        key: BudgetQuotaKeyView {
+            profile: quota_profile_view(quota.key().profile()),
+            owner_id: quota.key().owner_id().to_string(),
+            grant_index: quota.key().grant_index(),
+        },
+        max_invocations: quota.max_invocations(),
+    }
+}
+
+pub(crate) fn invocation_quota_from_view(
+    quota: &BudgetInvocationQuotaView,
+) -> Result<BudgetInvocationQuota, BudgetStoreError> {
+    let key = BudgetQuotaKey::from_persisted_parts(
+        quota_profile_from_view(quota.key.profile),
+        quota.key.owner_id.clone(),
+        quota.key.grant_index,
+    )?;
+    BudgetInvocationQuota::from_persisted_parts(key, quota.max_invocations)
+}
+
+pub(crate) fn canonical_revocation_set_view(
+    set: &CanonicalRevocationSet,
+) -> CanonicalRevocationSetView {
+    CanonicalRevocationSetView {
+        ids: set.ids().to_vec(),
+        digest: set.digest().to_string(),
+    }
+}
+
+pub(crate) fn canonical_revocation_set_from_view(
+    set: &CanonicalRevocationSetView,
+) -> Result<CanonicalRevocationSet, BudgetStoreError> {
+    CanonicalRevocationSet::from_persisted_parts(set.ids.clone(), set.digest.clone()).map_err(
+        |error| {
+            BudgetStoreError::Invariant(format!(
+                "remote response contains an invalid canonical revocation set: {error}"
+            ))
+        },
+    )
+}
+
+fn invocation_state_from_view(
+    state: BudgetInvocationReservationStateView,
+) -> BudgetInvocationReservationState {
+    match state {
+        BudgetInvocationReservationStateView::Absent => BudgetInvocationReservationState::Absent,
+        BudgetInvocationReservationStateView::Authorized => {
+            BudgetInvocationReservationState::Authorized
+        }
+        BudgetInvocationReservationStateView::Captured => {
+            BudgetInvocationReservationState::Captured
+        }
+        BudgetInvocationReservationStateView::Reversed => {
+            BudgetInvocationReservationState::Reversed
+        }
+        BudgetInvocationReservationStateView::Denied => BudgetInvocationReservationState::Denied,
+    }
+}
+
+fn monetary_state_from_view(state: BudgetMonetaryHoldStateView) -> BudgetMonetaryHoldState {
+    match state {
+        BudgetMonetaryHoldStateView::None => BudgetMonetaryHoldState::None,
+        BudgetMonetaryHoldStateView::Exposed => BudgetMonetaryHoldState::Exposed,
+        BudgetMonetaryHoldStateView::Released => BudgetMonetaryHoldState::Released,
+        BudgetMonetaryHoldStateView::Reconciled => BudgetMonetaryHoldState::Reconciled,
+        BudgetMonetaryHoldStateView::Captured => BudgetMonetaryHoldState::Captured,
+        BudgetMonetaryHoldStateView::Reversed => BudgetMonetaryHoldState::Reversed,
+    }
+}
+
+fn quota_usages_from_views(
+    expected_quotas: &[BudgetInvocationQuota],
+    usages: Vec<BudgetInvocationQuotaUsageView>,
+) -> Result<Vec<BudgetInvocationQuotaUsage>, BudgetStoreError> {
+    if usages.len() != expected_quotas.len() {
+        return Err(BudgetStoreError::Invariant(
+            "remote response changed the ordered invocation quota count".to_string(),
+        ));
+    }
+    usages
+        .into_iter()
+        .zip(expected_quotas)
+        .map(|(usage, expected)| {
+            let quota = invocation_quota_from_view(&usage.quota)?;
+            if &quota != expected {
+                return Err(BudgetStoreError::Invariant(
+                    "remote response changed an ordered invocation quota key or maximum"
+                        .to_string(),
+                ));
+            }
+            let usage = BudgetInvocationQuotaUsage {
+                quota,
+                reserved_invocations_after: usage.reserved_invocations_after,
+                captured_invocations_after: usage.captured_invocations_after,
+            };
+            usage.validate()?;
+            Ok(usage)
+        })
+        .collect()
+}
+
+fn validate_primary_invocation_count(
+    capability_id: &str,
+    grant_index: usize,
+    reported_count: u32,
+    usages: &[BudgetInvocationQuotaUsage],
+) -> Result<(), BudgetStoreError> {
+    let primary_key = BudgetQuotaKey::grant(capability_id, grant_index)?;
+    let actual = usages
+        .iter()
+        .find(|usage| usage.quota.key() == &primary_key)
+        .ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "remote response omitted the primary grant invocation quota".to_string(),
+            )
+        })?
+        .invocation_count_after()?;
+    if actual != reported_count {
+        return Err(BudgetStoreError::Invariant(
+            "remote response primary quota count does not match invocation_count_after".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_remote_composite_evidence(
+    authority: Option<&BudgetAuthorityMetadataView>,
+    commit: Option<&BudgetWriteCommitView>,
+    requested_authority: Option<&BudgetEventAuthority>,
+) -> Result<ValidatedRemoteBudgetEvidence, BudgetStoreError> {
+    if authority.is_none_or(|authority| authority.guarantee_level != "ha_linearizable")
+        || commit.is_none()
+    {
+        return Err(BudgetStoreError::Invariant(
+            "remote composite budget response is not HA-linearizable".to_string(),
+        ));
+    }
+    let evidence = validate_remote_budget_evidence(authority, commit, requested_authority)?;
+    if evidence.guarantee_level != BudgetGuaranteeLevel::HaLinearizable
+        || evidence.authority.is_none()
+        || evidence.commit_index.is_none()
+    {
+        return Err(BudgetStoreError::Invariant(
+            "remote composite budget response is not HA-linearizable".to_string(),
+        ));
+    }
+    Ok(evidence)
+}
+
+pub(crate) fn validate_composite_authorize_response(
+    request: &CompositeBudgetAuthorizeRequest,
+    response: CompositeBudgetAuthorizeResponse,
+) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+    if response.capability_id != request.capability_id
+        || response.grant_index != request.grant_index
+        || response.hold_id != request.hold_id
+        || response.event_id != request.event_id
+    {
+        return Err(BudgetStoreError::Invariant(
+            "remote composite authorization response identity does not match the request"
+                .to_string(),
+        ));
+    }
+    if response.admission_evidence != request.admission_evidence {
+        return Err(BudgetStoreError::Invariant(
+            "remote composite authorization response changed the admission evidence".to_string(),
+        ));
+    }
+    let expected_quotas = request
+        .admission_evidence
+        .invocation_quotas
+        .iter()
+        .map(invocation_quota_from_view)
+        .collect::<Result<Vec<_>, _>>()?;
+    let invocation_counts_after =
+        quota_usages_from_views(&expected_quotas, response.invocation_counts_after)?;
+    validate_primary_invocation_count(
+        &request.capability_id,
+        request.grant_index,
+        response.invocation_count_after,
+        &invocation_counts_after,
+    )?;
+    let revocation_set =
+        canonical_revocation_set_from_view(&response.admission_evidence.revocation_set)?;
+    if revocation_set
+        .ids()
+        .binary_search(&request.capability_id)
+        .is_err()
+    {
+        return Err(BudgetStoreError::Invariant(
+            "remote composite authorization revocation set omits the leaf capability".to_string(),
+        ));
+    }
+    let evidence = validate_remote_composite_evidence(
+        response.budget_authority.as_ref(),
+        response.budget_commit.as_ref(),
+        None,
+    )?;
+    let invocation_state = invocation_state_from_view(response.invocation_state);
+    let monetary_state = monetary_state_from_view(response.monetary_state);
+    let monetary_present = request.requested_exposure_units > 0
+        || request.max_exposure_per_invocation.is_some()
+        || request.max_total_exposure_units.is_some();
+    let expected_invocation_state = if response.allowed {
+        BudgetInvocationReservationState::Authorized
+    } else {
+        BudgetInvocationReservationState::Denied
+    };
+    let expected_monetary_state = if response.allowed && monetary_present {
+        BudgetMonetaryHoldState::Exposed
+    } else {
+        BudgetMonetaryHoldState::None
+    };
+    if invocation_state != expected_invocation_state || monetary_state != expected_monetary_state {
+        return Err(BudgetStoreError::Invariant(
+            "remote composite authorization response contains contradictory hold substates"
+                .to_string(),
+        ));
+    }
+    let amounts_match = if response.allowed {
+        response.authorized_exposure_units == Some(request.requested_exposure_units)
+            && response.attempted_exposure_units.is_none()
+    } else {
+        response.attempted_exposure_units == Some(request.requested_exposure_units)
+            && response.authorized_exposure_units.is_none()
+    };
+    if !amounts_match {
+        return Err(BudgetStoreError::Invariant(
+            "remote composite authorization response contains contradictory exposure amounts"
+                .to_string(),
+        ));
+    }
+    let metadata = BudgetCommitMetadata {
+        authority: evidence.authority,
+        guarantee_level: evidence.guarantee_level,
+        budget_profile: BudgetAuthorityProfile::AuthoritativeHoldEvent,
+        metering_profile: BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
+        budget_commit_index: evidence.commit_index,
+        event_id: Some(response.event_id),
+    };
+    if response.allowed {
+        Ok(BudgetAuthorizeHoldDecision::Authorized(
+            AuthorizedBudgetHold {
+                hold_id: Some(response.hold_id),
+                authorized_exposure_units: response
+                    .authorized_exposure_units
+                    .unwrap_or(request.requested_exposure_units),
+                committed_cost_units_after: response.committed_cost_units_after,
+                invocation_count_after: response.invocation_count_after,
+                invocation_counts_after,
+                invocation_state,
+                monetary_state,
+                revocation_set: Some(revocation_set),
+                metadata,
+            },
+        ))
+    } else {
+        Ok(BudgetAuthorizeHoldDecision::Denied(DeniedBudgetHold {
+            hold_id: Some(response.hold_id),
+            attempted_exposure_units: response
+                .attempted_exposure_units
+                .unwrap_or(request.requested_exposure_units),
+            committed_cost_units_after: response.committed_cost_units_after,
+            invocation_count_after: response.invocation_count_after,
+            invocation_counts_after,
+            invocation_state,
+            monetary_state,
+            revocation_set: Some(revocation_set),
+            metadata,
+        }))
+    }
+}
+
+pub(crate) fn validate_invocation_capture_response(
+    request: &BudgetCaptureInvocationRequest,
+    expected_quotas: &[BudgetInvocationQuota],
+    expected_revocation_set: &CanonicalRevocationSet,
+    expected_monetary_state: BudgetMonetaryHoldState,
+    response: CaptureInvocationReservationsResponse,
+) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
+    let hold_id = request.hold_id.as_deref().ok_or_else(|| {
+        BudgetStoreError::Invariant("remote invocation capture requires hold_id".to_string())
+    })?;
+    let event_id = request.event_id.as_deref().ok_or_else(|| {
+        BudgetStoreError::Invariant("remote invocation capture requires event_id".to_string())
+    })?;
+    if response.capability_id != request.capability_id
+        || response.grant_index != request.grant_index
+        || response.hold_id != hold_id
+        || response.event_id != event_id
+    {
+        return Err(BudgetStoreError::Invariant(
+            "remote invocation capture response identity does not match the request".to_string(),
+        ));
+    }
+    if response.exposure_units != 0 || response.realized_spend_units != 0 {
+        return Err(BudgetStoreError::Invariant(
+            "remote invocation capture response changed monetary amounts".to_string(),
+        ));
+    }
+    let invocation_counts_after =
+        quota_usages_from_views(expected_quotas, response.invocation_counts_after)?;
+    validate_primary_invocation_count(
+        &request.capability_id,
+        request.grant_index,
+        response.invocation_count_after,
+        &invocation_counts_after,
+    )?;
+    let revocation_set = canonical_revocation_set_from_view(&response.revocation_set)?;
+    if &revocation_set != expected_revocation_set {
+        return Err(BudgetStoreError::Invariant(
+            "remote invocation capture response changed the canonical revocation set".to_string(),
+        ));
+    }
+    let invocation_state = invocation_state_from_view(response.invocation_state);
+    let monetary_state = monetary_state_from_view(response.monetary_state);
+    if invocation_state != BudgetInvocationReservationState::Captured
+        || monetary_state != expected_monetary_state
+    {
+        return Err(BudgetStoreError::Invariant(
+            "remote invocation capture response contains contradictory hold substates".to_string(),
+        ));
+    }
+    let evidence = validate_remote_composite_evidence(
+        response.budget_authority.as_ref(),
+        response.budget_commit.as_ref(),
+        request.authority.as_ref(),
+    )?;
+    Ok(BudgetHoldMutationDecision {
+        hold_id: Some(response.hold_id),
+        exposure_units: response.exposure_units,
+        realized_spend_units: response.realized_spend_units,
+        committed_cost_units_after: response.committed_cost_units_after,
+        invocation_count_after: response.invocation_count_after,
+        invocation_counts_after,
+        invocation_state,
+        monetary_state,
+        revocation_set: Some(revocation_set),
+        metadata: BudgetCommitMetadata {
+            authority: evidence.authority,
+            guarantee_level: evidence.guarantee_level,
+            budget_profile: BudgetAuthorityProfile::AuthoritativeHoldEvent,
+            metering_profile: BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
+            budget_commit_index: evidence.commit_index,
+            event_id: Some(response.event_id),
+        },
+    })
 }
 
 #[derive(Debug, Clone)]

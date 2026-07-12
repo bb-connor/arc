@@ -80,12 +80,16 @@ use chio_credentials::{
 };
 use chio_did::DidChio;
 use chio_kernel::budget_store::{
-    AuthorizedBudgetHold, BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
-    BudgetCaptureHoldRequest, BudgetCommitMetadata, BudgetEventAuthority, BudgetGuaranteeLevel,
-    BudgetHoldMutationDecision, BudgetInvocationReservationState, BudgetMonetaryHoldState,
-    BudgetMutationKind, BudgetMutationRecord, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
-    BudgetReverseHoldRequest, DeniedBudgetHold,
+    AuthorizedBudgetHold, BudgetAuthorityProfile, BudgetAuthorizeHoldDecision,
+    BudgetAuthorizeHoldRequest, BudgetCaptureHoldRequest, BudgetCaptureInvocationRequest,
+    BudgetCommitMetadata, BudgetEventAuthority, BudgetGuaranteeLevel, BudgetHoldMutationDecision,
+    BudgetInvocationAdmissionEvidence, BudgetInvocationQuota, BudgetInvocationQuotaUsage,
+    BudgetInvocationReservationState, BudgetMeteringProfile, BudgetMonetaryHoldState,
+    BudgetMutationKind, BudgetMutationRecord, BudgetQuotaKey, BudgetQuotaProfile,
+    BudgetReconcileHoldRequest, BudgetReleaseHoldRequest, BudgetReverseHoldRequest,
+    DeniedBudgetHold,
 };
+use chio_kernel::supplemental_quota::CanonicalRevocationSet;
 use chio_kernel::{
     build_generic_governance_case_artifact, build_generic_governance_charter_artifact,
     build_generic_trust_activation_artifact, build_open_market_fee_schedule_artifact,
@@ -212,6 +216,7 @@ use chio_kernel::{
     MAX_CREDIT_LOSS_LIFECYCLE_LIST_LIMIT, UNDERWRITING_POLICY_INPUT_SCHEMA,
     UNDERWRITING_SIMULATION_REPORT_SCHEMA,
 };
+use chio_store_sqlite::budget_store::SqliteCompositeAuthorizeInput;
 use chio_store_sqlite::{
     SqliteBudgetStore, SqliteCapabilityAuthority, SqliteReceiptStore, SqliteRevocationStore,
 };
