@@ -22,6 +22,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "build": "npm run typecheck",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

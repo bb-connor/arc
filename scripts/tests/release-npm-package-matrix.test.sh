@@ -26,6 +26,9 @@ for (const pattern of rootPackage.workspaces ?? []) {
   if (!fs.existsSync(manifestPath)) continue;
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   if (manifest.private === true || manifest.publishConfig == null) continue;
+  if (typeof manifest.scripts?.build !== "string" || manifest.scripts.build.trim() === "") {
+    throw new Error(`${path.relative(root, packageDir)} is publishable but has no build script`);
+  }
   console.log(path.relative(root, packageDir).replaceAll(path.sep, "/"));
 }
 NODE
