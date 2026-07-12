@@ -1083,7 +1083,10 @@ fn pending_approval_receipt_write_uses_pending_outcome_label() {
         crate::receipt_write_total(crate::RECEIPT_WRITE_OUTCOME_ERROR),
         before_error
     );
-    assert!(crate::render_mcp_edge_metrics_prometheus().contains("outcome=\"pending_approval\""));
+    assert!(
+        crate::render_mcp_edge_metrics_prometheus(chio_kernel::ReceiptWriterLiveness::Healthy)
+            .contains("outcome=\"pending_approval\"")
+    );
 }
 
 #[test]
