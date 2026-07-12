@@ -11,13 +11,20 @@ use chio_kernel::{
     AuthoritySnapshot, AuthorityStatus, AuthorityStoreError, AuthorityTrustedKeySnapshot,
     CapabilityAuthority, KernelError,
 };
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OpenFlags};
 use uuid::Uuid;
 
 pub struct SqliteCapabilityAuthority {
     path: PathBuf,
+    open_mode: AuthorityOpenMode,
     cached_public_key: Mutex<PublicKey>,
     cached_trusted_public_keys: Mutex<Vec<PublicKey>>,
+}
+
+#[derive(Clone, Copy)]
+enum AuthorityOpenMode {
+    CreateOrMigrate,
+    ExistingOnly,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,13 +38,45 @@ pub struct AuthorityClusterFence {
 
 impl SqliteCapabilityAuthority {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, AuthorityStoreError> {
+        Self::open_with_mode(path, AuthorityOpenMode::CreateOrMigrate)
+    }
+
+    /// Open an initialized authority database without creating or repairing it.
+    pub fn open_existing(path: impl AsRef<Path>) -> Result<Self, AuthorityStoreError> {
+        Self::open_with_mode(path, AuthorityOpenMode::ExistingOnly)
+    }
+
+    fn open_with_mode(
+        path: impl AsRef<Path>,
+        open_mode: AuthorityOpenMode,
+    ) -> Result<Self, AuthorityStoreError> {
         let path = path.as_ref().to_path_buf();
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+        if matches!(open_mode, AuthorityOpenMode::CreateOrMigrate) {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
         }
 
+        let connection = Self::open_connection(&path, open_mode)?;
+        let status = match open_mode {
+            AuthorityOpenMode::CreateOrMigrate => {
+                Self::bootstrap_authority_state(&connection)?;
+                Self::read_status_from_connection(&connection)?
+            }
+            AuthorityOpenMode::ExistingOnly => {
+                Self::validate_existing_authority_state(&connection)?
+            }
+        };
+        Ok(Self {
+            path,
+            open_mode,
+            cached_public_key: Mutex::new(status.public_key),
+            cached_trusted_public_keys: Mutex::new(status.trusted_public_keys),
+        })
+    }
+
+    fn bootstrap_authority_state(connection: &Connection) -> Result<(), AuthorityStoreError> {
         let bootstrap = Keypair::generate();
-        let connection = Self::open_connection(&path)?;
         connection.execute(
             r#"
             INSERT INTO authority_state (singleton_id, seed_hex, public_key_hex, generation, rotated_at)
@@ -78,16 +117,11 @@ impl SqliteCapabilityAuthority {
             "#,
             params![current_public_key.public_key().to_hex(), unix_now() as i64],
         )?;
-        let status = Self::read_status_from_connection(&connection)?;
-        Ok(Self {
-            path,
-            cached_public_key: Mutex::new(status.public_key),
-            cached_trusted_public_keys: Mutex::new(status.trusted_public_keys),
-        })
+        Ok(())
     }
 
     pub fn status(&self) -> Result<AuthorityStatus, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
+        let connection = self.connection()?;
         let status = Self::read_status_from_connection(&connection)?;
         self.update_cached_public_key(status.public_key.clone());
         self.update_cached_trusted_public_keys(status.trusted_public_keys.clone());
@@ -95,7 +129,7 @@ impl SqliteCapabilityAuthority {
     }
 
     pub fn rotate(&self) -> Result<AuthorityStatus, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
+        let connection = self.connection()?;
         let status_before = Self::read_status_from_connection(&connection)?;
         let keypair = Keypair::generate();
         let rotated_at = unix_now();
@@ -134,7 +168,7 @@ impl SqliteCapabilityAuthority {
     }
 
     pub fn snapshot(&self) -> Result<AuthoritySnapshot, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
+        let connection = self.connection()?;
         let status = Self::read_status_from_connection(&connection)?;
         Ok(AuthoritySnapshot {
             public_key_hex: status.public_key.to_hex(),
@@ -148,7 +182,7 @@ impl SqliteCapabilityAuthority {
         &self,
         snapshot: &AuthoritySnapshot,
     ) -> Result<bool, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
+        let connection = self.connection()?;
         let local_snapshot = self.snapshot()?;
         let remote_public_key = PublicKey::from_hex(snapshot.public_key_hex.trim())?;
 
@@ -217,12 +251,12 @@ impl SqliteCapabilityAuthority {
     }
 
     pub fn local_keypair(&self) -> Result<Keypair, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
+        let connection = self.connection()?;
         Self::read_keypair_from_connection(&connection)
     }
 
     pub fn cluster_fence(&self) -> Result<AuthorityClusterFence, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
+        let connection = self.connection()?;
         Self::read_cluster_fence_from_connection(&connection)
     }
 
@@ -231,7 +265,7 @@ impl SqliteCapabilityAuthority {
         leader_url: Option<&str>,
         election_term: u64,
     ) -> Result<bool, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
+        let connection = self.connection()?;
         let current = Self::read_cluster_fence_from_connection(&connection)?;
         let (_, authority_generation, authority_rotated_at) =
             Self::read_public_state_from_connection(&connection)?;
@@ -258,7 +292,7 @@ impl SqliteCapabilityAuthority {
         leader_url: &str,
         election_term: u64,
     ) -> Result<(), AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
+        let connection = self.connection()?;
         let current = Self::read_cluster_fence_from_connection(&connection)?;
         let (_, authority_generation, authority_rotated_at) =
             Self::read_public_state_from_connection(&connection)?;
@@ -295,8 +329,34 @@ impl SqliteCapabilityAuthority {
         )
     }
 
-    fn open_connection(path: &Path) -> Result<Connection, AuthorityStoreError> {
-        let connection = Connection::open(path)?;
+    fn connection(&self) -> Result<Connection, AuthorityStoreError> {
+        let connection = Self::open_connection(&self.path, self.open_mode)?;
+        if matches!(self.open_mode, AuthorityOpenMode::ExistingOnly) {
+            Self::validate_existing_authority_state(&connection)?;
+        }
+        Ok(connection)
+    }
+
+    fn open_connection(
+        path: &Path,
+        open_mode: AuthorityOpenMode,
+    ) -> Result<Connection, AuthorityStoreError> {
+        let connection = match open_mode {
+            AuthorityOpenMode::CreateOrMigrate => Connection::open(path)?,
+            AuthorityOpenMode::ExistingOnly => Connection::open_with_flags(
+                path,
+                OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            )?,
+        };
+        if matches!(open_mode, AuthorityOpenMode::ExistingOnly) {
+            connection.execute_batch(
+                r#"
+                PRAGMA synchronous = FULL;
+                PRAGMA busy_timeout = 5000;
+                "#,
+            )?;
+            return Ok(connection);
+        }
         connection.execute_batch(
             r#"
             PRAGMA journal_mode = WAL;
@@ -358,6 +418,57 @@ impl SqliteCapabilityAuthority {
             )?;
         }
         Ok(connection)
+    }
+
+    fn validate_existing_authority_state(
+        connection: &Connection,
+    ) -> Result<AuthorityStatus, AuthorityStoreError> {
+        let (seed_hex, public_key_hex, generation, rotated_at) = connection.query_row(
+            r#"
+            SELECT seed_hex, public_key_hex, generation, rotated_at
+            FROM authority_state
+            WHERE singleton_id = 1
+            "#,
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                ))
+            },
+        )?;
+        let local_keypair = Keypair::from_seed_hex(seed_hex.trim())?;
+        let public_key_hex = public_key_hex
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                AuthorityStoreError::Fence("existing authority state has no public key".to_string())
+            })?;
+        let public_key = PublicKey::from_hex(public_key_hex)?;
+        if local_keypair.public_key() != public_key {
+            return Err(AuthorityStoreError::Fence(
+                "existing authority signing seed does not match its current public key".to_string(),
+            ));
+        }
+        if generation < 1 || rotated_at < 0 {
+            return Err(AuthorityStoreError::Fence(
+                "existing authority state has an invalid generation or rotation time".to_string(),
+            ));
+        }
+
+        let status = Self::read_status_from_connection(connection)?;
+        if status.public_key != public_key
+            || !status.trusted_public_keys.contains(&status.public_key)
+        {
+            return Err(AuthorityStoreError::Fence(
+                "existing authority state does not trust its current public key".to_string(),
+            ));
+        }
+        Self::read_cluster_fence_from_connection(connection)?;
+        Ok(status)
     }
 
     fn read_status_from_connection(
@@ -423,7 +534,7 @@ impl SqliteCapabilityAuthority {
     }
 
     fn read_current_keypair(&self) -> Result<Keypair, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
+        let connection = self.connection()?;
         let keypair = Self::read_keypair_from_connection(&connection)?;
         let status = Self::read_status_from_connection(&connection)?;
         self.update_cached_public_key(status.public_key.clone());
@@ -712,6 +823,163 @@ mod tests {
         let observed = authority_b.status().unwrap();
         assert_eq!(observed.public_key, rotated.public_key);
         assert_eq!(observed.generation, rotated.generation);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn sqlite_capability_authority_open_existing_loads_initialized_state() {
+        let path = unique_db_path("chio-authority-open-existing");
+        let created = SqliteCapabilityAuthority::open(&path).unwrap();
+        let expected = created.status().unwrap();
+
+        let existing = SqliteCapabilityAuthority::open_existing(&path).unwrap();
+        assert_eq!(existing.status().unwrap(), expected);
+        assert_eq!(existing.authority_public_key(), expected.public_key);
+        assert_eq!(existing.trusted_public_keys(), expected.trusted_public_keys);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn sqlite_capability_authority_open_existing_missing_path_creates_nothing() {
+        let missing_file = unique_db_path("chio-authority-missing-file");
+        assert!(!missing_file.exists());
+        assert!(SqliteCapabilityAuthority::open_existing(&missing_file).is_err());
+        assert!(!missing_file.exists());
+
+        let root = unique_db_path("chio-authority-missing-parent");
+        let path = root.join("nested").join("authority.sqlite3");
+        assert!(!root.exists());
+
+        assert!(SqliteCapabilityAuthority::open_existing(&path).is_err());
+        assert!(!root.exists());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn sqlite_capability_authority_existing_handle_never_recreates_removed_file() {
+        let path = unique_db_path("chio-authority-existing-handle");
+        drop(SqliteCapabilityAuthority::open(&path).unwrap());
+        let existing = SqliteCapabilityAuthority::open_existing(&path).unwrap();
+        fs::remove_file(&path).unwrap();
+
+        assert!(existing.status().is_err());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn sqlite_capability_authority_open_existing_rejects_empty_schema_without_repair() {
+        let path = unique_db_path("chio-authority-empty-schema");
+        drop(Connection::open(&path).unwrap());
+
+        assert!(SqliteCapabilityAuthority::open_existing(&path).is_err());
+        let connection = Connection::open(&path).unwrap();
+        let table_count = connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name LIKE 'authority_%'",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap();
+        assert_eq!(table_count, 0);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn sqlite_capability_authority_open_existing_rejects_missing_state_without_bootstrap() {
+        let path = unique_db_path("chio-authority-missing-state");
+        drop(SqliteCapabilityAuthority::open(&path).unwrap());
+        let connection = Connection::open(&path).unwrap();
+        connection
+            .execute("DELETE FROM authority_state WHERE singleton_id = 1", [])
+            .unwrap();
+        drop(connection);
+
+        assert!(SqliteCapabilityAuthority::open_existing(&path).is_err());
+        let connection = Connection::open(&path).unwrap();
+        let state_count = connection
+            .query_row("SELECT COUNT(*) FROM authority_state", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .unwrap();
+        assert_eq!(state_count, 0);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn sqlite_capability_authority_open_existing_rejects_seed_public_key_mismatch() {
+        let path = unique_db_path("chio-authority-seed-key-mismatch");
+        drop(SqliteCapabilityAuthority::open(&path).unwrap());
+        let forged_public_key = Keypair::generate().public_key();
+        let connection = Connection::open(&path).unwrap();
+        connection
+            .execute(
+                "UPDATE authority_state SET public_key_hex = ?1 WHERE singleton_id = 1",
+                params![forged_public_key.to_hex()],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO authority_trusted_keys (public_key_hex, generation, activated_at) VALUES (?1, 1, 1)",
+                params![forged_public_key.to_hex()],
+            )
+            .unwrap();
+        drop(connection);
+
+        assert!(SqliteCapabilityAuthority::open_existing(&path).is_err());
+        let connection = Connection::open(&path).unwrap();
+        let stored_public_key = connection
+            .query_row(
+                "SELECT public_key_hex FROM authority_state WHERE singleton_id = 1",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .unwrap();
+        assert_eq!(stored_public_key, forged_public_key.to_hex());
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn sqlite_capability_authority_existing_reads_never_repair_tampered_state() {
+        let path = unique_db_path("chio-authority-existing-no-repair");
+        drop(SqliteCapabilityAuthority::open(&path).unwrap());
+        let existing = SqliteCapabilityAuthority::open_existing(&path).unwrap();
+        let connection = Connection::open(&path).unwrap();
+        connection
+            .execute(
+                "UPDATE authority_state SET public_key_hex = '' WHERE singleton_id = 1",
+                [],
+            )
+            .unwrap();
+        drop(connection);
+
+        assert!(existing.status().is_err());
+        assert!(existing.current_keypair().is_err());
+        let connection = Connection::open(&path).unwrap();
+        let stored_public_key = connection
+            .query_row(
+                "SELECT public_key_hex FROM authority_state WHERE singleton_id = 1",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .unwrap();
+        assert!(stored_public_key.is_empty());
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn sqlite_capability_authority_open_existing_rejects_corrupt_database() {
+        let path = unique_db_path("chio-authority-corrupt");
+        let corrupt = b"not a sqlite authority database";
+        fs::write(&path, corrupt).unwrap();
+
+        assert!(SqliteCapabilityAuthority::open_existing(&path).is_err());
+        assert_eq!(fs::read(&path).unwrap(), corrupt);
 
         let _ = fs::remove_file(path);
     }
