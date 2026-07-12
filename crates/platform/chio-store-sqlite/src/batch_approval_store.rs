@@ -30,11 +30,12 @@ const BATCH_APPROVAL_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["chio_hitl_batches"
 impl SqliteBatchApprovalStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, ApprovalStoreError> {
         let path = path.as_ref();
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| ApprovalStoreError::Backend(format!("create dir: {e}")))?;
-            }
+        // Resolve any `file:` URI to its on-disk parent before creating it, so a
+        // URI-configured store creates the real backing directory rather than a
+        // bogus scheme-prefixed one.
+        if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
+            fs::create_dir_all(&parent)
+                .map_err(|e| ApprovalStoreError::Backend(format!("create dir: {e}")))?;
         }
         let manager = SqliteConnectionManager::file(path);
         let pool = Pool::builder()

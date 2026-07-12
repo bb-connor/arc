@@ -16,8 +16,11 @@ const BUDGET_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["capability_grant_budgets"]
 impl SqliteBudgetStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, BudgetStoreError> {
         let path = path.as_ref();
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+        // Resolve any `file:` URI to its on-disk parent before creating it, so a
+        // URI-configured store creates the real backing directory rather than a
+        // bogus scheme-prefixed one.
+        if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
+            fs::create_dir_all(&parent)?;
         }
 
         let mut connection = Connection::open(path)?;

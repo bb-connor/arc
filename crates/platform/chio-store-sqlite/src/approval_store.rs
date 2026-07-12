@@ -95,11 +95,14 @@ impl SqliteApprovalStore {
         anchor_tables: &[&str],
     ) -> Result<Self, ApprovalStoreError> {
         let path = path.as_ref();
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| ApprovalStoreError::Backend(format!("create dir: {e}")))?;
-            }
+        // Derive the directory from the resolved filesystem path: a co-located
+        // approval store opens the same `file:` URI as the receipt store (for
+        // example `file:/var/lib/chio/receipts.db?mode=rwc`), whose scheme and
+        // query a raw `parent()` would fold into a bogus directory, leaving the
+        // real one uncreated so SQLite fails to open the database.
+        if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
+            fs::create_dir_all(&parent)
+                .map_err(|e| ApprovalStoreError::Backend(format!("create dir: {e}")))?;
         }
         let manager = SqliteConnectionManager::file(path);
         let pool = Pool::builder()
@@ -515,6 +518,41 @@ impl ApprovalStore for SqliteApprovalStore {
 mod tests {
     use super::*;
     use chio_core::crypto::Keypair;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn open_colocated_creates_parent_dirs_for_a_file_uri_with_query() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time before epoch")
+            .as_nanos();
+        let base = std::env::temp_dir().join(format!("chio-approval-uri-{nonce}"));
+        let db = base.join("nested").join("receipts.db");
+        let parent = db.parent().expect("db path has a parent");
+        assert!(
+            !parent.exists(),
+            "precondition: the parent dir must not exist yet"
+        );
+
+        // The co-located approval store opens the receipt store's `file:` URI,
+        // whose query and scheme a raw `parent()` would fold into a bogus
+        // relative directory, leaving the real parent uncreated so SQLite would
+        // fail to open the database.
+        let uri = format!("file:{}?mode=rwc", db.display());
+        let store = SqliteApprovalStore::open_colocated_with_receipt_store(uri.as_str())
+            .expect("open colocated approval store from a file: URI");
+        // The store must be usable once its real parent directory exists.
+        store
+            .store_pending(&sample_request("uri-1", "hash-uri"))
+            .expect("store a pending approval");
+
+        assert!(
+            parent.exists(),
+            "the real parent directory must be created before SQLite opens the URI"
+        );
+
+        let _ = fs::remove_dir_all(&base);
+    }
 
     fn sample_request(id: &str, hash: &str) -> ApprovalRequest {
         let subject = Keypair::generate();
