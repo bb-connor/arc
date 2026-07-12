@@ -2670,11 +2670,26 @@ impl SqliteReceiptStore {
         // mismatch (fall back to the actor's verified head). Bounded O(b) over the
         // single latest checkpoint's own batch on the operator/health surface, NOT
         // a full O(N) chain walk on the per-append hot path.
+        //
+        // Watermark exemption: a checkpoint fully covered by a TRUSTED archival
+        // watermark has had its claim-log rows co-archived and deleted, so a live
+        // Merkle rebuild would fail for a perfectly valid checkpoint. Mirror the
+        // full chain verification (`verify_checkpoint_chain_integrity`): skip only
+        // the live rebuild for a watermark-covered checkpoint and trust the archive
+        // to serve that deep verification; its signature, column agreement, and
+        // chain connectivity above still run. Without this, a fully-archived latest
+        // checkpoint is discarded and flush reports a stale `checkpointed_entry_seq`
+        // and a spurious uncheckpointed range until a later write catches the head
+        // up. `trusted_retention_watermark` is fail-closed (0 unless the boundary,
+        // the absent live prefix, and the backing archive all check out), so a
+        // forged watermark cannot suppress the rebuild for an unarchived range.
+        let trusted_watermark = trusted_retention_watermark(&connection)?;
         let verified_persisted = load_latest_persisted_checkpoint_row(&connection)?
             .and_then(|row| parse_persisted_checkpoint_row(row).ok())
             .filter(|checkpoint| {
                 latest_checkpoint_is_chain_connected(&connection, checkpoint).is_ok()
-                    && validate_checkpoint_against_claim_log(&connection, checkpoint).is_ok()
+                    && (checkpoint.body.batch_end_seq <= trusted_watermark
+                        || validate_checkpoint_against_claim_log(&connection, checkpoint).is_ok())
             });
         let persisted_checkpoint_seq = verified_persisted
             .as_ref()

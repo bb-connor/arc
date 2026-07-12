@@ -2207,6 +2207,81 @@ fn flush_report_floors_committed_at_watermark_after_full_archive(
     Ok(())
 }
 
+/// A handle whose cached head is behind a checkpoint that a DIFFERENT handle
+/// created and then archived must still report the archived boundary as
+/// checkpointed. `flush` folds in the persisted latest checkpoint, but its live
+/// claim-log rows were co-archived and deleted, so the persisted-checkpoint
+/// validation must honor the archival watermark exemption (as the full chain
+/// walk does). Without it flush discards the checkpoint and reports a stale
+/// `checkpointed_entry_seq` with a spurious uncheckpointed range.
+#[test]
+fn flush_reports_watermark_covered_checkpoint_from_stale_head(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("flush-stale-head-watermark");
+    let archive = unique_db_path("flush-stale-head-watermark-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    // Instance A checkpoints [1,2] and keeps its cached head at boundary 2.
+    let store_a = SqliteReceiptStore::open(&path)?;
+    store_a.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for i in 0..2u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("fs-a-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store_a.append_chio_receipt_returning_seq(&r)?;
+    }
+    store_a.flush_receipt_writes()?;
+    assert!(store_a.load_checkpoint_by_seq(1)?.is_some());
+
+    // A second instance appends [3,4], builds checkpoint 2 (boundary 4), then
+    // archives the ENTIRE checkpointed history: every live claim-log row is
+    // deleted and the watermark is set to 4. Instance A stays idle, so its cached
+    // head never advances past boundary 2.
+    {
+        let store_b = SqliteReceiptStore::open_existing(&path)?;
+        store_b.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+        for i in 2..4u64 {
+            let r = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("fs-b-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store_b.append_chio_receipt_returning_seq(&r)?;
+        }
+        store_b.flush_receipt_writes()?;
+        assert!(store_b.load_checkpoint_by_seq(2)?.is_some());
+        let archived = store_b.archive_receipts_before(150, archive_path)?;
+        assert_eq!(archived, 4, "the whole checkpointed history archives");
+    }
+
+    // Flush through the stale instance A. Its head sits at boundary 2, so the
+    // report must fold in the persisted checkpoint 2 (boundary 4) even though the
+    // live rows for its range are gone behind the watermark.
+    let report = store_a.flush_receipt_writes()?;
+    assert_eq!(
+        report.latest_committed_entry_seq, 4,
+        "committed progress folds in the archived prefix"
+    );
+    assert_eq!(
+        report.latest_checkpointed_entry_seq, 4,
+        "a watermark-covered persisted checkpoint must still be reported as checkpointed"
+    );
+    assert_eq!(
+        report.uncheckpointed_start_seq, None,
+        "a fully-checkpointed, fully-archived store has no uncheckpointed range"
+    );
+    assert_eq!(report.uncheckpointed_end_seq, None);
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// The read-only health path must survive a store created before the retention
 /// migration: a missing watermark ledger is "never archived" (None), not a hard
 /// error that denies the observer every health report.
