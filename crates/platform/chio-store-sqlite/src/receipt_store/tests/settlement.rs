@@ -310,3 +310,87 @@ fn atomic_receipt_append_seeds_attempt_zero_once() -> Result<(), Box<dyn std::er
     let _ = fs::remove_file(path);
     Ok(())
 }
+
+#[test]
+fn receipt_retention_preserves_active_settlement_attempts() -> Result<(), Box<dyn std::error::Error>>
+{
+    use chio_settle::{
+        RetryPolicy, SettlementOutcomeStore, SettlementRoute, SettlementRoutingInput,
+    };
+
+    let path = unique_db_path("chio-settlement-retention");
+    let archive_path = unique_db_path("chio-settlement-retention-archive");
+    let mut store = SqliteReceiptStore::open(&path)?;
+    let receipt = sample_receipt_with_id_and_timestamp("rcpt-settlement-retention", 1);
+    let pending = chio_kernel::PendingSettlementObservation {
+        next_visible_at_ms: 1,
+    };
+    ReceiptStore::append_chio_receipt_with_pending_observation(&store, &receipt, &pending)?;
+
+    assert_eq!(
+        store.archive_receipts_before(2, archive_path.to_str().ok_or("invalid archive path")?)?,
+        1
+    );
+    assert!(store.load_chio_receipt(&receipt.id)?.is_some());
+    assert_eq!(attempt_count(&store, &receipt.id)?, 1);
+
+    let outcomes = crate::SqliteSettlementOutcomeStore::open_alongside(&store)?;
+    let claim = outcomes
+        .claim_receipt(&receipt.id, "retention-test", 1, 100)?
+        .ok_or("settlement attempt was not claimable")?;
+    assert_eq!(
+        outcomes.record_claimed_outcome(
+            &claim,
+            &SettlementRoutingInput::Accepted,
+            RetryPolicy::default(),
+            1,
+        )?,
+        SettlementRoute::NoAction
+    );
+
+    assert_eq!(
+        store.archive_receipts_before(2, archive_path.to_str().ok_or("invalid archive path")?)?,
+        0
+    );
+    assert!(store.load_chio_receipt(&receipt.id)?.is_none());
+    assert_eq!(attempt_count(&store, &receipt.id)?, 0);
+
+    drop(outcomes);
+    drop(store);
+    let _ = fs::remove_file(path);
+    let _ = fs::remove_file(archive_path);
+    Ok(())
+}
+
+#[test]
+fn receipt_retention_supports_store_without_settlement_projection(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-settlement-retention-legacy");
+    let archive_path = unique_db_path("chio-settlement-retention-legacy-archive");
+    let store = SqliteReceiptStore::open(&path)?;
+    drop(SqliteReceiptStore::open(&archive_path)?);
+    let receipt = sample_receipt_with_id_and_timestamp("rcpt-settlement-retention-legacy", 1);
+    store.append_chio_receipt_returning_seq(&receipt)?;
+    store.writer_handle().run_write(|connection| {
+        connection.execute_batch("DROP TABLE settle_attempts")?;
+        Ok(())
+    })?;
+    drop(store);
+
+    let mut reopened = SqliteReceiptStore::open_existing(&path)?;
+    assert_eq!(
+        ReceiptStore::atomic_receipt_projection(&reopened),
+        chio_kernel::AtomicReceiptProjection::Unsupported
+    );
+    assert_eq!(
+        reopened
+            .archive_receipts_before(2, archive_path.to_str().ok_or("invalid archive path")?,)?,
+        1
+    );
+    assert!(reopened.load_chio_receipt(&receipt.id)?.is_none());
+
+    drop(reopened);
+    let _ = fs::remove_file(path);
+    let _ = fs::remove_file(archive_path);
+    Ok(())
+}

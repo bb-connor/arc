@@ -323,6 +323,21 @@ impl SqliteReceiptStore {
         cutoff: i64,
         tenant_id: Option<&str>,
     ) -> Result<(), ReceiptStoreError> {
+        let settlement_attempts_installed = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM main.sqlite_master \
+             WHERE type = 'table' AND name = 'settle_attempts')",
+            [],
+            |row| row.get::<_, bool>(0),
+        )?;
+        let active_settlement_filter = if settlement_attempts_installed {
+            "AND NOT EXISTS ( \
+                 SELECT 1 \
+                 FROM main.settle_attempts attempt \
+                 WHERE attempt.receipt_id = main.chio_tool_receipts.receipt_id \
+             )"
+        } else {
+            ""
+        };
         connection.execute_batch(
             r#"
             DROP TRIGGER IF EXISTS chio_child_receipts_reject_delete;
@@ -349,14 +364,17 @@ impl SqliteReceiptStore {
                         params![cutoff, tenant_id],
                     )?;
                     connection.execute(
-                        "DELETE FROM main.chio_tool_receipts \
-                         WHERE timestamp < ?1 \
-                           AND tenant_id = ?2 \
-                           AND EXISTS ( \
-                               SELECT 1 \
-                               FROM archive.chio_tool_receipts archived \
-                               WHERE archived.receipt_id = main.chio_tool_receipts.receipt_id \
-                           )",
+                        &format!(
+                            "DELETE FROM main.chio_tool_receipts \
+                             WHERE timestamp < ?1 \
+                               AND tenant_id = ?2 \
+                               {active_settlement_filter} \
+                               AND EXISTS ( \
+                                   SELECT 1 \
+                                   FROM archive.chio_tool_receipts archived \
+                                   WHERE archived.receipt_id = main.chio_tool_receipts.receipt_id \
+                               )"
+                        ),
                         params![cutoff, tenant_id],
                     )?;
                 }
@@ -372,13 +390,16 @@ impl SqliteReceiptStore {
                         params![cutoff],
                     )?;
                     connection.execute(
-                        "DELETE FROM main.chio_tool_receipts \
-                         WHERE timestamp < ?1 \
-                           AND EXISTS ( \
-                               SELECT 1 \
-                               FROM archive.chio_tool_receipts archived \
-                               WHERE archived.receipt_id = main.chio_tool_receipts.receipt_id \
-                           )",
+                        &format!(
+                            "DELETE FROM main.chio_tool_receipts \
+                             WHERE timestamp < ?1 \
+                               {active_settlement_filter} \
+                               AND EXISTS ( \
+                                   SELECT 1 \
+                                   FROM archive.chio_tool_receipts archived \
+                                   WHERE archived.receipt_id = main.chio_tool_receipts.receipt_id \
+                               )"
+                        ),
                         params![cutoff],
                     )?;
                 }
