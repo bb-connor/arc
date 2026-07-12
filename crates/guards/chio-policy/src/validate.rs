@@ -5,7 +5,12 @@
 use crate::models::{DetectionLevel, Extensions, HushSpec, Rules, TransitionTrigger};
 use crate::regex_safety::{compile_policy_regex, validate_policy_regex_count};
 use crate::version;
+use chio_core::capability::threshold_approval::{
+    MAX_THRESHOLD_APPROVAL_IDENTIFIER_BYTES, MAX_THRESHOLD_APPROVAL_TIMEOUT_SECONDS,
+    MAX_THRESHOLD_APPROVAL_TOKENS,
+};
 use chio_core::capability::trust_policy::canonicalize_attestation_verifier;
+use chio_core::crypto::{PublicKey, SigningAlgorithm};
 use std::collections::{BTreeSet, HashSet};
 
 const MAX_POLICY_DENYLIST_PATTERNS: usize = 64;
@@ -63,9 +68,95 @@ pub fn validate(spec: &HushSpec) -> ValidationResult {
         validate_detection(ext, &mut errors, &mut warnings);
         validate_reputation(ext, &mut errors, &mut warnings);
         validate_runtime_assurance(ext, &mut errors);
+        validate_threshold_approval(ext, &mut errors);
     }
 
     ValidationResult { errors, warnings }
+}
+
+fn validate_threshold_approval(ext: &Extensions, errors: &mut Vec<ValidationError>) {
+    let Some(approvers) = ext
+        .chio
+        .as_ref()
+        .and_then(|chio| chio.human_in_loop.as_ref())
+        .and_then(|human_in_loop| human_in_loop.approvers.as_ref())
+    else {
+        return;
+    };
+
+    if approvers.n == 0 {
+        errors.push(ValidationError::Custom(
+            "extensions.chio.human_in_loop.approvers.n must be >= 1".to_string(),
+        ));
+    }
+    if approvers.of.len() > MAX_THRESHOLD_APPROVAL_TOKENS {
+        errors.push(ValidationError::Custom(format!(
+            "extensions.chio.human_in_loop.approvers.of allows at most {MAX_THRESHOLD_APPROVAL_TOKENS} entries"
+        )));
+    }
+    if usize::try_from(approvers.n).map_or(true, |required| required > approvers.of.len()) {
+        errors.push(ValidationError::Custom(format!(
+            "extensions.chio.human_in_loop.approvers.n {} exceeds eligible set size {}",
+            approvers.n,
+            approvers.of.len()
+        )));
+    }
+    if let Some(timeout_seconds) = approvers.timeout_seconds {
+        if timeout_seconds == 0 || timeout_seconds > MAX_THRESHOLD_APPROVAL_TIMEOUT_SECONDS {
+            errors.push(ValidationError::Custom(format!(
+                "extensions.chio.human_in_loop.approvers.timeout_seconds must be between 1 and {MAX_THRESHOLD_APPROVAL_TIMEOUT_SECONDS}"
+            )));
+        }
+    }
+
+    let mut approver_ids = BTreeSet::new();
+    let mut public_keys = BTreeSet::new();
+    for (index, approver_id) in approvers.of.iter().enumerate() {
+        let path = format!("extensions.chio.human_in_loop.approvers.of[{index}]");
+        if approver_id.is_empty()
+            || approver_id.len() > MAX_THRESHOLD_APPROVAL_IDENTIFIER_BYTES
+            || approver_id.chars().any(char::is_control)
+        {
+            errors.push(ValidationError::Custom(format!(
+                "{path} must be nonempty, control-free, and at most {MAX_THRESHOLD_APPROVAL_IDENTIFIER_BYTES} bytes"
+            )));
+            continue;
+        }
+        if approver_id.trim() != approver_id {
+            errors.push(ValidationError::Custom(format!(
+                "{path} must not have leading or trailing whitespace"
+            )));
+            continue;
+        }
+        if !approver_ids.insert(approver_id.clone()) {
+            errors.push(ValidationError::Custom(format!(
+                "extensions.chio.human_in_loop.approvers.of contains duplicate identifier {approver_id:?}"
+            )));
+            continue;
+        }
+
+        let public_key = match PublicKey::from_hex(approver_id) {
+            Ok(public_key) => public_key,
+            Err(_) => {
+                errors.push(ValidationError::Custom(format!(
+                    "{path} is not a supported self-authenticating hex public key"
+                )));
+                continue;
+            }
+        };
+        if public_key.algorithm() != SigningAlgorithm::Ed25519 {
+            errors.push(ValidationError::Custom(format!(
+                "{path} uses an unsupported approver key algorithm"
+            )));
+            continue;
+        }
+        if !public_keys.insert(public_key.to_hex()) {
+            errors.push(ValidationError::Custom(
+                "extensions.chio.human_in_loop.approvers.of contains the same public key more than once"
+                    .to_string(),
+            ));
+        }
+    }
 }
 
 fn validate_rules(rules: &Rules, errors: &mut Vec<ValidationError>) {

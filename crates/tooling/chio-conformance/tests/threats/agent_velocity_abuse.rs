@@ -51,6 +51,8 @@ fn request_for(agent_id: &str, cap_id: &str) -> (ToolCallRequest, ChioScope, Str
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };

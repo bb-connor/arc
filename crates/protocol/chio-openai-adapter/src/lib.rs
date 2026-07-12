@@ -322,6 +322,8 @@ impl ChioOpenAiAdapter {
             execution_nonce: execution.execution_nonces.get(&tool_call.id).cloned(),
             governed_intent: execution.governed_intent.clone(),
             approval_token: execution.approval_token.clone(),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: execution.model_metadata.clone(),
             federated_origin_kernel_id: None,
         };

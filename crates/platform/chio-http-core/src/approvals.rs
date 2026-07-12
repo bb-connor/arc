@@ -105,6 +105,7 @@ impl From<ApprovalStoreError> for ApprovalHandlerError {
                 Self::Conflict(format!("already resolved: {m}"))
             }
             ApprovalStoreError::Replay(m) => Self::ReplayDetected(m),
+            ApprovalStoreError::Invalid(m) => Self::BadRequest(m),
             ApprovalStoreError::Backend(m) => Self::Internal(m),
             ApprovalStoreError::Serialization(m) => Self::Internal(m),
         }

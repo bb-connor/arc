@@ -1,6 +1,7 @@
 use chio_core::capability::{
     governance::{GovernedApprovalToken, GovernedTransactionIntent},
     scope::ModelMetadata,
+    threshold_approval::{ThresholdApprovalProposal, MAX_THRESHOLD_APPROVAL_TOKENS},
     token::CapabilityToken,
 };
 use chio_core::receipt::body::ChioReceipt;
@@ -66,6 +67,12 @@ pub struct ToolCallRequest {
     /// Optional approval token authorizing this governed invocation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub approval_token: Option<GovernedApprovalToken>,
+    /// Canonical approval token set for a threshold-governed invocation.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub approval_tokens: Vec<GovernedApprovalToken>,
+    /// Policy-authority-signed proposal binding a threshold token set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub threshold_approval_proposal: Option<ThresholdApprovalProposal>,
     /// Optional metadata describing the model executing the calling
     /// agent. Consumed by `Constraint::ModelConstraint` enforcement.
     ///
@@ -83,6 +90,26 @@ pub struct ToolCallRequest {
     /// wire format stays byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub federated_origin_kernel_id: Option<String>,
+}
+
+impl ToolCallRequest {
+    /// Normalize the singular compatibility field and canonical token-array field.
+    pub fn normalized_approval_tokens(&self) -> Result<&[GovernedApprovalToken], KernelError> {
+        if self.approval_token.is_some() && !self.approval_tokens.is_empty() {
+            return Err(KernelError::GovernedTransactionDenied(
+                "approval_token and approval_tokens must not both be supplied".to_string(),
+            ));
+        }
+        if self.approval_tokens.len() > MAX_THRESHOLD_APPROVAL_TOKENS {
+            return Err(KernelError::GovernedTransactionDenied(format!(
+                "approval token set exceeds the protocol ceiling of {MAX_THRESHOLD_APPROVAL_TOKENS}"
+            )));
+        }
+        Ok(match self.approval_token.as_ref() {
+            Some(token) => core::slice::from_ref(token),
+            None => &self.approval_tokens,
+        })
+    }
 }
 
 /// The kernel's response to a tool call request.

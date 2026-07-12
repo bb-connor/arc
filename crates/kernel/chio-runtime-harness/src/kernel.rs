@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use chio_core::capability::governance::GovernedToolInvocationIntentBody;
 use chio_kernel::{ChioKernel, ToolCallRequest as KernelToolCallRequest};
 
 use crate::evidence_io::unix_now_ms;
@@ -439,34 +440,37 @@ pub(crate) fn execute_runtime_loopback_step(
                 step_index
             ))
         })?;
-    let governed_intent = chio_core::capability::governance::GovernedTransactionIntent {
-        id: format!("intent:chio-runtime-loopback:{}", step_index),
-        server_id: step.request.server_id.clone(),
-        tool_name: step.request.tool_name.clone(),
-        purpose: "Chio live runtime loopback proof regeneration".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(if let Some(chio_treaty) = chio_treaty.as_ref() {
-            serde_json::json!({
-                "chioAdmission": {
-                    "admissionId": step.admission_bundle.admission_id,
-                    "bundleSha256": bundle_sha256
-                },
-                "chioTreaty": chio_treaty.intent_context
-            })
-        } else {
-            serde_json::json!({
-                "chioAdmission": {
-                    "admissionId": step.admission_bundle.admission_id,
-                    "bundleSha256": bundle_sha256
-                }
-            })
-        }),
-    };
+    let governed_intent =
+        chio_core::capability::governance::GovernedTransactionIntent::tool_invocation(
+            GovernedToolInvocationIntentBody {
+                id: format!("intent:chio-runtime-loopback:{}", step_index),
+                server_id: step.request.server_id.clone(),
+                tool_name: step.request.tool_name.clone(),
+                purpose: "Chio live runtime loopback proof regeneration".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: Some(if let Some(chio_treaty) = chio_treaty.as_ref() {
+                    serde_json::json!({
+                        "chioAdmission": {
+                            "admissionId": step.admission_bundle.admission_id,
+                            "bundleSha256": bundle_sha256
+                        },
+                        "chioTreaty": chio_treaty.intent_context
+                    })
+                } else {
+                    serde_json::json!({
+                        "chioAdmission": {
+                            "admissionId": step.admission_bundle.admission_id,
+                            "bundleSha256": bundle_sha256
+                        }
+                    })
+                }),
+            },
+        );
     let request = KernelToolCallRequest {
         request_id: step.request.request_id.clone(),
         capability,
@@ -478,6 +482,8 @@ pub(crate) fn execute_runtime_loopback_step(
         execution_nonce: None,
         governed_intent: Some(governed_intent),
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: step.request.origin_kernel_id.clone(),
     };

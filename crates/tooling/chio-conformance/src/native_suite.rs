@@ -1226,23 +1226,25 @@ fn build_delegation_pair() -> (CapabilityToken, CapabilityToken) {
 }
 
 fn build_governed_intent() -> GovernedTransactionIntent {
-    GovernedTransactionIntent {
-        id: "intent-governed-001".to_string(),
-        server_id: "conformance".to_string(),
-        tool_name: "governed_transfer".to_string(),
-        purpose: "settle supplier invoice".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(serde_json::json!({
+    GovernedTransactionIntent::tool_invocation(
+        chio_core::capability::governance::GovernedToolInvocationIntentBody {
+            id: "intent-governed-001".to_string(),
+            server_id: "conformance".to_string(),
+            tool_name: "governed_transfer".to_string(),
+            purpose: "settle supplier invoice".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(serde_json::json!({
             "amount": 1250,
             "currency": "USD",
             "seller": "supplier-001"
-        })),
-    }
+            })),
+        },
+    )
 }
 
 fn build_governed_request() -> AgentMessage {

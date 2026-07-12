@@ -238,6 +238,7 @@ pub(crate) async fn operator_respond_approval_handler(
         approver: approver_pubkey.clone(),
         subject: subject_pubkey,
         governed_intent_hash: pending.parameter_hash.clone(),
+        threshold_proposal_hash: None,
         request_id: approval_id.clone(),
         issued_at: now,
         expires_at: now.saturating_add(600),

@@ -101,6 +101,8 @@ impl TargetProtocolExecutor for OpenAiTargetExecutor {
                     execution_nonce: request.execution.execution_nonce.clone(),
                     governed_intent: request.execution.governed_intent.clone(),
                     approval_token: request.execution.approval_token.clone(),
+                    approval_tokens: Vec::new(),
+                    threshold_approval_proposal: None,
                     model_metadata: request.execution.model_metadata.clone(),
                     federated_origin_kernel_id: None,
                 },

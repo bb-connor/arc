@@ -11,6 +11,7 @@ pub mod features;
 pub mod governance;
 pub mod runtime_attestation;
 pub mod scope;
+pub mod threshold_approval;
 pub mod token;
 pub mod trust_policy;
 pub mod validation;

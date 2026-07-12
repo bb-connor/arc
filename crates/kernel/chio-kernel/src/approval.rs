@@ -788,6 +788,7 @@ impl ApprovalGuard {
                         .request
                         .governed_intent
                         .as_ref()
+                        .and_then(|intent| intent.as_tool_invocation())
                         .and_then(|intent| intent.max_amount.as_ref());
                     match amount {
                         Some(amt) if amt.units >= *threshold_units => {
@@ -1569,6 +1570,7 @@ mod tests {
             approver: approver.public_key(),
             subject: subject.public_key(),
             governed_intent_hash: parameter_hash.to_string(),
+            threshold_proposal_hash: None,
             request_id: approval_id.to_string(),
             issued_at: 10,
             expires_at: 100,

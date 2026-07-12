@@ -310,6 +310,10 @@ pub struct ChioKernel {
     pub(super) aggregate_family_root_resolver: Option<
         Arc<dyn chio_core::capability::aggregate_budget::AggregateFamilyRootResolver + Send + Sync>,
     >,
+    pub(super) threshold_approval_requirement_resolver:
+        Option<Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>>,
+    pub(super) threshold_approval_policy_configured: bool,
+    pub(super) threshold_approval_policy_authorities: Vec<chio_core::PublicKey>,
     pub(super) receipt_store_write_lock: Mutex<()>,
     pub(super) payment_adapter: Option<Box<dyn PaymentAdapter>>,
     pub(super) price_oracle: Option<Box<dyn PriceOracle>>,

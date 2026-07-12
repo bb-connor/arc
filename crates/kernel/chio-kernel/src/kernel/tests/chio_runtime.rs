@@ -695,10 +695,7 @@ fn chio_runtime_admission_hook_denies_before_tool_dispatch_and_records_metadata(
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -712,7 +709,10 @@ fn chio_runtime_admission_hook_denies_before_tool_dispatch_and_records_metadata(
     let response = kernel.evaluate_tool_call_blocking(&request)?;
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert_eq!(response.reason.as_deref(), Some("chio runtime admission denied"));
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("chio runtime admission denied")
+    );
     assert_eq!(admission_calls.load(Ordering::SeqCst), 1);
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     let metadata = response
@@ -743,10 +743,7 @@ fn chio_governed_request_without_runtime_hook_fails_closed(
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let mut request = make_request_with_arguments(
@@ -756,24 +753,26 @@ fn chio_governed_request_without_runtime_hook_fails_closed(
         "srv-chio-runtime",
         serde_json::json!({"record": "vendor-ledger-7", "value": "closed"}),
     );
-    request.governed_intent = Some(GovernedTransactionIntent {
-        id: "intent:chio:no-hook".to_string(),
-        server_id: request.server_id.clone(),
-        tool_name: request.tool_name.clone(),
-        purpose: "verify Chio admission fails closed without a hook".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(serde_json::json!({
-            "chioAdmission": {
-                "admissionId": "adm-no-hook",
-                "bundleSha256": "a".repeat(64)
-            }
-        })),
-    });
+    request.governed_intent = Some(GovernedTransactionIntent::tool_invocation(
+        chio_core::capability::governance::GovernedToolInvocationIntentBody {
+            id: "intent:chio:no-hook".to_string(),
+            server_id: request.server_id.clone(),
+            tool_name: request.tool_name.clone(),
+            purpose: "verify Chio admission fails closed without a hook".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(serde_json::json!({
+                "chioAdmission": {
+                    "admissionId": "adm-no-hook",
+                    "bundleSha256": "a".repeat(64)
+                }
+            })),
+        },
+    ));
 
     let response = kernel.evaluate_tool_call_blocking(&request)?;
 
@@ -791,10 +790,9 @@ fn chio_governed_request_without_runtime_hook_fails_closed(
     Ok(())
 }
 
-
 #[test]
-fn chio_treaty_request_without_runtime_hook_fails_closed(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn chio_treaty_request_without_runtime_hook_fails_closed() -> Result<(), Box<dyn std::error::Error>>
+{
     let mut kernel = make_kernel(make_config());
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(SideEffectServer::new(
@@ -807,10 +805,7 @@ fn chio_treaty_request_without_runtime_hook_fails_closed(
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let mut request = make_request_with_arguments(
@@ -820,27 +815,29 @@ fn chio_treaty_request_without_runtime_hook_fails_closed(
         "srv-chio-runtime",
         serde_json::json!({"record": "vendor-ledger-7", "value": "closed"}),
     );
-    request.governed_intent = Some(GovernedTransactionIntent {
-        id: "intent:chio:treaty-no-hook".to_string(),
-        server_id: request.server_id.clone(),
-        tool_name: request.tool_name.clone(),
-        purpose: "verify Chio treaty context fails closed without a hook".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(serde_json::json!({
-            "chioTreaty": {
-                "treatyScopeId": "treaty-buyer-vendor",
-                "treatyScopeSha256": "b".repeat(64),
-                "ladderIntersectionId": "intersection-live-1",
-                "ladderIntersectionSha256": "c".repeat(64),
-                "actionClassId": "workflow.destructive.vendor_call"
-            }
-        })),
-    });
+    request.governed_intent = Some(GovernedTransactionIntent::tool_invocation(
+        chio_core::capability::governance::GovernedToolInvocationIntentBody {
+            id: "intent:chio:treaty-no-hook".to_string(),
+            server_id: request.server_id.clone(),
+            tool_name: request.tool_name.clone(),
+            purpose: "verify Chio treaty context fails closed without a hook".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(serde_json::json!({
+                "chioTreaty": {
+                    "treatyScopeId": "treaty-buyer-vendor",
+                    "treatyScopeSha256": "b".repeat(64),
+                    "ladderIntersectionId": "intersection-live-1",
+                    "ladderIntersectionSha256": "c".repeat(64),
+                    "actionClassId": "workflow.destructive.vendor_call"
+                }
+            })),
+        },
+    ));
 
     let response = kernel.evaluate_tool_call_blocking(&request)?;
 
@@ -899,10 +896,7 @@ fn chio_runtime_admission_hook_denies_federated_call_before_dispatch_or_cosign(
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let mut request = make_request_with_arguments(
@@ -917,7 +911,10 @@ fn chio_runtime_admission_hook_denies_federated_call_before_dispatch_or_cosign(
     let response = kernel.evaluate_tool_call_blocking(&request)?;
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert_eq!(response.reason.as_deref(), Some("chio runtime admission denied"));
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("chio runtime admission denied")
+    );
     assert_eq!(admission_calls.load(Ordering::SeqCst), 1);
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     assert_eq!(
@@ -966,10 +963,7 @@ fn federated_origin_without_runtime_hook_or_context_fails_closed(
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let mut request = make_request_with_arguments(
@@ -998,8 +992,8 @@ fn federated_origin_without_runtime_hook_or_context_fails_closed(
 }
 
 #[test]
-fn chio_swarm_request_without_runtime_hook_fails_closed(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn chio_swarm_request_without_runtime_hook_fails_closed() -> Result<(), Box<dyn std::error::Error>>
+{
     let mut kernel = make_kernel(make_config());
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(SideEffectServer::new(
@@ -1012,10 +1006,7 @@ fn chio_swarm_request_without_runtime_hook_fails_closed(
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let mut request = make_request_with_arguments(
@@ -1025,87 +1016,12 @@ fn chio_swarm_request_without_runtime_hook_fails_closed(
         "srv-chio-runtime",
         serde_json::json!({"record": "vendor-ledger-7", "value": "closed"}),
     );
-    request.governed_intent = Some(GovernedTransactionIntent {
-        id: "intent:chio:swarm-no-hook".to_string(),
-        server_id: request.server_id.clone(),
-        tool_name: request.tool_name.clone(),
-        purpose: "verify swarm authority fails closed without a runtime hook".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(serde_json::json!({
-            "chioSwarm": {
-                "taskGraph": {
-                    "id": "swarm-task-graph-runtime",
-                    "sha256": "a".repeat(64)
-                },
-                "continuationToken": {
-                    "id": "swarm-continuation-runtime",
-                    "sha256": "b".repeat(64)
-                }
-            }
-        })),
-    });
-
-    let response = kernel.evaluate_tool_call_blocking(&request)?;
-
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    let metadata = response
-        .receipt
-        .metadata
-        .ok_or_else(|| std::io::Error::other("deny metadata missing"))?;
-    assert_eq!(metadata["chio_runtime"]["accepted"], false);
-    assert_eq!(
-        metadata["chio_runtime"]["failure_code"],
-        "runtime_admission_hook_missing"
-    );
-    Ok(())
-}
-
-
-#[test]
-fn session_tool_call_preserves_chio_swarm_runtime_context(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let mut kernel = make_kernel(make_config());
-    let invocations = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.register_tool_server(Box::new(SideEffectServer::new(
-        "srv-chio-runtime",
-        vec!["destructive_update"],
-        std::sync::Arc::clone(&invocations),
-    )));
-
-    let agent_kp = make_keypair();
-    let cap = make_capability(
-        &kernel,
-        &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
-        300,
-    );
-    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;
-    kernel.activate_session(&session_id)?;
-    let context = make_operation_context(
-        &session_id,
-        "req-chio-swarm-session-no-hook",
-        &agent_kp.public_key().to_hex(),
-    );
-    let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
-        capability: cap,
-        server_id: "srv-chio-runtime".to_string(),
-        tool_name: "destructive_update".to_string(),
-        arguments: serde_json::json!({"record": "vendor-ledger-7", "value": "closed"}),
-        governed_intent: Some(GovernedTransactionIntent {
-            id: "intent:chio:swarm-session-no-hook".to_string(),
-            server_id: "srv-chio-runtime".to_string(),
-            tool_name: "destructive_update".to_string(),
-            purpose: "verify session swarm authority fails closed without a runtime hook"
-                .to_string(),
+    request.governed_intent = Some(GovernedTransactionIntent::tool_invocation(
+        chio_core::capability::governance::GovernedToolInvocationIntentBody {
+            id: "intent:chio:swarm-no-hook".to_string(),
+            server_id: request.server_id.clone(),
+            tool_name: request.tool_name.clone(),
+            purpose: "verify swarm authority fails closed without a runtime hook".to_string(),
             max_amount: None,
             commerce: None,
             metered_billing: None,
@@ -1124,10 +1040,85 @@ fn session_tool_call_preserves_chio_swarm_runtime_context(
                     }
                 }
             })),
-        }),
+        },
+    ));
+
+    let response = kernel.evaluate_tool_call_blocking(&request)?;
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    let metadata = response
+        .receipt
+        .metadata
+        .ok_or_else(|| std::io::Error::other("deny metadata missing"))?;
+    assert_eq!(metadata["chio_runtime"]["accepted"], false);
+    assert_eq!(
+        metadata["chio_runtime"]["failure_code"],
+        "runtime_admission_hook_missing"
+    );
+    Ok(())
+}
+
+#[test]
+fn session_tool_call_preserves_chio_swarm_runtime_context() -> Result<(), Box<dyn std::error::Error>>
+{
+    let mut kernel = make_kernel(make_config());
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-chio-runtime",
+        vec!["destructive_update"],
+        std::sync::Arc::clone(&invocations),
+    )));
+
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
+        300,
+    );
+    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;
+    kernel.activate_session(&session_id)?;
+    let context = make_operation_context(
+        &session_id,
+        "req-chio-swarm-session-no-hook",
+        &agent_kp.public_key().to_hex(),
+    );
+    let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        capability: cap,
+        server_id: "srv-chio-runtime".to_string(),
+        tool_name: "destructive_update".to_string(),
+        arguments: serde_json::json!({"record": "vendor-ledger-7", "value": "closed"}),
+        governed_intent: Some(GovernedTransactionIntent::tool_invocation(
+            chio_core::capability::governance::GovernedToolInvocationIntentBody {
+                id: "intent:chio:swarm-session-no-hook".to_string(),
+                server_id: "srv-chio-runtime".to_string(),
+                tool_name: "destructive_update".to_string(),
+                purpose: "verify session swarm authority fails closed without a runtime hook"
+                    .to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: Some(serde_json::json!({
+                    "chioSwarm": {
+                        "taskGraph": {
+                            "id": "swarm-task-graph-runtime",
+                            "sha256": "a".repeat(64)
+                        },
+                        "continuationToken": {
+                            "id": "swarm-continuation-runtime",
+                            "sha256": "b".repeat(64)
+                        }
+                    }
+                })),
+            },
+        )),
         execution_nonce: None,
         model_metadata: None,
-                extra_metadata: None,
+        extra_metadata: None,
     }));
 
     let response = session_tool_call(kernel.evaluate_session_operation(&context, &operation)?)
@@ -1167,10 +1158,7 @@ fn chio_runtime_admission_hook_allows_dispatch_and_records_metadata(
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -1221,10 +1209,7 @@ fn chio_runtime_admission_hook_receives_route_metadata_before_dispatch(
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -1271,10 +1256,7 @@ fn chio_runtime_admission_hook_receives_nested_flow_route_metadata_before_dispat
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;
@@ -1301,8 +1283,11 @@ fn chio_runtime_admission_hook_receives_nested_flow_route_metadata_before_dispat
     };
     let mut client = NoopNestedFlowClient;
 
-    let response =
-        kernel.evaluate_tool_call_operation_with_nested_flow_client(&context, &operation, &mut client)?;
+    let response = kernel.evaluate_tool_call_operation_with_nested_flow_client(
+        &context,
+        &operation,
+        &mut client,
+    )?;
 
     assert_eq!(response.verdict, Verdict::Allow);
     assert_eq!(admission_calls.load(Ordering::SeqCst), 1);
@@ -1334,25 +1319,20 @@ fn chio_runtime_admission_does_not_release_destructive_lease_after_dispatch_fail
 
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-dispatch-error",
-            admission_id: "adm-dispatch-error",
-            lease_id: "lease-dispatch-error",
-            continuation_id: None,
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-dispatch-error",
+        admission_id: "adm-dispatch-error",
+        lease_id: "lease-dispatch-error",
+        continuation_id: None,
+    }));
 
     let agent_kp = make_keypair();
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -1381,7 +1361,10 @@ fn chio_runtime_admission_does_not_release_destructive_lease_after_dispatch_fail
         .receipt
         .metadata
         .ok_or_else(|| std::io::Error::other("deny metadata missing"))?;
-    assert_eq!(metadata["chio_runtime"]["admission_id"], "adm-dispatch-error");
+    assert_eq!(
+        metadata["chio_runtime"]["admission_id"],
+        "adm-dispatch-error"
+    );
     assert_eq!(metadata["chio_runtime"]["accepted"], true);
     assert_eq!(
         metadata["chio_runtime"]["reserved_destructive_lease_id"],
@@ -1403,25 +1386,20 @@ fn chio_runtime_admission_retains_reservations_on_url_elicitation_connector_erro
 
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-url-elicitation",
-            admission_id: "adm-url-elicitation",
-            lease_id: "lease-url-elicitation",
-            continuation_id: Some("continuation-url-elicitation"),
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-url-elicitation",
+        admission_id: "adm-url-elicitation",
+        lease_id: "lease-url-elicitation",
+        continuation_id: Some("continuation-url-elicitation"),
+    }));
 
     let agent_kp = make_keypair();
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -1436,10 +1414,7 @@ fn chio_runtime_admission_retains_reservations_on_url_elicitation_connector_erro
         .evaluate_tool_call_blocking(&request)
         .expect_err("URL elicitation must surface to the caller");
 
-    assert!(matches!(
-        error,
-        KernelError::UrlElicitationsRequired { .. }
-    ));
+    assert!(matches!(error, KernelError::UrlElicitationsRequired { .. }));
     assert_eq!(admission_calls.load(Ordering::SeqCst), 1);
     assert_eq!(stream_attempts.load(Ordering::SeqCst), 1);
     assert_eq!(
@@ -1452,8 +1427,7 @@ fn chio_runtime_admission_retains_reservations_on_url_elicitation_connector_erro
     let receipt = receipt_log.get(0).unwrap();
     assert!(receipt.is_incomplete());
     assert_eq!(
-        receipt.metadata.as_ref().unwrap()["chio_runtime"]
-            ["reservations_retained_fail_closed"],
+        receipt.metadata.as_ref().unwrap()["chio_runtime"]["reservations_retained_fail_closed"],
         true
     );
     Ok(())
@@ -1472,25 +1446,20 @@ fn chio_runtime_admission_retains_reservations_on_ambiguous_cancellation(
 
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-cancelled",
-            admission_id: "adm-cancelled",
-            lease_id: "lease-cancelled",
-            continuation_id: Some("continuation-cancelled"),
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-cancelled",
+        admission_id: "adm-cancelled",
+        lease_id: "lease-cancelled",
+        continuation_id: Some("continuation-cancelled"),
+    }));
 
     let agent_kp = make_keypair();
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -1527,25 +1496,20 @@ fn chio_runtime_admission_retains_reservations_on_ambiguous_incomplete(
 
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-incomplete",
-            admission_id: "adm-incomplete",
-            lease_id: "lease-incomplete",
-            continuation_id: Some("continuation-incomplete"),
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-incomplete",
+        admission_id: "adm-incomplete",
+        lease_id: "lease-incomplete",
+        continuation_id: Some("continuation-incomplete"),
+    }));
 
     let agent_kp = make_keypair();
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -1575,25 +1539,20 @@ fn chio_post_admission_drop_guard_retains_non_monetary_runtime_reservations(
     let mut kernel = make_kernel(make_config());
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-dropped",
-            admission_id: "adm-dropped",
-            lease_id: "lease-dropped",
-            continuation_id: Some("continuation-dropped"),
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-dropped",
+        admission_id: "adm-dropped",
+        lease_id: "lease-dropped",
+        continuation_id: Some("continuation-dropped"),
+    }));
 
     let agent_kp = make_keypair();
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -1673,30 +1632,31 @@ fn chio_runtime_admission_releases_reservations_on_pre_dispatch_budget_denial(
         agent_id: child_a_kp.public_key().to_hex(),
         arguments: serde_json::json!({}),
         dpop_proof: None,
-                execution_nonce: None,
+        execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })?;
     assert_eq!(
-        allow_response.verdict, Verdict::Allow,
+        allow_response.verdict,
+        Verdict::Allow,
         "unexpected deny reason: {:?}",
         allow_response.reason
     );
 
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-pre-dispatch-budget-deny",
-            admission_id: "adm-pre-dispatch-budget-deny",
-            lease_id: "lease-pre-dispatch-budget-deny",
-            continuation_id: Some("continuation-pre-dispatch-budget-deny"),
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-pre-dispatch-budget-deny",
+        admission_id: "adm-pre-dispatch-budget-deny",
+        lease_id: "lease-pre-dispatch-budget-deny",
+        continuation_id: Some("continuation-pre-dispatch-budget-deny"),
+    }));
 
     let deny_response = kernel.evaluate_tool_call_blocking(&ToolCallRequest {
         request_id: "req-chio-runtime-pre-dispatch-budget-deny".to_string(),
@@ -1706,9 +1666,11 @@ fn chio_runtime_admission_releases_reservations_on_pre_dispatch_budget_denial(
         agent_id: child_b_kp.public_key().to_hex(),
         arguments: serde_json::json!({}),
         dpop_proof: None,
-                execution_nonce: None,
+        execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })?;
@@ -1762,29 +1724,30 @@ fn chio_runtime_release_failure_does_not_mask_pre_dispatch_budget_denial(
         agent_id: child_a_kp.public_key().to_hex(),
         arguments: serde_json::json!({}),
         dpop_proof: None,
-                execution_nonce: None,
+        execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })?;
     assert_eq!(
-        allow_response.verdict, Verdict::Allow,
+        allow_response.verdict,
+        Verdict::Allow,
         "unexpected deny reason: {:?}",
         allow_response.reason
     );
 
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        FailingReleaseRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-release-failure-budget-deny",
-            admission_id: "adm-release-failure-budget-deny",
-            lease_id: "lease-release-failure-budget-deny",
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(FailingReleaseRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-release-failure-budget-deny",
+        admission_id: "adm-release-failure-budget-deny",
+        lease_id: "lease-release-failure-budget-deny",
+    }));
 
     let deny_response = kernel.evaluate_tool_call_blocking(&ToolCallRequest {
         request_id: "req-chio-runtime-release-failure-budget-deny".to_string(),
@@ -1794,9 +1757,11 @@ fn chio_runtime_release_failure_does_not_mask_pre_dispatch_budget_denial(
         agent_id: child_b_kp.public_key().to_hex(),
         arguments: serde_json::json!({}),
         dpop_proof: None,
-                execution_nonce: None,
+        execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })?;
@@ -1823,10 +1788,7 @@ fn chio_runtime_release_failure_does_not_mask_pre_dispatch_budget_denial(
         metadata["chio_runtime"]["reserved_destructive_lease_id"],
         "lease-release-failure-budget-deny"
     );
-    assert_eq!(
-        metadata["chio_runtime"]["reservation_release_failed"],
-        true
-    );
+    assert_eq!(metadata["chio_runtime"]["reservation_release_failed"], true);
     assert_eq!(
         metadata["chio_runtime"]["reservation_release_failure_reason"],
         "internal error: runtime reservation release failed"
@@ -1956,30 +1918,24 @@ fn authorize_fabricated_drop_hold(
 }
 
 #[test]
-fn drop_pre_dispatch_releases_reservations_no_receipt(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn drop_pre_dispatch_releases_reservations_no_receipt() -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-pre-dispatch-dropped",
-            admission_id: "adm-pre-dispatch-dropped",
-            lease_id: "lease-pre-dispatch-dropped",
-            continuation_id: None,
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-pre-dispatch-dropped",
+        admission_id: "adm-pre-dispatch-dropped",
+        lease_id: "lease-pre-dispatch-dropped",
+        continuation_id: None,
+    }));
 
     let agent_kp = make_keypair();
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -2030,8 +1986,7 @@ fn drop_pre_dispatch_releases_reservations_no_receipt(
 }
 
 #[test]
-fn drop_pre_dispatch_monetary_unwinds_without_receipt(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn drop_pre_dispatch_monetary_unwinds_without_receipt() -> Result<(), Box<dyn std::error::Error>> {
     // A MONETARY future dropped before dispatch takes the pre-dispatch branch: the
     // hold is reversed, reservations released, and no receipt is recorded.
     let mut kernel = make_kernel(make_config());
@@ -2039,25 +1994,20 @@ fn drop_pre_dispatch_monetary_unwinds_without_receipt(
     kernel.set_payment_adapter(Box::new(payment.clone()));
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-monetary-pre-dispatch-drop",
-            admission_id: "adm-monetary-pre-dispatch-drop",
-            lease_id: "lease-monetary-pre-dispatch-drop",
-            continuation_id: None,
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-monetary-pre-dispatch-drop",
+        admission_id: "adm-monetary-pre-dispatch-drop",
+        lease_id: "lease-monetary-pre-dispatch-drop",
+        continuation_id: None,
+    }));
 
     let agent_kp = make_keypair();
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -2142,7 +2092,10 @@ fn drop_pre_dispatch_reverses_invocation_budget() -> Result<(), Box<dyn std::err
     // Model admission consuming the single invocation slot for grant 0.
     let admitted =
         kernel.with_budget_store(|store| Ok(store.try_increment(&cap.id, 0, Some(1))?))?;
-    assert!(admitted, "admission must consume the single invocation slot");
+    assert!(
+        admitted,
+        "admission must consume the single invocation slot"
+    );
 
     let mutation = PreExecutionBudgetMutation::Invocation { grant_index: 0 };
     drop(PostAdmissionDropGuard::new(
@@ -2467,10 +2420,7 @@ async fn drop_non_monetary_post_dispatch_records_cancellation_receipt(
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -2531,10 +2481,7 @@ fn nested_flow_drop_post_dispatch_records_cancellation_receipt(
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;
@@ -2564,8 +2511,7 @@ fn nested_flow_drop_post_dispatch_records_cancellation_receipt(
             &mut client,
             None,
         );
-        let raced =
-            tokio::time::timeout(std::time::Duration::from_millis(200), eval).await;
+        let raced = tokio::time::timeout(std::time::Duration::from_millis(200), eval).await;
         assert!(
             raced.is_err(),
             "parked nested dispatch must be dropped by the timeout"
@@ -2608,12 +2554,7 @@ struct NestedChildOpServer {
 }
 
 impl NestedChildOpServer {
-    fn new(
-        id: &str,
-        tools: Vec<&str>,
-        child_ops: std::sync::Arc<AtomicU64>,
-        park: bool,
-    ) -> Self {
+    fn new(id: &str, tools: Vec<&str>, child_ops: std::sync::Arc<AtomicU64>, park: bool) -> Self {
         Self {
             id: id.to_string(),
             tools: tools.into_iter().map(String::from).collect(),
@@ -2828,25 +2769,20 @@ async fn drop_post_dispatch_retains_and_marks_reservations(
     )));
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-drop-retained",
-            admission_id: "adm-drop-retained",
-            lease_id: "lease-drop-retained",
-            continuation_id: Some("continuation-drop-retained"),
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-drop-retained",
+        admission_id: "adm-drop-retained",
+        lease_id: "lease-drop-retained",
+        continuation_id: Some("continuation-drop-retained"),
+    }));
 
     let agent_kp = make_keypair();
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -2915,8 +2851,7 @@ async fn drop_post_dispatch_retains_and_marks_reservations(
 }
 
 #[test]
-fn request_cancelled_marks_reservations_retained(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn request_cancelled_marks_reservations_retained() -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
     let side_effects = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(CancellationAfterSideEffectServer::new(
@@ -2926,25 +2861,20 @@ fn request_cancelled_marks_reservations_retained(
     )));
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-cancel-marked",
-            admission_id: "adm-cancel-marked",
-            lease_id: "lease-cancel-marked",
-            continuation_id: Some("continuation-cancel-marked"),
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-cancel-marked",
+        admission_id: "adm-cancel-marked",
+        lease_id: "lease-cancel-marked",
+        continuation_id: Some("continuation-cancel-marked"),
+    }));
 
     let agent_kp = make_keypair();
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -2985,8 +2915,7 @@ fn request_cancelled_marks_reservations_retained(
 }
 
 #[test]
-fn request_incomplete_marks_reservations_retained(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn request_incomplete_marks_reservations_retained() -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
     let side_effects = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(IncompleteAfterSideEffectServer::new(
@@ -2996,25 +2925,20 @@ fn request_incomplete_marks_reservations_retained(
     )));
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-incomplete-marked",
-            admission_id: "adm-incomplete-marked",
-            lease_id: "lease-incomplete-marked",
-            continuation_id: Some("continuation-incomplete-marked"),
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-incomplete-marked",
+        admission_id: "adm-incomplete-marked",
+        lease_id: "lease-incomplete-marked",
+        continuation_id: Some("continuation-incomplete-marked"),
+    }));
 
     let agent_kp = make_keypair();
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -3050,8 +2974,8 @@ fn request_incomplete_marks_reservations_retained(
 }
 
 #[test]
-fn incomplete_stream_output_marks_reservations_retained(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn incomplete_stream_output_marks_reservations_retained() -> Result<(), Box<dyn std::error::Error>>
+{
     // Dispatch succeeds but returns Ok(ToolServerStreamResult::Incomplete)
     // (e.g. stream-limit truncation). This is finalized via
     // finalize_budgeted_tool_output_with_cost_and_metadata / the shared
@@ -3068,25 +2992,20 @@ fn incomplete_stream_output_marks_reservations_retained(
     )));
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-incomplete-stream-marked",
-            admission_id: "adm-incomplete-stream-marked",
-            lease_id: "lease-incomplete-stream-marked",
-            continuation_id: Some("continuation-incomplete-stream-marked"),
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-incomplete-stream-marked",
+        admission_id: "adm-incomplete-stream-marked",
+        lease_id: "lease-incomplete-stream-marked",
+        continuation_id: Some("continuation-incomplete-stream-marked"),
+    }));
 
     let agent_kp = make_keypair();
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -3125,8 +3044,7 @@ fn incomplete_stream_output_marks_reservations_retained(
 }
 
 #[test]
-fn post_invocation_block_marks_reservations_retained(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn post_invocation_block_marks_reservations_retained() -> Result<(), Box<dyn std::error::Error>> {
     // A runtime-admitted call dispatches successfully (a destructive side
     // effect commits) and returns a value, but a POST-invocation output guard
     // blocks the returned value AFTER dispatch. Because the tool already ran,
@@ -3144,16 +3062,14 @@ fn post_invocation_block_marks_reservations_retained(
     kernel.add_post_invocation_hook(Box::new(BlockingPostInvocationHook));
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-post-invocation-block",
-            admission_id: "adm-post-invocation-block",
-            lease_id: "lease-post-invocation-block",
-            continuation_id: Some("continuation-post-invocation-block"),
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-post-invocation-block",
+        admission_id: "adm-post-invocation-block",
+        lease_id: "lease-post-invocation-block",
+        continuation_id: Some("continuation-post-invocation-block"),
+    }));
 
     let agent_kp = make_keypair();
     let cap = make_capability(
@@ -3183,9 +3099,10 @@ fn post_invocation_block_marks_reservations_retained(
         0,
         "a post-invocation block after a side effect must retain reservations"
     );
-    let metadata = response.receipt.metadata.ok_or_else(|| {
-        std::io::Error::other("post-invocation block receipt metadata missing")
-    })?;
+    let metadata = response
+        .receipt
+        .metadata
+        .ok_or_else(|| std::io::Error::other("post-invocation block receipt metadata missing"))?;
     assert_eq!(
         metadata["chio_runtime"]["reservations_retained_fail_closed"],
         true
@@ -3213,25 +3130,20 @@ fn connector_tool_not_registered_retains_reservations_and_marks_receipt(
     )));
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: "req-chio-runtime-tool-not-registered",
-            admission_id: "adm-tool-not-registered",
-            lease_id: "lease-tool-not-registered",
-            continuation_id: None,
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-chio-runtime-tool-not-registered",
+        admission_id: "adm-tool-not-registered",
+        lease_id: "lease-tool-not-registered",
+        continuation_id: None,
+    }));
 
     let agent_kp = make_keypair();
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_grant(
-            "srv-chio-runtime",
-            "destructive_update",
-        )]),
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
         300,
     );
     let request = make_request_with_arguments(
@@ -3305,9 +3217,7 @@ fn connector_tool_not_registered_retains_invocation_top_level(
     assert_eq!(stream_attempts.load(Ordering::SeqCst), 1);
     let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
     assert_eq!(usage.invocation_count, 1);
-    assert!(!kernel
-        .budget_store
-        .try_increment(&cap.id, 0, Some(1))?);
+    assert!(!kernel.budget_store.try_increment(&cap.id, 0, Some(1))?);
     Ok(())
 }
 
@@ -3362,15 +3272,13 @@ fn connector_tool_not_registered_retains_invocation_nested_flow(
     assert_eq!(stream_attempts.load(Ordering::SeqCst), 1);
     let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
     assert_eq!(usage.invocation_count, 1);
-    assert!(!kernel
-        .budget_store
-        .try_increment(&cap.id, 0, Some(1))?);
+    assert!(!kernel.budget_store.try_increment(&cap.id, 0, Some(1))?);
     Ok(())
 }
 
 #[test]
-fn connector_url_elicitation_retains_invocation_top_level(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn connector_url_elicitation_retains_invocation_top_level() -> Result<(), Box<dyn std::error::Error>>
+{
     let mut kernel = make_kernel(make_config());
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
@@ -3411,9 +3319,7 @@ fn connector_url_elicitation_retains_invocation_top_level(
 
     let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
     assert_eq!(usage.invocation_count, 1);
-    assert!(!kernel
-        .budget_store
-        .try_increment(&cap.id, 0, Some(1))?);
+    assert!(!kernel.budget_store.try_increment(&cap.id, 0, Some(1))?);
     let receipt_log = kernel.receipt_log();
     assert_eq!(receipt_log.len(), 1);
     assert!(receipt_log.get(0).unwrap().is_incomplete());
@@ -3479,9 +3385,7 @@ fn connector_url_elicitation_retains_invocation_nested_flow(
 
     let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
     assert_eq!(usage.invocation_count, 1);
-    assert!(!kernel
-        .budget_store
-        .try_increment(&cap.id, 0, Some(1))?);
+    assert!(!kernel.budget_store.try_increment(&cap.id, 0, Some(1))?);
     let receipt_log = kernel.receipt_log();
     assert_eq!(receipt_log.len(), 1);
     assert!(receipt_log.get(0).unwrap().is_incomplete());
@@ -3505,16 +3409,14 @@ fn assert_monetary_url_elicitation_release_projection(
     )));
     let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
     let releases = std::sync::Arc::new(AtomicU64::new(0));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(
-        ReleaseTrackingRuntimeAdmissionHook {
-            calls: std::sync::Arc::clone(&admission_calls),
-            releases: std::sync::Arc::clone(&releases),
-            expected_request_id: request_id,
-            admission_id: "adm-monetary-url-release",
-            lease_id: "lease-monetary-url-release",
-            continuation_id: None,
-        },
-    ));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(ReleaseTrackingRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: request_id,
+        admission_id: "adm-monetary-url-release",
+        lease_id: "lease-monetary-url-release",
+        continuation_id: None,
+    }));
 
     let agent_kp = make_keypair();
     let mut grant = make_monetary_grant("cost-srv", "compute", 100, 1_000, "USD");
@@ -3529,8 +3431,7 @@ fn assert_monetary_url_elicitation_release_projection(
     );
 
     let result = if nested {
-        let session_id =
-            kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;
+        let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;
         kernel.activate_session(&session_id)?;
         let context =
             make_operation_context(&session_id, request_id, &agent_kp.public_key().to_hex());
@@ -3719,7 +3620,8 @@ fn url_elicitation_retained_evaluation_holder_blocks_sibling_nested_flow(
         .map_err(std::io::Error::other)?;
     assert!(first, "the first admission must acquire child_a's lease");
 
-    let session_id = kernel.open_session(child_a_kp.public_key().to_hex(), vec![child_a.clone()])?;
+    let session_id =
+        kernel.open_session(child_a_kp.public_key().to_hex(), vec![child_a.clone()])?;
     kernel.activate_session(&session_id)?;
     let context = make_operation_context(
         &session_id,
@@ -3816,16 +3718,13 @@ fn url_elicitation_retains_runtime_reservations_and_invocation_top_level(
     );
     let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
     assert_eq!(usage.invocation_count, 1);
-    assert!(!kernel
-        .budget_store
-        .try_increment(&cap.id, 0, Some(1))?);
+    assert!(!kernel.budget_store.try_increment(&cap.id, 0, Some(1))?);
     let receipt_log = kernel.receipt_log();
     assert_eq!(receipt_log.len(), 1);
     let receipt = receipt_log.get(0).unwrap();
     assert!(receipt.is_incomplete());
     assert_eq!(
-        receipt.metadata.as_ref().unwrap()["chio_runtime"]
-            ["reservations_retained_fail_closed"],
+        receipt.metadata.as_ref().unwrap()["chio_runtime"]["reservations_retained_fail_closed"],
         true
     );
     Ok(())
@@ -3898,16 +3797,13 @@ fn url_elicitation_retains_runtime_reservations_and_invocation_nested_flow(
     );
     let usage = kernel.budget_store.get_usage(&cap.id, 0)?.unwrap();
     assert_eq!(usage.invocation_count, 1);
-    assert!(!kernel
-        .budget_store
-        .try_increment(&cap.id, 0, Some(1))?);
+    assert!(!kernel.budget_store.try_increment(&cap.id, 0, Some(1))?);
     let receipt_log = kernel.receipt_log();
     assert_eq!(receipt_log.len(), 1);
     let receipt = receipt_log.get(0).unwrap();
     assert!(receipt.is_incomplete());
     assert_eq!(
-        receipt.metadata.as_ref().unwrap()["chio_runtime"]
-            ["reservations_retained_fail_closed"],
+        receipt.metadata.as_ref().unwrap()["chio_runtime"]["reservations_retained_fail_closed"],
         true
     );
     Ok(())
@@ -3934,9 +3830,9 @@ fn assert_url_elicitation_budget_cleanup_fault_recorded(
                                     && fault["attempted_release_event_id"]
                                         .as_str()
                                         .is_some_and(|event_id| event_id.ends_with(":release"))
-                                    && fault["hold_ids"].as_array().is_some_and(|ids| {
-                                        ids.iter().any(|id| id == hold_id)
-                                    })
+                                    && fault["hold_ids"]
+                                        .as_array()
+                                        .is_some_and(|ids| ids.iter().any(|id| id == hold_id))
                             })
                         })
             })
@@ -4015,9 +3911,7 @@ fn drop_pre_dispatch_cleanup_fault_receipt_includes_monetary_hold_id(
         .as_array()
         .ok_or_else(|| std::io::Error::other("monetary_unwind fault must carry hold_ids"))?;
     assert!(
-        hold_ids
-            .iter()
-            .any(|id| id == "hold-drop-guard-tests"),
+        hold_ids.iter().any(|id| id == "hold-drop-guard-tests"),
         "the monetary_unwind fault must name the budget hold id: {hold_ids:?}"
     );
     Ok(())
@@ -4110,7 +4004,9 @@ impl PaymentAdapter for FailingReleasePaymentAdapter {
         _currency: &str,
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
-        Err(PaymentError::RailError("capture should not run".to_string()))
+        Err(PaymentError::RailError(
+            "capture should not run".to_string(),
+        ))
     }
 
     fn release(
@@ -4154,7 +4050,9 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_async(
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_monetary_grant("cost-srv", "compute", 100, 1_000, "USD")]),
+        make_scope(vec![make_monetary_grant(
+            "cost-srv", "compute", 100, 1_000, "USD",
+        )]),
         300,
     );
     let request = make_request_with_arguments(
@@ -4253,7 +4151,9 @@ fn url_elicitation_monetary_release_failure_records_hold_ids_nested_flow(
     let cap = make_capability(
         &kernel,
         &agent_kp,
-        make_scope(vec![make_monetary_grant("cost-srv", "compute", 100, 1_000, "USD")]),
+        make_scope(vec![make_monetary_grant(
+            "cost-srv", "compute", 100, 1_000, "USD",
+        )]),
         300,
     );
     let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;

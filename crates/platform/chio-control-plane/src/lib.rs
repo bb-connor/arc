@@ -326,6 +326,7 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
         guard_pipeline,
         post_invocation_pipeline,
         runtime_assurance_policy,
+        threshold_approval_resolver,
         ..
     } = loaded_policy;
 
@@ -382,6 +383,11 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
         runtime_assurance_policy.and_then(|policy| policy.attestation_trust_policy)
     {
         kernel.set_attestation_trust_policy(attestation_trust_policy);
+    }
+
+    if let Some(resolver) = threshold_approval_resolver {
+        kernel.set_threshold_approval_requirement_resolver(Arc::new(resolver));
+        kernel.set_threshold_approval_policy_authority(kernel_kp.public_key());
     }
 
     kernel
@@ -1049,6 +1055,7 @@ mod tests {
             },
             issuance_policy: None,
             runtime_assurance_policy: None,
+            threshold_approval_resolver: None,
         };
 
         let kernel = build_kernel(loaded_policy, &keypair);
@@ -1070,11 +1077,119 @@ mod tests {
             post_invocation_pipeline: PostInvocationPipeline::new(),
             issuance_policy: None,
             runtime_assurance_policy: None,
+            threshold_approval_resolver: None,
         };
 
         let kernel = build_kernel(loaded_policy, &keypair);
 
         assert!(kernel.guard_count() >= 2);
         assert!(kernel.post_invocation_hook_count() >= 1);
+    }
+
+    #[test]
+    fn build_kernel_installs_threshold_resolver_and_proposal_authority() {
+        use chio_core::capability::threshold_approval::{
+            ThresholdApprovalRequest, ThresholdApprovalRequirementResolver,
+        };
+
+        let policy_path = unique_receipt_db_path("chio-threshold-composition");
+        let approver = Keypair::generate();
+        std::fs::write(
+            &policy_path,
+            format!(
+                "hushspec: \"0.1.0\"\nextensions:\n  chio:\n    human_in_loop:\n      approvers:\n        n: 1\n        of:\n          - \"{}\"\n",
+                approver.public_key().to_hex()
+            ),
+        )
+        .expect("write threshold policy");
+        let directory =
+            chio_policy::AuthenticatedApproverDirectorySnapshot::from_self_authenticating_hex_keys(
+                7,
+                vec![approver.public_key().to_hex()],
+            )
+            .expect("approver directory");
+        let loaded = policy::load_policy_with_approver_directory(&policy_path, &directory)
+            .expect("load threshold policy");
+        let runtime_hash = loaded.identity.runtime_hash.clone();
+        let request = ThresholdApprovalRequest::new("request-1", "server-1", "tool-1")
+            .expect("threshold request");
+        let requirement = loaded
+            .threshold_approval_resolver
+            .as_ref()
+            .expect("compiled resolver")
+            .resolve_threshold_approval_requirement(&request, &runtime_hash)
+            .expect("threshold requirement");
+
+        let kernel_keypair = Keypair::generate();
+        let kernel = build_kernel(loaded, &kernel_keypair);
+        assert_eq!(
+            kernel.threshold_approval_policy_authorities(),
+            std::slice::from_ref(&kernel_keypair.public_key())
+        );
+
+        let subject = Keypair::generate();
+        let intent_hash = "11".repeat(32);
+        let capability_hash = "22".repeat(32);
+        let proposal_body =
+            chio_core::capability::threshold_approval::ThresholdApprovalProposalBody::new(
+                "proposal-1",
+                "request-1",
+                intent_hash.clone(),
+                subject.public_key(),
+                capability_hash.clone(),
+                runtime_hash.clone(),
+                requirement.required(),
+                requirement.eligible_set_digest(),
+                1_000,
+                requirement.proposal_timeout_seconds(),
+                1_900,
+                1_900,
+            )
+            .expect("proposal body");
+        let proposal = chio_core::capability::threshold_approval::ThresholdApprovalProposal::sign(
+            proposal_body,
+            &kernel_keypair,
+        )
+        .expect("signed proposal");
+        let approval = chio_core::capability::governance::GovernedApprovalToken::sign(
+            chio_core::capability::governance::GovernedApprovalTokenBody {
+                id: "approval-1".to_string(),
+                approver: approver.public_key(),
+                subject: subject.public_key(),
+                governed_intent_hash: intent_hash.clone(),
+                threshold_proposal_hash: Some(proposal.proposal_hash().expect("proposal hash")),
+                request_id: "request-1".to_string(),
+                issued_at: 1_100,
+                expires_at: 1_800,
+                decision: chio_core::capability::governance::GovernedApprovalDecision::Approved,
+            },
+            &approver,
+        )
+        .expect("signed approval");
+        let verified = chio_kernel::threshold_approval::verify_threshold_approval_set(
+            &chio_kernel::threshold_approval::ThresholdApprovalVerificationInput {
+                request_id: "request-1",
+                server_id: "server-1",
+                tool_name: "tool-1",
+                governed_intent_hash: &intent_hash,
+                subject: &subject.public_key(),
+                authorization_capability_hash: &capability_hash,
+                authorizing_capability_expires_at: 1_900,
+                governed_operation_expires_at: 1_900,
+                policy_hash: &runtime_hash,
+                proposal: &proposal,
+                approval_tokens: std::slice::from_ref(&approval),
+                trusted_policy_authorities: kernel.threshold_approval_policy_authorities(),
+                allowed_token_algorithms: &[chio_core::crypto::SigningAlgorithm::Ed25519],
+                now: 1_200,
+            },
+            kernel
+                .threshold_approval_requirement_resolver()
+                .expect("installed resolver"),
+        )
+        .expect("verified approval set");
+        assert_eq!(verified.required(), 1);
+
+        let _ = std::fs::remove_file(policy_path);
     }
 }

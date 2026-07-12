@@ -1,6 +1,6 @@
 use super::*;
 use chio_core::capability::{
-    governance::GovernedTransactionIntent,
+    governance::{GovernedToolInvocationIntentBody, GovernedTransactionIntent},
     scope::{ChioScope, Constraint, ModelSafetyTier, MonetaryAmount, Operation, ToolGrant},
 };
 use chio_core::crypto::Keypair;
@@ -471,22 +471,24 @@ fn execute_tool_call_treats_pending_approval_as_denied() {
         agent_id: agent_kp.public_key().to_hex(),
         dpop_proof: None,
         execution_nonces: BTreeMap::new(),
-        governed_intent: Some(GovernedTransactionIntent {
-            id: "intent-openai-approval-1".to_string(),
-            server_id: "test-srv".to_string(),
-            tool_name: "get_weather".to_string(),
-            purpose: "require human approval".to_string(),
-            max_amount: Some(MonetaryAmount {
-                units: 100,
-                currency: "USD".to_string(),
-            }),
-            commerce: None,
-            metered_billing: None,
-            runtime_attestation: None,
-            call_chain: None,
-            autonomy: None,
-            context: None,
-        }),
+        governed_intent: Some(GovernedTransactionIntent::tool_invocation(
+            GovernedToolInvocationIntentBody {
+                id: "intent-openai-approval-1".to_string(),
+                server_id: "test-srv".to_string(),
+                tool_name: "get_weather".to_string(),
+                purpose: "require human approval".to_string(),
+                max_amount: Some(MonetaryAmount {
+                    units: 100,
+                    currency: "USD".to_string(),
+                }),
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: None,
+            },
+        )),
         approval_token: None,
         model_metadata: None,
     };
@@ -692,6 +694,8 @@ fn execute_tool_calls_uses_per_call_execution_nonces() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         };

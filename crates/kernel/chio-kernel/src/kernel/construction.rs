@@ -236,6 +236,9 @@ impl ChioKernel {
             child_receipt_mirror_gauge,
             receipt_store: None,
             aggregate_family_root_resolver: None,
+            threshold_approval_requirement_resolver: None,
+            threshold_approval_policy_configured: false,
+            threshold_approval_policy_authorities: Vec::new(),
             receipt_store_write_lock: Mutex::new(()),
             payment_adapter: None,
             price_oracle: None,
@@ -503,6 +506,70 @@ impl ChioKernel {
         &(dyn chio_core::capability::aggregate_budget::AggregateFamilyRootResolver + Send + Sync),
     > {
         self.aggregate_family_root_resolver.as_deref()
+    }
+
+    /// Install the policy-authoritative threshold requirement resolver.
+    pub fn set_threshold_approval_requirement_resolver(
+        &mut self,
+        resolver: Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>,
+    ) {
+        self.threshold_approval_requirement_resolver = Some(resolver);
+        self.threshold_approval_policy_configured = true;
+    }
+
+    /// Remove threshold authority during an explicit policy teardown.
+    pub fn clear_threshold_approval_requirement_resolver(&mut self) {
+        self.threshold_approval_requirement_resolver = None;
+        self.threshold_approval_policy_authorities.clear();
+    }
+
+    /// Disable threshold approval after an authenticated policy explicitly removes it.
+    pub fn disable_threshold_approval_policy(&mut self) {
+        self.threshold_approval_requirement_resolver = None;
+        self.threshold_approval_policy_configured = false;
+        self.threshold_approval_policy_authorities.clear();
+    }
+
+    /// Borrow the configured threshold authority without a permissive default.
+    #[must_use]
+    pub fn threshold_approval_requirement_resolver(
+        &self,
+    ) -> Option<&dyn crate::threshold_approval::ThresholdApprovalRequirementResolver> {
+        self.threshold_approval_requirement_resolver.as_deref()
+    }
+
+    /// Replace the bounded, deduplicated policy-authority trust roots for threshold proposals.
+    pub fn set_threshold_approval_policy_authorities(
+        &mut self,
+        authorities: Vec<chio_core::PublicKey>,
+    ) -> Result<(), KernelError> {
+        if authorities.is_empty()
+            || authorities.len()
+                > chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+        {
+            return Err(KernelError::InvalidConstraint(
+                "threshold proposal policy authorities must be nonempty and bounded".to_string(),
+            ));
+        }
+        let mut deduplicated = Vec::with_capacity(authorities.len());
+        for authority in authorities {
+            if !deduplicated.contains(&authority) {
+                deduplicated.push(authority);
+            }
+        }
+        self.threshold_approval_policy_authorities = deduplicated;
+        Ok(())
+    }
+
+    /// Install the single authenticated policy authority used by ordinary composition.
+    pub fn set_threshold_approval_policy_authority(&mut self, authority: chio_core::PublicKey) {
+        self.threshold_approval_policy_authorities = vec![authority];
+    }
+
+    /// Borrow the explicit threshold proposal trust roots.
+    #[must_use]
+    pub fn threshold_approval_policy_authorities(&self) -> &[chio_core::PublicKey] {
+        &self.threshold_approval_policy_authorities
     }
 
     pub fn try_set_receipt_store_handle(

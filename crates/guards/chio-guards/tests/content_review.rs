@@ -10,7 +10,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use chio_core::capability::{
-    governance::GovernedTransactionIntent,
+    governance::{GovernedToolInvocationIntentBody, GovernedTransactionIntent},
     scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
@@ -52,6 +52,8 @@ fn make_request_with_scope(
         execution_nonce: None,
         governed_intent: intent,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -168,7 +170,7 @@ fn stripe_charge_via_governed_intent_also_triggers_pending_approval() {
         grants: vec![grant],
         ..ChioScope::default()
     };
-    let intent = GovernedTransactionIntent {
+    let intent = GovernedTransactionIntent::tool_invocation(GovernedToolInvocationIntentBody {
         id: "intent-1".to_string(),
         server_id: "srv-content".to_string(),
         tool_name: "stripe_create_charge".to_string(),
@@ -183,7 +185,7 @@ fn stripe_charge_via_governed_intent_also_triggers_pending_approval() {
         call_chain: None,
         autonomy: None,
         context: None,
-    };
+    });
     let v = eval_with(
         &guard,
         "stripe_create_charge",

@@ -62,6 +62,7 @@ fn sign_token(
         approver: approver.public_key(),
         subject: subject.public_key(),
         governed_intent_hash: parameter_hash.into(),
+        threshold_proposal_hash: None,
         request_id: approval_id.into(),
         issued_at: 100,
         expires_at: 3600,

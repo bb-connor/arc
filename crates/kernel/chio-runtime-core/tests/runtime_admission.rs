@@ -1,6 +1,6 @@
 use chio_core_types::capability::attenuation::{compute_attenuation_witness, scope_hash};
 use chio_core_types::capability::{
-    governance::GovernedTransactionIntent,
+    governance::{GovernedToolInvocationIntentBody, GovernedTransactionIntent},
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
@@ -1030,25 +1030,29 @@ fn chio_runtime_hook_releases_chio_native_reserved_state_after_kernel_abort(
         arguments: args,
         dpop_proof: None,
         execution_nonce: None,
-        governed_intent: Some(GovernedTransactionIntent {
-            id: "intent-live-1".to_string(),
-            server_id: "vendor-ledger".to_string(),
-            tool_name: "close_account".to_string(),
-            purpose: "close governed vendor account".to_string(),
-            max_amount: None,
-            commerce: None,
-            metered_billing: None,
-            runtime_attestation: None,
-            call_chain: None,
-            autonomy: None,
-            context: Some(serde_json::json!({
-                "chioAdmission": {
-                    "admissionId": "adm-live-1",
-                    "bundleSha256": bundle_hash
-                }
-            })),
-        }),
+        governed_intent: Some(GovernedTransactionIntent::tool_invocation(
+            GovernedToolInvocationIntentBody {
+                id: "intent-live-1".to_string(),
+                server_id: "vendor-ledger".to_string(),
+                tool_name: "close_account".to_string(),
+                purpose: "close governed vendor account".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: Some(serde_json::json!({
+                    "chioAdmission": {
+                        "admissionId": "adm-live-1",
+                        "bundleSha256": bundle_hash
+                    }
+                })),
+            },
+        )),
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1100,35 +1104,39 @@ fn chio_runtime_hook_denies_swarm_context_without_required_evidence_refs(
         arguments: args,
         dpop_proof: None,
         execution_nonce: None,
-        governed_intent: Some(GovernedTransactionIntent {
-            id: "intent-live-1".to_string(),
-            server_id: "vendor-ledger".to_string(),
-            tool_name: "close_account".to_string(),
-            purpose: "close governed vendor account".to_string(),
-            max_amount: None,
-            commerce: None,
-            metered_billing: None,
-            runtime_attestation: None,
-            call_chain: None,
-            autonomy: None,
-            context: Some(serde_json::json!({
-                "chioAdmission": {
-                    "admissionId": "adm-live-1",
-                    "bundleSha256": bundle_hash
-                },
-                "chioSwarm": {
-                    "taskGraph": {
-                        "id": "swarm-task-graph-runtime",
-                        "sha256": "a".repeat(64)
+        governed_intent: Some(GovernedTransactionIntent::tool_invocation(
+            GovernedToolInvocationIntentBody {
+                id: "intent-live-1".to_string(),
+                server_id: "vendor-ledger".to_string(),
+                tool_name: "close_account".to_string(),
+                purpose: "close governed vendor account".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: Some(serde_json::json!({
+                    "chioAdmission": {
+                        "admissionId": "adm-live-1",
+                        "bundleSha256": bundle_hash
                     },
-                    "continuationToken": {
-                        "id": "swarm-continuation-runtime",
-                        "sha256": "b".repeat(64)
+                    "chioSwarm": {
+                        "taskGraph": {
+                            "id": "swarm-task-graph-runtime",
+                            "sha256": "a".repeat(64)
+                        },
+                        "continuationToken": {
+                            "id": "swarm-continuation-runtime",
+                            "sha256": "b".repeat(64)
+                        }
                     }
-                }
-            })),
-        }),
+                })),
+            },
+        )),
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1178,26 +1186,30 @@ fn chio_runtime_hook_denies_stale_swarm_continuation_before_dispatch(
         arguments: args,
         dpop_proof: None,
         execution_nonce: None,
-        governed_intent: Some(GovernedTransactionIntent {
-            id: "intent-live-1".to_string(),
-            server_id: "vendor-ledger".to_string(),
-            tool_name: "close_account".to_string(),
-            purpose: "close governed vendor account".to_string(),
-            max_amount: None,
-            commerce: None,
-            metered_billing: None,
-            runtime_attestation: None,
-            call_chain: None,
-            autonomy: None,
-            context: Some(serde_json::json!({
-                "chioAdmission": {
-                    "admissionId": "adm-live-1",
-                    "bundleSha256": bundle_hash
-                },
-                "chioSwarm": swarm_runtime_context(&swarm_bundle)?
-            })),
-        }),
+        governed_intent: Some(GovernedTransactionIntent::tool_invocation(
+            GovernedToolInvocationIntentBody {
+                id: "intent-live-1".to_string(),
+                server_id: "vendor-ledger".to_string(),
+                tool_name: "close_account".to_string(),
+                purpose: "close governed vendor account".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: Some(serde_json::json!({
+                    "chioAdmission": {
+                        "admissionId": "adm-live-1",
+                        "bundleSha256": bundle_hash
+                    },
+                    "chioSwarm": swarm_runtime_context(&swarm_bundle)?
+                })),
+            },
+        )),
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -2262,28 +2274,32 @@ fn treaty_runtime_request(
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
     };
-    request.governed_intent = Some(GovernedTransactionIntent {
-        id: "intent-live-1".to_string(),
-        server_id: "vendor-ledger".to_string(),
-        tool_name: "close_account".to_string(),
-        purpose: "close governed vendor account".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(serde_json::json!({
-            "chioAdmission": {
-                "admissionId": "adm-live-1",
-                "bundleSha256": bundle_hash
-            },
-            "chioTreaty": treaty_context
-        })),
-    });
+    request.governed_intent = Some(GovernedTransactionIntent::tool_invocation(
+        GovernedToolInvocationIntentBody {
+            id: "intent-live-1".to_string(),
+            server_id: "vendor-ledger".to_string(),
+            tool_name: "close_account".to_string(),
+            purpose: "close governed vendor account".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(serde_json::json!({
+                "chioAdmission": {
+                    "admissionId": "adm-live-1",
+                    "bundleSha256": bundle_hash
+                },
+                "chioTreaty": treaty_context
+            })),
+        },
+    ));
     Ok(request)
 }
 
@@ -2302,26 +2318,30 @@ fn chio_swarm_runtime_request(
         arguments: args,
         dpop_proof: None,
         execution_nonce: None,
-        governed_intent: Some(GovernedTransactionIntent {
-            id: "intent-live-1".to_string(),
-            server_id: "vendor-ledger".to_string(),
-            tool_name: "close_account".to_string(),
-            purpose: "close governed vendor account".to_string(),
-            max_amount: None,
-            commerce: None,
-            metered_billing: None,
-            runtime_attestation: None,
-            call_chain: None,
-            autonomy: None,
-            context: Some(serde_json::json!({
-                "chioAdmission": {
-                    "admissionId": "adm-live-1",
-                    "bundleSha256": bundle_hash
-                },
-                "chioSwarm": swarm_context
-            })),
-        }),
+        governed_intent: Some(GovernedTransactionIntent::tool_invocation(
+            GovernedToolInvocationIntentBody {
+                id: "intent-live-1".to_string(),
+                server_id: "vendor-ledger".to_string(),
+                tool_name: "close_account".to_string(),
+                purpose: "close governed vendor account".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: Some(serde_json::json!({
+                    "chioAdmission": {
+                        "admissionId": "adm-live-1",
+                        "bundleSha256": bundle_hash
+                    },
+                    "chioSwarm": swarm_context
+                })),
+            },
+        )),
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })

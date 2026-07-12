@@ -150,6 +150,7 @@ impl ChioKernel {
         request
             .governed_intent
             .as_ref()
+            .and_then(|intent| intent.as_tool_invocation())
             .and_then(|intent| intent.runtime_attestation.as_ref())
             .map(|attestation| self.verify_governed_runtime_attestation(attestation, now))
             .transpose()
@@ -276,7 +277,7 @@ impl ChioKernel {
     }
 
     fn validate_metered_billing_context(
-        intent: &chio_core::capability::governance::GovernedTransactionIntent,
+        intent: &chio_core::capability::governance::GovernedToolInvocationIntentBody,
         grant: &ToolGrant,
         now: u64,
     ) -> Result<(), KernelError> {
@@ -366,7 +367,8 @@ impl ChioKernel {
         &self,
         request: &ToolCallRequest,
         cap: &CapabilityToken,
-        intent: &chio_core::capability::governance::GovernedTransactionIntent,
+        governed_intent: &chio_core::capability::governance::GovernedTransactionIntent,
+        intent: &chio_core::capability::governance::GovernedToolInvocationIntentBody,
         parent_context: Option<&OperationContext>,
         now: u64,
     ) -> Result<Option<ValidatedGovernedCallChainProof>, KernelError> {
@@ -444,7 +446,7 @@ impl ChioKernel {
         self.validate_governed_call_chain_upstream_proof(
             request,
             cap,
-            intent,
+            governed_intent,
             call_chain,
             parent_context,
             now,
@@ -455,11 +457,16 @@ impl ChioKernel {
         &self,
         request: &ToolCallRequest,
         cap: &CapabilityToken,
-        intent: &chio_core::capability::governance::GovernedTransactionIntent,
+        governed_intent: &chio_core::capability::governance::GovernedTransactionIntent,
         call_chain: &chio_core::capability::governance::GovernedCallChainContext,
         parent_context: Option<&OperationContext>,
         now: u64,
     ) -> Result<Option<ValidatedGovernedCallChainProof>, KernelError> {
+        let intent = governed_intent.as_tool_invocation().ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "governed call-chain validation requires a tool-invocation intent".to_string(),
+            )
+        })?;
         if let Some(continuation_token) = intent.explicit_continuation_token().map_err(|error| {
             KernelError::GovernedTransactionDenied(format!(
                 "governed call_chain continuation token is malformed: {error}"
@@ -539,7 +546,7 @@ impl ChioKernel {
                 ));
             }
             if let Some(expected_intent_hash) = continuation_token.governed_intent_hash.as_deref() {
-                let intent_hash = intent.binding_hash().map_err(|error| {
+                let intent_hash = governed_intent.binding_hash().map_err(|error| {
                     KernelError::GovernedTransactionDenied(format!(
                         "failed to hash governed transaction intent for continuation validation: {error}"
                     ))
@@ -878,7 +885,7 @@ impl ChioKernel {
         &self,
         request: &ToolCallRequest,
         cap: &CapabilityToken,
-        intent: &chio_core::capability::governance::GovernedTransactionIntent,
+        intent: &chio_core::capability::governance::GovernedToolInvocationIntentBody,
         minimum_autonomy_tier: Option<GovernedAutonomyTier>,
         verified_runtime_attestation: Option<&VerifiedRuntimeAttestationRecord>,
         now: u64,
@@ -949,6 +956,7 @@ impl ChioKernel {
         parent_context: Option<&OperationContext>,
         now: u64,
     ) -> Result<Option<ValidatedGovernedAdmission>, KernelError> {
+        let approval_tokens = request.normalized_approval_tokens()?;
         let (
             intent_required,
             approval_threshold_units,
@@ -956,8 +964,9 @@ impl ChioKernel {
             minimum_runtime_assurance,
             minimum_autonomy_tier,
         ) = Self::governed_requirements(grant);
-        let governed_request_present =
-            request.governed_intent.is_some() || request.approval_token.is_some();
+        let governed_request_present = request.governed_intent.is_some()
+            || !approval_tokens.is_empty()
+            || request.threshold_approval_proposal.is_some();
 
         if !intent_required
             && approval_threshold_units.is_none()
@@ -969,9 +978,33 @@ impl ChioKernel {
             return Ok(None);
         }
 
-        let intent = request.governed_intent.as_ref().ok_or_else(|| {
+        let governed_intent = request.governed_intent.as_ref().ok_or_else(|| {
             KernelError::GovernedTransactionDenied(
                 "governed transaction intent required by grant or request".to_string(),
+            )
+        })?;
+        if governed_intent.as_active_response_plan().is_some() {
+            let negotiated = self
+                .capability_negotiation_for_remote(
+                    request.federated_origin_kernel_id.as_deref(),
+                    now,
+                )
+                .map_err(KernelError::GovernedTransactionDenied)?;
+            if !negotiated.supports(chio_core::capability::features::GOVERNED_ACTIVE_RESPONSE_PLAN)
+            {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed active-response plans were not negotiated".to_string(),
+                ));
+            }
+            return Err(KernelError::GovernedTransactionDenied(
+                "ordinary tool-call admission does not accept an active-response plan intent"
+                    .to_string(),
+            ));
+        }
+        let intent = governed_intent.as_tool_invocation().ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "ordinary tool-call admission requires a governed tool-invocation intent"
+                    .to_string(),
             )
         })?;
 
@@ -984,10 +1017,16 @@ impl ChioKernel {
         let verified_runtime_attestation =
             self.verify_governed_request_runtime_attestation(request, now)?;
 
-        let validated_upstream_call_chain_proof =
-            self.validate_governed_call_chain_context(request, cap, intent, parent_context, now)?;
+        let validated_upstream_call_chain_proof = self.validate_governed_call_chain_context(
+            request,
+            cap,
+            governed_intent,
+            intent,
+            parent_context,
+            now,
+        )?;
 
-        let intent_hash = intent.binding_hash().map_err(|error| {
+        let intent_hash = governed_intent.binding_hash().map_err(|error| {
             KernelError::GovernedTransactionDenied(format!(
                 "failed to hash governed transaction intent: {error}"
             ))
@@ -1084,22 +1123,148 @@ impl ChioKernel {
             .map(|threshold_units| requested_units >= threshold_units)
             .unwrap_or(false);
 
-        let approval_replay_key = if let Some(approval_token) = request.approval_token.as_ref() {
+        let threshold_artifacts_present = request.threshold_approval_proposal.is_some()
+            || approval_tokens.len() > 1
+            || approval_tokens
+                .iter()
+                .any(|token| token.threshold_proposal_hash.is_some());
+        let threshold_policy_required = if approval_required
+            && self.threshold_approval_policy_configured
+        {
+            let resolver = self
+                .threshold_approval_requirement_resolver
+                .as_deref()
+                .ok_or_else(|| {
+                    KernelError::GovernedTransactionDenied(
+                        "threshold approval policy is configured but its resolver is unavailable"
+                            .to_string(),
+                    )
+                })?;
+            let matched_request = crate::threshold_approval::ThresholdApprovalRequest::new(
+                &request.request_id,
+                &request.server_id,
+                &request.tool_name,
+            )
+            .map_err(|error| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "threshold approval request identity is invalid: {error}"
+                ))
+            })?;
+            match resolver
+                .resolve_threshold_approval_requirement(&matched_request, &self.config.policy_hash)
+            {
+                Ok(_) => true,
+                Err(crate::threshold_approval::ThresholdApprovalResolutionError::Missing) => false,
+                Err(error) => {
+                    return Err(KernelError::GovernedTransactionDenied(format!(
+                        "threshold approval policy resolution failed: {error}"
+                    )));
+                }
+            }
+        } else {
+            false
+        };
+        let verify_threshold = threshold_policy_required || threshold_artifacts_present;
+
+        let (approval_replay_key, verified_approval_set) = if verify_threshold {
+            let negotiated = self
+                .capability_negotiation_for_remote(
+                    request.federated_origin_kernel_id.as_deref(),
+                    now,
+                )
+                .map_err(|reason| KernelError::GovernedTransactionDenied(reason.to_string()))?;
+            if !negotiated.supports(chio_core::capability::features::THRESHOLD_GOVERNED_APPROVALS) {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "threshold governed approvals were not negotiated".to_string(),
+                ));
+            }
+            let resolver = self
+                .threshold_approval_requirement_resolver
+                .as_deref()
+                .ok_or_else(|| {
+                    KernelError::GovernedTransactionDenied(
+                        "threshold approval requirement resolver is not configured".to_string(),
+                    )
+                })?;
+            let proposal = request
+                .threshold_approval_proposal
+                .as_ref()
+                .ok_or_else(|| {
+                    KernelError::GovernedTransactionDenied(
+                        "signed threshold approval proposal is required".to_string(),
+                    )
+                })?;
+            cap.validate_time(now).map_err(|error| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "authorizing capability is not currently valid: {error}"
+                ))
+            })?;
+            let capability_hash = crate::threshold_approval::authorization_capability_hash(cap)
+                .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+            let allowed_token_algorithms: &[chio_core::crypto::SigningAlgorithm] =
+                match self.capability_crypto_floor {
+                    KernelCryptoFloor::AllowClassical => &[
+                        chio_core::crypto::SigningAlgorithm::Ed25519,
+                        chio_core::crypto::SigningAlgorithm::P256,
+                        chio_core::crypto::SigningAlgorithm::P384,
+                    ],
+                    KernelCryptoFloor::AllowHybrid => &[
+                        chio_core::crypto::SigningAlgorithm::Ed25519,
+                        chio_core::crypto::SigningAlgorithm::P256,
+                        chio_core::crypto::SigningAlgorithm::P384,
+                        chio_core::crypto::SigningAlgorithm::Hybrid,
+                    ],
+                    KernelCryptoFloor::PqRequired => &[chio_core::crypto::SigningAlgorithm::Hybrid],
+                };
+            let verified = crate::threshold_approval::verify_threshold_approval_set(
+                &crate::threshold_approval::ThresholdApprovalVerificationInput {
+                    request_id: &request.request_id,
+                    server_id: &request.server_id,
+                    tool_name: &request.tool_name,
+                    governed_intent_hash: &intent_hash,
+                    subject: &cap.subject,
+                    authorization_capability_hash: &capability_hash,
+                    authorizing_capability_expires_at: cap.expires_at,
+                    governed_operation_expires_at: cap.expires_at,
+                    policy_hash: &self.config.policy_hash,
+                    proposal,
+                    approval_tokens,
+                    trusted_policy_authorities: &self.threshold_approval_policy_authorities,
+                    allowed_token_algorithms,
+                    now,
+                },
+                resolver,
+            )
+            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+            let approval_set_hash = verified.approval_set_hash().map_err(|error| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "verified approval set hash failed: {error}"
+                ))
+            })?;
+            (
+                Some((approval_set_hash, intent_hash.clone())),
+                Some(verified),
+            )
+        } else if let Some(approval_token) = approval_tokens.first() {
             self.verify_governed_approval_token(request, cap, &intent_hash, approval_token, now)?;
-            Some((approval_token.request_id.clone(), intent_hash))
+            (
+                Some((approval_token.request_id.clone(), intent_hash.clone())),
+                None,
+            )
         } else if approval_required {
             return Err(KernelError::GovernedTransactionDenied(format!(
                 "approval token required for governed transaction intent {}",
                 intent.id
             )));
         } else {
-            None
+            (None, None)
         };
 
         Ok(Some(ValidatedGovernedAdmission {
             call_chain_proof: validated_upstream_call_chain_proof,
             verified_runtime_attestation,
             approval_replay_key,
+            verified_approval_set,
         }))
     }
 
@@ -1113,6 +1278,7 @@ impl ChioKernel {
         let Some(call_chain) = request
             .governed_intent
             .as_ref()
+            .and_then(|intent| intent.as_tool_invocation())
             .and_then(|intent| intent.call_chain.as_ref())
         else {
             return Ok(None);

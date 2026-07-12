@@ -16,6 +16,7 @@ include!("tests/plan_evaluation.rs");
 include!("tests/approval_flow.rs");
 include!("tests/admission_saga.rs");
 include!("tests/execution_nonce.rs");
+include!("tests/threshold_approval.rs");
 include!("tests/compliance_score.rs");
 include!("tests/multi_tenant_receipt.rs");
 include!("tests/memory_provenance.rs");

@@ -366,6 +366,7 @@ fn evaluate_amount_threshold(
         ctx.request
             .governed_intent
             .as_ref()
+            .and_then(|intent| intent.as_tool_invocation())
             .and_then(|intent| intent.max_amount.as_ref().map(|amt| amt.units))
     });
     let Some(units) = amount_units else {

@@ -1310,8 +1310,9 @@ impl ChioKernel {
         let governed = request
             .governed_intent
             .as_ref()
-            .map(|intent| {
-                intent
+            .and_then(|intent| intent.as_tool_invocation().map(|body| (intent, body)))
+            .map(|(governed_intent, intent)| {
+                governed_intent
                     .binding_hash()
                     .map(|intent_hash| GovernedPaymentContext {
                         intent_id: intent.id.clone(),
@@ -1331,16 +1332,20 @@ impl ChioKernel {
                     })
             })
             .transpose()?;
-        let commerce = request.governed_intent.as_ref().and_then(|intent| {
-            intent
-                .commerce
-                .as_ref()
-                .map(|commerce| CommercePaymentContext {
-                    seller: commerce.seller.clone(),
-                    shared_payment_token_id: commerce.shared_payment_token_id.clone(),
-                    max_amount: intent.max_amount.clone(),
-                })
-        });
+        let commerce = request
+            .governed_intent
+            .as_ref()
+            .and_then(|intent| intent.as_tool_invocation())
+            .and_then(|intent| {
+                intent
+                    .commerce
+                    .as_ref()
+                    .map(|commerce| CommercePaymentContext {
+                        seller: commerce.seller.clone(),
+                        shared_payment_token_id: commerce.shared_payment_token_id.clone(),
+                        max_amount: intent.max_amount.clone(),
+                    })
+            });
 
         adapter
             .authorize(&PaymentAuthorizeRequest {

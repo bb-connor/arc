@@ -269,7 +269,10 @@ struct RoutePlanningHints {
 fn route_planning_hints(
     governed_intent: Option<&GovernedTransactionIntent>,
 ) -> Result<RoutePlanningHints, BridgeError> {
-    let Some(context) = governed_intent.and_then(|intent| intent.context.as_ref()) else {
+    let Some(context) = governed_intent
+        .and_then(|intent| intent.as_tool_invocation())
+        .and_then(|intent| intent.context.as_ref())
+    else {
         return Ok(RoutePlanningHints::default());
     };
     let Some(control_plane) = context
@@ -384,7 +387,9 @@ fn planned_outcome(
             "selectedTargetProtocol": selected_target_protocol,
             "selectedProtocols": selected_protocols,
             "decision": decision,
-            "governedIntentId": governed_intent.map(|intent| intent.id.clone()),
+            "governedIntentId": governed_intent
+                .and_then(|intent| intent.as_tool_invocation())
+                .map(|intent| intent.id.clone()),
         }))
         .map_err(|error| BridgeError::Canonical(error.to_string()))?,
     );
@@ -400,7 +405,9 @@ fn planned_outcome(
             selected_target_protocol,
             selected_protocols,
             reason: reason.map(str::to_string),
-            governed_intent_id: governed_intent.map(|intent| intent.id.clone()),
+            governed_intent_id: governed_intent
+                .and_then(|intent| intent.as_tool_invocation())
+                .map(|intent| intent.id.clone()),
             candidates: candidates.to_vec(),
         },
     })

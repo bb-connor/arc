@@ -109,6 +109,14 @@ fn fixture_path(name: &str) -> PathBuf {
         .join(name)
 }
 
+fn unique_temp_path(prefix: &str, extension: &str) -> PathBuf {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .test_unwrap()
+        .as_nanos();
+    std::env::temp_dir().join(format!("{prefix}-{nonce}.{extension}"))
+}
+
 fn sample_threat_intel_pattern_db(label: &str) -> String {
     format!(
         r#"
@@ -1067,6 +1075,8 @@ guards:
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1235,6 +1245,66 @@ fn load_hushspec_policy_materializes_runtime_state() {
         "read_file"
     );
     assert_ne!(loaded.identity.source_hash, loaded.identity.runtime_hash);
+}
+
+#[test]
+fn threshold_policy_requires_directory_and_materializes_runtime_resolver() {
+    use chio_core::capability::threshold_approval::{
+        ThresholdApprovalRequest, ThresholdApprovalRequirementResolver,
+    };
+
+    let policy_path = unique_temp_path("hushspec-threshold-policy", "yaml");
+    let approver = chio_core::Keypair::generate();
+    let approver_id = approver.public_key().to_hex();
+    std::fs::write(
+        &policy_path,
+        format!(
+            r#"hushspec: "0.1.0"
+extensions:
+  chio:
+    human_in_loop:
+      approvers:
+        n: 1
+        of:
+          - "{approver_id}"
+"#
+        ),
+    )
+    .test_unwrap();
+
+    let error = load_policy(&policy_path).test_unwrap_err();
+    assert!(error.to_string().contains("approver directory"));
+
+    let directory =
+        chio_policy::AuthenticatedApproverDirectorySnapshot::from_self_authenticating_hex_keys(
+            7,
+            vec![approver_id.clone()],
+        )
+        .test_unwrap();
+    let loaded = load_policy_with_approver_directory(&policy_path, &directory).test_unwrap();
+    let resolver = loaded.threshold_approval_resolver.as_ref().test_unwrap();
+    let request = ThresholdApprovalRequest::new("request-1", "server-1", "tool-1").test_unwrap();
+    let requirement = resolver
+        .resolve_threshold_approval_requirement(&request, &loaded.identity.runtime_hash)
+        .test_unwrap();
+    assert_eq!(requirement.required(), 1);
+    assert_eq!(requirement.approver_directory_version(), 7);
+    assert_eq!(requirement.policy_hash(), loaded.identity.runtime_hash);
+
+    let replacement_directory =
+        chio_policy::AuthenticatedApproverDirectorySnapshot::from_self_authenticating_hex_keys(
+            8,
+            vec![approver_id],
+        )
+        .test_unwrap();
+    let replacement =
+        load_policy_with_approver_directory(&policy_path, &replacement_directory).test_unwrap();
+    assert_ne!(
+        loaded.identity.runtime_hash,
+        replacement.identity.runtime_hash
+    );
+
+    let _ = std::fs::remove_file(policy_path);
 }
 
 #[test]

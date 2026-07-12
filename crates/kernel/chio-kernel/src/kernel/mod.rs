@@ -135,6 +135,8 @@ pub(crate) struct ValidatedGovernedAdmission {
     call_chain_proof: Option<ValidatedGovernedCallChainProof>,
     verified_runtime_attestation: Option<VerifiedRuntimeAttestationRecord>,
     approval_replay_key: Option<(String, String)>,
+    verified_approval_set:
+        Option<chio_core::capability::threshold_approval::VerifiedApprovalSetBody>,
 }
 
 #[derive(Debug, Clone)]

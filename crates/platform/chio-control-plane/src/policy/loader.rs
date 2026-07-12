@@ -22,11 +22,26 @@ use super::util::{
 /// validated, compiled, and kept alive as runtime state rather than being
 /// reduced to an empty fallback policy shell.
 pub fn load_policy(path: &Path) -> Result<LoadedPolicy, PolicyError> {
+    load_policy_with_optional_approver_directory(path, None)
+}
+
+/// Load policy with an authenticated approver-directory authority.
+pub fn load_policy_with_approver_directory(
+    path: &Path,
+    directory: &chio_policy::AuthenticatedApproverDirectorySnapshot,
+) -> Result<LoadedPolicy, PolicyError> {
+    load_policy_with_optional_approver_directory(path, Some(directory))
+}
+
+fn load_policy_with_optional_approver_directory(
+    path: &Path,
+    directory: Option<&chio_policy::AuthenticatedApproverDirectorySnapshot>,
+) -> Result<LoadedPolicy, PolicyError> {
     let contents = std::fs::read_to_string(path)?;
     let source_hash = hash_bytes(contents.as_bytes());
 
     if chio_policy::is_hushspec_format(&contents) {
-        return load_hushspec_policy(path, source_hash);
+        return load_hushspec_policy(path, source_hash, directory);
     }
 
     let policy: ChioPolicy = serde_yml::from_str(&contents)?;
@@ -45,11 +60,16 @@ pub fn load_policy(path: &Path) -> Result<LoadedPolicy, PolicyError> {
         post_invocation_pipeline: build_post_invocation_pipeline(&policy.guards)?,
         issuance_policy: None,
         runtime_assurance_policy: None,
+        threshold_approval_resolver: None,
     })
 }
 
 /// Load a HushSpec policy and compile it into the runtime policy materialization.
-fn load_hushspec_policy(path: &Path, source_hash: String) -> Result<LoadedPolicy, PolicyError> {
+fn load_hushspec_policy(
+    path: &Path,
+    source_hash: String,
+    directory: Option<&chio_policy::AuthenticatedApproverDirectorySnapshot>,
+) -> Result<LoadedPolicy, PolicyError> {
     let spec = chio_policy::resolve_from_path(path)?;
     let validation = chio_policy::validate(&spec);
     if !validation.is_valid() {
@@ -63,14 +83,39 @@ fn load_hushspec_policy(path: &Path, source_hash: String) -> Result<LoadedPolicy
     let source_dir = path.parent();
     let auxiliary_assets = hushspec_auxiliary_asset_digests(&spec, source_dir)?;
     let source_hash = hushspec_source_hash_with_assets(&source_hash, &auxiliary_assets)?;
-    let compiled = chio_policy::compile_policy_with_source(&spec, Some(path))?;
+    let mut compiled = match directory {
+        Some(directory) => chio_policy::compile_policy_with_source_and_approver_directory(
+            &spec,
+            Some(path),
+            directory,
+        )?,
+        None => chio_policy::compile_policy_with_source(&spec, Some(path))?,
+    };
     let kernel = KernelPolicyConfig::default();
     let default_capabilities =
         build_default_capabilities_from_scope(&compiled.default_scope, kernel.max_capability_ttl);
     let issuance_policy = materialize_reputation_issuance_policy(&spec)?;
     let runtime_assurance_policy = materialize_runtime_assurance_policy(&spec)?;
-    let runtime_hash =
-        runtime_hash_for_hushspec(&kernel, &default_capabilities, &spec, &auxiliary_assets)?;
+    let threshold_requirement = compiled
+        .threshold_approval
+        .as_ref()
+        .and_then(chio_policy::ThresholdApprovalResolverSnapshot::requirement);
+    let runtime_hash = runtime_hash_for_hushspec(
+        &kernel,
+        &default_capabilities,
+        &spec,
+        &auxiliary_assets,
+        threshold_requirement.as_ref(),
+    )?;
+    let threshold_approval_resolver = compiled
+        .threshold_approval
+        .take()
+        .map(|snapshot| {
+            snapshot
+                .with_policy_hash(runtime_hash.clone())
+                .map(chio_policy::ThresholdApprovalResolver::new)
+        })
+        .transpose()?;
 
     Ok(LoadedPolicy {
         format: PolicyFormat::HushSpec,
@@ -84,6 +129,7 @@ fn load_hushspec_policy(path: &Path, source_hash: String) -> Result<LoadedPolicy
         post_invocation_pipeline: compiled.post_invocation,
         issuance_policy,
         runtime_assurance_policy,
+        threshold_approval_resolver,
     })
 }
 

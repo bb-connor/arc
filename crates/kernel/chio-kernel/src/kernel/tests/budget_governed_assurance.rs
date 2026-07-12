@@ -40,6 +40,8 @@ fn governed_monetary_denial_without_required_runtime_assurance_releases_budget()
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -86,7 +88,10 @@ fn governed_request_denies_unverified_attestation_when_runtime_assurance_is_requ
         100,
         "USD",
     );
-    intent.runtime_attestation = Some(make_runtime_attestation(RuntimeAssuranceTier::Attested));
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .runtime_attestation = Some(make_runtime_attestation(RuntimeAssuranceTier::Attested));
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -106,6 +111,8 @@ fn governed_request_denies_unverified_attestation_when_runtime_assurance_is_requ
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -141,7 +148,10 @@ fn governed_monetary_allow_omits_unverified_runtime_assurance_metadata_when_opti
         100,
         "USD",
     );
-    intent.runtime_attestation = Some(make_runtime_attestation(RuntimeAssuranceTier::Attested));
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .runtime_attestation = Some(make_runtime_attestation(RuntimeAssuranceTier::Attested));
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -161,6 +171,8 @@ fn governed_monetary_allow_omits_unverified_runtime_assurance_metadata_when_opti
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -200,30 +212,36 @@ fn governed_request_denies_conflicting_workload_identity_binding() {
         100,
         "USD",
     );
-    intent.runtime_attestation = Some(chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
-        schema: "chio.runtime-attestation.enterprise-verifier.json.v1".to_string(),
-        verifier: "https://attest.chio.example".to_string(),
-        tier: RuntimeAssuranceTier::Attested,
-        issued_at: current_unix_timestamp().saturating_sub(1),
-        expires_at: current_unix_timestamp() + 300,
-        evidence_sha256: "digest-invalid-workload".to_string(),
-        runtime_identity: Some("spiffe://chio/runtime/test".to_string()),
-        workload_identity: Some(chio_core::capability::workload_identity::WorkloadIdentity {
-            scheme: chio_core::capability::workload_identity::WorkloadIdentityScheme::Spiffe,
-            credential_kind: chio_core::capability::workload_identity::WorkloadCredentialKind::X509Svid,
-            uri: "spiffe://other/runtime/test".to_string(),
-            trust_domain: "other".to_string(),
-            path: "/runtime/test".to_string(),
-        }),
-        claims: Some(serde_json::json!({
-            "enterpriseVerifier": {
-                "attestationType": "enterprise_confidential_vm",
-                "hardwareModel": "AMD_SEV_SNP",
-                "secureBoot": "enabled",
-                "digest": "sha384:digest-invalid-workload"
-            }
-        })),
-    });
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .runtime_attestation = Some(
+        chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
+            schema: "chio.runtime-attestation.enterprise-verifier.json.v1".to_string(),
+            verifier: "https://attest.chio.example".to_string(),
+            tier: RuntimeAssuranceTier::Attested,
+            issued_at: current_unix_timestamp().saturating_sub(1),
+            expires_at: current_unix_timestamp() + 300,
+            evidence_sha256: "digest-invalid-workload".to_string(),
+            runtime_identity: Some("spiffe://chio/runtime/test".to_string()),
+            workload_identity: Some(chio_core::capability::workload_identity::WorkloadIdentity {
+                scheme: chio_core::capability::workload_identity::WorkloadIdentityScheme::Spiffe,
+                credential_kind:
+                    chio_core::capability::workload_identity::WorkloadCredentialKind::X509Svid,
+                uri: "spiffe://other/runtime/test".to_string(),
+                trust_domain: "other".to_string(),
+                path: "/runtime/test".to_string(),
+            }),
+            claims: Some(serde_json::json!({
+                "enterpriseVerifier": {
+                    "attestationType": "enterprise_confidential_vm",
+                    "hardwareModel": "AMD_SEV_SNP",
+                    "secureBoot": "enabled",
+                    "digest": "sha384:digest-invalid-workload"
+                }
+            })),
+        },
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -243,6 +261,8 @@ fn governed_request_denies_conflicting_workload_identity_binding() {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -282,7 +302,10 @@ fn governed_monetary_allow_rebinds_trusted_attestation_to_verified() {
         100,
         "USD",
     );
-    intent.runtime_attestation = Some(make_trusted_azure_runtime_attestation());
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .runtime_attestation = Some(make_trusted_azure_runtime_attestation());
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -302,6 +325,8 @@ fn governed_monetary_allow_rebinds_trusted_attestation_to_verified() {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -349,7 +374,10 @@ fn governed_request_denies_untrusted_attestation_when_trust_policy_is_configured
     );
     let mut attestation = make_trusted_azure_runtime_attestation();
     attestation.verifier = "https://maa.untrusted.test".to_string();
-    intent.runtime_attestation = Some(attestation);
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .runtime_attestation = Some(attestation);
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -369,6 +397,8 @@ fn governed_request_denies_untrusted_attestation_when_trust_policy_is_configured
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -408,7 +438,10 @@ fn governed_monetary_allow_rebinds_google_attestation_to_verified() {
         100,
         "USD",
     );
-    intent.runtime_attestation = Some(make_trusted_google_runtime_attestation());
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .runtime_attestation = Some(make_trusted_google_runtime_attestation());
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -428,6 +461,8 @@ fn governed_monetary_allow_rebinds_google_attestation_to_verified() {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -471,7 +506,10 @@ fn governed_monetary_allow_rebinds_nitro_attestation_to_verified() {
         100,
         "USD",
     );
-    intent.runtime_attestation = Some(make_trusted_nitro_runtime_attestation());
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .runtime_attestation = Some(make_trusted_nitro_runtime_attestation());
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -491,6 +529,8 @@ fn governed_monetary_allow_rebinds_nitro_attestation_to_verified() {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -539,12 +579,21 @@ fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
         100,
         "USD",
     );
-    intent.runtime_attestation = Some(make_trusted_azure_runtime_attestation());
-    intent.call_chain = Some(make_governed_call_chain_context(
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .runtime_attestation = Some(make_trusted_azure_runtime_attestation());
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .call_chain = Some(make_governed_call_chain_context(
         "chain-bond-1",
         "req-parent-1",
     ));
-    intent.autonomy = Some(make_governed_autonomy_context(
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .autonomy = Some(make_governed_autonomy_context(
         GovernedAutonomyTier::Delegated,
         None,
     ));
@@ -567,6 +616,8 @@ fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -603,12 +654,21 @@ fn governed_request_denies_autonomous_tier_with_weak_runtime_assurance() {
         100,
         "USD",
     );
-    intent.runtime_attestation = Some(make_trusted_azure_runtime_attestation());
-    intent.call_chain = Some(make_governed_call_chain_context(
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .runtime_attestation = Some(make_trusted_azure_runtime_attestation());
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .call_chain = Some(make_governed_call_chain_context(
         "chain-bond-2",
         "req-parent-2",
     ));
-    intent.autonomy = Some(make_governed_autonomy_context(
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .autonomy = Some(make_governed_autonomy_context(
         GovernedAutonomyTier::Autonomous,
         Some("bond-required"),
     ));
@@ -631,6 +691,8 @@ fn governed_request_denies_autonomous_tier_with_weak_runtime_assurance() {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -684,12 +746,21 @@ fn governed_request_denies_delegated_autonomy_with_expired_bond() {
         100,
         "USD",
     );
-    intent.runtime_attestation = Some(make_trusted_azure_runtime_attestation());
-    intent.call_chain = Some(make_governed_call_chain_context(
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .runtime_attestation = Some(make_trusted_azure_runtime_attestation());
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .call_chain = Some(make_governed_call_chain_context(
         "chain-bond-3",
         "req-parent-3",
     ));
-    intent.autonomy = Some(make_governed_autonomy_context(
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .autonomy = Some(make_governed_autonomy_context(
         GovernedAutonomyTier::Delegated,
         Some(&bond_id),
     ));
@@ -712,6 +783,8 @@ fn governed_request_denies_delegated_autonomy_with_expired_bond() {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -765,12 +838,21 @@ fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metad
         100,
         "USD",
     );
-    intent.runtime_attestation = Some(make_trusted_azure_runtime_attestation());
-    intent.call_chain = Some(make_governed_call_chain_context(
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .runtime_attestation = Some(make_trusted_azure_runtime_attestation());
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .call_chain = Some(make_governed_call_chain_context(
         "chain-bond-4",
         "req-parent-4",
     ));
-    intent.autonomy = Some(make_governed_autonomy_context(
+    intent
+        .as_tool_invocation_mut()
+        .expect("tool intent")
+        .autonomy = Some(make_governed_autonomy_context(
         GovernedAutonomyTier::Delegated,
         Some(&bond_id),
     ));
@@ -793,6 +875,8 @@ fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metad
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -842,6 +926,8 @@ fn governed_monetary_denial_without_approval_releases_budget_and_records_intent(
             execution_nonce: None,
             governed_intent: Some(intent.clone()),
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -864,7 +950,10 @@ fn governed_monetary_denial_without_approval_releases_budget_and_records_intent(
     let governed = metadata
         .get("governed_transaction")
         .expect("deny receipt should carry governed transaction metadata");
-    assert_eq!(governed["intent_id"], intent.id);
+    assert_eq!(
+        governed["intent_id"],
+        intent.as_tool_invocation().expect("tool intent").id
+    );
     assert!(governed["approval"].is_null());
 
     let financial = metadata
@@ -923,6 +1012,8 @@ fn governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata() 
             execution_nonce: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -942,7 +1033,10 @@ fn governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata() 
     let governed = metadata
         .get("governed_transaction")
         .expect("incomplete receipt should carry governed transaction metadata");
-    assert_eq!(governed["intent_id"], intent.id);
+    assert_eq!(
+        governed["intent_id"],
+        intent.as_tool_invocation().expect("tool intent").id
+    );
     assert_eq!(governed["approval"]["approved"], true);
 
     let financial = metadata
@@ -1025,6 +1119,8 @@ fn governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadat
             execution_nonce: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token.clone()),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1073,7 +1169,10 @@ fn governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadat
     let governed = metadata
         .get("governed_transaction")
         .expect("allow receipt should carry governed transaction metadata");
-    assert_eq!(governed["intent_id"], intent.id);
+    assert_eq!(
+        governed["intent_id"],
+        intent.as_tool_invocation().expect("tool intent").id
+    );
     assert_eq!(governed["approval"]["token_id"], approval_token.id);
 
     handle.join().expect("server thread should exit cleanly");
@@ -1132,6 +1231,8 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
             execution_nonce: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1170,14 +1271,12 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
     let governed = metadata
         .get("governed_transaction")
         .expect("deny receipt should carry governed transaction metadata");
-    assert_eq!(governed["intent_id"], intent.id);
+    assert_eq!(
+        governed["intent_id"],
+        intent.as_tool_invocation().expect("tool intent").id
+    );
 
-    let usage = kernel
-
-        .budget_store
-        .get_usage(&cap.id, 0)
-        .unwrap()
-        .unwrap();
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.committed_cost_units().unwrap(), 0);
 
@@ -1255,6 +1354,8 @@ fn governed_acp_hold_flow_records_commerce_scope_and_payment_metadata() {
             execution_nonce: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token.clone()),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1300,7 +1401,10 @@ fn governed_acp_hold_flow_records_commerce_scope_and_payment_metadata() {
     let governed = metadata
         .get("governed_transaction")
         .expect("allow receipt should carry governed transaction metadata");
-    assert_eq!(governed["intent_id"], intent.id);
+    assert_eq!(
+        governed["intent_id"],
+        intent.as_tool_invocation().expect("tool intent").id
+    );
     assert_eq!(governed["commerce"]["seller"], "merchant.example");
     assert_eq!(
         governed["commerce"]["shared_payment_token_id"],
@@ -1367,6 +1471,8 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
             execution_nonce: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1401,7 +1507,10 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
     let governed = metadata
         .get("governed_transaction")
         .expect("deny receipt should carry governed transaction metadata");
-    assert_eq!(governed["intent_id"], intent.id);
+    assert_eq!(
+        governed["intent_id"],
+        intent.as_tool_invocation().expect("tool intent").id
+    );
     assert_eq!(governed["commerce"]["seller"], "wrong-merchant.example");
 
     assert!(kernel.budget_store.get_usage(&cap.id, 0).unwrap().is_none());

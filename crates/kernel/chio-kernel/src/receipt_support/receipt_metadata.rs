@@ -251,7 +251,10 @@ fn governed_economic_authorization_metadata(
     financial: &FinancialReceiptMetadata,
 ) -> Result<Option<chio_core::receipt::economics::EconomicAuthorizationReceiptMetadata>, KernelError>
 {
-    let Some(intent) = request.governed_intent.as_ref() else {
+    let Some(governed_intent) = request.governed_intent.as_ref() else {
+        return Ok(None);
+    };
+    let Some(intent) = governed_intent.as_tool_invocation() else {
         return Ok(None);
     };
 
@@ -457,7 +460,10 @@ pub(crate) fn governed_request_metadata(
     attestation_trust_policy: Option<&AttestationTrustPolicy>,
     now: u64,
 ) -> Result<Option<serde_json::Value>, KernelError> {
-    let Some(intent) = request.governed_intent.as_ref() else {
+    let Some(governed_intent) = request.governed_intent.as_ref() else {
+        return Ok(None);
+    };
+    let Some(intent) = governed_intent.as_tool_invocation() else {
         return Ok(None);
     };
 
@@ -521,7 +527,7 @@ pub(crate) fn governed_request_metadata(
     let governed_transaction_diagnostics = governed_transaction_diagnostics(call_chain.as_ref());
     let metadata = GovernedTransactionReceiptMetadata {
         intent_id: intent.id.clone(),
-        intent_hash: intent.binding_hash().map_err(|error| {
+        intent_hash: governed_intent.binding_hash().map_err(|error| {
             KernelError::ReceiptSigningFailed(format!(
                 "failed to hash governed transaction intent for receipt metadata: {error}"
             ))

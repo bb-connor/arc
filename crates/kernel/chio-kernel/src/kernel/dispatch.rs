@@ -470,6 +470,7 @@ impl ChioKernel {
             let has_runtime_context = request
                 .governed_intent
                 .as_ref()
+                .and_then(|intent| intent.as_tool_invocation())
                 .and_then(|intent| intent.context.as_ref())
                 .is_some_and(|context| {
                     context.get("chioAdmission").is_some()

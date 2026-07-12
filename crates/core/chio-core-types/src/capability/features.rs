@@ -24,6 +24,18 @@ pub const DELEGATION_CHAIN_BINDING: &str = "delegation_chain_binding";
 /// durable composite quota authority is installed by the rollout composition.
 pub const AGGREGATE_INVOCATION_BUDGET: &str = "aggregate_invocation_budget";
 
+/// Peers understand and enforce signed threshold proposals and bounded governed approval-token sets.
+///
+/// This feature is intentionally absent from baseline profiles until the
+/// durable atomic approval-member replay authority is installed by the composition.
+pub const THRESHOLD_GOVERNED_APPROVALS: &str = "threshold_governed_approvals";
+
+/// Peers understand and enforce protocol-owned governed active-response plan intent bodies.
+///
+/// This feature is intentionally absent from baseline profiles until an
+/// approval-only active-response executor is installed by the composition.
+pub const GOVERNED_ACTIVE_RESPONSE_PLAN: &str = "governed_active_response_plan";
+
 fn capabilities_schema() -> String {
     CHIO_CAPABILITIES_SCHEMA.to_string()
 }

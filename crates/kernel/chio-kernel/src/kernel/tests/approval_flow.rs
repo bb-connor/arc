@@ -20,8 +20,8 @@ use std::sync::Arc as StdArc;
 // paths intentionally resolve through `crate::approval*` so the test
 // exercises the same type identities that downstream consumers see.
 use crate::approval::{
-    compute_parameter_hash, resume_with_decision, ApprovalContext, ApprovalDecision,
-    ApprovalGuard, ApprovalOutcome, ApprovalRequest, ApprovalStore, ApprovalToken, BatchApproval,
+    compute_parameter_hash, resume_with_decision, ApprovalContext, ApprovalDecision, ApprovalGuard,
+    ApprovalOutcome, ApprovalRequest, ApprovalStore, ApprovalToken, BatchApproval,
     BatchApprovalStore, HitlVerdict, InMemoryApprovalStore, InMemoryBatchApprovalStore,
 };
 use crate::approval_channels::RecordingChannel;
@@ -49,6 +49,7 @@ fn hitl_sign_token(
         approver: approver.public_key(),
         subject: subject.public_key(),
         governed_intent_hash: parameter_hash.to_string(),
+        threshold_proposal_hash: None,
         request_id: approval_id.to_string(),
         issued_at: now.saturating_sub(10),
         expires_at: now + 600,
@@ -81,7 +82,9 @@ fn hitl_force_approval_returns_pending() {
 
     let verdict = guard.evaluate(ctx, 1_000_000).unwrap();
     match verdict {
-        HitlVerdict::Pending { request: approval, .. } => {
+        HitlVerdict::Pending {
+            request: approval, ..
+        } => {
             assert_eq!(approval.approval_id, "ap-force-1");
             assert_eq!(approval.subject_id, request.agent_id);
             assert_eq!(approval.tool_server, "srv-a");
@@ -159,12 +162,11 @@ fn hitl_resume_approved_executes() {
 
     // Pending record is gone; resolved record exists.
     assert!(store.get_pending("ap-approve-1").unwrap().is_none());
-    assert!(store
-        .get_resolution("ap-approve-1")
-        .unwrap()
-        .is_some());
+    assert!(store.get_resolution("ap-approve-1").unwrap().is_some());
     assert_eq!(
-        store.count_approved(&request.agent_id, "policy-hitl").unwrap(),
+        store
+            .count_approved(&request.agent_id, "policy-hitl")
+            .unwrap(),
         1
     );
 }
@@ -227,7 +229,9 @@ fn hitl_resume_denied_records_denial() {
 
     // Approved counter stays zero.
     assert_eq!(
-        store.count_approved(&request.agent_id, "policy-hitl").unwrap(),
+        store
+            .count_approved(&request.agent_id, "policy-hitl")
+            .unwrap(),
         0
     );
     // Resolution record is present with Denied outcome.
@@ -302,9 +306,7 @@ fn hitl_replay_of_consumed_token_rejected() {
     );
 
     // Consumed registry records the token.
-    assert!(store
-        .is_consumed(&token.id, &hash)
-        .unwrap());
+    assert!(store.is_consumed(&token.id, &hash).unwrap());
 
     // Re-storing the pending row and replaying the consumed token
     // should also fail with a replay error (the consumed registry is
@@ -425,9 +427,21 @@ fn hitl_batch_respond_applies_multiple_decisions() {
     }
 
     let decisions = [
-        (ids[0], GovernedApprovalDecision::Approved, ApprovalOutcome::Approved),
-        (ids[1], GovernedApprovalDecision::Denied, ApprovalOutcome::Denied),
-        (ids[2], GovernedApprovalDecision::Approved, ApprovalOutcome::Approved),
+        (
+            ids[0],
+            GovernedApprovalDecision::Approved,
+            ApprovalOutcome::Approved,
+        ),
+        (
+            ids[1],
+            GovernedApprovalDecision::Denied,
+            ApprovalOutcome::Denied,
+        ),
+        (
+            ids[2],
+            GovernedApprovalDecision::Approved,
+            ApprovalOutcome::Approved,
+        ),
     ];
 
     let mut approved = 0usize;
@@ -452,7 +466,9 @@ fn hitl_batch_respond_applies_multiple_decisions() {
     assert_eq!(approved, 2);
     assert_eq!(denied, 1);
     assert_eq!(
-        store.count_approved(&request.agent_id, "policy-batch").unwrap(),
+        store
+            .count_approved(&request.agent_id, "policy-batch")
+            .unwrap(),
         2
     );
 }
@@ -506,6 +522,7 @@ fn governed_approval_token_binds_signed_fields_and_validity_window() {
         approver: approver.public_key(),
         subject: subject.public_key(),
         governed_intent_hash: "intent-hash".into(),
+        threshold_proposal_hash: None,
         request_id: "approval-bound".into(),
         issued_at: 100,
         expires_at: 200,

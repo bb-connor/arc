@@ -108,7 +108,8 @@ fn issue_and_use_capability() {
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(
-        response.verdict, Verdict::Allow,
+        response.verdict,
+        Verdict::Allow,
         "unexpected deny reason: {:?}",
         response.reason
     );
@@ -141,7 +142,8 @@ fn kernel_accepts_capabilities_from_configured_authority() {
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(cap.issuer, authority_keypair.public_key());
     assert_eq!(
-        response.verdict, Verdict::Allow,
+        response.verdict,
+        Verdict::Allow,
         "unexpected deny reason: {:?}",
         response.reason
     );
@@ -427,6 +429,8 @@ fn untrusted_issuer_denied() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -472,9 +476,13 @@ fn revoked_ancestor_capability_denies_descendant() {
         .record_capability_snapshot(&parent, None)
         .unwrap();
     drop(seed_store);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &scope);
-    kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
+    kernel
+        .register_budget_parent(parent.id.clone(), 10_000)
+        .unwrap();
 
     let link = make_chain_bound_delegation_link(
         &parent.id,
@@ -527,9 +535,13 @@ fn delegated_tool_call_records_observed_capability_lineage() {
         .unwrap();
     drop(seed_store);
 
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
-    kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
+    kernel
+        .register_budget_parent(parent.id.clone(), 10_000)
+        .unwrap();
 
     let link_timestamp = current_unix_timestamp();
     let link = make_chain_bound_delegation_link(
@@ -553,7 +565,8 @@ fn delegated_tool_call_records_observed_capability_lineage() {
         .evaluate_tool_call_blocking(&make_request("req-observed", &child, "read_file", "srv-a"))
         .unwrap();
     assert_eq!(
-        response.verdict, Verdict::Allow,
+        response.verdict,
+        Verdict::Allow,
         "unexpected deny reason: {:?}",
         response.reason
     );
@@ -586,9 +599,13 @@ fn delegated_tool_call_without_parent_snapshot_denies() {
     parent_grant.operations.push(Operation::Delegate);
     let parent_scope = make_scope(vec![parent_grant]);
     let parent = make_capability(&kernel, &parent_kp, parent_scope.clone(), 300);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
-    kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
+    kernel
+        .register_budget_parent(parent.id.clone(), 10_000)
+        .unwrap();
 
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let link = make_chain_bound_delegation_link(
@@ -643,9 +660,13 @@ fn delegated_tool_call_without_delegate_operation_denies() {
         .record_capability_snapshot(&parent, None)
         .unwrap();
     drop(seed_store);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
-    kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
+    kernel
+        .register_budget_parent(parent.id.clone(), 10_000)
+        .unwrap();
 
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let link = make_chain_bound_delegation_link(
@@ -711,9 +732,13 @@ fn delegated_tool_call_with_scope_escalation_denies() {
         .record_capability_snapshot(&parent, None)
         .unwrap();
     drop(seed_store);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
-    kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
+    kernel
+        .register_budget_parent(parent.id.clone(), 10_000)
+        .unwrap();
 
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let link_timestamp = current_unix_timestamp();
@@ -769,9 +794,13 @@ fn delegated_tool_call_with_delegatee_subject_mismatch_denies() {
         .record_capability_snapshot(&parent, None)
         .unwrap();
     drop(seed_store);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &parent_scope);
-    kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
+    kernel
+        .register_budget_parent(parent.id.clone(), 10_000)
+        .unwrap();
 
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let link = make_chain_bound_delegation_link(
@@ -855,9 +884,13 @@ fn delegated_tool_call_exceeding_configured_max_depth_denies() {
         .unwrap();
     drop(seed_store);
 
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &delegable_scope);
-    kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
+    kernel
+        .register_budget_parent(parent.id.clone(), 10_000)
+        .unwrap();
 
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let parent_to_child = make_chain_bound_delegation_link(
@@ -932,9 +965,13 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
         .unwrap();
     drop(seed_store);
 
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     trust_delegated_leaf_signer_for_scope(&mut kernel, &parent_kp, &delegable_scope);
-    kernel.register_budget_parent(parent.id.clone(), 10_000).unwrap();
+    kernel
+        .register_budget_parent(parent.id.clone(), 10_000)
+        .unwrap();
 
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let parent_to_child = make_chain_bound_delegation_link(
@@ -984,7 +1021,8 @@ fn wildcard_tool_grant_allows_any_tool() {
     let request = make_request("req-1", &cap, "anything", "srv-a");
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(
-        response.verdict, Verdict::Allow,
+        response.verdict,
+        Verdict::Allow,
         "unexpected deny reason: {:?}",
         response.reason
     );
@@ -1017,9 +1055,11 @@ fn dpop_required_grant_allows_when_valid_proof_provided() {
         agent_id: agent_kp.public_key().to_hex(),
         arguments,
         dpop_proof: Some(proof),
-                execution_nonce: None,
+        execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1051,6 +1091,8 @@ fn dpop_required_grant_denies_when_no_proof_provided() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1094,9 +1136,11 @@ fn dpop_required_grant_denies_when_proof_has_wrong_tool_name() {
         agent_id: agent_kp.public_key().to_hex(),
         arguments,
         dpop_proof: Some(proof),
-                execution_nonce: None,
+        execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1211,4 +1255,41 @@ fn aggregate_family_root_kernel_requires_explicit_resolver() {
         }
         other => panic!("expected explicit legacy root, got {other:?}"),
     }
+}
+
+#[test]
+fn threshold_approval_kernel_requires_explicit_resolver() {
+    let mut kernel = make_kernel(make_config());
+    assert!(kernel.threshold_approval_requirement_resolver().is_none());
+
+    let public_key = Keypair::generate().public_key();
+    let requirement = chio_core::capability::threshold_approval::ThresholdApprovalRequirement::new(
+        1,
+        std::collections::BTreeMap::from([("approver".to_string(), public_key)]),
+        900,
+        "11".repeat(32),
+        1,
+    )
+    .expect("valid requirement");
+    kernel.set_threshold_approval_requirement_resolver(std::sync::Arc::new({
+        let requirement = requirement.clone();
+        move |_: &chio_core::capability::threshold_approval::ThresholdApprovalRequest, _: &str| {
+            Ok(requirement.clone())
+        }
+    }));
+    let request = chio_core::capability::threshold_approval::ThresholdApprovalRequest::new(
+        "request-1",
+        "server-1",
+        "tool-1",
+    )
+    .expect("valid request");
+    let resolved = kernel
+        .threshold_approval_requirement_resolver()
+        .expect("explicit resolver")
+        .resolve_threshold_approval_requirement(&request, requirement.policy_hash())
+        .expect("resolved requirement");
+    assert_eq!(resolved, requirement);
+
+    kernel.clear_threshold_approval_requirement_resolver();
+    assert!(kernel.threshold_approval_requirement_resolver().is_none());
 }

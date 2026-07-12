@@ -115,6 +115,8 @@ impl TargetProtocolExecutor for MockMcpExecutor {
                     execution_nonce: request.execution.execution_nonce.clone(),
                     governed_intent: request.execution.governed_intent.clone(),
                     approval_token: request.execution.approval_token.clone(),
+                    approval_tokens: Vec::new(),
+                    threshold_approval_proposal: None,
                     model_metadata: request.execution.model_metadata.clone(),
                     federated_origin_kernel_id: None,
                 },
@@ -1029,19 +1031,21 @@ fn orchestrator_dispatches_to_registered_openai_target_executor() {
 }
 
 fn governed_intent_with_control_plane(control_plane: Value) -> GovernedTransactionIntent {
-    GovernedTransactionIntent {
-        id: "intent-1".to_string(),
-        server_id: "test-srv".to_string(),
-        tool_name: "echo".to_string(),
-        purpose: "test route planning".to_string(),
-        max_amount: None,
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(json!({ "chioControlPlane": control_plane })),
-    }
+    GovernedTransactionIntent::tool_invocation(
+        chio_core::capability::governance::GovernedToolInvocationIntentBody {
+            id: "intent-1".to_string(),
+            server_id: "test-srv".to_string(),
+            tool_name: "echo".to_string(),
+            purpose: "test route planning".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(json!({ "chioControlPlane": control_plane })),
+        },
+    )
 }
 
 #[test]

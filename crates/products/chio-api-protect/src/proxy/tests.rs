@@ -328,6 +328,7 @@ fn signed_approval_response_token(
             approver: approver.public_key(),
             subject: subject.public_key(),
             governed_intent_hash: "hash-1".to_string(),
+            threshold_proposal_hash: None,
             request_id: approval_id.to_string(),
             issued_at: now.saturating_sub(10),
             expires_at: now + 600,

@@ -437,7 +437,9 @@ fn make_sibling_sum_monetary_fixture(prefix: &str) -> SiblingSumMonetaryFixture 
         .record_capability_snapshot(&parent, None)
         .unwrap();
     drop(seed_store);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     kernel
         .register_budget_parent(parent.id.clone(), 5_000)
         .unwrap();
@@ -511,7 +513,9 @@ fn make_sibling_sum_invocation_fixture(prefix: &str) -> SiblingSumInvocationFixt
         .record_capability_snapshot(&parent, None)
         .unwrap();
     drop(seed_store);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     kernel
         .register_budget_parent(parent.id.clone(), 5_000)
         .unwrap();
@@ -706,25 +710,27 @@ fn make_governed_intent(
     units: u64,
     currency: &str,
 ) -> GovernedTransactionIntent {
-    GovernedTransactionIntent {
-        id: id.to_string(),
-        server_id: server.to_string(),
-        tool_name: tool.to_string(),
-        purpose: purpose.to_string(),
-        max_amount: Some(MonetaryAmount {
-            units,
-            currency: currency.to_string(),
-        }),
-        commerce: None,
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(serde_json::json!({
-            "invoice_id": "inv-1001",
-            "operator": "finance-ops",
-        })),
-    }
+    GovernedTransactionIntent::tool_invocation(
+        chio_core::capability::governance::GovernedToolInvocationIntentBody {
+            id: id.to_string(),
+            server_id: server.to_string(),
+            tool_name: tool.to_string(),
+            purpose: purpose.to_string(),
+            max_amount: Some(MonetaryAmount {
+                units,
+                currency: currency.to_string(),
+            }),
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(serde_json::json!({
+                "invoice_id": "inv-1001",
+                "operator": "finance-ops",
+            })),
+        },
+    )
 }
 
 struct GovernedAcpIntentFixture<'a> {
@@ -739,28 +745,30 @@ struct GovernedAcpIntentFixture<'a> {
 }
 
 fn make_governed_acp_intent(fixture: GovernedAcpIntentFixture<'_>) -> GovernedTransactionIntent {
-    GovernedTransactionIntent {
-        id: fixture.id.to_string(),
-        server_id: fixture.server.to_string(),
-        tool_name: fixture.tool.to_string(),
-        purpose: fixture.purpose.to_string(),
-        max_amount: Some(MonetaryAmount {
-            units: fixture.units,
-            currency: fixture.currency.to_string(),
-        }),
-        commerce: Some(chio_core::capability::governance::GovernedCommerceContext {
-            seller: fixture.seller.to_string(),
-            shared_payment_token_id: fixture.shared_payment_token_id.to_string(),
-        }),
-        metered_billing: None,
-        runtime_attestation: None,
-        call_chain: None,
-        autonomy: None,
-        context: Some(serde_json::json!({
-            "invoice_id": "inv-2002",
-            "operator": "commerce-ops",
-        })),
-    }
+    GovernedTransactionIntent::tool_invocation(
+        chio_core::capability::governance::GovernedToolInvocationIntentBody {
+            id: fixture.id.to_string(),
+            server_id: fixture.server.to_string(),
+            tool_name: fixture.tool.to_string(),
+            purpose: fixture.purpose.to_string(),
+            max_amount: Some(MonetaryAmount {
+                units: fixture.units,
+                currency: fixture.currency.to_string(),
+            }),
+            commerce: Some(chio_core::capability::governance::GovernedCommerceContext {
+                seller: fixture.seller.to_string(),
+                shared_payment_token_id: fixture.shared_payment_token_id.to_string(),
+            }),
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(serde_json::json!({
+                "invoice_id": "inv-2002",
+                "operator": "commerce-ops",
+            })),
+        },
+    )
 }
 
 fn make_runtime_attestation(
@@ -776,8 +784,10 @@ fn make_runtime_attestation(
         evidence_sha256: format!("digest-{tier:?}"),
         runtime_identity: Some("spiffe://chio/runtime/test".to_string()),
         workload_identity: Some(
-            chio_core::capability::workload_identity::WorkloadIdentity::parse_spiffe_uri("spiffe://chio/runtime/test")
-                .expect("parse runtime workload identity"),
+            chio_core::capability::workload_identity::WorkloadIdentity::parse_spiffe_uri(
+                "spiffe://chio/runtime/test",
+            )
+            .expect("parse runtime workload identity"),
         ),
         claims: Some(serde_json::json!({
             "enterpriseVerifier": {
@@ -790,7 +800,8 @@ fn make_runtime_attestation(
     }
 }
 
-fn make_trusted_azure_runtime_attestation() -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
+fn make_trusted_azure_runtime_attestation(
+) -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
     let now = current_unix_timestamp();
     chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
         schema: "chio.runtime-attestation.azure-maa.jwt.v1".to_string(),
@@ -809,7 +820,8 @@ fn make_trusted_azure_runtime_attestation() -> chio_core::capability::runtime_at
     }
 }
 
-fn make_trusted_google_runtime_attestation() -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
+fn make_trusted_google_runtime_attestation(
+) -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
     let now = current_unix_timestamp();
     chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
         schema: "chio.runtime-attestation.google-confidential-vm.jwt.v1".to_string(),
@@ -832,7 +844,8 @@ fn make_trusted_google_runtime_attestation() -> chio_core::capability::runtime_a
     }
 }
 
-fn make_trusted_nitro_runtime_attestation() -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
+fn make_trusted_nitro_runtime_attestation(
+) -> chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
     let now = current_unix_timestamp();
     chio_core::capability::runtime_attestation::RuntimeAttestationEvidence {
         schema: "chio.runtime-attestation.aws-nitro-attestation.v1".to_string(),
@@ -898,7 +911,8 @@ fn make_attestation_trust_policy() -> chio_core::capability::trust_policy::Attes
     }
 }
 
-fn make_attested_attestation_trust_policy() -> chio_core::capability::trust_policy::AttestationTrustPolicy {
+fn make_attested_attestation_trust_policy(
+) -> chio_core::capability::trust_policy::AttestationTrustPolicy {
     chio_core::capability::trust_policy::AttestationTrustPolicy {
         rules: vec![chio_core::capability::trust_policy::AttestationTrustRule {
             name: "azure-contoso-attested".to_string(),
@@ -978,6 +992,7 @@ fn attach_governed_upstream_call_chain_proof(
     intent: &mut GovernedTransactionIntent,
     proof: &GovernedUpstreamCallChainProof,
 ) {
+    let intent = intent.as_tool_invocation_mut().expect("tool intent");
     let mut context = match intent.context.take() {
         Some(serde_json::Value::Object(map)) => map,
         _ => serde_json::Map::new(),
@@ -1006,7 +1021,8 @@ fn make_governed_call_chain_continuation_token(
     let now = current_unix_timestamp();
     CallChainContinuationToken::sign(
         CallChainContinuationTokenBody {
-            schema: chio_core::capability::governance::CHIO_CALL_CHAIN_CONTINUATION_SCHEMA.to_string(),
+            schema: chio_core::capability::governance::CHIO_CALL_CHAIN_CONTINUATION_SCHEMA
+                .to_string(),
             token_id: "continuation-token-1".to_string(),
             signer: fixture.signer.public_key(),
             subject: fixture.subject.clone(),
@@ -1038,6 +1054,7 @@ fn attach_governed_call_chain_continuation_token(
     intent: &mut GovernedTransactionIntent,
     token: &CallChainContinuationToken,
 ) {
+    let intent = intent.as_tool_invocation_mut().expect("tool intent");
     let mut context = match intent.context.take() {
         Some(serde_json::Value::Object(map)) => map,
         _ => serde_json::Map::new(),
@@ -1158,6 +1175,7 @@ fn make_governed_approval_token(
             approver: approver.public_key(),
             subject: subject.clone(),
             governed_intent_hash: intent.binding_hash().unwrap(),
+            threshold_proposal_hash: None,
             request_id: request_id.to_string(),
             issued_at: now.saturating_sub(1),
             expires_at: now + 300,
@@ -1289,6 +1307,8 @@ async fn dropping_async_evaluate_after_monetary_admission_unwinds_budget_payment
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1303,7 +1323,9 @@ async fn dropping_async_evaluate_after_monetary_admission_unwinds_budget_payment
         .await
         .expect("pending monetary tool should be invoked before abort");
     eval.abort();
-    let join = eval.await.expect_err("aborted evaluation should not complete");
+    let join = eval
+        .await
+        .expect_err("aborted evaluation should not complete");
     assert!(join.is_cancelled());
 
     let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
@@ -1311,9 +1333,7 @@ async fn dropping_async_evaluate_after_monetary_admission_unwinds_budget_payment
     assert_eq!(usage.total_cost_exposed, 0);
     assert_eq!(usage.committed_cost_units().unwrap(), 0);
     assert_eq!(
-        payment
-            .authorized
-            .load(std::sync::atomic::Ordering::SeqCst),
+        payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
         1
     );
     assert_eq!(
@@ -1356,9 +1376,7 @@ async fn assert_post_dispatch_drop_cleanup_fault(
             kernel.set_payment_adapter(Box::new(FailingReleasePaymentAdapter));
         }
         DropCleanupFailureSource::BudgetStore => {
-            kernel.set_budget_store_handle(std::sync::Arc::new(
-                FailingReleaseBudgetStore::new(),
-            ));
+            kernel.set_budget_store_handle(std::sync::Arc::new(FailingReleaseBudgetStore::new()));
         }
     }
     kernel.register_tool_server(Box::new(PendingMonetaryServer {
@@ -1443,11 +1461,8 @@ async fn post_dispatch_drop_budget_cleanup_failure_is_signed() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn post_dispatch_drop_cleanup_failure_rejects_forged_budget_authority() {
     let metadata = forged_budget_authority_metadata();
-    assert_post_dispatch_drop_cleanup_fault(
-        DropCleanupFailureSource::Payment,
-        Some(metadata),
-    )
-    .await;
+    assert_post_dispatch_drop_cleanup_fault(DropCleanupFailureSource::Payment, Some(metadata))
+        .await;
 }
 
 fn make_dpop_grant(server: &str, tool: &str) -> ToolGrant {

@@ -30,6 +30,9 @@ pub(super) fn admission_ref_from_request(
     let Some(intent) = request.governed_intent.as_ref() else {
         return Err("missing_governed_intent");
     };
+    let Some(intent) = intent.as_tool_invocation() else {
+        return Err("invalid_governed_intent_kind");
+    };
     let Some(context) = intent.context.as_ref() else {
         return Err("missing_chio_admission_context");
     };
@@ -59,6 +62,7 @@ pub(super) fn request_has_chio_runtime_context(request: &ToolCallRequest) -> boo
     request
         .governed_intent
         .as_ref()
+        .and_then(|intent| intent.as_tool_invocation())
         .and_then(|intent| intent.context.as_ref())
         .and_then(serde_json::Value::as_object)
         .is_some_and(|context| {

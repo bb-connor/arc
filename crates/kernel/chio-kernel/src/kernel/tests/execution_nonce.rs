@@ -34,11 +34,10 @@ fn kernel_with_nonce() -> (ChioKernel, Keypair, ChioScope, ExecutionNonceConfig)
 }
 
 fn binding_for_request(cap: &CapabilityToken, request: &ToolCallRequest) -> NonceBinding {
-    let parameter_hash = chio_core::receipt::decision::ToolCallAction::from_parameters(
-        request.arguments.clone(),
-    )
-    .unwrap()
-    .parameter_hash;
+    let parameter_hash =
+        chio_core::receipt::decision::ToolCallAction::from_parameters(request.arguments.clone())
+            .unwrap()
+            .parameter_hash;
     NonceBinding {
         subject_id: cap.subject.to_hex(),
         capability_id: cap.id.clone(),
@@ -55,8 +54,13 @@ fn mint_nonce_for_request(
     cfg: &ExecutionNonceConfig,
 ) -> crate::execution_nonce::SignedExecutionNonce {
     let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-    mint_execution_nonce(&kernel.config.keypair, binding_for_request(cap, request), cfg, now)
-        .unwrap()
+    mint_execution_nonce(
+        &kernel.config.keypair,
+        binding_for_request(cap, request),
+        cfg,
+        now,
+    )
+    .unwrap()
 }
 
 #[test]
@@ -259,12 +263,7 @@ fn strict_nonce_mode_denies_missing_nonce_before_server_lookup() {
     );
 
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
-    let mut request = make_request(
-        "req-nonce-before-lookup",
-        &cap,
-        "read_file",
-        "missing-srv",
-    );
+    let mut request = make_request("req-nonce-before-lookup", &cap, "read_file", "missing-srv");
     request.server_id = "missing-srv".to_string();
 
     let err = block_on_async_tool_dispatch(kernel.dispatch_tool_call_with_cost(&request, false))
@@ -290,8 +289,7 @@ fn strict_nonce_mode_dispatches_once_with_presented_nonce() {
     request.execution_nonce = Some(mint_nonce_for_request(&kernel, &cap, &request, &cfg));
 
     let (output, cost) =
-        block_on_async_tool_dispatch(kernel.dispatch_tool_call_with_cost(&request, false))
-            .unwrap();
+        block_on_async_tool_dispatch(kernel.dispatch_tool_call_with_cost(&request, false)).unwrap();
     assert!(cost.is_none());
     let ToolServerOutput::Value(value) = output else {
         panic!("expected value output");
@@ -335,8 +333,11 @@ fn strict_nonce_mode_nested_flow_operation_forwards_presented_nonce(
     };
     let mut client = NoopNestedFlowClient;
 
-    let response =
-        kernel.evaluate_tool_call_operation_with_nested_flow_client(&context, &operation, &mut client)?;
+    let response = kernel.evaluate_tool_call_operation_with_nested_flow_client(
+        &context,
+        &operation,
+        &mut client,
+    )?;
 
     assert_eq!(response.verdict, Verdict::Allow);
     assert!(
@@ -458,6 +459,8 @@ fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };

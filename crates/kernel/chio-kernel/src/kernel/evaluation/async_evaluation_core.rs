@@ -428,6 +428,19 @@ impl ChioKernel {
             ));
         }
 
+        if let Some(verified_set) = validated_governed_admission
+            .as_ref()
+            .and_then(|admission| admission.verified_approval_set.as_ref())
+        {
+            if let Ok(approval_set_hash) = verified_set.approval_set_hash() {
+                debug!(
+                    request_id = %request.request_id,
+                    approval_set_hash = %approval_set_hash,
+                    "threshold approval set verified"
+                );
+            }
+        }
+
         if let Some((approval_request_id, intent_hash)) = validated_governed_admission
             .as_ref()
             .and_then(|admission| admission.approval_replay_key.as_ref())

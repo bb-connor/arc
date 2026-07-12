@@ -695,6 +695,31 @@ fn aggregate_invocation_budget_feature_is_opt_in_and_intersected() {
 }
 
 #[test]
+fn governed_threshold_and_response_plan_require_explicit_rollout() {
+    let baseline = CapabilityNegotiation::v1_default();
+    let current = CapabilityNegotiation::t1_default();
+    assert!(!baseline.supports(features::THRESHOLD_GOVERNED_APPROVALS));
+    assert!(!baseline.supports(features::GOVERNED_ACTIVE_RESPONSE_PLAN));
+    assert!(!current.supports(features::THRESHOLD_GOVERNED_APPROVALS));
+    assert!(!current.supports(features::GOVERNED_ACTIVE_RESPONSE_PLAN));
+
+    let mut rollout = CapabilityNegotiation::t1_default();
+    rollout
+        .features
+        .insert(features::THRESHOLD_GOVERNED_APPROVALS.to_string(), true);
+    rollout
+        .features
+        .insert(features::GOVERNED_ACTIVE_RESPONSE_PLAN.to_string(), true);
+    let mixed = rollout.negotiated_with(&current).unwrap();
+    assert!(!mixed.supports(features::THRESHOLD_GOVERNED_APPROVALS));
+    assert!(!mixed.supports(features::GOVERNED_ACTIVE_RESPONSE_PLAN));
+
+    let negotiated = rollout.negotiated_with(&rollout).unwrap();
+    assert!(negotiated.supports(features::THRESHOLD_GOVERNED_APPROVALS));
+    assert!(negotiated.supports(features::GOVERNED_ACTIVE_RESPONSE_PLAN));
+}
+
+#[test]
 fn chain_binding_disabled_does_not_reject_v1_tokens() {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
@@ -982,7 +1007,7 @@ fn constraint_serde_roundtrip() {
 
 #[test]
 fn governed_transaction_intent_binding_hash_changes_with_payload() {
-    let base = GovernedTransactionIntent {
+    let base = GovernedTransactionIntent::tool_invocation(GovernedToolInvocationIntentBody {
         id: "intent-1".to_string(),
         server_id: "srv-pay".to_string(),
         tool_name: "charge".to_string(),
@@ -1034,9 +1059,11 @@ fn governed_transaction_intent_binding_hash_changes_with_payload() {
             delegation_bond_id: Some("bond-1".to_string()),
         }),
         context: None,
-    };
+    });
     let mut changed = base.clone();
     changed
+        .as_tool_invocation_mut()
+        .expect("tool invocation present")
         .call_chain
         .as_mut()
         .expect("call chain present")
@@ -1078,6 +1105,7 @@ fn governed_approval_token_signature_roundtrip() {
         approver: approver.public_key(),
         subject: subject.public_key(),
         governed_intent_hash: "intent-hash".to_string(),
+        threshold_proposal_hash: None,
         request_id: "req-1".to_string(),
         issued_at: 1000,
         expires_at: 2000,
@@ -1111,7 +1139,7 @@ fn governed_upstream_call_chain_proof_roundtrip_and_context_extraction() {
         &signer,
     )
     .unwrap();
-    let intent = GovernedTransactionIntent {
+    let intent = GovernedTransactionIntent::tool_invocation(GovernedToolInvocationIntentBody {
         id: "intent-proof-1".to_string(),
         server_id: "srv-pay".to_string(),
         tool_name: "charge".to_string(),
@@ -1132,12 +1160,19 @@ fn governed_upstream_call_chain_proof_roundtrip_and_context_extraction() {
             GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY: proof.clone(),
             "note": "preserve-other-context"
         })),
-    };
+    });
 
     assert!(proof.verify_signature().unwrap());
     assert!(proof.is_valid_at(1500));
     assert!(!proof.is_valid_at(2000));
-    assert!(proof.matches_context(intent.call_chain.as_ref().unwrap()));
+    assert!(proof.matches_context(
+        intent
+            .as_tool_invocation()
+            .unwrap()
+            .call_chain
+            .as_ref()
+            .unwrap()
+    ));
     assert_eq!(intent.upstream_call_chain_proof().unwrap(), Some(proof));
 }
 
@@ -1181,7 +1216,7 @@ fn call_chain_continuation_token_roundtrip_and_matching_helpers() {
         &signer,
     )
     .unwrap();
-    let intent = GovernedTransactionIntent {
+    let intent = GovernedTransactionIntent::tool_invocation(GovernedToolInvocationIntentBody {
         id: "intent-cont-1".to_string(),
         server_id: "srv-pay".to_string(),
         tool_name: "charge".to_string(),
@@ -1195,7 +1230,7 @@ fn call_chain_continuation_token_roundtrip_and_matching_helpers() {
         context: Some(serde_json::json!({
             GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY: token.clone()
         })),
-    };
+    });
 
     assert!(token.verify_signature().unwrap());
     assert!(token.matches_context(&call_chain));
@@ -2018,6 +2053,7 @@ fn governed_approval_token_p256_verifies() {
         approver: backend.public_key(),
         subject: subject.public_key(),
         governed_intent_hash: "hash-xyz".to_string(),
+        threshold_proposal_hash: None,
         request_id: "req-1".to_string(),
         issued_at: 1000,
         expires_at: 2000,
@@ -2434,6 +2470,7 @@ fn bac573_approval_token(issued_at: u64, expires_at: u64) -> (Keypair, GovernedA
         approver: approver.public_key(),
         subject: Keypair::generate().public_key(),
         governed_intent_hash: "intent-hash".to_string(),
+        threshold_proposal_hash: None,
         request_id: "req-1".to_string(),
         issued_at,
         expires_at,

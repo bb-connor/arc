@@ -141,6 +141,7 @@ fn approval_token_body(
         approver,
         subject,
         governed_intent_hash: sha256_hex(b"governed-intent"),
+        threshold_proposal_hash: None,
         request_id: "req-mismatch".to_string(),
         issued_at: 1_710_000_000,
         expires_at: 1_710_003_600,
