@@ -312,6 +312,60 @@ fn atomic_receipt_append_seeds_attempt_zero_once() -> Result<(), Box<dyn std::er
 }
 
 #[test]
+fn atomic_settlement_write_failure_closes_serving_before_returning(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (temp_dir, path) = temp_db("chio-settlement-write-failure")?;
+    let store = SqliteReceiptStore::open(&path)?;
+    store.writer_handle().run_write(|connection| {
+        connection.execute_batch("DROP TABLE settle_attempts")?;
+        Ok(())
+    })?;
+
+    let receipt = sample_receipt_with_id("rcpt-settlement-write-failure");
+    let error = ReceiptStore::append_chio_receipt_with_pending_observation(
+        &store,
+        &receipt,
+        &chio_kernel::PendingSettlementObservation {
+            next_visible_at_ms: 1,
+        },
+    )
+    .err()
+    .ok_or("a missing settlement projection must reject the atomic write")?;
+    assert!(error.to_string().contains("settle_attempts"));
+    assert!(
+        store.writer_serving_closed(),
+        "the critical writer route must close serving before returning its error"
+    );
+    let health = store.receipt_store_health()?;
+    assert!(
+        health
+            .writer
+            .last_error
+            .as_deref()
+            .is_some_and(|message| message.contains("settle_attempts")),
+        "the projection failure must be retained in writer health: {health:?}"
+    );
+    let reseed = store
+        .reseed_verified_head()
+        .err()
+        .ok_or("receipt-log reseed must not clear a critical projection failure")?;
+    assert!(reseed.to_string().contains("reopen the receipt store"));
+    assert!(store.writer_serving_closed());
+
+    let later = store
+        .append_chio_receipt_returning_seq(&sample_receipt_with_id(
+            "rcpt-after-settlement-write-failure",
+        ))
+        .err()
+        .ok_or("a critical projection failure must poison later receipt writes")?;
+    assert!(later.to_string().contains("verified head is unavailable"));
+
+    drop(store);
+    temp_dir.close()?;
+    Ok(())
+}
+
+#[test]
 fn receipt_retention_preserves_active_settlement_attempts() -> Result<(), Box<dyn std::error::Error>>
 {
     use chio_settle::{

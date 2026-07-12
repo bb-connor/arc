@@ -59,6 +59,12 @@ pub(super) fn unique_db_path(prefix: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
 }
 
+pub(super) fn temp_db(prefix: &str) -> std::io::Result<(tempfile::TempDir, std::path::PathBuf)> {
+    let directory = tempfile::Builder::new().prefix(prefix).tempdir()?;
+    let path = directory.path().join("receipts.sqlite3");
+    Ok((directory, path))
+}
+
 pub(super) fn sample_receipt() -> ChioReceipt {
     let keypair = Keypair::generate();
     ChioReceipt::sign(

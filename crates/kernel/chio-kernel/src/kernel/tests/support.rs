@@ -1909,7 +1909,7 @@ impl ReceiptStore for AppendOnlyReceiptStore {
         Ok(())
     }
 }
-
+include!("support_dead_writer.rs");
 /// A store-authoritative point-lookup store: appended chio receipts are retained
 /// in-memory and `load_chio_receipt` resolves them by id. Models a durable store
 /// that implements point loads, so an evicted parent receipt still resolves from

@@ -29,6 +29,18 @@ for (const pattern of rootPackage.workspaces ?? []) {
   if (typeof manifest.scripts?.build !== "string" || manifest.scripts.build.trim() === "") {
     throw new Error(`${path.relative(root, packageDir)} is publishable but has no build script`);
   }
+  const runtimeEntries = [
+    manifest.main,
+    manifest.module,
+    manifest.exports?.["."]?.import,
+    manifest.exports?.["."]?.require,
+    manifest.exports?.["."]?.default,
+  ].filter((entry) => typeof entry === "string");
+  for (const entry of runtimeEntries) {
+    if (/\.(?:[cm]?ts|tsx)$/.test(entry)) {
+      throw new Error(`${path.relative(root, packageDir)} publishes TypeScript runtime entry ${entry}`);
+    }
+  }
   console.log(path.relative(root, packageDir).replaceAll(path.sep, "/"));
 }
 NODE

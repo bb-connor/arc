@@ -262,24 +262,25 @@ impl ReceiptStore for SqliteReceiptStore {
         let raw_json = serde_json::to_string(receipt)?;
         let receipt = receipt.clone();
         let next_visible_at_ms = pending.next_visible_at_ms;
-        self.writer_handle().run_write_receipt(move |connection| {
-            ensure_checkpoint_transparency_guards(connection)?;
-            let tx =
-                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-            let (_, inserted) =
-                append_chio_receipt_tx_with_insert_status(&tx, &receipt, &raw_json)?;
-            ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
-            if inserted {
-                crate::settle_attempts::insert_attempt_zero_tx(
-                    &tx,
-                    &receipt.id,
-                    receipt.timestamp,
-                    next_visible_at_ms,
-                )?;
-            }
-            tx.commit()?;
-            Ok(())
-        })
+        self.writer_handle()
+            .run_critical_receipt_write(move |connection| {
+                ensure_checkpoint_transparency_guards(connection)?;
+                let tx = connection
+                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+                let (_, inserted) =
+                    append_chio_receipt_tx_with_insert_status(&tx, &receipt, &raw_json)?;
+                ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
+                if inserted {
+                    crate::settle_attempts::insert_attempt_zero_tx(
+                        &tx,
+                        &receipt.id,
+                        receipt.timestamp,
+                        next_visible_at_ms,
+                    )?;
+                }
+                tx.commit()?;
+                Ok(())
+            })
     }
 
     fn load_chio_receipt(
@@ -379,6 +380,10 @@ impl ReceiptStore for SqliteReceiptStore {
 
     fn receipt_store_health(&self) -> Result<ReceiptStoreHealthReport, ReceiptStoreError> {
         SqliteReceiptStore::receipt_store_health(self)
+    }
+
+    fn writer_serving_closed(&self) -> bool {
+        SqliteReceiptStore::writer_serving_closed(self)
     }
 
     fn latest_committed_entry_seq(&self) -> Result<u64, ReceiptStoreError> {

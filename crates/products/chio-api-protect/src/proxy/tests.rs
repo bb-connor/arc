@@ -21,6 +21,9 @@ use chio_test_support::prelude::*;
 #[path = "tests/upstream_failures.rs"]
 mod upstream_failures;
 
+#[path = "tests/health.rs"]
+mod health;
+
 const PETSTORE_YAML: &str = r#"
 openapi: "3.0.0"
 info:
