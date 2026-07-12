@@ -115,6 +115,23 @@ fn dispatch_deadline_exceeded(budget: std::time::Duration) -> KernelError {
     }
 }
 
+/// Aborts an offloaded `spawn_blocking` task when the awaiting future is
+/// dropped, whether because its deadline fired or because the caller was
+/// cancelled. Dropping a bare `JoinHandle` only *detaches* the task: one still
+/// queued on a saturated blocking pool would then start and run the tool call
+/// (or guard) after the kernel has already emitted a timed-out response and
+/// unwound its charges. Aborting cancels a not-yet-started task so it cannot
+/// execute side effects past the deadline; a task already running its blocking
+/// body cannot be interrupted, but its own inner deadline still frees it, and a
+/// task that already finished is aborted as a harmless no-op.
+struct AbortOnDrop(tokio::task::AbortHandle);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
 thread_local! {
     /// Cached probe of whether the currently entered Tokio runtime has a timer
     /// driver, keyed by that runtime's id. Timer availability is a property of the
@@ -650,6 +667,11 @@ impl ChioKernel {
         let guards = Arc::clone(&self.guards);
         let owned_for_task = Arc::clone(&owned);
         let join = tokio::task::spawn_blocking(move || run_guards_owned(&guards, &owned_for_task));
+        // Abort the offloaded guard loop if the pipeline deadline fires or this
+        // future is cancelled, so a task still queued on a saturated blocking
+        // pool cannot run the (side-effecting) guards after the request has
+        // already failed closed.
+        let _abort_on_drop = AbortOnDrop(join.abort_handle());
         match pipeline_budget.filter(|_| timer_available) {
             Some(budget) => match tokio::time::timeout(budget, join).await {
                 Ok(Ok(result)) => result,
@@ -690,6 +712,11 @@ impl ChioKernel {
             let run_one = tokio::task::spawn_blocking(move || {
                 run_guards_owned(std::slice::from_ref(&guard), &owned)
             });
+            // Abort this guard's offloaded task if its own budget fires or the
+            // enclosing pipeline deadline drops this future, so a task still
+            // queued on a saturated blocking pool cannot run the guard after the
+            // request has already failed closed.
+            let _abort_on_drop = AbortOnDrop(run_one.abort_handle());
             let outcome = match budget {
                 Some(budget) => match tokio::time::timeout(budget, run_one).await {
                     Ok(joined) => joined,
@@ -1009,6 +1036,12 @@ impl ChioKernel {
                 handle.block_on(call)
             }
         });
+        // Cancel the offloaded call if the outer deadline fires before the
+        // blocking pool even starts it. Dropping the join handle alone detaches
+        // the task, so a call still queued on a saturated pool could later run
+        // the tool after this eval has already returned a timed-out response and
+        // unwound its charges.
+        let _abort_on_drop = AbortOnDrop(join.abort_handle());
 
         if timer_available {
             match tokio::time::timeout(budget, join).await {

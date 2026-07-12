@@ -839,6 +839,82 @@ fn nested_dispatch_isolates_a_synchronously_blocking_call_from_the_async_pool(
 }
 
 #[test]
+fn timed_out_dispatch_aborts_a_queued_blocking_task_before_it_runs_the_tool(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // When the dispatch deadline fires while the blocking pool is saturated, the
+    // offloaded call may still be queued (not yet started). Dropping its join
+    // handle only detaches the task, so without an explicit abort it would later
+    // run the tool after the kernel has already returned a timed-out response and
+    // unwound its charges. The timeout arm must abort the queued task so the
+    // side effect never happens.
+    let invocations = Arc::new(AtomicU64::new(0));
+    let mut config = make_config();
+    config.deadlines.dispatch_budget_ms = 100;
+    let mut kernel = make_kernel(config);
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-abort",
+        vec!["noop"],
+        Arc::clone(&invocations),
+    )));
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-abort", "noop")]),
+        300,
+    );
+    let request = make_request("req-abort", &cap, "noop", "srv-abort");
+    let kernel = Arc::new(kernel);
+
+    // A multi-thread runtime with a single blocking thread: occupying it forces
+    // the dispatch offload to queue behind the blocker rather than start.
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .max_blocking_threads(1)
+        .enable_all()
+        .build()?;
+    runtime.block_on(async {
+        let blocker_started = Arc::new(AtomicBool::new(false));
+        let started = Arc::clone(&blocker_started);
+        // Hold the sole blocking thread well past the 100ms dispatch budget so
+        // the dispatch task cannot start until after the deadline has fired.
+        let _blocker = tokio::task::spawn_blocking(move || {
+            started.store(true, Ordering::SeqCst);
+            std::thread::sleep(Duration::from_millis(800));
+        });
+        while !blocker_started.load(Ordering::SeqCst) {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+
+        let start = std::time::Instant::now();
+        let response = kernel
+            .evaluate_tool_call(&request)
+            .await
+            .unwrap_or_else(|e| panic!("evaluate should return a deny response, not error: {e}"));
+        assert!(
+            start.elapsed() < Duration::from_millis(600),
+            "the dispatch deadline must fire near 100ms, well before the 800ms blocker frees the pool"
+        );
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert_eq!(
+            invocations.load(Ordering::SeqCst),
+            0,
+            "the queued dispatch must not have started before the deadline fired"
+        );
+
+        // Let the blocker release the pool; the aborted dispatch must never run
+        // the tool afterwards.
+        tokio::time::sleep(Duration::from_millis(1_000)).await;
+        assert_eq!(
+            invocations.load(Ordering::SeqCst),
+            0,
+            "a timed-out dispatch must be aborted, not left to run the tool after the deadline"
+        );
+    });
+    Ok(())
+}
+
+#[test]
 fn watchdog_does_not_start_without_a_timer() -> Result<(), Box<dyn std::error::Error>> {
     // Starting the watchdog in a runtime with no time driver would panic when its
     // poll interval is constructed. It must degrade to not starting instead, and
