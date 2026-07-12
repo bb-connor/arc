@@ -306,6 +306,12 @@ pub struct KernelConfig {
     /// Wall-clock budgets for the mediation hot path. Construction input only,
     /// not a wire payload, so this changes no signed or transmitted bytes.
     pub deadlines: HotPathDeadlineConfig,
+
+    /// Which call classes must durably journal a dispatch intent before any
+    /// effect. Existing deployments construct this Off until an operator opts
+    /// in; the enum's own default (SideEffecting) is the fail-safe posture
+    /// for anyone deriving a value rather than spelling one.
+    pub dispatch_intent_journal: crate::receipt_store::DispatchIntentJournalMode,
 }
 
 impl KernelConfig {
@@ -666,6 +672,12 @@ pub struct ChioKernel {
     /// can resume on a different worker after dispatch, so the scope is
     /// stored in this map rather than a thread-local.
     pub(super) receipt_tenant_ids: Arc<DashMap<String, String>>,
+    /// Request-keyed dispatch-intent handles. Receipts carry no request id
+    /// and the evaluate future can migrate workers at the dispatch await, so
+    /// the pre-dispatch intent binding travels in this map (exactly like the
+    /// tenant scope above) for the terminal receipt sink to consume.
+    pub(super) dispatch_intents:
+        Arc<DashMap<String, crate::receipt_store::DispatchIntentHandle>>,
     /// Request-keyed copy of the receipt-version admission snapshot.
     /// Async evaluate futures may resume on a different Tokio worker
     /// after dispatch. This map keeps the admitted version and peer state

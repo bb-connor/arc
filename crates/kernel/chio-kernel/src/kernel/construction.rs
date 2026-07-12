@@ -299,6 +299,7 @@ impl ChioKernel {
             federation_dsse_envelopes_gauge,
             federation_artifact_store: None,
             receipt_tenant_ids: Arc::new(DashMap::new()),
+            dispatch_intents: Arc::new(DashMap::new()),
             receipt_federation_admissions: Arc::new(DashMap::new()),
             federation_local_kernel_id: ArcSwap::from_pointee(Option::<String>::None),
             signing_task,

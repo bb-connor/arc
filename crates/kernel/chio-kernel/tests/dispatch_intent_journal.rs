@@ -94,6 +94,111 @@ fn sample_receipt() -> ChioReceipt {
 }
 
 #[test]
+fn journal_mode_defaults_to_side_effecting_and_serializes_snake_case() {
+    use chio_kernel::DispatchIntentJournalMode;
+    assert_eq!(
+        DispatchIntentJournalMode::default(),
+        DispatchIntentJournalMode::SideEffecting
+    );
+    assert_eq!(
+        serde_json::to_string(&DispatchIntentJournalMode::Off).unwrap(),
+        "\"off\""
+    );
+    assert_eq!(
+        serde_json::to_string(&DispatchIntentJournalMode::SideEffecting).unwrap(),
+        "\"side_effecting\""
+    );
+    assert_eq!(
+        serde_json::to_string(&DispatchIntentJournalMode::All).unwrap(),
+        "\"all\""
+    );
+}
+
+/// An adapter that never authorizes; used only to observe trait defaults.
+struct InertPaymentAdapter;
+
+impl chio_kernel::PaymentAdapter for InertPaymentAdapter {
+    fn authorize(
+        &self,
+        _request: &chio_kernel::PaymentAuthorizeRequest,
+    ) -> Result<chio_kernel::PaymentAuthorization, chio_kernel::PaymentError> {
+        Err(chio_kernel::PaymentError::Unavailable("inert".to_string()))
+    }
+
+    fn capture(
+        &self,
+        _authorization_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+        Err(chio_kernel::PaymentError::Unavailable("inert".to_string()))
+    }
+
+    fn release(
+        &self,
+        _authorization_id: &str,
+        _reference: &str,
+    ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+        Err(chio_kernel::PaymentError::Unavailable("inert".to_string()))
+    }
+
+    fn refund(
+        &self,
+        _transaction_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+        Err(chio_kernel::PaymentError::Unavailable("inert".to_string()))
+    }
+}
+
+struct UnannotatedServer;
+
+#[async_trait::async_trait]
+impl chio_kernel::ToolServerConnection for UnannotatedServer {
+    fn server_id(&self) -> &str {
+        "srv"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["tool".to_string()]
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
+    ) -> Result<serde_json::Value, chio_kernel::KernelError> {
+        Ok(serde_json::json!({}))
+    }
+}
+
+#[test]
+fn unannotated_tools_read_as_side_effecting_and_rails_name_themselves() {
+    use chio_kernel::{PaymentAdapter, ToolServerConnection};
+
+    // Fail-safe: a connection that does not annotate its tools reports every
+    // tool as NOT read-only, so unknown tools get a durable intent.
+    assert!(!UnannotatedServer.tool_is_read_only("tool"));
+    assert!(!UnannotatedServer.tool_is_read_only("anything-else"));
+
+    // Rails name themselves so a monetary intent can record which rail to
+    // reconcile against; adapters that do not override keep a generic label.
+    assert_eq!(InertPaymentAdapter.rail_id(), "payment");
+    assert_eq!(
+        chio_kernel::X402PaymentAdapter::new("http://localhost:9").rail_id(),
+        "x402"
+    );
+    assert_eq!(
+        chio_kernel::AcpPaymentAdapter::new("http://localhost:9").rail_id(),
+        "acp"
+    );
+}
+
+#[test]
 fn journal_trait_methods_fail_closed_by_default() {
     let store = UnsupportedStore;
 

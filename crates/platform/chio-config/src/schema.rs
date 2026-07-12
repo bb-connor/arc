@@ -96,6 +96,10 @@ impl ChioConfig {
             }),
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             deadlines: self.kernel.deadlines.to_hot_path_deadline_config(),
+            // The dispatch-intent journal ships opt-in: file-configured
+            // deployments keep the pre-journal write path until an operator
+            // enables it on the returned config.
+            dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
         })
     }
 }

@@ -891,6 +891,7 @@ fn make_config() -> KernelConfig {
         retention_config: None,
         memory_budget: crate::MemoryBudgetConfig::defaults(),
         deadlines: crate::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: crate::DispatchIntentJournalMode::Off,
     }
 }
 
