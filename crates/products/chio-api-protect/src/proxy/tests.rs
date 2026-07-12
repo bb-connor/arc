@@ -215,11 +215,15 @@ fn test_state_with_receipt_db(
         } else {
             (None, Vec::new(), Vec::new(), HashSet::new())
         };
-    let revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>> = receipt_db.map(|path| {
-        Arc::new(
+    // Mirror the proxy's serving modes: a durable sibling store when a receipt
+    // database is configured, an in-memory store shared with the release path
+    // otherwise, so a release is honored in-process even without a receipt db.
+    let revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>> = Some(match receipt_db {
+        Some(path) => Arc::new(
             chio_store_sqlite::SqliteRevocationStore::open(format!("{path}.revocations"))
                 .test_unwrap(),
-        ) as Arc<dyn chio_kernel::RevocationStore>
+        ) as Arc<dyn chio_kernel::RevocationStore>,
+        None => Arc::new(chio_kernel::InMemoryRevocationStore::new()),
     });
     let signer_public_key = keypair.public_key();
     let trusted_capability_issuers = vec![signer_public_key.clone()];
@@ -2013,8 +2017,12 @@ async fn run_refuses_to_start_without_durable_receipts_unless_opted_in() {
     );
 }
 
+/// In ephemeral mode there is no durable receipt database, but the sidecar
+/// still shares an in-memory revocation store with the embedded kernel, so a
+/// release must succeed and revoke the capability in-process rather than fail
+/// and leave the token authorizing until it expires.
 #[tokio::test]
-async fn sidecar_release_requires_persistent_receipt_store() {
+async fn sidecar_release_revokes_in_process_without_a_receipt_store() {
     let state = test_state(
         vec![RouteEntry {
             pattern: "/pets".to_string(),
@@ -2023,6 +2031,10 @@ async fn sidecar_release_requires_persistent_receipt_store() {
             policy: PolicyDecision::DenyByDefault,
         }],
         "http://127.0.0.1:1".to_string(),
+    );
+    assert!(
+        state.receipt_store.is_none(),
+        "ephemeral serving mode has no durable receipt store"
     );
 
     let release_request = with_loopback_peer(
@@ -2042,22 +2054,26 @@ async fn sidecar_release_requires_persistent_receipt_store() {
     );
     let release_response =
         sidecar_release_handler(State(Arc::clone(&state)), release_request).await;
-    assert_eq!(release_response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(release_response.status(), StatusCode::OK);
 
     let bytes = to_bytes(release_response.into_body(), 1024 * 1024)
         .await
         .test_unwrap();
     let json: serde_json::Value = serde_json::from_slice(&bytes).test_unwrap();
-    assert_eq!(
-        json["message"],
-        "persistent receipt_db must be configured for capability release"
-    );
+    assert_eq!(json["released"], true);
 
-    assert!(!state
+    // The release takes effect in-process for both the validate path (in-memory
+    // set) and the mediated path (the shared revocation store).
+    assert!(state
         .revoked_capability_ids
         .lock()
         .await
         .contains("cap-revoked"));
+    let store = state.revocation_store.as_ref().test_unwrap();
+    assert!(
+        chio_kernel::RevocationStore::is_revoked(store.as_ref(), "cap-revoked").test_unwrap(),
+        "the shared revocation store must record the release"
+    );
 }
 
 #[tokio::test]

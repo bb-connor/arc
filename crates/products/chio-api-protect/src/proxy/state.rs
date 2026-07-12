@@ -203,10 +203,12 @@ pub(crate) struct ProxyState {
     pub(crate) receipt_log: Mutex<ReceiptLog>,
     pub(crate) tool_receipt_log: Mutex<ToolReceiptLog>,
     pub(crate) receipt_store: Option<Mutex<SqliteReceiptStore>>,
-    /// Durable revocation store shared with the embedded kernel. When a receipt
-    /// database is configured, releases persist here so a sibling replica on the
-    /// same volume observes the revocation even though its in-memory set was
-    /// loaded once at boot and is never reloaded.
+    /// Revocation store shared with the embedded kernel. With a receipt database
+    /// it is the durable sibling file, so releases persist and a sibling replica
+    /// on the same volume observes them even though its in-memory set is loaded
+    /// once at boot and never reloaded. In ephemeral mode it is an in-memory
+    /// store, so a release is still honored in-process rather than leaving the
+    /// token live until it expires.
     pub(crate) revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>>,
     pub(crate) revoked_capability_ids: Mutex<HashSet<String>>,
     pub(crate) trusted_capability_issuers: Vec<PublicKey>,
@@ -373,14 +375,18 @@ impl ProtectProxy {
         let trusted_receipt_signers = vec![signer_public_key];
 
         // The revocation store lives in a sibling file so a revoked capability
-        // survives a restart.
-        let durable_revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>> =
+        // survives a restart. In ephemeral mode there is no durable file, but a
+        // shared in-memory store still makes a release effective for the running
+        // process: the same handle backs the embedded kernel's mediated checks
+        // and the sidecar's release endpoint, so a token can be revoked in-process
+        // rather than staying live until it expires.
+        let revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>> =
             match &self.config.receipt_db {
                 Some(path) => Some(Arc::new(
                     chio_store_sqlite::SqliteRevocationStore::open(revocation_sibling_path(path))
                         .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
                 )),
-                None => None,
+                None => Some(Arc::new(chio_kernel::InMemoryRevocationStore::new())),
             };
 
         let evaluator = RequestEvaluator::new_with_durable_stores(
@@ -390,7 +396,7 @@ impl ProtectProxy {
             Arc::clone(&approval_store),
             self.config.trusted_capability_issuers.clone(),
             durable_receipt_store,
-            durable_revocation_store.clone(),
+            revocation_store.clone(),
         )
         .map_err(|error| ProtectError::Config(error.to_string()))?;
         let receipt_backend = evaluator.receipt_backend();
@@ -437,7 +443,7 @@ impl ProtectProxy {
             receipt_log: Mutex::new(receipt_log),
             tool_receipt_log: Mutex::new(tool_receipt_log),
             receipt_store,
-            revocation_store: durable_revocation_store,
+            revocation_store,
             revoked_capability_ids: Mutex::new(revoked_capability_ids),
             trusted_capability_issuers,
             trusted_receipt_signers,

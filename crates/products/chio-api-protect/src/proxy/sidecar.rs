@@ -315,13 +315,12 @@ pub(crate) async fn sidecar_release_handler(
     }
 
     let capability_id = release_request.capability_id.trim().to_string();
-    let Some(store) = &state.receipt_store else {
-        return internal_json_error_response(
-            "chio_capability_release_failed",
-            "persistent receipt_db must be configured for capability release",
-        );
-    };
-    {
+
+    // Record the release in the receipt store's revoked-capabilities table when
+    // a durable receipt database is configured, so a restart reloads it into the
+    // in-memory validate set. In ephemeral mode there is no such table; the
+    // shared revocation store below still makes the release effective in-process.
+    if let Some(store) = &state.receipt_store {
         let mut store = store.lock().await;
         if let Err(error) = store.revoke_capability(&capability_id) {
             warn!("failed to persist capability revocation: {error}");
@@ -331,18 +330,22 @@ pub(crate) async fn sidecar_release_handler(
             );
         }
     }
-    // Persist to the durable revocation store the health endpoint advertises so a
-    // sibling replica sharing the volume sees the revocation without waiting for a
-    // restart to reload its in-memory set. Fail closed: a release that cannot be
-    // recorded durably must not report success.
-    if let Some(revocation_store) = &state.revocation_store {
-        if let Err(error) = revocation_store.revoke(&capability_id) {
-            warn!("failed to persist durable capability revocation: {error}");
-            return internal_json_error_response(
-                "chio_capability_release_failed",
-                &error.to_string(),
-            );
-        }
+
+    // Record in the revocation store shared with the embedded kernel. It is
+    // present in every serving mode (the durable sibling database, or an
+    // in-memory store in ephemeral mode), so a release takes effect for mediated
+    // dispatch in-process and, when durable, for a sibling replica sharing the
+    // volume without waiting for a restart. Fail closed: a release that cannot be
+    // recorded must not report success.
+    let Some(revocation_store) = &state.revocation_store else {
+        return internal_json_error_response(
+            "chio_capability_release_failed",
+            "no revocation store is configured for capability release",
+        );
+    };
+    if let Err(error) = revocation_store.revoke(&capability_id) {
+        warn!("failed to record capability revocation: {error}");
+        return internal_json_error_response("chio_capability_release_failed", &error.to_string());
     }
     state
         .revoked_capability_ids

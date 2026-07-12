@@ -138,17 +138,25 @@ impl RequestEvaluator {
         } else {
             BACKEND_EPHEMERAL
         };
-        let revocation_backend = if revocation_store.is_some() {
-            BACKEND_DURABLE
-        } else {
+        // A revocation store counts as durable only if it survives a restart. An
+        // in-memory store may be attached to share its handle with the sidecar's
+        // release path in ephemeral mode; it must still report ephemeral so it
+        // neither advertises a durable backend nor falsely satisfies the kernel's
+        // revocation-durability gate.
+        let revocation_is_ephemeral = revocation_store
+            .as_ref()
+            .is_none_or(|store| store.is_ephemeral());
+        let revocation_backend = if revocation_is_ephemeral {
             BACKEND_EPHEMERAL
+        } else {
+            BACKEND_DURABLE
         };
 
         let mut builder = HttpAuthority::builder()
             .approval_store(approval_store)
             .trusted_capability_issuers(trusted_capability_issuers)
             .allow_ephemeral_receipt_log(receipt_store.is_none())
-            .allow_ephemeral_revocation_store(revocation_store.is_none());
+            .allow_ephemeral_revocation_store(revocation_is_ephemeral);
         if let Some(store) = receipt_store {
             builder = builder.receipt_store(store);
         }
