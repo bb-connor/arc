@@ -1359,9 +1359,29 @@ pub(super) fn retention_repair_on_writer(
         .map(|d| d.as_secs())
         .unwrap_or(0);
     let removed = extras.len() as u64;
+    let rounded_i64 = sqlite_i64(rounded_watermark, "repair rounded watermark")?;
+    let now_i64 = sqlite_i64(now, "repair tombstone timestamp")?;
     let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
     tx.execute_batch("DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete;")?;
+    // Repair runs on an `open_existing` connection, which skips the writable
+    // open() migration that creates the tombstone table and its reuse-reject
+    // triggers. Create them before deleting so a legacy store repaired here still
+    // blocks archived-id reuse.
+    super::support::ensure_receipt_retention_tombstones(&tx)?;
     for (entry_seq, _) in &extras {
+        // Tombstone the archived id BEFORE removing its claim-log row, exactly as
+        // the rotation delete does: the source receipt is already gone, so this
+        // orphaned claim-log row holds the last live UNIQUE(receipt_id) sentinel.
+        // Deleting it without a tombstone would let the same archived receipt_id
+        // be appended again as a brand-new live receipt, recreating the
+        // archived/live identity ambiguity the tombstone exists to prevent.
+        tx.execute(
+            "INSERT OR IGNORE INTO receipt_retention_tombstones \
+                 (receipt_id, receipt_kind, archived_through_entry_seq, tombstoned_at) \
+             SELECT receipt_id, receipt_kind, ?1, ?2 \
+             FROM claim_receipt_log_entries WHERE entry_seq = ?3",
+            params![rounded_i64, now_i64, entry_seq],
+        )?;
         tx.execute(
             "DELETE FROM claim_receipt_log_entries WHERE entry_seq = ?1",
             params![entry_seq],

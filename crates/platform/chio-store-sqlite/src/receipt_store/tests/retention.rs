@@ -2540,6 +2540,81 @@ fn watermark_trust_rejects_tampered_archive_contents() -> Result<(), Box<dyn std
     Ok(())
 }
 
+/// Retention repair deletes the surviving orphaned claim-log rows for receipts
+/// whose source rows are already gone. Those orphan rows hold the last live
+/// UNIQUE(receipt_id) sentinel, so repair must tombstone each archived id before
+/// deleting it, exactly as the rotation delete does. Otherwise the same archived
+/// receipt_id could be appended again as a brand-new live receipt, recreating
+/// the archived/live identity ambiguity the tombstone exists to prevent.
+#[test]
+fn repair_tombstones_archived_ids_to_block_reuse() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("repair-tombstone");
+    let archive = unique_db_path("repair-tombstone-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    // Build a bricked store: co-archive the claim-log for [1,2], then delete
+    // ONLY the source receipt rows (leaving the claim-log rows -> set drift).
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+        for i in 0..4u64 {
+            let r = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("dup-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store.append_chio_receipt_returning_seq(&r)?;
+        }
+        store.flush_receipt_writes()?;
+        store.writer_handle().run_write({
+            let archive_path = archive_path.to_string();
+            move |connection| {
+                let escaped = archive_path.replace('\'', "''");
+                connection.execute_batch(&format!("ATTACH DATABASE '{escaped}' AS archive"))?;
+                connection.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries \
+                       (entry_seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, receipt_kind TEXT NOT NULL, \
+                        source_seq INTEGER NOT NULL, timestamp INTEGER NOT NULL, capability_id TEXT, session_id TEXT, \
+                        parent_request_id TEXT, request_id TEXT, subject_key TEXT, issuer_key TEXT, tool_server TEXT, \
+                        tool_name TEXT, raw_json TEXT NOT NULL); \
+                     INSERT OR IGNORE INTO archive.claim_receipt_log_entries \
+                       SELECT * FROM main.claim_receipt_log_entries WHERE entry_seq <= 2; \
+                     DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
+                     DELETE FROM main.chio_tool_receipts WHERE seq <= 2; \
+                     CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
+                       BEFORE DELETE ON chio_tool_receipts \
+                       BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END;",
+                )?;
+                connection.execute_batch("DETACH DATABASE archive")?;
+                Ok(())
+            }
+        })?;
+    }
+
+    // Repair the bricked store.
+    let store = SqliteReceiptStore::open_existing(&path)?;
+    let removed = store.retention_repair(archive_path)?;
+    assert_eq!(removed, 2, "repair removed the two orphaned claim-log rows");
+    drop(store);
+
+    // The repaired (archived) ids are tombstoned, so re-appending one as a fresh
+    // live receipt is rejected: the archived id cannot be resurrected.
+    let reopened = SqliteReceiptStore::open(&path)?;
+    let reused =
+        super::support::sample_receipt_with_keypair_and_timestamp("dup-0", 1, 100, &keypair);
+    let result = reopened.append_chio_receipt_returning_seq(&reused);
+    assert!(
+        result.is_err(),
+        "re-appending an archived receipt id must be rejected by the retention tombstone"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&archive);
+    Ok(())
+}
+
 /// Primary correctness proof: a state-machine proptest that drives random
 /// interleaved sequences of tool/child appends (non-monotonic
 /// timestamps within an aged band, to exercise the MAX(timestamp)-over-prefix
