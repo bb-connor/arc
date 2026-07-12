@@ -253,6 +253,12 @@ fn dead_letter_intent_flips_store_unhealthy() -> Result<(), Box<dyn std::error::
     let path = unique_db_path("chio-intents-health");
     let store = SqliteReceiptStore::open(&path)?;
 
+    // Health folds in `writer_serving_closed`, which reads closed until the
+    // writer thread's one-time startup seed publishes a verified head. Wait
+    // for one writer round trip so the sample observes the seeded head
+    // rather than racing thread startup.
+    store.flush_receipt_writes()?;
+
     // A clean store is healthy with zero intent counts.
     let clean = store.receipt_store_health()?;
     assert!(clean.healthy);
