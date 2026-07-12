@@ -280,6 +280,10 @@ mod tests {
         exposes_binding: bool,
     }
 
+    struct LegacyAtomicStore {
+        binding: SettlementStoreBinding,
+    }
+
     struct RoutingOutcomeStore {
         claim: Result<Option<SettlementAttemptClaim>, SettlementRouteError>,
         route: Result<SettlementRoute, SettlementRouteError>,
@@ -401,6 +405,10 @@ mod tests {
             self.projection
         }
 
+        fn supports_atomic_receipt_projection_with_timeout(&self) -> bool {
+            self.projection == AtomicReceiptProjection::SettlementObservationV1
+        }
+
         fn settlement_store_binding(&self) -> Option<SettlementStoreBinding> {
             self.exposes_binding.then_some(self.binding)
         }
@@ -416,6 +424,45 @@ mod tests {
                     "atomic settlement observation projection".to_string(),
                 )),
             }
+        }
+
+        fn append_chio_receipt_with_pending_observation_and_timeout(
+            &self,
+            receipt: &ChioReceipt,
+            pending: &PendingSettlementObservation,
+            _budget: std::time::Duration,
+        ) -> Result<Option<u64>, ReceiptStoreError> {
+            self.append_chio_receipt_with_pending_observation(receipt, pending)?;
+            Ok(None)
+        }
+
+        fn append_child_receipt(
+            &self,
+            _receipt: &ChildRequestReceipt,
+        ) -> Result<(), ReceiptStoreError> {
+            Ok(())
+        }
+    }
+
+    impl ReceiptStore for LegacyAtomicStore {
+        fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+            Ok(())
+        }
+
+        fn settlement_store_binding(&self) -> Option<SettlementStoreBinding> {
+            Some(self.binding)
+        }
+
+        fn atomic_receipt_projection(&self) -> AtomicReceiptProjection {
+            AtomicReceiptProjection::SettlementObservationV1
+        }
+
+        fn append_chio_receipt_with_pending_observation(
+            &self,
+            _receipt: &ChioReceipt,
+            _pending: &PendingSettlementObservation,
+        ) -> Result<(), ReceiptStoreError> {
+            Ok(())
         }
 
         fn append_child_receipt(
@@ -439,9 +486,11 @@ mod tests {
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
             require_web3_evidence: false,
             allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
             memory_budget: MemoryBudgetConfig::defaults(),
+            deadlines: crate::HotPathDeadlineConfig::default(),
         })
     }
 
@@ -779,6 +828,29 @@ mod tests {
             outcome_store(&store),
             RetryPolicy::default(),
         );
+
+        assert!(matches!(
+            result,
+            Err(KernelError::SettlementConfiguration(
+                SettlementRuntimeConfigError::UnsupportedAtomicProjection
+            ))
+        ));
+        assert!(kernel.settlement_observer().is_none());
+    }
+
+    #[test]
+    fn installer_rejects_a_legacy_atomic_store_without_timeout_support() {
+        let mut kernel = kernel();
+        let store = Arc::new(LegacyAtomicStore {
+            binding: SettlementStoreBinding::from_digest([9; 32]),
+        });
+        let receipt_store: Arc<dyn ReceiptStore> = store;
+        assert!(kernel.set_receipt_store_handle(receipt_store).is_ok());
+        let outcomes = RoutingOutcomeStore::new(Ok(SettlementRoute::NoAction));
+        let outcome_store: Arc<dyn SettlementOutcomeStore> = outcomes;
+
+        let result =
+            kernel.set_settlement_observer_runtime(hook(), outcome_store, RetryPolicy::default());
 
         assert!(matches!(
             result,

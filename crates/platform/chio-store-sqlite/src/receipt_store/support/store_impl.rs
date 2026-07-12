@@ -1,5 +1,15 @@
 use super::*;
 
+/// Flatten a capability-lineage error into the receipt-store error the
+/// `ReceiptStore` trait surface speaks.
+fn capability_lineage_store_error(error: chio_kernel::CapabilityLineageError) -> ReceiptStoreError {
+    match error {
+        chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
+        chio_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
+        chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
+    }
+}
+
 impl SqliteReceiptStore {
     pub fn record_session_anchor_record(
         &self,
@@ -147,10 +157,39 @@ impl SqliteReceiptStore {
         receipt: &ChildRequestReceipt,
     ) -> Result<u64, ReceiptStoreError> {
         ensure_child_receipt_verified(receipt)?;
+        let job = Self::build_child_receipt_write_job(receipt)?;
+        self.writer_handle().run_write_receipt(job)
+    }
+
+    /// Deadline-bounded variant of [`append_child_receipt_record`]. Fails closed
+    /// with `ReceiptStoreError::Timeout` if the commit round trip exceeds
+    /// `budget`, so a wedged writer cannot pin the kernel-wide receipt write lock
+    /// while nested-flow child receipts drain.
+    pub fn append_child_receipt_record_with_timeout(
+        &self,
+        receipt: &ChildRequestReceipt,
+        budget: std::time::Duration,
+    ) -> Result<u64, ReceiptStoreError> {
+        ensure_child_receipt_verified(receipt)?;
+        let job = Self::build_child_receipt_write_job(receipt)?;
+        self.writer_handle()
+            .run_write_receipt_with_timeout(job, budget)
+    }
+
+    /// Build the single-writer transaction that inserts one child receipt and
+    /// its request-lineage row, returning the assigned claim-log entry seq. The
+    /// job owns cloned receipt data so it can run bounded or unbounded on the
+    /// commit actor.
+    fn build_child_receipt_write_job(
+        receipt: &ChildRequestReceipt,
+    ) -> Result<
+        impl FnOnce(&mut SqliteStoreConnection) -> Result<u64, ReceiptStoreError> + Send + 'static,
+        ReceiptStoreError,
+    > {
         let raw_json = serde_json::to_string(receipt)?;
         let lineage_json = child_receipt_request_lineage_json(receipt)?;
         let receipt = receipt.clone();
-        self.writer_handle().run_write_receipt(move |connection| {
+        Ok(move |connection: &mut SqliteStoreConnection| {
             ensure_checkpoint_transparency_guards(connection)?;
             let tx =
                 connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
@@ -224,6 +263,42 @@ impl SqliteReceiptStore {
             Ok(entry_seq)
         })
     }
+
+    fn build_pending_observation_write_job(
+        receipt: &ChioReceipt,
+        pending: &PendingSettlementObservation,
+    ) -> Result<
+        impl FnOnce(&mut SqliteStoreConnection) -> Result<u64, ReceiptStoreError> + Send + 'static,
+        ReceiptStoreError,
+    > {
+        ensure_chio_receipt_verified(receipt)?;
+        sqlite_i64(receipt.timestamp, "receipt timestamp")?;
+        sqlite_i64(
+            pending.next_visible_at_ms,
+            "settlement attempt visibility deadline",
+        )?;
+        let raw_json = serde_json::to_string(receipt)?;
+        let receipt = receipt.clone();
+        let next_visible_at_ms = pending.next_visible_at_ms;
+        Ok(move |connection: &mut SqliteStoreConnection| {
+            ensure_checkpoint_transparency_guards(connection)?;
+            let tx =
+                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            let (seq, inserted) =
+                append_chio_receipt_tx_with_insert_status(&tx, &receipt, &raw_json)?;
+            ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
+            if inserted {
+                crate::settle_attempts::insert_attempt_zero_tx(
+                    &tx,
+                    &receipt.id,
+                    receipt.timestamp,
+                    next_visible_at_ms,
+                )?;
+            }
+            tx.commit()?;
+            Ok(seq)
+        })
+    }
 }
 
 impl ReceiptStore for SqliteReceiptStore {
@@ -243,6 +318,10 @@ impl ReceiptStore for SqliteReceiptStore {
         }
     }
 
+    fn supports_atomic_receipt_projection_with_timeout(&self) -> bool {
+        self.settlement_store_binding.is_some()
+    }
+
     fn append_chio_receipt_with_pending_observation(
         &self,
         receipt: &ChioReceipt,
@@ -253,34 +332,27 @@ impl ReceiptStore for SqliteReceiptStore {
                 "atomic settlement observation projection".to_string(),
             ));
         }
-        ensure_chio_receipt_verified(receipt)?;
-        sqlite_i64(receipt.timestamp, "receipt timestamp")?;
-        sqlite_i64(
-            pending.next_visible_at_ms,
-            "settlement attempt visibility deadline",
-        )?;
-        let raw_json = serde_json::to_string(receipt)?;
-        let receipt = receipt.clone();
-        let next_visible_at_ms = pending.next_visible_at_ms;
+        let job = Self::build_pending_observation_write_job(receipt, pending)?;
         self.writer_handle()
-            .run_critical_receipt_write(move |connection| {
-                ensure_checkpoint_transparency_guards(connection)?;
-                let tx = connection
-                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-                let (_, inserted) =
-                    append_chio_receipt_tx_with_insert_status(&tx, &receipt, &raw_json)?;
-                ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
-                if inserted {
-                    crate::settle_attempts::insert_attempt_zero_tx(
-                        &tx,
-                        &receipt.id,
-                        receipt.timestamp,
-                        next_visible_at_ms,
-                    )?;
-                }
-                tx.commit()?;
-                Ok(())
-            })
+            .run_critical_receipt_write(job)
+            .map(|_| ())
+    }
+
+    fn append_chio_receipt_with_pending_observation_and_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        pending: &PendingSettlementObservation,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        if self.settlement_store_binding.is_none() {
+            return Err(ReceiptStoreError::Unsupported(
+                "atomic settlement observation projection".to_string(),
+            ));
+        }
+        let job = Self::build_pending_observation_write_job(receipt, pending)?;
+        self.writer_handle()
+            .run_critical_receipt_write_with_timeout(job, budget)
+            .map(Some)
     }
 
     fn load_chio_receipt(
@@ -349,6 +421,24 @@ impl ReceiptStore for SqliteReceiptStore {
         let raw_json = serde_json::to_string(receipt)?;
         let seq = self.append_verified_chio_receipt_record(receipt, &raw_json, true)?;
         Ok(Some(seq))
+    }
+
+    fn append_chio_receipt_with_timeout(
+        &self,
+        receipt: &ChioReceipt,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        let raw_json = serde_json::to_string(receipt)?;
+        let seq = self
+            .append_verified_chio_receipt_record_with_timeout(receipt, &raw_json, true, budget)?;
+        Ok(Some(seq))
+    }
+
+    fn writer_liveness(
+        &self,
+        stall_threshold: std::time::Duration,
+    ) -> chio_kernel::ReceiptWriterLiveness {
+        SqliteReceiptStore::writer_liveness(self, stall_threshold)
     }
 
     fn append_chio_receipt_consuming_authorization(
@@ -455,20 +545,40 @@ impl ReceiptStore for SqliteReceiptStore {
         .map(|()| true)
     }
 
+    fn supports_retention(&self) -> bool {
+        true
+    }
+
+    fn rotate_receipts(&self, config: &RetentionConfig) -> Result<u64, ReceiptStoreError> {
+        self.rotate_if_needed(config)
+    }
+
+    fn record_retention_rotation_outcome(&self, failure: Option<&str>) {
+        SqliteReceiptStore::record_retention_rotation_outcome(self, failure)
+    }
+
     fn record_capability_snapshot(
         &self,
         token: &CapabilityToken,
         parent_capability_id: Option<&str>,
     ) -> Result<(), ReceiptStoreError> {
-        SqliteReceiptStore::record_capability_snapshot(self, token, parent_capability_id).map_err(
-            |error| match error {
-                chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
-                chio_kernel::CapabilityLineageError::Sqlite(error) => {
-                    ReceiptStoreError::Sqlite(error)
-                }
-                chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
-            },
+        SqliteReceiptStore::record_capability_snapshot(self, token, parent_capability_id)
+            .map_err(capability_lineage_store_error)
+    }
+
+    fn record_capability_snapshot_with_timeout(
+        &self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+        budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::record_capability_snapshot_with_timeout(
+            self,
+            token,
+            parent_capability_id,
+            budget,
         )
+        .map_err(capability_lineage_store_error)
     }
 
     fn get_capability_snapshot(
@@ -603,6 +713,15 @@ impl ReceiptStore for SqliteReceiptStore {
         receipt: &ChildRequestReceipt,
     ) -> Result<Option<u64>, ReceiptStoreError> {
         SqliteReceiptStore::append_child_receipt_record(self, receipt).map(Some)
+    }
+
+    fn append_child_receipt_with_timeout(
+        &self,
+        receipt: &ChildRequestReceipt,
+        budget: std::time::Duration,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        SqliteReceiptStore::append_child_receipt_record_with_timeout(self, receipt, budget)
+            .map(Some)
     }
 }
 

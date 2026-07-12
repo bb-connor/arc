@@ -159,9 +159,11 @@ fn kernel_config() -> KernelConfig {
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: false,
+        allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: 0,
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
     }
 }
 

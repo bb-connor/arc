@@ -7,7 +7,24 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Mutex, MutexGuard};
 use std::thread;
 
-use chio_core::capability::{attenuation::{AttenuationProof, DelegationLink, DelegationLinkBody, compute_attenuation_witness, scope_hash}, governance::{CallChainContinuationAudience, CallChainContinuationToken, CallChainContinuationTokenBody, GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY, GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY, GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody, GovernedAutonomyContext, GovernedAutonomyTier, GovernedCallChainContext, GovernedTransactionIntent, GovernedUpstreamCallChainProof, GovernedUpstreamCallChainProofBody}, scope::{ChioScope, Constraint, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant}, token::{CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTokenBody}};
+use chio_core::capability::{
+    attenuation::{
+        compute_attenuation_witness, scope_hash, AttenuationProof, DelegationLink,
+        DelegationLinkBody,
+    },
+    governance::{
+        CallChainContinuationAudience, CallChainContinuationToken, CallChainContinuationTokenBody,
+        GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+        GovernedAutonomyContext, GovernedAutonomyTier, GovernedCallChainContext,
+        GovernedTransactionIntent, GovernedUpstreamCallChainProof,
+        GovernedUpstreamCallChainProofBody, GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY,
+        GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY,
+    },
+    scope::{
+        ChioScope, Constraint, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant,
+    },
+    token::{CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTokenBody},
+};
 use chio_core::credit::{
     CreditBondArtifact, CreditBondDisposition, CreditBondLifecycleState, CreditBondPrerequisites,
     CreditBondReport, CreditBondSupportBoundary, CreditScorecardBand, CreditScorecardConfidence,
@@ -16,7 +33,8 @@ use chio_core::credit::{
 };
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_core::receipt::{
-    body::ChioReceipt, body::ChioReceiptBody, decision::Decision, metadata::GuardEvidence, decision::ToolCallAction,
+    body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
+    metadata::GuardEvidence,
 };
 use chio_core::session::{
     CompleteOperation, CompletionArgument, CompletionReference, CreateMessageOperation,
@@ -159,11 +177,15 @@ impl SqliteReceiptStore {
             else {
                 return Ok(latest);
             };
-            checkpoint_seq = checkpoint.body.checkpoint_seq.checked_add(1).ok_or_else(|| {
-                ReceiptStoreError::Conflict(
-                    "checkpoint_seq overflow while loading latest".to_string(),
-                )
-            })?;
+            checkpoint_seq = checkpoint
+                .body
+                .checkpoint_seq
+                .checked_add(1)
+                .ok_or_else(|| {
+                    ReceiptStoreError::Conflict(
+                        "checkpoint_seq overflow while loading latest".to_string(),
+                    )
+                })?;
             latest = Some(checkpoint);
         }
     }
@@ -270,15 +292,17 @@ impl SqliteReceiptStore {
             .into_iter()
             .map(|(_, bytes)| bytes)
             .collect::<Vec<_>>();
-        let checkpoint_seq = previous_checkpoint
-            .as_ref()
-            .map_or(Ok(1), |checkpoint| {
-                checkpoint.body.checkpoint_seq.checked_add(1).ok_or_else(|| {
+        let checkpoint_seq = previous_checkpoint.as_ref().map_or(Ok(1), |checkpoint| {
+            checkpoint
+                .body
+                .checkpoint_seq
+                .checked_add(1)
+                .ok_or_else(|| {
                     ReceiptStoreError::Conflict(
                         "checkpoint_seq overflow while creating receipt checkpoint".to_string(),
                     )
                 })
-            })?;
+        })?;
         let checkpoint = build_checkpoint_with_previous(
             checkpoint_seq,
             batch_start_seq,
@@ -287,7 +311,9 @@ impl SqliteReceiptStore {
             keypair,
             previous_checkpoint.as_ref(),
         )
-        .map_err(|error| ReceiptStoreError::Conflict(format!("checkpoint build failed: {error}")))?;
+        .map_err(|error| {
+            ReceiptStoreError::Conflict(format!("checkpoint build failed: {error}"))
+        })?;
         Self::store_checkpoint_locked(connection, &checkpoint)?;
         Ok(ReceiptCheckpointCreateReport {
             created: true,
@@ -453,9 +479,7 @@ impl ReceiptStore for SqliteReceiptStore {
         max_batch: u64,
     ) -> Result<bool, ReceiptStoreError> {
         let mut signer = self.background_checkpoint_signer.lock().map_err(|_| {
-            ReceiptStoreError::Conflict(
-                "background checkpoint signer lock poisoned".to_string(),
-            )
+            ReceiptStoreError::Conflict("background checkpoint signer lock poisoned".to_string())
         })?;
         *signer = Some((std::sync::Arc::new(keypair), max_batch));
         Ok(true)
@@ -528,10 +552,7 @@ impl ReceiptStore for SqliteReceiptStore {
         })
     }
 
-    fn append_child_receipt(
-        &self,
-        receipt: &ChildRequestReceipt,
-    ) -> Result<(), ReceiptStoreError> {
+    fn append_child_receipt(&self, receipt: &ChildRequestReceipt) -> Result<(), ReceiptStoreError> {
         let raw_json = serde_json::to_string(receipt)?;
         self.connection()?.execute(
             r#"
@@ -886,9 +907,11 @@ fn make_config() -> KernelConfig {
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
         memory_budget: crate::MemoryBudgetConfig::defaults(),
+        deadlines: crate::HotPathDeadlineConfig::default(),
     }
 }
 
@@ -933,8 +956,10 @@ fn unique_receipt_db_path(prefix: &str) -> std::path::PathBuf {
         .expect("system time before unix epoch")
         .as_nanos();
     let counter = UNIQUE_RECEIPT_DB_COUNTER.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir()
-        .join(format!("{prefix}-{}-{nonce}-{counter}.sqlite3", std::process::id()))
+    std::env::temp_dir().join(format!(
+        "{prefix}-{}-{nonce}-{counter}.sqlite3",
+        std::process::id()
+    ))
 }
 
 fn make_elicited_content() -> CreateElicitationResult {
@@ -1213,7 +1238,10 @@ fn make_chain_bound_capability(
 }
 
 fn set_capability_trust_root_for_scope(kernel: &ChioKernel, scope: &ChioScope) {
-    kernel.set_capability_trust_root(kernel.config.keypair.public_key(), scope_hash(scope).unwrap());
+    kernel.set_capability_trust_root(
+        kernel.config.keypair.public_key(),
+        scope_hash(scope).unwrap(),
+    );
 }
 
 struct V2DelegatedChildInput<'a> {
@@ -1910,6 +1938,30 @@ impl ReceiptStore for AppendOnlyReceiptStore {
     }
 }
 include!("support_dead_writer.rs");
+
+/// A store that reports retention support but, like the real prefix-watermark
+/// store, cannot honor a tenant-scoped policy (it inherits the default
+/// `supports_tenant_scoped_retention` = false). Used to prove the attach path
+/// rejects a tenant-scoped retention config before spawning the worker.
+#[derive(Default)]
+struct RetentionCapableReceiptStore;
+
+impl ReceiptStore for RetentionCapableReceiptStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn supports_retention(&self) -> bool {
+        true
+    }
+}
 /// A store-authoritative point-lookup store: appended chio receipts are retained
 /// in-memory and `load_chio_receipt` resolves them by id. Models a durable store
 /// that implements point loads, so an evicted parent receipt still resolves from

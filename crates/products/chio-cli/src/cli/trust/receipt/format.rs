@@ -9,6 +9,8 @@ pub(crate) const CHIO_CLI_RECEIPT_CHECKPOINT_CREATE_SCHEMA: &str =
 pub(crate) const CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA: &str =
     "chio.cli.receipt.checkpoint_verify.v1";
 pub(crate) const CHIO_CLI_RECEIPT_AUDIT_SCHEMA: &str = "chio.cli.receipt.audit.v1";
+pub(crate) const CHIO_CLI_RECEIPT_RETENTION_REPAIR_SCHEMA: &str =
+    "chio.cli.receipt.retention.repair.v1";
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,9 +60,23 @@ pub(crate) fn push_writer_counters_human(
     writer: &chio_kernel::ReceiptWriterCounters,
 ) {
     lines.push(format!("writer_accepted_total: {}", writer.accepted_total));
-    lines.push(format!("writer_committed_total: {}", writer.committed_total));
+    lines.push(format!(
+        "writer_committed_total: {}",
+        writer.committed_total
+    ));
     lines.push(format!("writer_failed_total: {}", writer.failed_total));
-    lines.push(format!("writer_saturated_total: {}", writer.saturated_total));
+    lines.push(format!(
+        "writer_timed_out_total: {}",
+        writer.timed_out_total
+    ));
+    lines.push(format!(
+        "writer_timed_out_inflight: {}",
+        writer.timed_out_inflight
+    ));
+    lines.push(format!(
+        "writer_saturated_total: {}",
+        writer.saturated_total
+    ));
     lines.push(format!("writer_inflight: {}", writer.inflight));
     lines.push(format!(
         "writer_last_commit_unix_ms: {}",
@@ -72,7 +88,9 @@ pub(crate) fn push_writer_counters_human(
     ));
 }
 
-pub(crate) fn render_receipt_health_human(report: &chio_kernel::ReceiptStoreHealthReport) -> String {
+pub(crate) fn render_receipt_health_human(
+    report: &chio_kernel::ReceiptStoreHealthReport,
+) -> String {
     let writer_level = format!("{:?}", report.writer_level).to_ascii_lowercase();
     let mut lines = vec![
         format!(
@@ -84,7 +102,10 @@ pub(crate) fn render_receipt_health_human(report: &chio_kernel::ReceiptStoreHeal
             }
         ),
         format!("committed_entry_seq: {}", report.latest_committed_entry_seq),
-        format!("checkpoint_seq: {}", optional_u64(report.latest_checkpoint_seq)),
+        format!(
+            "checkpoint_seq: {}",
+            optional_u64(report.latest_checkpoint_seq)
+        ),
         format!(
             "checkpointed_entry_seq: {}",
             report.latest_checkpointed_entry_seq
@@ -103,8 +124,15 @@ pub(crate) fn render_receipt_health_human(report: &chio_kernel::ReceiptStoreHeal
         "db_size_bytes: {}",
         optional_u64(report.db_size_bytes)
     ));
+    lines.push(format!(
+        "retention_watermark_entry_seq: {}",
+        optional_u64(report.retention_watermark_entry_seq)
+    ));
     if let Some(error) = report.checkpoint_error.as_deref() {
         lines.push(format!("checkpoint_error: {error}"));
+    }
+    if let Some(error) = report.retention_error.as_deref() {
+        lines.push(format!("retention_error: {error}"));
     }
     lines.join("\n") + "\n"
 }
@@ -113,7 +141,10 @@ pub(crate) fn render_receipt_flush_human(report: &chio_kernel::ReceiptFlushRepor
     let mut lines = vec![
         "flushed: true".to_string(),
         format!("committed_entry_seq: {}", report.latest_committed_entry_seq),
-        format!("checkpoint_seq: {}", optional_u64(report.latest_checkpoint_seq)),
+        format!(
+            "checkpoint_seq: {}",
+            optional_u64(report.latest_checkpoint_seq)
+        ),
         format!(
             "checkpointed_entry_seq: {}",
             report.latest_checkpointed_entry_seq
@@ -158,17 +189,27 @@ pub(crate) fn render_receipt_checkpoint_status_human(
             }
         ),
         format!("committed_entry_seq: {}", report.latest_committed_entry_seq),
-        format!("checkpoint_seq: {}", optional_u64(report.latest_checkpoint_seq)),
+        format!(
+            "checkpoint_seq: {}",
+            optional_u64(report.latest_checkpoint_seq)
+        ),
         format!(
             "checkpointed_entry_seq: {}",
             report.latest_checkpointed_entry_seq
         ),
     ];
     if let Some(range) = &report.next_range {
-        lines.push(format!("next_range: {}..={}", range.start_seq, range.end_seq));
+        lines.push(format!(
+            "next_range: {}..={}",
+            range.start_seq, range.end_seq
+        ));
     } else {
         lines.push("next_range: none".to_string());
     }
+    lines.push(format!(
+        "retention_watermark_entry_seq: {}",
+        optional_u64(report.retention_watermark_entry_seq)
+    ));
     if let Some(error) = report.checkpoint_error.as_deref() {
         lines.push(format!("checkpoint_error: {error}"));
     }
@@ -196,4 +237,22 @@ pub(crate) fn render_receipt_checkpoint_create_human(
         report.latest_checkpointed_entry_seq
     ));
     lines.join("\n") + "\n"
+}
+
+/// Human output for `chio receipt retention repair`. `writable` reflects the
+/// ACTUAL post-repair state (a post-repair health check): removing the orphaned
+/// claim-log rows fully clears an extra-only brick, but a store with mixed drift
+/// keeps a poisoned head after the reseed, so the next append is still rejected.
+/// Report that honestly (fail-closed) rather than always claiming the store is
+/// writable. `removed` (the extra claim-log rows removed) stays accurate in
+/// both branches, matching the JSON envelope.
+pub(crate) fn render_receipt_retention_repair_human(removed: u64, writable: bool) -> String {
+    if writable {
+        format!("retention repair removed {removed} extra claim-log row(s); store is writable\n")
+    } else {
+        format!(
+            "retention repair removed {removed} extra claim-log row(s), but the store still has \
+             drift and is not writable; further recovery is required\n"
+        )
+    }
 }

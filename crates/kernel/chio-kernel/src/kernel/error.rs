@@ -46,7 +46,7 @@ pub enum SettlementRuntimeConfigError {
     InvalidRetryPolicy(#[from] chio_settle::RetryPolicyError),
     #[error("settlement observer runtime requires a receipt store")]
     MissingReceiptStore,
-    #[error("receipt store lacks atomic settlement observation projection")]
+    #[error("receipt store lacks timeout-aware atomic settlement observation projection")]
     UnsupportedAtomicProjection,
     #[error("receipt store lacks a settlement backend binding")]
     MissingStoreBinding,
@@ -66,6 +66,28 @@ impl SettlementRuntimeConfigError {
             Self::StoreBindingMismatch => "store_binding_mismatch",
             Self::ReceiptStoreReplacement => "receipt_store_replacement",
         }
+    }
+}
+
+/// A stage of the mediation hot path that can exceed its configured wall-clock
+/// budget. Carried in the deadline error and the structured report so operators
+/// can see which await ran long.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HotPathStage {
+    GuardPipeline,
+    Dispatch,
+    ReceiptAppend,
+}
+
+impl std::fmt::Display for HotPathStage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::GuardPipeline => "guard_pipeline",
+            Self::Dispatch => "dispatch",
+            Self::ReceiptAppend => "receipt_append",
+        };
+        f.write_str(s)
     }
 }
 
@@ -254,6 +276,19 @@ pub enum KernelError {
     /// never admits a call and never grows a collection.
     #[error("kernel overloaded: {resource:?} at capacity")]
     Overloaded { resource: OverloadResource },
+
+    /// A mediation-path stage exceeded its configured wall-clock budget. The
+    /// invocation is aborted fail-closed through the shared unwind path: budget
+    /// holds are reversed and, for a dispatch expiry, the runtime-admission
+    /// reservation is retained and marked auditable. Never yields Allow.
+    #[error("hot-path deadline exceeded at {stage}: budget {budget_ms}ms")]
+    HotPathDeadlineExceeded { stage: HotPathStage, budget_ms: u64 },
+
+    /// The receipt commit writer is wedged, saturated, or dead, as reported by
+    /// the receipt-writer watchdog. Enforced at the pre-dispatch readiness gate
+    /// so no tool side effect runs while receipts cannot be durably persisted.
+    #[error("receipt commit writer unavailable: {0}")]
+    ReceiptWriterUnavailable(String),
 }
 
 impl KernelError {
@@ -535,6 +570,16 @@ impl KernelError {
                 serde_json::json!({}),
                 "Move the host process to a multi-thread Tokio runtime so block_in_place can drive async tool dispatch. The public async evaluate_tool_call path is still backed by the blocking evaluator on this branch and is not a current-thread runtime workaround.",
             ),
+            Self::HotPathDeadlineExceeded { stage, budget_ms } => self.report_with_context(
+                "CHIO-KERNEL-HOT-PATH-DEADLINE",
+                serde_json::json!({ "stage": stage, "budget_ms": budget_ms }),
+                "Raise the offending stage budget in [deadlines] if the workload is legitimately slow, or repair the slow guard, tool server, or writer. Do not retry blindly; the request already failed closed.",
+            ),
+            Self::ReceiptWriterUnavailable(reason) => self.report_with_context(
+                "CHIO-KERNEL-RECEIPT-WRITER-UNAVAILABLE",
+                serde_json::json!({ "reason": reason }),
+                "The receipt commit writer is not durably accepting writes; repair or restart the writer. Requests deny until liveness recovers.",
+            ),
         }
     }
 }
@@ -577,5 +622,35 @@ mod overload_tests {
             Some("store_binding_mismatch")
         );
         assert!(!report.suggested_fix.contains("kernel bug"));
+    }
+}
+
+#[cfg(test)]
+mod hot_path_error_taxonomy_tests {
+    use super::*;
+
+    #[test]
+    fn hot_path_stage_display_is_snake_case() {
+        assert_eq!(HotPathStage::GuardPipeline.to_string(), "guard_pipeline");
+        assert_eq!(HotPathStage::Dispatch.to_string(), "dispatch");
+        assert_eq!(HotPathStage::ReceiptAppend.to_string(), "receipt_append");
+    }
+
+    #[test]
+    fn hot_path_deadline_exceeded_reports_stable_code() {
+        let err = KernelError::HotPathDeadlineExceeded {
+            stage: HotPathStage::Dispatch,
+            budget_ms: 1500,
+        };
+        let report = err.report();
+        assert_eq!(report.code, "CHIO-KERNEL-HOT-PATH-DEADLINE");
+        assert!(err.to_string().contains("dispatch"));
+        assert!(err.to_string().contains("1500"));
+    }
+
+    #[test]
+    fn receipt_writer_unavailable_reports_stable_code() {
+        let err = KernelError::ReceiptWriterUnavailable("writer is Wedged".to_string());
+        assert_eq!(err.report().code, "CHIO-KERNEL-RECEIPT-WRITER-UNAVAILABLE");
     }
 }

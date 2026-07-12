@@ -21,6 +21,7 @@ fn settlement_projection_binding_is_scoped_to_one_writer() -> Result<(), Box<dyn
         ReceiptStore::atomic_receipt_projection(&store),
         chio_kernel::AtomicReceiptProjection::SettlementObservationV1
     );
+    assert!(ReceiptStore::supports_atomic_receipt_projection_with_timeout(&store));
     let binding = ReceiptStore::settlement_store_binding(&store)
         .ok_or("migrated receipt store did not expose settlement binding")?;
     assert_eq!(
@@ -51,6 +52,7 @@ fn settlement_projection_binding_is_scoped_to_one_writer() -> Result<(), Box<dyn
         ReceiptStore::atomic_receipt_projection(&reopened),
         chio_kernel::AtomicReceiptProjection::SettlementObservationV1
     );
+    assert!(ReceiptStore::supports_atomic_receipt_projection_with_timeout(&reopened));
     assert!(ReceiptStore::settlement_store_binding(&reopened).is_some());
 
     drop(reopened);
@@ -74,6 +76,7 @@ fn open_existing_does_not_install_missing_settlement_schema(
         ReceiptStore::atomic_receipt_projection(&reopened),
         chio_kernel::AtomicReceiptProjection::Unsupported
     );
+    assert!(!ReceiptStore::supports_atomic_receipt_projection_with_timeout(&reopened));
     assert_eq!(ReceiptStore::settlement_store_binding(&reopened), None);
     let unsupported_receipt = sample_receipt_with_id("rcpt-settlement-unsupported");
     let unsupported = ReceiptStore::append_chio_receipt_with_pending_observation(
@@ -312,6 +315,127 @@ fn atomic_receipt_append_seeds_attempt_zero_once() -> Result<(), Box<dyn std::er
 }
 
 #[test]
+fn atomic_receipt_append_with_timeout_returns_seq_and_seeds_attempt_zero(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-settlement-atomic-append-timeout");
+    let store = SqliteReceiptStore::open(&path)?;
+    let receipt = sample_receipt_with_id("rcpt-settlement-atomic-timeout");
+    let pending = chio_kernel::PendingSettlementObservation {
+        next_visible_at_ms: 9_002,
+    };
+
+    let seq = ReceiptStore::append_chio_receipt_with_pending_observation_and_timeout(
+        &store,
+        &receipt,
+        &pending,
+        Duration::from_secs(2),
+    )?
+    .ok_or("sqlite atomic settlement append did not return its claim-log seq")?;
+
+    assert!(store.load_chio_receipt(&receipt.id)?.is_some());
+    assert_eq!(attempt_count(&store, &receipt.id)?, 1);
+    let connection = store.connection()?;
+    let persisted_seq = connection.query_row(
+        "SELECT entry_seq FROM claim_receipt_log_entries WHERE receipt_id = ?1",
+        [receipt.id.as_str()],
+        |row| row.get::<_, i64>(0),
+    )?;
+    assert_eq!(seq, sqlite_u64(persisted_seq, "claim-log entry seq")?);
+
+    drop(connection);
+    drop(store);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn timed_out_atomic_receipt_append_commits_once_after_writer_drains(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (temp_dir, path) = temp_db("chio-settlement-atomic-timeout-late-success")?;
+    let store = SqliteReceiptStore::open(&path)?;
+    let baseline = store.receipt_commit_actor.writer_counters();
+    let blocker = store.writer_handle();
+    let (started_tx, started_rx) = mpsc::sync_channel(1);
+    let (release_tx, release_rx) = mpsc::sync_channel(1);
+    let blocker_thread = std::thread::spawn(move || {
+        blocker.run_write(move |_connection| {
+            let _ = started_tx.send(());
+            let _ = release_rx.recv();
+            Ok(())
+        })
+    });
+    started_rx.recv()?;
+
+    let receipt = sample_receipt_with_id("rcpt-settlement-atomic-timeout-late-success");
+    let pending = chio_kernel::PendingSettlementObservation {
+        next_visible_at_ms: 9_003,
+    };
+    let error = ReceiptStore::append_chio_receipt_with_pending_observation_and_timeout(
+        &store,
+        &receipt,
+        &pending,
+        Duration::from_millis(25),
+    )
+    .err()
+    .ok_or("atomic settlement append must time out behind the blocked writer")?;
+    assert!(matches!(error, ReceiptStoreError::Timeout { .. }));
+    assert!(store.load_chio_receipt(&receipt.id)?.is_none());
+    assert_eq!(attempt_count(&store, &receipt.id)?, 0);
+    let timed_out = store.receipt_commit_actor.writer_counters();
+    assert_eq!(timed_out.accepted_total, baseline.accepted_total + 2);
+    assert_eq!(timed_out.committed_total, baseline.committed_total);
+    assert_eq!(timed_out.failed_total, baseline.failed_total);
+    assert_eq!(timed_out.timed_out_total, baseline.timed_out_total + 1);
+    assert_eq!(timed_out.timed_out_inflight, 1);
+    assert_eq!(
+        store.writer_liveness(Duration::from_secs(60)),
+        chio_kernel::ReceiptWriterLiveness::Wedged
+    );
+
+    release_tx.send(())?;
+    blocker_thread
+        .join()
+        .map_err(|_| "blocking writer thread panicked")??;
+    let mut drained = false;
+    for _ in 0..1_000 {
+        let counters = store.receipt_commit_actor.writer_counters();
+        if counters.timed_out_inflight == 0
+            && counters.committed_total == baseline.committed_total + 2
+            && store.load_chio_receipt(&receipt.id)?.is_some()
+            && attempt_count(&store, &receipt.id)? == 1
+        {
+            drained = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    assert!(drained, "timed-out atomic write did not drain and commit");
+
+    let completed = store.receipt_commit_actor.writer_counters();
+    assert_eq!(completed.timed_out_total, baseline.timed_out_total + 1);
+    assert_eq!(completed.timed_out_inflight, 0);
+    assert_eq!(completed.failed_total, baseline.failed_total);
+    assert_eq!(
+        completed.accepted_total,
+        completed.committed_total + completed.failed_total
+    );
+    assert!(!store
+        .receipt_commit_actor
+        .health
+        .critical_write_poisoned
+        .load(Ordering::SeqCst));
+    assert!(!store.writer_serving_closed());
+    assert_eq!(
+        store.writer_liveness(Duration::from_secs(60)),
+        chio_kernel::ReceiptWriterLiveness::Healthy
+    );
+
+    drop(store);
+    temp_dir.close()?;
+    Ok(())
+}
+
+#[test]
 fn atomic_settlement_write_failure_closes_serving_before_returning(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (temp_dir, path) = temp_db("chio-settlement-write-failure")?;
@@ -374,16 +498,17 @@ fn receipt_retention_preserves_active_settlement_attempts() -> Result<(), Box<dy
 
     let path = unique_db_path("chio-settlement-retention");
     let archive_path = unique_db_path("chio-settlement-retention-archive");
-    let mut store = SqliteReceiptStore::open(&path)?;
+    let store = SqliteReceiptStore::open(&path)?;
     let receipt = sample_receipt_with_id_and_timestamp("rcpt-settlement-retention", 1);
     let pending = chio_kernel::PendingSettlementObservation {
         next_visible_at_ms: 1,
     };
     ReceiptStore::append_chio_receipt_with_pending_observation(&store, &receipt, &pending)?;
+    store.create_next_receipt_checkpoint(1, &receipt_test_keypair())?;
 
     assert_eq!(
         store.archive_receipts_before(2, archive_path.to_str().ok_or("invalid archive path")?)?,
-        1
+        0
     );
     assert!(store.load_chio_receipt(&receipt.id)?.is_some());
     assert_eq!(attempt_count(&store, &receipt.id)?, 1);
@@ -404,7 +529,7 @@ fn receipt_retention_preserves_active_settlement_attempts() -> Result<(), Box<dy
 
     assert_eq!(
         store.archive_receipts_before(2, archive_path.to_str().ok_or("invalid archive path")?)?,
-        0
+        1
     );
     assert!(store.load_chio_receipt(&receipt.id)?.is_none());
     assert_eq!(attempt_count(&store, &receipt.id)?, 0);
@@ -422,16 +547,16 @@ fn receipt_retention_supports_store_without_settlement_projection(
     let path = unique_db_path("chio-settlement-retention-legacy");
     let archive_path = unique_db_path("chio-settlement-retention-legacy-archive");
     let store = SqliteReceiptStore::open(&path)?;
-    drop(SqliteReceiptStore::open(&archive_path)?);
     let receipt = sample_receipt_with_id_and_timestamp("rcpt-settlement-retention-legacy", 1);
     store.append_chio_receipt_returning_seq(&receipt)?;
+    store.create_next_receipt_checkpoint(1, &receipt_test_keypair())?;
     store.writer_handle().run_write(|connection| {
         connection.execute_batch("DROP TABLE settle_attempts")?;
         Ok(())
     })?;
     drop(store);
 
-    let mut reopened = SqliteReceiptStore::open_existing(&path)?;
+    let reopened = SqliteReceiptStore::open_existing(&path)?;
     assert_eq!(
         ReceiptStore::atomic_receipt_projection(&reopened),
         chio_kernel::AtomicReceiptProjection::Unsupported

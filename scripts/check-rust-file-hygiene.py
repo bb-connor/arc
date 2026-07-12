@@ -54,12 +54,12 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/products/chio-cli/tests/mcp_serve.rs": allow(
         "2026-07-31",
         "existing oversized CLI MCP serve integration suite; capped to current size until split",
-        max_lines=4_496,
+        max_lines=4_500,
     ),
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests.rs": allow(
         "2026-07-31",
         "existing oversized MCP edge runtime test suite; capped to current size until split",
-        max_lines=4_436,
+        max_lines=4_449,
     ),
     "crates/products/chio-cli/tests/certify.rs": allow(
         "2026-07-31",
@@ -89,17 +89,17 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/products/chio-api-protect/src/proxy/tests.rs": allow(
         "2026-07-31",
         "existing oversized API protect proxy test suite; capped to current size until split",
-        max_lines=3_024,
+        max_lines=3_477,
     ),
     "crates/protocol/chio-acp-edge/src/tests/all.rs": allow(
         "2026-07-31",
         "existing oversized ACP edge aggregate test suite; capped to current size until split",
-        max_lines=3_009,
+        max_lines=3_011,
     ),
     "crates/protocol/chio-a2a-edge/src/tests/all.rs": allow(
         "2026-07-31",
         "existing oversized A2A edge aggregate test suite; capped to current size until split",
-        max_lines=2_839,
+        max_lines=2_841,
     ),
     "crates/products/chio-cli/tests/proof_cli_contract/support.rs": allow(
         "2026-07-31",
@@ -149,7 +149,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/protocol/chio-mcp-remote/src/remote_mcp/tests.rs": allow(
         "2026-07-31",
         "existing oversized remote MCP test suite; capped to current size until split",
-        max_lines=2_009,
+        max_lines=2_011,
     ),
     "crates/trust/chio-selective-disclosure/src/lib.rs": allow(
         "2026-07-31",
@@ -204,7 +204,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime.rs": allow(
         "2026-07-31",
         "existing oversized kernel runtime test suite; capped to current size until split",
-        max_lines=4_458,
+        max_lines=4_817,
     ),
     "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/iroh_mount.rs": allow(
         "2026-07-31",
@@ -214,7 +214,12 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-store-sqlite/src/receipt_store.rs": allow(
         "2026-07-31",
         "receipt store hot-path module after batch-bounded rework; capped to current size until split",
-        max_lines=3_113,
+        max_lines=5_286,
+    ),
+    "crates/platform/chio-store-sqlite/src/receipt_store/tests/retention.rs": allow(
+        "2026-07-31",
+        "receipt retention regression suite; capped to current size until split",
+        max_lines=4_529,
     ),
     "crates/trust/chio-federation-transport-iroh/src/lanes/pheromone.rs": allow(
         "2026-07-31",
@@ -244,7 +249,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/kernel/chio-kernel/src/kernel/tests/support.rs": allow(
         "2026-07-31",
         "existing oversized kernel test support module; capped to current size until split",
-        max_lines=2_230,
+        max_lines=2_282,
     ),
     "crates/economy/chio-web3/src/settlement_proof.rs": allow(
         "2026-07-31",

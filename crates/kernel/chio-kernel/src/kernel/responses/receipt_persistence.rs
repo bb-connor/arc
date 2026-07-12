@@ -172,14 +172,23 @@ impl ChioKernel {
             })?;
             if let Some(next_visible_at_ms) = settlement_visible_at_ms {
                 self.with_receipt_store(|store| {
-                    Ok(store.append_chio_receipt_with_pending_observation(
-                        receipt,
-                        &PendingSettlementObservation { next_visible_at_ms },
-                    )?)
+                    Ok(
+                        store.append_chio_receipt_with_pending_observation_and_timeout(
+                            receipt,
+                            &PendingSettlementObservation { next_visible_at_ms },
+                            self.config.deadlines.receipt_append_budget(),
+                        )?,
+                    )
                 })?;
             } else {
+                // Bound the commit round trip so a wedged writer cannot pin
+                // the kernel-wide receipt write lock indefinitely. On timeout
+                // this fails closed before an allow response is signed.
                 self.with_receipt_store(|store| {
-                    Ok(store.append_chio_receipt_returning_seq(receipt)?)
+                    Ok(store.append_chio_receipt_with_timeout(
+                        receipt,
+                        self.config.deadlines.receipt_append_budget(),
+                    )?)
                 })?;
             }
             self.append_chio_receipt_to_local_log(receipt.clone());

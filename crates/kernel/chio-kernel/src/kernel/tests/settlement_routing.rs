@@ -42,6 +42,9 @@ mod settlement_routing_tests {
         inputs: Vec<SettlementRoutingInput>,
         legacy_appends: usize,
         atomic_appends: usize,
+        legacy_atomic_appends: usize,
+        timed_atomic_appends: usize,
+        timed_atomic_budget_ms: Option<u64>,
         claim_calls: usize,
         route_calls: usize,
         seed_fails: bool,
@@ -59,6 +62,9 @@ mod settlement_routing_tests {
                 inputs: Vec::new(),
                 legacy_appends: 0,
                 atomic_appends: 0,
+                legacy_atomic_appends: 0,
+                timed_atomic_appends: 0,
+                timed_atomic_budget_ms: None,
                 claim_calls: 0,
                 route_calls: 0,
                 seed_fails: false,
@@ -121,6 +127,10 @@ mod settlement_routing_tests {
             AtomicReceiptProjection::SettlementObservationV1
         }
 
+        fn supports_atomic_receipt_projection_with_timeout(&self) -> bool {
+            true
+        }
+
         fn append_chio_receipt_with_pending_observation(
             &self,
             receipt: &ChioReceipt,
@@ -128,6 +138,7 @@ mod settlement_routing_tests {
         ) -> Result<(), ReceiptStoreError> {
             let mut state = self.state();
             state.atomic_appends += 1;
+            state.legacy_atomic_appends += 1;
             if state.seed_fails {
                 return Err(ReceiptStoreError::Conflict(
                     "forced atomic settlement seed failure".to_string(),
@@ -136,6 +147,27 @@ mod settlement_routing_tests {
             state.receipts.insert(receipt.id.clone(), receipt.clone());
             state.attempts.insert(receipt.id.clone(), *pending);
             Ok(())
+        }
+
+        fn append_chio_receipt_with_pending_observation_and_timeout(
+            &self,
+            receipt: &ChioReceipt,
+            pending: &PendingSettlementObservation,
+            budget: Duration,
+        ) -> Result<Option<u64>, ReceiptStoreError> {
+            let mut state = self.state();
+            state.atomic_appends += 1;
+            state.timed_atomic_appends += 1;
+            state.timed_atomic_budget_ms =
+                Some(budget.as_millis().min(u128::from(u64::MAX)) as u64);
+            if state.seed_fails {
+                return Err(ReceiptStoreError::Conflict(
+                    "forced atomic settlement seed failure".to_string(),
+                ));
+            }
+            state.receipts.insert(receipt.id.clone(), receipt.clone());
+            state.attempts.insert(receipt.id.clone(), *pending);
+            Ok(Some(state.atomic_appends as u64))
         }
 
         fn append_child_receipt(
@@ -503,6 +535,33 @@ mod settlement_routing_tests {
     }
 
     #[test]
+    fn installed_runtime_uses_the_configured_bounded_atomic_append() {
+        let keypair = Keypair::generate();
+        let store = Arc::new(RoutingStore::new(ClaimMode::Claim, RouteMode::Contract));
+        let hook = Arc::new(RecordingHook::new(
+            HookBehavior::Accepted,
+            Arc::clone(&store),
+        ));
+        let mut config = make_config();
+        config.keypair = keypair.clone();
+        config.checkpoint_batch_size = 0;
+        config.deadlines.receipt_append_budget_ms = 321;
+        let mut kernel = make_kernel(config);
+        let hook_handle: Arc<dyn SettlementHook> = hook;
+        install_runtime(&mut kernel, &store, hook_handle);
+        let receipt = positive_receipt(&keypair, 21);
+
+        assert!(kernel.record_chio_receipt(&receipt).is_ok());
+
+        let state = store.state();
+        assert_eq!(state.timed_atomic_appends, 1);
+        assert_eq!(state.legacy_atomic_appends, 0);
+        assert_eq!(state.timed_atomic_budget_ms, Some(321));
+        assert_eq!(state.legacy_appends, 0);
+        assert!(state.receipts.contains_key(&receipt.id));
+    }
+
+    #[test]
     fn atomic_seed_failure_persists_neither_receipt_nor_work_and_skips_the_hook() {
         let harness = recording_harness(
             ClaimMode::Claim,
@@ -679,5 +738,4 @@ mod settlement_routing_tests {
         assert_eq!(hook.calls.load(Ordering::SeqCst), 1);
         assert_eq!(store.state().atomic_appends, 2);
     }
-
 }
