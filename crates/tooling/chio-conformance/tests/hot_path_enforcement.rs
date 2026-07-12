@@ -602,6 +602,7 @@ fn chain_binding_disabled_rejects_attenuated_token() {
 #[test]
 #[allow(deprecated)]
 fn hosted_path_rejects_attenuated_when_peer_disables_chain_binding() {
+    let receipt_dir = tempfile::tempdir().expect("receipt tempdir");
     let now = now_unix_secs();
     let scope = scope_with(vec![grant(vec![Operation::Invoke])]);
     let issuer = Keypair::generate();
@@ -628,6 +629,12 @@ fn hosted_path_rejects_attenuated_when_peer_disables_chain_binding() {
             capabilities,
             now,
         )]);
+    let receipt_store =
+        chio_store_sqlite::SqliteReceiptStore::open(receipt_dir.path().join("receipts.sqlite3"))
+            .expect("receipt store opens");
+    kernel
+        .set_receipt_store(Box::new(receipt_store))
+        .expect("receipt store configures");
     kernel.set_federation_cosigner(std::sync::Arc::new(InProcessCoSigner::new(
         origin_kernel_id,
         origin_keypair,
