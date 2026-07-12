@@ -33,6 +33,7 @@ pub(crate) fn cmd_run(
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
     configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
     configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
+    opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     configure_capability_authority(
         &mut kernel,
         &kernel_kp,
@@ -211,6 +212,26 @@ fn require_durable_or_ephemeral_optin(
         );
     }
     Ok(())
+}
+
+/// A local `chio run` / `chio check` / MCP-edge session keeps its revocation
+/// set in an in-memory store unless the operator wires a durable
+/// `--revocation-db` or a remote control plane. Without a durable backend the
+/// kernel's revocation-durability gate denies every dispatch, so a local
+/// interactive runtime explicitly accepts the ephemeral store. A configured
+/// durable backend satisfies the gate on its own, so this only ever relaxes the
+/// genuinely in-memory case (an in-memory SQLite path counts as no durable
+/// backend, mirroring the receipt-store durability check).
+pub(crate) fn opt_in_ephemeral_revocation_for_local_session(
+    kernel: &mut ChioKernel,
+    revocation_db_path: Option<&Path>,
+    control_url: Option<&str>,
+) {
+    let durable_backend = revocation_db_path.is_some_and(|path| !is_in_memory_sqlite_path(path))
+        || control_url.is_some();
+    if !durable_backend {
+        kernel.opt_in_ephemeral_revocation_store();
+    }
 }
 
 /// The receipt-store path to hand the proxy as a durable backend, or `None` when
@@ -421,6 +442,7 @@ pub(crate) fn cmd_check(
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
     configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
     configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
+    opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     configure_capability_authority(
         &mut kernel,
         &kernel_kp,
@@ -697,6 +719,7 @@ pub(crate) fn cmd_mcp_serve(
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
     configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
     configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
+    opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     configure_capability_authority(
         &mut kernel,
         &kernel_kp,

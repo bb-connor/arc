@@ -50,7 +50,10 @@
     }
 
     // Mirror production (cli/runtime.rs): pair build_kernel with a receipt
-    // store so the kernel's fail-closed receipt-persistence check passes.
+    // store so the kernel's fail-closed receipt-persistence check passes, and
+    // opt the in-memory revocation store into the ephemeral case exactly as a
+    // local `chio run` without `--revocation-db` does, so dispatch clears the
+    // revocation-durability gate for the same reason production does.
     fn build_kernel_with_receipt_store(
         loaded_policy: policy::LoadedPolicy,
         kernel_kp: &Keypair,
@@ -59,6 +62,7 @@
         let receipt_db_path = unique_db_path("chio-cli-session-receipts");
         configure_receipt_store(&mut kernel, Some(&receipt_db_path), None, None)
             .expect("configure receipt store for session test");
+        crate::runtime_cli::opt_in_ephemeral_revocation_for_local_session(&mut kernel, None, None);
         kernel
     }
 

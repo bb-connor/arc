@@ -565,6 +565,18 @@ impl ChioKernel {
         self.attestation_trust_policy = Some(attestation_trust_policy);
     }
 
+    /// Accept the default in-memory revocation store instead of requiring a
+    /// durable one. A locally-run kernel with no durable or remote revocation
+    /// backend keeps its revocation set in memory, so the durability gate would
+    /// otherwise deny every dispatch. Opting in here relaxes the gate
+    /// only while the store is genuinely ephemeral: installing a durable store
+    /// (or a revocation view) satisfies the gate on its own regardless of this
+    /// flag. Intended for local, interactive runtimes; deployments that must
+    /// survive restart should wire a durable store instead of calling this.
+    pub fn opt_in_ephemeral_revocation_store(&mut self) {
+        self.config.allow_ephemeral_revocation_store = true;
+    }
+
     pub fn set_revocation_store(&mut self, revocation_store: Box<dyn RevocationStore>) {
         self.set_revocation_store_handle(Arc::from(revocation_store));
     }
