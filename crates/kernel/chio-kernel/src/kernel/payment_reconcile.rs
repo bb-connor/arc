@@ -1,5 +1,7 @@
 use super::*;
 
+use chio_log_redact::redacted;
+
 use crate::payment::{
     PaymentError, PaymentJournalRecord, PaymentJournalState, PaymentSettleAction,
 };
@@ -97,7 +99,7 @@ pub(crate) fn resolve_and_finalize_payment_journal_row(
                 request_id = %record.request_id,
                 rail = %record.rail,
                 authorization_id = ?record.authorization_id,
-                detail = %detail,
+                detail = %redacted!(&detail),
                 "payment reconcile failed; operator incident"
             );
         }
@@ -270,7 +272,7 @@ fn reverse_hold_best_effort(kernel: &ChioKernel, record: &PaymentJournalRecord) 
         tracing::warn!(
             request_id = %record.request_id,
             hold_id = %hold_id,
-            error = %error,
+            reason = %redacted!(&error.to_string()),
             "budget hold reverse during payment reconcile failed; the hold sweeper will release it"
         );
     }

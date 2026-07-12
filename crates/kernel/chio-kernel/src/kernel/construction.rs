@@ -1062,7 +1062,7 @@ impl ChioKernel {
         if let Err(error) = closed {
             tracing::warn!(
                 request_id = %request_id,
-                error = %error,
+                reason = %redacted!(&error.to_string()),
                 "payment journal close failed; boot reconciliation will close the row"
             );
         }
@@ -1115,7 +1115,7 @@ impl ChioKernel {
         tracing::warn!(
             receipt_id = %receipt.id,
             retryable,
-            reason = %reason,
+            reason = %redacted!(&reason),
             "settlement outcome unresolved"
         );
         chio_metrics_spec::runtime::families::SETTLEMENT_UNRESOLVED.incr(&[]);
@@ -1193,7 +1193,7 @@ impl ChioKernel {
                         // surface the divergence loud.
                         tracing::warn!(
                             receipt_id = %receipt.id,
-                            %message,
+                            reason = %redacted!(&message),
                             "dead-letter insert conflicted with a divergent row"
                         );
                         chio_metrics_spec::runtime::families::SETTLEMENT_UNRESOLVED.incr(&[]);

@@ -1,3 +1,5 @@
+use chio_log_redact::redacted;
+
 /// Default interval between sweeps of orphaned budget holds.
 pub const DEFAULT_HOLD_SWEEP_INTERVAL_SECS: u64 = 300;
 /// Default age beyond which an open hold counts as orphaned. Generously
@@ -80,14 +82,17 @@ fn sweep_once(store: &dyn crate::budget_store::BudgetStore, horizon_secs: u64, b
                     Ok(false) => {}
                     Err(error) => tracing::warn!(
                         hold_id = %hold.hold_id,
-                        error = %error,
+                        reason = %redacted!(&error.to_string()),
                         "expire_open_hold failed; retrying next sweep"
                     ),
                 }
             }
         }
         Err(error) => {
-            tracing::warn!(error = %error, "listing open holds failed; retrying next sweep");
+            tracing::warn!(
+                reason = %redacted!(&error.to_string()),
+                "listing open holds failed; retrying next sweep"
+            );
         }
     }
     if let Ok(count) = store.open_hold_count() {
