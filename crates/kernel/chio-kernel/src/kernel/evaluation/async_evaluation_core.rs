@@ -110,6 +110,60 @@ impl ChioKernel {
             "evaluating tool call"
         );
 
+        // Confirm durable persistence is healthy before any path that records a
+        // receipt. Both the capability-rejection denials below and the
+        // capability-lineage write persist through the receipt writer; against a
+        // serving-closed writer that append fails and would surface its own error
+        // (or a 500) instead of a clean signed fail-closed Deny. Gating here means
+        // a degraded writer always produces the dedicated persistence Deny first.
+        if let Err(error) = self.ensure_federated_receipt_persistence_ready(
+            request.federated_origin_kernel_id.as_deref(),
+        ) {
+            let msg = error.to_string();
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&msg),
+                "federated receipt persistence unavailable pre-dispatch"
+            );
+            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+        if let Err(error) = self.ensure_tcb_locks_healthy() {
+            let msg = error.to_string();
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&msg),
+                "tcb lock poisoned pre-dispatch"
+            );
+            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+        if let Err(error) = self.ensure_receipt_persistence_ready() {
+            let msg = error.to_string();
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&msg),
+                "receipt persistence unavailable pre-dispatch"
+            );
+            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+
         let cap = &request.capability;
 
         // Signature is verified first (no budget mutation); the actual
@@ -235,61 +289,8 @@ impl ChioKernel {
             );
         }
 
-        // Confirm durable persistence is healthy BEFORE the first writer-backed
-        // metadata write below. Recording capability lineage runs through the
-        // receipt writer, so a serving-closed writer must be denied at these
-        // gates first; otherwise the lineage write fails against a dead writer and
-        // surfaces its own error (or a 500) instead of the clean fail-closed deny.
-        if let Err(error) = self.ensure_federated_receipt_persistence_ready(
-            request.federated_origin_kernel_id.as_deref(),
-        ) {
-            let msg = error.to_string();
-            warn!(
-                request_id = %request.request_id,
-                reason = %redacted!(&msg),
-                "federated receipt persistence unavailable pre-dispatch"
-            );
-            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
-                request,
-                &msg,
-                now,
-                None,
-                extra_metadata.clone(),
-            );
-        }
-        if let Err(error) = self.ensure_tcb_locks_healthy() {
-            let msg = error.to_string();
-            warn!(
-                request_id = %request.request_id,
-                reason = %redacted!(&msg),
-                "tcb lock poisoned pre-dispatch"
-            );
-            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
-                request,
-                &msg,
-                now,
-                None,
-                extra_metadata.clone(),
-            );
-        }
-        if let Err(error) = self.ensure_receipt_persistence_ready() {
-            let msg = error.to_string();
-            warn!(
-                request_id = %request.request_id,
-                reason = %redacted!(&msg),
-                "receipt persistence unavailable pre-dispatch"
-            );
-            return self.build_receipt_persistence_failclosed_deny_response_with_metadata(
-                request,
-                &msg,
-                now,
-                None,
-                extra_metadata.clone(),
-            );
-        }
-
-        // Persistence is confirmed healthy, so the writer-backed lineage write can
-        // run without racing a dead writer.
+        // Persistence was confirmed healthy at the pre-dispatch gate above, so the
+        // writer-backed lineage write can run without racing a dead writer.
         if let Err(error) = self.record_observed_capability_snapshot(cap) {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, reason = %redacted!(&msg), "failed to persist capability lineage");

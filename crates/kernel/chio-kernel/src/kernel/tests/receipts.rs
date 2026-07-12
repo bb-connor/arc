@@ -75,6 +75,54 @@ fn serving_closed_store_deny_is_not_masked_by_its_own_receipt_append() {
 }
 
 #[test]
+fn serving_closed_store_denies_before_an_early_capability_rejection() {
+    let mut kernel = make_kernel(make_config());
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-a",
+        vec!["read_file"],
+        std::sync::Arc::clone(&invocations),
+    )));
+    kernel
+        .set_receipt_store(Box::new(RejectingDeadWriterReceiptStore))
+        .unwrap();
+
+    // An untrusted-issuer capability is rejected by the very first pre-dispatch
+    // check, ahead of the persistence gate. That early rejection records its deny
+    // receipt through the receipt writer, and against a serving-closed store the
+    // append fails and would surface an opaque error (or a 500) instead of a
+    // signed verdict. The writer-health gate must run FIRST so the caller always
+    // sees the clean fail-closed persistence Deny.
+    let rogue_kp = make_keypair();
+    let agent_kp = make_keypair();
+    let body = CapabilityTokenBody {
+        id: "cap-rogue-serving-closed".to_string(),
+        issuer: rogue_kp.public_key(),
+        subject: agent_kp.public_key(),
+        scope: make_scope(vec![make_grant("srv-a", "read_file")]),
+        issued_at: current_unix_timestamp(),
+        expires_at: current_unix_timestamp() + 300,
+        delegation_chain: vec![],
+    };
+    let cap = CapabilityToken::sign(body, &rogue_kp).unwrap();
+    let request = make_request("req-rogue-serving-closed", &cap, "read_file", "srv-a");
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    let reason = response.reason.unwrap_or_default();
+    assert!(
+        reason.contains("commit writer is not serving"),
+        "expected a receipt-persistence-degraded deny, got: {reason}"
+    );
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        0,
+        "a serving-closed writer must deny before the tool executes"
+    );
+}
+
+#[test]
 fn dead_commit_writer_denies_before_the_capability_lineage_write() {
     let mut kernel = make_kernel(make_config());
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
