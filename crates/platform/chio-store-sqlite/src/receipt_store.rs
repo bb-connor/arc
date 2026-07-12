@@ -2413,7 +2413,17 @@ impl SqliteReceiptStore {
     pub fn receipt_store_health(&self) -> Result<ReceiptStoreHealthReport, ReceiptStoreError> {
         self.validate_claim_receipt_log_projection_current()?;
         let status = self.receipt_checkpoint_status(Some(1))?;
-        if status.latest_committed_entry_seq > status.latest_checkpointed_entry_seq {
+        // A checkpoint-chain error already produced an unhealthy status: the
+        // checkpointed boundary drops to 0, so the committed floor (which folds
+        // in a retention watermark whose live prefix rows were archived and
+        // deleted) reads as a whole-log backlog. Re-probing that range would
+        // decode rows retention intentionally removed and turn the prepared
+        // unhealthy report (carrying the checkpoint_error operators need) into a
+        // hard error. Only decode-probe the uncheckpointed suffix when the
+        // checkpoint status itself is clean.
+        if status.checkpoint_error.is_none()
+            && status.latest_committed_entry_seq > status.latest_checkpointed_entry_seq
+        {
             let connection = self.connection()?;
             let start_seq = status.latest_checkpointed_entry_seq + 1;
             load_claim_tree_canonical_bytes_range(

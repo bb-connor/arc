@@ -2285,6 +2285,52 @@ fn latest_committed_entry_seq_floors_at_watermark_after_full_archive(
     Ok(())
 }
 
+/// After a full-prefix rotation, removing the backing archive withdraws the
+/// watermark's trust, so the checkpoint chain fails to verify: status reports a
+/// checkpoint_error while the committed floor still sits at the archived
+/// boundary W. `receipt_store_health` must surface that prepared unhealthy
+/// report, not re-probe the [1, W] range whose rows retention already deleted -
+/// a probe that would turn the report into a hard error and hide the
+/// checkpoint_error operators need.
+#[test]
+fn health_reports_checkpoint_error_without_probing_archived_rows(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("health-missing-archive");
+    let archive = unique_db_path("health-missing-archive-archive");
+    let archive_path = archive.to_str().ok_or("archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for i in 0..4u64 {
+        let r = super::support::sample_receipt_with_keypair_and_timestamp(
+            &format!("hm-{i}"),
+            i + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&r)?;
+    }
+    store.flush_receipt_writes()?;
+    let archived = store.archive_receipts_before(150, archive_path)?;
+    assert_eq!(archived, 4, "the whole history archives");
+
+    // Remove the archive backing the deleted [1,4] prefix. The watermark is no
+    // longer trusted, so chain verification fails and the committed floor (W = 4)
+    // now looks like a backlog over rows retention deleted.
+    std::fs::remove_file(&archive)?;
+
+    let report = store.receipt_store_health()?;
+    assert!(!report.healthy, "a missing backing archive is unhealthy");
+    assert!(
+        report.checkpoint_error.is_some(),
+        "the checkpoint_error must be surfaced, not swallowed by a hard error from probing deleted rows"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 /// `chio receipt flush` reads committed progress from `flush_report`. After a
 /// full-prefix rotation deletes every live claim-log row, the live MAX(entry_seq)
 /// is 0 while the checkpoint chain and retention watermark still sit at the
