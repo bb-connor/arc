@@ -95,9 +95,15 @@ pub(crate) const CHILD_RECEIPTS_PATH: &str = "/v1/receipts/children";
 pub(crate) const BUDGETS_PATH: &str = "/v1/budgets";
 pub(crate) const BUDGET_INCREMENT_PATH: &str = "/v1/budgets/increment";
 pub(crate) const BUDGET_AUTHORIZE_EXPOSURE_PATH: &str = "/v1/budgets/authorize-exposure";
+#[allow(dead_code)]
+pub(crate) const BUDGET_AUTHORIZE_HOLD_PATH: &str = "/v1/budgets/authorize-hold";
+#[allow(dead_code)]
+pub(crate) const BUDGET_CAPTURE_INVOCATIONS_PATH: &str = "/v1/budgets/capture-invocations";
 pub(crate) const BUDGET_RELEASE_EXPOSURE_PATH: &str = "/v1/budgets/release-exposure";
 pub(crate) const BUDGET_RECONCILE_SPEND_PATH: &str = "/v1/budgets/reconcile-spend";
 pub(crate) const BUDGET_CAPTURE_EXPOSURE_PATH: &str = "/v1/budgets/capture-exposure";
+#[allow(dead_code)]
+pub(crate) const ADMISSION_CAPTURE_PATH: &str = "/v1/admissions/capture";
 pub(crate) const AGGREGATE_FAMILY_ROOT_LOOKUP_PATH: &str =
     "/v1/aggregate-family-roots/{root_capability_id}";
 pub(crate) const INTERNAL_CLUSTER_STATUS_PATH: &str = "/v1/internal/cluster/status";

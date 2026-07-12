@@ -6,6 +6,9 @@
 
 use super::*;
 
+#[allow(dead_code)]
+#[path = "service_types/admission_budget.rs"]
+mod admission_budget;
 #[path = "service_types/aggregate_family_root.rs"]
 mod aggregate_family_root;
 #[path = "service_types/capability_issuance.rs"]
@@ -23,6 +26,17 @@ mod responses;
 #[path = "service_types/state.rs"]
 mod state;
 
+#[allow(unused_imports)]
+pub(crate) use self::admission_budget::{
+    AdmissionCaptureMetadataView, AdmissionCaptureOutcomeView,
+    BudgetInvocationAdmissionEvidenceView, BudgetInvocationQuotaUsageView,
+    BudgetInvocationQuotaView, BudgetInvocationReservationStateView, BudgetMonetaryHoldStateView,
+    BudgetQuotaKeyView, BudgetQuotaProfileView, BudgetSupplementalQuotaBindingView,
+    CanonicalRevocationSetView, CaptureInvocationReservationsRequest,
+    CaptureInvocationReservationsResponse, CombinedAdmissionCaptureRequest,
+    CombinedAdmissionCaptureResponse, CompositeBudgetAuthorizeRequest,
+    CompositeBudgetAuthorizeResponse,
+};
 pub(crate) use self::aggregate_family_root::{
     validate_lookup_nonce, AggregateFamilyRootCorruptionCode, AggregateFamilyRootLookupBody,
     AggregateFamilyRootLookupOutcome, AggregateFamilyRootLookupQuery,
@@ -52,6 +66,10 @@ pub use self::cluster_budget::{
 pub(crate) use self::config::validate_control_secret;
 pub use self::config::TrustServiceConfig;
 pub use self::paths::FEDERATED_DELEGATION_POLICY_SCHEMA;
+#[allow(unused_imports)]
+pub(crate) use self::paths::{
+    ADMISSION_CAPTURE_PATH, BUDGET_AUTHORIZE_HOLD_PATH, BUDGET_CAPTURE_INVOCATIONS_PATH,
+};
 pub(crate) use self::paths::{
     AGENT_RECEIPTS_PATH, AGGREGATE_FAMILY_ROOT_LOOKUP_PATH, AUTHORITY_PATH,
     AUTHORIZATION_CONTEXT_REPORT_PATH, AUTHORIZATION_PROFILE_METADATA_PATH,
