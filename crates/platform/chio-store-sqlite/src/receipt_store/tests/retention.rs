@@ -3288,6 +3288,143 @@ fn repair_tombstones_already_deleted_prefix_ids() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
+/// Repair stamps tombstones from the SUPPLIED archive, but the archive that
+/// actually backs an already-committed watermark is the LEDGER's archive. When a
+/// caller supplies a different archive that happens to be faithful for the
+/// surviving orphans yet divergent for prefix entries already deleted from the
+/// live projection, the root re-derivation still passed against the ledger
+/// archive while the tombstones were stamped for the wrong receipt ids, leaving
+/// the truly archived ids re-appendable. Repair must require the supplied archive
+/// to be the ledger archive so both run against the one archive that backs the
+/// watermark; a mismatch fails closed.
+#[test]
+fn repair_rejects_archive_that_does_not_back_the_watermark(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("repair-wrong-backing");
+    let ledger_archive = unique_db_path("repair-wrong-backing-ledger");
+    let ledger_path = ledger_archive
+        .to_str()
+        .ok_or("ledger archive path invalid")?;
+    let supplied_archive = unique_db_path("repair-wrong-backing-supplied");
+    let supplied_path = supplied_archive
+        .to_str()
+        .ok_or("supplied archive path invalid")?;
+    let keypair = super::support::receipt_test_keypair();
+
+    // Mixed drift: co-archive [1,2] into the LEDGER archive, delete the source
+    // rows for [1,2] and the LIVE claim-log row for entry 1 (fully deleted,
+    // tombstoned only from the archive), leaving entry 2 as the surviving orphan.
+    // Record a watermark at boundary 2 naming the ledger archive.
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+        for i in 0..4u64 {
+            let r = super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("wb-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            );
+            store.append_chio_receipt_returning_seq(&r)?;
+        }
+        store.flush_receipt_writes()?;
+        store.writer_handle().run_write({
+            let ledger_path = ledger_path.to_string();
+            let supplied_path = supplied_path.to_string();
+            move |connection| {
+                let ledger_escaped = ledger_path.replace('\'', "''");
+                // The ledger archive faithfully backs [1,2] so its checkpoint root
+                // re-derives.
+                connection
+                    .execute_batch(&format!("ATTACH DATABASE '{ledger_escaped}' AS archive"))?;
+                connection.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries \
+                       (entry_seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, receipt_kind TEXT NOT NULL, \
+                        source_seq INTEGER NOT NULL, timestamp INTEGER NOT NULL, capability_id TEXT, session_id TEXT, \
+                        parent_request_id TEXT, request_id TEXT, subject_key TEXT, issuer_key TEXT, tool_server TEXT, \
+                        tool_name TEXT, raw_json TEXT NOT NULL); \
+                     INSERT OR IGNORE INTO archive.claim_receipt_log_entries \
+                       SELECT * FROM main.claim_receipt_log_entries WHERE entry_seq <= 2;",
+                )?;
+                connection.execute_batch("DETACH DATABASE archive")?;
+
+                // The SUPPLIED archive is faithful for the surviving orphan (entry
+                // 2) but carries a divergent row for the already-deleted entry 1.
+                let supplied_escaped = supplied_path.replace('\'', "''");
+                connection
+                    .execute_batch(&format!("ATTACH DATABASE '{supplied_escaped}' AS supplied"))?;
+                connection.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS supplied.claim_receipt_log_entries \
+                       (entry_seq INTEGER PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, receipt_kind TEXT NOT NULL, \
+                        source_seq INTEGER NOT NULL, timestamp INTEGER NOT NULL, capability_id TEXT, session_id TEXT, \
+                        parent_request_id TEXT, request_id TEXT, subject_key TEXT, issuer_key TEXT, tool_server TEXT, \
+                        tool_name TEXT, raw_json TEXT NOT NULL); \
+                     INSERT OR IGNORE INTO supplied.claim_receipt_log_entries \
+                       SELECT * FROM main.claim_receipt_log_entries WHERE entry_seq = 2; \
+                     INSERT INTO supplied.claim_receipt_log_entries \
+                       (entry_seq, receipt_id, receipt_kind, source_seq, timestamp, raw_json) \
+                       VALUES (1, 'wrong-archived-id', 'tool_receipt', 1, 100, '{\"wrong\":true}');",
+                )?;
+                connection.execute_batch("DETACH DATABASE supplied")?;
+
+                // Fabricate the drift.
+                connection.execute_batch(
+                    "DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete; \
+                     DELETE FROM main.chio_tool_receipts WHERE seq <= 2; \
+                     CREATE TRIGGER IF NOT EXISTS chio_tool_receipts_reject_delete \
+                       BEFORE DELETE ON chio_tool_receipts \
+                       BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END; \
+                     DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_delete; \
+                     DELETE FROM main.claim_receipt_log_entries WHERE entry_seq = 1; \
+                     CREATE TRIGGER IF NOT EXISTS claim_receipt_log_entries_reject_delete \
+                       BEFORE DELETE ON claim_receipt_log_entries \
+                       BEGIN SELECT RAISE(ABORT, 'claim receipt log entries are immutable'); END;",
+                )?;
+                crate::receipt_store::support::insert_receipt_retention_watermark(
+                    connection,
+                    2,
+                    100,
+                    &ledger_path,
+                    None,
+                    1,
+                )?;
+                Ok(())
+            }
+        })?;
+    }
+
+    // Repair with the divergent archive must fail closed instead of tombstoning
+    // from an archive that does not back the committed watermark.
+    let store = SqliteReceiptStore::open_existing(&path)?;
+    let result = store.retention_repair(supplied_path);
+    let message = result
+        .err()
+        .ok_or("expected repair to reject an archive that does not back the watermark")?
+        .to_string();
+    assert!(
+        message.contains("differs from the archive"),
+        "unexpected error: {message}"
+    );
+
+    // Fail-closed: the surviving orphan is untouched, so a correct re-run against
+    // the ledger archive can still complete.
+    let live = store.reader_connection_for_test()?;
+    let orphan_present: i64 = live.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries WHERE entry_seq = 2",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        orphan_present, 1,
+        "a rejected repair must leave the orphan for a correct re-run"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(&ledger_archive);
+    let _ = std::fs::remove_file(&supplied_archive);
+    Ok(())
+}
+
 /// In incremental mode the rotation skips the O(N) chain rebuild and trusts the
 /// per-append verified head. That head can be stale relative to
 /// `kernel_checkpoints` when a second store instance appends checkpoint rows
@@ -3638,11 +3775,12 @@ fn repair_rejects_corrupted_archive_prefix() -> Result<(), Box<dyn std::error::E
 
 /// A prior botched rotation can leave a watermark covering the boundary but
 /// pointing at a missing or wrong archive, with the orphaned claim-log rows still
-/// live. Re-running repair with the correct archive must not silently skip the
+/// live. Re-running repair with a different archive must not silently skip the
 /// insert (the monotonic ledger cannot be corrected in place) and delete the
 /// orphans behind a watermark whose recorded archive can never satisfy
-/// verification. Repair must require the ledger archive to back the prefix and
-/// fail closed without deleting when it does not.
+/// verification. Tombstones must be stamped from the archive that backs the
+/// watermark, so a supplied archive that is not the ledger archive (here the
+/// ledger names a missing file) fails closed without deleting.
 #[test]
 fn repair_refuses_when_ledger_names_missing_archive() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("repair-ledger-missing-archive");
@@ -3698,9 +3836,10 @@ fn repair_refuses_when_ledger_names_missing_archive() -> Result<(), Box<dyn std:
         })?;
     }
 
-    // Repair with the correct archive. The ledger already covers boundary 2, so
-    // repair would skip the insert; it must instead verify the LEDGER archive
-    // backs the prefix, find it missing, and refuse without deleting the orphans.
+    // Repair with an archive that is not the one the ledger names. The ledger
+    // already covers boundary 2 and points at the missing file, so repair cannot
+    // stamp tombstones from the archive that backs the watermark and must refuse
+    // without deleting the orphans.
     let store = SqliteReceiptStore::open_existing(&path)?;
     let result = store.retention_repair(archive_path);
     let message = result
@@ -3708,7 +3847,7 @@ fn repair_refuses_when_ledger_names_missing_archive() -> Result<(), Box<dyn std:
         .ok_or("expected a fail-closed refusal; repair deleted orphans behind a broken ledger")?
         .to_string();
     assert!(
-        message.contains("co-archival incomplete"),
+        message.contains("differs from the archive"),
         "unexpected error: {message}"
     );
 

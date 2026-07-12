@@ -1570,25 +1570,40 @@ pub(super) fn retention_repair_on_writer(
         // `raw_json` or attribution in the archived copy passes the count check
         // yet would fail the next archive-backed chain verification and leave the
         // store bricked. Re-derive the signed checkpoint roots from the archive
-        // that will back the trusted watermark AFTER repair: the ledger archive
-        // when an existing watermark already covers this boundary (repair skips
-        // the insert and keeps pointing there), otherwise the supplied archive
-        // this repair is about to record. A ledger that names a missing or wrong
-        // archive therefore cannot let repair delete the orphans behind a
-        // watermark the recorded archive can never satisfy; fail closed and
-        // delete nothing when the covered roots do not re-derive.
+        // that backs the trusted watermark, and stamp the post-repair tombstones
+        // from that SAME archive.
+        //
+        // The per-extra identity check above and the tombstone insert below both
+        // read from the SUPPLIED archive attached as `archive`. When an existing
+        // watermark already covers this boundary the prefix is backed by the
+        // LEDGER's archive, which the supplied path need not equal: the prefix
+        // entries already deleted from the live projection have no surviving extra
+        // to compare, so a supplied archive that is faithful for the surviving
+        // extras but divergent for those deleted entries would pass every
+        // live-vs-archive check yet stamp tombstones for the WRONG receipt ids,
+        // leaving the truly archived ids reusable. Require the supplied archive to
+        // be the ledger archive so the root re-derivation and the tombstone
+        // stamping run against the one archive that actually backs the watermark;
+        // fail closed on a mismatch.
         let rounded_u64 = sqlite_u64(rounded, "repair rounded watermark")?;
         let watermark_covers = matches!(
             super::support::retention_watermark(connection)?,
             Some(current) if current >= rounded_u64
         );
-        let backing_archive = if watermark_covers {
-            super::support::latest_watermark_archive_path(connection)?
-                .unwrap_or_else(|| archive_path.to_string())
-        } else {
-            archive_path.to_string()
-        };
-        if !super::support::archive_path_backs_prefix(connection, &backing_archive, rounded_u64)? {
+        if watermark_covers {
+            if let Some(ledger_archive) = super::support::latest_watermark_archive_path(connection)?
+            {
+                if ledger_archive != archive_path {
+                    return Err(ReceiptStoreError::Conflict(format!(
+                        "retention repair archive {archive_path:?} differs from the archive \
+                         {ledger_archive:?} that backs the existing watermark; tombstones must be \
+                         stamped from the archive that backs the prefix. Supply the ledger archive \
+                         or start a fresh store"
+                    )));
+                }
+            }
+        }
+        if !super::support::archive_path_backs_prefix(connection, archive_path, rounded_u64)? {
             return Err(ReceiptStoreError::RetentionArchiveIncomplete {
                 table: "claim_receipt_log_entries",
                 live: rounded_u64,
