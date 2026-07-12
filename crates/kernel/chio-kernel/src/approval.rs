@@ -28,6 +28,7 @@ use chio_core::crypto::{sha256_hex, PublicKey};
 use chio_log_redact::redacted;
 use serde::{Deserialize, Serialize};
 
+use crate::admission_operation::ReplayReservationState;
 use crate::runtime::{ToolCallRequest, Verdict};
 use crate::{AgentId, KernelError, ServerId};
 
@@ -36,6 +37,7 @@ use crate::{AgentId, KernelError, ServerId};
 /// section 15: the single-use replay registry's TTL is pinned to this
 /// value so no token can outlive its replay entry.
 pub const MAX_APPROVAL_TTL_SECS: u64 = 3600;
+const MAX_RESERVATION_IDENTIFIER_BYTES: usize = 512;
 
 /// A request for human approval, produced when the approval guard
 /// returns `Verdict::PendingApproval`. Designed to be serialized into
@@ -252,6 +254,8 @@ impl ApprovalToken {
 /// Errors emitted by approval stores.
 #[derive(Debug, thiserror::Error)]
 pub enum ApprovalStoreError {
+    #[error("invalid approval reservation: {0}")]
+    Invalid(String),
     #[error("approval request not found: {0}")]
     NotFound(String),
     #[error("approval already resolved: {0}")]
@@ -262,6 +266,221 @@ pub enum ApprovalStoreError {
     Backend(String),
     #[error("serialization error: {0}")]
     Serialization(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApprovalReservationMember {
+    token_id: String,
+    token_digest: String,
+}
+
+impl ApprovalReservationMember {
+    pub fn new(token_id: String, token_digest: String) -> Result<Self, ApprovalStoreError> {
+        validate_reservation_identifier(&token_id, "token_id")?;
+        validate_reservation_digest(&token_digest, "token_digest")?;
+        Ok(Self {
+            token_id,
+            token_digest,
+        })
+    }
+
+    pub fn token_id(&self) -> &str {
+        &self.token_id
+    }
+
+    pub fn token_digest(&self) -> &str {
+        &self.token_digest
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApprovalSetReservationInput {
+    approval_set_hash: String,
+    members: Vec<ApprovalReservationMember>,
+    proposal_deadline: u64,
+}
+
+impl ApprovalSetReservationInput {
+    pub fn new(
+        approval_set_hash: String,
+        members: Vec<ApprovalReservationMember>,
+        proposal_deadline: u64,
+    ) -> Result<Self, ApprovalStoreError> {
+        validate_reservation_digest(&approval_set_hash, "approval_set_hash")?;
+        if proposal_deadline == 0 || proposal_deadline > i64::MAX as u64 {
+            return Err(ApprovalStoreError::Invalid(
+                "proposal_deadline is outside the durable timestamp range".to_string(),
+            ));
+        }
+        let members = normalize_approval_reservation_members(members)?;
+        Ok(Self {
+            approval_set_hash,
+            members,
+            proposal_deadline,
+        })
+    }
+
+    pub fn from_persisted_parts(
+        approval_set_hash: String,
+        members: Vec<ApprovalReservationMember>,
+        proposal_deadline: u64,
+    ) -> Result<Self, ApprovalStoreError> {
+        let normalized = Self::new(
+            approval_set_hash.clone(),
+            members.clone(),
+            proposal_deadline,
+        )
+        .map_err(persisted_approval_reservation_error)?;
+        if normalized.members != members {
+            return Err(ApprovalStoreError::Serialization(
+                "persisted approval members are not normalized".to_string(),
+            ));
+        }
+        Ok(normalized)
+    }
+
+    pub fn approval_set_hash(&self) -> &str {
+        &self.approval_set_hash
+    }
+
+    pub fn members(&self) -> &[ApprovalReservationMember] {
+        &self.members
+    }
+
+    pub fn proposal_deadline(&self) -> u64 {
+        self.proposal_deadline
+    }
+}
+
+/// Immutable operation ownership for one normalized verified approval set.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApprovalReservation {
+    operation_id: String,
+    approval_set: ApprovalSetReservationInput,
+    state: ReplayReservationState,
+}
+
+impl ApprovalReservation {
+    pub fn new(
+        operation_id: String,
+        approval_set: ApprovalSetReservationInput,
+    ) -> Result<Self, ApprovalStoreError> {
+        validate_reservation_digest(&operation_id, "operation_id")?;
+        let approval_set = ApprovalSetReservationInput::new(
+            approval_set.approval_set_hash,
+            approval_set.members,
+            approval_set.proposal_deadline,
+        )?;
+        Ok(Self {
+            operation_id,
+            approval_set,
+            state: ReplayReservationState::Reserved,
+        })
+    }
+
+    pub fn from_persisted_parts(
+        operation_id: String,
+        approval_set: ApprovalSetReservationInput,
+        state: ReplayReservationState,
+    ) -> Result<Self, ApprovalStoreError> {
+        let approval_set = ApprovalSetReservationInput::from_persisted_parts(
+            approval_set.approval_set_hash,
+            approval_set.members,
+            approval_set.proposal_deadline,
+        )?;
+        let mut reservation =
+            Self::new(operation_id, approval_set).map_err(persisted_approval_reservation_error)?;
+        reservation.state = state;
+        Ok(reservation)
+    }
+
+    pub fn operation_id(&self) -> &str {
+        &self.operation_id
+    }
+
+    pub fn approval_set(&self) -> &ApprovalSetReservationInput {
+        &self.approval_set
+    }
+
+    pub fn state(&self) -> ReplayReservationState {
+        self.state
+    }
+}
+
+fn validate_reservation_identifier(
+    value: &str,
+    label: &'static str,
+) -> Result<(), ApprovalStoreError> {
+    if value.is_empty()
+        || value.len() > MAX_RESERVATION_IDENTIFIER_BYTES
+        || value.bytes().any(|byte| byte == 0)
+    {
+        return Err(ApprovalStoreError::Invalid(format!(
+            "{label} is empty, oversized, or contains NUL"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_reservation_digest(value: &str, label: &'static str) -> Result<(), ApprovalStoreError> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        return Err(ApprovalStoreError::Invalid(format!(
+            "{label} must be lowercase SHA-256 hex"
+        )));
+    }
+    Ok(())
+}
+
+fn normalize_approval_reservation_members(
+    mut members: Vec<ApprovalReservationMember>,
+) -> Result<Vec<ApprovalReservationMember>, ApprovalStoreError> {
+    if members.is_empty()
+        || members.len() > crate::admission_operation::MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION
+    {
+        return Err(ApprovalStoreError::Invalid(format!(
+            "approval member count must be between 1 and {}",
+            crate::admission_operation::MAX_APPROVAL_TOKEN_DIGESTS_PER_OPERATION
+        )));
+    }
+    for member in &members {
+        validate_reservation_identifier(&member.token_id, "token_id")?;
+        validate_reservation_digest(&member.token_digest, "token_digest")?;
+    }
+    members.sort_unstable_by(|left, right| {
+        left.token_digest
+            .cmp(&right.token_digest)
+            .then_with(|| left.token_id.cmp(&right.token_id))
+    });
+    if members
+        .windows(2)
+        .any(|pair| pair[0].token_digest == pair[1].token_digest)
+    {
+        return Err(ApprovalStoreError::Invalid(
+            "approval-token digests contain a duplicate".to_string(),
+        ));
+    }
+    let mut token_ids = members
+        .iter()
+        .map(|member| member.token_id.as_str())
+        .collect::<Vec<_>>();
+    token_ids.sort_unstable();
+    if token_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(ApprovalStoreError::Invalid(
+            "approval token IDs contain a duplicate".to_string(),
+        ));
+    }
+    Ok(members)
+}
+
+fn persisted_approval_reservation_error(error: ApprovalStoreError) -> ApprovalStoreError {
+    match error {
+        ApprovalStoreError::Invalid(message) => ApprovalStoreError::Serialization(message),
+        other => other,
+    }
 }
 
 /// Filter for `list_pending`.
@@ -342,6 +561,46 @@ pub trait ApprovalStore: Send + Sync {
 
     /// Fetch the resolution record for a previously resolved approval.
     fn get_resolution(&self, id: &str) -> Result<Option<ResolvedApproval>, ApprovalStoreError>;
+
+    /// Atomically bind a normalized approval-token digest set to an operation.
+    /// The default fails closed so operation-owned callers never fall back to
+    /// the legacy immediate-consumption registry.
+    fn reserve_approval_set(
+        &self,
+        _operation_id: &str,
+        _approval_set: &ApprovalSetReservationInput,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        Err(ApprovalStoreError::Backend(
+            "operation-owned approval reservations are unavailable".to_string(),
+        ))
+    }
+
+    fn commit_approval_reservation(
+        &self,
+        _operation_id: &str,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        Err(ApprovalStoreError::Backend(
+            "operation-owned approval reservations are unavailable".to_string(),
+        ))
+    }
+
+    fn cancel_approval_reservation(
+        &self,
+        _operation_id: &str,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        Err(ApprovalStoreError::Backend(
+            "operation-owned approval reservations are unavailable".to_string(),
+        ))
+    }
+
+    fn get_approval_reservation(
+        &self,
+        _operation_id: &str,
+    ) -> Result<Option<ApprovalReservation>, ApprovalStoreError> {
+        Err(ApprovalStoreError::Backend(
+            "operation-owned approval reservations are unavailable".to_string(),
+        ))
+    }
 }
 
 /// Batch approvals let a human pre-approve a class of calls.
@@ -833,11 +1092,20 @@ pub fn resume_with_decision(
 /// on restart (ephemeral: data is lost on restart; use the SQLite-backed
 /// store for production durability).
 #[derive(Default)]
+struct InMemoryApprovalReplayState {
+    consumed: HashMap<String, (String, u64)>,
+    by_operation: HashMap<String, ApprovalReservation>,
+    approval_set_hash_owners: HashMap<String, String>,
+    token_id_owners: HashMap<String, String>,
+    token_digest_owners: HashMap<String, String>,
+}
+
+#[derive(Default)]
 pub struct InMemoryApprovalStore {
     pending: RwLock<HashMap<String, ApprovalRequest>>,
     resolved: RwLock<HashMap<String, ResolvedApproval>>,
-    consumed: Mutex<HashMap<String, u64>>, // key: token_id ":" parameter_hash
     approved_counts: Mutex<HashMap<String, u64>>, // key: subject_id + ":" + policy_id
+    replay: Mutex<InMemoryApprovalReplayState>,
 }
 
 impl InMemoryApprovalStore {
@@ -845,8 +1113,35 @@ impl InMemoryApprovalStore {
         Self::default()
     }
 
-    fn consumed_key(token_id: &str, parameter_hash: &str) -> String {
-        format!("{token_id}:{parameter_hash}")
+    fn transition_approval_reservation(
+        &self,
+        operation_id: &str,
+        target: ReplayReservationState,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        validate_reservation_digest(operation_id, "operation_id")?;
+        let mut replay = self.replay.lock().map_err(|_| {
+            ApprovalStoreError::Backend("approval replay state poisoned".to_string())
+        })?;
+        let reservation = replay.by_operation.get_mut(operation_id).ok_or_else(|| {
+            ApprovalStoreError::NotFound(format!(
+                "approval reservation for operation {operation_id}"
+            ))
+        })?;
+        match (reservation.state, target) {
+            (current, requested) if current == requested => Ok(reservation.clone()),
+            (
+                ReplayReservationState::Reserved,
+                ReplayReservationState::Committed | ReplayReservationState::Cancelled,
+            ) => {
+                reservation.state = target;
+                Ok(reservation.clone())
+            }
+            (current, requested) => Err(ApprovalStoreError::Replay(format!(
+                "operation `{operation_id}` approval reservation cannot transition from {} to {}",
+                current.as_str(),
+                requested.as_str()
+            ))),
+        }
     }
 }
 
@@ -922,18 +1217,21 @@ impl ApprovalStore for InMemoryApprovalStore {
         };
 
         {
-            let mut consumed = self
-                .consumed
-                .lock()
-                .map_err(|_| ApprovalStoreError::Backend("consumed map poisoned".into()))?;
-            let key = Self::consumed_key(&decision.token.id, &pending.parameter_hash);
-            if consumed.contains_key(&key) {
+            let mut replay = self.replay.lock().map_err(|_| {
+                ApprovalStoreError::Backend("approval replay state poisoned".into())
+            })?;
+            if replay.consumed.contains_key(&decision.token.id)
+                || replay.token_id_owners.contains_key(&decision.token.id)
+            {
                 // Put the pending row back so the caller can retry the
                 // lookup on subsequent requests.
                 pending_guard.insert(id.to_string(), pending);
                 return Err(ApprovalStoreError::Replay(id.to_string()));
             }
-            consumed.insert(key, decision.received_at);
+            replay.consumed.insert(
+                decision.token.id.clone(),
+                (pending.parameter_hash.clone(), decision.received_at),
+            );
         }
 
         let mut resolved = self
@@ -983,30 +1281,31 @@ impl ApprovalStore for InMemoryApprovalStore {
         parameter_hash: &str,
         now: u64,
     ) -> Result<(), ApprovalStoreError> {
-        let mut consumed = self
-            .consumed
+        let mut replay = self
+            .replay
             .lock()
-            .map_err(|_| ApprovalStoreError::Backend("consumed map poisoned".into()))?;
-        let key = Self::consumed_key(token_id, parameter_hash);
-        if consumed.contains_key(&key) {
+            .map_err(|_| ApprovalStoreError::Backend("approval replay state poisoned".into()))?;
+        if replay.consumed.contains_key(token_id) || replay.token_id_owners.contains_key(token_id) {
             return Err(ApprovalStoreError::Replay(format!(
                 "token {token_id} already consumed"
             )));
         }
-        consumed.insert(key, now);
+        replay
+            .consumed
+            .insert(token_id.to_string(), (parameter_hash.to_string(), now));
         Ok(())
     }
 
     fn is_consumed(
         &self,
         token_id: &str,
-        parameter_hash: &str,
+        _parameter_hash: &str,
     ) -> Result<bool, ApprovalStoreError> {
-        let consumed = self
-            .consumed
+        let replay = self
+            .replay
             .lock()
-            .map_err(|_| ApprovalStoreError::Backend("consumed map poisoned".into()))?;
-        Ok(consumed.contains_key(&Self::consumed_key(token_id, parameter_hash)))
+            .map_err(|_| ApprovalStoreError::Backend("approval replay state poisoned".into()))?;
+        Ok(replay.consumed.contains_key(token_id) || replay.token_id_owners.contains_key(token_id))
     }
 
     fn get_resolution(&self, id: &str) -> Result<Option<ResolvedApproval>, ApprovalStoreError> {
@@ -1015,6 +1314,92 @@ impl ApprovalStore for InMemoryApprovalStore {
             .read()
             .map_err(|_| ApprovalStoreError::Backend("resolved map poisoned".into()))?;
         Ok(guard.get(id).cloned())
+    }
+
+    fn reserve_approval_set(
+        &self,
+        operation_id: &str,
+        approval_set: &ApprovalSetReservationInput,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        let requested = ApprovalReservation::new(operation_id.to_string(), approval_set.clone())?;
+        let mut replay = self.replay.lock().map_err(|_| {
+            ApprovalStoreError::Backend("approval replay state poisoned".to_string())
+        })?;
+        if let Some(existing) = replay.by_operation.get(operation_id) {
+            if existing.approval_set == requested.approval_set {
+                return Ok(existing.clone());
+            }
+            return Err(ApprovalStoreError::Replay(format!(
+                "operation `{operation_id}` is already bound to a different approval-token set"
+            )));
+        }
+        if let Some(owner) = replay
+            .approval_set_hash_owners
+            .get(requested.approval_set.approval_set_hash())
+        {
+            return Err(ApprovalStoreError::Replay(format!(
+                "approval set hash is already owned by operation `{owner}`"
+            )));
+        }
+        for member in requested.approval_set.members() {
+            if replay.consumed.contains_key(member.token_id()) {
+                return Err(ApprovalStoreError::Replay(format!(
+                    "approval token `{}` was already consumed",
+                    member.token_id()
+                )));
+            }
+            if let Some(owner) = replay.token_id_owners.get(member.token_id()) {
+                return Err(ApprovalStoreError::Replay(format!(
+                    "approval token ID is already owned by operation `{owner}`"
+                )));
+            }
+            if let Some(owner) = replay.token_digest_owners.get(member.token_digest()) {
+                return Err(ApprovalStoreError::Replay(format!(
+                    "approval token digest is already owned by operation `{owner}`"
+                )));
+            }
+        }
+        replay.approval_set_hash_owners.insert(
+            requested.approval_set.approval_set_hash().to_string(),
+            operation_id.to_string(),
+        );
+        for member in requested.approval_set.members() {
+            replay
+                .token_id_owners
+                .insert(member.token_id().to_string(), operation_id.to_string());
+            replay
+                .token_digest_owners
+                .insert(member.token_digest().to_string(), operation_id.to_string());
+        }
+        replay
+            .by_operation
+            .insert(operation_id.to_string(), requested.clone());
+        Ok(requested)
+    }
+
+    fn commit_approval_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        self.transition_approval_reservation(operation_id, ReplayReservationState::Committed)
+    }
+
+    fn cancel_approval_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<ApprovalReservation, ApprovalStoreError> {
+        self.transition_approval_reservation(operation_id, ReplayReservationState::Cancelled)
+    }
+
+    fn get_approval_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<Option<ApprovalReservation>, ApprovalStoreError> {
+        validate_reservation_digest(operation_id, "operation_id")?;
+        let replay = self.replay.lock().map_err(|_| {
+            ApprovalStoreError::Backend("approval replay state poisoned".to_string())
+        })?;
+        Ok(replay.by_operation.get(operation_id).cloned())
     }
 }
 
@@ -1144,6 +1529,10 @@ mod tests {
     use super::*;
     use chio_core::capability::governance::{GovernedApprovalDecision, GovernedApprovalTokenBody};
     use chio_core::crypto::Keypair;
+
+    fn operation_id(hex_pair: &str) -> String {
+        hex_pair.repeat(32)
+    }
 
     fn make_request(approval_id: &str, parameter_hash: &str) -> ApprovalRequest {
         let subject = Keypair::generate();
@@ -1401,5 +1790,184 @@ mod tests {
             }
             other => panic!("expected ApprovalRejected, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn approval_reservation_requires_a_bounded_proposal_deadline() {
+        let member =
+            ApprovalReservationMember::new("token-deadline".to_string(), "11".repeat(32)).unwrap();
+        let input = ApprovalSetReservationInput::new("aa".repeat(32), vec![member.clone()], 10_000)
+            .unwrap();
+        assert_eq!(input.proposal_deadline(), 10_000);
+        assert!(ApprovalReservation::new("not-a-digest".to_string(), input).is_err());
+        assert!(ApprovalSetReservationInput::new("bb".repeat(32), vec![member], 0).is_err());
+    }
+
+    #[test]
+    fn in_memory_approval_reservations_are_normalized_owned_and_terminal() {
+        let store = InMemoryApprovalStore::new();
+        let first_digest = "11".repeat(32);
+        let second_digest = "22".repeat(32);
+        let approval_set = ApprovalSetReservationInput::new(
+            "aa".repeat(32),
+            vec![
+                ApprovalReservationMember::new("token-2".to_string(), second_digest.clone())
+                    .unwrap(),
+                ApprovalReservationMember::new("token-1".to_string(), first_digest.clone())
+                    .unwrap(),
+            ],
+            10_000,
+        )
+        .unwrap();
+        let reserved = store
+            .reserve_approval_set(operation_id("01").as_str(), &approval_set)
+            .unwrap();
+        assert_eq!(reserved.operation_id(), operation_id("01").as_str());
+        assert_eq!(
+            reserved
+                .approval_set()
+                .members()
+                .iter()
+                .map(ApprovalReservationMember::token_id)
+                .collect::<Vec<_>>(),
+            vec!["token-1", "token-2"]
+        );
+        assert_eq!(reserved.approval_set().approval_set_hash(), "aa".repeat(32));
+        assert_eq!(reserved.state(), ReplayReservationState::Reserved);
+        for state in [
+            ReplayReservationState::Reserved,
+            ReplayReservationState::Committed,
+            ReplayReservationState::Cancelled,
+        ] {
+            assert_eq!(ReplayReservationState::parse(state.as_str()), Some(state));
+        }
+        assert_eq!(ReplayReservationState::parse("unknown"), None);
+        let deserialized_invalid_set =
+            serde_json::from_value::<ApprovalSetReservationInput>(serde_json::json!({
+                "approval_set_hash": "ff".repeat(32),
+                "members": [],
+                "proposal_deadline": 10_000
+            }))
+            .unwrap();
+        assert!(matches!(
+            store.reserve_approval_set(operation_id("09").as_str(), &deserialized_invalid_set),
+            Err(ApprovalStoreError::Invalid(_))
+        ));
+        assert!(matches!(
+            ApprovalSetReservationInput::new(
+                "bb".repeat(32),
+                vec![
+                    ApprovalReservationMember::new("duplicate-1".to_string(), first_digest.clone())
+                        .unwrap(),
+                    ApprovalReservationMember::new("duplicate-2".to_string(), first_digest.clone())
+                        .unwrap(),
+                ],
+                10_000
+            ),
+            Err(ApprovalStoreError::Invalid(_))
+        ));
+        assert_eq!(
+            store
+                .reserve_approval_set(operation_id("01").as_str(), &approval_set)
+                .unwrap(),
+            reserved
+        );
+        let overlapping_set = ApprovalSetReservationInput::new(
+            "bb".repeat(32),
+            vec![
+                ApprovalReservationMember::new("token-1".to_string(), first_digest.clone())
+                    .unwrap(),
+            ],
+            10_000,
+        )
+        .unwrap();
+        assert!(matches!(
+            store.reserve_approval_set(operation_id("02").as_str(), &overlapping_set),
+            Err(ApprovalStoreError::Replay(_))
+        ));
+        let duplicate_hash_set = ApprovalSetReservationInput::new(
+            "aa".repeat(32),
+            vec![
+                ApprovalReservationMember::new("token-hash".to_string(), "55".repeat(32)).unwrap(),
+            ],
+            10_000,
+        )
+        .unwrap();
+        assert!(matches!(
+            store.reserve_approval_set(operation_id("05").as_str(), &duplicate_hash_set),
+            Err(ApprovalStoreError::Replay(_))
+        ));
+        assert!(matches!(
+            store.record_consumed("token-1", "parameter-hash", 1),
+            Err(ApprovalStoreError::Replay(_))
+        ));
+        assert!(store.is_consumed("token-1", "parameter-hash").unwrap());
+
+        let committed = store
+            .commit_approval_reservation(operation_id("01").as_str())
+            .unwrap();
+        assert_eq!(committed.state(), ReplayReservationState::Committed);
+        assert_eq!(
+            store
+                .commit_approval_reservation(operation_id("01").as_str())
+                .unwrap(),
+            committed
+        );
+        assert!(matches!(
+            store.cancel_approval_reservation(operation_id("01").as_str()),
+            Err(ApprovalStoreError::Replay(_))
+        ));
+
+        let cancellation_set = ApprovalSetReservationInput::new(
+            "cc".repeat(32),
+            vec![ApprovalReservationMember::new("token-3".to_string(), "33".repeat(32)).unwrap()],
+            10_000,
+        )
+        .unwrap();
+        let cancelled = store
+            .reserve_approval_set(operation_id("03").as_str(), &cancellation_set)
+            .and_then(|_| store.cancel_approval_reservation(operation_id("03").as_str()))
+            .unwrap();
+        assert_eq!(cancelled.state(), ReplayReservationState::Cancelled);
+        assert_eq!(
+            store
+                .cancel_approval_reservation(operation_id("03").as_str())
+                .unwrap(),
+            cancelled
+        );
+        assert_eq!(
+            store
+                .get_approval_reservation(operation_id("03").as_str())
+                .unwrap(),
+            Some(cancelled)
+        );
+        assert!(matches!(
+            store.reserve_approval_set(operation_id("04").as_str(), &cancellation_set),
+            Err(ApprovalStoreError::Replay(_))
+        ));
+
+        store
+            .record_consumed("legacy-token", "legacy-parameter", 2)
+            .unwrap();
+        assert!(matches!(
+            store.record_consumed("legacy-token", "different-parameter", 3),
+            Err(ApprovalStoreError::Replay(_))
+        ));
+        assert!(store
+            .is_consumed("legacy-token", "different-parameter")
+            .unwrap());
+        let legacy_consumed_set = ApprovalSetReservationInput::new(
+            "dd".repeat(32),
+            vec![
+                ApprovalReservationMember::new("legacy-token".to_string(), "44".repeat(32))
+                    .unwrap(),
+            ],
+            10_000,
+        )
+        .unwrap();
+        assert!(matches!(
+            store.reserve_approval_set(operation_id("06").as_str(), &legacy_consumed_set),
+            Err(ApprovalStoreError::Replay(_))
+        ));
     }
 }
