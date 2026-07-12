@@ -1240,6 +1240,7 @@ mod tests {
         verify_direct_aggregate_family_root, AggregateFamilyRootResolution,
         AggregateFamilyRootResolutionError, AggregateFamilyRootResolver,
         AggregateInvocationAuthorityError, AggregateInvocationBudget, AggregateInvocationScope,
+        MAX_AGGREGATE_FAMILY_ROOT_ID_BYTES,
     };
     use chio_core::capability::attenuation::{
         compute_attenuation_witness, scope_hash, AttenuationProof, DelegationLink,
@@ -1249,7 +1250,7 @@ mod tests {
     use chio_core::capability::token::{
         CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTokenBody,
     };
-    use chio_core::{Keypair, PublicKey, SigningAlgorithm};
+    use chio_core::{canonical_json_bytes, Keypair, PublicKey, SigningAlgorithm};
     use rusqlite::{params, Connection};
     use tempfile::tempdir;
 
@@ -1360,6 +1361,20 @@ mod tests {
             [],
             |row| row.get(0),
         )
+    }
+
+    fn replication_record(
+        seq: u64,
+        token: &CapabilityToken,
+    ) -> Result<super::StoredAggregateFamilyRoot, Box<dyn StdError>> {
+        let canonical_token_json = String::from_utf8(canonical_json_bytes(token)?)?;
+        Ok(super::StoredAggregateFamilyRoot {
+            seq,
+            token_digest: super::aggregate_family_root_token_digest(
+                canonical_token_json.as_bytes(),
+            ),
+            canonical_token_json,
+        })
     }
 
     fn drop_update_guard(connection: &Connection) -> Result<(), rusqlite::Error> {
@@ -1645,6 +1660,74 @@ mod tests {
             })
             .collect::<Result<Vec<_>, _>>()?;
         assert_eq!(reopened_ids, vec![family.id, legacy.id]);
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_family_root_registration_enforces_id_byte_bound() -> TestResult {
+        let directory = tempdir()?;
+        let path = directory.path().join("registration-bound.db");
+        let store = SqliteReceiptStore::open(&path)?;
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let trusted = [issuer.public_key()];
+
+        let accepted_id = "a".repeat(MAX_AGGREGATE_FAMILY_ROOT_ID_BYTES);
+        let accepted = family_root_with_keys(&accepted_id, 5, &issuer, &subject)?;
+        assert_eq!(
+            store.record_aggregate_family_root(&accepted, &trusted, 1_100)?,
+            super::AggregateFamilyRootRecordStatus::Inserted
+        );
+
+        for rejected_id in [
+            String::new(),
+            "b".repeat(MAX_AGGREGATE_FAMILY_ROOT_ID_BYTES + 1),
+        ] {
+            let rejected = family_root_with_keys(&rejected_id, 5, &issuer, &subject)?;
+            assert!(matches!(
+                store.record_aggregate_family_root(&rejected, &trusted, 1_100),
+                Err(super::AggregateFamilyRootStoreError::InvalidRecord(_))
+            ));
+        }
+        assert_eq!(row_count(&path)?, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_family_root_import_enforces_id_byte_bound() -> TestResult {
+        let directory = tempdir()?;
+        let path = directory.path().join("import-bound.db");
+        let store = SqliteReceiptStore::open(&path)?;
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let trusted = [issuer.public_key()];
+
+        let accepted_id = "a".repeat(MAX_AGGREGATE_FAMILY_ROOT_ID_BYTES);
+        let accepted = family_root_with_keys(&accepted_id, 5, &issuer, &subject)?;
+        assert_eq!(
+            store.import_aggregate_family_roots(
+                &[replication_record(1, &accepted)?],
+                &trusted,
+                1_100,
+            )?,
+            vec![super::AggregateFamilyRootRecordStatus::Inserted]
+        );
+
+        for (seq, rejected_id) in [
+            (2, String::new()),
+            (3, "b".repeat(MAX_AGGREGATE_FAMILY_ROOT_ID_BYTES + 1)),
+        ] {
+            let rejected = family_root_with_keys(&rejected_id, 5, &issuer, &subject)?;
+            assert!(matches!(
+                store.import_aggregate_family_roots(
+                    &[replication_record(seq, &rejected)?],
+                    &trusted,
+                    1_100,
+                ),
+                Err(super::AggregateFamilyRootStoreError::InvalidRecord(_))
+            ));
+        }
+        assert_eq!(row_count(&path)?, 1);
         Ok(())
     }
 

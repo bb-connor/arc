@@ -34,6 +34,9 @@ pub const CHIO_AGGREGATE_BUDGET_FAMILY_KEY_DOMAIN: &str = "chio.aggregate-budget
 pub const CHIO_AGGREGATE_BUDGET_ROOT_BINDING_DOMAIN: &str =
     "chio.aggregate-budget-root-binding.v1\0";
 
+/// Maximum UTF-8 byte length accepted for a durable aggregate family-root ID.
+pub const MAX_AGGREGATE_FAMILY_ROOT_ID_BYTES: usize = 512;
+
 /// Scope over which an aggregate invocation maximum is shared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -780,6 +783,11 @@ pub fn verify_direct_aggregate_root_record(
     token: &CapabilityToken,
     trusted_issuers: &[PublicKey],
 ) -> Result<AggregateFamilyRootResolution> {
+    if token.id.is_empty() || token.id.len() > MAX_AGGREGATE_FAMILY_ROOT_ID_BYTES {
+        return Err(Error::AttenuationViolation {
+            reason: "aggregate root capability id must contain 1 to 512 bytes".to_string(),
+        });
+    }
     ensure_algorithm_consistency(
         token.algorithm,
         &token.issuer,
@@ -1497,6 +1505,40 @@ mod tests {
         assert!(
             verify_direct_aggregate_root_record(&nondelegable, &[issuer.public_key()]).is_err()
         );
+    }
+
+    #[test]
+    fn direct_aggregate_root_record_verifier_enforces_id_byte_bound_before_issuer_trust() {
+        let issuer = fixed_issuer();
+        let subject = fixed_subject();
+        let accepted_id = "a".repeat(MAX_AGGREGATE_FAMILY_ROOT_ID_BYTES);
+        let accepted = CapabilityToken::sign(
+            delegable_root_body(&issuer.public_key(), &subject.public_key(), &accepted_id),
+            &issuer,
+        )
+        .expect("512-byte root id");
+        assert!(matches!(
+            verify_direct_aggregate_root_record(&accepted, &[issuer.public_key()]),
+            Ok(AggregateFamilyRootResolution::LegacyUnbound(root))
+                if root.root_capability_id() == accepted_id
+        ));
+
+        for rejected_id in [
+            String::new(),
+            "b".repeat(MAX_AGGREGATE_FAMILY_ROOT_ID_BYTES + 1),
+        ] {
+            let rejected = CapabilityToken::sign(
+                delegable_root_body(&issuer.public_key(), &subject.public_key(), &rejected_id),
+                &issuer,
+            )
+            .expect("structurally signed root");
+            let error = verify_direct_aggregate_root_record(&rejected, &[])
+                .expect_err("invalid root id must fail before issuer trust");
+            assert_attenuation_reason(
+                error,
+                "aggregate root capability id must contain 1 to 512 bytes",
+            );
+        }
     }
 
     #[test]
