@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 
 use chio_core::crypto::Keypair;
 use chio_errors::_generated::error_codes::{
@@ -400,11 +401,19 @@ pub fn configure_receipt_store(
             ));
         }
         (Some(path), None) => {
-            kernel
-                .set_receipt_store(Box::new(chio_store_sqlite::SqliteReceiptStore::open(path)?))?;
+            let store = Arc::new(chio_store_sqlite::SqliteReceiptStore::open(path)?);
+            let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = store.clone();
+            let root_resolver: Arc<
+                dyn chio_core::capability::aggregate_budget::AggregateFamilyRootResolver
+                    + Send
+                    + Sync,
+            > = store;
+            kernel.set_receipt_store_handle(receipt_store)?;
+            kernel.set_aggregate_family_root_resolver(root_resolver);
         }
         (None, Some(url)) => {
             let token = require_control_token(control_token)?;
+            kernel.clear_aggregate_family_root_resolver();
             kernel.set_receipt_store(
                 trust_control::service_runtime::remote_stores::build_remote_receipt_store(
                     url, token,
@@ -771,6 +780,74 @@ mod tests {
 
         configure_receipt_store(&mut kernel, Some(&path), None, None).unwrap();
         kernel.validate_web3_evidence_prerequisites().unwrap();
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn aggregate_family_root_resolver_is_explicit_and_local_only() {
+        let path = unique_receipt_db_path("chio-control-plane-family-resolver");
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let root = chio_core::capability::token::CapabilityToken::sign(
+            chio_core::capability::token::CapabilityTokenBody {
+                id: "configured-local-root".to_string(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: chio_core::capability::scope::ChioScope {
+                    grants: vec![chio_core::capability::scope::ToolGrant {
+                        server_id: "configured-server".to_string(),
+                        tool_name: "configured-tool".to_string(),
+                        operations: vec![
+                            chio_core::capability::scope::Operation::Invoke,
+                            chio_core::capability::scope::Operation::Delegate,
+                        ],
+                        constraints: Vec::new(),
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: Vec::new(),
+                    prompt_grants: Vec::new(),
+                },
+                issued_at: 1_000,
+                expires_at: 2_000,
+                delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
+            },
+            &issuer,
+        )
+        .expect("configured root");
+        let seed_store = chio_store_sqlite::SqliteReceiptStore::open(&path).expect("seed store");
+        seed_store
+            .record_aggregate_family_root(&root, &[issuer.public_key()], 1_100)
+            .expect("seed root");
+        drop(seed_store);
+        let mut kernel = make_kernel(false);
+        assert!(kernel.aggregate_family_root_resolver().is_none());
+
+        configure_receipt_store(&mut kernel, Some(&path), None, None).unwrap();
+        let resolver = kernel
+            .aggregate_family_root_resolver()
+            .expect("local SQLite composition must install a root resolver");
+        assert!(matches!(
+            resolver.resolve_aggregate_family_root(&root.id),
+            Ok(
+                chio_core::capability::aggregate_budget::AggregateFamilyRootResolution::LegacyUnbound(
+                    resolved
+                )
+            ) if resolved.root_subject() == &root.subject
+        ));
+
+        configure_receipt_store(
+            &mut kernel,
+            None,
+            Some("http://127.0.0.1:8080"),
+            Some("test-token"),
+        )
+        .unwrap();
+        assert!(kernel.aggregate_family_root_resolver().is_none());
 
         let _ = std::fs::remove_file(path);
     }

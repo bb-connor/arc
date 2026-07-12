@@ -232,6 +232,7 @@ impl ChioKernel {
             receipt_mirror_gauge,
             child_receipt_mirror_gauge,
             receipt_store: None,
+            aggregate_family_root_resolver: None,
             receipt_store_write_lock: Mutex::new(()),
             payment_adapter: None,
             price_oracle: None,
@@ -474,6 +475,31 @@ impl ChioKernel {
         receipt_store: Arc<dyn ReceiptStore>,
     ) -> Result<(), KernelError> {
         self.try_set_receipt_store_handle(receipt_store)
+    }
+
+    /// Install the explicit trusted authority for aggregate family roots.
+    pub fn set_aggregate_family_root_resolver(
+        &mut self,
+        resolver: Arc<
+            dyn chio_core::capability::aggregate_budget::AggregateFamilyRootResolver + Send + Sync,
+        >,
+    ) {
+        self.aggregate_family_root_resolver = Some(resolver);
+    }
+
+    /// Remove aggregate family-root authority during composition changes.
+    pub fn clear_aggregate_family_root_resolver(&mut self) {
+        self.aggregate_family_root_resolver = None;
+    }
+
+    /// Borrow the configured root authority without manufacturing a default.
+    #[must_use]
+    pub fn aggregate_family_root_resolver(
+        &self,
+    ) -> Option<
+        &(dyn chio_core::capability::aggregate_budget::AggregateFamilyRootResolver + Send + Sync),
+    > {
+        self.aggregate_family_root_resolver.as_deref()
     }
 
     pub fn try_set_receipt_store_handle(

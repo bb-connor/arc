@@ -302,6 +302,9 @@ pub struct ChioKernel {
     pub(super) receipt_mirror_gauge: chio_bounded::SizeGauge,
     pub(super) child_receipt_mirror_gauge: chio_bounded::SizeGauge,
     pub(super) receipt_store: Option<Arc<dyn ReceiptStore>>,
+    pub(super) aggregate_family_root_resolver: Option<
+        Arc<dyn chio_core::capability::aggregate_budget::AggregateFamilyRootResolver + Send + Sync>,
+    >,
     pub(super) receipt_store_write_lock: Mutex<()>,
     pub(super) payment_adapter: Option<Box<dyn PaymentAdapter>>,
     pub(super) price_oracle: Option<Box<dyn PriceOracle>>,

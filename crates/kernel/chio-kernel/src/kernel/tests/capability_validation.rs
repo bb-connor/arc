@@ -1159,3 +1159,56 @@ fn kernel_error_report_includes_request_cancel_context() {
     assert_eq!(report.context["reason"], "operator cancelled");
     assert!(report.suggested_fix.contains("cancelled request ID"));
 }
+struct ExplicitAggregateFamilyRootResolver {
+    subject: chio_core::PublicKey,
+}
+
+impl chio_core::capability::aggregate_budget::AggregateFamilyRootResolver
+    for ExplicitAggregateFamilyRootResolver
+{
+    fn resolve_aggregate_family_root(
+        &self,
+        root_capability_id: &str,
+    ) -> Result<
+        chio_core::capability::aggregate_budget::AggregateFamilyRootResolution,
+        chio_core::capability::aggregate_budget::AggregateFamilyRootResolutionError,
+    > {
+        Ok(
+            chio_core::capability::aggregate_budget::AggregateFamilyRootResolution::LegacyUnbound(
+                chio_core::capability::aggregate_budget::LegacyUnboundAggregateRoot::new(
+                    root_capability_id.to_string(),
+                    self.subject.clone(),
+                    "0".repeat(64),
+                    2_000,
+                ),
+            ),
+        )
+    }
+}
+
+#[test]
+fn aggregate_family_root_kernel_requires_explicit_resolver() {
+    let mut kernel = make_kernel(make_config());
+    assert!(kernel.aggregate_family_root_resolver().is_none());
+
+    let subject = Keypair::generate().public_key();
+    kernel.set_aggregate_family_root_resolver(std::sync::Arc::new(
+        ExplicitAggregateFamilyRootResolver {
+            subject: subject.clone(),
+        },
+    ));
+    let resolution = kernel
+        .aggregate_family_root_resolver()
+        .expect("explicit resolver")
+        .resolve_aggregate_family_root("explicit-root")
+        .expect("explicit resolution");
+    match resolution {
+        chio_core::capability::aggregate_budget::AggregateFamilyRootResolution::LegacyUnbound(
+            root,
+        ) => {
+            assert_eq!(root.root_capability_id(), "explicit-root");
+            assert_eq!(root.root_subject(), &subject);
+        }
+        other => panic!("expected explicit legacy root, got {other:?}"),
+    }
+}
