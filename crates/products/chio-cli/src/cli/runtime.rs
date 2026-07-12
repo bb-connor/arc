@@ -148,32 +148,14 @@ pub(crate) fn cmd_run(
 }
 
 /// Whether a `--receipt-store` value opens a SQLite database that lives only in
-/// memory for the life of the process. rusqlite enables URI filenames, so the
-/// bare `:memory:` sentinel, `file::memory:`, and any `file:...?mode=memory`
-/// URI all open a non-durable database that loses every receipt on restart and
-/// must not be mistaken for a durable audit log.
+/// memory for the life of the process. A non-UTF-8 path is always a real
+/// filesystem path, so it is never in-memory; otherwise the shared
+/// [`chio_store_sqlite::is_in_memory_sqlite_path`] classifier decides, keeping a
+/// single source of truth for what counts as a non-durable receipt database
+/// across the boot gate, the store-wiring path, and this sidecar.
 fn is_in_memory_sqlite_path(path: &Path) -> bool {
-    let Some(value) = path.to_str() else {
-        return false;
-    };
-    if value.eq_ignore_ascii_case(":memory:") {
-        return true;
-    }
-    let Some(rest) = value.strip_prefix("file:") else {
-        return false;
-    };
-    let (name, query) = match rest.split_once('?') {
-        Some((name, query)) => (name, Some(query)),
-        None => (rest, None),
-    };
-    if name.eq_ignore_ascii_case(":memory:") {
-        return true;
-    }
-    query.is_some_and(|query| {
-        query
-            .split('&')
-            .any(|param| param.eq_ignore_ascii_case("mode=memory"))
-    })
+    path.to_str()
+        .is_some_and(chio_store_sqlite::is_in_memory_sqlite_path)
 }
 
 /// Refuse to boot without a durable receipt store unless the operator has
