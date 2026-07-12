@@ -2724,6 +2724,11 @@ impl SqliteReceiptStore {
                 self.receipt_commit_actor
                     .health
                     .note_channel_send_rejected();
+                // A disconnected admin send is the first observation that the
+                // writer is gone. Record the unavailable marker so the next
+                // liveness sample reports the writer Dead immediately, rather
+                // than staying Healthy until a later append also disconnects.
+                self.receipt_commit_actor.health.note_writer_unavailable();
                 return Err(receipt_actor_unavailable_error());
             }
         }
@@ -2756,6 +2761,9 @@ impl SqliteReceiptStore {
                 self.receipt_commit_actor
                     .health
                     .note_channel_send_rejected();
+                // See `reseed_verified_head`: a disconnected admin send must
+                // flip liveness to Dead now, not on a later append.
+                self.receipt_commit_actor.health.note_writer_unavailable();
                 Err(receipt_actor_unavailable_error())
             }
         }
@@ -3827,6 +3835,49 @@ mod receipt_commit_actor_tests {
             ),
             chio_kernel::ReceiptWriterLiveness::Dead
         );
+        Ok(())
+    }
+
+    #[test]
+    fn disconnected_reseed_flips_writer_liveness_dead_immediately(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // A disconnected admin send (reseed after the commit actor has already
+        // exited) is the first observation that the writer is gone. It must flip
+        // liveness to Dead now, so the pre-dispatch gate denies admission before
+        // a later append reconfirms the death.
+        let path = std::env::temp_dir().join(format!(
+            "chio-reseed-dead-{}-{}.sqlite3",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let mut store = SqliteReceiptStore::open(&path)?;
+
+        // Replace the live commit actor with one whose receiver is dropped, so
+        // the next admin send observes a dead actor. Overwriting the field drops
+        // the original sender, letting the original actor thread exit cleanly.
+        let (sender, receiver) = receipt_commit_channel();
+        drop(receiver);
+        store.receipt_commit_actor = ReceiptCommitActor {
+            sender,
+            health: Arc::new(ReceiptCommitWriterHealth::default()),
+        };
+
+        let error = match store.reseed_verified_head() {
+            Ok(()) => return Err("reseed against a dead actor must fail closed".into()),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("unavailable"));
+
+        assert_eq!(
+            store.writer_liveness(Duration::from_secs(60)),
+            chio_kernel::ReceiptWriterLiveness::Dead,
+            "a disconnected reseed must flip writer liveness to Dead immediately"
+        );
+
+        let _ = std::fs::remove_file(&path);
         Ok(())
     }
 
