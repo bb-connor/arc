@@ -3169,6 +3169,29 @@ impl SqliteReceiptStore {
         )
     }
 
+    /// Delete the open intent for a call that returned to its caller without
+    /// dispatching (no effect, no terminal receipt): the row must not
+    /// survive to dead-letter as a false orphan at the next boot.
+    pub fn clear_dispatch_intent(
+        &self,
+        key: &chio_kernel::receipt_store::DispatchIntentKey,
+    ) -> Result<(), ReceiptStoreError> {
+        self.writer_handle()
+            .run_write(dispatch_intent_clear_job(key))
+    }
+
+    /// Bounded variant of [`Self::clear_dispatch_intent`]: the response wait
+    /// is capped at `budget` so the non-dispatch exit cannot hang its caller
+    /// on a wedged writer.
+    pub fn clear_dispatch_intent_with_timeout(
+        &self,
+        key: &chio_kernel::receipt_store::DispatchIntentKey,
+        budget: Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        self.writer_handle()
+            .run_write_with_timeout(dispatch_intent_clear_job(key), budget)
+    }
+
     /// List the open dispatch intents, oldest first: the operator view of
     /// work that is either in flight or awaiting boot reconciliation.
     pub fn open_dispatch_intents(

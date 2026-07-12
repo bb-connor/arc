@@ -825,6 +825,11 @@ impl ChioKernel {
                         &pre_invocation_guard_evidence,
                     );
                 }
+                // No tool effect ran and this arm records no terminal
+                // receipt, so the journaled dispatch intent must be cleared
+                // here: leaving it open would dead-letter a false orphan at
+                // the next boot for a call that never executed.
+                self.clear_dispatch_intent_for_non_dispatch_exit(request);
                 warn!(
                     request_id = %request.request_id,
                     reason = %redacted!(&error),

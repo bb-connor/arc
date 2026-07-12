@@ -172,6 +172,140 @@ fn nested_flow_dispatch_journals_a_durable_intent_and_consumes_it_on_allow(
     Ok(())
 }
 
+/// Tool server whose dispatch always requires URL elicitations, so the
+/// evaluation returns to the caller WITHOUT any tool side effect and without
+/// recording a terminal receipt.
+struct UrlElicitingServer {
+    id: String,
+    tools: Vec<String>,
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for UrlElicitingServer {
+    fn server_id(&self) -> &str {
+        &self.id
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        self.tools.clone()
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        Err(KernelError::UrlElicitationsRequired {
+            message: "URL elicitation required before dispatch side effect".to_string(),
+            elicitations: Vec::new(),
+        })
+    }
+}
+
+fn url_elicitation_journal_kernel(
+    db_path: &Path,
+) -> Result<(ChioKernel, std::sync::Arc<SqliteReceiptStore>), Box<dyn std::error::Error>> {
+    let mut config = make_config();
+    config.dispatch_intent_journal = crate::DispatchIntentJournalMode::SideEffecting;
+    let mut kernel = make_kernel(config);
+    let store = std::sync::Arc::new(SqliteReceiptStore::open(db_path)?);
+    kernel.set_receipt_store_handle(
+        std::sync::Arc::clone(&store) as std::sync::Arc<dyn crate::receipt_store::ReceiptStore>
+    )?;
+    kernel.register_tool_server(Box::new(UrlElicitingServer {
+        id: "srv-elicit".to_string(),
+        tools: vec!["write_file".to_string()],
+    }));
+    Ok((kernel, store))
+}
+
+#[test]
+fn url_elicitation_exit_clears_the_journaled_intent(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // UrlElicitationsRequired precedes any tool side effect and records no
+    // terminal receipt, so the pre-dispatch intent must be cleared on this
+    // exit: an intent left open would dead-letter as a false orphan at the
+    // next boot even though nothing executed.
+    let path = unique_receipt_db_path("chio-intent-elicitation-clear");
+    let (kernel, store) = url_elicitation_journal_kernel(&path)?;
+
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-elicit", "write_file")]),
+        300,
+    );
+    let request = make_request("req-elicit-clear", &cap, "write_file", "srv-elicit");
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    let result = rt.block_on(kernel.evaluate_tool_call(&request));
+    assert!(
+        matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
+        "the elicitation error must propagate to the caller"
+    );
+    assert_eq!(
+        ReceiptStore::open_dispatch_intent_count(store.as_ref())?,
+        0,
+        "a non-dispatch elicitation exit must not leave an open intent"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn nested_flow_url_elicitation_exit_clears_the_journaled_intent(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Same contract on the nested-flow evaluator: its elicitation arm also
+    // returns without dispatching or recording a terminal receipt, so it
+    // must clear the intent it journaled.
+    let path = unique_receipt_db_path("chio-intent-elicitation-clear-nested");
+    let (kernel, store) = url_elicitation_journal_kernel(&path)?;
+
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-elicit", "write_file")]),
+        300,
+    );
+    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![cap.clone()])?;
+    kernel.activate_session(&session_id)?;
+    let context = make_operation_context(
+        &session_id,
+        "req-elicit-clear-nested",
+        &agent_kp.public_key().to_hex(),
+    );
+    kernel.begin_session_request(&context, OperationKind::ToolCall, true)?;
+    let request = make_request("req-elicit-clear-nested", &cap, "write_file", "srv-elicit");
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    let result = rt.block_on(async {
+        let mut client = NoopNestedFlowClient;
+        kernel
+            .evaluate_tool_call_with_nested_flow_client_async(&context, &request, &mut client, None)
+            .await
+    });
+    assert!(
+        matches!(result, Err(KernelError::UrlElicitationsRequired { .. })),
+        "the elicitation error must propagate to the caller"
+    );
+    assert_eq!(
+        ReceiptStore::open_dispatch_intent_count(store.as_ref())?,
+        0,
+        "a nested non-dispatch elicitation exit must not leave an open intent"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 #[test]
 fn intent_and_receipt_tenant_ignore_a_foreign_thread_scope(
 ) -> Result<(), Box<dyn std::error::Error>> {

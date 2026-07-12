@@ -574,6 +574,26 @@ impl ReceiptStore for SqliteReceiptStore {
         Ok(())
     }
 
+    fn clear_dispatch_intent(
+        &self,
+        key: &crate::receipt_store::DispatchIntentKey,
+    ) -> Result<(), ReceiptStoreError> {
+        let changed = self.connection()?.execute(
+            "DELETE FROM chio_dispatch_intents \
+             WHERE request_id = ?1 AND parameter_hash = ?2 \
+               AND ((tenant_id IS NULL AND ?3 IS NULL) OR tenant_id = ?3) \
+               AND state = 'open'",
+            params![key.request_id, key.parameter_hash, key.tenant_id.as_deref()],
+        )?;
+        if changed == 0 {
+            return Err(ReceiptStoreError::NotFound(format!(
+                "open dispatch intent for request `{}` not found with matching parameter_hash",
+                key.request_id
+            )));
+        }
+        Ok(())
+    }
+
     fn open_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
         let count: i64 = self.connection()?.query_row(
             "SELECT COUNT(*) FROM chio_dispatch_intents WHERE state = 'open'",

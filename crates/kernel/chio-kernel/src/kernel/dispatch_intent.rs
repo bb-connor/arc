@@ -1,5 +1,7 @@
 use super::*;
 
+use chio_log_redact::redacted;
+
 use crate::receipt_store::{
     DispatchIntentHandle, DispatchIntentJournalMode, DispatchIntentReconciler,
     DispatchIntentRecord, DispatchIntentResolution, ReceiptStoreError, SideEffectClass,
@@ -143,5 +145,38 @@ impl ChioKernel {
             parameter_hash,
             tenant_id,
         }))
+    }
+
+    /// Clear the journaled intent for an evaluation that exits WITHOUT
+    /// dispatching and without recording a terminal receipt (the URL
+    /// elicitation return): the tool did not execute, so the row must not
+    /// survive to dead-letter as a false orphan at the next boot. No-op when
+    /// the request journaled nothing. Best-effort and bounded: on failure
+    /// the intent stays open and boot reconciliation dead-letters it
+    /// (fail-closed, operator-visible) rather than losing track of it, and
+    /// the caller's response is never masked by the cleanup.
+    pub(crate) fn clear_dispatch_intent_for_non_dispatch_exit(
+        &self,
+        request: &crate::runtime::ToolCallRequest,
+    ) {
+        let Some(handle) = self.dispatch_intent_for_request(Some(request.request_id.as_str()))
+        else {
+            return;
+        };
+        let key = crate::receipt_store::DispatchIntentKey {
+            request_id: handle.request_id,
+            parameter_hash: handle.parameter_hash,
+            tenant_id: handle.tenant_id,
+        };
+        let budget = self.config.deadlines.receipt_append_budget();
+        if let Err(error) = self
+            .with_receipt_store(|store| Ok(store.clear_dispatch_intent_with_timeout(&key, budget)?))
+        {
+            warn!(
+                request_id = %request.request_id,
+                reason = %redacted!(&error.to_string()),
+                "failed to clear the dispatch intent for a call that did not dispatch"
+            );
+        }
     }
 }

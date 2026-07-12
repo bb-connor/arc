@@ -133,6 +133,50 @@ pub(crate) fn finalize_dispatch_intent_tx(
     Ok(())
 }
 
+/// Writer job that deletes one open intent in its own immediate transaction,
+/// for an evaluation that exits without dispatching (no effect ran, no
+/// terminal receipt will consume the row).
+pub(crate) fn dispatch_intent_clear_job(
+    key: &chio_kernel::receipt_store::DispatchIntentKey,
+) -> impl FnOnce(&mut SqliteStoreConnection) -> Result<(), ReceiptStoreError> + Send + 'static {
+    let key = key.clone();
+    move |connection| {
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        clear_dispatch_intent_tx(&tx, &key)?;
+        tx.commit()?;
+        Ok(())
+    }
+}
+
+/// Delete the open intent matching `key` for a call that provably never
+/// dispatched. Guarded exactly like the consuming delete (request id,
+/// parameter hash, tenant) plus the open state; zero rows changed is
+/// `NotFound` so the caller logs the anomaly instead of assuming the row is
+/// gone.
+pub(crate) fn clear_dispatch_intent_tx(
+    tx: &rusqlite::Transaction<'_>,
+    key: &chio_kernel::receipt_store::DispatchIntentKey,
+) -> Result<(), ReceiptStoreError> {
+    let changed = tx.execute(
+        "DELETE FROM chio_dispatch_intents \
+         WHERE request_id = ?1 AND parameter_hash = ?2 \
+           AND ((tenant_id IS NULL AND ?3 IS NULL) OR tenant_id = ?3) \
+           AND state = 'open'",
+        rusqlite::params![
+            key.request_id.as_str(),
+            key.parameter_hash.as_str(),
+            key.tenant_id.as_deref(),
+        ],
+    )?;
+    if changed == 0 {
+        return Err(ReceiptStoreError::NotFound(format!(
+            "open dispatch intent for request `{}` not found with matching parameter_hash",
+            key.request_id
+        )));
+    }
+    Ok(())
+}
+
 /// Load every open intent for boot reconciliation, oldest first. A missing
 /// table (pre-journal database opened without DDL) reports no open intents.
 pub(crate) fn select_open_dispatch_intents(

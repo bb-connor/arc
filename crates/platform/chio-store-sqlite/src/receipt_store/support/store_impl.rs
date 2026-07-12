@@ -401,6 +401,21 @@ impl ReceiptStore for SqliteReceiptStore {
         )
     }
 
+    fn clear_dispatch_intent(
+        &self,
+        key: &chio_kernel::receipt_store::DispatchIntentKey,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::clear_dispatch_intent(self, key)
+    }
+
+    fn clear_dispatch_intent_with_timeout(
+        &self,
+        key: &chio_kernel::receipt_store::DispatchIntentKey,
+        budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::clear_dispatch_intent_with_timeout(self, key, budget)
+    }
+
     fn append_chio_receipt_consuming_intent(
         &self,
         receipt: &ChioReceipt,

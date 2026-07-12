@@ -647,6 +647,27 @@ pub trait ReceiptStore: Send + Sync {
     ) -> Result<(), ReceiptStoreError> {
         self.attach_dispatch_intent_rail_ref(request_id, rail_authorization_id)
     }
+    /// Delete the open intent matching `key` for an evaluation that exits
+    /// WITHOUT dispatching the tool and without a terminal receipt (a URL
+    /// elicitation returned to the caller): no effect ran, so the intent
+    /// must not survive to dead-letter as a false orphan at the next boot.
+    /// The key match mirrors the consuming append, so a mismatched or
+    /// already-consumed intent is reported rather than silently ignored.
+    fn clear_dispatch_intent(&self, _key: &DispatchIntentKey) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "dispatch-intent clearing is not supported by this receipt store".to_string(),
+        ))
+    }
+    /// Bounded variant of `clear_dispatch_intent`, failing closed with
+    /// `ReceiptStoreError::Timeout` past `budget` so the non-dispatch exit
+    /// can never hang an evaluation on a wedged writer.
+    fn clear_dispatch_intent_with_timeout(
+        &self,
+        key: &DispatchIntentKey,
+        _budget: std::time::Duration,
+    ) -> Result<(), ReceiptStoreError> {
+        self.clear_dispatch_intent(key)
+    }
     /// Reconcile every open intent surviving a restart. Default: a no-op
     /// empty report, because a store without the journal has no orphans.
     fn reconcile_dispatch_intents(
