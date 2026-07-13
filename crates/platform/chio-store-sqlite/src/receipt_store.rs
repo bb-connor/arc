@@ -141,6 +141,44 @@ pub(crate) struct WriterLifetimeLock {
     pub(crate) probe_path: std::path::PathBuf,
 }
 
+/// Scope guard for the exclusive section of a reconcile pass: restores the
+/// shared writer lifetime mark when dropped, so the downgrade happens on
+/// every exit path, including a reconciler panic unwinding through the
+/// pass. The mark descriptor outlives the pass (it lives on the store), so
+/// a mark left exclusive would block every sibling open and defer every
+/// sibling reconcile for the rest of this process's life. The normal path
+/// consumes the guard through `downgrade` so a failed downgrade surfaces
+/// as an error; the drop path downgrades best-effort because it only runs
+/// while an unwind or an early error return is already in flight.
+struct MarkDowngradeGuard<'lock> {
+    /// The exclusively converted mark, or `None` while the pass has not
+    /// converted it (or once it is downgraded).
+    mark: Option<&'lock std::fs::File>,
+}
+
+impl MarkDowngradeGuard<'_> {
+    /// Restore the shared mark now, surfacing the error the drop path
+    /// would have to swallow. A no-op when the mark was never converted.
+    fn downgrade(mut self) -> std::io::Result<()> {
+        match self.mark.take() {
+            Some(mark) => mark.lock_shared(),
+            None => Ok(()),
+        }
+    }
+}
+
+impl Drop for MarkDowngradeGuard<'_> {
+    fn drop(&mut self) {
+        if let Some(mark) = self.mark.take() {
+            // Cannot block: re-sharing waits only on a sibling's exclusive
+            // conversion, and conversions happen only under the probe
+            // mutex, which this pass still holds (the probe descriptor is
+            // declared before this guard, so it is dropped after it).
+            let _ = mark.lock_shared();
+        }
+    }
+}
+
 type FederatedShareSubjectCorpus = (
     FederatedEvidenceShareSummary,
     Vec<StoredToolReceipt>,
@@ -3388,7 +3426,11 @@ impl SqliteReceiptStore {
         if open.is_empty() {
             return Ok(report);
         }
+        // Declaration order is load-bearing: on an unwind the guard (declared
+        // later) drops first, re-sharing the mark while the probe mutex is
+        // still held, and the probe releases after it.
         let mut reconcile_probe: Option<std::fs::File> = None;
+        let mut exclusive_mark = MarkDowngradeGuard { mark: None };
         if let Some(lock) = &self.writer_lifetime_lock {
             // Serialize sibling exclusivity probes on a separate sidecar
             // mutex BEFORE touching the lifetime mark. flock conversions
@@ -3419,7 +3461,7 @@ impl SqliteReceiptStore {
                 Err(std::fs::TryLockError::Error(error)) => return Err(error.into()),
             }
             match lock.mark.try_lock() {
-                Ok(()) => {}
+                Ok(()) => exclusive_mark.mark = Some(&lock.mark),
                 Err(std::fs::TryLockError::WouldBlock) => {
                     // The refused conversion may have dropped the shared
                     // mark; restore it before deferring so this instance
@@ -3489,11 +3531,9 @@ impl SqliteReceiptStore {
         // Return to the shared mark even when the claim failed: holding the
         // exclusive lock past this pass would block sibling opens for the
         // store's whole lifetime. The claim error outranks a downgrade error
-        // (both refuse the attach).
-        let downgrade = match &self.writer_lifetime_lock {
-            Some(lock) => lock.mark.lock_shared().map_err(ReceiptStoreError::from),
-            None => Ok(()),
-        };
+        // (both refuse the pass); a reconciler panic unwinding through the
+        // claim downgrades through the guard's drop instead.
+        let downgrade = exclusive_mark.downgrade().map_err(ReceiptStoreError::from);
         // Release the probe mutex only after the mark is shared again, so no
         // sibling's probe can ever overlap this pass's conversion gaps.
         drop(reconcile_probe);

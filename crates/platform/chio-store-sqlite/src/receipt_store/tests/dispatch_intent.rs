@@ -659,6 +659,94 @@ fn concurrent_sibling_reconciles_never_claim_each_others_live_intents(
     Ok(())
 }
 
+/// Reconciler that fails by unwinding, standing in for any implementation
+/// bug that panics while resolving an orphan.
+struct PanickingReconciler;
+
+impl chio_kernel::receipt_store::DispatchIntentReconciler for PanickingReconciler {
+    fn resolve(
+        &self,
+        _intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+    ) -> Result<
+        chio_kernel::receipt_store::DispatchIntentResolution,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        panic!("injected reconciler failure");
+    }
+}
+
+#[test]
+fn reconciler_panic_re_shares_the_writer_lifetime_mark() -> Result<(), Box<dyn std::error::Error>> {
+    // The background recovery worker catches reconciler panics and keeps
+    // the store serving, so the pass itself must restore the shared
+    // lifetime mark on the unwind path. The mark descriptor outlives the
+    // pass (it lives on the store), so a mark left exclusive would block
+    // every sibling open and defer every sibling reconcile for the rest of
+    // this process's life, with no operator-visible signal.
+    let path = unique_db_path("chio-intents-panic-downgrade");
+    {
+        let doomed = SqliteReceiptStore::open(&path)?;
+        doomed.record_dispatch_intent(&sample_intent("req-panic-orphan"))?;
+    }
+    // Strip the owner token so the orphan is claimable only under the
+    // whole-file exclusive conversion, the section whose unwind must not
+    // strand the mark.
+    let connection = rusqlite::Connection::open(&path)?;
+    connection.execute("UPDATE chio_dispatch_intents SET owner_token = NULL", [])?;
+    drop(connection);
+
+    let survivor = SqliteReceiptStore::open(&path)?;
+    let unwound = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        survivor.reconcile_dispatch_intents(&PanickingReconciler)
+    }));
+    assert!(
+        unwound.is_err(),
+        "the pass must reach the reconciler and unwind"
+    );
+
+    // A sibling's open acquires the mark shared and blocks until it can, so
+    // probe non-blockingly: a stranded mark fails fast instead of hanging.
+    let mark_path = crate::sqlite_writer_lock_path(&path).ok_or("writer mark sidecar path")?;
+    let mark = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&mark_path)?;
+    match mark.try_lock_shared() {
+        Ok(()) => {}
+        Err(std::fs::TryLockError::WouldBlock) => {
+            return Err("writer lifetime mark stranded exclusive after a reconciler panic".into());
+        }
+        Err(std::fs::TryLockError::Error(error)) => return Err(error.into()),
+    }
+    drop(mark);
+
+    // The probe mutex must be free again as well: its descriptor is a pass
+    // local, closed by the unwind.
+    let probe_path = crate::sqlite_reconcile_lock_path(&path).ok_or("probe mutex sidecar path")?;
+    let probe = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&probe_path)?;
+    match probe.try_lock() {
+        Ok(()) => {}
+        Err(std::fs::TryLockError::WouldBlock) => {
+            return Err("reconcile probe mutex still held after a reconciler panic".into());
+        }
+        Err(std::fs::TryLockError::Error(error)) => return Err(error.into()),
+    }
+    drop(probe);
+
+    // Recovery resumes on the very next pass.
+    let report = survivor.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(
+        report.dead_lettered, 1,
+        "the orphan must still surface once the panicking reconciler is replaced"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 /// Rail-aware reconciler: proves the outcome of monetary orphans against the
 /// rail and dead-letters everything else.
 struct RailProvingReconciler;
