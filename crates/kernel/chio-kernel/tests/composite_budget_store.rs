@@ -11,19 +11,25 @@ use chio_kernel::budget_store::{
     BudgetCaptureHoldRequest, BudgetCaptureInvocationRequest,
     BudgetCapturedBeforeDispatchCancellationDecision, BudgetCumulativeApprovalAccountKey,
     BudgetCumulativeApprovalAuthorizationDecision, BudgetCumulativeApprovalRequest,
-    BudgetCumulativeApprovalState, BudgetEventAuthority, BudgetHoldMutationDecision,
-    BudgetInvocationCaptureDecision, BudgetInvocationQuota, BudgetInvocationQuotaUsage,
-    BudgetInvocationState, BudgetMonetaryState, BudgetMutationKind, BudgetQuotaKey,
-    BudgetQuotaProfile, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
-    BudgetReverseHoldRequest, DeniedBudgetHold, MAX_INVOCATION_QUOTAS_PER_ADMISSION,
+    BudgetCumulativeApprovalState, BudgetEventAuthority, BudgetGuaranteeLevel,
+    BudgetHoldMutationDecision, BudgetInvocationCaptureDecision, BudgetInvocationQuota,
+    BudgetInvocationQuotaUsage, BudgetInvocationState, BudgetMonetaryState, BudgetMutationKind,
+    BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
+    BudgetReverseHoldRequest, DeniedBudgetHold, RevocationCommitMetadata,
+    MAX_INVOCATION_QUOTAS_PER_ADMISSION,
 };
 use chio_kernel::supplemental_quota::CanonicalRevocationSet;
 use chio_kernel::{BudgetStore, BudgetStoreError, InMemoryBudgetStore};
-use proptest::prelude::*;
-use proptest::test_runner::Config as ProptestConfig;
+
+#[path = "composite_budget_store/concurrency_and_properties.rs"]
+mod concurrency_and_properties;
 
 const CAPABILITY_ID: &str = "cap-composite-test";
 const GRANT_INDEX: usize = 0;
+const APPROVAL_SET_DIGEST: &str =
+    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+const DIFFERENT_APPROVAL_SET_DIGEST: &str =
+    "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
 fn quota(
     profile: BudgetQuotaProfile,
@@ -78,6 +84,7 @@ fn admission_binding(
     } else {
         Vec::new()
     };
+    let supplemental_artifact_digest = has_supplemental_quota.then(|| "a".repeat(64));
     BudgetAdmissionBinding {
         operation_id: operation_id.to_string(),
         revocation_set: CanonicalRevocationSet::canonicalize(
@@ -86,11 +93,19 @@ fn admission_binding(
                 .collect(),
         )
         .expect("build canonical revocation set"),
+        authorization_artifact_digests: supplemental_artifact_digest.iter().cloned().collect(),
+        last_observed_revocation: has_supplemental_quota.then(|| RevocationCommitMetadata {
+            authority: BudgetEventAuthority {
+                authority_id: "authority:test".to_string(),
+                lease_id: "lease:test".to_string(),
+                lease_epoch: 1,
+            },
+            guarantee_level: BudgetGuaranteeLevel::SingleNodeAtomic,
+            commit_index: 1,
+        }),
         supplemental_verifier_id: has_supplemental_quota.then(|| "verifier:test".to_string()),
-        supplemental_verifier_config_digest: has_supplemental_quota
-            .then(|| "verifier-config:test".to_string()),
-        supplemental_authorization_artifact_digest: has_supplemental_quota
-            .then(|| format!("supplemental-artifact:{operation_id}")),
+        supplemental_verifier_config_digest: has_supplemental_quota.then(|| "b".repeat(64)),
+        supplemental_authorization_artifact_digest: supplemental_artifact_digest,
         supplemental_authorization_expires_at: has_supplemental_quota.then_some(1_000),
     }
 }
@@ -121,6 +136,24 @@ fn authorize_request(
         event_id: Some(format!("event:{operation_id}:authorize")),
         authority: None,
     }
+}
+
+#[test]
+fn composite_authorization_requires_leaf_revocation_coverage() {
+    let mut request =
+        authorize_request("operation-missing-leaf-revocation", vec![grant_quota(1)], 0);
+    request
+        .admission_binding
+        .as_mut()
+        .expect("admission binding")
+        .revocation_set =
+        CanonicalRevocationSet::canonicalize(vec!["different-capability".to_string()])
+            .expect("canonical revocation set");
+
+    assert!(matches!(
+        request.validate(),
+        Err(BudgetStoreError::Invariant(_))
+    ));
 }
 
 fn cumulative_account() -> BudgetCumulativeApprovalAccountKey {
@@ -593,9 +626,10 @@ fn legacy_charge_cannot_bypass_or_redefine_structured_grant_maximum() {
             .expect("authorize structured grant quota"),
     );
 
-    assert!(!store
-        .try_charge_cost(CAPABILITY_ID, GRANT_INDEX, None, 0, None, None)
-        .expect("apply the existing structured maximum"));
+    assert!(matches!(
+        store.try_charge_cost(CAPABILITY_ID, GRANT_INDEX, None, 0, None, None),
+        Err(BudgetStoreError::Invariant(_))
+    ));
     assert!(matches!(
         store.try_charge_cost(CAPABILITY_ID, GRANT_INDEX, Some(2), 0, None, None),
         Err(BudgetStoreError::Invariant(_))
@@ -628,6 +662,200 @@ fn legacy_admission_cannot_skip_a_live_composite_quota() {
     for quota in quotas {
         assert_usage(&quota_usage(&store, &quota.key), 1, 0);
     }
+}
+
+#[test]
+fn composite_admission_cannot_omit_an_existing_grant_quota() {
+    let store = InMemoryBudgetStore::new();
+    let grant = grant_quota(2);
+    expect_authorized(
+        store
+            .authorize_budget_hold(authorize_request(
+                "grant-quota-owner",
+                vec![grant.clone()],
+                0,
+            ))
+            .expect("authorize grant quota"),
+    );
+
+    let aggregate = quota(
+        BudgetQuotaProfile::AggregateCapabilityInvocation,
+        "aggregate:grant-quota-omission",
+        2,
+    );
+    assert!(matches!(
+        store.authorize_budget_hold(authorize_request(
+            "grant-quota-omission",
+            vec![aggregate.clone()],
+            0,
+        )),
+        Err(BudgetStoreError::Invariant(_))
+    ));
+
+    assert_usage(&quota_usage(&store, &grant.key), 1, 0);
+    assert!(store
+        .get_invocation_quota_usage(&aggregate.key)
+        .expect("query omitted admission quota")
+        .is_none());
+    assert_eq!(
+        store
+            .get_usage(CAPABILITY_ID, GRANT_INDEX)
+            .expect("query grant usage")
+            .expect("grant usage")
+            .invocation_count,
+        1
+    );
+}
+
+#[test]
+fn direct_legacy_authorization_inherits_legacy_quota_and_rejects_structured_history() {
+    let legacy_store = InMemoryBudgetStore::new();
+    assert!(legacy_store
+        .try_charge_cost(CAPABILITY_ID, GRANT_INDEX, Some(2), 0, None, None)
+        .expect("define legacy quota"));
+    let mut legacy = authorize_request("legacy-quota-inheritance", Vec::new(), 0);
+    legacy.admission_binding = None;
+    expect_authorized(
+        legacy_store
+            .authorize_budget_hold(legacy)
+            .expect("inherit existing legacy grant quota"),
+    );
+    assert_usage(&quota_usage(&legacy_store, &grant_quota(2).key), 1, 1);
+
+    let structured_store = InMemoryBudgetStore::new();
+    expect_authorized(
+        structured_store
+            .authorize_budget_hold(authorize_request(
+                "structured-history-owner",
+                vec![quota(
+                    BudgetQuotaProfile::AggregateCapabilityInvocation,
+                    "aggregate:direct-legacy-bypass",
+                    2,
+                )],
+                0,
+            ))
+            .expect("authorize structured history"),
+    );
+    let mut bypass = authorize_request("direct-legacy-bypass", Vec::new(), 0);
+    bypass.admission_binding = None;
+    assert!(matches!(
+        structured_store.authorize_budget_hold(bypass),
+        Err(BudgetStoreError::Invariant(_))
+    ));
+    assert!(matches!(
+        structured_store.try_charge_cost(CAPABILITY_ID, GRANT_INDEX, None, 1, Some(0), None,),
+        Err(BudgetStoreError::Invariant(_))
+    ));
+    assert_eq!(
+        structured_store
+            .get_usage(CAPABILITY_ID, GRANT_INDEX)
+            .expect("query structured usage")
+            .expect("structured usage")
+            .invocation_count,
+        1
+    );
+}
+
+#[test]
+fn unheld_legacy_terminals_cannot_mutate_after_structured_history() {
+    let prepared_store = || {
+        let store = InMemoryBudgetStore::new();
+        assert!(store
+            .try_charge_cost(CAPABILITY_ID, GRANT_INDEX, None, 10, None, None)
+            .expect("create legacy reversible charge"));
+        expect_authorized(
+            store
+                .authorize_budget_hold(authorize_request(
+                    "structured-terminal-boundary",
+                    vec![quota(
+                        BudgetQuotaProfile::AggregateCapabilityInvocation,
+                        "aggregate:terminal-boundary",
+                        1,
+                    )],
+                    0,
+                ))
+                .expect("authorize structured boundary"),
+        );
+        store
+            .reverse_budget_hold(BudgetReverseHoldRequest {
+                capability_id: CAPABILITY_ID.to_string(),
+                grant_index: GRANT_INDEX,
+                reversed_exposure_units: 0,
+                hold_id: Some("hold:structured-terminal-boundary".to_string()),
+                event_id: Some("event:structured-terminal-boundary:reverse".to_string()),
+                expected_cumulative_approval_state: None,
+                authority: None,
+            })
+            .expect("terminalize structured hold");
+        store
+    };
+
+    assert!(matches!(
+        prepared_store().reverse_charge_cost(CAPABILITY_ID, GRANT_INDEX, 10),
+        Err(BudgetStoreError::Invariant(_))
+    ));
+    assert!(matches!(
+        prepared_store().reduce_charge_cost(CAPABILITY_ID, GRANT_INDEX, 10),
+        Err(BudgetStoreError::Invariant(_))
+    ));
+    assert!(matches!(
+        prepared_store().settle_charge_cost(CAPABILITY_ID, GRANT_INDEX, 10, 5),
+        Err(BudgetStoreError::Invariant(_))
+    ));
+}
+
+#[test]
+fn legacy_admission_cannot_bypass_denied_or_reversed_composite_history() {
+    let denied_store = InMemoryBudgetStore::new();
+    let mut denied_request = authorize_request(
+        "legacy-after-denial",
+        vec![quota(
+            BudgetQuotaProfile::AggregateCapabilityInvocation,
+            "aggregate:legacy-after-denial",
+            1,
+        )],
+        1,
+    );
+    denied_request.max_total_cost_units = Some(0);
+    expect_denied(
+        denied_store
+            .authorize_budget_hold(denied_request)
+            .expect("record denied composite authorization"),
+    );
+    assert!(matches!(
+        denied_store.try_increment(CAPABILITY_ID, GRANT_INDEX, None),
+        Err(BudgetStoreError::Invariant(_))
+    ));
+
+    let reversed_store = InMemoryBudgetStore::new();
+    expect_authorized(
+        reversed_store
+            .authorize_budget_hold(authorize_request(
+                "legacy-after-reverse",
+                vec![quota(
+                    BudgetQuotaProfile::AggregateCapabilityInvocation,
+                    "aggregate:legacy-after-reverse",
+                    1,
+                )],
+                0,
+            ))
+            .expect("authorize composite hold before reversal"),
+    );
+    reversed_store
+        .reverse_budget_hold(BudgetReverseHoldRequest {
+            capability_id: CAPABILITY_ID.to_string(),
+            grant_index: GRANT_INDEX,
+            reversed_exposure_units: 0,
+            hold_id: Some("hold:legacy-after-reverse".to_string()),
+            event_id: Some("event:legacy-after-reverse:terminal".to_string()),
+            expected_cumulative_approval_state: None,
+            authority: None,
+        })
+        .expect("reverse composite hold");
+    assert!(matches!(
+        reversed_store.try_charge_cost(CAPABILITY_ID, GRANT_INDEX, None, 0, None, None),
+        Err(BudgetStoreError::Invariant(_))
+    ));
 }
 
 #[test]
@@ -1017,6 +1245,7 @@ fn authorization_replay_fails_after_release_or_approval_attachment() {
         Err(BudgetStoreError::Invariant(_))
     ));
 
+    let store = InMemoryBudgetStore::new();
     let cumulative = cumulative_request(
         "authorization-after-approval",
         cumulative_account(),
@@ -1031,9 +1260,16 @@ fn authorization_replay_fails_after_release_or_approval_attachment() {
     );
     store
         .authorize_cumulative_approval(BudgetAuthorizeCumulativeApprovalRequest {
+            capability_id: CAPABILITY_ID.to_string(),
+            grant_index: GRANT_INDEX,
             operation_id: "authorization-after-approval".to_string(),
             hold_id: "hold:authorization-after-approval".to_string(),
-            approval_set_digest: "approval-set:authorization-after-approval".to_string(),
+            admission_binding: admission_binding(
+                "authorization-after-approval",
+                CAPABILITY_ID,
+                false,
+            ),
+            approval_set_digest: APPROVAL_SET_DIGEST.to_string(),
             event_id: "event:authorization-after-approval:approval".to_string(),
             authority: None,
         })
@@ -1378,6 +1614,18 @@ fn cumulative_threshold_boundary_requires_approval_before_capture() {
         pending.cumulative_approval.reserved_authorized_after.units,
         100
     );
+    assert_eq!(
+        store
+            .get_cumulative_approval_operation_usage("cumulative-boundary")
+            .expect("query pending cumulative operation"),
+        Some(pending.cumulative_approval.clone())
+    );
+    assert_eq!(
+        store
+            .get_cumulative_approval_operation_usage("missing-operation")
+            .expect("query missing cumulative operation"),
+        None
+    );
 
     let capture_before_approval =
         store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
@@ -1394,9 +1642,12 @@ fn cumulative_threshold_boundary_requires_approval_before_capture() {
     ));
 
     let approval_request = BudgetAuthorizeCumulativeApprovalRequest {
+        capability_id: CAPABILITY_ID.to_string(),
+        grant_index: GRANT_INDEX,
         operation_id: "cumulative-boundary".to_string(),
         hold_id: "hold:cumulative-boundary".to_string(),
-        approval_set_digest: "approval-set:cumulative-boundary".to_string(),
+        admission_binding: admission_binding("cumulative-boundary", CAPABILITY_ID, false),
+        approval_set_digest: APPROVAL_SET_DIGEST.to_string(),
         event_id: "event:cumulative-boundary:approval".to_string(),
         authority: None,
     };
@@ -1423,13 +1674,19 @@ fn cumulative_threshold_boundary_requires_approval_before_capture() {
         other => panic!("expected already-authorized replay, got {other:?}"),
     };
     assert_eq!(replayed, approved);
+    assert_eq!(
+        store
+            .get_cumulative_approval_operation_usage("cumulative-boundary")
+            .expect("query approved cumulative operation"),
+        approved.cumulative_approval.clone()
+    );
     let account_before_mismatch = store
         .get_cumulative_approval_account_usage(&account)
         .expect("query cumulative account")
         .expect("cumulative account exists");
 
     let mut mismatched_digest = approval_request.clone();
-    mismatched_digest.approval_set_digest = "approval-set:different".to_string();
+    mismatched_digest.approval_set_digest = DIFFERENT_APPROVAL_SET_DIGEST.to_string();
     assert!(matches!(
         store.authorize_cumulative_approval(mismatched_digest),
         Err(BudgetStoreError::Invariant(_))
@@ -1462,6 +1719,12 @@ fn cumulative_threshold_boundary_requires_approval_before_capture() {
             .map(|usage| usage.state),
         Some(BudgetCumulativeApprovalState::Captured)
     );
+    assert_eq!(
+        store
+            .get_cumulative_approval_operation_usage("cumulative-boundary")
+            .expect("query captured cumulative operation"),
+        captured.cumulative_approval.clone()
+    );
     assert!(matches!(
         store.authorize_cumulative_approval(approval_request),
         Err(BudgetStoreError::Invariant(_))
@@ -1474,7 +1737,7 @@ fn cumulative_threshold_boundary_requires_approval_before_capture() {
         .expect("cumulative capture event");
     assert_eq!(
         capture_event.cumulative_approval_set_digest.as_deref(),
-        Some("approval-set:cumulative-boundary")
+        Some(APPROVAL_SET_DIGEST)
     );
     let authorize_event = store
         .list_mutation_events(10, Some(CAPABILITY_ID), Some(GRANT_INDEX))
@@ -1508,9 +1771,12 @@ fn pending_approval_timeout_and_attachment_have_one_cas_winner() {
         approval_barrier.wait();
         approval_store
             .authorize_cumulative_approval(BudgetAuthorizeCumulativeApprovalRequest {
+                capability_id: CAPABILITY_ID.to_string(),
+                grant_index: GRANT_INDEX,
                 operation_id: "approval-timeout-race".to_string(),
                 hold_id: "hold:approval-timeout-race".to_string(),
-                approval_set_digest: "approval-set:approval-timeout-race".to_string(),
+                admission_binding: admission_binding("approval-timeout-race", CAPABILITY_ID, false),
+                approval_set_digest: APPROVAL_SET_DIGEST.to_string(),
                 event_id: "event:approval-timeout-race:approval".to_string(),
                 authority: None,
             })
@@ -1689,197 +1955,4 @@ fn family_siblings_share_authority_account_but_keep_effective_thresholds() {
         boundary.cumulative_approval.reserved_authorized_after.units,
         100
     );
-}
-
-#[test]
-fn real_threads_cannot_partially_reserve_overlapping_quota_sets() {
-    let store = Arc::new(InMemoryBudgetStore::new());
-    let barrier = Arc::new(Barrier::new(3));
-    let shared = quota(
-        BudgetQuotaProfile::AggregateCapabilityInvocation,
-        "aggregate:thread-shared",
-        1,
-    );
-
-    let spawn_authorization = |operation_id: &'static str, private_owner: &'static str| {
-        let store = Arc::clone(&store);
-        let barrier = Arc::clone(&barrier);
-        let shared = shared.clone();
-        thread::spawn(move || {
-            let private = quota(
-                BudgetQuotaProfile::AggregateFamilyInvocation,
-                private_owner,
-                1,
-            );
-            let request =
-                authorize_request(operation_id, canonical_quotas(vec![shared, private]), 0);
-            barrier.wait();
-            store
-                .authorize_budget_hold(request)
-                .expect("threaded composite authorization")
-        })
-    };
-
-    let left = spawn_authorization("thread-left", "family:thread-left");
-    let right = spawn_authorization("thread-right", "family:thread-right");
-    barrier.wait();
-    let decisions = [
-        left.join().expect("left thread"),
-        right.join().expect("right thread"),
-    ];
-    assert_eq!(
-        decisions
-            .iter()
-            .filter(|decision| matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)))
-            .count(),
-        1
-    );
-    assert_eq!(
-        decisions
-            .iter()
-            .filter(|decision| matches!(decision, BudgetAuthorizeHoldDecision::Denied(_)))
-            .count(),
-        1
-    );
-    assert_usage(&quota_usage(&store, &shared.key), 1, 0);
-
-    let left_key = BudgetQuotaKey {
-        profile: BudgetQuotaProfile::AggregateFamilyInvocation,
-        owner_id: "family:thread-left".to_string(),
-        grant_index: None,
-    };
-    let right_key = BudgetQuotaKey {
-        profile: BudgetQuotaProfile::AggregateFamilyInvocation,
-        owner_id: "family:thread-right".to_string(),
-        grant_index: None,
-    };
-    let private_reserved = store
-        .get_invocation_quota_usage(&left_key)
-        .expect("query left private quota")
-        .map_or(0, |usage| usage.reserved_invocations)
-        + store
-            .get_invocation_quota_usage(&right_key)
-            .expect("query right private quota")
-            .map_or(0, |usage| usage.reserved_invocations);
-    assert_eq!(private_reserved, 1);
-}
-
-#[test]
-fn real_threads_serialize_cumulative_sixty_plus_sixty() {
-    let store = Arc::new(InMemoryBudgetStore::new());
-    let barrier = Arc::new(Barrier::new(3));
-    let account = cumulative_account();
-
-    let spawn_reservation = |operation_id: &'static str| {
-        let store = Arc::clone(&store);
-        let barrier = Arc::clone(&barrier);
-        let account = account.clone();
-        thread::spawn(move || {
-            let request = cumulative_request(operation_id, account, 100, 100, 60);
-            barrier.wait();
-            store
-                .authorize_budget_hold(request)
-                .expect("threaded cumulative authorization")
-        })
-    };
-
-    let left = spawn_reservation("cumulative-thread-left");
-    let right = spawn_reservation("cumulative-thread-right");
-    barrier.wait();
-    let decisions = [
-        left.join().expect("left thread"),
-        right.join().expect("right thread"),
-    ];
-    assert_eq!(
-        decisions
-            .iter()
-            .filter(|decision| matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)))
-            .count(),
-        1
-    );
-    assert_eq!(
-        decisions
-            .iter()
-            .filter(|decision| {
-                matches!(decision, BudgetAuthorizeHoldDecision::ApprovalRequired(_))
-            })
-            .count(),
-        1
-    );
-    let reserved_after = decisions
-        .iter()
-        .filter_map(|decision| match decision {
-            BudgetAuthorizeHoldDecision::Authorized(authorized) => {
-                authorized.cumulative_approval.as_ref()
-            }
-            BudgetAuthorizeHoldDecision::ApprovalRequired(required) => {
-                Some(&required.cumulative_approval)
-            }
-            _ => None,
-        })
-        .map(|usage| usage.reserved_authorized_after.units)
-        .collect::<Vec<_>>();
-    assert!(reserved_after.contains(&60));
-    assert!(reserved_after.contains(&120));
-}
-
-proptest! {
-    #![proptest_config(ProptestConfig {
-        cases: 64,
-        failure_persistence: None,
-        ..ProptestConfig::default()
-    })]
-
-    #[test]
-    fn any_exhausted_quota_keeps_the_other_composite_members_unchanged(
-        exhausted_index in 0usize..3,
-        maximum in 1u32..5,
-    ) {
-        let store = InMemoryBudgetStore::new();
-        let quotas = three_quotas(maximum);
-        let exhausted = quotas[exhausted_index].clone();
-        let prefill_quotas = canonical_quotas(
-            quotas.iter().filter(|quota| {
-                quota.key == exhausted.key
-                    || quota.key.profile == BudgetQuotaProfile::GrantInvocation
-            }).cloned().collect()
-        );
-
-        for attempt in 0..maximum {
-            let request = authorize_request(
-                &format!("property-prefill:{exhausted_index}:{maximum}:{attempt}"),
-                prefill_quotas.clone(),
-                0,
-            );
-            prop_assert!(matches!(
-                store.authorize_budget_hold(request),
-                Ok(BudgetAuthorizeHoldDecision::Authorized(_))
-            ));
-        }
-        let denied = store
-            .authorize_budget_hold(authorize_request(
-                &format!("property-denied:{exhausted_index}:{maximum}"),
-                quotas.clone(),
-                0,
-            ))
-            .expect("evaluate property composite hold");
-        prop_assert!(matches!(denied, BudgetAuthorizeHoldDecision::Denied(_)));
-
-        for quota in &quotas {
-            let was_prefilled = prefill_quotas
-                .iter()
-                .any(|prefilled| prefilled.key == quota.key);
-            let usage = store
-                .get_invocation_quota_usage(&quota.key)
-                .expect("query property quota");
-            if was_prefilled {
-                let usage = usage.expect("prefilled quota exists");
-                prop_assert_eq!(usage.reserved_invocations, maximum);
-                prop_assert_eq!(usage.captured_invocations, 0);
-                prop_assert_eq!(usage.quota.max_invocations, maximum);
-            } else {
-                prop_assert!(usage.is_none());
-            }
-        }
-    }
 }

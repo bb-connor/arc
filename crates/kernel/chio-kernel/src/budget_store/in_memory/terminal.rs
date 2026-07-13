@@ -226,6 +226,12 @@ impl InMemoryBudgetStoreInner {
             }
             Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
         } else if !cancels_captured_before_dispatch {
+            if self.has_composite_history(capability_id, grant_index) {
+                return Err(BudgetStoreError::Invariant(
+                    "cannot reverse an unheld invocation after structured admission history"
+                        .to_string(),
+                ));
+            }
             if self.holds.values().any(|hold| {
                 hold.capability_id == capability_id
                     && hold.grant_index == grant_index
@@ -644,6 +650,12 @@ impl InMemoryBudgetStoreInner {
             }
             Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
         } else {
+            if self.has_composite_history(capability_id, grant_index) {
+                return Err(BudgetStoreError::Invariant(
+                    "cannot release unheld exposure after structured admission history"
+                        .to_string(),
+                ));
+            }
             if self.holds.values().any(|hold| {
                 hold.capability_id == capability_id
                     && hold.grant_index == grant_index
@@ -914,6 +926,12 @@ impl InMemoryBudgetStoreInner {
             }
             Self::validate_hold_authority(hold_id, hold.authority.as_ref(), authority)?;
         } else {
+            if self.has_composite_history(capability_id, grant_index) {
+                return Err(BudgetStoreError::Invariant(
+                    "cannot settle unheld exposure after structured admission history"
+                        .to_string(),
+                ));
+            }
             if self.holds.values().any(|hold| {
                 hold.capability_id == capability_id
                     && hold.grant_index == grant_index

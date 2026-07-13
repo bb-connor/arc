@@ -80,13 +80,21 @@ use chio_credentials::{
 };
 use chio_did::DidChio;
 use chio_kernel::budget_store::{
-    AuthorizedBudgetHold, BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
-    BudgetCaptureInvocationRequest, BudgetCommitMetadata, BudgetEventAuthority,
+    ApprovalRequiredBudgetHold, AuthorizedBudgetHold, BudgetAdmissionBinding,
+    BudgetAuthorizationOutcome, BudgetAuthorizeCumulativeApprovalRequest,
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
+    BudgetCancelCapturedBeforeDispatchRequest, BudgetCaptureHoldRequest,
+    BudgetCaptureInvocationRequest, BudgetCapturedBeforeDispatchCancellationDecision,
+    BudgetCommitMetadata, BudgetCumulativeApprovalAccountKey,
+    BudgetCumulativeApprovalAuthorizationDecision, BudgetCumulativeApprovalRequest,
+    BudgetCumulativeApprovalState, BudgetCumulativeApprovalUsage, BudgetEventAuthority,
     BudgetGuaranteeLevel, BudgetHoldMutationDecision, BudgetInvocationCaptureDecision,
-    BudgetInvocationState, BudgetMonetaryState, BudgetMutationKind, BudgetMutationRecord,
+    BudgetInvocationQuota, BudgetInvocationQuotaUsage, BudgetInvocationState, BudgetMonetaryState,
+    BudgetMutationKind, BudgetMutationRecord, BudgetQuotaKey, BudgetQuotaProfile,
     BudgetReconcileHoldRequest, BudgetReleaseHoldRequest, BudgetReverseHoldRequest,
-    DeniedBudgetHold,
+    DeniedBudgetHold, RevocationCommitMetadata,
 };
+use chio_kernel::supplemental_quota::CanonicalRevocationSet;
 use chio_kernel::{
     build_generic_governance_case_artifact, build_generic_governance_charter_artifact,
     build_generic_trust_activation_artifact, build_open_market_fee_schedule_artifact,
@@ -214,7 +222,8 @@ use chio_kernel::{
     UNDERWRITING_SIMULATION_REPORT_SCHEMA,
 };
 use chio_store_sqlite::{
-    SqliteBudgetStore, SqliteCapabilityAuthority, SqliteReceiptStore, SqliteRevocationStore,
+    BudgetStoreSnapshot, SqliteAuthorityStore, SqliteBudgetStore, SqliteCapabilityAuthority,
+    SqliteReceiptStore, SqliteRevocationStore,
 };
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};

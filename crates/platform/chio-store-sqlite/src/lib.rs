@@ -43,6 +43,7 @@ pub mod receipt_query;
 pub mod receipt_store;
 pub mod revocation_store;
 pub mod schema_version;
+pub mod serving_owner;
 pub mod settle_attempts;
 
 pub use chio_core::crypto::SharedCanonicalBytes;
@@ -181,7 +182,7 @@ fn sqlite_uri_filesystem_path(text: &str) -> PathBuf {
 pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use batch_approval_store::SqliteBatchApprovalStore;
-pub use budget_store::SqliteBudgetStore;
+pub use budget_store::{BudgetStoreSnapshot, SqliteBudgetStore};
 pub use encrypted_blob::{
     decrypt_blob, encrypt_blob, BlobHandle, BlobStoreError, DecryptError, EncryptError,
     EncryptedBlob, SqliteEncryptedBlobStore, TenantId, TenantKey,
@@ -194,6 +195,7 @@ pub use revocation_store::SqliteRevocationStore;
 pub use schema_version::{
     check_schema_version, stamp_schema_version, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID,
 };
+pub use serving_owner::{SqliteAuthorityStore, SqliteServingOwnerError};
 pub use settle_attempts::{SqliteSettlementOutcomeStore, SETTLE_ATTEMPTS_MIGRATION};
 
 #[cfg(test)]

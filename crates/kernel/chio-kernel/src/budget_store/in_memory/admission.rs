@@ -45,10 +45,9 @@ impl InMemoryBudgetStoreInner {
                 allowed = quota.max_invocations > 0;
             }
         }
-        if allowed && self.has_live_composite_hold(capability_id, grant_index) {
+        if self.has_composite_history(capability_id, grant_index) {
             return Err(BudgetStoreError::Invariant(
-                "legacy invocation admission cannot bypass a live composite budget hold"
-                    .to_string(),
+                "legacy invocation admission cannot bypass composite budget history".to_string(),
             ));
         }
         let invocation_quota_usages_before = quota
@@ -326,9 +325,9 @@ impl InMemoryBudgetStoreInner {
                 allowed = false;
             }
         }
-        if allowed && self.has_live_composite_hold(capability_id, grant_index) {
+        if self.has_composite_history(capability_id, grant_index) {
             return Err(BudgetStoreError::Invariant(
-                "legacy budget admission cannot bypass a live composite budget hold".to_string(),
+                "legacy budget admission cannot bypass composite budget history".to_string(),
             ));
         }
 

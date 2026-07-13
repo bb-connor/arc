@@ -76,7 +76,7 @@ enum BudgetMutationRequest {
         authority: Option<BudgetEventAuthority>,
     },
     AuthorizeComposite(Box<BudgetAuthorizeHoldRequest>),
-    AuthorizeCumulativeApproval(BudgetAuthorizeCumulativeApprovalRequest),
+    AuthorizeCumulativeApproval(Box<BudgetAuthorizeCumulativeApprovalRequest>),
     CaptureInvocation {
         capability_id: String,
         grant_index: usize,

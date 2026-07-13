@@ -108,11 +108,12 @@ fn sqlite_oversized_grant_index_fails_before_mutation() -> Result<(), Box<dyn st
 }
 
 #[test]
-fn sqlite_budget_store_rejects_composite_authorization_without_mutation(
+fn independent_plain_opens_reject_composite_authorization_without_mutation(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-composite-unsupported");
-    let store = SqliteBudgetStore::open(&path)?;
-    let error = match store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+    let path = unique_db_path("chio-budget-composite-durable");
+    let first = SqliteBudgetStore::open(&path)?;
+    let second = SqliteBudgetStore::open(&path)?;
+    let request = BudgetAuthorizeHoldRequest {
         capability_id: "cap-composite".to_string(),
         grant_index: 0,
         max_invocations: Some(1),
@@ -126,6 +127,8 @@ fn sqlite_budget_store_rejects_composite_authorization_without_mutation(
             revocation_set: chio_kernel::supplemental_quota::CanonicalRevocationSet::canonicalize(
                 vec!["cap-composite".to_string()],
             )?,
+            authorization_artifact_digests: Vec::new(),
+            last_observed_revocation: None,
             supplemental_verifier_id: None,
             supplemental_verifier_config_digest: None,
             supplemental_authorization_artifact_digest: None,
@@ -137,89 +140,17 @@ fn sqlite_budget_store_rejects_composite_authorization_without_mutation(
         hold_id: Some("hold-composite".to_string()),
         event_id: Some("hold-composite:authorize".to_string()),
         authority: None,
-    }) {
-        Ok(_) => {
-            return Err(std::io::Error::other("sqlite accepted composite authorization").into())
-        }
-        Err(error) => error,
     };
-    assert!(error
-        .to_string()
-        .contains("composite budget authorization is not supported"));
-    assert!(store.get_usage("cap-composite", 0)?.is_none());
-    assert_eq!(store.max_mutation_event_seq()?, 0);
-
-    let legacy = BudgetAuthorizeHoldRequest {
-        capability_id: "cap-composite".to_string(),
-        grant_index: 0,
-        max_invocations: Some(1),
-        invocation_quotas: Vec::new(),
-        cumulative_approval: None,
-        admission_binding: None,
-        requested_exposure_units: 10,
-        max_cost_per_invocation: Some(10),
-        max_total_cost_units: Some(10),
-        hold_id: Some("hold-legacy".to_string()),
-        event_id: Some("hold-legacy:authorize".to_string()),
-        authority: None,
-    };
-    for (hold_id, event_id) in [
-        (Some(""), Some("hold-legacy:authorize")),
-        (Some("hold-legacy"), None),
-    ] {
-        let mut invalid = legacy.clone();
-        invalid.hold_id = hold_id.map(ToOwned::to_owned);
-        invalid.event_id = event_id.map(ToOwned::to_owned);
-        assert!(invalid
-            .validate()
-            .is_err_and(|error| error.to_string().contains("non-empty identifiers")));
-        assert!(store.authorize_budget_hold(invalid).is_err());
+    for store in [&first, &second] {
+        let error = store
+            .authorize_budget_hold(request.clone())
+            .expect_err("plain sqlite open must not own structured authority");
+        assert!(error
+            .to_string()
+            .contains("require a provisioned serving owner"));
+        assert_eq!(store.max_mutation_event_seq()?, 0);
+        assert!(store.get_usage("cap-composite", 0)?.is_none());
     }
-    assert!(store.get_usage("cap-composite", 0)?.is_none());
-    assert_eq!(store.max_mutation_event_seq()?, 0);
-    assert!(matches!(
-        store.authorize_budget_hold(legacy)?,
-        BudgetAuthorizeHoldDecision::Authorized(_)
-    ));
-    for (hold_id, event_id) in [("", "hold-legacy:capture"), ("hold-legacy", "")] {
-        assert!(store
-            .capture_invocation_reservations(BudgetCaptureInvocationRequest {
-                capability_id: "cap-composite".to_string(),
-                grant_index: 0,
-                hold_id: hold_id.to_string(),
-                event_id: event_id.to_string(),
-                trusted_time: None,
-                authority: None,
-            })
-            .is_err());
-        assert!(store
-            .cancel_captured_before_dispatch(BudgetCancelCapturedBeforeDispatchRequest {
-                capability_id: "cap-composite".to_string(),
-                grant_index: 0,
-                hold_id: hold_id.to_string(),
-                event_id: event_id.to_string(),
-                authority: None,
-            })
-            .is_err());
-    }
-    let capture_error =
-        match store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
-            capability_id: "cap-composite".to_string(),
-            grant_index: 0,
-            hold_id: "hold-legacy".to_string(),
-            event_id: "hold-legacy:capture".to_string(),
-            trusted_time: Some(1),
-            authority: None,
-        }) {
-            Ok(_) => {
-                return Err(std::io::Error::other("sqlite accepted trusted capture time").into())
-            }
-            Err(error) => error,
-        };
-    assert!(capture_error
-        .to_string()
-        .contains("trusted capture time is not supported"));
-    assert_eq!(store.max_mutation_event_seq()?, 1);
 
     let _ = fs::remove_file(path);
     Ok(())
@@ -583,7 +514,13 @@ fn compensated_kernel_budget_holds_require_fresh_request_identity(
 
         let terminal_seq = store.max_mutation_event_seq()?;
         let next_event_id = format!("{hold_id}:authorize:attempt-2");
-        for retry_event_id in [event_id.as_str(), next_event_id.as_str()] {
+        for (retry_event_id, expected_error) in [
+            (event_id.as_str(), "cannot be reopened"),
+            (
+                next_event_id.as_str(),
+                "exists without the requested authorization event",
+            ),
+        ] {
             let retry = store.try_charge_cost_with_ids(
                 capability_id,
                 0,
@@ -594,10 +531,12 @@ fn compensated_kernel_budget_holds_require_fresh_request_identity(
                 Some(&hold_id),
                 Some(retry_event_id),
             );
-            assert!(retry.as_ref().is_err_and(|error| {
-                error.to_string().contains("terminal after compensation")
-                    || error.to_string().contains("cannot be reopened")
-            }));
+            assert!(
+                retry
+                    .as_ref()
+                    .is_err_and(|error| error.to_string().contains(expected_error)),
+                "unexpected retry result: {retry:?}"
+            );
             assert_eq!(store.max_mutation_event_seq()?, terminal_seq);
         }
 
@@ -654,7 +593,9 @@ fn sqlite_rich_reverse_supports_kernel_cleanup_with_durable_projection(
     assert!(store
         .reverse_budget_hold(fenced)
         .as_ref()
-        .is_err_and(|error| error.to_string().contains("state-fenced reversal")));
+        .is_err_and(|error| error
+            .to_string()
+            .contains("cumulative approval state fencing")));
     assert_eq!(store.max_mutation_event_seq()?, event_seq_before);
 
     let reversed = store.reverse_budget_hold(request.clone())?;
@@ -752,16 +693,20 @@ fn sqlite_budget_store_rejects_future_budget_schema_version(
     let path = unique_db_path("chio-budget-future-schema");
     drop(SqliteBudgetStore::open(&path)?);
     let connection = Connection::open(&path)?;
-    crate::stamp_schema_version(&connection, "budget", 3)?;
+    crate::stamp_schema_version(
+        &connection,
+        "budget",
+        BUDGET_STORE_SUPPORTED_SCHEMA_VERSION + 1,
+    )?;
     drop(connection);
 
     let error = match SqliteBudgetStore::open(&path) {
         Ok(_) => return Err(std::io::Error::other("future budget schema was accepted").into()),
         Err(error) => error,
     };
-    assert!(error
-        .to_string()
-        .contains("newer than this binary supports (2)"));
+    assert!(error.to_string().contains(&format!(
+        "newer than this binary supports ({BUDGET_STORE_SUPPORTED_SCHEMA_VERSION})"
+    )));
     let _ = fs::remove_file(path);
     Ok(())
 }
@@ -793,12 +738,11 @@ fn sqlite_budget_store_rejects_capture_schema_stamp_without_column(
 fn sqlite_budget_store_upsert_usage_keeps_newer_seq_state() {
     let path = unique_db_path("chio-budget-upsert");
     let store = SqliteBudgetStore::open(&path).unwrap();
-    store
-        .upsert_usage(&usage_record("cap-1", 0, 3, 10, 3, 300, 0))
-        .unwrap();
-    store
+    install_usage_anchor(&store, &usage_record("cap-1", 0, 3, 10, 3, 300, 0));
+    let error = store
         .upsert_usage(&usage_record("cap-1", 0, 2, 9, 2, 200, 0))
-        .unwrap();
+        .expect_err("stale usage snapshot must be rejected");
+    assert!(error.to_string().contains("anchor"));
 
     let records = store.list_usages(10, Some("cap-1")).unwrap();
     assert_eq!(records[0].invocation_count, 3);
@@ -834,9 +778,8 @@ fn sqlite_budget_store_preserves_imported_seq_across_failover_writes() {
     let path = unique_db_path("chio-budget-seq-floor");
     let store = SqliteBudgetStore::open(&path).unwrap();
 
-    store
-        .upsert_usage(&usage_record("cap-1", 0, 3, 10, 42, 0, 0))
-        .unwrap();
+    install_usage_anchor(&store, &usage_record("cap-1", 0, 3, 10, 42, 0, 0));
+    assert_eq!(store.budget_snapshot_covered_head().unwrap(), 0);
     assert!(store.try_increment("cap-1", 0, Some(5)).unwrap());
 
     let records = store.list_usages(10, Some("cap-1")).unwrap();
@@ -1364,6 +1307,22 @@ fn budget_store_capture_invocation_is_atomic_idempotent_and_persistent_sqlite(
         .ok_or_else(|| std::io::Error::other("compensated captured usage missing"))?;
     assert_eq!(usage.invocation_count, 0);
     assert_usage_totals(&usage, 0, 0);
+    let retry = reopened
+        .try_charge_cost_with_ids_and_authority(
+            "cap-capture",
+            0,
+            Some(1),
+            100,
+            Some(100),
+            Some(1000),
+            Some(hold_id),
+            Some(authorize_event_id),
+            Some(&authority),
+        )
+        .expect_err("a compensated hold must remain terminal");
+    assert!(retry.to_string().contains("cannot be reopened"));
+
+    let fresh_hold_id = "hold-cap-capture-1";
     assert!(reopened.try_charge_cost_with_ids_and_authority(
         "cap-capture",
         0,
@@ -1371,14 +1330,14 @@ fn budget_store_capture_invocation_is_atomic_idempotent_and_persistent_sqlite(
         100,
         Some(100),
         Some(1000),
-        Some(hold_id),
-        Some(authorize_event_id),
+        Some(fresh_hold_id),
+        Some("hold-cap-capture-1:authorize"),
         Some(&authority),
     )?);
     let mut connection = reopened.connection()?;
     let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
-    let hold = SqliteBudgetStore::load_hold(&transaction, hold_id)?
-        .ok_or_else(|| std::io::Error::other("reversed captured hold missing"))?;
+    let hold = SqliteBudgetStore::load_hold(&transaction, fresh_hold_id)?
+        .ok_or_else(|| std::io::Error::other("fresh replacement hold missing"))?;
     assert!(!hold.invocation_captured);
     assert_eq!(hold.disposition, HoldDisposition::Open);
     transaction.rollback()?;
@@ -1433,7 +1392,7 @@ fn budget_store_import_reconstructs_captured_before_dispatch_cancellation_sqlite
         (
             BudgetMutationKind::CancelCapturedBeforeDispatch,
             "cancellation",
-            "does not match captured cancellation exposure",
+            "counters do not follow the durable usage chain",
         ),
     ] {
         let malformed_path = unique_db_path(&format!("chio-capture-import-{suffix}-mismatch"));
@@ -1453,7 +1412,10 @@ fn budget_store_import_reconstructs_captured_before_dispatch_cancellation_sqlite
             }
             Err(error) => error,
         };
-        assert!(error.to_string().contains(expected_error));
+        assert!(
+            error.to_string().contains(expected_error),
+            "unexpected {suffix} import error: {error}"
+        );
         assert_eq!(malformed_target.max_mutation_event_seq()?, 0);
         let _ = fs::remove_file(malformed_path);
     }

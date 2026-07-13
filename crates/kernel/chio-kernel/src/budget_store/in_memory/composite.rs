@@ -1,13 +1,9 @@
 impl InMemoryBudgetStoreInner {
-    fn has_live_composite_hold(&self, capability_id: &str, grant_index: usize) -> bool {
-        self.holds.values().any(|hold| {
-            hold.capability_id == capability_id
-                && hold.grant_index == grant_index
-                && !hold.captured_cancellation_allowed
-                && matches!(
-                    hold.invocation_state,
-                    BudgetInvocationState::Authorized | BudgetInvocationState::Captured
-                )
+    fn has_composite_history(&self, capability_id: &str, grant_index: usize) -> bool {
+        self.events.iter().any(|event| {
+            event.capability_id == capability_id
+                && event.grant_index as usize == grant_index
+                && event.admission_binding.is_some()
         })
     }
 
@@ -197,14 +193,36 @@ impl InMemoryBudgetStoreInner {
         })
     }
 
+    fn get_cumulative_approval_operation_usage(
+        &self,
+        operation_id: &str,
+    ) -> Option<BudgetCumulativeApprovalUsage> {
+        self.events.iter().rev().find_map(|event| {
+            event
+                .cumulative_approval
+                .as_ref()
+                .filter(|usage| usage.operation_id == operation_id)
+                .cloned()
+        })
+    }
+
     fn authorize_composite_budget_hold(
         &mut self,
         request: &BudgetAuthorizeHoldRequest,
     ) -> Result<BudgetMutationRecord, BudgetStoreError> {
-        let quotas = request.validate_composite()?;
+        let mut quotas = request.validate_composite()?;
+        let legacy = request.admission_binding.is_none()
+            && request.invocation_quotas.is_empty()
+            && request.cumulative_approval.is_none();
         let mutation = BudgetMutationRequest::AuthorizeComposite(Box::new(request.clone()));
         if let Some(existing) = self.duplicate_mutation(request.event_id.as_deref(), &mutation)? {
             return Ok(existing.record);
+        }
+        if legacy && self.has_composite_history(&request.capability_id, request.grant_index) {
+            return Err(BudgetStoreError::Invariant(
+                "legacy budget authorization cannot bypass structured admission history"
+                    .to_string(),
+            ));
         }
         if let Some(hold_id) = request.hold_id.as_deref() {
             if let Some(existing) = self.hold_authorizations.get(hold_id) {
@@ -237,6 +255,30 @@ impl InMemoryBudgetStoreInner {
 
         let grant_index = u32::try_from(request.grant_index)
             .map_err(|_| BudgetStoreError::Invariant("grant_index does not fit u32".to_string()))?;
+        let grant_quota_key = BudgetQuotaKey::grant(&request.capability_id, grant_index);
+        if self.invocation_quotas.contains_key(&grant_quota_key)
+            && !quotas.iter().any(|quota| quota.key == grant_quota_key)
+        {
+            if legacy {
+                let maximum = self
+                    .invocation_quotas
+                    .get(&grant_quota_key)
+                    .ok_or_else(|| {
+                        BudgetStoreError::Invariant(
+                            "existing grant quota disappeared during authorization".to_string(),
+                        )
+                    })?
+                    .max_invocations;
+                quotas.push(BudgetInvocationQuota {
+                    key: grant_quota_key,
+                    max_invocations: maximum,
+                });
+            } else {
+                return Err(BudgetStoreError::Invariant(
+                    "budget authorization omitted the existing grant quota".to_string(),
+                ));
+            }
+        }
         let primary_key = (request.capability_id.clone(), request.grant_index);
         let current = self
             .counts
@@ -606,16 +648,9 @@ impl InMemoryBudgetStoreInner {
         &mut self,
         request: &BudgetAuthorizeCumulativeApprovalRequest,
     ) -> Result<(bool, BudgetMutationRecord), BudgetStoreError> {
-        if request.operation_id.is_empty()
-            || request.hold_id.is_empty()
-            || request.approval_set_digest.is_empty()
-            || request.event_id.is_empty()
-        {
-            return Err(BudgetStoreError::Invariant(
-                "cumulative approval attachment fields must not be empty".to_string(),
-            ));
-        }
-        let mutation = BudgetMutationRequest::AuthorizeCumulativeApproval(request.clone());
+        request.validate()?;
+        let mutation =
+            BudgetMutationRequest::AuthorizeCumulativeApproval(Box::new(request.clone()));
         if let Some(existing) = self.duplicate_mutation(Some(&request.event_id), &mutation)? {
             let hold = self.holds.get(&request.hold_id).ok_or_else(|| {
                 BudgetStoreError::Invariant(format!(
@@ -623,6 +658,14 @@ impl InMemoryBudgetStoreInner {
                     request.hold_id
                 ))
             })?;
+            if hold.capability_id != request.capability_id
+                || hold.grant_index != request.grant_index
+                || hold.admission_binding.as_ref() != Some(&request.admission_binding)
+            {
+                return Err(BudgetStoreError::Invariant(
+                    "cumulative approval replay changed the durable hold identity".to_string(),
+                ));
+            }
             Self::validate_hold_authority(
                 &request.hold_id,
                 hold.authority.as_ref(),
@@ -655,6 +698,14 @@ impl InMemoryBudgetStoreInner {
                 request.hold_id
             ))
         })?;
+        if hold.capability_id != request.capability_id
+            || hold.grant_index != request.grant_index
+            || hold.admission_binding.as_ref() != Some(&request.admission_binding)
+        {
+            return Err(BudgetStoreError::Invariant(
+                "cumulative approval request changed the durable hold identity".to_string(),
+            ));
+        }
         Self::validate_hold_authority(
             &request.hold_id,
             hold.authority.as_ref(),

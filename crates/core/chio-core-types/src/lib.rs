@@ -42,6 +42,7 @@ mod schema_binding;
 pub mod session;
 pub mod signed_artifact;
 mod signer_binding;
+mod store_fence;
 
 pub use canonical::{
     canonical_json_bytes, canonical_json_bytes_from_str, canonical_json_string,
@@ -95,6 +96,7 @@ pub use signed_artifact::{
     CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA, CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA,
     CHIO_TRANSACTION_CLAIM_SET_V1_SCHEMA, KNOWN_SIGNED_ARTIFACT_SCHEMAS,
 };
+pub use store_fence::StoreMutationFence;
 
 /// Opaque agent identifier: hex-encoded Ed25519 public key or SPIFFE URI
 /// accepted; the core performs no structural validation.

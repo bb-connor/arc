@@ -162,13 +162,15 @@ impl SqliteBudgetStore {
     /// max_budget_mutation_event_seq helper but is a public head read for the
     /// status path.
     pub fn max_mutation_event_seq(&self) -> Result<u64, BudgetStoreError> {
-        let connection = self.connection()?;
-        let seq: i64 = connection.query_row(
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let seq = transaction.query_row(
             "SELECT COALESCE(MAX(event_seq), 0) FROM budget_mutation_events",
             [],
-            |row| row.get(0),
+            |row| budget_u64_from_row(row, 0, "event_seq"),
         )?;
-        Ok(seq.max(0) as u64)
+        transaction.rollback()?;
+        Ok(seq)
     }
 
     /// Highest mutation event_seq written under one origin authority, or 0 when
@@ -181,13 +183,15 @@ impl SqliteBudgetStore {
         &self,
         authority_id: &str,
     ) -> Result<u64, BudgetStoreError> {
-        let connection = self.connection()?;
-        let seq: i64 = connection.query_row(
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let seq = transaction.query_row(
             "SELECT COALESCE(MAX(event_seq), 0) FROM budget_mutation_events WHERE authority_id = ?1",
             rusqlite::params![authority_id],
-            |row| row.get(0),
+            |row| budget_u64_from_row(row, 0, "event_seq"),
         )?;
-        Ok(seq.max(0) as u64)
+        transaction.rollback()?;
+        Ok(seq)
     }
 
     /// The exact event_seq of the mutation event written under `event_id`, or
@@ -204,15 +208,25 @@ impl SqliteBudgetStore {
         &self,
         event_id: &str,
     ) -> Result<Option<u64>, BudgetStoreError> {
-        let connection = self.connection()?;
-        let seq: Option<Option<i64>> = connection
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let seq: Option<Option<i64>> = transaction
             .query_row(
                 "SELECT event_seq FROM budget_mutation_events WHERE event_id = ?1",
                 rusqlite::params![event_id],
                 |row| row.get::<_, Option<i64>>(0),
             )
             .optional()?;
-        Ok(seq.flatten().map(|value| value.max(0) as u64))
+        transaction.rollback()?;
+        seq.flatten()
+            .map(|value| {
+                u64::try_from(value).map_err(|_| {
+                    BudgetStoreError::Invariant(
+                        "budget mutation event has a negative event sequence".to_string(),
+                    )
+                })
+            })
+            .transpose()
     }
 
     pub fn mutation_event_for_event_id(
@@ -220,10 +234,82 @@ impl SqliteBudgetStore {
         event_id: &str,
     ) -> Result<Option<BudgetMutationRecord>, BudgetStoreError> {
         let mut connection = self.connection()?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
-        let event = Self::load_mutation_event(&transaction, event_id)?;
+        let transaction = self.begin_read(&mut connection)?;
+        let event = Self::load_projected_mutation_event(&transaction, event_id)?;
         transaction.rollback()?;
         Ok(event)
+    }
+
+    pub fn usage_projection_for_event_id(
+        &self,
+        event_id: &str,
+    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let event = Self::load_mutation_event(&transaction, event_id)?;
+        let Some(event) = event else {
+            transaction.rollback()?;
+            return Ok(None);
+        };
+        let Some(usage_seq) = event.usage_seq else {
+            transaction.rollback()?;
+            return Ok(None);
+        };
+        if usage_seq == 0 || usage_seq > event.event_seq {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget event `{event_id}` has an invalid usage sequence {usage_seq}"
+            )));
+        }
+        let usage = transaction
+            .query_row(
+                r#"
+                SELECT recorded_at, invocation_count_after,
+                       total_cost_exposed_after, total_cost_realized_spend_after
+                FROM budget_mutation_events
+                WHERE capability_id = ?1 AND grant_index = ?2
+                  AND event_seq = ?3 AND usage_seq = event_seq
+                "#,
+                params![
+                    &event.capability_id,
+                    i64::from(event.grant_index),
+                    budget_u64_to_sqlite(usage_seq, "usage_seq")?,
+                ],
+                |row| {
+                    Ok(BudgetUsageRecord {
+                        capability_id: event.capability_id.clone(),
+                        grant_index: event.grant_index,
+                        invocation_count: budget_u32_from_row(row, 1, "invocation_count_after")?,
+                        updated_at: row.get(0)?,
+                        seq: usage_seq,
+                        total_cost_exposed: budget_u64_from_row(
+                            row,
+                            2,
+                            "total_cost_exposed_after",
+                        )?,
+                        total_cost_realized_spend: budget_u64_from_row(
+                            row,
+                            3,
+                            "total_cost_realized_spend_after",
+                        )?,
+                    })
+                },
+            )
+            .optional()?
+            .ok_or_else(|| {
+                BudgetStoreError::Invariant(format!(
+                    "budget event `{event_id}` references missing usage sequence {usage_seq}"
+                ))
+            })?;
+        if usage.invocation_count != event.invocation_count_after
+            || usage.total_cost_exposed != event.total_cost_exposed_after
+            || usage.total_cost_realized_spend != event.total_cost_realized_spend_after
+        {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget event `{event_id}` usage projection counters changed"
+            )));
+        }
+        transaction.rollback()?;
+        Ok(Some(usage))
     }
 
     /// The quorum-witness identity of the mutation event stored under `event_id`:
@@ -239,8 +325,9 @@ impl SqliteBudgetStore {
         &self,
         event_id: &str,
     ) -> Result<Option<BudgetEventWitness>, BudgetStoreError> {
-        let connection = self.connection()?;
-        let row = connection
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let row = transaction
             .query_row(
                 "SELECT event_seq, authority_id, lease_epoch FROM budget_mutation_events WHERE event_id = ?1",
                 rusqlite::params![event_id],
@@ -252,15 +339,115 @@ impl SqliteBudgetStore {
                 },
             )
             .optional()?;
-        Ok(row.and_then(|(seq, authority_id, lease_epoch)| {
-            seq.map(|seq| {
-                (
-                    seq.max(0) as u64,
-                    authority_id,
-                    lease_epoch.map(|epoch| epoch.max(0) as u64),
+        let witness = row
+            .map(
+                |(seq, authority_id, lease_epoch)| -> Result<_, BudgetStoreError> {
+                    let Some(seq) = seq else {
+                        return Ok(None);
+                    };
+                    let seq = u64::try_from(seq).map_err(|_| {
+                        BudgetStoreError::Invariant(
+                            "budget mutation witness has a negative event sequence".to_string(),
+                        )
+                    })?;
+                    let lease_epoch = lease_epoch
+                        .map(|epoch| {
+                            u64::try_from(epoch).map_err(|_| {
+                                BudgetStoreError::Invariant(
+                                    "budget mutation witness has a negative lease epoch"
+                                        .to_string(),
+                                )
+                            })
+                        })
+                        .transpose()?;
+                    Ok(Some((seq, authority_id, lease_epoch)))
+                },
+            )
+            .transpose()?
+            .flatten();
+        transaction.rollback()?;
+        Ok(witness)
+    }
+
+    /// Record snapshot-carried abandoned event sequences.
+    pub fn record_abandoned_event_seqs(&self, seqs: &[u64]) -> Result<(), BudgetStoreError> {
+        self.require_standalone_mutation("abandoned event sequence import")?;
+        if seqs.is_empty() {
+            return Ok(());
+        }
+        let mut connection = self.connection()?;
+        let transaction = self.begin_write(&mut connection)?;
+        for &seq in seqs {
+            if seq == 0 {
+                continue;
+            }
+            transaction.execute(
+                "INSERT OR IGNORE INTO budget_abandoned_event_seqs(seq) VALUES (?1)",
+                rusqlite::params![budget_u64_to_sqlite(seq, "seq")?],
+            )?;
+        }
+        // Tombstone inserts only fill holes. Preserve the proven watermark and
+        // any snapshot-installed per-origin heads so the next scan can advance.
+        transaction.commit()?;
+        Ok(())
+    }
+
+    /// Record snapshot-carried abandoned event sequences as inclusive ranges.
+    pub fn record_abandoned_event_seq_ranges(
+        &self,
+        ranges: &[(u64, u64)],
+    ) -> Result<(), BudgetStoreError> {
+        self.require_standalone_mutation("abandoned event sequence range import")?;
+        if ranges.is_empty() {
+            return Ok(());
+        }
+        let mut connection = self.connection()?;
+        let transaction = self.begin_write(&mut connection)?;
+        Self::insert_abandoned_event_seq_ranges(&transaction, ranges)?;
+        // As above, adding covered slots cannot invalidate an acknowledged prefix.
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub(super) fn insert_abandoned_event_seq_ranges(
+        transaction: &rusqlite::Transaction<'_>,
+        ranges: &[(u64, u64)],
+    ) -> Result<(), BudgetStoreError> {
+        let mut previous_end = 0;
+        for &(start, end) in ranges {
+            if start == 0 || end < start || start <= previous_end {
+                return Err(BudgetStoreError::Invariant(
+                    "abandoned budget sequence ranges must be positive, ordered, and non-overlapping"
+                        .to_string(),
+                ));
+            }
+            let start = budget_u64_to_sqlite(start, "range_start_seq")?;
+            let end = budget_u64_to_sqlite(end, "range_end_seq")?;
+            let overlaps_event: bool = transaction.query_row(
+                "SELECT EXISTS(SELECT 1 FROM budget_mutation_events WHERE event_seq BETWEEN ?1 AND ?2)",
+                rusqlite::params![start, end],
+                |row| row.get::<_, i64>(0).map(|value| value != 0),
+            )?;
+            if overlaps_event {
+                return Err(BudgetStoreError::Invariant(format!(
+                    "abandoned budget sequence range {start}..={end} overlaps a mutation event"
+                )));
+            }
+            transaction.execute(
+                r#"
+                INSERT OR IGNORE INTO budget_abandoned_event_seqs(seq)
+                WITH RECURSIVE run(s) AS (
+                    SELECT ?1
+                    UNION ALL
+                    SELECT s + 1 FROM run WHERE s < ?2
                 )
-            })
-        }))
+                SELECT s FROM run
+                "#,
+                rusqlite::params![start, end],
+            )?;
+            previous_end = end as u64;
+        }
+        Ok(())
     }
 }
 

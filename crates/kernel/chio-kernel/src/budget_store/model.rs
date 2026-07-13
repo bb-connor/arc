@@ -1,4 +1,29 @@
 pub const MAX_INVOCATION_QUOTAS_PER_ADMISSION: usize = 8;
+pub const MAX_AUTHORIZATION_ARTIFACT_DIGESTS: usize = 8;
+
+pub(crate) fn validate_authorization_artifact_digests(
+    digests: &[String],
+    require_nonempty: bool,
+) -> Result<(), BudgetStoreError> {
+    if (require_nonempty && digests.is_empty())
+        || digests.len() > MAX_AUTHORIZATION_ARTIFACT_DIGESTS
+        || digests.iter().any(|digest| !is_sha256_digest(digest))
+        || digests.windows(2).any(|pair| pair[0] >= pair[1])
+    {
+        return Err(BudgetStoreError::Invariant(format!(
+            "authorization artifact digests must contain {} to {MAX_AUTHORIZATION_ARTIFACT_DIGESTS} sorted unique SHA-256 values",
+            usize::from(require_nonempty)
+        )));
+    }
+    Ok(())
+}
+
+fn is_sha256_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BudgetQuotaProfile {
@@ -47,7 +72,7 @@ impl BudgetQuotaKey {
         }
     }
 
-    fn validate(&self) -> Result<(), BudgetStoreError> {
+    pub fn validate(&self) -> Result<(), BudgetStoreError> {
         if self.owner_id.is_empty() {
             return Err(BudgetStoreError::Invariant(
                 "budget quota owner_id must not be empty".to_string(),
@@ -73,10 +98,76 @@ pub struct BudgetInvocationQuota {
 pub struct BudgetAdmissionBinding {
     pub operation_id: String,
     pub revocation_set: CanonicalRevocationSet,
+    pub authorization_artifact_digests: Vec<String>,
+    pub last_observed_revocation: Option<RevocationCommitMetadata>,
     pub supplemental_verifier_id: Option<String>,
     pub supplemental_verifier_config_digest: Option<String>,
     pub supplemental_authorization_artifact_digest: Option<String>,
     pub supplemental_authorization_expires_at: Option<u64>,
+}
+
+impl BudgetAdmissionBinding {
+    pub fn validate(&self) -> Result<(), BudgetStoreError> {
+        if self.operation_id.is_empty() || self.revocation_set.ids().is_empty() {
+            return Err(BudgetStoreError::Invariant(
+                "admission binding operation and revocation set must not be empty".to_string(),
+            ));
+        }
+        validate_authorization_artifact_digests(&self.authorization_artifact_digests, false)?;
+        if let Some(observation) = &self.last_observed_revocation {
+            observation.validate()?;
+        }
+        let supplemental_fields_present = [
+            self.supplemental_verifier_id.is_some(),
+            self.supplemental_verifier_config_digest.is_some(),
+            self.supplemental_authorization_artifact_digest.is_some(),
+            self.supplemental_authorization_expires_at.is_some(),
+        ];
+        let has_supplemental = supplemental_fields_present.iter().all(|present| *present);
+        if supplemental_fields_present.iter().any(|present| *present) != has_supplemental {
+            return Err(BudgetStoreError::Invariant(
+                "supplemental verifier, config, artifact, and expiry bindings must be presented together"
+                    .to_string(),
+            ));
+        }
+        if has_supplemental
+            && (self
+                .supplemental_verifier_id
+                .as_ref()
+                .is_some_and(String::is_empty)
+                || self
+                    .supplemental_verifier_config_digest
+                    .as_ref()
+                    .is_none_or(|digest| !is_sha256_digest(digest))
+                || self
+                    .supplemental_authorization_artifact_digest
+                    .as_ref()
+                    .is_none_or(|digest| !is_sha256_digest(digest))
+                || self
+                    .supplemental_authorization_expires_at
+                    .is_none_or(|expires_at| expires_at == 0)
+                || self.last_observed_revocation.is_none())
+        {
+            return Err(BudgetStoreError::Invariant(
+                "supplemental admission binding is not authority-complete".to_string(),
+            ));
+        }
+        if self
+            .supplemental_authorization_artifact_digest
+            .as_ref()
+            .is_some_and(|digest| {
+                self.authorization_artifact_digests
+                    .binary_search(digest)
+                    .is_err()
+            })
+        {
+            return Err(BudgetStoreError::Invariant(
+                "supplemental authorization artifact digest is absent from the admission artifact set"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,7 +211,7 @@ pub struct BudgetCumulativeApprovalAccountKey {
 }
 
 impl BudgetCumulativeApprovalAccountKey {
-    fn validate(&self) -> Result<(), BudgetStoreError> {
+    pub fn validate(&self) -> Result<(), BudgetStoreError> {
         if self.authority_id.is_empty()
             || self.owner_id.is_empty()
             || self.approval_budget_id.is_empty()
@@ -275,6 +366,32 @@ pub enum BudgetGuaranteeLevel {
     HaLinearizable,
     PartitionEscrowed,
     AdvisoryPosthoc,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RevocationCommitMetadata {
+    pub authority: BudgetEventAuthority,
+    pub guarantee_level: BudgetGuaranteeLevel,
+    pub commit_index: u64,
+}
+
+impl RevocationCommitMetadata {
+    pub fn validate(&self) -> Result<(), BudgetStoreError> {
+        if self.authority.authority_id.is_empty()
+            || self.authority.lease_id.is_empty()
+            || self.authority.lease_epoch == 0
+            || self.commit_index == 0
+            || !matches!(
+                self.guarantee_level,
+                BudgetGuaranteeLevel::SingleNodeAtomic | BudgetGuaranteeLevel::HaLinearizable
+            )
+        {
+            return Err(BudgetStoreError::Invariant(
+                "revocation commit metadata requires an atomic fenced authority".to_string(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl BudgetGuaranteeLevel {

@@ -484,7 +484,7 @@ pub(crate) async fn handle_operator_report(
         Ok(store) => store,
         Err(response) => return response,
     };
-    let budget_store = match open_budget_store(&state.config) {
+    let budget_store = match state.budget_store() {
         Ok(store) => store,
         Err(response) => return response,
     };

@@ -386,6 +386,15 @@ impl BudgetStore for InMemoryBudgetStore {
             .get_cumulative_approval_account_usage(key))
     }
 
+    fn get_cumulative_approval_operation_usage(
+        &self,
+        operation_id: &str,
+    ) -> Result<Option<BudgetCumulativeApprovalUsage>, BudgetStoreError> {
+        Ok(self
+            .lock_inner()?
+            .get_cumulative_approval_operation_usage(operation_id))
+    }
+
     fn list_mutation_events(
         &self,
         limit: usize,

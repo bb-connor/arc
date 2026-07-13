@@ -3,6 +3,12 @@ use super::*;
 #[derive(Clone)]
 pub(crate) struct TrustServiceState {
     pub(crate) config: TrustServiceConfig,
+    /// Present only when a trusted, already-provisioned joint budget/revocation
+    /// authority was injected. Configured database paths alone never enable the
+    /// structured authority surface.
+    pub(crate) joint_authority_store: Option<Arc<SqliteAuthorityStore>>,
+    pub(crate) budget_store: Option<Arc<SqliteBudgetStore>>,
+    pub(crate) revocation_store: Option<Arc<SqliteRevocationStore>>,
     pub(crate) enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
     pub(crate) verifier_policy_registry: Option<Arc<VerifierPolicyRegistry>>,
     pub(crate) federation_admission_rate_limiter: Arc<Mutex<FederationAdmissionRateLimiter>>,
@@ -93,10 +99,57 @@ pub(crate) struct RemoteReceiptStore {
 pub(crate) struct RemoteBudgetStore {
     pub(crate) client: TrustControlClient,
     pub(crate) cached_usage: Mutex<HashMap<(String, usize), BudgetUsageRecord>>,
-    pub(crate) captured_holds: Mutex<HashSet<(String, usize, String)>>,
 }
 
 impl TrustServiceState {
+    pub(crate) fn optional_budget_store(&self) -> Result<Option<SqliteBudgetStore>, &'static str> {
+        if let Some(authority_store) = self.joint_authority_store.as_ref() {
+            if self.cluster.is_some() {
+                return Err(
+                    "joint budget and revocation authority cannot run with the legacy cluster coordinator",
+                );
+            }
+            return Ok(Some(authority_store.budget_store()));
+        }
+        Ok(self.budget_store.as_deref().cloned())
+    }
+
+    pub(crate) fn budget_store(&self) -> Result<SqliteBudgetStore, Response> {
+        self.optional_budget_store()
+            .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error))?
+            .ok_or_else(|| {
+                plain_http_error(
+                    StatusCode::CONFLICT,
+                    "trust control service requires --budget-db",
+                )
+            })
+    }
+
+    pub(crate) fn optional_revocation_store(
+        &self,
+    ) -> Result<Option<SqliteRevocationStore>, &'static str> {
+        if let Some(authority_store) = self.joint_authority_store.as_ref() {
+            if self.cluster.is_some() {
+                return Err(
+                    "joint budget and revocation authority cannot run with the legacy cluster coordinator",
+                );
+            }
+            return Ok(Some(authority_store.revocation_store()));
+        }
+        Ok(self.revocation_store.as_deref().cloned())
+    }
+
+    pub(crate) fn revocation_store(&self) -> Result<SqliteRevocationStore, Response> {
+        self.optional_revocation_store()
+            .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error))?
+            .ok_or_else(|| {
+                plain_http_error(
+                    StatusCode::CONFLICT,
+                    "trust control service requires --revocation-db",
+                )
+            })
+    }
+
     pub(crate) fn enterprise_provider_registry(&self) -> Option<&EnterpriseProviderRegistry> {
         self.enterprise_provider_registry.as_deref()
     }

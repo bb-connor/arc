@@ -6,6 +6,8 @@
 
 use super::*;
 
+#[path = "service_types/budget_lifecycle.rs"]
+mod budget_lifecycle;
 #[path = "service_types/cluster_budget.rs"]
 mod cluster_budget;
 #[path = "service_types/config.rs"]
@@ -18,7 +20,10 @@ mod requests;
 mod responses;
 #[path = "service_types/state.rs"]
 mod state;
+#[path = "service_types/structured_budget.rs"]
+mod structured_budget;
 
+pub(crate) use self::budget_lifecycle::BudgetMutationLifecycleView;
 pub(crate) use self::cluster_budget::{
     AbandonedSeqRange, AuthoritySnapshotView, AuthorityTrustedKeyView, BudgetAuthorityMetadataView,
     BudgetAuthorizeExposureDecision, BudgetCursorView, BudgetDeltaQuery, BudgetDeltaResponse,
@@ -100,7 +105,11 @@ pub(crate) use self::paths::{
     RECEIPT_ANALYTICS_PATH, RECEIPT_QUERY_PATH, REPUTATION_COMPARE_PATH, REVOCATIONS_PATH,
     RUNTIME_ATTESTATION_APPRAISAL_IMPORT_PATH, RUNTIME_ATTESTATION_APPRAISAL_PATH,
     RUNTIME_ATTESTATION_APPRAISAL_RESULT_PATH, SCIM_USERS_PATH, SCIM_USER_PATH,
-    SETTLEMENT_RECONCILE_PATH, SETTLEMENT_REPORT_PATH, TOOL_RECEIPTS_PATH,
+    SETTLEMENT_RECONCILE_PATH, SETTLEMENT_REPORT_PATH, STRUCTURED_BUDGET_AUTHORIZE_CUMULATIVE_PATH,
+    STRUCTURED_BUDGET_AUTHORIZE_PATH, STRUCTURED_BUDGET_CANCEL_CAPTURED_PATH,
+    STRUCTURED_BUDGET_CAPTURE_INVOCATION_PATH, STRUCTURED_BUDGET_CAPTURE_SPEND_PATH,
+    STRUCTURED_BUDGET_CUMULATIVE_OPERATION_PATH, STRUCTURED_BUDGET_FENCED_REVERSE_PATH,
+    STRUCTURED_BUDGET_RECONCILE_PATH, STRUCTURED_BUDGET_RELEASE_PATH, TOOL_RECEIPTS_PATH,
     UNDERWRITING_APPEALS_PATH, UNDERWRITING_APPEAL_RESOLVE_PATH,
     UNDERWRITING_DECISIONS_REPORT_PATH, UNDERWRITING_DECISION_ISSUE_PATH,
     UNDERWRITING_DECISION_PATH, UNDERWRITING_INPUT_PATH, UNDERWRITING_SIMULATION_PATH,
@@ -149,3 +158,4 @@ pub(crate) use self::state::{
     RemoteBudgetStore, RemoteCapabilityAuthority, RemoteReceiptStore, RemoteRevocationStore,
     RevocationCursor, TrustServiceState,
 };
+pub(crate) use self::structured_budget::*;

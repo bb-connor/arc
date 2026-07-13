@@ -13,6 +13,12 @@ pub(super) struct CapturedRequest {
     body: String,
 }
 
+impl CapturedRequest {
+    pub(super) fn body(&self) -> &str {
+        &self.body
+    }
+}
+
 pub(super) struct StaticResponseServer {
     pub(super) url: String,
     captured: Arc<Mutex<Vec<CapturedRequest>>>,
@@ -186,6 +192,22 @@ pub(super) fn assert_json_post(request: &CapturedRequest, path: &str, body_fragm
         assert!(
             request.body.contains(fragment),
             "expected `{}` in body `{}`",
+            fragment,
+            request.body
+        );
+    }
+}
+
+pub(super) fn assert_json_post_omits(
+    request: &CapturedRequest,
+    path: &str,
+    body_fragments: &[&str],
+) {
+    assert_json_post(request, path, &[]);
+    for fragment in body_fragments {
+        assert!(
+            !request.body.contains(fragment),
+            "did not expect `{}` in body `{}`",
             fragment,
             request.body
         );

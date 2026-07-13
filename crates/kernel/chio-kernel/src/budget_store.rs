@@ -13,6 +13,14 @@ pub enum BudgetStoreError {
     #[error("budget arithmetic overflow: {0}")]
     Overflow(String),
 
+    #[error(
+        "budget mutation fenced: expected owner epoch {expected_epoch}, actual owner epoch {actual_epoch:?}"
+    )]
+    Fenced {
+        expected_epoch: u64,
+        actual_epoch: Option<u64>,
+    },
+
     #[error("budget state invariant violated: {0}")]
     Invariant(String),
 }
@@ -207,9 +215,15 @@ impl BudgetAuthorizeHoldRequest {
             ));
         }
         if let Some(binding) = &self.admission_binding {
-            if binding.operation_id.is_empty() || binding.revocation_set.ids().is_empty() {
+            binding.validate()?;
+            if binding
+                .revocation_set
+                .ids()
+                .binary_search(&self.capability_id)
+                .is_err()
+            {
                 return Err(BudgetStoreError::Invariant(
-                    "admission binding operation and revocation set must not be empty".to_string(),
+                    "admission revocation set must contain the leaf capability".to_string(),
                 ));
             }
             let has_supplemental = quotas.iter().any(|quota| {
@@ -305,11 +319,41 @@ pub struct BudgetCaptureInvocationRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BudgetAuthorizeCumulativeApprovalRequest {
+    pub capability_id: String,
+    pub grant_index: usize,
     pub operation_id: String,
     pub hold_id: String,
+    pub admission_binding: BudgetAdmissionBinding,
     pub approval_set_digest: String,
     pub event_id: String,
     pub authority: Option<BudgetEventAuthority>,
+}
+
+impl BudgetAuthorizeCumulativeApprovalRequest {
+    pub fn validate(&self) -> Result<(), BudgetStoreError> {
+        if self.capability_id.is_empty()
+            || self.operation_id.is_empty()
+            || self.hold_id.is_empty()
+            || !is_sha256_digest(&self.approval_set_digest)
+            || self.event_id.is_empty()
+        {
+            return Err(BudgetStoreError::Invariant(
+                "cumulative approval attachment identity must not be empty".to_string(),
+            ));
+        }
+        u32::try_from(self.grant_index).map_err(|_| {
+            BudgetStoreError::Invariant(
+                "cumulative approval grant_index does not fit u32".to_string(),
+            )
+        })?;
+        self.admission_binding.validate()?;
+        if self.admission_binding.operation_id != self.operation_id {
+            return Err(BudgetStoreError::Invariant(
+                "cumulative approval operation does not match admission binding".to_string(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -785,6 +829,15 @@ pub trait BudgetStore: Send + Sync {
         ))
     }
 
+    fn get_cumulative_approval_operation_usage(
+        &self,
+        _operation_id: &str,
+    ) -> Result<Option<BudgetCumulativeApprovalUsage>, BudgetStoreError> {
+        Err(BudgetStoreError::Invariant(
+            "cumulative approval operation usage is unavailable for this backend".to_string(),
+        ))
+    }
+
     fn list_mutation_events(
         &self,
         _limit: usize,
@@ -974,6 +1027,8 @@ mod tests {
             operation_id: operation_id.to_string(),
             revocation_set: CanonicalRevocationSet::canonicalize(vec![capability_id.to_string()])
                 .unwrap(),
+            authorization_artifact_digests: Vec::new(),
+            last_observed_revocation: None,
             supplemental_verifier_id: None,
             supplemental_verifier_config_digest: None,
             supplemental_authorization_artifact_digest: None,
@@ -1013,6 +1068,38 @@ mod tests {
 
         request.event_id = Some("event-structured-validation".to_string());
         assert_eq!(request.validate_composite().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn admission_binding_requires_canonical_artifact_digests() {
+        let mut binding = test_admission_binding("operation-artifacts", "cap-artifacts");
+        binding.authorization_artifact_digests = vec!["b".repeat(64), "a".repeat(64)];
+        assert!(matches!(
+            binding.validate(),
+            Err(BudgetStoreError::Invariant(_))
+        ));
+
+        let mut binding = test_admission_binding("operation-artifacts", "cap-artifacts");
+        binding.supplemental_authorization_artifact_digest = Some("a".repeat(64));
+        assert!(matches!(
+            binding.validate(),
+            Err(BudgetStoreError::Invariant(_))
+        ));
+
+        binding.authorization_artifact_digests = vec!["a".repeat(64)];
+        binding.supplemental_verifier_id = Some("verifier:test".to_string());
+        binding.supplemental_verifier_config_digest = Some("b".repeat(64));
+        binding.supplemental_authorization_expires_at = Some(1_000);
+        binding.last_observed_revocation = Some(RevocationCommitMetadata {
+            authority: BudgetEventAuthority {
+                authority_id: "authority-1".to_string(),
+                lease_id: "lease-1".to_string(),
+                lease_epoch: 1,
+            },
+            guarantee_level: BudgetGuaranteeLevel::SingleNodeAtomic,
+            commit_index: 1,
+        });
+        assert!(binding.validate().is_ok());
     }
 
     #[test]

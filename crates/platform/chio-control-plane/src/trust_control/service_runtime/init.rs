@@ -18,6 +18,28 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
     )?;
     let verifier_policy_registry =
         load_verifier_policy_registry(config.verifier_policies_file.as_deref(), "trust_control")?;
+    let budget_store = config
+        .budget_db_path
+        .as_deref()
+        .map(SqliteBudgetStore::open)
+        .transpose()
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to open trust-control budget store: {error}"
+            ))
+        })?
+        .map(Arc::new);
+    let revocation_store = config
+        .revocation_db_path
+        .as_deref()
+        .map(SqliteRevocationStore::open)
+        .transpose()
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to open trust-control revocation store: {error}"
+            ))
+        })?
+        .map(Arc::new);
     let cluster = build_cluster_state(&config, local_addr)?;
     // Thread the operator-configured memory budget into the admission guard so a
     // lowered `admission_key_cap` actually tightens it. Read the cap before
@@ -28,6 +50,9 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
     let cluster_progress = cluster.as_ref().map(|_| Arc::new(ClusterProgress::new()));
     let state = TrustServiceState {
         config,
+        joint_authority_store: None,
+        budget_store,
+        revocation_store,
         enterprise_provider_registry,
         verifier_policy_registry,
         federation_admission_rate_limiter,

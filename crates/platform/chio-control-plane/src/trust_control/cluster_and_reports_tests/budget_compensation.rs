@@ -22,21 +22,21 @@ fn budget_authorize_compensation_tracks_the_authorize_generation(
         hold_id: Some("hold-compensation".to_string()),
         event_id: Some("hold-compensation:authorize".to_string()),
     };
-    let authorize_request = || BudgetAuthorizeHoldRequest {
-        capability_id: payload.capability_id.clone(),
-        grant_index: payload.grant_index,
-        max_invocations: payload.max_invocations,
+    let authorize_request = |request: &TryChargeCostRequest| BudgetAuthorizeHoldRequest {
+        capability_id: request.capability_id.clone(),
+        grant_index: request.grant_index,
+        max_invocations: request.max_invocations,
         invocation_quotas: Vec::new(),
         cumulative_approval: None,
         admission_binding: None,
-        requested_exposure_units: payload.cost_units,
-        max_cost_per_invocation: payload.max_cost_per_invocation,
-        max_total_cost_units: payload.max_total_cost_units,
-        hold_id: payload.hold_id.clone(),
-        event_id: payload.event_id.clone(),
+        requested_exposure_units: request.cost_units,
+        max_cost_per_invocation: request.max_cost_per_invocation,
+        max_total_cost_units: request.max_total_cost_units,
+        hold_id: request.hold_id.clone(),
+        event_id: request.event_id.clone(),
         authority: None,
     };
-    let authorized = match store.authorize_budget_hold(authorize_request())? {
+    let authorized = match store.authorize_budget_hold(authorize_request(&payload))? {
         BudgetAuthorizeHoldDecision::Authorized(authorized) => authorized,
         decision => {
             return Err(std::io::Error::other(format!(
@@ -85,7 +85,22 @@ fn budget_authorize_compensation_tracks_the_authorize_generation(
     assert_eq!(usage_after_rollback.invocation_count, 1);
     assert_eq!(usage_after_rollback.total_cost_exposed, 40);
 
-    let retried = match store.authorize_budget_hold(authorize_request())? {
+    let replay_error = store
+        .authorize_budget_hold(authorize_request(&payload))
+        .test_unwrap_err();
+    assert!(replay_error.to_string().contains("cannot be reopened"));
+
+    let retry_payload = TryChargeCostRequest {
+        capability_id: payload.capability_id.clone(),
+        grant_index: payload.grant_index,
+        max_invocations: payload.max_invocations,
+        cost_units: payload.cost_units,
+        max_cost_per_invocation: payload.max_cost_per_invocation,
+        max_total_cost_units: payload.max_total_cost_units,
+        hold_id: Some("hold-compensation-retry".to_string()),
+        event_id: Some("hold-compensation-retry:authorize".to_string()),
+    };
+    let retried = match store.authorize_budget_hold(authorize_request(&retry_payload))? {
         BudgetAuthorizeHoldDecision::Authorized(authorized) => authorized,
         decision => {
             return Err(std::io::Error::other(format!(

@@ -141,6 +141,7 @@ fn budget_op_strategy() -> impl Strategy<Value = BudgetOp> {
 fn error_kind(error: &BudgetStoreError) -> &'static str {
     match error {
         BudgetStoreError::Overflow(_) => "overflow",
+        BudgetStoreError::Fenced { .. } => "fenced",
         BudgetStoreError::Invariant(_) => "invariant",
         BudgetStoreError::Sqlite(_) => "sqlite",
         BudgetStoreError::Io(_) => "io",

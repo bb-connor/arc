@@ -1,6 +1,9 @@
 use super::*;
 use chio_kernel::InMemoryBudgetStore;
 
+#[path = "tests/composite.rs"]
+mod composite_lifecycle;
+
 fn unique_db_path(prefix: &str) -> std::path::PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -27,6 +30,51 @@ fn usage_record(
         total_cost_exposed,
         total_cost_realized_spend,
     }
+}
+
+fn install_usage_anchor(store: &SqliteBudgetStore, record: &BudgetUsageRecord) {
+    install_usage_anchors(store, std::slice::from_ref(record));
+}
+
+fn install_usage_anchors(store: &SqliteBudgetStore, records: &[BudgetUsageRecord]) {
+    let mut connection = store.connection().unwrap();
+    let transaction = store.begin_write(&mut connection).unwrap();
+    transaction
+        .execute(
+            "INSERT OR IGNORE INTO budget_usage_anchor_migration_gate(singleton) VALUES (1)",
+            [],
+        )
+        .unwrap();
+    for record in records {
+        SqliteBudgetStore::upsert_usage_in_transaction(&transaction, record).unwrap();
+        transaction
+            .execute(
+                r#"
+                INSERT INTO budget_usage_history_anchors (
+                    capability_id, grant_index, invocation_count, updated_at, seq,
+                    total_cost_exposed, total_cost_realized_spend, anchored_schema_version
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 6)
+                "#,
+                params![
+                    &record.capability_id,
+                    i64::from(record.grant_index),
+                    i64::from(record.invocation_count),
+                    record.updated_at,
+                    budget_u64_to_sqlite(record.seq, "seq").unwrap(),
+                    budget_u64_to_sqlite(record.total_cost_exposed, "total_cost_exposed").unwrap(),
+                    budget_u64_to_sqlite(
+                        record.total_cost_realized_spend,
+                        "total_cost_realized_spend",
+                    )
+                    .unwrap(),
+                ],
+            )
+            .unwrap();
+    }
+    transaction
+        .execute("DELETE FROM budget_usage_anchor_migration_gate", [])
+        .unwrap();
+    transaction.commit().unwrap();
 }
 
 fn assert_usage_totals(record: &BudgetUsageRecord, exposed: u64, realized: u64) {
@@ -65,9 +113,7 @@ fn sqlite_budget_store_persists_across_reopen() {
 fn budget_usage_query_rejects_negative_persisted_counter() {
     let path = unique_db_path("chio-budget-negative-usage");
     let store = SqliteBudgetStore::open(&path).unwrap();
-    store
-        .upsert_usage(&usage_record("cap-negative", 0, 1, 10, 1, 0, 0))
-        .unwrap();
+    install_usage_anchor(&store, &usage_record("cap-negative", 0, 1, 10, 1, 0, 0));
     {
         let connection = store.connection().unwrap();
         connection
@@ -202,9 +248,7 @@ fn budget_store_settle_with_ids_is_idempotent_and_append_only_sqlite() {
 fn budget_store_reduce_charge_cost_allows_zero_invocation_release_sqlite() {
     let path = unique_db_path("chio-reduce-charge-zero-invocations");
     let store = SqliteBudgetStore::open(&path).unwrap();
-    store
-        .upsert_usage(&usage_record("cap-zero", 0, 0, 10, 10, 40, 0))
-        .unwrap();
+    install_usage_anchor(&store, &usage_record("cap-zero", 0, 0, 10, 10, 40, 0));
 
     store.reduce_charge_cost("cap-zero", 0, 25).unwrap();
 
@@ -456,78 +500,7 @@ fn budget_store_event_id_retry_rejects_authority_rollover_sqlite() {
 }
 
 #[test]
-fn budget_store_deleted_provisional_event_allows_retry_after_compensation_sqlite() {
-    let path = unique_db_path("chio-hold-authority-compensation");
-    let store = SqliteBudgetStore::open(&path).unwrap();
-    let hold_id = "hold-cap-lease-0";
-    let event_id = "hold-cap-lease-0:authorize";
-    let initial = authority("budget-primary", "lease-7", 7);
-    let changed = authority("budget-primary", "lease-8", 8);
-
-    assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&initial),
-        )
-        .unwrap());
-    store
-        .reverse_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            100,
-            Some(hold_id),
-            Some("hold-cap-lease-0:authorize:rollback:1"),
-            Some(&initial),
-        )
-        .unwrap();
-    store.delete_hold(hold_id).unwrap();
-    store.delete_mutation_event(event_id).unwrap();
-
-    assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-lease",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&changed),
-        )
-        .unwrap());
-
-    let usage = store.get_usage("cap-lease", 0).unwrap().unwrap();
-    assert_eq!(usage.invocation_count, 1);
-    assert_usage_totals(&usage, 100, 0);
-
-    let events = store
-        .list_mutation_events(10, Some("cap-lease"), Some(0))
-        .unwrap();
-    let event_ids = events
-        .iter()
-        .map(|record| record.event_id.as_str())
-        .collect::<Vec<_>>();
-    assert_eq!(
-        event_ids,
-        vec![
-            "hold-cap-lease-0:authorize:rollback:1",
-            "hold-cap-lease-0:authorize"
-        ]
-    );
-
-    let _ = fs::remove_file(path);
-}
-
-#[test]
-fn budget_store_rollback_artifact_allows_retry_with_new_authority_sqlite() {
+fn budget_store_compensated_identity_is_terminal_and_fresh_identity_succeeds_sqlite() {
     let path = unique_db_path("chio-hold-authority-rollback-retry");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let hold_id = "hold-cap-lease-0";
@@ -560,7 +533,7 @@ fn budget_store_rollback_artifact_allows_retry_with_new_authority_sqlite() {
         )
         .unwrap();
 
-    assert!(store
+    let error = store
         .try_charge_cost_with_ids_and_authority(
             "cap-lease",
             0,
@@ -570,6 +543,21 @@ fn budget_store_rollback_artifact_allows_retry_with_new_authority_sqlite() {
             Some(1000),
             Some(hold_id),
             Some(event_id),
+            Some(&initial),
+        )
+        .expect_err("compensated authorization identity must remain terminal");
+    assert!(error.to_string().contains("cannot be reopened"));
+
+    assert!(store
+        .try_charge_cost_with_ids_and_authority(
+            "cap-lease",
+            0,
+            Some(10),
+            100,
+            Some(200),
+            Some(1000),
+            Some("hold-cap-lease-1"),
+            Some("hold-cap-lease-1:authorize"),
             Some(&changed),
         )
         .unwrap());
@@ -581,160 +569,16 @@ fn budget_store_rollback_artifact_allows_retry_with_new_authority_sqlite() {
     let events = store
         .list_mutation_events(10, Some("cap-lease"), Some(0))
         .unwrap();
-    let authorize = events
+    let original = events
         .iter()
         .find(|record| record.event_id == event_id)
-        .expect("replacement authorize event");
-    assert_eq!(authorize.authority.as_ref(), Some(&changed));
-
-    let _ = fs::remove_file(path);
-}
-
-#[test]
-fn budget_store_retry_after_rollback_replaces_orphaned_open_hold_sqlite() {
-    let path = unique_db_path("chio-hold-rollback-orphan-retry");
-    let store = SqliteBudgetStore::open(&path).unwrap();
-    let hold_id = "hold-cap-orphan-0";
-    let event_id = "hold-cap-orphan-0:authorize";
-    let rollback_event_id = "hold-cap-orphan-0:authorize:rollback:5";
-    let initial = authority("budget-primary", "lease-7", 7);
-    let changed = authority("budget-primary", "lease-8", 8);
-
-    for _ in 0..3 {
-        assert!(store
-            .try_increment_with_event_id("cap-orphan", 0, Some(10), None)
-            .unwrap());
-    }
-    assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-orphan",
-            0,
-            Some(10),
-            75,
-            Some(100),
-            Some(400),
-            Some(hold_id),
-            Some(event_id),
-            Some(&initial),
-        )
-        .unwrap());
-    store
-        .reverse_charge_cost_with_ids_and_authority(
-            "cap-orphan",
-            0,
-            75,
-            Some(hold_id),
-            Some(rollback_event_id),
-            Some(&initial),
-        )
-        .unwrap();
-
-    {
-        let mut connection = store.connection().unwrap();
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .unwrap();
-        transaction
-            .execute(
-                "DELETE FROM budget_mutation_events WHERE event_id = ?1",
-                params![event_id],
-            )
-            .unwrap();
-        SqliteBudgetStore::upsert_hold(
-            &transaction,
-            hold_id,
-            "cap-orphan",
-            0,
-            75,
-            75,
-            false,
-            HoldDisposition::Open,
-            Some(&initial),
-        )
-        .unwrap();
-        transaction.commit().unwrap();
-    }
-
-    assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-orphan",
-            0,
-            Some(10),
-            75,
-            Some(100),
-            Some(400),
-            Some(hold_id),
-            Some(event_id),
-            Some(&changed),
-        )
-        .unwrap());
-
-    let usage = store.get_usage("cap-orphan", 0).unwrap().unwrap();
-    assert_eq!(usage.invocation_count, 4);
-    assert_usage_totals(&usage, 75, 0);
-
-    let events = store
-        .list_mutation_events(20, Some("cap-orphan"), Some(0))
-        .unwrap();
-    let rollback = events
+        .expect("original authorize event");
+    assert_eq!(original.authority.as_ref(), Some(&initial));
+    let fresh = events
         .iter()
-        .find(|record| record.event_id == rollback_event_id)
-        .expect("rollback event");
-    let retry = events
-        .iter()
-        .find(|record| record.event_id == event_id)
-        .expect("retry authorize event");
-    assert!(retry.event_seq > rollback.event_seq);
-    assert_eq!(retry.authority.as_ref(), Some(&changed));
-
-    {
-        let mut connection = store.connection().unwrap();
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .unwrap();
-        let hold = SqliteBudgetStore::load_hold(&transaction, hold_id)
-            .unwrap()
-            .expect("retry open hold");
-        assert_eq!(hold.remaining_exposure_units, 75);
-        assert_eq!(hold.disposition, HoldDisposition::Open);
-    }
-
-    {
-        let mut connection = store.connection().unwrap();
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .unwrap();
-        transaction
-            .execute(
-                "DELETE FROM budget_mutation_events WHERE event_id = ?1",
-                params![event_id],
-            )
-            .unwrap();
-        transaction.commit().unwrap();
-    }
-
-    assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-orphan",
-            0,
-            Some(10),
-            75,
-            Some(100),
-            Some(400),
-            Some(hold_id),
-            Some(event_id),
-            Some(&changed),
-        )
-        .unwrap());
-    let events = store
-        .list_mutation_events(20, Some("cap-orphan"), Some(0))
-        .unwrap();
-    let replayed_retry = events
-        .iter()
-        .find(|record| record.event_id == event_id)
-        .expect("replayed retry authorize event");
-    assert_eq!(replayed_retry.allowed, Some(true));
-    assert_eq!(replayed_retry.usage_seq, Some(usage.seq));
+        .find(|record| record.event_id == "hold-cap-lease-1:authorize")
+        .expect("fresh authorize event");
+    assert_eq!(fresh.authority.as_ref(), Some(&changed));
 
     let _ = fs::remove_file(path);
 }
@@ -846,13 +690,440 @@ fn import_snapshot_records_replay_is_idempotent_when_peer_cursor_is_lost_sqlite(
         replicated_events[0].event_id,
         "hold-import-replay-0:authorize"
     );
+    drop(target);
+    let reopened = SqliteBudgetStore::open(&target_path).expect("reopen imported snapshot");
+    assert_eq!(
+        reopened
+            .get_usage("cap-import-replay", 0)
+            .expect("reopened usage")
+            .expect("reopened usage row")
+            .invocation_count,
+        1
+    );
 
     let _ = fs::remove_file(source_path);
     let _ = fs::remove_file(target_path);
 }
 
 #[test]
-fn import_snapshot_records_duplicate_event_ignores_peer_transport_fields_sqlite() {
+fn caller_provided_snapshot_anchor_cannot_create_usage_or_coverage() {
+    let path = unique_db_path("chio-budget-explicit-anchor-only");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let usage = usage_record("cap-anchor-only", 0, 7, 1_717_171_717, 42, 550, 375);
+
+    let error = store
+        .upsert_usage(&usage)
+        .expect_err("public usage upsert must not invent durable history");
+    assert!(error.to_string().contains("explicit history anchor"));
+    let error = store
+        .import_snapshot_records(std::slice::from_ref(&usage), &[])
+        .expect_err("the compatibility snapshot path must not invent durable history");
+    assert!(error.to_string().contains("explicit history anchor"));
+    assert!(store.get_usage("cap-anchor-only", 0).unwrap().is_none());
+    assert!(store.list_usage_history_anchors().unwrap().is_empty());
+    assert_eq!(store.budget_snapshot_covered_head().unwrap(), 0);
+
+    let error = store
+        .import_snapshot_records_with_anchors(
+            std::slice::from_ref(&usage),
+            &[],
+            std::slice::from_ref(&usage),
+            &[],
+            42,
+        )
+        .expect_err("a caller-provided anchor must not create migration provenance");
+    assert!(error
+        .to_string()
+        .contains("no identical locally migration-anchored state"));
+    assert!(store.get_usage("cap-anchor-only", 0).unwrap().is_none());
+    assert!(store.list_usage_history_anchors().unwrap().is_empty());
+    assert_eq!(store.budget_snapshot_covered_head().unwrap(), 0);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn identical_local_migration_anchor_is_idempotent_but_does_not_prove_coverage() {
+    let path = unique_db_path("chio-budget-local-migration-anchor");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let usage = usage_record("cap-local-anchor", 0, 7, 1_717_171_717, 42, 550, 375);
+    install_usage_anchor(&store, &usage);
+
+    store
+        .import_snapshot_records_with_anchors(
+            std::slice::from_ref(&usage),
+            &[],
+            std::slice::from_ref(&usage),
+            &[],
+            0,
+        )
+        .unwrap();
+    assert_eq!(
+        store.get_usage("cap-local-anchor", 0).unwrap(),
+        Some(usage.clone())
+    );
+    assert_eq!(store.list_usage_history_anchors().unwrap(), vec![usage]);
+    assert_eq!(store.budget_snapshot_covered_head().unwrap(), 0);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn full_snapshot_rejects_an_unproved_claimed_head_atomically() {
+    let path = unique_db_path("chio-budget-forged-snapshot-head");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+
+    let error = store
+        .import_snapshot_records_with_anchors(
+            &[],
+            &[ack_head_event(1, "forged-head-event", "http://origin")],
+            &[],
+            &[],
+            u64::MAX,
+        )
+        .expect_err("a claimed head above the imported contiguous prefix must fail");
+    assert!(error.to_string().contains("records prove 1"));
+    assert_eq!(store.max_mutation_event_seq().unwrap(), 0);
+    assert!(store.list_all_usages().unwrap().is_empty());
+    assert!(store.list_abandoned_event_seqs().unwrap().is_empty());
+    assert_eq!(store.budget_snapshot_covered_head().unwrap(), 0);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn full_snapshot_proves_holes_only_with_atomic_abandoned_ranges() {
+    let path = unique_db_path("chio-budget-snapshot-hole-proof");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let events = [
+        ack_head_event(1, "snapshot-head-1", "http://origin"),
+        ack_head_event(3, "snapshot-head-3", "http://origin"),
+    ];
+
+    let error = store
+        .import_snapshot_records_with_anchors(&[], &events, &[], &[], 3)
+        .expect_err("a missing sequence must cap snapshot coverage");
+    assert!(error.to_string().contains("records prove 1"));
+    assert_eq!(store.max_mutation_event_seq().unwrap(), 0);
+
+    let error = store
+        .import_snapshot_records_with_anchors(&[], &events, &[], &[(1, 2)], 3)
+        .expect_err("an abandoned range must not cover a live event");
+    assert!(error.to_string().contains("overlaps a mutation event"));
+    assert_eq!(store.max_mutation_event_seq().unwrap(), 0);
+
+    store
+        .import_snapshot_records_with_anchors(&[], &events, &[], &[(2, 2)], 3)
+        .unwrap();
+    assert_eq!(store.budget_snapshot_covered_head().unwrap(), 3);
+    assert_eq!(
+        store.list_abandoned_event_seq_ranges().unwrap(),
+        vec![(2, 2)]
+    );
+    assert_eq!(
+        store
+            .budget_ack_heads()
+            .unwrap()
+            .into_iter()
+            .find(|(origin, _)| origin == "http://origin")
+            .map(|(_, head)| head),
+        Some(3)
+    );
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn full_snapshot_rejects_forged_origin_heads_atomically() {
+    let path = unique_db_path("chio-budget-forged-origin-head");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let snapshot = BudgetStoreSnapshot {
+        usages: Vec::new(),
+        usage_history_anchors: Vec::new(),
+        mutation_events: vec![ack_head_event(1, "origin-head-1", "http://origin")],
+        abandoned_seq_ranges: Vec::new(),
+        covered_head: 1,
+        origin_ack_heads: vec![("http://origin".to_string(), 2)],
+    };
+
+    let error = store
+        .import_budget_snapshot(&snapshot)
+        .expect_err("an origin head above its retained event must fail");
+    assert!(error
+        .to_string()
+        .contains("origin acknowledgement heads are not proved"));
+    assert_eq!(store.max_mutation_event_seq().unwrap(), 0);
+    assert!(store.list_all_usages().unwrap().is_empty());
+    assert!(store.budget_ack_heads().unwrap().is_empty());
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn full_snapshot_rejects_local_history_missing_from_payload_atomically() {
+    let path = unique_db_path("chio-budget-snapshot-local-history");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let retained = [
+        ack_head_event(1, "retained-event-1", "http://origin"),
+        ack_head_event(3, "local-only-event-3", "http://origin"),
+    ];
+    store.import_snapshot_records(&[], &retained).unwrap();
+    let before = store.export_budget_snapshot().unwrap();
+    let incoming = BudgetStoreSnapshot {
+        usages: vec![before.usages[0].clone()],
+        usage_history_anchors: Vec::new(),
+        mutation_events: vec![retained[0].clone()],
+        abandoned_seq_ranges: Vec::new(),
+        covered_head: 1,
+        origin_ack_heads: vec![("http://origin".to_string(), 1)],
+    };
+
+    let error = store
+        .import_budget_snapshot(&incoming)
+        .expect_err("a peer snapshot must not discard unmatched local history");
+    assert!(error
+        .to_string()
+        .contains("does not retain identical local event `local-only-event-3`"));
+    assert_eq!(store.export_budget_snapshot().unwrap(), before);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn full_snapshot_proves_coverage_from_payload_without_local_rows() {
+    let path = unique_db_path("chio-budget-snapshot-isolated-proof");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let retained = [
+        ack_head_event(1, "isolated-event-1", "http://origin"),
+        ack_head_event(3, "isolated-local-event-3", "http://origin"),
+    ];
+    store.import_snapshot_records(&[], &retained).unwrap();
+    store.record_abandoned_event_seq_ranges(&[(2, 2)]).unwrap();
+    let before = store.export_budget_snapshot().unwrap();
+    let incoming = BudgetStoreSnapshot {
+        usages: vec![before.usages[0].clone()],
+        usage_history_anchors: Vec::new(),
+        mutation_events: vec![retained[0].clone()],
+        abandoned_seq_ranges: Vec::new(),
+        covered_head: 3,
+        origin_ack_heads: vec![("http://origin".to_string(), 3)],
+    };
+
+    let error = store
+        .import_budget_snapshot(&incoming)
+        .expect_err("local rows must not prove an incomplete peer payload");
+    assert!(error.to_string().contains("imported records prove 1"));
+    assert_eq!(store.export_budget_snapshot().unwrap(), before);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn full_snapshot_requires_the_exact_immutable_anchor_set() {
+    let path = unique_db_path("chio-budget-snapshot-anchor-set");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let anchor = usage_record("cap-local-anchor-extra", 0, 2, 20, 2, 10, 3);
+    install_usage_anchor(&store, &anchor);
+    let before = store.export_budget_snapshot().unwrap();
+    let incoming = BudgetStoreSnapshot {
+        usages: Vec::new(),
+        usage_history_anchors: Vec::new(),
+        mutation_events: Vec::new(),
+        abandoned_seq_ranges: Vec::new(),
+        covered_head: 0,
+        origin_ack_heads: Vec::new(),
+    };
+
+    let error = store
+        .import_budget_snapshot(&incoming)
+        .expect_err("immutable local anchors cannot be omitted from a full snapshot");
+    assert!(error
+        .to_string()
+        .contains("history anchor set differs from immutable local migration anchors"));
+    assert_eq!(store.export_budget_snapshot().unwrap(), before);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn reopen_rebuilds_forged_snapshot_proof_caches_from_genesis() {
+    let path = unique_db_path("chio-budget-forged-proof-cache");
+    {
+        let store = SqliteBudgetStore::open(&path).unwrap();
+        let connection = store.connection().unwrap();
+        connection
+            .execute(
+                "UPDATE budget_snapshot_coverage SET covered_head = 42 WHERE singleton = 1",
+                [],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "UPDATE budget_ack_head_watermark SET head_seq = 42 WHERE singleton = 1",
+                [],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO budget_origin_ack_heads(authority_id, head_seq) VALUES ('forged', 42)",
+                [],
+            )
+            .unwrap();
+    }
+
+    let reopened = SqliteBudgetStore::open(&path).unwrap();
+    assert_eq!(reopened.budget_snapshot_covered_head().unwrap(), 0);
+    assert!(reopened.budget_ack_heads().unwrap().is_empty());
+    let connection = reopened.connection().unwrap();
+    let caches: (i64, i64, i64) = connection
+        .query_row(
+            r#"
+            SELECT
+                (SELECT covered_head FROM budget_snapshot_coverage WHERE singleton = 1),
+                (SELECT head_seq FROM budget_ack_head_watermark WHERE singleton = 1),
+                (SELECT COUNT(*) FROM budget_origin_ack_heads)
+            "#,
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .unwrap();
+    assert_eq!(caches, (0, 0, 0));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn snapshot_export_keeps_every_same_sequence_usage_in_identity_order() {
+    let path = unique_db_path("chio-budget-same-seq-snapshot");
+    let store = SqliteBudgetStore::open(&path).unwrap();
+    let records = (0..1_025)
+        .map(|index| usage_record(&format!("cap-{index:04}"), 0, 1, 1_717_171_717, 42, 1, 0))
+        .collect::<Vec<_>>();
+    install_usage_anchors(&store, &records);
+
+    let snapshot = store.export_budget_snapshot().unwrap();
+    assert_eq!(snapshot.usages, records);
+    assert_eq!(snapshot.usage_history_anchors, records);
+    assert_eq!(snapshot.covered_head, 0);
+    assert!(snapshot.mutation_events.is_empty());
+    assert!(snapshot.origin_ack_heads.is_empty());
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn snapshot_export_is_consistent_while_another_connection_commits() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Barrier};
+
+    let path = unique_db_path("chio-budget-concurrent-snapshot");
+    let reader = SqliteBudgetStore::open(&path).unwrap();
+    let writer = SqliteBudgetStore::open(&path).unwrap();
+    let started = Arc::new(Barrier::new(2));
+    let done = Arc::new(AtomicBool::new(false));
+    let writer_started = Arc::clone(&started);
+    let writer_done = Arc::clone(&done);
+    let handle = std::thread::spawn(move || {
+        writer_started.wait();
+        let authority = authority("http://origin", "http://origin#term-1", 1);
+        for index in 0..64 {
+            assert!(writer
+                .try_charge_cost_with_ids_and_authority(
+                    "cap-concurrent-snapshot",
+                    0,
+                    Some(64),
+                    1,
+                    Some(1),
+                    Some(64),
+                    Some(&format!("hold-concurrent-{index}")),
+                    Some(&format!("event-concurrent-{index}")),
+                    Some(&authority),
+                )
+                .unwrap());
+        }
+        writer_done.store(true, Ordering::Release);
+    });
+    started.wait();
+
+    let mut exports = 0;
+    while exports < 8 || (!done.load(Ordering::Acquire) && exports < 512) {
+        let snapshot = reader.export_budget_snapshot().unwrap();
+        exports += 1;
+        let Some(last_event) = snapshot.mutation_events.last() else {
+            continue;
+        };
+        assert_eq!(snapshot.covered_head, last_event.event_seq);
+        assert!(snapshot
+            .mutation_events
+            .windows(2)
+            .all(|pair| pair[1].event_seq == pair[0].event_seq + 1));
+        let usage = snapshot
+            .usages
+            .iter()
+            .find(|usage| usage.capability_id == "cap-concurrent-snapshot")
+            .unwrap();
+        assert_eq!(usage.seq, last_event.event_seq);
+        assert_eq!(usage.invocation_count, last_event.invocation_count_after);
+        assert_eq!(
+            usage.total_cost_exposed,
+            last_event.total_cost_exposed_after
+        );
+        assert_eq!(
+            snapshot.origin_ack_heads,
+            vec![("http://origin".to_string(), snapshot.covered_head)]
+        );
+    }
+    handle.join().unwrap();
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn migration_anchor_does_not_bootstrap_coverage_over_later_events() {
+    let path = unique_db_path("chio-budget-anchor-plus-events");
+    let anchor = usage_record("cap-anchor", 0, 7, 1_717_171_717, 42, 550, 375);
+    let events = [
+        ack_head_event(43, "snapshot-head-43", "http://origin"),
+        ack_head_event(44, "snapshot-head-44", "http://origin"),
+    ];
+    {
+        let store = SqliteBudgetStore::open(&path).unwrap();
+        install_usage_anchor(&store, &anchor);
+        store
+            .import_snapshot_records_with_anchors(
+                std::slice::from_ref(&anchor),
+                &events,
+                std::slice::from_ref(&anchor),
+                &[],
+                0,
+            )
+            .unwrap();
+        assert_eq!(store.budget_snapshot_covered_head().unwrap(), 0);
+        assert!(store
+            .try_charge_cost_with_ids_and_authority(
+                "cap-after-snapshot",
+                0,
+                Some(2),
+                1,
+                None,
+                None,
+                None,
+                Some("snapshot-head-45"),
+                Some(&authority("http://origin", "http://origin#term-1", 1,)),
+            )
+            .unwrap());
+        assert_eq!(store.max_mutation_event_seq().unwrap(), 45);
+    }
+
+    let reopened = SqliteBudgetStore::open(&path).expect("reopen anchored snapshot");
+    assert_eq!(reopened.budget_snapshot_covered_head().unwrap(), 0);
+    assert_eq!(reopened.list_usage_history_anchors().unwrap(), vec![anchor]);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn import_snapshot_records_duplicate_event_rejects_peer_transport_sequence_injection_sqlite() {
     let source_path = unique_db_path("chio-budget-import-transport-source");
     let target_path = unique_db_path("chio-budget-import-transport-target");
     let source = SqliteBudgetStore::open(&source_path).unwrap();
@@ -885,9 +1156,12 @@ fn import_snapshot_records_duplicate_event_ignores_peer_transport_fields_sqlite(
     target
         .import_snapshot_records(std::slice::from_ref(&usage), &events)
         .unwrap();
-    target
+    let error = target
         .import_snapshot_records(std::slice::from_ref(&usage), &[replayed_event])
-        .unwrap();
+        .expect_err("duplicate event transport fields must be immutable");
+    assert!(error
+        .to_string()
+        .contains("reused for a different mutation"));
 
     let replicated_events = target
         .list_mutation_events(10, Some("cap-import-transport"), Some(0))
@@ -896,6 +1170,10 @@ fn import_snapshot_records_duplicate_event_ignores_peer_transport_fields_sqlite(
     assert_eq!(
         replicated_events[0].event_id,
         "hold-import-transport-0:authorize"
+    );
+    assert_eq!(
+        target.max_mutation_event_seq().unwrap(),
+        events[0].event_seq
     );
 
     let _ = fs::remove_file(source_path);
@@ -949,7 +1227,7 @@ fn import_snapshot_records_rolls_back_usage_rows_when_mutation_conflicts_sqlite(
 }
 
 #[test]
-fn budget_store_open_hold_recovers_missing_authorize_event_sqlite() {
+fn budget_store_open_hold_rejects_missing_authorize_event_sqlite() {
     let path = unique_db_path("chio-hold-authority-recover-missing-event");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let hold_id = "hold-cap-recover-0";
@@ -971,7 +1249,7 @@ fn budget_store_open_hold_recovers_missing_authorize_event_sqlite() {
         .unwrap());
     store.delete_mutation_event(event_id).unwrap();
 
-    assert!(store
+    let error = store
         .try_charge_cost_with_ids_and_authority(
             "cap-recover",
             0,
@@ -983,13 +1261,13 @@ fn budget_store_open_hold_recovers_missing_authorize_event_sqlite() {
             Some(event_id),
             Some(&authority),
         )
-        .unwrap());
+        .expect_err("an open hold without its authorization event must fail closed");
+    assert!(error.to_string().contains("authorization event"));
 
     let events = store
         .list_mutation_events(10, Some("cap-recover"), Some(0))
         .unwrap();
-    assert_eq!(events.len(), 1);
-    assert_eq!(events[0].event_id, event_id);
+    assert!(events.is_empty());
 
     let _ = fs::remove_file(path);
 }
@@ -1000,14 +1278,13 @@ fn upsert_usage_preserves_newer_split_cost_state() {
     let store = SqliteBudgetStore::open(&path).unwrap();
 
     // Higher-seq record written first
-    store
-        .upsert_usage(&usage_record("cap-1", 0, 5, 10, 10, 500, 0))
-        .unwrap();
+    install_usage_anchor(&store, &usage_record("cap-1", 0, 5, 10, 10, 500, 0));
 
     // Lower-seq record written second (stale replica)
-    store
+    let error = store
         .upsert_usage(&usage_record("cap-1", 0, 3, 12, 5, 300, 0))
-        .unwrap();
+        .expect_err("stale usage snapshot must be rejected");
+    assert!(error.to_string().contains("anchor"));
 
     let records = store.list_usages(10, Some("cap-1")).unwrap();
     assert_usage_totals(&records[0], 500, 0);
@@ -1021,12 +1298,11 @@ fn upsert_usage_does_not_resurrect_split_cost_state_from_stale_seq() {
     let path = unique_db_path("chio-budget-upsert-split");
     let store = SqliteBudgetStore::open(&path).unwrap();
 
-    store
-        .upsert_usage(&usage_record("cap-1", 0, 1, 20, 20, 0, 75))
-        .unwrap();
-    store
+    install_usage_anchor(&store, &usage_record("cap-1", 0, 1, 20, 20, 0, 75));
+    let error = store
         .upsert_usage(&usage_record("cap-1", 0, 1, 10, 10, 100, 0))
-        .unwrap();
+        .expect_err("stale split-cost snapshot must be rejected");
+    assert!(error.to_string().contains("anchor"));
 
     let records = store.list_usages(10, Some("cap-1")).unwrap();
     assert_usage_totals(&records[0], 0, 75);
@@ -1200,7 +1476,7 @@ fn budget_ack_heads_reports_contiguous_prefix_only() -> Result<(), Box<dyn std::
         event_id: format!("evt-{seq}"),
         hold_id: None,
         admission_binding: None,
-        capability_id: "cap-o".to_string(),
+        capability_id: format!("cap-o-{seq}"),
         grant_index: 0,
         kind: BudgetMutationKind::AuthorizeExposure,
         allowed: Some(true),
@@ -1265,7 +1541,7 @@ fn budget_ack_heads_caps_partial_head_at_interior_gap() -> Result<(), Box<dyn st
         event_id: format!("evt-{seq}"),
         hold_id: None,
         admission_binding: None,
-        capability_id: "cap-p".to_string(),
+        capability_id: format!("cap-p-{seq}"),
         grant_index: 0,
         kind: BudgetMutationKind::AuthorizeExposure,
         allowed: Some(true),
@@ -1335,7 +1611,7 @@ fn budget_ack_heads_stays_pinned_at_a_post_watermark_gap() -> Result<(), Box<dyn
         event_id: format!("evt-{seq}"),
         hold_id: None,
         admission_binding: None,
-        capability_id: "cap-g".to_string(),
+        capability_id: format!("cap-g-{seq}"),
         grant_index: 0,
         kind: BudgetMutationKind::AuthorizeExposure,
         allowed: Some(true),
@@ -1513,7 +1789,7 @@ fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
         event_id: format!("evt-{origin}-{seq}"),
         hold_id: None,
         admission_binding: None,
-        capability_id: "cap-m".to_string(),
+        capability_id: format!("cap-m-{seq}"),
         grant_index: 0,
         kind: BudgetMutationKind::AuthorizeExposure,
         allowed: Some(true),
@@ -1540,8 +1816,8 @@ fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
         total_cost_realized_spend_after: 0,
         authority: Some(BudgetEventAuthority {
             authority_id: origin.to_string(),
-            lease_id: format!("{origin}#term-1"),
-            lease_epoch: 1,
+            lease_id: format!("{origin}#term-{seq}"),
+            lease_epoch: seq,
         }),
     };
     let head_for = |heads: &[(String, u64)], origin: &str| {
@@ -1606,7 +1882,7 @@ fn ack_head_event(seq: u64, event_id: &str, origin: &str) -> BudgetMutationRecor
         event_id: event_id.to_string(),
         hold_id: None,
         admission_binding: None,
-        capability_id: "cap-w".to_string(),
+        capability_id: format!("cap-w-{seq}"),
         grant_index: 0,
         kind: BudgetMutationKind::AuthorizeExposure,
         allowed: Some(true),
@@ -1690,10 +1966,16 @@ fn budget_ack_head_watermark_recomputes_after_delete_caps_below_hole(
     // (the second call is a no-op advance, not a regression).
     assert_eq!(head_for(&store.budget_ack_heads()?, "http://o"), Some(3));
     assert_eq!(head_for(&store.budget_ack_heads()?, "http://o"), Some(3));
+    assert_eq!(store.budget_snapshot_covered_head()?, 3);
 
     // Delete the middle event (seq 2): the watermark reset forces re-verification
     // and the head caps at 1, NOT the stale-high 3.
     store.delete_mutation_event("e2")?;
+    assert_eq!(
+        store.budget_snapshot_covered_head()?,
+        1,
+        "snapshot coverage must not trust an allocator high-water mark past a hole"
+    );
     assert_eq!(
         head_for(&store.budget_ack_heads()?, "http://o"),
         Some(1),
@@ -1907,449 +2189,6 @@ fn abandoned_seqs_advance_the_head_but_genuine_gaps_still_cap(
 
     let _ = fs::remove_file(&path);
     Ok(())
-}
-
-#[test]
-fn rollback_retry_records_abandoned_seq_and_head_does_not_stall() {
-    // End-to-end: an authorize, its rollback, and a retry under a new lease. The
-    // retry auto-deletes the rolled-back authorize and re-appends it at a fresh seq;
-    // the freed seq is recorded abandoned so the global contiguous ack head advances
-    // to the re-appended event instead of stalling at the hole.
-    let path = unique_db_path("chio-rollback-retry-no-stall");
-    let store = SqliteBudgetStore::open(&path).unwrap();
-    let hold_id = "hold-x";
-    let event_id = "evt-x:authorize";
-    let initial = authority("budget-primary", "lease-1", 1);
-    let changed = authority("budget-primary", "lease-2", 2);
-
-    assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-x",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&initial),
-        )
-        .unwrap());
-    assert!(
-        store.list_abandoned_event_seqs().unwrap().is_empty(),
-        "no seq is abandoned before the rollback-retry"
-    );
-    store
-        .reverse_charge_cost_with_ids_and_authority(
-            "cap-x",
-            0,
-            100,
-            Some(hold_id),
-            Some("evt-x:authorize:rollback:1"),
-            Some(&initial),
-        )
-        .unwrap();
-    // Retry the SAME event_id WITHOUT a manual delete: existing_event_allowed
-    // auto-deletes the stale authorize (abandoning its seq 1) and re-appends it.
-    assert!(store
-        .try_charge_cost_with_ids_and_authority(
-            "cap-x",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&changed),
-        )
-        .unwrap());
-
-    assert_eq!(
-        store.list_abandoned_event_seqs().unwrap(),
-        vec![1],
-        "the rolled-back authorize's freed seq 1 must be recorded abandoned"
-    );
-
-    // The contiguous ack head advances to the max present event_seq (the re-
-    // appended authorize): the abandoned seq 1 is filled, so no permanent stall.
-    let max_seq = store.max_mutation_event_seq().unwrap();
-    let heads = store.budget_ack_heads().unwrap();
-    let origin_head = heads
-        .iter()
-        .find(|(origin, _)| origin == "budget-primary")
-        .map(|(_, seq)| *seq);
-    assert_eq!(
-        origin_head,
-        Some(max_seq),
-        "the ack head must advance past the abandoned seq to the re-appended event, not stall"
-    );
-
-    let _ = fs::remove_file(&path);
-}
-
-#[test]
-fn follower_replace_self_records_abandoned_seq_and_head_advances() {
-    // An ALREADY-SYNCED follower holds E@X before the leader's rollback-retry, so
-    // its pull cursor is already
-    // past X and the delta's abandoned_seqs (which are strictly ABOVE the cursor)
-    // exclude X. When it later imports the re-appended E@Y, the REPLACE path
-    // deletes its local E@X; it must self-record X abandoned in the same
-    // transaction so its contiguous ack head advances past the hole WITHOUT
-    // waiting for a snapshot. Only the specifically-superseded seq is recorded, so
-    // a genuine gap is never filled and the witness never over-counts.
-    let leader_path = unique_db_path("chio-follower-replace-leader");
-    let follower_path = unique_db_path("chio-follower-replace-follower");
-    let leader = SqliteBudgetStore::open(&leader_path).unwrap();
-    let follower = SqliteBudgetStore::open(&follower_path).unwrap();
-    let hold_id = "hold-fr";
-    let event_id = "evt-fr:authorize";
-    let initial = authority("budget-primary", "lease-1", 1);
-    let changed = authority("budget-primary", "lease-2", 2);
-
-    // Leader authorizes E (seq 1), then rolls it back (rollback marker at seq 2).
-    assert!(leader
-        .try_charge_cost_with_ids_and_authority(
-            "cap-fr",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&initial),
-        )
-        .unwrap());
-    leader
-        .reverse_charge_cost_with_ids_and_authority(
-            "cap-fr",
-            0,
-            100,
-            Some(hold_id),
-            Some("evt-fr:authorize:rollback:1"),
-            Some(&initial),
-        )
-        .unwrap();
-
-    // Follower syncs the PRE-retry state (E@1 + the rollback marker), ascending.
-    let pre_retry = leader.list_mutation_events_after_seq(100, 0).unwrap();
-    follower.import_snapshot_records(&[], &pre_retry).unwrap();
-    assert!(
-        follower.list_abandoned_event_seqs().unwrap().is_empty(),
-        "no abandoned seq before the leader's retry"
-    );
-
-    // Leader retries under the NEW lease: deletes E@1 (abandons 1), re-appends E@3.
-    assert!(leader
-        .try_charge_cost_with_ids_and_authority(
-            "cap-fr",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&changed),
-        )
-        .unwrap());
-    assert_eq!(leader.list_abandoned_event_seqs().unwrap(), vec![1]);
-
-    // Follower imports the re-appended authorize (the leader's delta). Its cursor
-    // is already past seq 1, so the delta would NOT carry seq 1 as abandoned - the
-    // REPLACE path must record it locally.
-    let reappended = leader
-        .list_mutation_events_after_seq(100, 0)
-        .unwrap()
-        .into_iter()
-        .find(|record| record.event_id == event_id)
-        .expect("the re-appended authorize event");
-    assert!(
-        reappended.event_seq > 1,
-        "re-appended at a fresh higher seq"
-    );
-    follower.import_mutation_record(&reappended).unwrap();
-
-    // The follower self-recorded the superseded seq 1 abandoned, so its head
-    // advances to the re-appended event instead of stalling at the hole.
-    assert_eq!(
-        follower.list_abandoned_event_seqs().unwrap(),
-        vec![1],
-        "the follower REPLACE path self-records the superseded seq abandoned"
-    );
-    let follower_max = follower.max_mutation_event_seq().unwrap();
-    let heads = follower.budget_ack_heads().unwrap();
-    let head = heads
-        .iter()
-        .find(|(origin, _)| origin == "budget-primary")
-        .map(|(_, seq)| *seq);
-    assert_eq!(
-        head,
-        Some(follower_max),
-        "the follower head advances past the abandoned hole with no snapshot needed"
-    );
-
-    let _ = fs::remove_file(&leader_path);
-    let _ = fs::remove_file(&follower_path);
-}
-
-#[test]
-fn follower_replace_inserts_reappended_event_and_head_reaches_new_seq() {
-    // Exercises the follower REPLACE path. An ALREADY-SYNCED follower holds the
-    // ORIGINAL authorize E@1 (its pull cursor is already past 1). When it imports
-    // the leader's re-appended E@new (same event_id, fresh higher seq), the REPLACE
-    // path deletes E@1 and tombstones seq 1, then MUST re-insert E@new so the
-    // follower actually holds the retried write and its budget_ack_heads head
-    // ADVANCES to the new seq. Without the re-insert, E@new is ABSENT and the head
-    // halts at the rollback marker (never witnessing the retried write -> quorum
-    // waits time out). This asserts the ABSOLUTE new seq (not head == max, which
-    // passes even with E@new missing because both degrade to the rollback marker
-    // together).
-    let leader_path = unique_db_path("chio-follower-replace-leader");
-    let follower_path = unique_db_path("chio-follower-replace-follower");
-    let leader = SqliteBudgetStore::open(&leader_path).unwrap();
-    let follower = SqliteBudgetStore::open(&follower_path).unwrap();
-    let hold_id = "hold-fr";
-    let event_id = "evt-fr:authorize";
-    let initial = authority("budget-primary", "lease-1", 1);
-    let changed = authority("budget-primary", "lease-2", 2);
-
-    // Leader authorizes E (seq 1), then rolls it back (rollback marker at seq 2).
-    assert!(leader
-        .try_charge_cost_with_ids_and_authority(
-            "cap-fr",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&initial),
-        )
-        .unwrap());
-    leader
-        .reverse_charge_cost_with_ids_and_authority(
-            "cap-fr",
-            0,
-            100,
-            Some(hold_id),
-            Some("evt-fr:authorize:rollback:1"),
-            Some(&initial),
-        )
-        .unwrap();
-
-    // Follower syncs the PRE-retry state (E@1 + the rollback marker), and confirms it
-    // holds the ORIGINAL authorize at seq 1 with no abandoned slot yet.
-    let pre_retry = leader.list_mutation_events_after_seq(100, 0).unwrap();
-    follower.import_snapshot_records(&[], &pre_retry).unwrap();
-    assert_eq!(
-        follower.mutation_event_seq_for_event_id(event_id).unwrap(),
-        Some(1),
-        "follower holds the ORIGINAL authorize at seq 1 pre-retry"
-    );
-    assert!(follower.list_abandoned_event_seqs().unwrap().is_empty());
-
-    // Leader retries under the NEW lease: deletes E@1 (abandons 1), re-appends E@new.
-    assert!(leader
-        .try_charge_cost_with_ids_and_authority(
-            "cap-fr",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&changed),
-        )
-        .unwrap());
-    let reappended = leader
-        .list_mutation_events_after_seq(100, 0)
-        .unwrap()
-        .into_iter()
-        .find(|record| record.event_id == event_id)
-        .expect("the re-appended authorize event");
-    let new_seq = reappended.event_seq;
-    assert!(
-        new_seq > 2,
-        "re-appended strictly above the rollback marker"
-    );
-
-    // Follower imports the re-appended authorize. The REPLACE path deletes E@1,
-    // tombstones seq 1, and re-inserts E@new.
-    follower.import_mutation_record(&reappended).unwrap();
-
-    // The re-appended event is PRESENT at its new seq (exactly one row: the
-    // unique event_seq index would reject a duplicate).
-    assert_eq!(
-        follower.mutation_event_seq_for_event_id(event_id).unwrap(),
-        Some(new_seq),
-        "the follower re-inserts the re-appended event at its fresh seq"
-    );
-    // The follower's max advances to the re-appended seq (E@new is held, not lost).
-    assert_eq!(
-        follower.max_mutation_event_seq().unwrap(),
-        new_seq,
-        "the follower's max advances to the re-appended seq"
-    );
-    // The contiguous ack head ADVANCES to the ABSOLUTE new seq, so the
-    // follower witnesses the retried write.
-    let head = follower
-        .budget_ack_heads()
-        .unwrap()
-        .into_iter()
-        .find(|(origin, _)| origin == "budget-primary")
-        .map(|(_, seq)| seq);
-    assert_eq!(
-        head,
-        Some(new_seq),
-        "the follower's ack head reaches the re-appended seq, not the rollback marker"
-    );
-    // The superseded OLD seq stays abandoned (a FILLED-but-not-live slot: it lets the
-    // head cross the hole but contributes no origin ack, so no over-count).
-    assert_eq!(
-        follower.list_abandoned_event_seqs().unwrap(),
-        vec![1],
-        "the superseded old seq stays abandoned, never a live witness"
-    );
-
-    let _ = fs::remove_file(&leader_path);
-    let _ = fs::remove_file(&follower_path);
-}
-
-#[test]
-fn same_authority_rollback_retry_reinserts_reappended_event_and_head_advances() {
-    // Exercises the SAME-AUTHORITY re-append. When the leader keeps its lease and
-    // retries a rolled-back authorize, the re-appended event is byte-identical to
-    // the original EXCEPT its fresh higher event_seq, so `same_imported_mutation`
-    // (authority/content-only, ignores event_seq) reports it a duplicate. If the
-    // importer short-circuited on that, it would never store the re-appended row, so
-    // the follower's ack head would stall at the rollback marker (seq 2) and it could
-    // not witness the retried write until a full snapshot rebuild. Gating the replace
-    // path on `record.event_seq > existing.event_seq` makes a differing seq force the
-    // replace + reinsert even when authority/content match; without it the follower
-    // still holds E@1 and its head is 2.
-    let leader_path = unique_db_path("chio-same-authority-retry-leader");
-    let follower_path = unique_db_path("chio-same-authority-retry-follower");
-    let leader = SqliteBudgetStore::open(&leader_path).unwrap();
-    let follower = SqliteBudgetStore::open(&follower_path).unwrap();
-    let hold_id = "hold-sa";
-    let event_id = "evt-sa:authorize";
-    // ONE authority reused across the original authorize AND the retry: the leader
-    // never changed leases, so the re-appended event's authority is byte-identical.
-    let leased = authority("budget-primary", "lease-1", 1);
-
-    // Leader authorizes E (seq 1), then rolls it back (rollback marker at seq 2).
-    assert!(leader
-        .try_charge_cost_with_ids_and_authority(
-            "cap-sa",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&leased),
-        )
-        .unwrap());
-    leader
-        .reverse_charge_cost_with_ids_and_authority(
-            "cap-sa",
-            0,
-            100,
-            Some(hold_id),
-            Some("evt-sa:authorize:rollback:1"),
-            Some(&leased),
-        )
-        .unwrap();
-
-    // Follower syncs the PRE-retry state (E@1 + the rollback marker) and confirms it
-    // holds the ORIGINAL authorize at seq 1 with no abandoned slot yet.
-    let pre_retry = leader.list_mutation_events_after_seq(100, 0).unwrap();
-    follower.import_snapshot_records(&[], &pre_retry).unwrap();
-    assert_eq!(
-        follower.mutation_event_seq_for_event_id(event_id).unwrap(),
-        Some(1),
-        "follower holds the ORIGINAL authorize at seq 1 pre-retry"
-    );
-    assert!(follower.list_abandoned_event_seqs().unwrap().is_empty());
-
-    // Leader retries under the SAME lease: the rollback decremented the usage
-    // counters, so this is a GENUINE re-append (not the idempotent no-op) - it
-    // deletes E@1 (abandons 1) and re-appends E@new at a fresh higher seq.
-    assert!(leader
-        .try_charge_cost_with_ids_and_authority(
-            "cap-sa",
-            0,
-            Some(10),
-            100,
-            Some(200),
-            Some(1000),
-            Some(hold_id),
-            Some(event_id),
-            Some(&leased),
-        )
-        .unwrap());
-    let reappended = leader
-        .list_mutation_events_after_seq(100, 0)
-        .unwrap()
-        .into_iter()
-        .find(|record| record.event_id == event_id)
-        .expect("the re-appended authorize event");
-    let new_seq = reappended.event_seq;
-    assert!(
-        new_seq > 2,
-        "re-appended strictly above the rollback marker (leader really re-appended, not idempotent)"
-    );
-    // Sanity: the re-appended event carries the SAME authority as the original, so
-    // `same_imported_mutation` would call it a duplicate on authority/content alone.
-    assert_eq!(
-        reappended.authority.as_ref(),
-        Some(&leased),
-        "the retry kept the original lease (same-authority re-append)"
-    );
-
-    // Follower imports the same-authority re-append.
-    follower.import_mutation_record(&reappended).unwrap();
-
-    // The re-appended event is PRESENT at its new seq (exactly one row: the
-    // unique event_seq index would reject a duplicate).
-    assert_eq!(
-        follower.mutation_event_seq_for_event_id(event_id).unwrap(),
-        Some(new_seq),
-        "the follower re-inserts the same-authority re-append at its fresh seq"
-    );
-    assert_eq!(
-        follower.max_mutation_event_seq().unwrap(),
-        new_seq,
-        "the follower's max advances to the re-appended seq"
-    );
-    // The contiguous ack head ADVANCES to the ABSOLUTE new seq (not the
-    // rollback marker), so the follower witnesses the retried write.
-    let head = follower
-        .budget_ack_heads()
-        .unwrap()
-        .into_iter()
-        .find(|(origin, _)| origin == "budget-primary")
-        .map(|(_, seq)| seq);
-    assert_eq!(
-        head,
-        Some(new_seq),
-        "the follower's ack head reaches the re-appended seq, not the rollback marker"
-    );
-    // The superseded OLD seq stays abandoned: a FILLED-but-not-live slot that lets
-    // the head cross the hole but contributes NO origin ack, so no over-count.
-    assert_eq!(
-        follower.list_abandoned_event_seqs().unwrap(),
-        vec![1],
-        "the superseded old seq stays abandoned, never a live witness"
-    );
-
-    let _ = fs::remove_file(&leader_path);
-    let _ = fs::remove_file(&follower_path);
 }
 
 #[test]

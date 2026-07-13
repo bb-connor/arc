@@ -34,6 +34,8 @@ r2d2_sqlite = "0.33.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
 rusqlite = { workspace = true }
+libc = "0.2"
+nix = { version = "0.31.2", features = ["user"] }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v7"] }
 zeroize = { workspace = true, features = ["derive"] }

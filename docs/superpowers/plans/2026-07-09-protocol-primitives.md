@@ -444,9 +444,11 @@ Commit: `feat(kernel): authorize composite invocation quotas atomically`
 
 **Files:**
 
+- Create `crates/core/chio-core-types/src/store_fence.rs` and export the
+  backend-neutral `StoreMutationFence`
 - Modify `crates/platform/chio-store-sqlite/src/budget_store/`
-- Create `crates/platform/chio-store-sqlite/src/admission_capture_authority.rs`
 - Modify `crates/platform/chio-store-sqlite/src/revocation_store.rs`
+- Create `crates/platform/chio-store-sqlite/src/serving_owner.rs`
 - Modify `crates/platform/chio-control-plane/src/trust_control/budget_handlers.rs`
 - Modify `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs`
 - Modify `crates/platform/chio-control-plane/src/trust_control/service_types.rs`
@@ -458,6 +460,29 @@ Commit: `feat(kernel): authorize composite invocation quotas atomically`
 - [ ] Store structured quota columns, not a delimiter-concatenated key.
 - [ ] Make the structured quota key itself primary or unique. Store `max_invocations` as an immutable checked column on that one row; never use `(quota_key, max_invocations)` as the uniqueness constraint because that permits multiple maxima for one key.
 - [ ] Use one `BEGIN IMMEDIATE` transaction to load, compare, reserve, and append all rows.
+- [ ] Provision a joint SQLite authority before serving it. Bind one canonical
+  database inode to one protected lock inode and store UUID, advance an exclusive
+  owner epoch and lease on every serving open, and verify that exact durable fence
+  inside every authority write transaction. Independent budget or revocation
+  opens reject a provisioned database. Offline forward migrations acquire the
+  same lock and reject a live serving owner.
+- [ ] Give every structured hold and event an immutable projection discriminator,
+  bound revocation-set digest, expected child counts, and optional-child presence
+  flags. Startup and every loader reject missing, extra, noncanonical, or
+  contradictory quota, artifact, revocation, cumulative-approval, and lifecycle
+  projections. Never infer structured enforcement from one nullable child row.
+- [ ] Persist authorization outcome plus invocation and monetary before/after
+  states for every mutation event, including legacy events. Migrate old rows from
+  their ordered hold history, preserve the fields through delta and snapshot
+  DTOs, and reject ambiguous old-peer projections rather than inventing a state.
+- [ ] Seal the joint authority against legacy business, replication, import,
+  delete, and direct-usage write paths. Only composite authorization and lifecycle
+  mutations over an existing structured hold may mutate its budget state. Legacy
+  rows remain readable and migratable but cannot become a second authority path.
+- [ ] Once a capability/grant has any durable structured authorization history,
+  including a denial or terminal reversal, reject unstructured increment, charge,
+  import, and direct-usage mutations for that identity. A terminal hold does not
+  erase the policy boundary.
 - [ ] Persist invocation and monetary substates plus every quota member so crash recovery can finish, compensate, or reconcile deterministically.
 - [ ] Persist cumulative-approval authority accounts and operation reservations
   in the same transaction. Enforce immutable budget id/epoch, root authority
@@ -467,11 +492,41 @@ Commit: `feat(kernel): authorize composite invocation quotas atomically`
 - [ ] Extend remote request and response DTOs without dropping authority metadata.
 - [ ] Let the kernel include only the installed supplemental verifier's result in the same composite request. Do not accept a caller-built broker claim, add a broker-only counter endpoint, or make the broker reserve that key a second time.
 - [ ] Expose invocation capture separately from monetary capture, release, and reconciliation through local and remote DTOs.
-- [ ] Add `AdmissionCaptureAuthority` for broker dispatch. In one commit domain it verifies the operation-bound revocation-set digest, reads latest state for the leaf, every delegation ancestor, and every supplemental id, rejects revoked or mismatched authorization, captures every invocation quota, and returns combined budget and revocation commit metadata.
-- [ ] Implement `SqliteAdmissionCaptureAuthority` only when budget and revocation tables share one database and one `BEGIN IMMEDIATE` transaction. Route every revocation write for combined-capture capabilities through it; reject configurations with a separate writer.
-- [ ] Extend the remote trust-control leader so revocation writes and combined captures use one consensus log and leader epoch. A sequential revocation read followed by budget capture is not production support.
-- [ ] Require `HaLinearizable` for a non-escrowed hard family limit. Reject `AdvisoryPosthoc`.
-- [ ] For `PartitionEscrowed`, validate that signed allocations sum to no more than the capability maximum.
+- [ ] Persist complete prior revocation-observation provenance without presenting
+  it as combined-capture proof. A commit index copied from an independent read is
+  not evidence that revocation, operation state, and budget capture were one
+  commit.
+- [ ] For a fresh joint authorization, require any presented observation to use
+  the active fence and read every admission-bound revocation member in the same
+  transaction. Revoked-first records a durable denial. Exact event replay may
+  return its historical observation under a later active epoch. This early check
+  does not replace Task 6's capture-time revocation check.
+- [ ] Keep the existing remote cluster profile `AdvisoryPosthoc`. Do not label
+  quorum acknowledgements or replicated SQLite rows `HaLinearizable`, and reject
+  them for non-escrowed hard family limits. A real HA authority requires one
+  consensus log for operation, revocation, and budget commands and lands only
+  with its conformance environment.
+- [ ] Do not expose a partial `AdmissionCaptureAuthority` or wire endpoint in this
+  task. Its first implementation lands with the durable `AdmissionOperation` in
+  Task 6, where the operation precondition and combined outcome can be stored and
+  replayed from the same authority commit.
+- [ ] Keep composite joint-authority activation out of the normal control-plane
+  constructor in this task. Injected tests prove the owner and wire contracts;
+  Task 6 owns privileged provisioning, production runtime composition, and
+  startup rejection of incompatible multi-worker or local-store deployments.
+- [ ] Route every rich hold lifecycle method through a versioned endpoint and
+  require its exact event-time lifecycle, usage, authority, quota, admission,
+  and cumulative projections when present. Versioned projections may omit the
+  admission binding only for a genuinely legacy hold with no structured quota
+  or cumulative children. Keep only the low-level compatibility methods on v1.
+  An older server must reject an unknown semantic operation before mutation
+  rather than ignore a new field or return an optional projection after applying
+  a different legacy transition.
+- [ ] Validate imported usage only as the final projection of a legal ordered
+  event chain for the same capability and grant. Reject free-standing higher-seq
+  snapshots that lower or otherwise forge invocation, exposure, or realized
+  spend counters, and reject holdless events whose usage sequence and after-state
+  do not match that chain.
 - [ ] Preserve old rows and existing grant-budget reports through migration.
 
 **Crash and restart tests:**
@@ -479,6 +534,8 @@ Commit: `feat(kernel): authorize composite invocation quotas atomically`
 - crash before transaction commit leaves no hold
 - crash after commit restores an authorized hold
 - retry after response loss returns the same decision
+- retry after owner-epoch rotation returns the original decision and commit
+  metadata while new mutations use the active fence
 - restart after invocation capture preserves exhaustion and unresolved monetary exposure
 - restart after monetary reconciliation preserves captured invocation counts
 - restart after reversal preserves capacity
@@ -487,8 +544,18 @@ Commit: `feat(kernel): authorize composite invocation quotas atomically`
 - an existing key cannot be reopened with a different maximum after restart
 - direct SQL or API insertion of a second maximum for the same quota key fails the unique-key invariant
 - imported mutation cannot regress sequence, authority epoch, or count
-- two remote clients racing for the last unit admit exactly one under HA-linearizable mode
-- revocation racing combined capture has one linearization order: revoked-first denies, captured-first consumes exactly once
+- a compensated authorization remains an append-only terminal tombstone on the
+  leader and a fresh follower; retry requires a fresh hold and event identity
+- in-bounds quota, cumulative-account, lifecycle, or trusted-capture-time SQL
+  drift is rejected at serving open before it can change admission capacity
+- two clients sharing one local serving owner and racing for the last unit admit
+  exactly one
+- concurrent provisioning creates one durable store identity and one serving
+  lock; a second serving open and every stale handle fail closed
+- projection-child deletion, discriminator loss, forged historical revocation
+  provenance, and legacy writer attempts fail before a structured mutation
+- legacy lifecycle events round-trip exactly through SQLite, delta, and snapshot
+  paths; ambiguous old-peer lifecycle fields fail closed
 
 **Gate:**
 
@@ -509,11 +576,11 @@ Commit: `feat(store-sqlite): persist composite invocation holds`
   provider API and private verified attempt-lifecycle results
 - Create `crates/core/chio-core-types/src/provider_attempt.rs` for canonical
   provider checkpoint and invocation-blob bindings
-- Create `crates/core/chio-core-types/src/store_fence.rs` and export the
-  backend-neutral `StoreMutationFence`
+- Use the backend-neutral `StoreMutationFence` established in Task 5
 - Create `crates/platform/chio-store-sqlite/src/admission_operation_store.rs`
+- Create `crates/platform/chio-store-sqlite/src/admission_capture_authority.rs`
 - Create `crates/platform/chio-store-sqlite/src/tool_outcome_store.rs`
-- Create `crates/platform/chio-store-sqlite/src/{serving_owner,provision}.rs`
+- Modify `crates/platform/chio-store-sqlite/src/serving_owner.rs`
 - Create `crates/platform/chio-store-sqlite/src/obligation_store.rs`
 - Create or extend the kernel `AdmissionCaptureAuthority` port used by combined broker capture
 - Modify admission-operation service DTOs and handlers under `crates/platform/chio-control-plane/src/trust_control/`
@@ -591,6 +658,22 @@ Commit: `feat(store-sqlite): persist composite invocation holds`
   repeat the authorize request or derive a new operation from approval
   membership.
 - [ ] Persist `CapturePending`, commit approval and nonce reservations, then perform the applicable capture. Ordinary dispatch calls `capture_invocation_reservations`; broker dispatch calls `AdmissionCaptureAuthority` with the hold, operation, canonical leaf-plus-ancestor-plus-supplemental revocation set and digest, and verified authorization-artifact digest. A capture denial compensates before dispatch while retaining replay tombstones.
+- [ ] Define `AdmissionCaptureAuthority` only over an authority that also owns the
+  relevant revocation writes and can read the durable operation row. The local
+  implementation is available only when operation, budget, and revocation tables
+  share one serving owner and one `BEGIN IMMEDIATE` transaction. Reject separate
+  writers at composition time.
+- [ ] Persist one combined-capture commit record. It binds the exact operation
+  version and `CapturePending` precondition, capability and grant, hold and event,
+  complete leaf-plus-ancestor-plus-supplemental revocation set, authorization
+  artifacts, every quota member, authority-sourced trusted time, outcome, and any
+  closed denial reason. Captured results prove the time is within authorization
+  expiry. Denials persist `allowed = false` and replay the same reason. A copied
+  pair of budget and revocation indices is not a combined commit.
+- [ ] Route revocations for combined-capture capabilities through the same
+  authority. Test both orders of the race: revoked-first denies durably, while
+  captured-first consumes every quota exactly once. Bound and validate every
+  revocation identifier before storage lookup or mutation.
 - [ ] After successful capture, persist `DispatchCommitted` and only then authorize the broker's upstream send or begin the ordinary tool-server side effect. Recovery may complete the state write after discovering a capture under `operation_id`, because code cannot send while the operation remains `CapturePending`. After `DispatchCommitted`, never resend without downstream idempotency. The enterprise broker performs no second reservation.
 - [ ] Make both exact invoke sites call one shared coordinator and immediately
   persist the content-addressed output plus `ToolOutcomeRecordV1` before

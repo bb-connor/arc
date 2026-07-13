@@ -2,6 +2,18 @@ use super::client::build_client;
 use super::errors::into_budget_store_error;
 use super::*;
 
+#[path = "budget/lifecycle.rs"]
+mod lifecycle;
+#[path = "budget/structured.rs"]
+mod structured;
+
+#[derive(Clone, Copy)]
+enum StructuredUsageSequenceRelation {
+    None,
+    ExistingProjection,
+    AdvancesAtCommit,
+}
+
 pub fn build_remote_budget_store(
     control_url: &str,
     control_token: &str,
@@ -9,7 +21,6 @@ pub fn build_remote_budget_store(
     Ok(Box::new(RemoteBudgetStore {
         client: build_client(control_url, control_token)?,
         cached_usage: Mutex::new(HashMap::new()),
-        captured_holds: Mutex::new(HashSet::new()),
     }))
 }
 
@@ -90,7 +101,50 @@ fn validate_remote_authorize_decision(
     }
 }
 
+fn required_remote_hold_event<'a>(
+    hold_id: Option<&'a str>,
+    event_id: Option<&'a str>,
+    transition: &str,
+) -> Result<(&'a str, &'a str), BudgetStoreError> {
+    match (hold_id, event_id) {
+        (Some(hold_id), Some(event_id)) if !hold_id.is_empty() && !event_id.is_empty() => {
+            Ok((hold_id, event_id))
+        }
+        _ => Err(BudgetStoreError::Invariant(format!(
+            "structured remote budget {transition} requires non-empty hold_id and event_id"
+        ))),
+    }
+}
+
+fn structured_budget_error(error: impl Into<String>) -> BudgetStoreError {
+    BudgetStoreError::Invariant(error.into())
+}
+
+fn reject_unsupported_remote_hard_authority(
+    request: &BudgetAuthorizeHoldRequest,
+) -> Result<(), BudgetStoreError> {
+    if request
+        .invocation_quotas
+        .iter()
+        .any(|quota| quota.key.profile == BudgetQuotaProfile::AggregateFamilyInvocation)
+    {
+        return Err(structured_budget_error(
+            "advisory remote budget authority cannot enforce aggregate family invocation limits without a modeled partition escrow profile",
+        ));
+    }
+    if request.cumulative_approval.is_some() {
+        return Err(structured_budget_error(
+            "advisory remote budget authority cannot reserve cumulative family approval without a modeled partition escrow profile",
+        ));
+    }
+    Ok(())
+}
+
 impl BudgetStore for RemoteBudgetStore {
+    fn budget_guarantee_level(&self) -> BudgetGuaranteeLevel {
+        BudgetGuaranteeLevel::AdvisoryPosthoc
+    }
+
     fn try_increment(
         &self,
         capability_id: &str,
@@ -521,14 +575,12 @@ impl BudgetStore for RemoteBudgetStore {
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
         remote_budget_grant_index(request.grant_index)?;
         request.validate()?;
+        reject_unsupported_remote_hard_authority(&request)?;
         if !request.invocation_quotas.is_empty()
             || request.cumulative_approval.is_some()
             || request.admission_binding.is_some()
         {
-            return Err(BudgetStoreError::Invariant(
-                "composite budget authorization is not supported by the remote budget store"
-                    .to_string(),
-            ));
+            return self.authorize_structured_budget_hold(request);
         }
         let response = self
             .client
@@ -757,329 +809,49 @@ impl BudgetStore for RemoteBudgetStore {
         &self,
         request: BudgetCaptureInvocationRequest,
     ) -> Result<BudgetInvocationCaptureDecision, BudgetStoreError> {
-        remote_budget_grant_index(request.grant_index)?;
-        request.validate()?;
-        if request.trusted_time.is_some() {
-            return Err(BudgetStoreError::Invariant(
-                "trusted capture time is not supported by the remote budget store".to_string(),
-            ));
-        }
-        let response = self
-            .client
-            .capture_invocation_reservations(
-                &request.capability_id,
-                request.grant_index,
-                &request.hold_id,
-                &request.event_id,
-            )
-            .map_err(into_budget_store_error)?;
-        if response.capability_id != request.capability_id
-            || response.grant_index != request.grant_index
-            || response.hold_id != request.hold_id
-            || response.event_id != request.event_id
-        {
-            return Err(BudgetStoreError::Invariant(
-                "remote invocation capture response changed the request identity".to_string(),
-            ));
-        }
-        response
-            .total_cost_exposed_after
-            .checked_add(response.total_cost_realized_spend_after)
-            .ok_or_else(|| {
-                BudgetStoreError::Overflow(
-                    "remote captured budget usage overflowed committed cost".to_string(),
-                )
-            })?;
-        if response.invocation_count_after == 0
-            || response.committed_cost_units_after < response.exposure_units
-        {
-            return Err(BudgetStoreError::Invariant(
-                "remote invocation capture response returned impossible event-time state"
-                    .to_string(),
-            ));
-        }
-        let mut captured_holds = self.captured_holds.lock().map_err(|_| {
-            BudgetStoreError::Invariant("remote captured-hold fence lock is poisoned".to_string())
-        })?;
-        let mutation = BudgetHoldMutationDecision {
-            hold_id: Some(response.hold_id.clone()),
-            admission_binding: None,
-            exposure_units: response.exposure_units,
-            realized_spend_units: 0,
-            committed_cost_units_after: response.committed_cost_units_after,
-            invocation_count_after: response.invocation_count_after,
-            invocation_quota_usages: Vec::new(),
-            cumulative_approval: None,
-            invocation_state: BudgetInvocationState::Captured,
-            monetary_state: if response.exposure_units == 0 {
-                BudgetMonetaryState::None
-            } else {
-                BudgetMonetaryState::Exposed
-            },
-            metadata: self.remote_budget_commit_metadata(
-                response.budget_authority.as_ref(),
-                response.budget_commit.as_ref(),
-                request.authority.as_ref(),
-                Some(response.event_id.clone()),
-            ),
-        };
-        self.cache_usage(
-            &request.capability_id,
-            request.grant_index,
-            response.usage_seq,
-            Some(response.usage_invocation_count),
-            Some(response.total_cost_exposed_after),
-            Some(response.total_cost_realized_spend_after),
-        )?;
-        captured_holds.insert((
-            request.capability_id.clone(),
-            request.grant_index,
-            request.hold_id.clone(),
-        ));
-        Ok(match response.decision {
-            CaptureInvocationDecision::Captured => {
-                BudgetInvocationCaptureDecision::Captured(mutation)
-            }
-            CaptureInvocationDecision::AlreadyCaptured => {
-                BudgetInvocationCaptureDecision::AlreadyCaptured(mutation)
-            }
-        })
+        self.capture_invocation_reservations_remote(request)
+    }
+
+    fn authorize_cumulative_approval(
+        &self,
+        request: BudgetAuthorizeCumulativeApprovalRequest,
+    ) -> Result<BudgetCumulativeApprovalAuthorizationDecision, BudgetStoreError> {
+        self.authorize_cumulative_approval_remote(request)
+    }
+
+    fn cancel_captured_before_dispatch(
+        &self,
+        request: BudgetCancelCapturedBeforeDispatchRequest,
+    ) -> Result<BudgetCapturedBeforeDispatchCancellationDecision, BudgetStoreError> {
+        self.cancel_captured_before_dispatch_remote(request)
     }
 
     fn reverse_budget_hold(
         &self,
         request: BudgetReverseHoldRequest,
     ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
-        remote_budget_grant_index(request.grant_index)?;
-        request.validate()?;
-        if request.expected_cumulative_approval_state.is_some() {
-            return Err(BudgetStoreError::Invariant(
-                "remote budget store does not support cumulative approval state-fenced reversal"
-                    .to_string(),
-            ));
-        }
-        let response = self
-            .client
-            .reverse_charge_cost_with_ids(
-                &request.capability_id,
-                request.grant_index,
-                request.reversed_exposure_units,
-                request.hold_id.as_deref(),
-                request.event_id.as_deref(),
-            )
-            .map_err(into_budget_store_error)?;
-        validate_remote_budget_identity(
-            &request.capability_id,
-            request.grant_index,
-            &response.capability_id,
-            response.grant_index,
-            "reversal",
-        )?;
-        validate_remote_budget_transition_identity(
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            response.hold_id.as_deref(),
-            response.event_id.as_deref(),
-            "reversal",
-            request.hold_id.is_some() || request.event_id.is_some(),
-        )?;
-        let (
-            Some(invocation_count_after),
-            Some(total_cost_exposed),
-            Some(total_cost_realized_spend),
-        ) = (
-            response.invocation_count,
-            response.total_cost_exposed,
-            response.total_cost_realized_spend,
-        )
-        else {
-            return Err(BudgetStoreError::Invariant(
-                "remote budget reversal response omitted committed usage state".to_string(),
-            ));
-        };
-        let committed_cost_units_after = total_cost_exposed
-            .checked_add(total_cost_realized_spend)
-            .ok_or_else(|| {
-                BudgetStoreError::Overflow(
-                    "remote reversed budget usage overflowed committed cost".to_string(),
-                )
-            })?;
-        self.cache_usage(
-            &request.capability_id,
-            request.grant_index,
-            response_budget_commit_index(
-                response.budget_authority.as_ref(),
-                response.budget_commit.as_ref(),
-            ),
-            Some(invocation_count_after),
-            Some(total_cost_exposed),
-            Some(total_cost_realized_spend),
-        )?;
-        Ok(BudgetHoldMutationDecision {
-            hold_id: request.hold_id,
-            admission_binding: None,
-            exposure_units: request.reversed_exposure_units,
-            realized_spend_units: 0,
-            committed_cost_units_after,
-            invocation_count_after,
-            invocation_quota_usages: Vec::new(),
-            cumulative_approval: None,
-            invocation_state: BudgetInvocationState::Reversed,
-            monetary_state: if request.reversed_exposure_units == 0 {
-                BudgetMonetaryState::None
-            } else {
-                BudgetMonetaryState::Reversed
-            },
-            metadata: self.remote_budget_commit_metadata(
-                response.budget_authority.as_ref(),
-                response.budget_commit.as_ref(),
-                request.authority.as_ref(),
-                response.event_id,
-            ),
-        })
+        self.reverse_budget_hold_remote(request)
     }
 
     fn release_budget_hold(
         &self,
         request: BudgetReleaseHoldRequest,
     ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
-        remote_budget_grant_index(request.grant_index)?;
-        request.validate()?;
-        Err(BudgetStoreError::Invariant(
-            "remote budget release cannot preserve invocation state".to_string(),
-        ))
+        self.release_budget_hold_remote(request)
     }
 
     fn reconcile_budget_hold(
         &self,
         request: BudgetReconcileHoldRequest,
     ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
-        remote_budget_grant_index(request.grant_index)?;
-        request.validate()?;
-        let hold_id = request.hold_id.as_deref().ok_or_else(|| {
-            BudgetStoreError::Invariant(
-                "remote budget reconciliation requires a locally captured hold".to_string(),
-            )
-        })?;
-        let captured = self
-            .captured_holds
-            .lock()
-            .map_err(|_| {
-                BudgetStoreError::Invariant(
-                    "remote captured-hold fence lock is poisoned".to_string(),
-                )
-            })?
-            .contains(&(
-                request.capability_id.clone(),
-                request.grant_index,
-                hold_id.to_string(),
-            ));
-        if !captured {
-            return Err(BudgetStoreError::Invariant(
-                "remote budget reconciliation requires a locally captured hold".to_string(),
-            ));
-        }
-        let response = self
-            .client
-            .reconcile_budget_spend_with_ids(
-                &request.capability_id,
-                request.grant_index,
-                request.exposed_cost_units,
-                request.realized_spend_units,
-                Some(hold_id),
-                request.event_id.as_deref(),
-            )
-            .map_err(into_budget_store_error)?;
-        validate_remote_budget_identity(
-            &request.capability_id,
-            request.grant_index,
-            &response.capability_id,
-            response.grant_index,
-            "reconciliation",
-        )?;
-        validate_remote_budget_transition_identity(
-            request.hold_id.as_deref(),
-            request.event_id.as_deref(),
-            response.hold_id.as_deref(),
-            response.event_id.as_deref(),
-            "reconciliation",
-            true,
-        )?;
-        let released_exposure_units = request
-            .exposed_cost_units
-            .checked_sub(request.realized_spend_units)
-            .ok_or_else(|| {
-                BudgetStoreError::Invariant(
-                    "realized spend cannot exceed exposed cost during reconciliation".to_string(),
-                )
-            })?;
-        if response.released_exposure_units != Some(released_exposure_units) {
-            return Err(BudgetStoreError::Invariant(
-                "remote budget reconciliation response changed or omitted the released exposure"
-                    .to_string(),
-            ));
-        }
-        let (
-            Some(invocation_count_after),
-            Some(total_cost_exposed),
-            Some(total_cost_realized_spend),
-        ) = (
-            response.invocation_count,
-            response.total_cost_exposed,
-            response.total_cost_realized_spend,
-        )
-        else {
-            return Err(BudgetStoreError::Invariant(
-                "remote budget reconciliation response omitted committed usage state".to_string(),
-            ));
-        };
-        let committed_cost_units_after = total_cost_exposed
-            .checked_add(total_cost_realized_spend)
-            .ok_or_else(|| {
-                BudgetStoreError::Overflow(
-                    "remote reconciled budget usage overflowed committed cost".to_string(),
-                )
-            })?;
-        if committed_cost_units_after < request.realized_spend_units {
-            return Err(BudgetStoreError::Invariant(
-                "remote budget reconciliation response returned impossible event-time state"
-                    .to_string(),
-            ));
-        }
-        self.cache_usage(
-            &request.capability_id,
-            request.grant_index,
-            response_budget_commit_index(
-                response.budget_authority.as_ref(),
-                response.budget_commit.as_ref(),
-            ),
-            Some(invocation_count_after),
-            Some(total_cost_exposed),
-            Some(total_cost_realized_spend),
-        )?;
-        Ok(BudgetHoldMutationDecision {
-            hold_id: request.hold_id,
-            admission_binding: None,
-            exposure_units: request.exposed_cost_units,
-            realized_spend_units: request.realized_spend_units,
-            committed_cost_units_after,
-            invocation_count_after,
-            invocation_quota_usages: Vec::new(),
-            cumulative_approval: None,
-            invocation_state: BudgetInvocationState::Captured,
-            monetary_state: if request.exposed_cost_units == 0 && request.realized_spend_units == 0
-            {
-                BudgetMonetaryState::None
-            } else {
-                BudgetMonetaryState::Reconciled
-            },
-            metadata: self.remote_budget_commit_metadata(
-                response.budget_authority.as_ref(),
-                response.budget_commit.as_ref(),
-                request.authority.as_ref(),
-                response.event_id,
-            ),
-        })
+        self.reconcile_budget_hold_remote(request)
+    }
+
+    fn capture_budget_hold(
+        &self,
+        request: BudgetCaptureHoldRequest,
+    ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
+        self.capture_budget_hold_remote(request)
     }
 
     fn list_usages(
@@ -1126,6 +898,13 @@ impl BudgetStore for RemoteBudgetStore {
                     .into_iter()
                     .find(|usage| usage.grant_index == grant_index_u32)
             })
+    }
+
+    fn get_cumulative_approval_operation_usage(
+        &self,
+        operation_id: &str,
+    ) -> Result<Option<BudgetCumulativeApprovalUsage>, BudgetStoreError> {
+        self.get_cumulative_approval_operation_usage_remote(operation_id)
     }
 }
 
@@ -1341,32 +1120,8 @@ fn remote_budget_event_authority(
 }
 
 fn remote_budget_guarantee_level(
-    authority: Option<&BudgetAuthorityMetadataView>,
-    commit: Option<&BudgetWriteCommitView>,
+    _authority: Option<&BudgetAuthorityMetadataView>,
+    _commit: Option<&BudgetWriteCommitView>,
 ) -> BudgetGuaranteeLevel {
-    if commit.is_some_and(|commit| commit.quorum_committed) {
-        return BudgetGuaranteeLevel::HaLinearizable;
-    }
-    match authority.map(|authority| authority.guarantee_level.as_str()) {
-        Some("single_node_atomic") => BudgetGuaranteeLevel::SingleNodeAtomic,
-        Some("ha_quorum_commit") | Some("ha_linearizable") => BudgetGuaranteeLevel::HaLinearizable,
-        Some("partition_escrowed") => BudgetGuaranteeLevel::PartitionEscrowed,
-        Some("ha_leader_visible") | Some("advisory_posthoc") => {
-            BudgetGuaranteeLevel::AdvisoryPosthoc
-        }
-        Some(_) => {
-            if commit.is_some_and(|commit| commit.quorum_committed) {
-                BudgetGuaranteeLevel::HaLinearizable
-            } else {
-                BudgetGuaranteeLevel::AdvisoryPosthoc
-            }
-        }
-        None => {
-            if commit.is_some_and(|commit| commit.quorum_committed) {
-                BudgetGuaranteeLevel::HaLinearizable
-            } else {
-                BudgetGuaranteeLevel::SingleNodeAtomic
-            }
-        }
-    }
+    BudgetGuaranteeLevel::AdvisoryPosthoc
 }

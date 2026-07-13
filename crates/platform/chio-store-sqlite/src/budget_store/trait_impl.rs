@@ -19,11 +19,9 @@ impl BudgetStore for SqliteBudgetStore {
             || request.cumulative_approval.is_some()
             || request.admission_binding.is_some()
         {
-            return Err(BudgetStoreError::Invariant(
-                "composite budget authorization is not supported by the sqlite budget store"
-                    .to_string(),
-            ));
+            return self.authorize_composite_hold(request);
         }
+        self.require_standalone_mutation("unbound authorization")?;
         self.authorize_budget_hold_atomic(&request)
     }
 
@@ -33,6 +31,10 @@ impl BudgetStore for SqliteBudgetStore {
     ) -> Result<BudgetInvocationCaptureDecision, BudgetStoreError> {
         validate_budget_grant_index(request.grant_index)?;
         request.validate()?;
+        if self.is_structured_hold(&request.hold_id)? {
+            return self.capture_composite_invocation(request);
+        }
+        self.require_standalone_mutation("unbound invocation capture")?;
         if request.trusted_time.is_some() {
             return Err(BudgetStoreError::Invariant(
                 "trusted capture time is not supported by the sqlite budget store".to_string(),
@@ -42,7 +44,12 @@ impl BudgetStore for SqliteBudgetStore {
             budget_u64_to_sqlite(authority.lease_epoch, "lease_epoch")?;
         }
         let mut connection = self.connection()?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let transaction = self.begin_write(&mut connection)?;
+        Self::reject_structured_hold_from_legacy_writer(
+            &transaction,
+            Some(&request.hold_id),
+            "invocation capture",
+        )?;
 
         let existing_event =
             SqliteBudgetStore::load_mutation_event(&transaction, &request.event_id)?;
@@ -246,17 +253,36 @@ impl BudgetStore for SqliteBudgetStore {
         )?))
     }
 
+    fn authorize_cumulative_approval(
+        &self,
+        request: BudgetAuthorizeCumulativeApprovalRequest,
+    ) -> Result<BudgetCumulativeApprovalAuthorizationDecision, BudgetStoreError> {
+        self.authorize_composite_cumulative_approval(request)
+    }
+
     fn cancel_captured_before_dispatch(
         &self,
         request: BudgetCancelCapturedBeforeDispatchRequest,
     ) -> Result<BudgetCapturedBeforeDispatchCancellationDecision, BudgetStoreError> {
         validate_budget_grant_index(request.grant_index)?;
         request.validate()?;
+        if self.is_structured_hold(&request.hold_id)? {
+            return Err(BudgetStoreError::Invariant(
+                "composite invocation capture is terminal without a durable admission-operation cancellation fence"
+                    .to_string(),
+            ));
+        }
+        self.require_standalone_mutation("captured invocation cancellation")?;
         if let Some(authority) = request.authority.as_ref() {
             budget_u64_to_sqlite(authority.lease_epoch, "lease_epoch")?;
         }
         let mut connection = self.connection()?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let transaction = self.begin_write(&mut connection)?;
+        Self::reject_structured_hold_from_legacy_writer(
+            &transaction,
+            Some(&request.hold_id),
+            "captured invocation cancellation",
+        )?;
 
         if let Some(existing) =
             SqliteBudgetStore::load_mutation_event(&transaction, &request.event_id)?
@@ -474,6 +500,10 @@ impl BudgetStore for SqliteBudgetStore {
                 "sqlite rich budget release requires a durable event identity".to_string(),
             )
         })?;
+        if self.is_structured_hold(hold_id)? {
+            return self.release_composite_hold(request);
+        }
+        self.require_standalone_mutation("legacy exposure release")?;
         self.reduce_charge_cost_with_ids_and_authority(
             &request.capability_id,
             request.grant_index,
@@ -490,12 +520,6 @@ impl BudgetStore for SqliteBudgetStore {
         request: BudgetReverseHoldRequest,
     ) -> Result<BudgetReverseHoldDecision, BudgetStoreError> {
         request.validate()?;
-        if request.expected_cumulative_approval_state.is_some() {
-            return Err(BudgetStoreError::Invariant(
-                "sqlite budget store does not support cumulative approval state-fenced reversal"
-                    .to_string(),
-            ));
-        }
         let hold_id = request.hold_id.as_deref().ok_or_else(|| {
             BudgetStoreError::Invariant(
                 "sqlite rich budget reversal requires a durable hold identity".to_string(),
@@ -506,6 +530,16 @@ impl BudgetStore for SqliteBudgetStore {
                 "sqlite rich budget reversal requires a durable event identity".to_string(),
             )
         })?;
+        if self.is_structured_hold(hold_id)? {
+            return self.reverse_composite_hold(request);
+        }
+        self.require_standalone_mutation("legacy hold reversal")?;
+        if request.expected_cumulative_approval_state.is_some() {
+            return Err(BudgetStoreError::Invariant(
+                "legacy sqlite budget holds do not support cumulative approval state fencing"
+                    .to_string(),
+            ));
+        }
         self.reverse_charge_cost_with_ids_and_authority(
             &request.capability_id,
             request.grant_index,
@@ -532,6 +566,10 @@ impl BudgetStore for SqliteBudgetStore {
                 "sqlite rich budget reconciliation requires a durable event identity".to_string(),
             )
         })?;
+        if self.is_structured_hold(hold_id)? {
+            return self.reconcile_composite_hold(request);
+        }
+        self.require_standalone_mutation("legacy spend reconciliation")?;
         self.settle_charge_cost_with_ids_and_authority(
             &request.capability_id,
             request.grant_index,
@@ -542,6 +580,24 @@ impl BudgetStore for SqliteBudgetStore {
             request.authority.as_ref(),
         )?;
         recorded_sqlite_hold_mutation(self, hold_id, event_id, BudgetMutationKind::ReconcileSpend)
+    }
+
+    fn capture_budget_hold(
+        &self,
+        request: BudgetCaptureHoldRequest,
+    ) -> Result<BudgetCaptureHoldDecision, BudgetStoreError> {
+        request.validate()?;
+        let hold_id = request.hold_id.as_deref().ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "sqlite monetary capture requires a durable hold identity".to_string(),
+            )
+        })?;
+        if !self.is_structured_hold(hold_id)? {
+            return Err(BudgetStoreError::Invariant(
+                "legacy sqlite budget holds do not support distinct monetary capture".to_string(),
+            ));
+        }
+        self.capture_composite_hold(request)
     }
 
     fn try_charge_cost(
@@ -601,6 +657,7 @@ impl BudgetStore for SqliteBudgetStore {
         event_id: Option<&str>,
         authority: Option<&BudgetEventAuthority>,
     ) -> Result<bool, BudgetStoreError> {
+        self.require_standalone_mutation("unbound charge")?;
         validate_budget_grant_index(grant_index)?;
         let request = BudgetAuthorizeHoldRequest {
             capability_id: capability_id.to_string(),
@@ -658,13 +715,15 @@ impl BudgetStore for SqliteBudgetStore {
         event_id: Option<&str>,
         authority: Option<&BudgetEventAuthority>,
     ) -> Result<(), BudgetStoreError> {
+        self.require_standalone_mutation("legacy charge reversal")?;
         validate_budget_grant_index(grant_index)?;
         budget_u64_to_sqlite(cost_units, "exposure_units")?;
         if let Some(authority) = authority {
             budget_u64_to_sqlite(authority.lease_epoch, "lease_epoch")?;
         }
         let mut connection = self.connection()?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let transaction = self.begin_write(&mut connection)?;
+        Self::reject_structured_hold_from_legacy_writer(&transaction, hold_id, "charge reversal")?;
 
         if SqliteBudgetStore::existing_event_allowed(
             &transaction,
@@ -856,13 +915,15 @@ impl BudgetStore for SqliteBudgetStore {
         event_id: Option<&str>,
         authority: Option<&BudgetEventAuthority>,
     ) -> Result<(), BudgetStoreError> {
+        self.require_standalone_mutation("legacy charge reduction")?;
         validate_budget_grant_index(grant_index)?;
         budget_u64_to_sqlite(cost_units, "exposure_units")?;
         if let Some(authority) = authority {
             budget_u64_to_sqlite(authority.lease_epoch, "lease_epoch")?;
         }
         let mut connection = self.connection()?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let transaction = self.begin_write(&mut connection)?;
+        Self::reject_structured_hold_from_legacy_writer(&transaction, hold_id, "charge reduction")?;
 
         if SqliteBudgetStore::existing_event_allowed(
             &transaction,
@@ -1065,6 +1126,7 @@ impl BudgetStore for SqliteBudgetStore {
         event_id: Option<&str>,
         authority: Option<&BudgetEventAuthority>,
     ) -> Result<(), BudgetStoreError> {
+        self.require_standalone_mutation("legacy charge settlement")?;
         validate_budget_grant_index(grant_index)?;
         if realized_cost_units > exposed_cost_units {
             return Err(BudgetStoreError::Invariant(
@@ -1078,7 +1140,12 @@ impl BudgetStore for SqliteBudgetStore {
         }
 
         let mut connection = self.connection()?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let transaction = self.begin_write(&mut connection)?;
+        Self::reject_structured_hold_from_legacy_writer(
+            &transaction,
+            hold_id,
+            "charge settlement",
+        )?;
 
         if SqliteBudgetStore::existing_event_allowed(
             &transaction,
@@ -1251,8 +1318,9 @@ impl BudgetStore for SqliteBudgetStore {
         limit: usize,
         capability_id: Option<&str>,
     ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
-        let connection = self.connection()?;
-        let mut statement = connection.prepare(
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let mut statement = transaction.prepare(
             r#"
             SELECT
                 capability_id,
@@ -1269,7 +1337,10 @@ impl BudgetStore for SqliteBudgetStore {
             "#,
         )?;
         let rows = statement.query_map(params![capability_id, limit as i64], record_from_row)?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+        let rows = rows.collect::<Result<Vec<_>, _>>()?;
+        drop(statement);
+        transaction.rollback()?;
+        Ok(rows)
     }
 
     fn get_usage(
@@ -1278,7 +1349,9 @@ impl BudgetStore for SqliteBudgetStore {
         grant_index: usize,
     ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
         validate_budget_grant_index(grant_index)?;
-        self.connection()?
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let row = transaction
             .query_row(
                 r#"
                 SELECT
@@ -1295,8 +1368,87 @@ impl BudgetStore for SqliteBudgetStore {
                 params![capability_id, grant_index as i64],
                 record_from_row,
             )
-            .optional()
-            .map_err(Into::into)
+            .optional()?;
+        transaction.rollback()?;
+        Ok(row)
+    }
+
+    fn get_invocation_quota_usage(
+        &self,
+        key: &BudgetQuotaKey,
+    ) -> Result<Option<BudgetInvocationQuotaUsage>, BudgetStoreError> {
+        self.composite_quota_usage(key)
+    }
+
+    fn get_cumulative_approval_account_usage(
+        &self,
+        key: &BudgetCumulativeApprovalAccountKey,
+    ) -> Result<Option<BudgetCumulativeApprovalAccountUsage>, BudgetStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let row = transaction
+            .query_row(
+                r#"
+                SELECT root_grant_hash, delegation_root_id, root_binding_digest,
+                       currency, authority_threshold_units,
+                       reserved_authorized_units, captured_authorized_units, version
+                FROM budget_cumulative_approval_accounts
+                WHERE authority_id = ?1 AND owner_id = ?2
+                  AND approval_budget_id = ?3 AND approval_budget_epoch = ?4
+                "#,
+                params![
+                    &key.authority_id,
+                    &key.owner_id,
+                    &key.approval_budget_id,
+                    budget_u64_to_sqlite(key.approval_budget_epoch, "approval_budget_epoch")?,
+                ],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, String>(3)?,
+                        budget_u64_from_row(row, 4, "authority_threshold_units")?,
+                        budget_u64_from_row(row, 5, "reserved_authorized_units")?,
+                        budget_u64_from_row(row, 6, "captured_authorized_units")?,
+                        budget_u64_from_row(row, 7, "version")?,
+                    ))
+                },
+            )
+            .optional()?;
+        let Some(row) = row else {
+            transaction.rollback()?;
+            return Ok(None);
+        };
+        if row.0 != key.root_grant_hash
+            || row.1 != key.delegation_root_id
+            || row.2 != key.root_binding_digest
+            || row.3 != key.currency
+        {
+            return Err(BudgetStoreError::Invariant(
+                "cumulative approval account immutable identity changed".to_string(),
+            ));
+        }
+        let amount = |units| MonetaryAmount {
+            units,
+            currency: key.currency.clone(),
+        };
+        let usage = BudgetCumulativeApprovalAccountUsage {
+            account_key: key.clone(),
+            authority_threshold: amount(row.4),
+            reserved_authorized: amount(row.5),
+            captured_authorized: amount(row.6),
+            version: row.7,
+        };
+        transaction.rollback()?;
+        Ok(Some(usage))
+    }
+
+    fn get_cumulative_approval_operation_usage(
+        &self,
+        operation_id: &str,
+    ) -> Result<Option<BudgetCumulativeApprovalUsage>, BudgetStoreError> {
+        self.composite_cumulative_operation_usage(operation_id)
     }
 
     fn list_mutation_events(
@@ -1308,30 +1460,11 @@ impl BudgetStore for SqliteBudgetStore {
         if let Some(grant_index) = grant_index {
             validate_budget_grant_index(grant_index)?;
         }
-        let connection = self.connection()?;
-        let mut statement = connection.prepare(
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let mut statement = transaction.prepare(
             r#"
-            SELECT
-                event_id,
-                hold_id,
-                capability_id,
-                grant_index,
-                kind,
-                allowed,
-                recorded_at,
-                event_seq,
-                usage_seq,
-                exposure_units,
-                realized_spend_units,
-                max_invocations,
-                max_exposure_per_invocation,
-                max_total_exposure_units,
-                invocation_count_after,
-                total_cost_exposed_after,
-                total_cost_realized_spend_after,
-                authority_id,
-                lease_id,
-                lease_epoch
+            SELECT event_id
             FROM budget_mutation_events
             WHERE (?1 IS NULL OR capability_id = ?1)
               AND (?2 IS NULL OR grant_index = ?2)
@@ -1339,15 +1472,29 @@ impl BudgetStore for SqliteBudgetStore {
             LIMIT ?3
             "#,
         )?;
-        let rows = statement.query_map(
-            params![
-                capability_id,
-                grant_index.map(|value| value as i64),
-                limit as i64
-            ],
-            mutation_record_from_row,
-        )?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+        let event_ids = statement
+            .query_map(
+                params![
+                    capability_id,
+                    grant_index.map(|value| value as i64),
+                    limit as i64
+                ],
+                |row| row.get::<_, String>(0),
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(statement);
+        let events = event_ids
+            .iter()
+            .map(|event_id| {
+                Self::load_projected_mutation_event(&transaction, event_id)?.ok_or_else(|| {
+                    BudgetStoreError::Invariant(format!(
+                        "budget mutation event `{event_id}` disappeared while listing"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        transaction.rollback()?;
+        Ok(events)
     }
 }
 
@@ -1358,7 +1505,7 @@ fn recorded_sqlite_hold_mutation(
     expected_kind: BudgetMutationKind,
 ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
     let mut connection = store.connection()?;
-    let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+    let transaction = store.begin_read(&mut connection)?;
     let event =
         SqliteBudgetStore::load_mutation_event(&transaction, event_id)?.ok_or_else(|| {
             BudgetStoreError::Invariant(format!(

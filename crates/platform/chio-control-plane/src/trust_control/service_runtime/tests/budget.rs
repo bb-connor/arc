@@ -6,168 +6,7 @@ use super::super::errors::{
 };
 use super::super::issuance::ensure_signed_by_trusted_authority;
 use super::support::{assert_json_post, StaticResponseServer};
-use chio_kernel::budget_store::{
-    BudgetCancelCapturedBeforeDispatchRequest, BudgetCaptureHoldRequest,
-    BudgetCumulativeApprovalState,
-};
 use chio_test_support::prelude::*;
-
-#[test]
-fn remote_budget_store_rejects_composite_authorization_before_network_io(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let store = build_remote_budget_store("http://127.0.0.1:1", "secret")?;
-    let identity_error = match store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
-        capability_id: "cap-composite".to_string(),
-        grant_index: 0,
-        max_invocations: None,
-        invocation_quotas: Vec::new(),
-        cumulative_approval: None,
-        admission_binding: None,
-        requested_exposure_units: 10,
-        max_cost_per_invocation: Some(10),
-        max_total_cost_units: Some(10),
-        hold_id: Some("hold-composite".to_string()),
-        event_id: None,
-        authority: None,
-    }) {
-        Ok(_) => {
-            return Err(std::io::Error::other("remote store accepted partial identity").into())
-        }
-        Err(error) => error,
-    };
-    assert!(identity_error.to_string().contains("non-empty identifiers"));
-    let error = match store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
-        capability_id: "cap-composite".to_string(),
-        grant_index: 0,
-        max_invocations: Some(1),
-        invocation_quotas: vec![chio_kernel::budget_store::BudgetInvocationQuota {
-            key: chio_kernel::budget_store::BudgetQuotaKey::grant("cap-composite", 0),
-            max_invocations: 1,
-        }],
-        cumulative_approval: None,
-        admission_binding: Some(chio_kernel::budget_store::BudgetAdmissionBinding {
-            operation_id: "op-composite".to_string(),
-            revocation_set: chio_kernel::supplemental_quota::CanonicalRevocationSet::canonicalize(
-                vec!["cap-composite".to_string()],
-            )?,
-            supplemental_verifier_id: None,
-            supplemental_verifier_config_digest: None,
-            supplemental_authorization_artifact_digest: None,
-            supplemental_authorization_expires_at: None,
-        }),
-        requested_exposure_units: 10,
-        max_cost_per_invocation: Some(10),
-        max_total_cost_units: Some(10),
-        hold_id: Some("hold-composite".to_string()),
-        event_id: Some("hold-composite:authorize".to_string()),
-        authority: None,
-    }) {
-        Ok(_) => {
-            return Err(
-                std::io::Error::other("remote store accepted composite authorization").into(),
-            )
-        }
-        Err(error) => error,
-    };
-    assert!(error
-        .to_string()
-        .contains("composite budget authorization is not supported"));
-    let capture_error =
-        match store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
-            capability_id: "cap-composite".to_string(),
-            grant_index: 0,
-            hold_id: "hold-composite".to_string(),
-            event_id: "hold-composite:capture".to_string(),
-            trusted_time: Some(1),
-            authority: None,
-        }) {
-            Ok(_) => {
-                return Err(
-                    std::io::Error::other("remote store accepted trusted capture time").into(),
-                )
-            }
-            Err(error) => error,
-        };
-    assert!(capture_error
-        .to_string()
-        .contains("trusted capture time is not supported"));
-    let empty_capture = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
-        capability_id: "cap-composite".to_string(),
-        grant_index: 0,
-        hold_id: "hold-composite".to_string(),
-        event_id: String::new(),
-        trusted_time: None,
-        authority: None,
-    });
-    assert!(empty_capture
-        .as_ref()
-        .is_err_and(|error| error.to_string().contains("non-empty hold_id and event_id")));
-    let reverse_error = match store.reverse_budget_hold(BudgetReverseHoldRequest {
-        capability_id: "cap-composite".to_string(),
-        grant_index: 0,
-        reversed_exposure_units: 10,
-        hold_id: Some("hold-composite".to_string()),
-        event_id: Some("hold-composite:reverse".to_string()),
-        expected_cumulative_approval_state: Some(BudgetCumulativeApprovalState::PendingApproval),
-        authority: None,
-    }) {
-        Ok(_) => {
-            return Err(std::io::Error::other(
-                "remote store accepted state-fenced cumulative approval reversal",
-            )
-            .into())
-        }
-        Err(error) => error,
-    };
-    assert!(reverse_error
-        .to_string()
-        .contains("cumulative approval state-fenced reversal"));
-    for (result, expected) in [
-        (
-            store.release_budget_hold(BudgetReleaseHoldRequest {
-                capability_id: "cap-composite".to_string(),
-                grant_index: 0,
-                released_exposure_units: 10,
-                hold_id: Some("hold-composite".to_string()),
-                event_id: Some("hold-composite:release".to_string()),
-                authority: None,
-            }),
-            "cannot preserve invocation state",
-        ),
-        (
-            store.reconcile_budget_hold(BudgetReconcileHoldRequest {
-                capability_id: "cap-composite".to_string(),
-                grant_index: 0,
-                exposed_cost_units: 10,
-                realized_spend_units: 5,
-                hold_id: Some("hold-composite".to_string()),
-                event_id: Some("hold-composite:reconcile".to_string()),
-                authority: None,
-            }),
-            "requires a locally captured hold",
-        ),
-        (
-            store.capture_budget_hold(BudgetCaptureHoldRequest {
-                capability_id: "cap-composite".to_string(),
-                grant_index: 0,
-                exposed_cost_units: 10,
-                realized_spend_units: 5,
-                hold_id: Some("hold-composite".to_string()),
-                event_id: Some("hold-composite:capture-spend".to_string()),
-                authority: None,
-            }),
-            "distinct monetary capture transition",
-        ),
-    ] {
-        let Err(error) = result else {
-            return Err(
-                std::io::Error::other("remote store fabricated rich lifecycle state").into(),
-            );
-        };
-        assert!(error.to_string().contains(expected));
-    }
-    Ok(())
-}
 
 #[test]
 fn budget_wrappers_use_split_budget_routes() {
@@ -293,102 +132,6 @@ fn budget_wrappers_include_budget_event_identity_when_provided() {
 }
 
 #[test]
-fn remote_budget_store_preserves_capture_decision() -> Result<(), Box<dyn std::error::Error>> {
-    for (wire, expected_captured) in [("captured", true), ("already_captured", false)] {
-        let body = serde_json::json!({
-            "capabilityId": "cap-budget",
-            "grantIndex": 2,
-            "holdId": "hold-budget",
-            "eventId": "hold-budget:original-capture",
-            "decision": wire,
-            "invocationCountAfter": 1,
-            "usageInvocationCount": 2,
-            "committedCostUnitsAfter": 100,
-            "exposureUnits": 100,
-            "totalCostExposedAfter": 100,
-            "totalCostRealizedSpendAfter": 0,
-            "usageSeq": 7,
-        })
-        .to_string();
-        let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
-        let store = build_remote_budget_store(&server.url, "secret")?;
-
-        let decision = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
-            capability_id: "cap-budget".to_string(),
-            grant_index: 2,
-            hold_id: "hold-budget".to_string(),
-            event_id: "hold-budget:original-capture".to_string(),
-            trusted_time: None,
-            authority: None,
-        })?;
-
-        let (captured, mutation) = match decision {
-            BudgetInvocationCaptureDecision::Captured(mutation) => (true, mutation),
-            BudgetInvocationCaptureDecision::AlreadyCaptured(mutation) => (false, mutation),
-        };
-        assert_eq!(captured, expected_captured);
-        assert_eq!(mutation.hold_id.as_deref(), Some("hold-budget"));
-        assert_eq!(mutation.invocation_count_after, 1);
-        assert_eq!(mutation.committed_cost_units_after, 100);
-        assert_eq!(mutation.exposure_units, 100);
-        assert_eq!(mutation.monetary_state, BudgetMonetaryState::Exposed);
-        assert_eq!(
-            mutation.metadata.event_id.as_deref(),
-            Some("hold-budget:original-capture")
-        );
-        let usage = store
-            .get_usage("cap-budget", 2)?
-            .ok_or_else(|| std::io::Error::other("captured usage was not cached"))?;
-        assert_eq!(usage.invocation_count, 2);
-        assert_eq!(usage.total_cost_exposed, 100);
-        assert_eq!(usage.total_cost_realized_spend, 0);
-        assert_eq!(usage.seq, 7);
-    }
-    Ok(())
-}
-
-#[test]
-fn remote_budget_store_rejects_capture_identity_substitution(
-) -> Result<(), Box<dyn std::error::Error>> {
-    for (field, substituted) in [
-        ("capabilityId", serde_json::json!("cap-other")),
-        ("grantIndex", serde_json::json!(3)),
-        ("holdId", serde_json::json!("hold-other")),
-        ("eventId", serde_json::json!("hold-budget:other-capture")),
-    ] {
-        let mut body = serde_json::json!({
-            "capabilityId": "cap-budget",
-            "grantIndex": 2,
-            "holdId": "hold-budget",
-            "eventId": "hold-budget:capture",
-            "decision": "already_captured",
-            "invocationCountAfter": 1,
-            "usageInvocationCount": 1,
-            "committedCostUnitsAfter": 100,
-            "exposureUnits": 100,
-            "totalCostExposedAfter": 100,
-            "totalCostRealizedSpendAfter": 0,
-            "usageSeq": 7,
-        });
-        body[field] = substituted;
-        let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
-        let store = build_remote_budget_store(&server.url, "secret")?;
-        let result = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
-            capability_id: "cap-budget".to_string(),
-            grant_index: 2,
-            hold_id: "hold-budget".to_string(),
-            event_id: "hold-budget:capture".to_string(),
-            trusted_time: None,
-            authority: None,
-        });
-        assert!(result
-            .as_ref()
-            .is_err_and(|error| error.to_string().contains("changed the request identity")));
-    }
-    Ok(())
-}
-
-#[test]
 fn remote_budget_store_binds_authorize_response_identity_and_event(
 ) -> Result<(), Box<dyn std::error::Error>> {
     for (field, substituted) in [
@@ -468,7 +211,6 @@ fn remote_budget_store_binds_authorize_response_identity_and_event(
         let store = RemoteBudgetStore {
             client: build_client(&server.url, "secret")?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-            captured_holds: std::sync::Mutex::new(std::collections::HashSet::new()),
         };
         store.cache_usage("cap-budget", 2, Some(5), Some(5), Some(50), Some(25))?;
         let request = BudgetAuthorizeHoldRequest {
@@ -672,7 +414,6 @@ fn remote_budget_store_rejects_incomplete_event_projection_without_poisoning_cac
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-        captured_holds: std::sync::Mutex::new(std::collections::HashSet::new()),
     };
     store.cache_usage("cap-budget", 2, Some(5), Some(5), Some(50), Some(25))?;
     let request = BudgetAuthorizeHoldRequest {
@@ -756,7 +497,6 @@ fn remote_budget_store_rejects_impossible_authorize_projection_without_poisoning
         let store = RemoteBudgetStore {
             client: build_client(&server.url, "secret")?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-            captured_holds: std::sync::Mutex::new(std::collections::HashSet::new()),
         };
         store.cache_usage("cap-budget", 2, Some(5), Some(5), Some(50), Some(25))?;
         let result = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
@@ -949,7 +689,6 @@ fn remote_budget_store_rejects_legacy_identity_substitution_without_poisoning_ca
         let store = RemoteBudgetStore {
             client: build_client(&server.url, "secret")?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-            captured_holds: std::sync::Mutex::new(std::collections::HashSet::new()),
         };
         store.cache_usage("cap-budget", 2, Some(5), Some(5), Some(50), Some(25))?;
         let result = match operation {
@@ -972,398 +711,6 @@ fn remote_budget_store_rejects_legacy_identity_substitution_without_poisoning_ca
         assert_eq!(cached.total_cost_exposed, 50);
         assert_eq!(cached.total_cost_realized_spend, 25);
     }
-    Ok(())
-}
-
-#[test]
-fn remote_budget_store_rejects_reconcile_mismatch_without_poisoning_cache(
-) -> Result<(), Box<dyn std::error::Error>> {
-    for (released_exposure, total_realized_spend, expected) in [
-        (24, 75, "released exposure"),
-        (25, 50, "impossible event-time state"),
-    ] {
-        let body = serde_json::json!({
-            "capabilityId": "cap-budget",
-            "grantIndex": 2,
-            "holdId": "hold-budget",
-            "eventId": "hold-budget:reconcile",
-            "invocationCount": 1,
-            "releasedExposureUnits": released_exposure,
-            "totalExposureCharged": 0,
-            "totalRealizedSpend": total_realized_spend,
-            "budgetCommit": {
-                "budgetSeq": 7,
-                "commitIndex": 7,
-                "quorumCommitted": true,
-                "quorumSize": 1,
-                "committedNodes": 1,
-                "witnessUrls": [],
-                "authorityId": "local",
-                "budgetTerm": 1,
-                "leaseId": "local#1",
-                "leaseEpoch": 1
-            }
-        })
-        .to_string();
-        let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
-        let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
-            cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-            captured_holds: std::sync::Mutex::new(std::collections::HashSet::from([(
-                "cap-budget".to_string(),
-                2,
-                "hold-budget".to_string(),
-            )])),
-        };
-        store.cache_usage("cap-budget", 2, Some(5), Some(5), Some(50), Some(25))?;
-        let result = store.reconcile_budget_hold(BudgetReconcileHoldRequest {
-            capability_id: "cap-budget".to_string(),
-            grant_index: 2,
-            exposed_cost_units: 100,
-            realized_spend_units: 75,
-            hold_id: Some("hold-budget".to_string()),
-            event_id: Some("hold-budget:reconcile".to_string()),
-            authority: None,
-        });
-        let cached = store
-            .cached_usage("cap-budget", 2)
-            .ok_or_else(|| std::io::Error::other("seeded cache missing"))?;
-        assert!(result
-            .as_ref()
-            .is_err_and(|error| error.to_string().contains(expected)));
-        assert_eq!(cached.seq, 5);
-        assert_eq!(cached.invocation_count, 5);
-        assert_eq!(cached.total_cost_exposed, 50);
-        assert_eq!(cached.total_cost_realized_spend, 25);
-    }
-    Ok(())
-}
-
-#[test]
-fn remote_budget_store_rejects_reconcile_hold_or_event_substitution_without_poisoning_cache(
-) -> Result<(), Box<dyn std::error::Error>> {
-    for (field, replacement) in [
-        ("holdId", Some(serde_json::json!("hold-other"))),
-        (
-            "eventId",
-            Some(serde_json::json!("hold-budget:other-reconcile")),
-        ),
-        ("holdId", None),
-        ("eventId", None),
-    ] {
-        let mut body = serde_json::json!({
-            "capabilityId": "cap-budget",
-            "grantIndex": 2,
-            "holdId": "hold-budget",
-            "eventId": "hold-budget:reconcile",
-            "invocationCount": 1,
-            "releasedExposureUnits": 25,
-            "totalExposureCharged": 0,
-            "totalRealizedSpend": 75,
-            "budgetCommit": {
-                "budgetSeq": 7,
-                "commitIndex": 7,
-                "quorumCommitted": true,
-                "quorumSize": 1,
-                "committedNodes": 1,
-                "witnessUrls": [],
-                "authorityId": "local",
-                "budgetTerm": 1,
-                "leaseId": "local#1",
-                "leaseEpoch": 1
-            }
-        });
-        if let Some(replacement) = replacement {
-            body[field] = replacement;
-        } else {
-            body.as_object_mut()
-                .ok_or_else(|| std::io::Error::other("reconcile response was not an object"))?
-                .remove(field);
-        }
-        let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
-        let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
-            cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-            captured_holds: std::sync::Mutex::new(std::collections::HashSet::from([(
-                "cap-budget".to_string(),
-                2,
-                "hold-budget".to_string(),
-            )])),
-        };
-        store.cache_usage("cap-budget", 2, Some(5), Some(5), Some(50), Some(25))?;
-        let result = store.reconcile_budget_hold(BudgetReconcileHoldRequest {
-            capability_id: "cap-budget".to_string(),
-            grant_index: 2,
-            exposed_cost_units: 100,
-            realized_spend_units: 75,
-            hold_id: Some("hold-budget".to_string()),
-            event_id: Some("hold-budget:reconcile".to_string()),
-            authority: None,
-        });
-        let cached = store
-            .cached_usage("cap-budget", 2)
-            .ok_or_else(|| std::io::Error::other("seeded cache missing"))?;
-        assert!(result
-            .as_ref()
-            .is_err_and(|error| error.to_string().contains("hold/event identity")));
-        assert_eq!(cached.seq, 5);
-        assert_eq!(cached.invocation_count, 5);
-        assert_eq!(cached.total_cost_exposed, 50);
-        assert_eq!(cached.total_cost_realized_spend, 25);
-    }
-    Ok(())
-}
-
-#[test]
-fn remote_budget_store_rejects_impossible_capture_event_state(
-) -> Result<(), Box<dyn std::error::Error>> {
-    for (field, invalid) in [
-        ("invocationCountAfter", serde_json::json!(0)),
-        ("committedCostUnitsAfter", serde_json::json!(99)),
-    ] {
-        let mut body = serde_json::json!({
-            "capabilityId": "cap-budget",
-            "grantIndex": 2,
-            "holdId": "hold-budget",
-            "eventId": "hold-budget:capture",
-            "decision": "captured",
-            "exposureUnits": 100,
-            "invocationCountAfter": 1,
-            "usageInvocationCount": 1,
-            "committedCostUnitsAfter": 100,
-            "totalCostExposedAfter": 100,
-            "totalCostRealizedSpendAfter": 0,
-            "usageSeq": 7,
-        });
-        body[field] = invalid;
-        let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
-        let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
-            cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-            captured_holds: std::sync::Mutex::new(std::collections::HashSet::new()),
-        };
-        let result = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
-            capability_id: "cap-budget".to_string(),
-            grant_index: 2,
-            hold_id: "hold-budget".to_string(),
-            event_id: "hold-budget:capture".to_string(),
-            trusted_time: None,
-            authority: None,
-        });
-        assert!(result
-            .as_ref()
-            .is_err_and(|error| error.to_string().contains("impossible event-time state")));
-        assert!(store.cached_usage("cap-budget", 2).is_none());
-        assert!(store
-            .captured_holds
-            .lock()
-            .test_expect("captured hold fence")
-            .is_empty());
-    }
-    Ok(())
-}
-
-#[test]
-fn remote_budget_store_rejects_reverse_identity_substitution(
-) -> Result<(), Box<dyn std::error::Error>> {
-    for (field, substituted) in [
-        ("capabilityId", serde_json::json!("cap-other")),
-        ("grantIndex", serde_json::json!(3)),
-    ] {
-        let mut body = serde_json::json!({
-            "capabilityId": "cap-budget",
-            "grantIndex": 2,
-            "invocationCount": 0,
-            "totalExposureCharged": 0,
-            "totalRealizedSpend": 0,
-        });
-        body[field] = substituted;
-        let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
-        let store = build_remote_budget_store(&server.url, "secret")?;
-        let result = store.reverse_budget_hold(BudgetReverseHoldRequest {
-            capability_id: "cap-budget".to_string(),
-            grant_index: 2,
-            reversed_exposure_units: 100,
-            hold_id: Some("hold-budget".to_string()),
-            event_id: Some("hold-budget:reverse".to_string()),
-            expected_cumulative_approval_state: None,
-            authority: None,
-        });
-        assert!(result.as_ref().is_err_and(|error| error
-            .to_string()
-            .contains("reversal response changed the request identity")));
-    }
-    Ok(())
-}
-
-#[test]
-fn remote_budget_store_rejects_reverse_hold_or_event_substitution_without_poisoning_cache(
-) -> Result<(), Box<dyn std::error::Error>> {
-    for (field, replacement) in [
-        ("holdId", Some(serde_json::json!("hold-other"))),
-        (
-            "eventId",
-            Some(serde_json::json!("hold-budget:other-reverse")),
-        ),
-        ("holdId", None),
-        ("eventId", None),
-    ] {
-        let mut body = serde_json::json!({
-            "capabilityId": "cap-budget",
-            "grantIndex": 2,
-            "holdId": "hold-budget",
-            "eventId": "hold-budget:reverse",
-            "invocationCount": 0,
-            "totalExposureCharged": 0,
-            "totalRealizedSpend": 0,
-            "budgetCommit": {
-                "budgetSeq": 7,
-                "commitIndex": 7,
-                "quorumCommitted": true,
-                "quorumSize": 1,
-                "committedNodes": 1,
-                "witnessUrls": [],
-                "authorityId": "local",
-                "budgetTerm": 1,
-                "leaseId": "local#1",
-                "leaseEpoch": 1
-            }
-        });
-        if let Some(replacement) = replacement {
-            body[field] = replacement;
-        } else {
-            body.as_object_mut()
-                .ok_or_else(|| std::io::Error::other("reverse response was not an object"))?
-                .remove(field);
-        }
-        let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
-        let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
-            cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-            captured_holds: std::sync::Mutex::new(std::collections::HashSet::new()),
-        };
-        store.cache_usage("cap-budget", 2, Some(5), Some(5), Some(50), Some(25))?;
-        let result = store.reverse_budget_hold(BudgetReverseHoldRequest {
-            capability_id: "cap-budget".to_string(),
-            grant_index: 2,
-            reversed_exposure_units: 100,
-            hold_id: Some("hold-budget".to_string()),
-            event_id: Some("hold-budget:reverse".to_string()),
-            expected_cumulative_approval_state: None,
-            authority: None,
-        });
-        let cached = store
-            .cached_usage("cap-budget", 2)
-            .ok_or_else(|| std::io::Error::other("seeded cache missing"))?;
-        assert!(result
-            .as_ref()
-            .is_err_and(|error| error.to_string().contains("hold/event identity")));
-        assert_eq!(cached.seq, 5);
-        assert_eq!(cached.invocation_count, 5);
-        assert_eq!(cached.total_cost_exposed, 50);
-        assert_eq!(cached.total_cost_realized_spend, 25);
-    }
-    Ok(())
-}
-
-#[test]
-fn remote_budget_store_reconciles_only_a_locally_captured_hold(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let body = serde_json::json!({
-        "capabilityId": "cap-budget",
-        "grantIndex": 2,
-        "holdId": "hold-budget",
-        "eventId": "hold-budget:capture",
-        "decision": "captured",
-        "exposureUnits": 100,
-        "invocationCountAfter": 1,
-        "usageInvocationCount": 1,
-        "committedCostUnitsAfter": 100,
-        "totalCostExposedAfter": 100,
-        "totalCostRealizedSpendAfter": 0,
-        "usageSeq": 7,
-        "invocationCount": 1,
-        "releasedExposureUnits": 25,
-        "totalExposureCharged": 0,
-        "totalRealizedSpend": 75,
-        "budgetCommit": {
-            "budgetSeq": 8,
-            "commitIndex": 8,
-            "quorumCommitted": true,
-            "quorumSize": 1,
-            "committedNodes": 1,
-            "witnessUrls": [],
-            "authorityId": "local",
-            "budgetTerm": 1,
-            "leaseId": "local#1",
-            "leaseEpoch": 1
-        }
-    })
-    .to_string();
-    let reconcile_body = serde_json::json!({
-        "capabilityId": "cap-budget",
-        "grantIndex": 2,
-        "holdId": "hold-budget",
-        "eventId": "hold-budget:reconcile",
-        "invocationCount": 1,
-        "releasedExposureUnits": 25,
-        "totalExposureCharged": 0,
-        "totalRealizedSpend": 75,
-        "budgetCommit": {
-            "budgetSeq": 8,
-            "commitIndex": 8,
-            "quorumCommitted": true,
-            "quorumSize": 1,
-            "committedNodes": 1,
-            "witnessUrls": [],
-            "authorityId": "local",
-            "budgetTerm": 1,
-            "leaseId": "local#1",
-            "leaseEpoch": 1
-        }
-    })
-    .to_string();
-    let server = StaticResponseServer::spawn(200, &body, "application/json", 2);
-    let store = build_remote_budget_store(&server.url, "secret")?;
-    store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
-        capability_id: "cap-budget".to_string(),
-        grant_index: 2,
-        hold_id: "hold-budget".to_string(),
-        event_id: "hold-budget:capture".to_string(),
-        trusted_time: None,
-        authority: None,
-    })?;
-    server.set_body(&reconcile_body);
-    let reconciled = store.reconcile_budget_hold(BudgetReconcileHoldRequest {
-        capability_id: "cap-budget".to_string(),
-        grant_index: 2,
-        exposed_cost_units: 100,
-        realized_spend_units: 75,
-        hold_id: Some("hold-budget".to_string()),
-        event_id: Some("hold-budget:reconcile".to_string()),
-        authority: None,
-    })?;
-    assert_eq!(reconciled.invocation_state, BudgetInvocationState::Captured);
-    assert_eq!(reconciled.monetary_state, BudgetMonetaryState::Reconciled);
-    assert_eq!(reconciled.exposure_units, 100);
-    assert_eq!(reconciled.realized_spend_units, 75);
-    assert_eq!(reconciled.committed_cost_units_after, 75);
-    assert_eq!(
-        reconciled.metadata.event_id.as_deref(),
-        Some("hold-budget:reconcile")
-    );
-    let requests = server.requests();
-    assert_eq!(requests.len(), 2);
-    assert_json_post(
-        &requests[1],
-        BUDGET_RECONCILE_SPEND_PATH,
-        &[
-            "\"holdId\":\"hold-budget\"",
-            "\"eventId\":\"hold-budget:reconcile\"",
-            "\"authorizedExposureUnits\":100",
-            "\"realizedSpendUnits\":75",
-        ],
-    );
     Ok(())
 }
 
@@ -1431,67 +778,12 @@ fn remote_budget_store_preserves_captured_authorize_replay_decision(
 }
 
 #[test]
-fn remote_budget_store_retains_capture_when_cancellation_is_unsupported(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let body = serde_json::json!({
-        "capabilityId": "cap-budget",
-        "grantIndex": 2,
-        "holdId": "hold-budget",
-        "eventId": "hold-budget:capture",
-        "decision": "captured",
-        "invocationCountAfter": 1,
-        "usageInvocationCount": 2,
-        "committedCostUnitsAfter": 100,
-        "exposureUnits": 100,
-        "totalCostExposedAfter": 100,
-        "totalCostRealizedSpendAfter": 25,
-        "usageSeq": 8,
-    })
-    .to_string();
-    let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
-    let store = build_remote_budget_store(&server.url, "secret")?;
-    let _capture = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
-        capability_id: "cap-budget".to_string(),
-        grant_index: 2,
-        hold_id: "hold-budget".to_string(),
-        event_id: "hold-budget:capture".to_string(),
-        trusted_time: None,
-        authority: None,
-    })?;
-
-    let cancellation =
-        store.cancel_captured_before_dispatch(BudgetCancelCapturedBeforeDispatchRequest {
-            capability_id: "cap-budget".to_string(),
-            grant_index: 2,
-            hold_id: "hold-budget".to_string(),
-            event_id: "hold-budget:cancel".to_string(),
-            authority: None,
-        });
-    assert!(matches!(
-        cancellation,
-        Err(BudgetStoreError::Invariant(reason))
-            if reason == "captured-before-dispatch cancellation is not supported by this budget store"
-    ));
-    assert_eq!(server.requests().len(), 1);
-
-    let usage = store
-        .get_usage("cap-budget", 2)?
-        .ok_or_else(|| std::io::Error::other("captured usage was not retained"))?;
-    assert_eq!(usage.invocation_count, 2);
-    assert_eq!(usage.total_cost_exposed, 100);
-    assert_eq!(usage.total_cost_realized_spend, 25);
-    assert_eq!(usage.seq, 8);
-    Ok(())
-}
-
-#[test]
 fn remote_capture_cancel_and_authorize_replays_cannot_regress_cached_usage(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let server = StaticResponseServer::spawn(200, "{}", "application/json", 0);
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-        captured_holds: std::sync::Mutex::new(std::collections::HashSet::new()),
     };
     store.cache_usage("cap-budget", 0, Some(12), Some(3), Some(300), Some(25))?;
 
@@ -1565,7 +857,6 @@ fn remote_budget_list_cannot_regress_or_conflict_with_newer_cached_usage(
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-        captured_holds: std::sync::Mutex::new(std::collections::HashSet::new()),
     };
     store.cache_usage("cap-budget", 0, Some(12), Some(3), Some(300), Some(25))?;
     let stale_result = store.list_usages(10, Some("cap-budget"));
@@ -1623,7 +914,6 @@ fn remote_budget_get_rejects_substituted_capability_without_partial_cache_update
     let store = RemoteBudgetStore {
         client: build_client(&server.url, "secret")?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
-        captured_holds: std::sync::Mutex::new(std::collections::HashSet::new()),
     };
     let result = store.get_usage("cap-budget", 2);
     assert!(result.as_ref().is_err_and(|error| error
@@ -1794,7 +1084,7 @@ fn remote_budget_store_preserves_authority_term_and_commit_metadata() {
     assert_eq!(authorized.metadata.budget_commit_index, Some(41));
     assert_eq!(
         authorized.metadata.guarantee_level,
-        BudgetGuaranteeLevel::HaLinearizable
+        BudgetGuaranteeLevel::AdvisoryPosthoc
     );
     assert_eq!(
         authorized.metadata.event_id.as_deref(),

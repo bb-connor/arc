@@ -424,7 +424,7 @@ pub use receipt_store::{
     ReceiptStoreError, ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
     ReceiptWriterLiveness, RetentionConfig, StoredChildReceipt, StoredToolReceipt,
 };
-pub use revocation_runtime::{InMemoryRevocationStore, RevocationStore};
+pub use revocation_runtime::{InMemoryRevocationStore, RevocationObservation, RevocationStore};
 pub use revocation_store::{RevocationRecord, RevocationStoreError};
 pub use runtime::{
     NestedFlowBridge, NestedFlowClient, ToolCallChunk, ToolCallOutput, ToolCallRequest,

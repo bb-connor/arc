@@ -174,17 +174,7 @@ fn test_operator_report_endpoint() {
 
     {
         let budgets = SqliteBudgetStore::open(&budget_db_path).expect("open budget store");
-        budgets
-            .upsert_usage(&BudgetUsageRecord {
-                capability_id: "cap-op-child".to_string(),
-                grant_index: 0,
-                invocation_count: 2,
-                updated_at: 3_100,
-                seq: 1,
-                total_cost_exposed: 850,
-                total_cost_realized_spend: 0,
-            })
-            .expect("upsert budget usage");
+        seed_budget_exposure(&budgets, "cap-op-child", 850);
     }
 
     let listen = reserve_listen_addr();

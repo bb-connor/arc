@@ -5,6 +5,9 @@
     clippy::unwrap_used
 )]
 
+mod budget_fixture;
+pub(crate) use budget_fixture::seed_budget_exposure;
+
 pub(crate) use super::receipt_query_capital_authority::*;
 pub(crate) use super::receipt_query_helpers::*;
 
@@ -59,8 +62,8 @@ pub(crate) use chio_core::receipt::{
     metadata::ReceiptAttributionMetadata,
 };
 pub(crate) use chio_kernel::{
-    build_checkpoint, AuthorizationContextReport, BudgetUsageRecord, CapabilitySnapshot,
-    CreditBacktestReport, CreditBondListReport, CreditBondReport,
+    build_checkpoint, AuthorizationContextReport, BudgetStore, BudgetUsageRecord,
+    CapabilitySnapshot, CreditBacktestReport, CreditBondListReport, CreditBondReport,
     CreditBondedExecutionSimulationReport, CreditFacilityListReport, CreditFacilityReport,
     CreditLossLifecycleListReport, FederatedEvidenceShareImport, LiabilityMarketWorkflowReport,
     LiabilityProviderListReport, LiabilityProviderResolutionReport, ReceiptStore,

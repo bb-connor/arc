@@ -80,6 +80,10 @@ pub(crate) struct ClusterStateSnapshotResponse {
     pub(crate) child_receipts: Vec<StoredReceiptView>,
     pub(crate) lineage: Vec<StoredLineageView>,
     pub(crate) budgets: Vec<BudgetUsageView>,
+    /// Immutable pre-history usage projections needed to validate snapshots whose
+    /// retained mutation stream starts after an imported usage baseline.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) budget_usage_history_anchors: Vec<BudgetUsageView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) budget_mutation_events: Vec<BudgetMutationEventView>,
     /// Abandoned/tombstoned budget event_seqs (rolled-back-then-re-appended
@@ -94,6 +98,7 @@ pub(crate) struct ClusterStateSnapshotResponse {
     /// wrong value.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) budget_abandoned_seq_ranges: Vec<AbandonedSeqRange>,
+    pub(crate) budget_origin_ack_heads: Vec<BudgetOriginAck>,
 }
 
 /// A contiguous run of abandoned/tombstoned budget event_seqs, inclusive on both
@@ -235,6 +240,8 @@ pub(crate) struct BudgetMutationEventView {
     pub(crate) kind: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) allowed: Option<bool>,
+    #[serde(flatten)]
+    pub(crate) lifecycle: BudgetMutationLifecycleView,
     pub(crate) recorded_at: i64,
     pub(crate) event_seq: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -472,6 +479,8 @@ pub(crate) struct CaptureInvocationResponse {
     pub(crate) budget_authority: Option<BudgetAuthorityMetadataView>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) budget_commit: Option<BudgetWriteCommitView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) structured_projection: Option<StructuredBudgetMutationResponse>,
 }
 
 #[derive(Debug)]
@@ -492,8 +501,10 @@ pub(crate) struct ReverseChargeCostResponse {
     pub(crate) invocation_count: Option<u32>,
     pub(crate) total_cost_exposed: Option<u64>,
     pub(crate) total_cost_realized_spend: Option<u64>,
+    pub(crate) usage_seq: Option<u64>,
     pub(crate) budget_authority: Option<BudgetAuthorityMetadataView>,
     pub(crate) budget_commit: Option<BudgetWriteCommitView>,
+    pub(crate) structured_projection: Option<StructuredBudgetMutationResponse>,
 }
 
 #[derive(Debug)]
@@ -517,8 +528,10 @@ pub(crate) struct ReduceChargeCostResponse {
     pub(crate) total_cost_exposed: Option<u64>,
     pub(crate) total_cost_realized_spend: Option<u64>,
     pub(crate) released_exposure_units: Option<u64>,
+    pub(crate) usage_seq: Option<u64>,
     pub(crate) budget_authority: Option<BudgetAuthorityMetadataView>,
     pub(crate) budget_commit: Option<BudgetWriteCommitView>,
+    pub(crate) structured_projection: Option<StructuredBudgetMutationResponse>,
 }
 
 #[derive(Debug, Serialize)]
@@ -800,9 +813,13 @@ struct ReverseChargeCostResponseWire<'a> {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     total_realized_spend: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    usage_seq: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     budget_authority: Option<&'a BudgetAuthorityMetadataView>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     budget_commit: Option<&'a BudgetWriteCommitView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    structured_projection: Option<&'a StructuredBudgetMutationResponse>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -821,9 +838,13 @@ struct ReverseChargeCostResponseWireInput {
     #[serde(default)]
     total_realized_spend: Option<u64>,
     #[serde(default)]
+    usage_seq: Option<u64>,
+    #[serde(default)]
     budget_authority: Option<BudgetAuthorityMetadataView>,
     #[serde(default)]
     budget_commit: Option<BudgetWriteCommitView>,
+    #[serde(default)]
+    structured_projection: Option<StructuredBudgetMutationResponse>,
 }
 
 impl Serialize for ReverseChargeCostResponse {
@@ -839,8 +860,10 @@ impl Serialize for ReverseChargeCostResponse {
             invocation_count: self.invocation_count,
             total_exposure_charged: self.total_cost_exposed,
             total_realized_spend: self.total_cost_realized_spend,
+            usage_seq: self.usage_seq,
             budget_authority: self.budget_authority.as_ref(),
             budget_commit: self.budget_commit.as_ref(),
+            structured_projection: self.structured_projection.as_ref(),
         }
         .serialize(serializer)
     }
@@ -860,8 +883,10 @@ impl<'de> Deserialize<'de> for ReverseChargeCostResponse {
             invocation_count: wire.invocation_count,
             total_cost_exposed: wire.total_exposure_charged,
             total_cost_realized_spend: wire.total_realized_spend,
+            usage_seq: wire.usage_seq,
             budget_authority: wire.budget_authority,
             budget_commit: wire.budget_commit,
+            structured_projection: wire.structured_projection,
         })
     }
 }
@@ -980,9 +1005,13 @@ struct ReduceChargeCostResponseWire<'a> {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     total_realized_spend: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    usage_seq: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     budget_authority: Option<&'a BudgetAuthorityMetadataView>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     budget_commit: Option<&'a BudgetWriteCommitView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    structured_projection: Option<&'a StructuredBudgetMutationResponse>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1003,9 +1032,13 @@ struct ReduceChargeCostResponseWireInput {
     #[serde(default)]
     total_realized_spend: Option<u64>,
     #[serde(default)]
+    usage_seq: Option<u64>,
+    #[serde(default)]
     budget_authority: Option<BudgetAuthorityMetadataView>,
     #[serde(default)]
     budget_commit: Option<BudgetWriteCommitView>,
+    #[serde(default)]
+    structured_projection: Option<StructuredBudgetMutationResponse>,
 }
 
 impl Serialize for ReduceChargeCostResponse {
@@ -1022,8 +1055,10 @@ impl Serialize for ReduceChargeCostResponse {
             released_exposure_units: self.released_exposure_units,
             total_exposure_charged: self.total_cost_exposed,
             total_realized_spend: self.total_cost_realized_spend,
+            usage_seq: self.usage_seq,
             budget_authority: self.budget_authority.as_ref(),
             budget_commit: self.budget_commit.as_ref(),
+            structured_projection: self.structured_projection.as_ref(),
         }
         .serialize(serializer)
     }
@@ -1044,8 +1079,10 @@ impl<'de> Deserialize<'de> for ReduceChargeCostResponse {
             total_cost_exposed: wire.total_exposure_charged,
             total_cost_realized_spend: wire.total_realized_spend,
             released_exposure_units: wire.released_exposure_units,
+            usage_seq: wire.usage_seq,
             budget_authority: wire.budget_authority,
             budget_commit: wire.budget_commit,
+            structured_projection: wire.structured_projection,
         })
     }
 }

@@ -75,6 +75,7 @@ chio-test-support = { workspace = true }
 chio-settle = { workspace = true }
 proptest = { workspace = true }
 rcgen = "0.13"
+tempfile = { workspace = true }
 tower = { workspace = true }
 
 [lints]

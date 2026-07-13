@@ -16,33 +16,16 @@ impl SqliteBudgetStore {
             budget_u64_to_sqlite(authority.lease_epoch, "lease_epoch")?;
         }
         let mut connection = self.connection()?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let transaction = self.begin_write(&mut connection)?;
+        Self::reject_legacy_admission_after_composite_history(
+            &transaction,
+            &request.capability_id,
+            request.grant_index,
+        )?;
         let request_event = match request.event_id.as_deref() {
             Some(event_id) => Self::load_mutation_event(&transaction, event_id)?,
             None => None,
         };
-        let rollback_retry = match request_event.as_ref() {
-            Some(event) if event.kind == BudgetMutationKind::AuthorizeExposure => {
-                Self::rollback_event_exists_for_generation(&transaction, event)?
-                    || Self::legacy_latest_rollback_matches_reversed_hold(
-                        &transaction,
-                        &event.event_id,
-                        request.hold_id.as_deref(),
-                    )?
-            }
-            _ => false,
-        };
-        if rollback_retry
-            && request.hold_id.as_deref().is_some_and(|hold_id| {
-                hold_id.starts_with("nonce-preflight-budget-hold:")
-                    || hold_id.starts_with("budget-hold:")
-            })
-        {
-            transaction.rollback()?;
-            return Err(BudgetStoreError::Invariant(
-                "kernel budget hold is terminal after compensation".to_string(),
-            ));
-        }
         let existing = Self::existing_event_allowed(
             &transaction,
             request.event_id.as_deref(),
@@ -57,6 +40,15 @@ impl SqliteBudgetStore {
             request.max_cost_per_invocation,
             request.max_total_cost_units,
         )?;
+        if existing.is_none() {
+            if let Some(hold_id) = request.hold_id.as_deref() {
+                if Self::load_hold(&transaction, hold_id)?.is_some() {
+                    return Err(BudgetStoreError::Invariant(format!(
+                        "budget hold `{hold_id}` exists without the requested authorization event"
+                    )));
+                }
+            }
+        }
 
         if let Some(hold_id) = request.hold_id.as_deref() {
             if let Some(hold) = Self::load_hold(&transaction, hold_id)? {
@@ -94,7 +86,7 @@ impl SqliteBudgetStore {
                     transaction.commit()?;
                     return Ok(decision);
                 }
-                if hold.disposition != HoldDisposition::Open && !rollback_retry {
+                if hold.disposition != HoldDisposition::Open {
                     return Err(BudgetStoreError::Invariant(format!(
                         "budget hold `{hold_id}` cannot be reopened by authorization"
                     )));
@@ -137,102 +129,6 @@ impl SqliteBudgetStore {
             )
             .optional()?
             .unwrap_or((0, 0, 0, 0));
-
-        if let Some(hold_id) = request.hold_id.as_deref() {
-            if let Some(hold) = Self::load_hold(&transaction, hold_id)? {
-                Self::validate_authorize_hold(
-                    &transaction,
-                    request,
-                    &hold,
-                    request_event.as_ref(),
-                )?;
-                let other_open_exposure = transaction.query_row(
-                    r#"
-                    SELECT COALESCE(SUM(remaining_exposure_units), 0)
-                    FROM budget_authorization_holds
-                    WHERE capability_id = ?1
-                      AND grant_index = ?2
-                      AND disposition = 'open'
-                      AND hold_id != ?3
-                    "#,
-                    params![&request.capability_id, request.grant_index as i64, hold_id],
-                    |row| budget_u64_from_row(row, 0, "remaining_exposure_units"),
-                )?;
-                let reflected_exposure = other_open_exposure
-                    .checked_add(request.requested_exposure_units)
-                    .ok_or_else(|| {
-                        BudgetStoreError::Overflow(
-                            "open hold exposure accounting overflowed u64".to_string(),
-                        )
-                    })?;
-                let other_open_invocations = transaction.query_row(
-                    r#"
-                    SELECT COUNT(*)
-                    FROM budget_authorization_holds
-                    WHERE capability_id = ?1
-                      AND grant_index = ?2
-                      AND disposition = 'open'
-                      AND invocation_count_debited = 1
-                      AND hold_id != ?3
-                    "#,
-                    params![&request.capability_id, request.grant_index as i64, hold_id],
-                    |row| budget_u32_from_row(row, 0, "invocation_count"),
-                )?;
-                let reflected_invocations =
-                    other_open_invocations.checked_add(1).ok_or_else(|| {
-                        BudgetStoreError::Overflow(
-                            "open hold invocation accounting overflowed u32".to_string(),
-                        )
-                    })?;
-                let matching_open = hold.disposition == HoldDisposition::Open
-                    && !hold.invocation_captured
-                    && hold.remaining_exposure_units == request.requested_exposure_units;
-                if matching_open
-                    && current.2 >= reflected_exposure
-                    && current.1 >= reflected_invocations
-                {
-                    let event_seq = allocate_budget_replication_seq(&transaction)?;
-                    let event = Self::append_mutation_event(
-                        &transaction,
-                        request.event_id.as_deref(),
-                        Some(hold_id),
-                        request.authority.as_ref(),
-                        &request.capability_id,
-                        request.grant_index,
-                        BudgetMutationKind::AuthorizeExposure,
-                        Some(true),
-                        event_seq,
-                        Some(current.0),
-                        request.requested_exposure_units,
-                        0,
-                        request.max_invocations,
-                        request.max_cost_per_invocation,
-                        request.max_total_cost_units,
-                        current.1,
-                        current.2,
-                        current.3,
-                    )?;
-                    let decision = Self::authorize_event_decision(self, event)?;
-                    transaction.commit()?;
-                    return Ok(decision);
-                } else if matching_open
-                    && request_event.is_none()
-                    && Self::current_reverse_allows_orphan_recovery(
-                        &transaction,
-                        request,
-                        &hold,
-                        current,
-                    )?
-                    || rollback_retry && hold.disposition == HoldDisposition::Reversed
-                {
-                    Self::delete_hold_if_exists(&transaction, hold_id)?;
-                } else {
-                    return Err(BudgetStoreError::Invariant(format!(
-                        "budget hold `{hold_id}` cannot be reopened by authorization"
-                    )));
-                }
-            }
-        }
 
         let allowed = Self::authorize_limits_allow(request, current.1, current.2, current.3)?;
         let authorized_usage = if allowed {
@@ -320,49 +216,6 @@ impl SqliteBudgetStore {
         let decision = Self::authorize_event_decision(self, event)?;
         transaction.commit()?;
         Ok(decision)
-    }
-
-    fn current_reverse_allows_orphan_recovery(
-        transaction: &rusqlite::Transaction<'_>,
-        request: &BudgetAuthorizeHoldRequest,
-        hold: &SqliteBudgetHold,
-        current: (u64, u32, u64, u64),
-    ) -> Result<bool, BudgetStoreError> {
-        let Some(authorize_event_id) = request.event_id.as_deref() else {
-            return Ok(false);
-        };
-        let reverse_event_id = transaction
-            .query_row(
-                r#"
-                SELECT event_id FROM budget_mutation_events
-                WHERE hold_id = ?1 AND kind = ?2
-                ORDER BY event_seq DESC LIMIT 1
-                "#,
-                params![hold.hold_id, BudgetMutationKind::ReverseExposure.as_str()],
-                |row| row.get::<_, String>(0),
-            )
-            .optional()?;
-        let Some(reverse_event_id) = reverse_event_id else {
-            return Ok(false);
-        };
-        if !reverse_event_id.starts_with(&format!("{authorize_event_id}:rollback:")) {
-            return Ok(false);
-        }
-        let Some(reverse) = Self::load_mutation_event(transaction, &reverse_event_id)? else {
-            return Ok(false);
-        };
-        Ok(reverse.kind == BudgetMutationKind::ReverseExposure
-            && reverse.hold_id.as_deref() == Some(hold.hold_id.as_str())
-            && reverse.capability_id == request.capability_id
-            && reverse.grant_index == request.grant_index as u32
-            && reverse.allowed.is_none()
-            && reverse.exposure_units == request.requested_exposure_units
-            && reverse.realized_spend_units == 0
-            && reverse.authority == hold.authority
-            && reverse.usage_seq == Some(current.0)
-            && reverse.invocation_count_after == current.1
-            && reverse.total_cost_exposed_after == current.2
-            && reverse.total_cost_realized_spend_after == current.3)
     }
 
     fn validate_authorize_hold(
