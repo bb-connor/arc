@@ -99,6 +99,7 @@ jobs:
       - name: Install JS deps
         run: |
           bun install --frozen-lockfile
+          bun run --filter @chio-protocol/wasm-core build
           npm ci --prefix sdks/typescript/packages/conformance
       - name: Size budget gate (${{ matrix.target }} <= ${{ matrix.budget_kb }} KB gzip)
         env:

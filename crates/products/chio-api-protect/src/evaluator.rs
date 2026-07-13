@@ -308,7 +308,11 @@ impl RequestEvaluator {
         body_length: u64,
         execution_nonce: Option<&SignedExecutionNonce>,
     ) -> Result<EvaluationResult, crate::error::ProtectError> {
-        let request_id = uuid::Uuid::now_v7().to_string();
+        // A nonce retry is the same request; retain its signed idempotency identity.
+        let request_id = execution_nonce.map_or_else(
+            || uuid::Uuid::now_v7().to_string(),
+            |nonce| nonce.nonce.bound_to.request_id.clone(),
+        );
         let caller = caller_identity_from_headers(headers);
         let (route_pattern, matched_policy) = self.match_route(method, path);
         let result = self.authority.evaluate(HttpAuthorityInput {

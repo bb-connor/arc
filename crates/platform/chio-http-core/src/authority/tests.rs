@@ -295,7 +295,7 @@ fn strict_execution_nonce_preflight_round_trips_before_authorizing_http() {
 
     let allowed = authority
         .evaluate(HttpAuthorityInput {
-            request_id: "req-strict-nonce-http-authority-retry".to_string(),
+            request_id: "req-strict-nonce-http-authority".to_string(),
             method: HttpMethod::Post,
             route_pattern: "/pets".to_string(),
             path: "/pets",
@@ -319,7 +319,7 @@ fn strict_execution_nonce_preflight_round_trips_before_authorizing_http() {
 
     let replay = authority
         .evaluate(HttpAuthorityInput {
-            request_id: "req-strict-nonce-http-authority-replay".to_string(),
+            request_id: "req-strict-nonce-http-authority".to_string(),
             method: HttpMethod::Post,
             route_pattern: "/pets".to_string(),
             path: "/pets",
