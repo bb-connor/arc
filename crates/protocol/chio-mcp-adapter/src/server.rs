@@ -73,6 +73,14 @@ impl ToolServerConnection for AdaptedMcpServer {
             .collect()
     }
 
+    /// The manifest derives `has_side_effects` from the upstream MCP
+    /// `readOnlyHint` annotation, so a hinted read-only tool is exempt from
+    /// side-effect handling (the dispatch-intent journal in particular)
+    /// while unhinted tools stay side-effecting.
+    fn tool_is_read_only(&self, tool_name: &str) -> bool {
+        self.manifest.tool_is_read_only(tool_name)
+    }
+
     async fn invoke(
         &self,
         tool_name: &str,
