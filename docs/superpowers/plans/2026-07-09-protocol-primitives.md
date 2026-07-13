@@ -193,7 +193,7 @@ Commit: `test(security): lock budget and governed approval baseline`
 - Modify `crates/core/chio-core-types/src/capability/validation.rs`
 - Modify `crates/core/chio-core-types/src/capability/scope.rs`
 - Modify `crates/core/chio-core-types/src/delegation_receipt.rs` if needed for the attenuation projection
-- Modify capability-authority issuance in `crates/kernel/chio-kernel/` and `crates/platform/chio-control-plane/`
+- Keep capability-authority and HTTP issuance fail closed until atomic aggregate enforcement is installed
 - Modify every `CapabilityTokenBody` constructor reported by the compiler
 
 **Work:**
@@ -207,11 +207,14 @@ Commit: `test(security): lock budget and governed approval baseline`
 - [ ] Require `root_binding = None` for capability scope and `Some(verified binding)` for family scope.
 - [ ] Implement `AggregateBudgetRootCommitment` and domain-separated root hash `SHA256("chio.aggregate-budget-root-commitment.v1\0" || canonical_json(commitment))`.
 - [ ] Add a direct-CA issuance helper that creates the commitment, signs `"chio.aggregate-budget-root.v1\0" || canonical_json(binding_body)` with the CA key, inserts the binding into `CapabilityTokenBody`, and then signs the complete token.
+- [ ] Keep production authority emission disabled until aggregate quota reservation and dispatch capture are authoritative.
 - [ ] Accept a v1 family root only when the token has an empty delegation chain, the issuer is a trusted CA, the binding signer equals the token issuer, and every bound root field matches the pre-binding commitment.
 - [ ] Require every descendant to preserve the byte-identical canonical root binding and identical family maximum. Reject descendant lowering, raising, omission, and family creation beneath an unbound parent.
+- [ ] Resolve and verify the signed direct-root capability from verifier-owned lineage for every descendant before comparing aggregate state. Missing authenticated root evidence denies; a subject-signed delegation link is not proof that the root had no family budget.
 - [ ] Bind descendants to the root: require the first verified delegation link's capability ID, delegator, and scope hash to match root ID, root subject, and root scope hash, and require descendant expiry no later than root expiry.
 - [ ] Derive the family quota owner from the verified root-binding digest. Never trust `delegation_chain.first().capability_id` as the family owner.
 - [ ] Extend the attenuation witness and delegation receipt with root-binding-digest and immutable-maximum preservation.
+- [ ] Extend every signed delegation link with the same preservation projection. Treat it as mutation evidence only, never as a replacement for the verified direct-root token.
 
 **Tests:**
 

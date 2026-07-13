@@ -60,6 +60,7 @@ fn make_capability(subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
         issued_at: ISSUED_AT,
         expires_at: EXPIRES_AT,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     CapabilityToken::sign(body, issuer).unwrap()
 }
@@ -80,6 +81,7 @@ fn make_delegated_capability(
             attenuations: vec![],
             timestamp: ISSUED_AT,
             scope_hash: None,
+            aggregate_budget: None,
         },
         issuer,
     )
@@ -491,6 +493,7 @@ fn verify_capability_happy_path() {
         issued_at: 1_000_000_000,
         expires_at: 5_000_000_000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let capability = CapabilityToken::sign(body, &issuer).unwrap();
 

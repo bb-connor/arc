@@ -130,6 +130,7 @@ fn direct_attenuated_token(
                 issued_at,
                 expires_at,
                 delegation_chain: vec![],
+                aggregate_invocation_budget: None,
             },
             caveats: vec![],
             scope_attenuations: vec![],
@@ -216,6 +217,7 @@ fn kernel_hot_path_rejects_inflated_parent_scope() {
         issued_at: 100,
         expires_at: 200,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -279,6 +281,7 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
             attenuations: vec![],
             timestamp: 100,
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+            aggregate_budget: None,
         };
         vec![DelegationLink::sign(body, &issuer).expect("delegation link signs")]
     };
@@ -298,6 +301,7 @@ fn kernel_hot_path_rejects_oversubscribed_siblings() {
             issued_at: 100,
             expires_at: 200,
             delegation_chain: mk_chain(delegatee),
+            aggregate_invocation_budget: None,
         };
         CapabilityToken::sign_attenuated(
             CapabilityTokenAttenuationBody {
@@ -379,6 +383,7 @@ fn delegated_child_without_pre_registered_parent_fails_closed() {
             attenuations: vec![],
             timestamp: 100,
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+            aggregate_budget: None,
         };
         vec![DelegationLink::sign(body, &issuer).expect("delegation link signs")]
     };
@@ -397,6 +402,7 @@ fn delegated_child_without_pre_registered_parent_fails_closed() {
         issued_at: 100,
         expires_at: 200,
         delegation_chain: chain,
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -465,6 +471,7 @@ fn unregistered_parent_rejects_first_sibling_fail_closed() {
             attenuations: vec![],
             timestamp: 100,
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
+            aggregate_budget: None,
         };
         vec![DelegationLink::sign(body, &issuer).expect("delegation link signs")]
     };
@@ -484,6 +491,7 @@ fn unregistered_parent_rejects_first_sibling_fail_closed() {
             issued_at: 100,
             expires_at: 200,
             delegation_chain: mk_chain(delegatee),
+            aggregate_invocation_budget: None,
         };
         CapabilityToken::sign_attenuated(
             CapabilityTokenAttenuationBody {
@@ -554,6 +562,7 @@ fn chain_binding_disabled_rejects_attenuated_token() {
         issued_at: 100,
         expires_at: 200,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {

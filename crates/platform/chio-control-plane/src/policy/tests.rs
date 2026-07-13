@@ -1053,6 +1053,7 @@ guards:
         issued_at: 0,
         expires_at: u64::MAX,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let cap = chio_core::capability::token::CapabilityToken::sign(cap_body, &kp).test_unwrap();
     let request = chio_kernel::ToolCallRequest {

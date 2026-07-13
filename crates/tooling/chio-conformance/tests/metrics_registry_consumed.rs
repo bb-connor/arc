@@ -214,6 +214,7 @@ fn capability_for_tool(
             issued_at: now.saturating_sub(30),
             expires_at: now + 300,
             delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
         },
         issuer,
     )

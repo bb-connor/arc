@@ -124,6 +124,7 @@ fn build_validation_fixture() -> (
             attenuations: Vec::new(),
             timestamp: 1_710_000_000,
             scope_hash: None,
+            aggregate_budget: None,
         },
         &root,
     )
@@ -136,6 +137,7 @@ fn build_validation_fixture() -> (
             attenuations: Vec::new(),
             timestamp: 1_710_000_060,
             scope_hash: None,
+            aggregate_budget: None,
         },
         &delegate_one,
     )
@@ -151,6 +153,7 @@ fn build_validation_fixture() -> (
             issued_at: now - 60,
             expires_at: now + 600,
             delegation_chain: vec![link_one.clone(), link_two.clone()],
+            aggregate_invocation_budget: None,
         },
         &delegate_two,
     )

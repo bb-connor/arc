@@ -25,6 +25,7 @@ fn test_capability() -> CapabilityToken {
             issued_at: 100,
             expires_at: 200,
             delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
         },
         &keypair,
     )

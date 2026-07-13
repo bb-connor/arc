@@ -75,6 +75,7 @@ fn unsigned_capability(ttl: u64) -> CapabilityToken {
         scope_attenuations: None,
         attenuation_proof: None,
         budget_share_bps: None,
+        aggregate_invocation_budget: None,
         signature: Signature::from_bytes(&[0; 64]),
     }
 }

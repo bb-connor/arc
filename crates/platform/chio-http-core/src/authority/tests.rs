@@ -33,6 +33,7 @@ fn signed_capability_token_json_with_scope(issuer: &Keypair, id: &str, scope: Ch
             issued_at: now.saturating_sub(60),
             expires_at: now + 3600,
             delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
         },
         issuer,
     )
@@ -56,6 +57,7 @@ fn signed_direct_v2_capability_token_json(issuer: &Keypair, id: &str) -> String 
                 issued_at: now.saturating_sub(60),
                 expires_at: now + 3600,
                 delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
             },
             caveats: Vec::new(),
             scope_attenuations: Vec::new(),

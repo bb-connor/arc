@@ -103,6 +103,7 @@ fn serving_closed_store_denies_before_an_early_capability_rejection() {
         issued_at: current_unix_timestamp(),
         expires_at: current_unix_timestamp() + 300,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let cap = CapabilityToken::sign(body, &rogue_kp).unwrap();
     let request = make_request("req-rogue-serving-closed", &cap, "read_file", "srv-a");

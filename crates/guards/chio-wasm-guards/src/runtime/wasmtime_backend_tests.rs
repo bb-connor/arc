@@ -761,6 +761,7 @@ fn wasmtime_fuel_consumed_tracked_on_wasm_guard() {
             issued_at: 0,
             expires_at: u64::MAX,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &issuer,
     )

@@ -9,6 +9,7 @@ use crate::crypto::{sha256_hex, Keypair, PublicKey, Signature};
 use crate::error::{Error, Result};
 use crate::signer_binding::ensure_keypair_matches_embedded_key;
 
+use super::aggregate_invocation::AggregateBudgetDelegationMarker;
 use super::caveat::GrantSubsetRelation;
 use super::scope::{ChioScope, Constraint, MonetaryAmount, Operation};
 use super::token::CapabilityToken;
@@ -28,6 +29,8 @@ pub struct AttenuationWitness {
     pub subset_relations: Vec<GrantSubsetRelation>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub restricted_predicates: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_budget: Option<AggregateBudgetDelegationMarker>,
 }
 
 /// Wire proof carried by `CapabilityToken.attenuation_proof`.
@@ -72,6 +75,9 @@ pub struct DelegationLink {
     /// the next hop.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scope_hash: Option<ScopeHash>,
+    /// Authenticated preservation marker for a delegation-family invocation budget.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_budget: Option<AggregateBudgetDelegationMarker>,
     /// Ed25519 signature by the delegator over the canonical form of the
     /// other fields in this link.
     pub signature: Signature,
@@ -89,6 +95,8 @@ pub struct DelegationLinkBody {
     /// Delegation chain-binding: see [`DelegationLink::scope_hash`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scope_hash: Option<ScopeHash>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_budget: Option<AggregateBudgetDelegationMarker>,
 }
 
 impl DelegationLink {
@@ -108,6 +116,7 @@ impl DelegationLink {
             attenuations: body.attenuations,
             timestamp: body.timestamp,
             scope_hash: body.scope_hash,
+            aggregate_budget: body.aggregate_budget,
             signature,
         })
     }
@@ -122,6 +131,7 @@ impl DelegationLink {
             attenuations: self.attenuations.clone(),
             timestamp: self.timestamp,
             scope_hash: self.scope_hash.clone(),
+            aggregate_budget: self.aggregate_budget.clone(),
         }
     }
 
@@ -820,6 +830,7 @@ pub fn compute_attenuation_witness(
         normalized_child_scope: canonical_scope_string(child)?,
         subset_relations,
         restricted_predicates,
+        aggregate_budget: None,
     })
 }
 
@@ -876,19 +887,7 @@ pub fn validate_attenuation_proof(
 }
 
 fn validate_delegable_child_scope(parent: &ChioScope, child: &ChioScope) -> Result<()> {
-    let has_delegable_parent_grant = parent
-        .grants
-        .iter()
-        .any(|grant| grant.operations.contains(&Operation::Delegate))
-        || parent
-            .resource_grants
-            .iter()
-            .any(|grant| grant.operations.contains(&Operation::Delegate))
-        || parent
-            .prompt_grants
-            .iter()
-            .any(|grant| grant.operations.contains(&Operation::Delegate));
-    if !has_delegable_parent_grant {
+    if !parent.authorizes_delegation() {
         return Err(Error::AttenuationViolation {
             reason: "parent capability scope does not authorize delegation".to_string(),
         });
@@ -1078,6 +1077,22 @@ pub fn delegate(
     // delegation link. A child token proving parent -> child attenuation binds
     // attenuation_proof.parent_scope_hash to this predecessor link.
     let parent_scope_hash = scope_hash(&parent.scope)?;
+    let aggregate_budget = parent
+        .aggregate_invocation_budget
+        .as_ref()
+        .and_then(|budget| budget.root_binding.as_ref())
+        .map(|binding| binding.delegation_marker())
+        .transpose()?;
+    if aggregate_budget.is_none()
+        && parent
+            .delegation_chain
+            .iter()
+            .any(|link| link.aggregate_budget.is_some())
+    {
+        return Err(Error::AttenuationViolation {
+            reason: "parent capability omitted its aggregate family budget".to_string(),
+        });
+    }
     let body = DelegationLinkBody {
         capability_id: parent.id.clone(),
         delegator: parent.subject.clone(),
@@ -1085,6 +1100,7 @@ pub fn delegate(
         attenuations: attenuation.steps.clone(),
         timestamp: signed_at,
         scope_hash: Some(parent_scope_hash),
+        aggregate_budget: aggregate_budget.clone(),
     };
     let link = DelegationLink::sign(body, delegator_keypair)?;
 
@@ -1095,5 +1111,6 @@ pub fn delegate(
         nonce,
         link,
         parent_capability_id: parent.id.clone(),
+        aggregate_budget,
     })
 }

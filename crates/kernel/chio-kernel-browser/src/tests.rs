@@ -39,6 +39,7 @@ fn make_delegated_capability(
             attenuations: std::vec![],
             timestamp: ISSUED_AT,
             scope_hash: Some(parent_scope_hash.clone()),
+            aggregate_budget: None,
         },
         issuer,
     )
@@ -111,6 +112,7 @@ fn make_capability_body(id: &str, subject: &Keypair, issuer: &Keypair) -> Capabi
         issued_at: ISSUED_AT,
         expires_at: EXPIRES_AT,
         delegation_chain: std::vec![],
+        aggregate_invocation_budget: None,
     }
 }
 

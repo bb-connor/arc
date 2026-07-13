@@ -57,6 +57,7 @@ fn make_capability_token(
             issued_at,
             expires_at,
             delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
         },
         issuer,
     )

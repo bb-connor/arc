@@ -342,6 +342,7 @@ mod tests {
             issued_at: 0,
             expires_at: u64::MAX,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         };
         let cap =
             chio_core::capability::token::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
@@ -394,6 +395,7 @@ mod tests {
             issued_at: 0,
             expires_at: u64::MAX,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         };
         let cap =
             chio_core::capability::token::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
@@ -450,6 +452,7 @@ mod tests {
             issued_at: 0,
             expires_at: u64::MAX,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         };
         let cap =
             chio_core::capability::token::CapabilityToken::sign(cap_body, &kp).expect("sign cap");

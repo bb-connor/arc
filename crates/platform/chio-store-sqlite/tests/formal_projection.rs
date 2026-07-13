@@ -44,6 +44,7 @@ fn capability(id: &str, subject: &Keypair) -> CapabilityToken {
         issued_at: 1,
         expires_at: 100,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     CapabilityToken::sign(body, &issuer).test_unwrap()
 }

@@ -93,6 +93,7 @@ fn signed_capability_token_json(issuer: &Keypair, id: &str) -> String {
             issued_at: now.saturating_sub(60),
             expires_at: now + 3600,
             delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
         },
         issuer,
     )
@@ -2685,6 +2686,7 @@ fn child_token_with_chain_ancestor(
             attenuations: Vec::new(),
             timestamp: now,
             scope_hash: None,
+            aggregate_budget: None,
         },
         &delegator,
     )
@@ -2698,6 +2700,7 @@ fn child_token_with_chain_ancestor(
             issued_at: now.saturating_sub(60),
             expires_at: now + 3600,
             delegation_chain: vec![link],
+            aggregate_invocation_budget: None,
         },
         &state.signer_keypair,
     )
@@ -2776,6 +2779,7 @@ async fn sidecar_validate_capability_checks_issuer_trust_before_walking_chain() 
             attenuations: Vec::new(),
             timestamp: now,
             scope_hash: None,
+            aggregate_budget: None,
         },
         &delegator,
     )
@@ -2789,6 +2793,7 @@ async fn sidecar_validate_capability_checks_issuer_trust_before_walking_chain() 
             issued_at: now.saturating_sub(60),
             expires_at: now + 3600,
             delegation_chain: vec![link],
+            aggregate_invocation_budget: None,
         },
         &untrusted_issuer,
     )

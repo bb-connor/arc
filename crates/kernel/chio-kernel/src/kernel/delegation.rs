@@ -151,6 +151,7 @@ mod tests {
                 attenuations: vec![],
                 timestamp: 1500,
                 scope_hash: None,
+                aggregate_budget: None,
             };
             let link = DelegationLink::sign(body, &last_kp).unwrap();
             chain.push(link);
@@ -164,6 +165,7 @@ mod tests {
             issued_at: 1000,
             expires_at: 2000,
             delegation_chain: chain,
+            aggregate_invocation_budget: None,
         };
         CapabilityToken::sign(body, &kp).unwrap()
     }

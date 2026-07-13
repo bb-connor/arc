@@ -89,6 +89,7 @@ fn make_execution() -> Option<AcpKernelExecutionContext> {
         issued_at,
         expires_at,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let capability: CapabilityToken = CapabilityToken::sign(body, &issuer).ok()?;
     Some(AcpKernelExecutionContext {

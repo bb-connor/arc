@@ -164,6 +164,11 @@ fn verify_capability_base(
     if !trusted_issuers.contains(&token.issuer) {
         return Err(CapabilityError::UntrustedIssuer);
     }
+    if token.aggregate_invocation_budget.is_some() {
+        return Err(CapabilityError::AttenuationViolation(
+            "aggregate_invocation_budget is not enabled".to_string(),
+        ));
+    }
 
     // Signature check.
     match token.verify_signature_with_floor(crypto_floor) {
@@ -444,6 +449,7 @@ mod tests {
     use crate::InMemoryBudgetRegistry;
     use alloc::vec;
     use chio_core_types::capability::{
+        aggregate_invocation::{AggregateInvocationBudget, AggregateInvocationScope},
         attenuation::{
             compute_attenuation_witness, scope_hash, AttenuationProof, DelegationLink,
             DelegationLinkBody,
@@ -454,6 +460,36 @@ mod tests {
     };
     use chio_core_types::crypto::Keypair;
     use core::cell::Cell;
+
+    #[test]
+    fn aggregate_invocation_budget_rejects_until_negotiated() -> Result<(), CapabilityError> {
+        let issuer = Keypair::generate();
+        let mut body = CapabilityTokenBody {
+            id: "cap-aggregate-disabled".to_string(),
+            issuer: issuer.public_key(),
+            subject: Keypair::generate().public_key(),
+            scope: ChioScope::default(),
+            issued_at: 100,
+            expires_at: 200,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        };
+        body.aggregate_invocation_budget = Some(AggregateInvocationBudget {
+            scope: AggregateInvocationScope::Capability,
+            max_invocations: 1,
+            root_binding: None,
+        });
+        let token = CapabilityToken::sign(body, &issuer)
+            .map_err(|error| CapabilityError::Internal(error.to_string()))?;
+        let clock = crate::FixedClock::new(150);
+
+        let result = verify_capability(&token, &[issuer.public_key()], &clock);
+        assert!(matches!(
+            result,
+            Err(CapabilityError::AttenuationViolation(_))
+        ));
+        Ok(())
+    }
 
     struct CountingTrustRootResolver {
         issuer: PublicKey,
@@ -498,6 +534,7 @@ mod tests {
                 issued_at: 100,
                 expires_at: 200,
                 delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
             },
             &issuer,
         )
@@ -529,6 +566,7 @@ mod tests {
                 issued_at: 100,
                 expires_at: 200,
                 delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
             },
             &issuer,
         )
@@ -566,6 +604,7 @@ mod tests {
                     issued_at: 100,
                     expires_at: 200,
                     delegation_chain: Vec::new(),
+                    aggregate_invocation_budget: None,
                 },
                 caveats: Vec::new(),
                 scope_attenuations: Vec::new(),
@@ -715,6 +754,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: None,
+                aggregate_budget: None,
             },
             &issuer,
         )
@@ -728,6 +768,7 @@ mod tests {
                 issued_at: 100,
                 expires_at: 200,
                 delegation_chain: Vec::from([parent_link]),
+                aggregate_invocation_budget: None,
             },
             &issuer,
         )
@@ -783,6 +824,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: None,
+                aggregate_budget: None,
             },
             &issuer,
         )
@@ -796,6 +838,7 @@ mod tests {
                 issued_at: 100,
                 expires_at: 200,
                 delegation_chain: Vec::from([parent_link]),
+                aggregate_invocation_budget: None,
             },
             &issuer,
         )
@@ -847,6 +890,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: None,
+                aggregate_budget: None,
             },
             &issuer,
         )
@@ -861,6 +905,7 @@ mod tests {
                 issued_at: 100,
                 expires_at: 200,
                 delegation_chain: Vec::from([parent_link]),
+                aggregate_invocation_budget: None,
             },
             &issuer,
         )
@@ -912,6 +957,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: None,
+                aggregate_budget: None,
             },
             &issuer,
         )
@@ -926,6 +972,7 @@ mod tests {
                 issued_at: 100,
                 expires_at: 200,
                 delegation_chain: Vec::from([parent_link]),
+                aggregate_invocation_budget: None,
             },
             &issuer,
         )
@@ -992,6 +1039,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: Some(inflated_hash.clone()),
+                aggregate_budget: None,
             },
             &issuer,
         )
@@ -1015,6 +1063,7 @@ mod tests {
                     issued_at: 100,
                     expires_at: 200,
                     delegation_chain: vec![parent_link],
+                    aggregate_invocation_budget: None,
                 },
                 caveats: Vec::new(),
                 scope_attenuations: Vec::new(),
@@ -1087,6 +1136,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: Some(trust_root_hash.clone()),
+                aggregate_budget: None,
             },
             &issuer,
         )
@@ -1099,6 +1149,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 101,
                 scope_hash: Some(intermediate_hash.clone()),
+                aggregate_budget: None,
             },
             &intermediate,
         )
@@ -1122,6 +1173,7 @@ mod tests {
                     issued_at: 100,
                     expires_at: 200,
                     delegation_chain: vec![first_link, second_link],
+                    aggregate_invocation_budget: None,
                 },
                 caveats: Vec::new(),
                 scope_attenuations: Vec::new(),
@@ -1175,6 +1227,7 @@ mod tests {
                 attenuations: Vec::new(),
                 timestamp: 100,
                 scope_hash: None,
+                aggregate_budget: None,
             },
             &issuer,
         )
@@ -1196,6 +1249,7 @@ mod tests {
                     issued_at: 100,
                     expires_at: 200,
                     delegation_chain: Vec::from([parent_link]),
+                    aggregate_invocation_budget: None,
                 },
                 caveats: Vec::new(),
                 scope_attenuations: Vec::new(),

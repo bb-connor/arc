@@ -33,6 +33,7 @@ fn capability(kp: &Keypair, id: &str) -> CapabilityToken {
         issued_at: 0,
         expires_at: u64::MAX,
         delegation_chain: Vec::new(),
+        aggregate_invocation_budget: None,
     };
     CapabilityToken::sign(body, kp).expect("sign capability")
 }

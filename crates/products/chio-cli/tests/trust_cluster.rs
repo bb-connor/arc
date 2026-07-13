@@ -756,6 +756,7 @@ fn sample_capability(id: &str, subject_kp: &Keypair, issuer_kp: &Keypair) -> Cap
             issued_at: 1_000,
             expires_at: 9_000,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         issuer_kp,
     )

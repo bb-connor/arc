@@ -167,6 +167,7 @@ mod tests {
             issued_at: 1000,
             expires_at: 2000,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         };
         CapabilityToken::sign(body, kp).unwrap()
     }

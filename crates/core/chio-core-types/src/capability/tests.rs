@@ -52,6 +52,7 @@ fn capability_token_serde_roundtrip() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
 
@@ -81,6 +82,7 @@ fn capability_token_signature_verification() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
     assert!(token.verify_signature().unwrap());
@@ -101,6 +103,7 @@ fn legacy_body_signed_capability_token_still_verifies() -> Result<()> {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let (signature, _bytes) = kp.sign_canonical(&body)?;
     let token = CapabilityToken {
@@ -117,6 +120,7 @@ fn legacy_body_signed_capability_token_still_verifies() -> Result<()> {
         scope_attenuations: None,
         attenuation_proof: None,
         budget_share_bps: None,
+        aggregate_invocation_budget: None,
         signature,
     };
 
@@ -140,6 +144,7 @@ fn wrong_key_signature_fails() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let mut token = CapabilityToken::sign(body, &kp).unwrap();
     token.issuer = other_kp.public_key();
@@ -158,6 +163,7 @@ fn time_validation() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
 
@@ -376,6 +382,7 @@ fn attenuated_capability_schema_and_budget_fail_closed() {
         issued_at: 10,
         expires_at: 20,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -430,6 +437,7 @@ fn attenuated_capability_chain_binding_feature_disabled_fails_closed() {
         issued_at: 10,
         expires_at: 20,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -479,6 +487,7 @@ fn attenuated_capability_requires_attenuation_proof() -> Result<()> {
         issued_at: 10,
         expires_at: 20,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let mut token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -519,6 +528,7 @@ fn empty_child_scope_attenuation_proof_survives_serialization() -> Result<()> {
         issued_at: 10,
         expires_at: 20,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -550,6 +560,7 @@ fn attenuation_proof_validation_rejects_non_subset_scope() -> Result<()> {
             subset: true,
         }],
         restricted_predicates: vec![],
+        aggregate_budget: None,
     };
 
     let parent_hash = scope_hash(&parent)?;
@@ -603,6 +614,7 @@ fn chain_binding_disabled_does_not_reject_v1_tokens() {
             issued_at: 10,
             expires_at: 20,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &issuer,
     )
@@ -640,6 +652,7 @@ fn plain_delegated_token_without_attenuation_proof_verifies_and_skips_chain_bind
             attenuations: vec![],
             timestamp: 100,
             scope_hash: None,
+            aggregate_budget: None,
         },
         &issuer,
     )
@@ -654,6 +667,7 @@ fn plain_delegated_token_without_attenuation_proof_verifies_and_skips_chain_bind
             issued_at: 100,
             expires_at: 200,
             delegation_chain: vec![parent_link],
+            aggregate_invocation_budget: None,
         },
         &issuer,
     )
@@ -709,6 +723,7 @@ fn requires_chain_binding_tracks_only_new_attenuation() {
             issued_at: 100,
             expires_at: 200,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         &issuer,
     )
@@ -723,6 +738,7 @@ fn requires_chain_binding_tracks_only_new_attenuation() {
             attenuations: vec![],
             timestamp: 100,
             scope_hash: None,
+            aggregate_budget: None,
         },
         &issuer,
     )
@@ -760,6 +776,7 @@ fn make_signed_link(
         attenuations: vec![],
         timestamp,
         scope_hash: None,
+        aggregate_budget: None,
     };
     DelegationLink::sign(body, delegator_kp).unwrap()
 }
@@ -1733,6 +1750,7 @@ fn ed25519_capability_token_is_byte_identical_without_algorithm_field() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
     let json = serde_json::to_value(&token).unwrap();
@@ -1755,6 +1773,7 @@ fn capability_token_backend_signing_with_ed25519_verifies() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
     assert_eq!(
@@ -1780,6 +1799,7 @@ fn capability_token_p256_round_trip() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
     assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P256));
@@ -1806,6 +1826,7 @@ fn capability_token_p384_round_trip() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
     assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P384));
@@ -1825,6 +1846,7 @@ fn capability_token_p256_tampered_body_fails() {
         issued_at: 1000,
         expires_at: 2000,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let mut token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
     token.id = "cap-tampered".to_string();
@@ -1869,6 +1891,7 @@ fn delegate_parent_token(
         issued_at,
         expires_at,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     CapabilityToken::sign(body, parent_kp).unwrap()
 }
@@ -2158,6 +2181,7 @@ fn bac573_capability_token(issued_at: u64, expires_at: u64) -> (Keypair, Capabil
         issued_at,
         expires_at,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
     (kp, token)

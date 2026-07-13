@@ -167,6 +167,7 @@ mod tests {
             issued_at: 0,
             expires_at: u64::MAX,
             delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
         };
         match CapabilityToken::sign(body, kp) {
             Ok(token) => token,

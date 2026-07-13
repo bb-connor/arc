@@ -46,6 +46,7 @@ fn make_capability_at(
         issued_at,
         expires_at,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     CapabilityToken::sign(body, issuer).unwrap()
 }
@@ -66,6 +67,7 @@ fn make_delegated_capability(
             attenuations: vec![],
             timestamp: ISSUED_AT,
             scope_hash: None,
+            aggregate_budget: None,
         },
         issuer,
     )

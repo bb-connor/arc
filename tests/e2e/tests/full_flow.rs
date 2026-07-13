@@ -450,6 +450,7 @@ async fn full_flow_revocation_cascade() {
         attenuations: vec![],
         timestamp: now,
         scope_hash: None,
+        aggregate_budget: None,
     };
     let link = DelegationLink::sign(link_body, &agent_a_kp).expect("sign delegation link");
 
@@ -473,6 +474,7 @@ async fn full_flow_revocation_cascade() {
         issued_at: now,
         expires_at: now + 300,
         delegation_chain: vec![link],
+        aggregate_invocation_budget: None,
     };
     let cap_b = CapabilityToken::sign(cap_b_body, &ca_kp).expect("sign delegated cap");
 
@@ -819,6 +821,7 @@ async fn full_flow_untrusted_issuer() {
         issued_at: now,
         expires_at: now + 300,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let forged_cap = CapabilityToken::sign(body, &rogue_kp).expect("sign forged cap");
 

@@ -32,6 +32,7 @@ fn request_for(tool_name: &str) -> (ToolCallRequest, ChioScope, String, String) 
         issued_at: 0,
         expires_at: u64::MAX,
         delegation_chain: vec![],
+        aggregate_invocation_budget: None,
     };
     let token = match CapabilityToken::sign(body, &kp) {
         Ok(token) => token,

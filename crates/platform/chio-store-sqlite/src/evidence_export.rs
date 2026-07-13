@@ -476,6 +476,7 @@ mod tests {
                         attenuations: Vec::new(),
                         timestamp: 100,
                         scope_hash: None,
+                        aggregate_budget: None,
                     },
                     issuer,
                 )
@@ -503,6 +504,7 @@ mod tests {
                 issued_at: 100,
                 expires_at: 10_000,
                 delegation_chain,
+                aggregate_invocation_budget: None,
             },
             issuer,
         )

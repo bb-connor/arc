@@ -33,6 +33,7 @@ fn capability_body(issuer: &Keypair, subject: &Keypair) -> CapabilityTokenBody {
         issued_at: 1_710_000_000,
         expires_at: 1_710_003_600,
         delegation_chain: Vec::new(),
+        aggregate_invocation_budget: None,
     }
 }
 
@@ -269,6 +270,7 @@ fn delegation_link_sign_rejects_embedded_delegator_mismatch() {
         attenuations: Vec::new(),
         timestamp: 1_710_000_000,
         scope_hash: None,
+        aggregate_budget: None,
     };
 
     assert!(DelegationLink::sign(body, &actual_signer).is_err());

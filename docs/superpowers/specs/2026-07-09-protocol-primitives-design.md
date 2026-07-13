@@ -107,7 +107,11 @@ A direct CA issuance of `DelegationFamily` is two-stage and non-circular:
 
 The root hash is explicitly the pre-binding root commitment hash, not a hash of the final self-containing token. The binding signature and the final capability signature are separate and both are required.
 
+Delegation evidence identifies the preserved binding with `SHA256("chio.aggregate-budget-root-binding-digest.v1\0" || canonical_json(full_root_binding))`. This digest is audit metadata; the family quota owner remains the separately domain-separated hash of the verified binding body.
+
 The field is not a replacement for grant limits. A request with a matching grant limit of 10 and an aggregate limit of 3 is admitted only while both counters have capacity.
+
+Production authority and HTTP issuance remain disabled until the atomic aggregate quota store and dispatch-capture path are installed. The core signing helper exists for vectors and verifier tests; an authority must not advertise an unenforced ceiling.
 
 ### 4.2 Counter ownership
 
@@ -148,8 +152,10 @@ Aggregate budgets are authority and must be lineage-bound:
 - Every descendant must preserve the exact canonical root binding and the exact family maximum. Omission or any changed byte is rejected. A descendant cannot lower the maximum for the shared row because a quota key has one immutable maximum.
 - For a descendant, the first verified delegation link's capability ID, delegator, and scope hash must equal the binding's root capability ID, root subject, and root scope hash. Descendant expiry cannot exceed the bound root expiry. This rejects grafting a valid family binding onto an unrelated delegation chain.
 - A parent without a family binding cannot issue a delegated child with `DelegationFamily`. A trusted CA can issue a separate direct root.
+- Descendant verification resolves the signed direct-root capability by the first delegation link's capability ID from verifier-owned lineage. The verifier checks that root token's CA signature and trusted issuer before comparing its aggregate state with the descendant. A missing root snapshot denies. A delegation link or receipt signed only by the root subject cannot prove that a family budget was not omitted at the first hop.
 - A capability-scoped limit covers only that nondelegable token. Issuers that need a ceiling over descendants must use `DelegationFamily`.
-- The attenuation witness and delegation receipt must record preservation of the root-binding digest and family maximum so offline verification reaches the same conclusion as the kernel.
+- Every signed delegation link, attenuation witness, and delegation receipt records preservation of the root-binding digest and family maximum. These projections detect mutation between known ancestors, but they supplement rather than replace the authenticated direct-root lookup.
+- Portable full-verification entry points receive an authenticated direct-root snapshot or a trusted resolver. Negotiated aggregate semantics with no such root evidence deny instead of treating an absent leaf field as an unbudgeted family.
 
 ### 4.4 Atomic store contract
 

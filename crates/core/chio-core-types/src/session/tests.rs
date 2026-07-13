@@ -29,6 +29,7 @@ fn make_token(kp: &Keypair) -> CapabilityToken {
             issued_at: 100,
             expires_at: 200,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         },
         kp,
     )

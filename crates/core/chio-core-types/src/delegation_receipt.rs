@@ -37,6 +37,7 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 use crate::canonical::CanonicalBytes;
+use crate::capability::aggregate_invocation::AggregateBudgetDelegationMarker;
 use crate::capability::attenuation::{Attenuation, DelegationLink};
 use crate::error::Result;
 
@@ -132,6 +133,9 @@ pub struct DelegationReceipt {
     /// Capability identifier of the parent token whose chain was extended.
     /// Diagnostic only: the cryptographic binding lives in `link`.
     pub parent_capability_id: String,
+    /// Delegation-family budget preservation copied from the signed link.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_budget: Option<AggregateBudgetDelegationMarker>,
 }
 
 impl DelegationReceipt {
@@ -139,7 +143,17 @@ impl DelegationReceipt {
     /// host languages so downstream verifiers and lineage indexers can
     /// hash the receipt deterministically.
     pub fn canonical_bytes(&self) -> Result<CanonicalBytes> {
+        self.validate_aggregate_budget_projection()?;
         CanonicalBytes::new(self)
+    }
+
+    pub fn validate_aggregate_budget_projection(&self) -> Result<()> {
+        if self.aggregate_budget != self.link.aggregate_budget {
+            return Err(crate::error::Error::AttenuationViolation {
+                reason: "delegation receipt aggregate budget does not match its signed link".into(),
+            });
+        }
+        Ok(())
     }
 
     /// Reconstruct the complete delegation chain represented by this
@@ -201,6 +215,7 @@ mod tests {
             issued_at: 1000,
             expires_at: 2000,
             delegation_chain: vec![],
+            aggregate_invocation_budget: None,
         };
         CapabilityToken::sign(body, parent_kp).unwrap()
     }
@@ -295,6 +310,17 @@ mod tests {
         let s = core::str::from_utf8(bytes.as_bytes()).unwrap();
         // 16 bytes -> 32 hex chars.
         assert!(s.contains("\"nonce\":\"abababababababababababababababab\""));
+    }
+
+    #[test]
+    fn aggregate_budget_projection_must_match_signed_link() {
+        let mut receipt = mint([4_u8; 16]);
+        receipt.aggregate_budget = Some(AggregateBudgetDelegationMarker {
+            root_binding_digest: "00".repeat(32),
+            max_invocations: 1,
+        });
+
+        assert!(receipt.canonical_bytes().is_err());
     }
 
     #[test]

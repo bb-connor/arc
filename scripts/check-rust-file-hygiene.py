@@ -49,7 +49,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/products/chio-cli/tests/passport.rs": allow(
         "2026-07-31",
         "existing oversized CLI passport integration suite; capped to current size until split",
-        max_lines=5_392,
+        max_lines=5_393,
     ),
     "crates/products/chio-cli/tests/mcp_serve.rs": allow(
         "2026-07-31",
@@ -84,7 +84,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/products/chio-cli/tests/trust_cluster.rs": allow(
         "2026-07-31",
         "existing oversized CLI trust-cluster integration suite; capped to current size until split",
-        max_lines=3_209,
+        max_lines=3_210,
     ),
     "crates/products/chio-api-protect/src/proxy/tests.rs": allow(
         "2026-07-31",
@@ -94,12 +94,12 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/protocol/chio-acp-edge/src/tests/all.rs": allow(
         "2026-07-31",
         "existing oversized ACP edge aggregate test suite; capped to current size until split",
-        max_lines=3_011,
+        max_lines=3_012,
     ),
     "crates/protocol/chio-a2a-edge/src/tests/all.rs": allow(
         "2026-07-31",
         "existing oversized A2A edge aggregate test suite; capped to current size until split",
-        max_lines=2_841,
+        max_lines=2_842,
     ),
     "crates/products/chio-cli/tests/proof_cli_contract/support.rs": allow(
         "2026-07-31",
@@ -149,7 +149,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/protocol/chio-mcp-remote/src/remote_mcp/tests.rs": allow(
         "2026-07-31",
         "existing oversized remote MCP test suite; capped to current size until split",
-        max_lines=2_011,
+        max_lines=2_012,
     ),
     "crates/trust/chio-selective-disclosure/src/lib.rs": allow(
         "2026-07-31",
@@ -249,7 +249,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/kernel/chio-kernel/src/kernel/tests/support.rs": allow(
         "2026-07-31",
         "existing oversized kernel test support module; capped to current size until split",
-        max_lines=2_282,
+        max_lines=2_287,
     ),
     "crates/economy/chio-web3/src/settlement_proof.rs": allow(
         "2026-07-31",
@@ -259,7 +259,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/products/chio-wall/src/commands.rs": allow(
         "2026-07-31",
         "wall command surface; capped to current size until split",
-        max_lines=2_047,
+        max_lines=2_048,
     ),
     "crates/platform/chio-http-session/src/lib.rs": allow(
         "2026-07-31",
