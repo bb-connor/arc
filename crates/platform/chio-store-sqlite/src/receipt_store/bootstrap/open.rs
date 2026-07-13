@@ -246,7 +246,8 @@ impl SqliteReceiptStore {
                 connection_flags,
             )?;
 
-            let writer_lifetime_lock = acquire_writer_lifetime_lock(path)?;
+            let instance_token = fresh_instance_token();
+            let writer_lifetime_lock = acquire_writer_lifetime_lock(path, &instance_token)?;
             return Ok(Self {
                 receipt_commit_actor: ReceiptCommitActor::start(
                     writer_pool,
@@ -256,7 +257,7 @@ impl SqliteReceiptStore {
                 strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
                 incremental_verification: options.incremental_verification,
                 writer_lifetime_lock,
-                instance_token: fresh_instance_token(),
+                instance_token,
             });
         }
 
@@ -1238,7 +1239,8 @@ impl SqliteReceiptStore {
             connection_flags,
         )?;
 
-        let writer_lifetime_lock = acquire_writer_lifetime_lock(path)?;
+        let instance_token = fresh_instance_token();
+        let writer_lifetime_lock = acquire_writer_lifetime_lock(path, &instance_token)?;
         Ok(Self {
             receipt_commit_actor: ReceiptCommitActor::start(
                 writer_pool,
@@ -1248,7 +1250,7 @@ impl SqliteReceiptStore {
             strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
             incremental_verification: options.incremental_verification,
             writer_lifetime_lock,
-            instance_token: fresh_instance_token(),
+            instance_token,
         })
     }
 
@@ -1267,17 +1269,6 @@ impl SqliteReceiptStore {
     }
 }
 
-/// Mark this instance as a live writer on the database file: a shared
-/// advisory lock on a sidecar file, held for the store's lifetime and
-/// released by the OS when the process exits, cleanly or not. Dispatch-
-/// intent reconciliation converts the lock to exclusive to prove no sibling
-/// writer instance is live before claiming open intents as orphans; without
-/// the shared mark, one instance reconciling a shared database would
-/// dead-letter a sibling's in-flight intents. The conversion happens only
-/// under the sibling-serializing probe mutex at `probe_path` (see
-/// `WriterLifetimeLock`). Blocks only while a sibling holds the exclusive
-/// conversion for the duration of its bounded reconcile pass. In-memory
-/// databases have no on-disk file to coordinate on and take no lock.
 /// Identity of one store instance for the rows it journals, distinct across
 /// every open of every process (a fresh UUID, never persisted or reused).
 /// Reconciliation treats a row carrying a different token as another
@@ -1288,23 +1279,54 @@ fn fresh_instance_token() -> String {
     uuid::Uuid::now_v7().to_string()
 }
 
+/// Mark this instance as a live writer on the database file: a shared
+/// advisory lock on a sidecar file, plus an exclusive lock on a per-owner
+/// mark named by `instance_token`, both held for the store's lifetime and
+/// released by the OS when the process exits, cleanly or not.
+/// Dispatch-intent reconciliation reads liveness from these marks before
+/// claiming open intents as orphans: a foreign row's owner is probed
+/// through its own per-owner mark, and a row naming no probeable owner is
+/// claimed only after converting the shared mark to exclusive, proving no
+/// sibling writer instance at all. Probes and conversions happen only
+/// under the sibling-serializing probe mutex at `probe_path` (see
+/// `WriterLifetimeLock`). Taking the shared mark blocks only while a
+/// sibling holds the exclusive conversion for the duration of its bounded
+/// reconcile pass. In-memory databases have no on-disk file to coordinate
+/// on and take no locks.
 fn acquire_writer_lifetime_lock(
     path: &Path,
+    instance_token: &str,
 ) -> Result<Option<WriterLifetimeLock>, ReceiptStoreError> {
-    let (Some(lock_path), Some(probe_path)) = (
+    let (Some(lock_path), Some(probe_path), Some(owner_mark_path)) = (
         crate::sqlite_writer_lock_path(path),
         crate::sqlite_reconcile_lock_path(path),
+        crate::sqlite_owner_mark_path(path, instance_token),
     ) else {
         return Ok(None);
     };
-    let mark = std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .open(&lock_path)?;
+    let mark = open_sidecar_lock_file(&lock_path)?;
     mark.lock_shared()?;
-    Ok(Some(WriterLifetimeLock { mark, probe_path }))
+    // The owner mark is held before the store can journal a single row, so
+    // a reconcile probe that acquires it is proof this owner journals
+    // nothing further. A fresh UUID cannot be contended; refuse rather
+    // than share.
+    let owner_lock = open_sidecar_lock_file(&owner_mark_path)?;
+    match owner_lock.try_lock() {
+        Ok(()) => {}
+        Err(std::fs::TryLockError::WouldBlock) => {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "owner liveness mark for a fresh store open is already held: {}",
+                owner_mark_path.display()
+            )));
+        }
+        Err(std::fs::TryLockError::Error(error)) => return Err(error.into()),
+    }
+    Ok(Some(WriterLifetimeLock {
+        mark,
+        probe_path,
+        database_path: path.to_path_buf(),
+        _owner_mark: OwnerLivenessMark::new(owner_lock, owner_mark_path),
+    }))
 }
 
 fn build_receipt_pool(

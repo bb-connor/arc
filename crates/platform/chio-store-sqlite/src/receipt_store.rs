@@ -119,8 +119,8 @@ pub struct SqliteReceiptStore {
     /// instance journals. Reconciliation skips rows carrying this token, so
     /// the pass can run while serving without ever claiming this instance's
     /// own in-flight work; rows from any other open (a sibling, or this
-    /// process before a restart) are foreign and claimable once exclusivity
-    /// is proven.
+    /// process before a restart) are foreign and claimable once their owner
+    /// is provably gone.
     pub(crate) instance_token: String,
 }
 
@@ -130,15 +130,108 @@ pub(crate) struct WriterLifetimeLock {
     /// Shared advisory lock held for the store's lifetime, released by the
     /// OS when the process exits (cleanly or not): its continuous presence
     /// is what proves this instance live to its siblings. Reconciliation
-    /// converts it to exclusive to prove no sibling is live before claiming
-    /// open dispatch intents as orphans, and only ever under the probe
-    /// mutex, because flock conversions are not atomic and drop the mark
-    /// for an instant while they resolve.
+    /// converts it to exclusive only to claim rows that name no probeable
+    /// owner, proving no sibling is live at all, and only ever under the
+    /// probe mutex, because flock conversions are not atomic and drop the
+    /// mark for an instant while they resolve.
     pub(crate) mark: std::fs::File,
-    /// Path of the sidecar mutex serializing sibling exclusivity probes.
-    /// Opened and locked per reconcile pass; closing the descriptor releases
-    /// it, so an aborted pass can never leave the mutex held.
+    /// Path of the sidecar mutex serializing sibling reconcile passes.
+    /// Opened and locked per pass; closing the descriptor releases it, so
+    /// an aborted pass can never leave the mutex held.
     pub(crate) probe_path: std::path::PathBuf,
+    /// Database path the sidecar lock files derive from, kept to derive the
+    /// owner-mark paths of foreign tokens found in the journal.
+    pub(crate) database_path: std::path::PathBuf,
+    /// This instance's own per-owner liveness mark, held (never read) so
+    /// sibling reconcile passes defer exactly this instance's rows while
+    /// it lives.
+    pub(crate) _owner_mark: OwnerLivenessMark,
+}
+
+/// Per-owner liveness mark: an exclusive advisory lock on a sidecar file
+/// derived from one instance's owner token, held from before its first row
+/// is journaled until the store closes, and released by the OS if the
+/// process dies first. Reconciliation judges a foreign row's owner live by
+/// try-locking THAT owner's file (never its own, and never converting a
+/// lock it holds), so a crashed owner's rows surface even while other
+/// siblings stay live. Liveness is the held lock, never the file's
+/// existence: the file itself is only hygiene.
+pub(crate) struct OwnerLivenessMark {
+    /// Held for the advisory lock alone; never read or written.
+    _lock: std::fs::File,
+    /// Path of the mark, kept to remove the file on a clean close.
+    path: std::path::PathBuf,
+}
+
+impl OwnerLivenessMark {
+    pub(crate) fn new(lock: std::fs::File, path: std::path::PathBuf) -> Self {
+        Self { _lock: lock, path }
+    }
+}
+
+impl Drop for OwnerLivenessMark {
+    fn drop(&mut self) {
+        // A clean close removes the file so store opens do not accumulate
+        // one sidecar file each. A crash skips this and the reconcile pass
+        // that claims the crashed owner's rows removes it instead; a
+        // leftover is inert either way, because probes take liveness from
+        // the lock, which dies with this descriptor. Tokens are never
+        // reused, so no prober can confuse a successor file with this
+        // owner.
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
+/// Open a sidecar advisory-lock file, creating it if absent. Never
+/// truncates: the file carries no contents, only its locks.
+pub(crate) fn open_sidecar_lock_file(path: &std::path::Path) -> std::io::Result<std::fs::File> {
+    std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path)
+}
+
+/// One foreign owner's liveness as read by a reconcile pass.
+enum OwnerLiveness {
+    /// The owner's mark was acquired, so the owner is gone and its rows are
+    /// claimable. Holds the acquired lock (and the mark's path) until the
+    /// claim lands and the stale file is removed.
+    Gone {
+        mark: std::fs::File,
+        path: std::path::PathBuf,
+    },
+    /// The owner holds its mark: it is live and its rows defer to it.
+    Live,
+}
+
+/// Probe whether the foreign owner named by `token` still lives, by trying
+/// its per-owner mark non-blockingly. Runs only under the probe mutex, so
+/// no two passes ever race one owner's mark or its cleanup, and only on
+/// foreign tokens, so no pass ever touches a lock it itself holds.
+///
+/// The mark is opened with create: a live owner has held its lock since
+/// before it journaled its first row, so an acquirable lock means the owner
+/// is gone whether its file survived a crash or was already cleaned up.
+/// This trusts the sidecar directory exactly as every other advisory lock
+/// here does; deleting lock files out from under a live database breaks
+/// their coordination as a whole, not just this probe.
+fn probe_foreign_owner_liveness(
+    database_path: &std::path::Path,
+    token: &str,
+) -> Result<OwnerLiveness, ReceiptStoreError> {
+    let Some(path) = crate::sqlite_owner_mark_path(database_path, token) else {
+        // Unreachable for a database that coordinates on sidecar files at
+        // all; refuse the claim rather than guess.
+        return Ok(OwnerLiveness::Live);
+    };
+    let mark = open_sidecar_lock_file(&path)?;
+    match mark.try_lock() {
+        Ok(()) => Ok(OwnerLiveness::Gone { mark, path }),
+        Err(std::fs::TryLockError::WouldBlock) => Ok(OwnerLiveness::Live),
+        Err(std::fs::TryLockError::Error(error)) => Err(error.into()),
+    }
 }
 
 /// Scope guard for the exclusive section of a reconcile pass: restores the
@@ -3378,6 +3471,15 @@ impl SqliteReceiptStore {
         select_open_dispatch_intents(&connection)
     }
 
+    /// True when [`Self::reconcile_dispatch_intents`] is worth re-running
+    /// while the store serves: an on-disk database can gain and lose
+    /// sibling writer instances at any time, so a crashed sibling's orphans
+    /// only surface if some survivor re-reconciles. An in-memory database
+    /// can have no siblings; its attach-time pass is complete.
+    pub fn supports_dispatch_intent_recovery(&self) -> bool {
+        self.writer_lifetime_lock.is_some()
+    }
+
     /// Resolve every open intent journaled by another store instance (a
     /// crashed prior incarnation, or a sibling on a shared database file).
     /// Reads run on the reader pool and the reconciler runs on the calling
@@ -3391,98 +3493,157 @@ impl SqliteReceiptStore {
     /// sibling that crashed after this instance attached.
     ///
     /// Claiming an open row asserts its writer is gone, but the database
-    /// file may be shared with a live sibling instance whose in-flight calls
-    /// own some of these rows. The pass therefore proves exclusivity first
-    /// by converting this instance's lifetime mark to exclusive, under a
-    /// separate probe mutex that keeps sibling conversions from ever
-    /// overlapping: a refused conversion (or a probe already held by a
-    /// sibling's pass) means a live sibling owns some of the rows, so every
-    /// row is deferred to its owner (reported, never silent) instead of
-    /// claimed, and a later exclusive pass still reconciles any true
-    /// orphans among them. A single-instance restart holds the file
-    /// exclusively and reconciles exactly as before.
-    /// True when [`Self::reconcile_dispatch_intents`] is worth re-running
-    /// while the store serves: an on-disk database can gain and lose
-    /// sibling writer instances at any time, so a crashed sibling's orphans
-    /// only surface if some survivor re-reconciles. An in-memory database
-    /// can have no siblings; its attach-time pass is complete.
-    pub fn supports_dispatch_intent_recovery(&self) -> bool {
-        self.writer_lifetime_lock.is_some()
-    }
-
+    /// file may be shared with live sibling instances whose in-flight calls
+    /// own some of these rows. Liveness is therefore judged per owner,
+    /// serialized under a sidecar probe mutex: every instance holds its own
+    /// owner mark for its open's lifetime, and a foreign row is claimed
+    /// only when a non-blocking probe acquires ITS owner's mark, proving
+    /// that owner gone. A crashed writer's orphans thus surface even while
+    /// other siblings stay live, and a live writer's rows always defer to
+    /// it (reported, never silent). A row naming no probeable owner
+    /// (journaled before owner tokens existed) is claimed only after
+    /// converting this instance's shared lifetime mark to exclusive,
+    /// proving no sibling at all, so a single-instance restart still
+    /// reconciles everything foreign.
     pub fn reconcile_dispatch_intents(
         &self,
         reconciler: &dyn chio_kernel::receipt_store::DispatchIntentReconciler,
     ) -> Result<chio_kernel::receipt_store::DispatchIntentReconcileReport, ReceiptStoreError> {
         use chio_kernel::receipt_store::{DispatchIntentReconcileReport, DispatchIntentResolution};
-        let open = {
+        // First read without any sidecar traffic: the recovery worker calls
+        // this on a cadence, and an idle store should answer with one
+        // indexed query. The authoritative candidate set is re-read under
+        // the probe mutex below.
+        let foreign_open = {
             let connection = self.connection()?;
             select_open_dispatch_intents_excluding_owner(&connection, &self.instance_token)?
         };
         let mut report = DispatchIntentReconcileReport {
-            open: open.len() as u64,
+            open: foreign_open.len() as u64,
             ..DispatchIntentReconcileReport::default()
         };
-        if open.is_empty() {
+        if foreign_open.is_empty() {
             return Ok(report);
         }
-        // Declaration order is load-bearing: on an unwind the guard (declared
-        // later) drops first, re-sharing the mark while the probe mutex is
-        // still held, and the probe releases after it.
+        // Declaration order is load-bearing: on an unwind the downgrade
+        // guard and the held owner marks (declared later) drop first, while
+        // the probe mutex is still held, and the probe releases after them.
         let mut reconcile_probe: Option<std::fs::File> = None;
         let mut exclusive_mark = MarkDowngradeGuard { mark: None };
-        if let Some(lock) = &self.writer_lifetime_lock {
-            // Serialize sibling exclusivity probes on a separate sidecar
-            // mutex BEFORE touching the lifetime mark. flock conversions
-            // are not atomic: upgrading drops this instance's shared mark
-            // for an instant while the exclusive attempt resolves, so two
-            // instances probing concurrently could each observe the other
-            // markless, win exclusivity in turn, and dead-letter each
-            // other's LIVE in-flight intents. With the probe mutex held,
-            // every sibling's mark is continuously present (siblings only
-            // convert under this same mutex), so the conversion below races
-            // nothing. A refused probe means a live sibling is
-            // mid-reconcile: defer to it without disturbing this instance's
-            // own mark.
-            let probe = std::fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .truncate(false)
-                .open(&lock.probe_path)?;
-            match probe.try_lock() {
-                Ok(()) => reconcile_probe = Some(probe),
-                Err(std::fs::TryLockError::WouldBlock) => {
-                    report.deferred_to_live_writer = report.open;
+        // Marks of owners proven gone, held (with their paths) until their
+        // rows are claimed and the stale files removed.
+        let mut claimed_owner_marks: Vec<(std::fs::File, std::path::PathBuf)> = Vec::new();
+        let claimable = match &self.writer_lifetime_lock {
+            // An in-memory database cannot be shared with sibling
+            // instances, so every foreign row (a prior open within this
+            // process) is an orphan.
+            None => foreign_open
+                .into_iter()
+                .map(|row| row.record)
+                .collect::<Vec<_>>(),
+            Some(lock) => {
+                // Serialize sibling reconcile passes on a separate sidecar
+                // mutex BEFORE touching any mark. flock conversions are not
+                // atomic: upgrading drops this instance's shared mark for
+                // an instant while the exclusive attempt resolves, so two
+                // instances converting concurrently could each observe the
+                // other markless, win exclusivity in turn, and dead-letter
+                // each other's LIVE in-flight intents. With the probe mutex
+                // held, every sibling's marks are continuously present
+                // (siblings only convert or clean up under this same
+                // mutex). A refused probe means a live sibling is
+                // mid-reconcile: defer to it without disturbing this
+                // instance's own marks.
+                let probe = open_sidecar_lock_file(&lock.probe_path)?;
+                match probe.try_lock() {
+                    Ok(()) => reconcile_probe = Some(probe),
+                    Err(std::fs::TryLockError::WouldBlock) => {
+                        report.deferred_to_live_writer = report.open;
+                        return Ok(report);
+                    }
+                    // An errored probe must neither claim possibly live
+                    // rows nor silently skip: fail closed, refusing the
+                    // pass.
+                    Err(std::fs::TryLockError::Error(error)) => return Err(error.into()),
+                }
+                // Re-read the candidates now that no sibling pass can be
+                // mid-claim: the first read may have seen rows a since-
+                // finished pass already resolved, and resolving works from
+                // a set no serialized pass can be mutating.
+                let foreign_open = {
+                    let connection = self.connection()?;
+                    select_open_dispatch_intents_excluding_owner(&connection, &self.instance_token)?
+                };
+                report.open = foreign_open.len() as u64;
+                if foreign_open.is_empty() {
                     return Ok(report);
                 }
-                // An errored probe must neither claim possibly live rows
-                // nor silently skip: fail closed, refusing the attach.
-                Err(std::fs::TryLockError::Error(error)) => return Err(error.into()),
-            }
-            match lock.mark.try_lock() {
-                Ok(()) => exclusive_mark.mark = Some(&lock.mark),
-                Err(std::fs::TryLockError::WouldBlock) => {
-                    // The refused conversion may have dropped the shared
-                    // mark; restore it before deferring so this instance
-                    // stays visible as a live writer. Only the probe holder
-                    // converts, so no sibling can misread this instance as
-                    // gone during the gap.
-                    lock.mark.lock_shared()?;
-                    report.deferred_to_live_writer = report.open;
+                // Judge liveness per owner: a row whose token can name a
+                // mark file probes THAT owner's mark, so a crashed owner's
+                // rows surface even while other siblings stay live, and no
+                // pass ever converts a lock it holds itself. Rows naming no
+                // probeable owner (journaled before owner tokens existed,
+                // or carrying a token this code never generated) fall back
+                // to whole-file exclusivity.
+                let mut per_owner = std::collections::BTreeMap::<String, Vec<_>>::new();
+                let mut unattributed = Vec::new();
+                for row in foreign_open {
+                    match row
+                        .owner_token
+                        .filter(|token| crate::is_owner_token_shaped(token))
+                    {
+                        Some(token) => per_owner.entry(token).or_default().push(row.record),
+                        None => unattributed.push(row.record),
+                    }
+                }
+                let mut rows = Vec::new();
+                let mut deferred = 0u64;
+                for (token, group) in per_owner {
+                    match probe_foreign_owner_liveness(&lock.database_path, &token)? {
+                        OwnerLiveness::Gone { mark, path } => {
+                            claimed_owner_marks.push((mark, path));
+                            rows.extend(group);
+                        }
+                        OwnerLiveness::Live => deferred += group.len() as u64,
+                    }
+                }
+                if !unattributed.is_empty() {
+                    match lock.mark.try_lock() {
+                        Ok(()) => {
+                            exclusive_mark.mark = Some(&lock.mark);
+                            rows.extend(unattributed);
+                        }
+                        Err(std::fs::TryLockError::WouldBlock) => {
+                            // The refused conversion may have dropped the
+                            // shared mark; restore it before deferring so
+                            // this instance stays visible as a live writer.
+                            // Only the probe holder converts, so no sibling
+                            // can misread this instance as gone during the
+                            // gap.
+                            lock.mark.lock_shared()?;
+                            deferred += unattributed.len() as u64;
+                        }
+                        // An errored exclusivity check must neither claim
+                        // possibly live rows nor silently skip: fail
+                        // closed, refusing the pass.
+                        Err(std::fs::TryLockError::Error(error)) => return Err(error.into()),
+                    }
+                }
+                report.deferred_to_live_writer = deferred;
+                if rows.is_empty() {
+                    // Every candidate deferred: the downgrade guard is
+                    // unarmed (the conversion only happens when it yields
+                    // rows) and the probe releases on return.
                     return Ok(report);
                 }
-                // An errored exclusivity check must neither claim possibly
-                // live rows nor silently skip: fail closed, refusing the
-                // attach.
-                Err(std::fs::TryLockError::Error(error)) => return Err(error.into()),
+                rows
             }
-        }
+        };
         let claim = (|| {
             let mut dead_letters: Vec<(String, String)> = Vec::new();
             let mut reconciled: Vec<(String, String)> = Vec::new();
             let mut replayable: Vec<String> = Vec::new();
-            for intent in &open {
+            for intent in &claimable {
                 match reconciler.resolve(intent)? {
                     DispatchIntentResolution::DeadLetter { detail } => {
                         report.dead_lettered += 1;
@@ -3534,6 +3695,18 @@ impl SqliteReceiptStore {
         // (both refuse the pass); a reconciler panic unwinding through the
         // claim downgrades through the guard's drop instead.
         let downgrade = exclusive_mark.downgrade().map_err(ReceiptStoreError::from);
+        if claim.is_ok() {
+            // The claimed owners' rows are terminal, so their mark files
+            // are stale: remove them while still holding both their locks
+            // and the probe mutex, so no concurrent pass can be probing
+            // them. Best-effort, because a leftover file is inert (liveness
+            // is the lock, and a dead owner's lock stays acquirable). A
+            // failed claim keeps the files for the retrying pass instead.
+            for (_mark, path) in &claimed_owner_marks {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+        drop(claimed_owner_marks);
         // Release the probe mutex only after the mark is shared again, so no
         // sibling's probe can ever overlap this pass's conversion gaps.
         drop(reconcile_probe);

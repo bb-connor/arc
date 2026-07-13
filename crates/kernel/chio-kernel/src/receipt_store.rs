@@ -144,11 +144,10 @@ pub(crate) const DISPATCH_INTENT_RECOVERY_INTERVAL: std::time::Duration =
 /// sibling writers, but a sibling that crashes AFTER this kernel attaches
 /// leaves open, outcome-unknown rows that no later attach may ever revisit
 /// (the survivor can stay up indefinitely). This worker re-runs
-/// reconciliation on a fixed cadence: each pass claims rows only under
-/// proven exclusivity and never touches this instance's own in-flight
+/// reconciliation on a fixed cadence: each pass claims only rows whose
+/// owner is provably gone and never touches this instance's own in-flight
 /// intents, so a live writer is never harmed while a crashed writer's
-/// orphans surface as durable incidents instead of staying invisible until
-/// every writer restarts.
+/// orphans surface as durable incidents even while other writers stay up.
 ///
 /// The worker thread NEVER PANICS: each pass is wrapped in `catch_unwind`
 /// so a panic inside the store's reconcile path is caught, logged, and

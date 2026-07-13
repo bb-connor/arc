@@ -305,6 +305,15 @@ pub(crate) fn select_open_dispatch_intents(
     Ok(out)
 }
 
+/// One reconciliation candidate: an open intent journaled by some other
+/// store instance, paired with the owner token naming that instance (or
+/// `None` for a row journaled before owner tokens existed) so the pass can
+/// judge the owner's liveness through its per-owner mark.
+pub(crate) struct ForeignOpenIntent {
+    pub(crate) owner_token: Option<String>,
+    pub(crate) record: DispatchIntentRecord,
+}
+
 /// Load the open intents that are reconciliation candidates for the
 /// instance identified by `owner_token`: every open row journaled by some
 /// OTHER instance, oldest first. Rows carrying the caller's own token are
@@ -314,17 +323,22 @@ pub(crate) fn select_open_dispatch_intents(
 pub(crate) fn select_open_dispatch_intents_excluding_owner(
     connection: &rusqlite::Connection,
     owner_token: &str,
-) -> Result<Vec<DispatchIntentRecord>, ReceiptStoreError> {
+) -> Result<Vec<ForeignOpenIntent>, ReceiptStoreError> {
     if !dispatch_intents_table_exists(connection)? {
         return Ok(Vec::new());
     }
     let mut statement = connection.prepare(&format!(
-        "SELECT {OPEN_DISPATCH_INTENT_COLUMNS} \
+        "SELECT {OPEN_DISPATCH_INTENT_COLUMNS}, owner_token \
          FROM chio_dispatch_intents \
          WHERE state = 'open' AND (owner_token IS NULL OR owner_token <> ?1) \
          ORDER BY created_at_unix_ms",
     ))?;
-    let rows = statement.query_map(rusqlite::params![owner_token], dispatch_intent_from_row)?;
+    let rows = statement.query_map(rusqlite::params![owner_token], |row| {
+        Ok(ForeignOpenIntent {
+            owner_token: row.get(11)?,
+            record: dispatch_intent_from_row(row)?,
+        })
+    })?;
     let mut out = Vec::new();
     for row in rows {
         out.push(row?);

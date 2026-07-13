@@ -840,12 +840,12 @@ impl ChioKernel {
         // sibling writers, and a sibling that crashes AFTER this attach
         // leaves rows no attach will ever revisit while this kernel stays
         // up. For stores that coordinate sibling writers, re-run
-        // reconciliation on a fixed cadence: each pass claims rows only
-        // under proven exclusivity (never a live writer's, never this
+        // reconciliation on a fixed cadence: each pass claims only rows
+        // whose owner is provably gone (never a live writer's, never this
         // instance's own), so a crashed sibling's orphans surface as
-        // incidents instead of sitting open and invisible until every
-        // writer restarts. Assigned unconditionally so replacing the store
-        // always retires the previous store's worker.
+        // incidents even while other writers stay up. Assigned
+        // unconditionally so replacing the store always retires the
+        // previous store's worker.
         self.dispatch_intent_recovery =
             receipt_store.supports_dispatch_intent_recovery().then(|| {
                 crate::receipt_store::DispatchIntentRecoveryHandle::spawn(

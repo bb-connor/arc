@@ -488,8 +488,8 @@ fn attach_defers_reconciliation_while_a_sibling_writer_is_live(
     // while that writer is alive the call may still be in flight, and
     // claiming the row as a restart orphan would erase a live crash marker,
     // reject the owner's terminal receipt, and flip health for work that is
-    // not an incident. Reconciliation must claim open rows only when this
-    // instance holds the file exclusively.
+    // not an incident. Reconciliation must defer a row while its owner
+    // holds its liveness mark.
     let path = unique_db_path("chio-intents-live-sibling");
     let owner = SqliteReceiptStore::open(&path)?;
     owner.record_dispatch_intent(&sample_intent("req-live-sibling"))?;
@@ -539,8 +539,8 @@ fn surviving_writer_reclaims_a_crashed_siblings_orphan_without_restarting(
     // survivor must therefore be able to re-run reconciliation while
     // serving: its OWN in-flight intents are never candidates (they carry
     // its owner token), and the crashed sibling's rows are claimed the
-    // moment exclusivity is provable, surfacing the orphan as an incident
-    // without every writer going down.
+    // moment its liveness mark reads gone, surfacing the orphan as an
+    // incident without every writer going down.
     let path = unique_db_path("chio-intents-sibling-crash");
     let survivor = SqliteReceiptStore::open(&path)?;
     survivor.record_dispatch_intent(&sample_intent("req-survivor-live"))?;
@@ -597,15 +597,15 @@ fn surviving_writer_reclaims_a_crashed_siblings_orphan_without_restarting(
 fn concurrent_sibling_reconciles_never_claim_each_others_live_intents(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Two live sibling instances reconciling at the same time must both
-    // defer: each holds its shared lifetime mark, so neither can prove
-    // exclusivity. The hazard is the shared-to-exclusive flock conversion,
-    // which is not atomic: it can drop this instance's mark before the
-    // exclusive attempt resolves, and two unserialized probes can each
-    // observe the other markless, win exclusivity in turn, and dead-letter
-    // the other's LIVE in-flight intents. The race window is inside the
-    // conversion syscall and cannot be held open from outside, so this
-    // hammers concurrent passes and requires that no interleaving ever
-    // claims a row.
+    // defer: each holds its own liveness mark, so the other's probe reads
+    // it live. The historical hazard the probe mutex guards against is the
+    // shared-to-exclusive flock conversion, which is not atomic: it can
+    // drop this instance's mark before the exclusive attempt resolves, and
+    // two unserialized probes can each observe the other markless, win in
+    // turn, and dead-letter the other's LIVE in-flight intents. The race
+    // window is inside the conversion syscall and cannot be held open from
+    // outside, so this hammers concurrent passes and requires that no
+    // interleaving ever claims a row.
     let path = unique_db_path("chio-intents-concurrent-reconcile");
     let store_a = std::sync::Arc::new(SqliteReceiptStore::open(&path)?);
     let store_b = std::sync::Arc::new(SqliteReceiptStore::open(&path)?);
@@ -741,6 +741,186 @@ fn reconciler_panic_re_shares_the_writer_lifetime_mark() -> Result<(), Box<dyn s
     assert_eq!(
         report.dead_lettered, 1,
         "the orphan must still surface once the panicking reconciler is replaced"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn crashed_owner_orphan_surfaces_while_multiple_siblings_survive(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Whole-file exclusivity is unreachable while two or more writers
+    // survive, so it cannot be the only way to claim: a crashed third
+    // writer's orphans would stay open (and health green) until the
+    // deployment happened to shrink to a single live writer. Liveness is
+    // therefore judged per owner: each instance holds its own owner mark
+    // for its open's lifetime, and a foreign row defers only while ITS
+    // owner's mark is held.
+    let path = unique_db_path("chio-intents-multi-survivor");
+    let crashed = SqliteReceiptStore::open(&path)?;
+    crashed.record_dispatch_intent(&sample_intent("req-crashed"))?;
+    let survivor_b = SqliteReceiptStore::open(&path)?;
+    survivor_b.record_dispatch_intent(&sample_intent("req-live-b"))?;
+    let survivor_c = SqliteReceiptStore::open(&path)?;
+    survivor_c.record_dispatch_intent(&sample_intent("req-live-c"))?;
+
+    // The crash: the OS drops the owner's locks with its descriptors, and
+    // the open row stays behind as the crash marker.
+    drop(crashed);
+
+    // B's pass sees two foreign rows, claims exactly the crashed owner's,
+    // and defers the live sibling's to its owner.
+    let report = survivor_b.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(report.open, 2);
+    assert_eq!(
+        report.dead_lettered, 1,
+        "the crashed owner's orphan must surface while siblings survive"
+    );
+    assert_eq!(
+        report.deferred_to_live_writer, 1,
+        "the live sibling's row must defer to its owner"
+    );
+    let connection = survivor_b.reader_connection_for_test()?;
+    let mut statement = connection
+        .prepare("SELECT request_id, state FROM chio_dispatch_intents ORDER BY request_id")?;
+    let states = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(
+        states,
+        vec![
+            ("req-crashed".to_string(), "dead_letter".to_string()),
+            ("req-live-b".to_string(), "open".to_string()),
+            ("req-live-c".to_string(), "open".to_string()),
+        ],
+        "exactly the crashed owner's row is claimed; both live rows stay open"
+    );
+    drop(statement);
+    drop(connection);
+
+    // C's own pass afterwards finds nothing left to claim and defers B's
+    // row to B.
+    let report = survivor_c.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(report.dead_lettered, 0);
+    assert_eq!(report.deferred_to_live_writer, 1);
+
+    // Sidecar hygiene: the claimed owner's mark file was removed with its
+    // rows, and clean closes remove their own, so opens do not accumulate
+    // one file per store lifetime.
+    drop(survivor_b);
+    drop(survivor_c);
+    let db_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or("database file name")?
+        .to_string();
+    let leftover: Vec<String> = std::fs::read_dir(path.parent().ok_or("database parent dir")?)?
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| entry.file_name().to_str().map(String::from))
+        .filter(|name| name.starts_with(&db_name) && name.contains(".owner-"))
+        .collect();
+    assert!(
+        leftover.is_empty(),
+        "owner mark files must not accumulate: {leftover:?}"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn concurrent_survivor_passes_claim_only_the_crashed_owners_row(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Two survivors reconciling at the same time must together claim the
+    // crashed owner's row exactly once and never each other's: passes are
+    // serialized on the probe mutex, and each pass judges liveness against
+    // owner marks it never holds itself.
+    let path = unique_db_path("chio-intents-concurrent-survivors");
+    let crashed = SqliteReceiptStore::open(&path)?;
+    crashed.record_dispatch_intent(&sample_intent("req-crashed"))?;
+    let store_b = std::sync::Arc::new(SqliteReceiptStore::open(&path)?);
+    store_b.record_dispatch_intent(&sample_intent("req-live-b"))?;
+    let store_c = std::sync::Arc::new(SqliteReceiptStore::open(&path)?);
+    store_c.record_dispatch_intent(&sample_intent("req-live-c"))?;
+    drop(crashed);
+
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+    let claimed = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let mut workers = Vec::new();
+    for store in [
+        std::sync::Arc::clone(&store_b),
+        std::sync::Arc::clone(&store_c),
+    ] {
+        let barrier = std::sync::Arc::clone(&barrier);
+        let claimed = std::sync::Arc::clone(&claimed);
+        workers.push(std::thread::spawn(
+            move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+                for _ in 0..500 {
+                    // Rendezvous each pass so the probes run as close to
+                    // simultaneously as the scheduler allows.
+                    barrier.wait();
+                    let report = store.reconcile_dispatch_intents(&RecordingReconciler)?;
+                    claimed.fetch_add(report.dead_lettered, std::sync::atomic::Ordering::SeqCst);
+                }
+                Ok(())
+            },
+        ));
+    }
+    for worker in workers {
+        worker
+            .join()
+            .map_err(|_| "reconcile worker panicked")?
+            .map_err(|error| error.to_string())?;
+    }
+
+    assert_eq!(
+        claimed.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the crashed owner's row must be claimed exactly once, and no live row ever"
+    );
+    assert_eq!(
+        open_intent_row_count(&store_b)?,
+        2,
+        "both survivors' live intents must stay open through every pass"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn rows_naming_no_owner_claim_only_under_whole_file_exclusivity(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // A row journaled before owner tokens existed names no owner mark to
+    // probe, so the only safe claim is the original whole-file one: prove
+    // no sibling is live at all. While any sibling survives the row
+    // defers; a true single-writer restart still reconciles it.
+    let path = unique_db_path("chio-intents-unattributed");
+    {
+        let legacy = SqliteReceiptStore::open(&path)?;
+        legacy.record_dispatch_intent(&sample_intent("req-unattributed"))?;
+    }
+    let connection = rusqlite::Connection::open(&path)?;
+    connection.execute("UPDATE chio_dispatch_intents SET owner_token = NULL", [])?;
+    drop(connection);
+
+    let survivor = SqliteReceiptStore::open(&path)?;
+    let sibling = SqliteReceiptStore::open(&path)?;
+    let deferred = survivor.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(
+        deferred.dead_lettered, 0,
+        "an unattributable row must not be claimed while a sibling could own it"
+    );
+    assert_eq!(deferred.deferred_to_live_writer, 1);
+
+    drop(sibling);
+    let report = survivor.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(
+        report.dead_lettered, 1,
+        "a single surviving writer still claims unattributable rows"
     );
 
     let _ = std::fs::remove_file(&path);
