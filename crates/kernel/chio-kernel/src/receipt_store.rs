@@ -734,10 +734,13 @@ pub trait ReceiptStore: Send + Sync {
     }
     /// Best-effort attach of a rail authorization id to an open monetary
     /// intent, so a monetary orphan names the exact reference an operator
-    /// reconciles against.
+    /// reconciles against. Keyed on the intent's (tenant, request id)
+    /// identity: request ids are only unique within a tenant, so the tenant
+    /// travels with the attach to keep it off another tenant's row.
     fn attach_dispatch_intent_rail_ref(
         &self,
         _request_id: &str,
+        _tenant_id: Option<&str>,
         _rail_authorization_id: &str,
     ) -> Result<(), ReceiptStoreError> {
         Err(ReceiptStoreError::Conflict(
@@ -751,10 +754,11 @@ pub trait ReceiptStore: Send + Sync {
     fn attach_dispatch_intent_rail_ref_with_timeout(
         &self,
         request_id: &str,
+        tenant_id: Option<&str>,
         rail_authorization_id: &str,
         _budget: std::time::Duration,
     ) -> Result<(), ReceiptStoreError> {
-        self.attach_dispatch_intent_rail_ref(request_id, rail_authorization_id)
+        self.attach_dispatch_intent_rail_ref(request_id, tenant_id, rail_authorization_id)
     }
     /// Delete the open intent matching `key` for an evaluation that exits
     /// WITHOUT dispatching the tool and without a terminal receipt (a URL

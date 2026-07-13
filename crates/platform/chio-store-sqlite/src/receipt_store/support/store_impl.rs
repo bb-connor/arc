@@ -382,20 +382,28 @@ impl ReceiptStore for SqliteReceiptStore {
     fn attach_dispatch_intent_rail_ref(
         &self,
         request_id: &str,
+        tenant_id: Option<&str>,
         rail_authorization_id: &str,
     ) -> Result<(), ReceiptStoreError> {
-        SqliteReceiptStore::attach_dispatch_intent_rail_ref(self, request_id, rail_authorization_id)
+        SqliteReceiptStore::attach_dispatch_intent_rail_ref(
+            self,
+            request_id,
+            tenant_id,
+            rail_authorization_id,
+        )
     }
 
     fn attach_dispatch_intent_rail_ref_with_timeout(
         &self,
         request_id: &str,
+        tenant_id: Option<&str>,
         rail_authorization_id: &str,
         budget: std::time::Duration,
     ) -> Result<(), ReceiptStoreError> {
         SqliteReceiptStore::attach_dispatch_intent_rail_ref_with_timeout(
             self,
             request_id,
+            tenant_id,
             rail_authorization_id,
             budget,
         )

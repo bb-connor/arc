@@ -3410,16 +3410,18 @@ impl SqliteReceiptStore {
     }
 
     /// Attach a rail authorization id to the open monetary intent for
-    /// `request_id`. Best-effort from the caller's perspective (`NotFound`
-    /// when the intent was already consumed or never written), but the update
-    /// itself commits durably on the single writer.
+    /// `(tenant_id, request_id)`. Best-effort from the caller's perspective
+    /// (`NotFound` when the intent was already consumed or never written),
+    /// but the update itself commits durably on the single writer.
     pub fn attach_dispatch_intent_rail_ref(
         &self,
         request_id: &str,
+        tenant_id: Option<&str>,
         rail_authorization_id: &str,
     ) -> Result<(), ReceiptStoreError> {
         self.writer_handle().run_write(dispatch_intent_rail_ref_job(
             request_id,
+            tenant_id,
             rail_authorization_id,
         ))
     }
@@ -3430,11 +3432,12 @@ impl SqliteReceiptStore {
     pub fn attach_dispatch_intent_rail_ref_with_timeout(
         &self,
         request_id: &str,
+        tenant_id: Option<&str>,
         rail_authorization_id: &str,
         budget: Duration,
     ) -> Result<(), ReceiptStoreError> {
         self.writer_handle().run_write_with_timeout(
-            dispatch_intent_rail_ref_job(request_id, rail_authorization_id),
+            dispatch_intent_rail_ref_job(request_id, tenant_id, rail_authorization_id),
             budget,
         )
     }
@@ -3640,14 +3643,18 @@ impl SqliteReceiptStore {
             }
         };
         let claim = (|| {
-            let mut dead_letters: Vec<(String, String)> = Vec::new();
-            let mut reconciled: Vec<(String, String)> = Vec::new();
-            let mut replayable: Vec<String> = Vec::new();
+            let mut dead_letters: Vec<(String, Option<String>, String)> = Vec::new();
+            let mut reconciled: Vec<(String, Option<String>, String)> = Vec::new();
+            let mut replayable: Vec<(String, Option<String>)> = Vec::new();
             for intent in &claimable {
                 match reconciler.resolve(intent)? {
                     DispatchIntentResolution::DeadLetter { detail } => {
                         report.dead_lettered += 1;
-                        dead_letters.push((intent.request_id.clone(), detail));
+                        dead_letters.push((
+                            intent.request_id.clone(),
+                            intent.tenant_id.clone(),
+                            detail,
+                        ));
                     }
                     DispatchIntentResolution::MonetaryReconciled { rail_reference } => {
                         // A rail-proven outcome gets its own terminal state:
@@ -3657,33 +3664,37 @@ impl SqliteReceiptStore {
                         report.monetary_reconciled += 1;
                         reconciled.push((
                             intent.request_id.clone(),
+                            intent.tenant_id.clone(),
                             format!("monetary reconciled; rail_reference={rail_reference}"),
                         ));
                     }
                     DispatchIntentResolution::SafeToReplay => {
                         // The reconciler proved the effect never ran, so the
                         // resolution is to run the request again. The replay
-                        // journals its own intent under the same request id
-                        // (the journal's primary key), so the row must be
-                        // released outright: any survivor would refuse the
-                        // replay's pre-dispatch insert and fail the request
-                        // before the tool runs.
+                        // journals its own intent under the same (tenant,
+                        // request id) identity, so the row must be released
+                        // outright: any survivor would refuse the replay's
+                        // pre-dispatch insert and fail the request before
+                        // the tool runs.
                         report.replayed += 1;
-                        replayable.push(intent.request_id.clone());
+                        replayable.push((intent.request_id.clone(), intent.tenant_id.clone()));
                     }
                 }
             }
+            // Every resolution write is keyed on the claimed row's (tenant,
+            // request id) identity so a live tenant's intent sharing the
+            // request id is never resolved alongside the orphan.
             self.writer_handle().run_write(move |connection| {
                 let tx = connection
                     .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-                for (request_id, detail) in &dead_letters {
-                    dead_letter_dispatch_intent_tx(&tx, request_id, detail)?;
+                for (request_id, tenant_id, detail) in &dead_letters {
+                    dead_letter_dispatch_intent_tx(&tx, request_id, tenant_id.as_deref(), detail)?;
                 }
-                for (request_id, detail) in &reconciled {
-                    reconcile_dispatch_intent_tx(&tx, request_id, detail)?;
+                for (request_id, tenant_id, detail) in &reconciled {
+                    reconcile_dispatch_intent_tx(&tx, request_id, tenant_id.as_deref(), detail)?;
                 }
-                for request_id in &replayable {
-                    release_dispatch_intent_for_replay_tx(&tx, request_id)?;
+                for (request_id, tenant_id) in &replayable {
+                    release_dispatch_intent_for_replay_tx(&tx, request_id, tenant_id.as_deref())?;
                 }
                 tx.commit()?;
                 Ok(())

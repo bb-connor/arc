@@ -13,11 +13,13 @@ fn side_effect_class_str(class: SideEffectClass) -> &'static str {
     }
 }
 
-/// Insert a dispatch intent. `request_id` is the primary key: a second insert
-/// for the same id collides and is rejected fail-closed rather than
-/// duplicating an effect record. `owner_token` names the inserting store
-/// instance so reconciliation can tell this instance's live work from
-/// another instance's rows.
+/// Insert a dispatch intent. A row's identity is (tenant, request id):
+/// request ids are caller-supplied and only unique within a tenant, so a
+/// second insert reusing the id inside the SAME tenant scope collides and is
+/// rejected fail-closed rather than duplicating an effect record, while an
+/// unrelated tenant's request with the same id journals independently.
+/// `owner_token` names the inserting store instance so reconciliation can
+/// tell this instance's live work from another instance's rows.
 pub(crate) fn insert_dispatch_intent_tx(
     tx: &rusqlite::Transaction<'_>,
     intent: &DispatchIntentRecord,
@@ -29,7 +31,7 @@ pub(crate) fn insert_dispatch_intent_tx(
             side_effect_class, monetary, rail, rail_authorization_id, tenant_id,
             created_at_unix_ms, state, owner_token
         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'open', ?12)
-        ON CONFLICT(request_id) DO NOTHING",
+        ON CONFLICT(COALESCE(tenant_id, ''), request_id) DO NOTHING",
         rusqlite::params![
             intent.request_id.as_str(),
             intent.capability_id.as_str(),
@@ -50,7 +52,7 @@ pub(crate) fn insert_dispatch_intent_tx(
     )?;
     if changed == 0 {
         return Err(ReceiptStoreError::Conflict(format!(
-            "dispatch intent for request `{}` already exists",
+            "dispatch intent for request `{}` already exists in its tenant scope",
             intent.request_id
         )));
     }
@@ -118,7 +120,8 @@ pub(crate) fn dispatch_intent_insert_job_unless_abandoned(
 /// deletes the intent row only when the shared `landed` slot proves THIS
 /// attempt's insert committed it. The timed-out attempt may have been a
 /// retry or concurrent duplicate of a request whose intent is already open
-/// from an earlier invocation; that insert refuses on the primary key, and
+/// from an earlier invocation; that insert refuses on the tenant-scoped
+/// uniqueness of the request id, and
 /// an unconditional delete here would erase the earlier invocation's durable
 /// crash marker and reject its terminal receipt's consume. FIFO order on the
 /// single writer runs this job strictly after the insert, so the slot is
@@ -147,29 +150,41 @@ pub(crate) fn dispatch_intent_sweep_landed_job(
 /// own immediate transaction. Shared by the bounded and unbounded paths.
 pub(crate) fn dispatch_intent_rail_ref_job(
     request_id: &str,
+    tenant_id: Option<&str>,
     rail_authorization_id: &str,
 ) -> impl FnOnce(&mut SqliteStoreConnection) -> Result<(), ReceiptStoreError> + Send + 'static {
     let request_id = request_id.to_string();
+    let tenant_id = tenant_id.map(str::to_string);
     let rail_authorization_id = rail_authorization_id.to_string();
     move |connection| {
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        attach_dispatch_intent_rail_ref_tx(&tx, &request_id, &rail_authorization_id)?;
+        attach_dispatch_intent_rail_ref_tx(
+            &tx,
+            &request_id,
+            tenant_id.as_deref(),
+            &rail_authorization_id,
+        )?;
         tx.commit()?;
         Ok(())
     }
 }
 
 /// Attach a rail authorization id to an open monetary intent (best-effort).
-/// Zero rows changed (already consumed, or never written) is `NotFound`.
+/// Keyed on the row's (tenant, request id) identity so a tenant's attach can
+/// never annotate another tenant's row sharing the request id. Zero rows
+/// changed (already consumed, or never written) is `NotFound`.
 pub(crate) fn attach_dispatch_intent_rail_ref_tx(
     tx: &rusqlite::Transaction<'_>,
     request_id: &str,
+    tenant_id: Option<&str>,
     rail_authorization_id: &str,
 ) -> Result<(), ReceiptStoreError> {
     let changed = tx.execute(
-        "UPDATE chio_dispatch_intents SET rail_authorization_id = ?2 \
-         WHERE request_id = ?1 AND state = 'open'",
-        rusqlite::params![request_id, rail_authorization_id],
+        "UPDATE chio_dispatch_intents SET rail_authorization_id = ?3 \
+         WHERE request_id = ?1 \
+           AND ((tenant_id IS NULL AND ?2 IS NULL) OR tenant_id = ?2) \
+           AND state = 'open'",
+        rusqlite::params![request_id, tenant_id, rail_authorization_id],
     )?;
     if changed == 0 {
         return Err(ReceiptStoreError::NotFound(format!(
@@ -347,16 +362,21 @@ pub(crate) fn select_open_dispatch_intents_excluding_owner(
 }
 
 /// Mark an orphaned intent as a durable, operator-visible dead-letter
-/// incident, recording the reconciler's outcome annotation.
+/// incident, recording the reconciler's outcome annotation. Keyed on the
+/// row's (tenant, request id) identity: another tenant's still-live intent
+/// sharing the request id must never be swept into the incident.
 pub(crate) fn dead_letter_dispatch_intent_tx(
     tx: &rusqlite::Transaction<'_>,
     request_id: &str,
+    tenant_id: Option<&str>,
     detail: &str,
 ) -> Result<(), ReceiptStoreError> {
     tx.execute(
-        "UPDATE chio_dispatch_intents SET state = 'dead_letter', resolution_detail = ?2 \
-         WHERE request_id = ?1 AND state = 'open'",
-        rusqlite::params![request_id, detail],
+        "UPDATE chio_dispatch_intents SET state = 'dead_letter', resolution_detail = ?3 \
+         WHERE request_id = ?1 \
+           AND ((tenant_id IS NULL AND ?2 IS NULL) OR tenant_id = ?2) \
+           AND state = 'open'",
+        rusqlite::params![request_id, tenant_id, detail],
     )?;
     Ok(())
 }
@@ -365,34 +385,42 @@ pub(crate) fn dead_letter_dispatch_intent_tx(
 /// against the rail as terminally reconciled. Distinct from a dead letter:
 /// the outcome is known, so the row must not count as an outcome-unknown
 /// incident or flip store health; the annotation preserves the rail
-/// reference the proof came from.
+/// reference the proof came from. Keyed on (tenant, request id) like every
+/// resolution write.
 pub(crate) fn reconcile_dispatch_intent_tx(
     tx: &rusqlite::Transaction<'_>,
     request_id: &str,
+    tenant_id: Option<&str>,
     detail: &str,
 ) -> Result<(), ReceiptStoreError> {
     tx.execute(
-        "UPDATE chio_dispatch_intents SET state = 'reconciled', resolution_detail = ?2 \
-         WHERE request_id = ?1 AND state = 'open'",
-        rusqlite::params![request_id, detail],
+        "UPDATE chio_dispatch_intents SET state = 'reconciled', resolution_detail = ?3 \
+         WHERE request_id = ?1 \
+           AND ((tenant_id IS NULL AND ?2 IS NULL) OR tenant_id = ?2) \
+           AND state = 'open'",
+        rusqlite::params![request_id, tenant_id, detail],
     )?;
     Ok(())
 }
 
 /// Delete an orphaned intent whose effect the reconciler PROVED never ran,
 /// so the request is safe to run again. The replay travels the normal
-/// pre-dispatch path and journals its own intent under the same request id
-/// (the journal's primary key), so no row may survive in any state: a
-/// leftover would refuse the replay's insert and fail the request before
-/// the tool runs. Zero rows changed is tolerated, matching the other
-/// resolution writes (the row was already consumed or cleared).
+/// pre-dispatch path and journals its own intent under the same (tenant,
+/// request id) identity, so no row may survive in any state: a leftover
+/// would refuse the replay's insert and fail the request before the tool
+/// runs. Zero rows changed is tolerated, matching the other resolution
+/// writes (the row was already consumed or cleared).
 pub(crate) fn release_dispatch_intent_for_replay_tx(
     tx: &rusqlite::Transaction<'_>,
     request_id: &str,
+    tenant_id: Option<&str>,
 ) -> Result<(), ReceiptStoreError> {
     tx.execute(
-        "DELETE FROM chio_dispatch_intents WHERE request_id = ?1 AND state = 'open'",
-        rusqlite::params![request_id],
+        "DELETE FROM chio_dispatch_intents \
+         WHERE request_id = ?1 \
+           AND ((tenant_id IS NULL AND ?2 IS NULL) OR tenant_id = ?2) \
+           AND state = 'open'",
+        rusqlite::params![request_id, tenant_id],
     )?;
     Ok(())
 }

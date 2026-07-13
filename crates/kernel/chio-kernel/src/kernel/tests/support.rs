@@ -110,7 +110,7 @@ impl SqliteReceiptStore {
                 );
 
                 CREATE TABLE IF NOT EXISTS chio_dispatch_intents (
-                    request_id            TEXT PRIMARY KEY,
+                    request_id            TEXT NOT NULL,
                     capability_id         TEXT NOT NULL,
                     tool_server           TEXT NOT NULL,
                     tool_name             TEXT NOT NULL,
@@ -124,6 +124,8 @@ impl SqliteReceiptStore {
                     state                 TEXT NOT NULL DEFAULT 'open',
                     resolution_detail     TEXT
                 );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_chio_dispatch_intents_tenant_request
+                    ON chio_dispatch_intents(COALESCE(tenant_id, ''), request_id);
                 "#,
         )?;
         Ok(Self {
@@ -475,7 +477,7 @@ impl ReceiptStore for SqliteReceiptStore {
                     parameter_hash, side_effect_class, monetary, rail,
                     rail_authorization_id, tenant_id, created_at_unix_ms, state
                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'open')
-                ON CONFLICT(request_id) DO NOTHING
+                ON CONFLICT(COALESCE(tenant_id, ''), request_id) DO NOTHING
                 "#,
             params![
                 intent.request_id,
@@ -493,7 +495,7 @@ impl ReceiptStore for SqliteReceiptStore {
         )?;
         if changed == 0 {
             return Err(ReceiptStoreError::Conflict(format!(
-                "dispatch intent for request `{}` already exists",
+                "dispatch intent for request `{}` already exists in its tenant scope",
                 intent.request_id
             )));
         }
@@ -559,12 +561,15 @@ impl ReceiptStore for SqliteReceiptStore {
     fn attach_dispatch_intent_rail_ref(
         &self,
         request_id: &str,
+        tenant_id: Option<&str>,
         rail_authorization_id: &str,
     ) -> Result<(), ReceiptStoreError> {
         let changed = self.connection()?.execute(
-            "UPDATE chio_dispatch_intents SET rail_authorization_id = ?2 \
-             WHERE request_id = ?1 AND state = 'open'",
-            params![request_id, rail_authorization_id],
+            "UPDATE chio_dispatch_intents SET rail_authorization_id = ?3 \
+             WHERE request_id = ?1 \
+               AND ((tenant_id IS NULL AND ?2 IS NULL) OR tenant_id = ?2) \
+               AND state = 'open'",
+            params![request_id, tenant_id, rail_authorization_id],
         )?;
         if changed == 0 {
             return Err(ReceiptStoreError::NotFound(format!(

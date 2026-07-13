@@ -617,6 +617,7 @@ impl ChioKernel {
                 if let Err(error) = self.with_receipt_store(|store| {
                     Ok(store.attach_dispatch_intent_rail_ref_with_timeout(
                         &handle.request_id,
+                        handle.tenant_id.as_deref(),
                         &authorization.authorization_id,
                         budget,
                     )?)

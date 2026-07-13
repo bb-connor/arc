@@ -72,7 +72,7 @@ fn attach_rail_ref_updates_open_intent_and_notfound_when_absent(
     let store = SqliteReceiptStore::open(&path)?;
     store.record_dispatch_intent(&sample_intent("req-M"))?;
 
-    store.attach_dispatch_intent_rail_ref("req-M", "auth-xyz")?;
+    store.attach_dispatch_intent_rail_ref("req-M", None, "auth-xyz")?;
     let connection = store.reader_connection_for_test()?;
     let attached: String = connection.query_row(
         "SELECT rail_authorization_id FROM chio_dispatch_intents WHERE request_id = 'req-M'",
@@ -83,8 +83,61 @@ fn attach_rail_ref_updates_open_intent_and_notfound_when_absent(
 
     // Attaching to a non-existent intent reports NotFound; the best-effort
     // caller logs and continues.
-    let missing = store.attach_dispatch_intent_rail_ref("req-absent", "auth-1");
+    let missing = store.attach_dispatch_intent_rail_ref("req-absent", None, "auth-1");
     assert!(missing.is_err());
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn same_request_id_journals_independently_across_tenants() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("chio-intents-tenant-scope");
+    let store = SqliteReceiptStore::open(&path)?;
+
+    let mut tenant_a = sample_intent("req-shared");
+    tenant_a.tenant_id = Some("tenant-a".to_string());
+    let mut tenant_b = sample_intent("req-shared");
+    tenant_b.tenant_id = Some("tenant-b".to_string());
+
+    // Request ids are caller-supplied and only unique within a tenant: one
+    // tenant's open intent must not deny an unrelated tenant's request that
+    // reuses the id.
+    store.record_dispatch_intent(&tenant_a)?;
+    store.record_dispatch_intent(&tenant_b)?;
+    assert_eq!(open_intent_row_count(&store)?, 2);
+
+    // Within one tenant the id still journals exactly once.
+    let same_tenant = store.record_dispatch_intent(&tenant_a);
+    assert!(same_tenant.is_err(), "same-tenant duplicate must conflict");
+
+    // Tenantless rows conflict with each other too: the unique index folds
+    // a NULL tenant to '', where a plain UNIQUE constraint would admit
+    // duplicate NULLs.
+    store.record_dispatch_intent(&sample_intent("req-tenantless"))?;
+    let no_tenant = store.record_dispatch_intent(&sample_intent("req-tenantless"));
+    assert!(no_tenant.is_err(), "no-tenant duplicate must conflict");
+
+    // The rail-ref attach is keyed to its own tenant's row and never
+    // annotates the other tenant's row sharing the request id.
+    store.attach_dispatch_intent_rail_ref("req-shared", Some("tenant-a"), "auth-a")?;
+    let connection = store.reader_connection_for_test()?;
+    let mut statement = connection.prepare(
+        "SELECT tenant_id, rail_authorization_id FROM chio_dispatch_intents \
+         WHERE request_id = 'req-shared' ORDER BY tenant_id",
+    )?;
+    let rows: Vec<(Option<String>, Option<String>)> = statement
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+        .collect::<Result<_, _>>()?;
+    assert_eq!(
+        rows,
+        vec![
+            (Some("tenant-a".to_string()), Some("auth-a".to_string())),
+            (Some("tenant-b".to_string()), None),
+        ],
+        "the attach lands on exactly its tenant's row"
+    );
 
     let _ = std::fs::remove_file(&path);
     Ok(())
@@ -355,7 +408,8 @@ fn duplicate_timeout_does_not_clear_the_preexisting_open_intent(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // A retry (or concurrent duplicate) of a request that already has an
     // open intent can time out on a slow writer. Its queued insert then
-    // refuses (abandoned marker, or the primary key it collides with), so
+    // refuses (abandoned marker, or the tenant-scoped request id it
+    // collides with), so
     // the compensating sweep behind it has nothing of its own to delete:
     // removing the first invocation's row would erase that call's durable
     // crash marker and reject its terminal receipt's consume.
@@ -586,6 +640,57 @@ fn surviving_writer_reclaims_a_crashed_siblings_orphan_without_restarting(
     assert_eq!(
         survivor_state, "open",
         "the survivor's own in-flight intent must never be claimed"
+    );
+    assert_eq!(orphan_state, "dead_letter");
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn crashed_tenants_orphan_never_dead_letters_a_live_tenants_same_id_intent(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Two tenants share a request id; the writer that journaled tenant-b's
+    // intent crashes while tenant-a's writer stays live with its own
+    // in-flight intent. Reconciliation must claim exactly the orphan: every
+    // resolution write is keyed on (tenant, request id), so the live
+    // tenant's row is never swept into the incident.
+    let path = unique_db_path("chio-intents-tenant-reconcile");
+    let survivor = SqliteReceiptStore::open(&path)?;
+    let mut live = sample_intent("req-shared");
+    live.tenant_id = Some("tenant-a".to_string());
+    survivor.record_dispatch_intent(&live)?;
+
+    let doomed = SqliteReceiptStore::open(&path)?;
+    let mut orphan = sample_intent("req-shared");
+    orphan.tenant_id = Some("tenant-b".to_string());
+    doomed.record_dispatch_intent(&orphan)?;
+    drop(doomed);
+
+    let recovered = survivor.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(
+        recovered.dead_lettered, 1,
+        "exactly the crashed tenant's orphan surfaces"
+    );
+
+    let connection = survivor.reader_connection_for_test()?;
+    let (live_state, orphan_state): (String, String) = (
+        connection.query_row(
+            "SELECT state FROM chio_dispatch_intents \
+             WHERE request_id = 'req-shared' AND tenant_id = 'tenant-a'",
+            [],
+            |row| row.get(0),
+        )?,
+        connection.query_row(
+            "SELECT state FROM chio_dispatch_intents \
+             WHERE request_id = 'req-shared' AND tenant_id = 'tenant-b'",
+            [],
+            |row| row.get(0),
+        )?,
+    );
+    assert_eq!(
+        live_state, "open",
+        "a live tenant's same-id intent must never be dead-lettered"
     );
     assert_eq!(orphan_state, "dead_letter");
 
@@ -1032,9 +1137,9 @@ fn safe_to_replay_frees_the_request_id_for_a_fresh_dispatch(
     // "Safe to replay" means the reconciler PROVED the effect never ran and
     // the resolution is to run the request again. The replay travels the
     // normal pre-dispatch path, which journals its own intent under the
-    // same request id, so the proven-effectless row must not survive: the
-    // request id is the journal's primary key, and any leftover row would
-    // refuse the replay's insert and fail the request before the tool runs.
+    // same (tenant, request id) identity, so the proven-effectless row must
+    // not survive: any leftover row would refuse the replay's insert and
+    // fail the request before the tool runs.
     let path = unique_db_path("chio-intents-safe-to-replay");
     {
         let store = SqliteReceiptStore::open(&path)?;

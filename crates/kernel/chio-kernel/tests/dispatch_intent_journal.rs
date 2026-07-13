@@ -856,7 +856,7 @@ fn journal_trait_methods_fail_closed_by_default() {
         )
         .is_err());
     assert!(store
-        .attach_dispatch_intent_rail_ref("req-1", "auth-1")
+        .attach_dispatch_intent_rail_ref("req-1", None, "auth-1")
         .is_err());
 
     // Reconcile is a no-op default: a store without the journal has no orphans.

@@ -52,9 +52,16 @@ const RECEIPT_STORE_GENERIC_LEGACY_ANCHOR_TABLES: &[&str] = &["http_receipts", "
 /// pass safe to re-run while serving: liveness comes from the sidecar
 /// writer mark, identity from the token, and neither involves a clock (a
 /// paused-but-live writer keeps both).
+///
+/// A row's identity is (tenant, request id): request ids are caller-supplied
+/// and only unique within a tenant, so tenant-scoped uniqueness keeps one
+/// tenant's open or dead-letter intent from blocking an unrelated tenant's
+/// request that reuses the id. The unique index folds a NULL tenant to ''
+/// (a nullable column in a plain UNIQUE constraint would admit duplicate
+/// NULLs), so tenantless rows still conflict with each other.
 const DISPATCH_INTENT_JOURNAL_DDL: &str = r#"
     CREATE TABLE IF NOT EXISTS chio_dispatch_intents (
-        request_id            TEXT PRIMARY KEY,
+        request_id            TEXT NOT NULL,
         capability_id         TEXT NOT NULL,
         tool_server           TEXT NOT NULL,
         tool_name             TEXT NOT NULL,
@@ -69,6 +76,8 @@ const DISPATCH_INTENT_JOURNAL_DDL: &str = r#"
         resolution_detail     TEXT,
         owner_token           TEXT
     );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_chio_dispatch_intents_tenant_request
+        ON chio_dispatch_intents(COALESCE(tenant_id, ''), request_id);
     CREATE INDEX IF NOT EXISTS idx_chio_dispatch_intents_state
         ON chio_dispatch_intents(state);
 "#;
