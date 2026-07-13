@@ -28,6 +28,7 @@ run_tests() {
 }
 
 run_tests "broker capability and proof binding" cargo test -p chio-secret-broker --test execution
+run_tests "production transport API is sealed" cargo test -p chio-secret-broker --doc
 run_tests "broker execution concurrency and recovery" cargo test -p chio-secret-broker --test concurrency
 run_tests "broker isolation secret boundary" cargo test -p chio-secret-broker --test no_secret_crossing
 run_tests "broker network adversarial cases" cargo test -p chio-secret-broker --test network_adversarial
