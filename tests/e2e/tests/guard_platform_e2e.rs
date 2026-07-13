@@ -156,7 +156,6 @@ fn loaded_allowing_backend(bytes: &[u8]) -> Result<Box<dyn WasmGuardAbi>, WasmGu
 fn capability_request() -> (ToolCallRequest, ChioScope, String, String) {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let signer = Keypair::generate();
     let scope = ChioScope::default();
     let capability = CapabilityToken::sign(
         CapabilityTokenBody {
@@ -169,7 +168,7 @@ fn capability_request() -> (ToolCallRequest, ChioScope, String, String) {
             delegation_chain: vec![],
             aggregate_invocation_budget: None,
         },
-        &signer,
+        &issuer,
     )
     .unwrap_or_else(|err| panic!("capability signing failed: {err}"));
 
@@ -198,7 +197,6 @@ fn temp_incident_root() -> PathBuf {
 }
 
 #[test]
-#[ignore = "e2e gate: requires the full guard-platform harness; run explicitly"]
 fn publish_pull_verify_swap_rollback_and_metrics_gate() {
     let manifest_wit_world = Some(REQUIRED_WIT_WORLD.to_string());
     verify_wit_world(manifest_wit_world.as_deref())
