@@ -199,16 +199,6 @@ Commit: `test(security): lock budget and governed approval baseline`
 **Work:**
 
 - [ ] Add `AggregateInvocationBudget`, `AggregateInvocationScope`, `AggregateBudgetRootBindingBody`, and `AggregateBudgetRootBinding` with strict serde shapes.
-- [ ] Add a domain-separated `CumulativeApprovalRootBinding` for delegable
-  `RequireApprovalAbove`. It binds the CA-authenticated family root, root subject
-  and scope, approval budget id/epoch, currency, threshold and expiry. Every
-  descendant preserves its canonical bytes; a delegated cumulative constraint
-  without that binding rejects.
-- [ ] Add `cumulative_approval_root_binding: Option<...>` to the strict capability
-  body and signing/attenuation projections. It is absent for a nondelegable direct
-  constraint and required for every delegable root or descendant. Attenuation may
-  narrow threshold/expiry only as the signed binding permits and never replace
-  family, budget id/epoch, currency, subject, or scope.
 - [ ] Add `aggregate_invocation_budget: Option<...>` to both `CapabilityToken` and `CapabilityTokenBody`. `CapabilityTokenSigningBody` and `CapabilityTokenAttenuationBody` receive it through their flattened `CapabilityTokenBody`; do not add a second serialized field.
 - [ ] Update `CapabilityToken::body()`, `sign`, `sign_with_backend`, `sign_attenuated`, token reconstruction, verification, and every issuance constructor. This is required because the public sign APIs accept `CapabilityTokenBody`.
 - [ ] Use `skip_serializing_if = "Option::is_none"` in the body and prove an absent field preserves the exact prior canonical signing bytes. Disable legacy-body fallback whenever the field is present.
@@ -235,8 +225,6 @@ Commit: `test(security): lock budget and governed approval baseline`
 - family-budget omission rejected
 - capability-scoped budget with delegate authority rejected
 - root and descendants derive the same family owner
-- cumulative-approval siblings derive the same bound family owner; omission,
-  mutation or delegated creation of the binding rejects
 - forged root capability ID rejected
 - forged root commitment hash rejected
 - wrong root issuer or signature rejected
@@ -259,6 +247,12 @@ Commit: `feat(core-types): add aggregate invocation budget`
 **Files:**
 
 - Modify `crates/core/chio-core-types/src/capability/features.rs`
+- Modify `crates/core/chio-core-types/src/capability/token.rs`
+- Modify `crates/core/chio-core-types/src/capability/attenuation.rs`
+- Modify `crates/core/chio-core-types/src/capability/validation.rs`
+- Modify `crates/core/chio-core-types/src/capability/scope.rs`
+- Modify `crates/core/chio-core-types/src/delegation_receipt.rs` if needed for the attenuation projection
+- Modify capability-authority issuance in `crates/kernel/chio-kernel/` and `crates/platform/chio-control-plane/`
 - Modify capability-verification entry points in `crates/kernel/chio-kernel-core/src/capability_verify.rs`
 - Modify portable entry points in `chio-kernel-browser`, `chio-kernel-mobile`, and `chio-cpp-kernel-ffi`
 - Modify federation handshake tests in `crates/trust/chio-federation/`
@@ -272,10 +266,22 @@ Commit: `feat(core-types): add aggregate invocation budget`
   cumulative_approval_root_binding: Option<CumulativeApprovalRootBinding> }` wire
   form with conditional root-binding requirements. An old per-request
   threshold never silently claims cumulative enforcement.
+- [ ] Add a domain-separated `CumulativeApprovalRootBinding` for delegable
+  `RequireApprovalAbove`. It binds the CA-authenticated family root, root subject
+  and scope, approval budget id/epoch, currency, threshold and expiry. Every
+  descendant preserves its canonical bytes; a delegated cumulative constraint
+  without that binding rejects.
+- [ ] Add `cumulative_approval_root_binding: Option<...>` to the strict capability
+  body and signing/attenuation projections. It is absent for a nondelegable direct
+  constraint and required for every delegable root or descendant. Attenuation may
+  narrow threshold/expiry only as the signed binding permits and never replace
+  family, budget id/epoch, currency, subject, or scope.
 - [ ] Keep `v1_default()` disabled. Enable only in the rollout profile after storage is ready.
 - [ ] Reject a token carrying the aggregate field when the negotiated intersection does not enable it.
 - [ ] Apply the same check in browser, mobile, FFI, federation, and direct kernel entry points.
 - [ ] Add mixed-version tests proving the field is denied rather than ignored.
+- [ ] Prove cumulative-approval siblings derive the same bound family owner and
+  reject omission, mutation, or delegated creation of the binding.
 
 Commit: `feat(core-types): negotiate aggregate invocation budgets`
 
