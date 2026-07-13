@@ -3136,6 +3136,7 @@ name = "chio-core-types"
 version = "0.1.0"
 dependencies = [
  "aws-lc-rs",
+ "chio-security-types",
  "chio-spec-codegen",
  "chio-test-support",
  "ed25519-dalek 2.2.0",

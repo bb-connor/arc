@@ -31,6 +31,7 @@ ryu = { version = "1", default-features = false }
 sha2 = { version = "0.10", default-features = false }
 percent-encoding = { version = "2", default-features = false, features = ["alloc"] }
 url = { version = "2", default-features = false }
+chio-security-types = { workspace = true }
 # thiserror 1.x always generates `impl std::error::Error`, so it is only
 # available on the `std` feature path. Under `no_std`, we provide manual
 # `core::fmt::Display` + `core::error::Error` impls for every error type.
@@ -64,6 +65,7 @@ std = [
     "hex/std",
     "percent-encoding/std",
     "url/std",
+    "chio-security-types/std",
     "dep:thiserror",
 ]
 # Enables the P-256 and P-384 SigningBackend implementations backed by
