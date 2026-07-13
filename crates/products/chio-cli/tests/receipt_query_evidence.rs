@@ -70,20 +70,19 @@ fn test_shared_evidence_reporting_surfaces() {
         &local_issuer_kp,
     )
     .expect("sign local root capability");
-    let local_child = CapabilityToken::sign(
-        CapabilityTokenBody {
-            id: "cap-local-child".to_string(),
-            issuer: local_issuer_kp.public_key(),
-            subject: local_leaf_kp.public_key(),
-            scope,
-            issued_at: 1_600,
-            expires_at: 20_000,
-            delegation_chain: vec![],
-            aggregate_invocation_budget: None,
-        },
-        &local_issuer_kp,
-    )
-    .expect("sign local child capability");
+    let local_child = make_delegated_capability_token(
+        "cap-local-child",
+        &local_leaf_kp,
+        &local_root_kp,
+        &local_root,
+    );
+    let remote_root = make_capability_token("cap-remote-root", &remote_root_kp, &remote_issuer_kp);
+    let remote_delegate = make_delegated_capability_token(
+        "cap-remote-delegate",
+        &remote_delegate_kp,
+        &remote_root_kp,
+        &remote_root,
+    );
 
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
@@ -115,28 +114,8 @@ fn test_shared_evidence_reporting_surfaces() {
                     ),
                 }],
                 capability_lineage: vec![
-                    CapabilitySnapshot {
-                        capability_id: "cap-remote-root".to_string(),
-                        subject_key: remote_root_hex.clone(),
-                        issuer_key: remote_issuer_hex.clone(),
-                        issued_at: 1_000,
-                        expires_at: 20_000,
-                        grants_json: serde_json::to_string(&ChioScope::default())
-                            .expect("serialize remote root grants"),
-                        delegation_depth: 0,
-                        parent_capability_id: None,
-                    },
-                    CapabilitySnapshot {
-                        capability_id: "cap-remote-delegate".to_string(),
-                        subject_key: remote_delegate_hex.clone(),
-                        issuer_key: remote_issuer_hex.clone(),
-                        issued_at: 1_100,
-                        expires_at: 20_000,
-                        grants_json: serde_json::to_string(&ChioScope::default())
-                            .expect("serialize remote delegate grants"),
-                        delegation_depth: 1,
-                        parent_capability_id: Some("cap-remote-root".to_string()),
-                    },
+                    signed_snapshot(&remote_root),
+                    signed_snapshot(&remote_delegate),
                 ],
             })
             .expect("import federated evidence share");
@@ -381,20 +360,7 @@ fn test_behavioral_feed_export_surfaces() {
         &issuer_kp,
     )
     .expect("sign root capability");
-    let child = CapabilityToken::sign(
-        CapabilityTokenBody {
-            id: "cap-risk-child".to_string(),
-            issuer: issuer_kp.public_key(),
-            subject: leaf_kp.public_key(),
-            scope,
-            issued_at: 1_100,
-            expires_at: 10_000,
-            delegation_chain: vec![],
-            aggregate_invocation_budget: None,
-        },
-        &issuer_kp,
-    )
-    .expect("sign child capability");
+    let child = make_delegated_capability_token("cap-risk-child", &leaf_kp, &root_kp, &root);
 
     let rc_risk_2 = make_financial_receipt_with_settlement_status(
         "rc-risk-2",

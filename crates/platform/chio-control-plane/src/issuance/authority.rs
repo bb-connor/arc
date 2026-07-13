@@ -4,7 +4,10 @@ use chio_core::capability::{
     runtime_attestation::RuntimeAttestationEvidence, scope::ChioScope, token::CapabilityToken,
 };
 use chio_core::crypto::PublicKey;
-use chio_kernel::{CapabilityAuthority, KernelError};
+use chio_kernel::{
+    ensure_capability_issuance_supported, validate_issued_capability_response, CapabilityAuthority,
+    KernelError,
+};
 use chio_store_sqlite::SqliteReceiptStore;
 
 use crate::policy::{ReputationIssuancePolicy, RuntimeAssuranceIssuancePolicy};
@@ -105,7 +108,18 @@ impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
             )?;
         }
 
-        let capability = self.inner.issue_capability(subject, scope, ttl_seconds)?;
+        ensure_capability_issuance_supported(&scope)?;
+
+        let capability = self
+            .inner
+            .issue_capability(subject, scope.clone(), ttl_seconds)?;
+        validate_issued_capability_response(
+            &capability,
+            subject,
+            &scope,
+            ttl_seconds,
+            &self.inner.authority_public_key(),
+        )?;
 
         if let Some(path) = self.receipt_db_path.as_deref() {
             let store = SqliteReceiptStore::open(path)

@@ -585,22 +585,61 @@ impl ReceiptStore for SqliteReceiptStore {
         &self,
         capability_id: &str,
     ) -> Result<Option<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
-        SqliteReceiptStore::get_lineage(self, capability_id).map_err(|error| match error {
-            chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
-            chio_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
-            chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
-        })
+        // Admission resolves only exact signed-token projections. Synthetic
+        // federation anchors, legacy rows, and imported evidence remain
+        // available through explicit lineage/reporting APIs but are not roots
+        // of authority for a live kernel evaluation.
+        let snapshot =
+            SqliteReceiptStore::get_lineage(self, capability_id).map_err(|error| match error {
+                chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
+                chio_kernel::CapabilityLineageError::Sqlite(error) => {
+                    ReceiptStoreError::Sqlite(error)
+                }
+                chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
+            })?;
+        Ok(snapshot.filter(|snapshot| {
+            snapshot.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken
+        }))
     }
 
     fn get_capability_delegation_chain(
         &self,
         capability_id: &str,
     ) -> Result<Vec<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
-        SqliteReceiptStore::get_delegation_chain(self, capability_id).map_err(|error| match error {
-            chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
-            chio_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
-            chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
-        })
+        let chain =
+            SqliteReceiptStore::get_delegation_chain(self, capability_id).map_err(|error| {
+                match error {
+                    chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
+                    chio_kernel::CapabilityLineageError::Sqlite(error) => {
+                        ReceiptStoreError::Sqlite(error)
+                    }
+                    chio_kernel::CapabilityLineageError::Json(error) => {
+                        ReceiptStoreError::Json(error)
+                    }
+                }
+            })?;
+        let complete_signed_chain = chain.is_empty()
+            || (chain.first().is_some_and(|root| {
+                root.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken
+                    && root.parent_capability_id.is_none()
+                    && root.delegation_depth == 0
+            }) && chain.windows(2).all(|pair| {
+                let parent = &pair[0];
+                let child = &pair[1];
+                child.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken
+                    && child.parent_capability_id.as_deref() == Some(parent.capability_id.as_str())
+                    && parent
+                        .delegation_depth
+                        .checked_add(1)
+                        .is_some_and(|depth| child.delegation_depth == depth)
+            }) && chain
+                .last()
+                .is_some_and(|leaf| leaf.capability_id == capability_id));
+        if complete_signed_chain {
+            Ok(chain)
+        } else {
+            Ok(Vec::new())
+        }
     }
 
     fn record_session_anchor(

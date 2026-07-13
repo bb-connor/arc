@@ -942,9 +942,41 @@ fn archive_range(
 /// a write-once evidence copy, not a live database enforcing FK-cascade
 /// invariants.
 pub(super) fn create_archive_schema(
-    connection: &rusqlite::Connection,
+    connection: &mut rusqlite::Connection,
 ) -> Result<(), ReceiptStoreError> {
-    connection.execute_batch(
+    let transaction =
+        connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+    let application_id: i32 =
+        transaction.query_row("PRAGMA archive.application_id", [], |row| row.get(0))?;
+    if application_id != 0 && application_id != crate::CHIO_SQLITE_APPLICATION_ID {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "retention archive application_id {application_id:#x} is not a Chio store"
+        )));
+    }
+    let version_table_exists: bool = transaction.query_row(
+        "SELECT EXISTS(SELECT 1 FROM archive.sqlite_master WHERE type = 'table' AND name = 'chio_store_schema_versions')",
+        [],
+        |row| row.get(0),
+    )?;
+    let archive_schema_version = if version_table_exists {
+        transaction
+            .query_row(
+                "SELECT version FROM archive.chio_store_schema_versions WHERE store_key = ?1",
+                [RECEIPT_STORE_SCHEMA_KEY],
+                |row| row.get::<_, i32>(0),
+            )
+            .optional()?
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    if archive_schema_version > RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "retention archive schema version {archive_schema_version} is newer than this binary supports ({RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION})"
+        )));
+    }
+
+    transaction.execute_batch(
         r#"
         CREATE TABLE IF NOT EXISTS archive.chio_tool_receipts (
             seq INTEGER PRIMARY KEY,
@@ -973,7 +1005,11 @@ pub(super) fn create_archive_schema(
             capability_id TEXT PRIMARY KEY, subject_key TEXT NOT NULL,
             issuer_key TEXT NOT NULL, issued_at INTEGER NOT NULL,
             expires_at INTEGER NOT NULL, grants_json TEXT NOT NULL,
-            delegation_depth INTEGER NOT NULL DEFAULT 0, parent_capability_id TEXT
+            delegation_depth INTEGER NOT NULL DEFAULT 0, parent_capability_id TEXT,
+            federated_parent_capability_id TEXT,
+            provenance TEXT NOT NULL DEFAULT 'legacy_projection'
+                CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection')),
+            signed_capability_json TEXT
         );
         CREATE TABLE IF NOT EXISTS archive.claim_receipt_log_entries (
             entry_seq INTEGER PRIMARY KEY,
@@ -1033,6 +1069,60 @@ pub(super) fn create_archive_schema(
         );
         "#,
     )?;
+    for (column, definition) in [
+        ("signed_capability_json", "signed_capability_json TEXT"),
+        (
+            "federated_parent_capability_id",
+            "federated_parent_capability_id TEXT",
+        ),
+        (
+            "provenance",
+            "provenance TEXT NOT NULL DEFAULT 'legacy_projection' CHECK (provenance IN \
+             ('signed_token', 'synthetic_anchor', 'legacy_projection'))",
+        ),
+    ] {
+        let has_column = {
+            let mut statement =
+                transaction.prepare("PRAGMA archive.table_info(capability_lineage)")?;
+            let mut rows = statement.query([])?;
+            let mut found = false;
+            while let Some(row) = rows.next()? {
+                if row.get::<_, String>(1)? == column {
+                    found = true;
+                    break;
+                }
+            }
+            found
+        };
+        if !has_column {
+            transaction.execute(
+                &format!("ALTER TABLE archive.capability_lineage ADD COLUMN {definition}"),
+                [],
+            )?;
+        }
+    }
+    transaction.execute(
+        "UPDATE archive.capability_lineage SET provenance = 'signed_token' \
+         WHERE provenance = 'legacy_projection' \
+           AND signed_capability_json IS NOT NULL",
+        [],
+    )?;
+    transaction.execute_batch(&format!(
+        "PRAGMA archive.application_id = {}; \
+         CREATE TABLE IF NOT EXISTS archive.chio_store_schema_versions (\
+             store_key TEXT PRIMARY KEY, version INTEGER NOT NULL\
+         );",
+        crate::CHIO_SQLITE_APPLICATION_ID
+    ))?;
+    transaction.execute(
+        "INSERT INTO archive.chio_store_schema_versions (store_key, version) VALUES (?1, ?2) \
+         ON CONFLICT(store_key) DO UPDATE SET version = excluded.version",
+        params![
+            RECEIPT_STORE_SCHEMA_KEY,
+            RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+        ],
+    )?;
+    transaction.commit()?;
     Ok(())
 }
 
@@ -1089,7 +1179,15 @@ pub(super) fn copy_archived_prefix(
         INSERT OR IGNORE INTO archive.kernel_checkpoints
             SELECT * FROM main.kernel_checkpoints WHERE batch_end_seq <= {w};
         INSERT OR IGNORE INTO archive.capability_lineage
-            SELECT DISTINCT cl.* FROM main.capability_lineage cl
+            (capability_id, subject_key, issuer_key, issued_at, expires_at,
+             grants_json, delegation_depth, parent_capability_id,
+             federated_parent_capability_id, provenance, signed_capability_json)
+            SELECT DISTINCT cl.capability_id, cl.subject_key, cl.issuer_key,
+                   cl.issued_at, cl.expires_at, cl.grants_json,
+                   cl.delegation_depth, cl.parent_capability_id,
+                   cl.federated_parent_capability_id, cl.provenance,
+                   cl.signed_capability_json
+            FROM main.capability_lineage cl
             INNER JOIN main.chio_tool_receipts r ON r.capability_id = cl.capability_id
             WHERE r.seq IN (
                 SELECT source_seq FROM main.claim_receipt_log_entries
@@ -1325,7 +1423,10 @@ fn verify_co_archival_complete(
                  AND a.subject_key IS m.subject_key AND a.issuer_key IS m.issuer_key \
                  AND a.issued_at IS m.issued_at AND a.expires_at IS m.expires_at \
                  AND a.grants_json IS m.grants_json AND a.delegation_depth IS m.delegation_depth \
-                 AND a.parent_capability_id IS m.parent_capability_id)"
+                 AND a.parent_capability_id IS m.parent_capability_id \
+                 AND a.federated_parent_capability_id IS m.federated_parent_capability_id \
+                 AND a.provenance IS m.provenance \
+                 AND a.signed_capability_json IS m.signed_capability_json)"
             ),
         ),
         (

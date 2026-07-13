@@ -90,6 +90,7 @@ fn signed_link(
             timestamp: 200,
             scope_hash: Some(scope_hash(&root.scope)?),
             aggregate_budget,
+            cumulative_approval: None,
         },
         subject,
     )
@@ -103,6 +104,7 @@ fn descendant(
     aggregate_invocation_budget: Option<AggregateInvocationBudget>,
 ) -> crate::error::Result<CapabilityToken> {
     let mut body = token_body(id, &issuer.public_key(), delegatee, tool_scope(false));
+    body.issued_at = link.timestamp;
     body.delegation_chain = vec![link];
     body.aggregate_invocation_budget = aggregate_invocation_budget;
     CapabilityToken::sign(body, issuer)
@@ -277,6 +279,139 @@ fn aggregate_invocation_family_root_and_descendant_share_owner() -> TestResult {
     assert_eq!(
         root_verified.max_invocations,
         child_verified.max_invocations
+    );
+    Ok(())
+}
+
+#[test]
+fn aggregate_invocation_rejects_widened_or_predated_descendant() -> TestResult {
+    let issuer = Keypair::generate();
+    let root_subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+    let root = signed_family_root("cap-descendant-bounds", &issuer, &root_subject, 9)?;
+    let budget = root
+        .aggregate_invocation_budget
+        .clone()
+        .ok_or_else(|| std::io::Error::other("root budget missing"))?;
+    let marker = budget
+        .root_binding
+        .as_ref()
+        .ok_or_else(|| std::io::Error::other("root binding missing"))?
+        .delegation_marker()?;
+
+    let widened_link = signed_link(
+        &root,
+        &root_subject,
+        &delegatee.public_key(),
+        Some(marker.clone()),
+    )?;
+    let mut widened_body = token_body(
+        "cap-widened-descendant",
+        &issuer.public_key(),
+        &delegatee.public_key(),
+        tool_scope(false),
+    );
+    widened_body.scope.grants[0].server_id = "*".to_string();
+    widened_body.issued_at = widened_link.timestamp;
+    widened_body.delegation_chain = vec![widened_link];
+    widened_body.aggregate_invocation_budget = Some(budget.clone());
+    let widened = CapabilityToken::sign(widened_body, &issuer)?;
+    assert!(
+        verify_aggregate_invocation_budget(&widened, &[issuer.public_key()], Some(&root),).is_err()
+    );
+
+    let predating_link = signed_link(&root, &root_subject, &delegatee.public_key(), Some(marker))?;
+    let mut predating_body = token_body(
+        "cap-predating-descendant",
+        &issuer.public_key(),
+        &delegatee.public_key(),
+        tool_scope(false),
+    );
+    predating_body.issued_at = predating_link.timestamp.saturating_sub(1);
+    predating_body.delegation_chain = vec![predating_link];
+    predating_body.aggregate_invocation_budget = Some(budget);
+    let predating = CapabilityToken::sign(predating_body, &issuer)?;
+    assert!(
+        verify_aggregate_invocation_budget(&predating, &[issuer.public_key()], Some(&root),)
+            .is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn aggregate_invocation_authenticates_ordinary_root_delegation_bounds() -> TestResult {
+    let issuer = Keypair::generate();
+    let root_subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+    let root = CapabilityToken::sign(
+        token_body(
+            "cap-ordinary-root",
+            &issuer.public_key(),
+            &root_subject.public_key(),
+            tool_scope(true),
+        ),
+        &issuer,
+    )?;
+
+    let widened_link = signed_link(&root, &root_subject, &delegatee.public_key(), None)?;
+    let mut widened_scope = tool_scope(false);
+    widened_scope.grants[0].server_id = "*".to_string();
+    let mut widened_body = token_body(
+        "cap-ordinary-widened",
+        &issuer.public_key(),
+        &delegatee.public_key(),
+        widened_scope,
+    );
+    widened_body.issued_at = widened_link.timestamp;
+    widened_body.delegation_chain = vec![widened_link];
+    let widened = CapabilityToken::sign(widened_body, &issuer)?;
+    assert!(
+        verify_aggregate_invocation_budget(&widened, &[issuer.public_key()], Some(&root),).is_err()
+    );
+
+    let nondelegable_root = CapabilityToken::sign(
+        token_body(
+            "cap-ordinary-nondelegable-root",
+            &issuer.public_key(),
+            &root_subject.public_key(),
+            tool_scope(false),
+        ),
+        &issuer,
+    )?;
+    let unauthorized_link = signed_link(
+        &nondelegable_root,
+        &root_subject,
+        &delegatee.public_key(),
+        None,
+    )?;
+    let unauthorized = descendant(
+        "cap-ordinary-unauthorized",
+        &issuer,
+        &delegatee.public_key(),
+        unauthorized_link,
+        None,
+    )?;
+    assert!(verify_aggregate_invocation_budget(
+        &unauthorized,
+        &[issuer.public_key()],
+        Some(&nondelegable_root),
+    )
+    .is_err());
+
+    let overlong_link = signed_link(&root, &root_subject, &delegatee.public_key(), None)?;
+    let mut overlong_body = token_body(
+        "cap-ordinary-overlong",
+        &issuer.public_key(),
+        &delegatee.public_key(),
+        tool_scope(false),
+    );
+    overlong_body.issued_at = overlong_link.timestamp;
+    overlong_body.expires_at = root.expires_at.saturating_add(1);
+    overlong_body.delegation_chain = vec![overlong_link];
+    let overlong = CapabilityToken::sign(overlong_body, &issuer)?;
+    assert!(
+        verify_aggregate_invocation_budget(&overlong, &[issuer.public_key()], Some(&root),)
+            .is_err()
     );
     Ok(())
 }
@@ -687,6 +822,7 @@ fn aggregate_invocation_backend_binding_survives_root_round_trip() -> TestResult
         &delegatee.public_key(),
         tool_scope(false),
     );
+    child_body.issued_at = link.timestamp;
     child_body.delegation_chain = vec![link];
     child_body.aggregate_invocation_budget = Some(budget);
     let child = CapabilityToken::sign_with_backend(child_body, &backend)?;
@@ -728,12 +864,19 @@ fn aggregate_invocation_root_helper_rejects_delegated_body() -> TestResult {
 }
 
 #[test]
-fn aggregate_invocation_multi_hop_preserves_family_binding() -> TestResult {
+fn aggregate_invocation_rejects_multi_hop_scope_pivot_and_intermediate_predating() -> TestResult {
     let issuer = Keypair::generate();
     let root_subject = Keypair::generate();
     let intermediate = Keypair::generate();
     let delegatee = Keypair::generate();
-    let root = signed_family_root("cap-multi-root", &issuer, &root_subject, 7)?;
+    let mut root_body = token_body(
+        "cap-multi-root",
+        &issuer.public_key(),
+        &root_subject.public_key(),
+        tool_scope(true),
+    );
+    root_body.scope.grants[0].server_id = "*".to_string();
+    let root = CapabilityToken::sign_aggregate_family_root(root_body, 7, &issuer)?;
     let budget = root
         .aggregate_invocation_budget
         .clone()
@@ -743,37 +886,80 @@ fn aggregate_invocation_multi_hop_preserves_family_binding() -> TestResult {
         .as_ref()
         .ok_or_else(|| std::io::Error::other("root binding missing"))?
         .delegation_marker()?;
-    let first = signed_link(
+    let mut intermediate_scope = tool_scope(true);
+    intermediate_scope.grants[0].server_id = "server-a".to_string();
+    let first_receipt = delegate(
         &root,
+        &intermediate_scope,
         &root_subject,
         &intermediate.public_key(),
-        Some(marker.clone()),
+        ScopeAttenuation::empty(),
+        200,
+        [3_u8; 16],
     )?;
-    let second = DelegationLink::sign(
-        DelegationLinkBody {
-            capability_id: "cap-intermediate".to_string(),
-            delegator: intermediate.public_key(),
-            delegatee: delegatee.public_key(),
-            attenuations: vec![],
-            timestamp: 300,
-            scope_hash: Some(scope_hash(&tool_scope(false))?),
-            aggregate_budget: Some(marker),
-        },
-        &intermediate,
-    )?;
-    let mut body = token_body(
-        "cap-multi-leaf",
+    let mut intermediate_body = token_body(
+        "cap-intermediate",
         &issuer.public_key(),
-        &delegatee.public_key(),
-        tool_scope(false),
+        &intermediate.public_key(),
+        intermediate_scope.clone(),
     );
-    body.delegation_chain = vec![first, second];
-    body.aggregate_invocation_budget = Some(budget);
-    let leaf = CapabilityToken::sign(body, &issuer)?;
+    intermediate_body.issued_at = 250;
+    intermediate_body.delegation_chain = first_receipt.complete_chain();
+    intermediate_body.aggregate_invocation_budget = Some(budget.clone());
+    let intermediate_token = CapabilityToken::sign(intermediate_body, &issuer)?;
 
-    assert!(
-        verify_aggregate_invocation_budget(&leaf, &[issuer.public_key()], Some(&root),)?.is_some()
-    );
+    let make_leaf =
+        |id: &str, mut scope: ChioScope, timestamp: u64| -> crate::error::Result<CapabilityToken> {
+            let second = DelegationLink::sign(
+                DelegationLinkBody {
+                    capability_id: intermediate_token.id.clone(),
+                    delegator: intermediate.public_key(),
+                    delegatee: delegatee.public_key(),
+                    attenuations: vec![],
+                    timestamp,
+                    scope_hash: Some(scope_hash(&intermediate_token.scope)?),
+                    aggregate_budget: Some(marker.clone()),
+                    cumulative_approval: None,
+                },
+                &intermediate,
+            )?;
+            scope.grants[0]
+                .operations
+                .retain(|op| op != &Operation::Delegate);
+            let mut body = token_body(id, &issuer.public_key(), &delegatee.public_key(), scope);
+            body.issued_at = 300;
+            body.delegation_chain = intermediate_token
+                .delegation_chain
+                .iter()
+                .cloned()
+                .chain(core::iter::once(second))
+                .collect();
+            body.aggregate_invocation_budget = Some(budget.clone());
+            CapabilityToken::sign(body, &issuer)
+        };
+
+    let mut pivot_scope = tool_scope(false);
+    pivot_scope.grants[0].server_id = "server-b".to_string();
+    let pivot = make_leaf("cap-multi-pivot", pivot_scope, 275)?;
+    let chronology = make_leaf(
+        "cap-multi-chronology",
+        intermediate_scope,
+        intermediate_token.issued_at.saturating_sub(1),
+    )?;
+
+    for leaf in [&pivot, &chronology] {
+        let error =
+            match verify_aggregate_invocation_budget(leaf, &[issuer.public_key()], Some(&root)) {
+                Err(error) => error,
+                Ok(_) => {
+                    return Err(std::io::Error::other(
+                        "multi-hop aggregate family did not fail closed",
+                    )
+                    .into());
+                }
+            };
+        assert!(error.to_string().contains("per-hop signed child-scope"));
+    }
     Ok(())
 }
 
@@ -803,6 +989,7 @@ fn aggregate_invocation_delegate_projects_marker_across_hops() -> TestResult {
         &intermediate.public_key(),
         tool_scope(true),
     );
+    intermediate_body.issued_at = first.link.timestamp;
     intermediate_body.delegation_chain = first.complete_chain();
     intermediate_body.aggregate_invocation_budget = root.aggregate_invocation_budget.clone();
     let intermediate_token = CapabilityToken::sign(intermediate_body, &issuer)?;

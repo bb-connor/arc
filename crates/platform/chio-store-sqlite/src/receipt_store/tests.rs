@@ -6,6 +6,8 @@ mod bootstrap;
 mod checkpoint;
 #[path = "tests/errors.rs"]
 mod errors;
+#[path = "tests/federated_lineage.rs"]
+mod federated_lineage;
 #[path = "tests/head_property.rs"]
 mod head_property;
 #[path = "tests/insert.rs"]
@@ -20,6 +22,8 @@ mod query;
 mod retention;
 #[path = "tests/scale_proof.rs"]
 mod scale_proof;
+#[path = "tests/schema_archive.rs"]
+mod schema_archive;
 #[path = "tests/settlement.rs"]
 mod settlement;
 #[path = "tests/single_writer.rs"]

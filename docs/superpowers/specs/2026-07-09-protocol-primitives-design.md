@@ -156,6 +156,19 @@ Aggregate budgets are authority and must be lineage-bound:
 - A capability-scoped limit covers only that nondelegable token. Issuers that need a ceiling over descendants must use `DelegationFamily`.
 - Every signed delegation link, attenuation witness, and delegation receipt records preservation of the root-binding digest and family maximum. These projections detect mutation between known ancestors, but they supplement rather than replace the authenticated direct-root lookup.
 - Portable full-verification entry points receive an authenticated direct-root snapshot or a trusted resolver. Negotiated aggregate semantics with no such root evidence deny instead of treating an absent leaf field as an unbudgeted family.
+- Portable v1 verification rejects aggregate or cumulative family descendants with more than one delegation link. A direct-root and final-leaf envelope cannot prove an intermediate capability's child scope or issuance chronology. Multi-hop portable support requires authenticated per-hop child-scope witnesses before it can be enabled.
+
+Verifier-owned lineage persists the complete signed capability token alongside its scalar audit projection. The signed token is nullable only for pre-migration rows and explicit non-capability federation anchors; every newly recorded real capability preserves its exact token. Synthetic federation relationships live in the separate lineage-bridge projection and never rewrite signed token lineage. Replication, evidence export, and portable verification preserve the exact token; no verifier reconstructs it from capability ID, keys, scope JSON, or timestamps. When either aggregate invocation or cumulative approval semantics are negotiated, every delegated token requires the signed direct root identified by its first verified delegation link. A legacy row or synthetic anchor with no signed token denies on those paths.
+
+### 4.3.1 Cumulative approval authority
+
+The `cumulative_approval_budget` feature introduces the strict `RequireCumulativeApprovalAbove` variant. Its threshold is a `MonetaryAmount`, and its signed budget ID, epoch, currency, and optional family-root binding are authority. The legacy `RequireApprovalAbove { threshold_units }` variant remains per-request behavior and never advertises cumulative enforcement.
+
+A nondelegable direct capability carries no family-root binding and derives its cumulative account from the verified capability issuer and capability ID. A delegable root carries a CA-signed, domain-separated `CumulativeApprovalRootBinding` over the pre-binding root commitment, root issuer and subject, root scope and grant identity, approval budget ID and epoch, currency, root threshold, and expiry. Descendants preserve the binding's canonical bytes, budget ID, epoch, and currency. A descendant may lower the approval threshold or expiry, but cannot raise either above the authenticated root authority, create a cumulative family below an unbound root, or omit the binding.
+
+The family owner is derived only after verifying the direct root token, root binding, and delegation origin. Delegation links and attenuation witnesses carry preservation markers as mutation evidence, but do not replace the signed direct-root lookup. Feature-disabled verifiers reject the cumulative form rather than interpreting it as the legacy per-request threshold.
+
+Until a joint aggregate-and-cumulative pre-binding commitment is defined, v1 rejects every capability that combines `aggregate_invocation_budget` with `RequireCumulativeApprovalAbove`; the independent signing helpers cannot be composed into ambiguous roots.
 
 ### 4.4 Atomic store contract
 

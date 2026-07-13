@@ -20,10 +20,11 @@ use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey};
 use chio_core_types::receipt::body::ChioReceiptBody;
 use chio_kernel_core::passport_verify::{verify_passport as core_verify_passport, VerifyError};
 use chio_kernel_core::{
-    evaluate_with_full_floor, sign_receipt as core_sign_receipt,
-    sign_receipt_relaying_trusted_body as core_relay_trusted_body, verify_capability_full,
-    BudgetRegistry, BudgetSplitError, CapabilityError, Clock, EvaluateInput, FixedClock, Guard,
-    InMemoryBudgetRegistry, PortableToolCallRequest, ReceiptSigningError, Verdict,
+    evaluate_with_full_floor_and_root, sign_receipt as core_sign_receipt,
+    sign_receipt_relaying_trusted_body as core_relay_trusted_body,
+    verify_capability_full_with_root, BudgetRegistry, BudgetSplitError, CapabilityError,
+    CapabilityFeatureContext, Clock, EvaluateInput, FixedClock, Guard, InMemoryBudgetRegistry,
+    PortableToolCallRequest, ReceiptSigningError, Verdict,
 };
 use serde::{Deserialize, Serialize};
 
@@ -157,6 +158,9 @@ struct EvaluateRequestEnvelope {
     /// with current chain-binding semantics when omitted.
     #[serde(default)]
     peer_capabilities: Option<CapabilityNegotiation>,
+    /// Authenticated direct-root token for delegated negotiated family features.
+    #[serde(default)]
+    direct_root_capability: Option<serde_json::Value>,
     /// Optional chain-binding trust roots, keyed by issuer hex. Attenuated or
     /// delegated tokens require an entry here; absent issuers fail-closed.
     #[serde(default)]
@@ -175,6 +179,9 @@ struct VerifyCapabilityRequestEnvelope {
     now_secs: Option<i64>,
     #[serde(default)]
     peer_capabilities: Option<CapabilityNegotiation>,
+    /// Authenticated direct-root token for delegated negotiated family features.
+    #[serde(default)]
+    direct_root_capability: Option<serde_json::Value>,
     #[serde(default)]
     capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
     #[serde(default)]
@@ -376,6 +383,11 @@ fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
 
     let capability: CapabilityToken = serde_json::from_value(parsed.capability)
         .map_err(|error| KernelFfiError::invalid_json("capability token", error))?;
+    let direct_root_capability = parsed
+        .direct_root_capability
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(|error| KernelFfiError::invalid_json("direct root capability", error))?;
 
     let trusted = decode_trusted_issuers(&parsed.trusted_issuers)?;
     validate_capability_trust_roots(&parsed.capability_trust_roots)?;
@@ -412,7 +424,7 @@ fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
     // parent shares.
     let mut budgets = InMemoryBudgetRegistry::new();
     seed_budget_registry(&mut budgets, &parsed.parent_budget_snapshots)?;
-    let verdict = evaluate_with_full_floor(
+    let verdict = evaluate_with_full_floor_and_root(
         EvaluateInput {
             request: &portable_request,
             capability: &capability,
@@ -423,6 +435,7 @@ fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
         },
         CapabilityCryptoFloor::AllowClassical,
         &peer_profile,
+        direct_root_capability.as_ref(),
         &trust_resolver,
         &mut budgets,
     );
@@ -540,6 +553,7 @@ fn verify_capability_json_str(
         vec![authority],
         Some(now_secs),
         CapabilityNegotiation::t1_default(),
+        None,
         std::collections::BTreeMap::new(),
         &[],
     )
@@ -550,6 +564,11 @@ fn verify_capability_with_context_json_str(request_json: &str) -> Result<String,
         .map_err(|error| KernelFfiError::invalid_json("verify capability request", error))?;
     let token: CapabilityToken = serde_json::from_value(parsed.token)
         .map_err(|error| KernelFfiError::invalid_json("capability token", error))?;
+    let direct_root_capability = parsed
+        .direct_root_capability
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(|error| KernelFfiError::invalid_json("direct root capability", error))?;
     let trusted = decode_trusted_issuers(&parsed.trusted_issuers)?;
     let peer_profile = parsed
         .peer_capabilities
@@ -561,6 +580,7 @@ fn verify_capability_with_context_json_str(request_json: &str) -> Result<String,
         trusted,
         parsed.now_secs,
         peer_profile,
+        direct_root_capability,
         parsed.capability_trust_roots,
         &parsed.parent_budget_snapshots,
     )
@@ -571,6 +591,7 @@ fn verify_capability_with_parts(
     trusted: Vec<PublicKey>,
     now_secs: Option<i64>,
     peer_profile: CapabilityNegotiation,
+    direct_root_capability: Option<CapabilityToken>,
     capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
     parent_budget_snapshots: &[ParentBudgetSnapshot],
 ) -> Result<String, KernelFfiError> {
@@ -587,12 +608,15 @@ fn verify_capability_with_parts(
     };
     let mut budgets = InMemoryBudgetRegistry::new();
     seed_budget_registry(&mut budgets, parent_budget_snapshots)?;
-    let verified = verify_capability_full(
+    let verified = verify_capability_full_with_root(
         &token,
         &trusted,
         clock,
         CapabilityCryptoFloor::AllowClassical,
-        &peer_profile,
+        CapabilityFeatureContext {
+            peer: &peer_profile,
+            direct_root: direct_root_capability.as_ref(),
+        },
         &trust_resolver,
         &mut budgets,
     )

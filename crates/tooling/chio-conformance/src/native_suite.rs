@@ -1211,6 +1211,7 @@ fn build_delegation_pair() -> (CapabilityToken, CapabilityToken) {
             timestamp: 1_700_000_100,
             scope_hash: Some(child_scope_hash),
             aggregate_budget: None,
+            cumulative_approval: None,
         },
         &parent_subject,
     )

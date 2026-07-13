@@ -7,14 +7,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chio_core::capability::{
     runtime_attestation::{RuntimeAssuranceTier, RuntimeAttestationEvidence},
     scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant},
-    token::CapabilityToken,
+    token::{CapabilityToken, CapabilityTokenBody},
 };
-use chio_core::crypto::Keypair;
+use chio_core::crypto::{Keypair, PublicKey};
 use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     metadata::ReceiptAttributionMetadata,
 };
-use chio_kernel::{KernelError, ReceiptStore};
+use chio_kernel::{CapabilityAuthority, KernelError, ReceiptStore};
 use chio_store_sqlite::SqliteReceiptStore;
 
 use crate::policy::{
@@ -320,6 +320,31 @@ fn make_subject_capability(
     CapabilityToken::sign(body, issuer_kp).test_expect("sign capability")
 }
 
+struct FixedResponseAuthority {
+    response: CapabilityToken,
+    current_issuer: PublicKey,
+    trusted_issuers: Vec<PublicKey>,
+}
+
+impl CapabilityAuthority for FixedResponseAuthority {
+    fn authority_public_key(&self) -> PublicKey {
+        self.current_issuer.clone()
+    }
+
+    fn trusted_public_keys(&self) -> Vec<PublicKey> {
+        self.trusted_issuers.clone()
+    }
+
+    fn issue_capability(
+        &self,
+        _subject: &PublicKey,
+        _scope: ChioScope,
+        _ttl_seconds: u64,
+    ) -> Result<CapabilityToken, KernelError> {
+        Ok(self.response.clone())
+    }
+}
+
 #[test]
 fn probationary_subject_requires_constrained_read_scope_and_persists_snapshot() {
     let receipt_db_path = unique_path("issuance-policy-receipts", ".sqlite3");
@@ -405,6 +430,122 @@ fn probationary_subject_denied_broad_issue_request() {
     );
 
     let _ = fs::remove_file(receipt_db_path);
+}
+
+#[test]
+fn control_plane_rejects_cumulative_approval_until_atomic_enforcement_exists() {
+    let authority = wrap_capability_authority(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new(
+            Keypair::generate(),
+        )),
+        None,
+        None,
+        None,
+        None,
+    );
+    let scope = ChioScope {
+        grants: vec![ToolGrant {
+            server_id: "payments".to_string(),
+            tool_name: "charge".to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![Constraint::RequireCumulativeApprovalAbove {
+                threshold: MonetaryAmount {
+                    units: 100,
+                    currency: "USD".to_string(),
+                },
+                approval_budget_id: "budget-1".to_string(),
+                approval_budget_epoch: 1,
+                cumulative_approval_root_binding: None,
+            }],
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }],
+        ..ChioScope::default()
+    };
+
+    assert!(matches!(
+        authority.issue_capability(&Keypair::generate().public_key(), scope, 300),
+        Err(KernelError::CapabilityIssuanceDenied(_))
+    ));
+}
+
+#[test]
+fn policy_authority_rejects_trusted_signed_inner_substitution(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let issuer = Keypair::generate();
+    let requested_subject = Keypair::generate().public_key();
+    let scope = ChioScope::default();
+    let response = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-policy-substitution".to_string(),
+            issuer: issuer.public_key(),
+            subject: Keypair::generate().public_key(),
+            scope: scope.clone(),
+            issued_at: 100,
+            expires_at: 130,
+            delegation_chain: vec![],
+            aggregate_invocation_budget: None,
+        },
+        &issuer,
+    )?;
+    let authority = wrap_capability_authority(
+        Box::new(FixedResponseAuthority {
+            response,
+            current_issuer: issuer.public_key(),
+            trusted_issuers: vec![issuer.public_key()],
+        }),
+        None,
+        None,
+        None,
+        None,
+    );
+
+    let result = authority.issue_capability(&requested_subject, scope, 30);
+
+    assert!(matches!(
+        result,
+        Err(KernelError::CapabilityIssuanceFailed(_))
+    ));
+    Ok(())
+}
+
+#[test]
+fn policy_authority_rejects_historical_issuance_key() -> Result<(), Box<dyn std::error::Error>> {
+    let historical_issuer = Keypair::generate();
+    let current_issuer = Keypair::generate().public_key();
+    let requested_subject = Keypair::generate().public_key();
+    let scope = ChioScope::default();
+    let response = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-policy-historical-key".to_string(),
+            issuer: historical_issuer.public_key(),
+            subject: requested_subject.clone(),
+            scope: scope.clone(),
+            issued_at: 100,
+            expires_at: 130,
+            delegation_chain: vec![],
+            aggregate_invocation_budget: None,
+        },
+        &historical_issuer,
+    )?;
+    let authority = wrap_capability_authority(
+        Box::new(FixedResponseAuthority {
+            response,
+            current_issuer: current_issuer.clone(),
+            trusted_issuers: vec![historical_issuer.public_key(), current_issuer],
+        }),
+        None,
+        None,
+        None,
+        None,
+    );
+
+    let result = authority.issue_capability(&requested_subject, scope, 30);
+
+    assert!(matches!(result, Err(KernelError::UntrustedIssuer)));
+    Ok(())
 }
 
 #[test]

@@ -2687,6 +2687,7 @@ fn child_token_with_chain_ancestor(
             timestamp: now,
             scope_hash: None,
             aggregate_budget: None,
+            cumulative_approval: None,
         },
         &delegator,
     )
@@ -2780,6 +2781,7 @@ async fn sidecar_validate_capability_checks_issuer_trust_before_walking_chain() 
             timestamp: now,
             scope_hash: None,
             aggregate_budget: None,
+            cumulative_approval: None,
         },
         &delegator,
     )

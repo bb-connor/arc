@@ -26,9 +26,17 @@ impl ChioKernel {
         scope: ChioScope,
         ttl_seconds: u64,
     ) -> Result<CapabilityToken, KernelError> {
-        let capability = self
-            .capability_authority
-            .issue_capability(subject, scope, ttl_seconds)?;
+        crate::ensure_capability_issuance_supported(&scope)?;
+        let capability =
+            self.capability_authority
+                .issue_capability(subject, scope.clone(), ttl_seconds)?;
+        crate::validate_issued_capability_response(
+            &capability,
+            subject,
+            &scope,
+            ttl_seconds,
+            &self.capability_authority.authority_public_key(),
+        )?;
 
         info!(
             capability_id = %capability.id,
@@ -281,18 +289,70 @@ impl ChioKernel {
         let peer_profile = self.capability_negotiation_for_remote(remote_kernel_id, now)?;
         let trust_resolver = self.capability_trust_root_resolver_snapshot();
         let mut budgets = chio_kernel_core::NoopBudgetRegistry;
+        let direct_root = self.negotiated_capability_root(cap, &peer_profile)?;
 
-        chio_kernel_core::verify_capability_full(
+        chio_kernel_core::verify_capability_full_with_root(
             cap,
             &trusted,
             &clock,
             capability_crypto_floor(self.capability_crypto_floor),
-            &peer_profile,
+            chio_kernel_core::CapabilityFeatureContext {
+                peer: &peer_profile,
+                direct_root: direct_root.as_ref(),
+            },
             &trust_resolver,
             &mut budgets,
         )
-        .map(|_| ())
-        .map_err(|error| chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason())
+        .map_err(|error| {
+            chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason()
+        })?;
+        if cap.aggregate_invocation_budget.is_some() {
+            return Err("aggregate invocation enforcement is unavailable".to_string());
+        }
+        if cap.scope.has_cumulative_approval() {
+            return Err("cumulative approval enforcement is unavailable".to_string());
+        }
+        Ok(())
+    }
+
+    fn negotiated_capability_root(
+        &self,
+        cap: &CapabilityToken,
+        peer: &chio_core::capability::features::CapabilityNegotiation,
+    ) -> Result<Option<CapabilityToken>, String> {
+        let features = &peer.features;
+        let lineage_required = features
+            .get(chio_core::capability::features::AGGREGATE_INVOCATION_BUDGET)
+            .copied()
+            .unwrap_or(false)
+            || features
+                .get(chio_core::capability::features::CUMULATIVE_APPROVAL_BUDGET)
+                .copied()
+                .unwrap_or(false);
+        if !lineage_required || cap.delegation_chain.is_empty() {
+            return Ok(None);
+        }
+
+        let root_id = cap
+            .delegation_chain
+            .first()
+            .map(|link| link.capability_id.as_str())
+            .ok_or_else(|| "delegated capability has no root delegation link".to_string())?;
+        let snapshot = self
+            .with_receipt_store(|store| Ok(store.get_capability_snapshot(root_id)?))
+            .map_err(|error| format!("failed to resolve signed capability root: {error}"))?
+            .flatten()
+            .ok_or_else(|| format!("missing signed capability root snapshot for {root_id}"))?;
+        let signed_root = snapshot.signed_capability.ok_or_else(|| {
+            format!("capability root snapshot {root_id} has no signed token evidence")
+        })?;
+        if signed_root.id != root_id {
+            return Err(format!(
+                "signed capability root {} does not match requested root {root_id}",
+                signed_root.id
+            ));
+        }
+        Ok(Some(signed_root))
     }
 
     /// The hosted `evaluate_tool_call_*` paths route the full chain
@@ -438,6 +498,17 @@ impl ChioKernel {
             }
         };
         let trust_resolver = self.capability_trust_root_resolver_snapshot();
+        let direct_root = match self.negotiated_capability_root(capability, &peer_profile) {
+            Ok(root) => root,
+            Err(reason) => {
+                return chio_kernel_core::EvaluationVerdict {
+                    verdict: chio_kernel_core::Verdict::Deny,
+                    reason: Some(reason),
+                    matched_grant_index: None,
+                    verified: None,
+                };
+            }
+        };
         let mut budgets = match self.budget_registry.lock() {
             Ok(guard) => guard,
             Err(_poisoned) => {
@@ -453,7 +524,7 @@ impl ChioKernel {
                 };
             }
         };
-        chio_kernel_core::evaluate_with_full_floor(
+        chio_kernel_core::evaluate_with_full_floor_and_root(
             chio_kernel_core::EvaluateInput {
                 request,
                 capability,
@@ -464,6 +535,7 @@ impl ChioKernel {
             },
             capability_crypto_floor(self.capability_crypto_floor),
             &peer_profile,
+            direct_root.as_ref(),
             &trust_resolver,
             &mut *budgets,
         )

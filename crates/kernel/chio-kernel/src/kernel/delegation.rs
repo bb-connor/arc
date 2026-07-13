@@ -152,6 +152,7 @@ mod tests {
                 timestamp: 1500,
                 scope_hash: None,
                 aggregate_budget: None,
+                cumulative_approval: None,
             };
             let link = DelegationLink::sign(body, &last_kp).unwrap();
             chain.push(link);

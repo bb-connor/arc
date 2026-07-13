@@ -131,6 +131,7 @@ fn make_delegation_link(delegator_kp: &Keypair, delegatee_kp: &Keypair) -> Deleg
         timestamp: 1_000_100,
         scope_hash: None,
         aggregate_budget: None,
+        cumulative_approval: None,
     };
     DelegationLink::sign(body, delegator_kp).unwrap()
 }

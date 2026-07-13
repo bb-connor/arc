@@ -255,8 +255,11 @@ Commit: `feat(core-types): add aggregate invocation budget`
 - Modify `crates/core/chio-core-types/src/capability/validation.rs`
 - Modify `crates/core/chio-core-types/src/capability/scope.rs`
 - Modify `crates/core/chio-core-types/src/delegation_receipt.rs` if needed for the attenuation projection
-- Modify capability-authority issuance in `crates/kernel/chio-kernel/` and `crates/platform/chio-control-plane/`
+- Keep capability-authority and HTTP issuance for both negotiated budget forms disabled until atomic enforcement is installed
 - Modify capability-verification entry points in `crates/kernel/chio-kernel-core/src/capability_verify.rs`
+- Modify `crates/kernel/chio-kernel/src/capability_lineage.rs`
+- Modify `crates/platform/chio-store-sqlite/src/capability_lineage.rs`
+- Modify the SQLite lineage schema initializer and migration tests
 - Modify portable entry points in `chio-kernel-browser`, `chio-kernel-mobile`, and `chio-cpp-kernel-ffi`
 - Modify federation handshake tests in `crates/trust/chio-federation/`
 
@@ -264,13 +267,14 @@ Commit: `feat(core-types): add aggregate invocation budget`
 
 - [ ] Add `aggregate_invocation_budget` as a string-keyed feature.
 - [ ] Add `cumulative_approval_budget` as a string-keyed feature and a strict
-  versioned `RequireApprovalAbove { threshold: MonetaryAmount,
+  `RequireCumulativeApprovalAbove { threshold: MonetaryAmount,
   approval_budget_id, approval_budget_epoch,
   cumulative_approval_root_binding: Option<CumulativeApprovalRootBinding> }` wire
-  form with conditional root-binding requirements. An old per-request
-  threshold never silently claims cumulative enforcement.
+  variant with conditional root-binding requirements. Preserve the legacy
+  `RequireApprovalAbove { threshold_units }` variant as explicitly per-request;
+  it never silently claims cumulative enforcement.
 - [ ] Add a domain-separated `CumulativeApprovalRootBinding` for delegable
-  `RequireApprovalAbove`. It binds the CA-authenticated family root, root subject
+  `RequireCumulativeApprovalAbove`. It binds the CA-authenticated family root, root subject
   and scope, approval budget id/epoch, currency, threshold and expiry. Every
   descendant preserves its canonical bytes; a delegated cumulative constraint
   without that binding rejects.
@@ -281,10 +285,16 @@ Commit: `feat(core-types): add aggregate invocation budget`
   family, budget id/epoch, currency, subject, or scope.
 - [ ] Keep `v1_default()` disabled. Enable only in the rollout profile after storage is ready.
 - [ ] Reject a token carrying the aggregate field when the negotiated intersection does not enable it.
+- [ ] Persist the exact signed capability token as an optional field in every verifier-owned lineage snapshot. Store it as nullable JSON, preserve its signature-bearing semantics through replication and evidence export, and never reconstruct signature authority from scalar snapshot columns.
+- [ ] Resolve the first signed direct-root token for every delegated capability when either aggregate or cumulative approval semantics are enabled. A legacy snapshot with no signed token denies on those negotiated paths while remaining readable when both features are disabled.
+- [ ] Add the optional signed direct-root token to portable verification and evaluation envelopes. Feature-enabled delegated verification with no root token denies.
+- [ ] Reject portable aggregate and cumulative family chains with more than one delegation link until every hop carries an authenticated child-scope witness that proves intermediate scope and issuance chronology.
 - [ ] Apply the same check in browser, mobile, FFI, federation, and direct kernel entry points.
 - [ ] Add mixed-version tests proving the field is denied rather than ignored.
 - [ ] Prove cumulative-approval siblings derive the same bound family owner and
   reject omission, mutation, or delegated creation of the binding.
+- [ ] Keep production authority emission disabled until the composite hold owns
+  cumulative approval reservation and dispatch capture.
 
 Commit: `feat(core-types): negotiate aggregate invocation budgets`
 
@@ -804,13 +814,15 @@ Commit: `docs(protocol): define runtime evidence authorization boundary`
 **Schema requirements:**
 
 - `aggregate_invocation_budget` has `additionalProperties: false`, required `scope` and `max_invocations`, scope enum, nonnegative integer maximum, and conditional family-root binding requirements.
-- `RequireApprovalAbove` has one strict negotiated definition with amount,
+- `RequireCumulativeApprovalAbove` has one strict negotiated definition with amount,
   currency, budget id/epoch, and conditional
   `cumulative_approval_root_binding`. Every duplicated capability/token schema
   references it. Delegable shapes require the signed binding; nondelegable direct
   shapes require it absent. The binding schema covers family root, root subject,
   scope, threshold, currency, budget id/epoch, expiry, signer/key epoch, and
   `additionalProperties: false`.
+- Legacy `RequireApprovalAbove { threshold_units }` remains a separate per-request
+  constraint and is never accepted as cumulative approval authority.
 - Root binding and threshold proposal signatures use their domain-separated verifier contracts, not schema validation as a substitute for signature verification.
 - Approval token arrays have an explicit maximum item count and reference one canonical token definition including `threshold_proposal_hash`.
 - Threshold proposal and verified-set schemas require policy, eligible-set, request, intent, subject, authorizing-capability digest, creation-time, and deadline bindings.

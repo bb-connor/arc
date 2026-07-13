@@ -119,6 +119,7 @@ fn parent_5000_child_4000_two_grandchildren_3000_each_second_rejected() {
             timestamp: 100,
             scope_hash: Some(scope_hash(&parent_scope).unwrap()),
             aggregate_budget: None,
+            cumulative_approval: None,
         },
         &kp,
     )
@@ -163,6 +164,7 @@ fn parent_5000_child_4000_two_grandchildren_3000_each_second_rejected() {
                 timestamp: 110,
                 scope_hash: Some(scope_hash(&parent_scope).unwrap()),
                 aggregate_budget: None,
+                cumulative_approval: None,
             },
             &child_subject,
         )

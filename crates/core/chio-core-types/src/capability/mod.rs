@@ -7,6 +7,7 @@ pub mod aggregate_invocation;
 pub mod attenuation;
 pub mod caveat;
 pub mod crypto_floor;
+pub mod cumulative_approval;
 pub mod features;
 pub mod governance;
 pub mod runtime_attestation;
@@ -26,6 +27,9 @@ mod delegation_trust_root_tests;
 
 #[cfg(test)]
 mod aggregate_invocation_tests;
+
+#[cfg(test)]
+mod cumulative_approval_tests;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]

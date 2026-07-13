@@ -1,14 +1,5 @@
 use super::*;
 
-/// Receipt-store schema revision. Bump on every schema-affecting change so an
-/// older binary refuses to open a database it cannot fully interpret.
-const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
-
-/// Stable key under which this store records its schema revision in the shared
-/// keyed metadata table. Distinct from the co-located approval store's key so the
-/// two track their revisions independently in the one sidecar file.
-const RECEIPT_STORE_SCHEMA_KEY: &str = "receipt";
-
 /// Tables that identify a database this receipt store may open, all of them the
 /// store's own: `chio_tool_receipts` is the current anchor (also the table the
 /// store shipped before schema stamping existed) and `http_receipts` /
@@ -232,13 +223,18 @@ impl SqliteReceiptStore {
             // Validate provenance before configuring pragmas: a foreign or
             // future database must be refused before any write touches its
             // header, so a mistargeted path is never mutated into WAL mode.
-            crate::check_schema_version(
+            let on_disk_schema_version = crate::check_schema_version(
                 &connection,
                 RECEIPT_STORE_SCHEMA_KEY,
                 RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
                 RECEIPT_STORE_LEGACY_ANCHOR_TABLES,
             )
             .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+            if on_disk_schema_version < RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "receipt database schema version {on_disk_schema_version} requires writable migration to version {RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION}; reopen it with SqliteReceiptStore::open"
+                )));
+            }
             configure_sqlite_connection(&mut connection)?;
             super::support::ensure_transparency_projection_guards(&connection)?;
             let settlement_store_binding = settlement_store_binding_if_ready(&connection)?;
@@ -1121,7 +1117,11 @@ impl SqliteReceiptStore {
                 expires_at           INTEGER NOT NULL,
                 grants_json          TEXT NOT NULL,
                 delegation_depth     INTEGER NOT NULL DEFAULT 0,
-                parent_capability_id TEXT REFERENCES capability_lineage(capability_id)
+                parent_capability_id TEXT REFERENCES capability_lineage(capability_id),
+                federated_parent_capability_id TEXT,
+                provenance TEXT NOT NULL DEFAULT 'legacy_projection'
+                    CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection')),
+                signed_capability_json TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_capability_lineage_subject
                 ON capability_lineage(subject_key);
@@ -1131,7 +1131,6 @@ impl SqliteReceiptStore {
                 ON capability_lineage(issued_at);
             CREATE INDEX IF NOT EXISTS idx_capability_lineage_parent
                 ON capability_lineage(parent_capability_id);
-
             CREATE TABLE IF NOT EXISTS federated_lineage_bridges (
                 local_capability_id TEXT PRIMARY KEY REFERENCES capability_lineage(capability_id) ON DELETE CASCADE,
                 parent_capability_id TEXT NOT NULL,
@@ -1181,6 +1180,10 @@ impl SqliteReceiptStore {
                 grants_json TEXT NOT NULL,
                 delegation_depth INTEGER NOT NULL DEFAULT 0,
                 parent_capability_id TEXT,
+                federated_parent_capability_id TEXT,
+                provenance TEXT NOT NULL DEFAULT 'legacy_projection'
+                    CHECK (provenance IN ('signed_token', 'synthetic_anchor', 'legacy_projection')),
+                signed_capability_json TEXT,
                 PRIMARY KEY (share_id, capability_id)
             );
             CREATE INDEX IF NOT EXISTS idx_federated_share_lineage_capability
@@ -1226,13 +1229,18 @@ impl SqliteReceiptStore {
             }
         }
 
-        let settlement_store_binding = settlement_store_binding_if_ready(&connection)?;
+        let migration =
+            connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        ensure_capability_lineage_provenance_columns(&migration)?;
         crate::stamp_schema_version(
-            &connection,
+            &migration,
             RECEIPT_STORE_SCHEMA_KEY,
             RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
         )
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        migration.commit()?;
+
+        let settlement_store_binding = settlement_store_binding_if_ready(&connection)?;
 
         drop(connection);
 
@@ -1387,6 +1395,126 @@ fn table_has_receipt_payload_column(
     while let Some(row) = rows.next()? {
         let column: String = row.get(1)?;
         if column.eq_ignore_ascii_case("raw_json") || column.eq_ignore_ascii_case("receipt_json") {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn ensure_capability_lineage_provenance_columns(
+    connection: &Connection,
+) -> Result<(), ReceiptStoreError> {
+    for table in ["capability_lineage", "federated_share_capability_lineage"] {
+        if !table_has_column(connection, table, "signed_capability_json")? {
+            connection.execute(
+                &format!("ALTER TABLE {table} ADD COLUMN signed_capability_json TEXT"),
+                [],
+            )?;
+        }
+        if !table_has_column(connection, table, "federated_parent_capability_id")? {
+            connection.execute(
+                &format!("ALTER TABLE {table} ADD COLUMN federated_parent_capability_id TEXT"),
+                [],
+            )?;
+        }
+        if !table_has_column(connection, table, "provenance")? {
+            connection.execute(
+                &format!(
+                    "ALTER TABLE {table} ADD COLUMN provenance TEXT NOT NULL DEFAULT \
+                     'legacy_projection' CHECK (provenance IN ('signed_token', \
+                     'synthetic_anchor', 'legacy_projection'))"
+                ),
+                [],
+            )?;
+        }
+        connection.execute(
+            &format!(
+                "UPDATE {table} SET provenance = 'signed_token' \
+                 WHERE provenance = 'legacy_projection' \
+                   AND signed_capability_json IS NOT NULL"
+            ),
+            [],
+        )?;
+    }
+
+    let conflicting_bridge: bool = connection.query_row(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM capability_lineage c
+            INNER JOIN federated_lineage_bridges b
+                ON b.local_capability_id = c.capability_id
+            WHERE c.federated_parent_capability_id IS NOT NULL
+              AND c.federated_parent_capability_id != b.parent_capability_id
+        )
+        "#,
+        [],
+        |row| row.get(0),
+    )?;
+    if conflicting_bridge {
+        return Err(ReceiptStoreError::Conflict(
+            "capability lineage federation metadata conflicts with its persisted bridge"
+                .to_string(),
+        ));
+    }
+    let bridges_to_backfill = {
+        let mut statement = connection.prepare(
+            r#"
+            SELECT b.local_capability_id, b.parent_capability_id
+            FROM federated_lineage_bridges b
+            INNER JOIN capability_lineage c
+                ON c.capability_id = b.local_capability_id
+            WHERE c.federated_parent_capability_id IS NULL
+            ORDER BY c.rowid
+            "#,
+        )?;
+        let bridges = statement
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        bridges
+    };
+    let mut next_rowid: i64 = connection.query_row(
+        "SELECT COALESCE(MAX(rowid), 0) FROM capability_lineage",
+        [],
+        |row| row.get(0),
+    )?;
+    for (local_capability_id, parent_capability_id) in bridges_to_backfill {
+        next_rowid = next_rowid.checked_add(1).ok_or_else(|| {
+            ReceiptStoreError::Conflict(
+                "capability lineage replication sequence is exhausted".to_string(),
+            )
+        })?;
+        connection.execute(
+            r#"
+            UPDATE capability_lineage
+            SET federated_parent_capability_id = ?2,
+                rowid = ?3
+            WHERE capability_id = ?1
+              AND federated_parent_capability_id IS NULL
+            "#,
+            params![local_capability_id, parent_capability_id, next_rowid],
+        )?;
+    }
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_capability_lineage_federated_parent \
+         ON capability_lineage(federated_parent_capability_id)",
+        [],
+    )?;
+    Ok(())
+}
+
+fn table_has_column(
+    connection: &Connection,
+    table: &str,
+    expected_column: &str,
+) -> Result<bool, ReceiptStoreError> {
+    let mut statement = connection.prepare(&format!("PRAGMA table_info({table})"))?;
+    let mut rows = statement.query([])?;
+    while let Some(row) = rows.next()? {
+        let column: String = row.get(1)?;
+        if column.eq_ignore_ascii_case(expected_column) {
             return Ok(true);
         }
     }

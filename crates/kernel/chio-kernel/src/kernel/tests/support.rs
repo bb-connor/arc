@@ -49,6 +49,23 @@ use chio_core::{
 use chio_link::{ExchangeRate, PriceOracle, PriceOracleError};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 
+fn signed_capability_from_row(
+    row: &Row<'_>,
+    column: usize,
+) -> rusqlite::Result<Option<CapabilityToken>> {
+    row.get::<_, Option<String>>(column)?
+        .map(|json| {
+            serde_json::from_str(&json).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    column,
+                    rusqlite::types::Type::Text,
+                    Box::new(error),
+                )
+            })
+        })
+        .transpose()
+}
+
 struct SqliteReceiptStore {
     connection: Mutex<Connection>,
     // Test-double analogue of the real store's writer-actor signer install
@@ -107,7 +124,8 @@ impl SqliteReceiptStore {
                     expires_at INTEGER NOT NULL,
                     grants_json TEXT NOT NULL,
                     delegation_depth INTEGER NOT NULL DEFAULT 0,
-                    parent_capability_id TEXT
+                    parent_capability_id TEXT,
+                    signed_capability_json TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS credit_bonds (
@@ -354,6 +372,7 @@ impl SqliteReceiptStore {
         capability_id: &str,
     ) -> Result<Vec<CapabilitySnapshot>, CapabilityLineageError> {
         fn snapshot_from_row(row: &Row<'_>) -> rusqlite::Result<CapabilitySnapshot> {
+            let signed_capability = signed_capability_from_row(row, 8)?;
             Ok(CapabilitySnapshot {
                 capability_id: row.get::<_, String>(0)?,
                 subject_key: row.get::<_, String>(1)?,
@@ -363,6 +382,13 @@ impl SqliteReceiptStore {
                 grants_json: row.get::<_, String>(5)?,
                 delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
                 parent_capability_id: row.get::<_, Option<String>>(7)?,
+                federated_parent_capability_id: None,
+                provenance: if signed_capability.is_some() {
+                    crate::CapabilitySnapshotProvenance::SignedToken
+                } else {
+                    crate::CapabilitySnapshotProvenance::LegacyProjection
+                },
+                signed_capability,
             })
         }
 
@@ -382,7 +408,8 @@ impl SqliteReceiptStore {
                             expires_at,
                             grants_json,
                             delegation_depth,
-                            parent_capability_id
+                            parent_capability_id,
+                            signed_capability_json
                         FROM capability_lineage
                         WHERE capability_id = ?1
                         "#,
@@ -416,12 +443,14 @@ impl SqliteReceiptStore {
                         expires_at,
                         grants_json,
                         delegation_depth,
-                        parent_capability_id
+                        parent_capability_id,
+                        signed_capability_json
                     FROM capability_lineage
                     WHERE capability_id = ?1
                 "#,
                 params![capability_id],
                 |row| {
+                    let signed_capability = signed_capability_from_row(row, 8)?;
                     Ok(CapabilitySnapshot {
                         capability_id: row.get::<_, String>(0)?,
                         subject_key: row.get::<_, String>(1)?,
@@ -431,6 +460,13 @@ impl SqliteReceiptStore {
                         grants_json: row.get::<_, String>(5)?,
                         delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
                         parent_capability_id: row.get::<_, Option<String>>(7)?,
+                        federated_parent_capability_id: None,
+                        provenance: if signed_capability.is_some() {
+                            crate::CapabilitySnapshotProvenance::SignedToken
+                        } else {
+                            crate::CapabilitySnapshotProvenance::LegacyProjection
+                        },
+                        signed_capability,
                     })
                 },
             )
@@ -762,6 +798,7 @@ impl ReceiptStore for SqliteReceiptStore {
         parent_capability_id: Option<&str>,
     ) -> Result<(), ReceiptStoreError> {
         let grants_json = serde_json::to_string(&token.scope)?;
+        let signed_capability_json = serde_json::to_string(token)?;
         let subject_key = token.subject.to_hex();
         let issuer_key = token.issuer.to_hex();
         let delegation_depth = if let Some(parent_id) = parent_capability_id {
@@ -788,8 +825,9 @@ impl ReceiptStore for SqliteReceiptStore {
                     expires_at,
                     grants_json,
                     delegation_depth,
-                    parent_capability_id
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                    parent_capability_id,
+                    signed_capability_json
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
                 "#,
             params![
                 token.id,
@@ -800,6 +838,7 @@ impl ReceiptStore for SqliteReceiptStore {
                 grants_json,
                 delegation_depth as i64,
                 parent_capability_id,
+                signed_capability_json,
             ],
         )?;
         Ok(())
@@ -1192,6 +1231,7 @@ fn make_chain_bound_delegation_link(
             timestamp,
             scope_hash: Some(scope_hash(authorized_scope).unwrap()),
             aggregate_budget: None,
+            cumulative_approval: None,
         },
         delegator_kp,
     )
@@ -1281,6 +1321,7 @@ fn make_v2_delegated_child(input: V2DelegatedChildInput<'_>) -> CapabilityToken 
             timestamp: current_unix_timestamp(),
             scope_hash: Some(parent_scope_hash),
             aggregate_budget: None,
+            cumulative_approval: None,
         },
         input.parent_kp,
     )

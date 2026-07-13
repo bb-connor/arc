@@ -271,6 +271,7 @@ fn delegation_link_sign_rejects_embedded_delegator_mismatch() {
         timestamp: 1_710_000_000,
         scope_hash: None,
         aggregate_budget: None,
+        cumulative_approval: None,
     };
 
     assert!(DelegationLink::sign(body, &actual_signer).is_err());

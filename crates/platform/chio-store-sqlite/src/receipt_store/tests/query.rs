@@ -233,15 +233,28 @@ fn cost_attribution_report_aggregates_matching_corpus_and_limits_detail_rows() {
     let child = CapabilityToken::sign(
         CapabilityTokenBody {
             id: "cap-child".to_string(),
-            issuer: issuer_kp.public_key(),
+            issuer: root_kp.public_key(),
             subject: leaf_kp.public_key(),
             scope: ChioScope::default(),
             issued_at: 1_100,
             expires_at: 9_000,
-            delegation_chain: vec![],
+            delegation_chain: vec![chio_core::capability::attenuation::DelegationLink::sign(
+                chio_core::capability::attenuation::DelegationLinkBody {
+                    capability_id: root.id.clone(),
+                    delegator: root_kp.public_key(),
+                    delegatee: leaf_kp.public_key(),
+                    attenuations: Vec::new(),
+                    timestamp: 1_100,
+                    scope_hash: None,
+                    aggregate_budget: None,
+                    cumulative_approval: None,
+                },
+                &root_kp,
+            )
+            .test_unwrap()],
             aggregate_invocation_budget: None,
         },
-        &issuer_kp,
+        &root_kp,
     )
     .test_unwrap();
 

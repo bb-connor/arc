@@ -785,6 +785,7 @@ fn signed_delegation_link(
             timestamp,
             scope_hash: None,
             aggregate_budget: None,
+            cumulative_approval: None,
         },
         delegator,
     )

@@ -1,5 +1,8 @@
 use super::*;
 
+pub(crate) const RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 2;
+pub(crate) const RECEIPT_STORE_SCHEMA_KEY: &str = "receipt";
+
 #[path = "support/checkpoint_projection.rs"]
 mod checkpoint_projection;
 #[path = "support/checkpoint_validate.rs"]

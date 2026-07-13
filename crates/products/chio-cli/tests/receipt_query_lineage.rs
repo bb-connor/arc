@@ -323,7 +323,7 @@ fn test_cost_attribution_report_endpoint() {
     let issuer_hex = issuer_kp.public_key().to_hex();
 
     let root = make_capability_token("cap-cost-root", &root_kp, &issuer_kp);
-    let child = make_capability_token("cap-cost-child", &leaf_kp, &issuer_kp);
+    let child = make_delegated_capability_token("cap-cost-child", &leaf_kp, &root_kp, &root);
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open store");

@@ -81,6 +81,7 @@ impl ChioKernel {
                 | Constraint::ContentReviewTier(_)
                 | Constraint::MaxTransactionAmountUsd(_)
                 | Constraint::RequireDualApproval(_)
+                | Constraint::RequireCumulativeApprovalAbove { .. }
                 | Constraint::ModelConstraint { .. }
                 | Constraint::MemoryStoreAllowlist(_)
                 | Constraint::MemoryWriteDenyPatterns(_) => {}

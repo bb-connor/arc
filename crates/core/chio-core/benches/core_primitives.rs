@@ -125,6 +125,7 @@ fn build_validation_fixture() -> (
             timestamp: 1_710_000_000,
             scope_hash: None,
             aggregate_budget: None,
+            cumulative_approval: None,
         },
         &root,
     )
@@ -138,6 +139,7 @@ fn build_validation_fixture() -> (
             timestamp: 1_710_000_060,
             scope_hash: None,
             aggregate_budget: None,
+            cumulative_approval: None,
         },
         &delegate_one,
     )

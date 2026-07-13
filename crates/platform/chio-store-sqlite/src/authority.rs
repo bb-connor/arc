@@ -8,8 +8,8 @@ use chio_core::capability::{
 };
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel::{
-    AuthoritySnapshot, AuthorityStatus, AuthorityStoreError, AuthorityTrustedKeySnapshot,
-    CapabilityAuthority, KernelError,
+    ensure_capability_issuance_supported, AuthoritySnapshot, AuthorityStatus, AuthorityStoreError,
+    AuthorityTrustedKeySnapshot, CapabilityAuthority, KernelError,
 };
 use rusqlite::{params, Connection};
 use uuid::Uuid;
@@ -644,6 +644,7 @@ impl CapabilityAuthority for SqliteCapabilityAuthority {
         scope: ChioScope,
         ttl_seconds: u64,
     ) -> Result<CapabilityToken, KernelError> {
+        ensure_capability_issuance_supported(&scope)?;
         let keypair = self
             .read_current_keypair()
             .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;

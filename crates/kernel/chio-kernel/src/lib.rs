@@ -125,12 +125,15 @@ pub use approval::{
 };
 pub use approval_channels::{RecordingChannel, WebhookChannel, WebhookPayload};
 pub use authority::{
-    AuthoritySnapshot, AuthorityStatus, AuthorityStoreError, AuthorityTrustedKeySnapshot,
-    CapabilityAuthority, LocalCapabilityAuthority,
+    ensure_capability_issuance_supported, validate_issued_capability_response,
+    validate_issued_capability_response_at, AuthoritySnapshot, AuthorityStatus,
+    AuthorityStoreError, AuthorityTrustedKeySnapshot, CapabilityAuthority,
+    LocalCapabilityAuthority,
 };
 pub use budget_store::{BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore};
 pub use capability_lineage::{
-    CapabilityLineageError, CapabilitySnapshot, StoredCapabilitySnapshot,
+    CapabilityLineageError, CapabilitySnapshot, CapabilitySnapshotProvenance,
+    StoredCapabilitySnapshot,
 };
 pub use checkpoint::{
     build_checkpoint, build_checkpoint_with_previous, build_inclusion_proof,

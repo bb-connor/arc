@@ -1,6 +1,36 @@
 use super::super::*;
 use super::support::*;
 
+fn stage_receipt_schema_v0(path: &std::path::Path) {
+    drop(SqliteReceiptStore::open(path).test_unwrap());
+    let connection = rusqlite::Connection::open(path).test_unwrap();
+    connection
+        .execute("DROP INDEX idx_capability_lineage_federated_parent", [])
+        .test_unwrap();
+    for table in ["capability_lineage", "federated_share_capability_lineage"] {
+        for column in [
+            "provenance",
+            "federated_parent_capability_id",
+            "signed_capability_json",
+        ] {
+            connection
+                .execute(&format!("ALTER TABLE {table} DROP COLUMN {column}"), [])
+                .test_unwrap();
+        }
+    }
+    crate::stamp_schema_version(&connection, "receipt", 0).test_unwrap();
+}
+
+fn table_has_column(connection: &rusqlite::Connection, table: &str, column: &str) -> bool {
+    connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM pragma_table_info(?1) WHERE name = ?2)",
+            rusqlite::params![table, column],
+            |row| row.get(0),
+        )
+        .test_unwrap()
+}
+
 #[test]
 fn sqlite_receipt_store_persists_across_reopen() {
     let path = unique_db_path("chio-receipts");
@@ -129,6 +159,124 @@ fn sqlite_receipt_store_stamps_application_id_and_refuses_future_database() {
         SqliteReceiptStore::open_existing(&path).is_err(),
         "a future-version receipt database must be refused"
     );
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn open_existing_rejects_v0_until_writable_open_migrates_it() {
+    let path = unique_db_path("chio-receipts-v0-open-existing");
+    stage_receipt_schema_v0(&path);
+
+    let error = SqliteReceiptStore::open_existing(&path).test_unwrap_err();
+    assert!(
+        error.to_string().contains("requires writable migration"),
+        "unexpected error: {error}"
+    );
+    let unmigrated = rusqlite::Connection::open(&path).test_unwrap();
+    assert!(!table_has_column(
+        &unmigrated,
+        "capability_lineage",
+        "signed_capability_json"
+    ));
+    assert!(!table_has_column(
+        &unmigrated,
+        "capability_lineage",
+        "provenance"
+    ));
+    drop(unmigrated);
+
+    let migrated = SqliteReceiptStore::open(&path).test_unwrap();
+    let connection = migrated.connection().test_unwrap();
+    assert!(table_has_column(
+        &connection,
+        "capability_lineage",
+        "signed_capability_json"
+    ));
+    assert!(table_has_column(
+        &connection,
+        "federated_share_capability_lineage",
+        "signed_capability_json"
+    ));
+    assert!(table_has_column(
+        &connection,
+        "capability_lineage",
+        "federated_parent_capability_id"
+    ));
+    assert!(table_has_column(
+        &connection,
+        "capability_lineage",
+        "provenance"
+    ));
+    let version: i32 = connection
+        .query_row(
+            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'receipt'",
+            [],
+            |row| row.get(0),
+        )
+        .test_unwrap();
+    assert_eq!(
+        version,
+        crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+    );
+    drop(connection);
+    drop(migrated);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn concurrent_writable_opens_serialize_lineage_migration_and_stamp() {
+    let path = unique_db_path("chio-receipts-v1-concurrent-migration");
+    stage_receipt_schema_v0(&path);
+    let barrier = Arc::new(std::sync::Barrier::new(3));
+    let mut workers = Vec::new();
+    for _ in 0..2 {
+        let path = path.clone();
+        let barrier = Arc::clone(&barrier);
+        workers.push(std::thread::spawn(move || {
+            barrier.wait();
+            SqliteReceiptStore::open(&path).map(drop)
+        }));
+    }
+    barrier.wait();
+    for worker in workers {
+        worker.join().test_unwrap().test_unwrap();
+    }
+
+    let connection = rusqlite::Connection::open(&path).test_unwrap();
+    assert!(table_has_column(
+        &connection,
+        "capability_lineage",
+        "signed_capability_json"
+    ));
+    assert!(table_has_column(
+        &connection,
+        "federated_share_capability_lineage",
+        "signed_capability_json"
+    ));
+    assert!(table_has_column(
+        &connection,
+        "capability_lineage",
+        "federated_parent_capability_id"
+    ));
+    assert!(table_has_column(
+        &connection,
+        "capability_lineage",
+        "provenance"
+    ));
+    let version: i32 = connection
+        .query_row(
+            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'receipt'",
+            [],
+            |row| row.get(0),
+        )
+        .test_unwrap();
+    assert_eq!(
+        version,
+        crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+    );
+    drop(connection);
 
     let _ = fs::remove_file(path);
 }

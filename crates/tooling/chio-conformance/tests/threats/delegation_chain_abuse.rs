@@ -83,6 +83,7 @@ fn signed_delegated_cap(
             timestamp: issued_at,
             scope_hash: None,
             aggregate_budget: None,
+            cumulative_approval: None,
         },
         issuer,
     ) {

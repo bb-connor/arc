@@ -18,6 +18,12 @@ pub const ACCEPTS_HYBRID_SIGNATURES: &str = "accepts_hybrid_signatures";
 /// Peers enforce delegation-chain binding for attenuated capability tokens.
 pub const DELEGATION_CHAIN_BINDING: &str = "delegation_chain_binding";
 
+/// Peers can verify and enforce aggregate invocation budgets.
+pub const AGGREGATE_INVOCATION_BUDGET: &str = "aggregate_invocation_budget";
+
+/// Peers can verify and enforce cumulative approval budgets.
+pub const CUMULATIVE_APPROVAL_BUDGET: &str = "cumulative_approval_budget";
+
 fn capabilities_schema() -> String {
     CHIO_CAPABILITIES_SCHEMA.to_string()
 }

@@ -561,6 +561,7 @@ fn attenuation_proof_validation_rejects_non_subset_scope() -> Result<()> {
         }],
         restricted_predicates: vec![],
         aggregate_budget: None,
+        cumulative_approval: None,
     };
 
     let parent_hash = scope_hash(&parent)?;
@@ -653,6 +654,7 @@ fn plain_delegated_token_without_attenuation_proof_verifies_and_skips_chain_bind
             timestamp: 100,
             scope_hash: None,
             aggregate_budget: None,
+            cumulative_approval: None,
         },
         &issuer,
     )
@@ -739,6 +741,7 @@ fn requires_chain_binding_tracks_only_new_attenuation() {
             timestamp: 100,
             scope_hash: None,
             aggregate_budget: None,
+            cumulative_approval: None,
         },
         &issuer,
     )
@@ -777,6 +780,7 @@ fn make_signed_link(
         timestamp,
         scope_hash: None,
         aggregate_budget: None,
+        cumulative_approval: None,
     };
     DelegationLink::sign(body, delegator_kp).unwrap()
 }

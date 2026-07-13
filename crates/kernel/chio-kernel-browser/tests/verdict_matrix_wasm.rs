@@ -369,6 +369,7 @@ fn evaluate_browser_scenario(scenario: &VerdictScenario) -> DriverOutcome {
         clock_override_unix_secs: Some(ISSUED_AT + 1),
         session_filesystem_roots: None,
         peer_capabilities: None,
+        direct_root_capability: None,
         capability_trust_roots: Default::default(),
         parent_budget_snapshots: Vec::new(),
     };

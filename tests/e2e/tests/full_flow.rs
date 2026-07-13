@@ -14,9 +14,9 @@ use chio_core::crypto::Keypair;
 use chio_core::receipt::{body::ChioReceipt, lineage::ChildRequestReceipt};
 use chio_guards::{ForbiddenPathGuard, GuardPipeline, ShellCommandGuard};
 use chio_kernel::{
-    CapabilitySnapshot, ChioKernel, Guard, GuardContext, GuardDecision, KernelConfig, KernelError,
-    ReceiptStore, ReceiptStoreError, ToolCallOutput, ToolCallRequest, ToolServerConnection,
-    Verdict,
+    CapabilitySnapshot, CapabilitySnapshotProvenance, ChioKernel, Guard, GuardContext,
+    GuardDecision, KernelConfig, KernelError, ReceiptStore, ReceiptStoreError, ToolCallOutput,
+    ToolCallRequest, ToolServerConnection, Verdict,
 };
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -59,6 +59,9 @@ impl ReceiptStore for InMemoryReceiptStore {
             grants_json: serde_json::to_string(&token.scope)?,
             delegation_depth: token.delegation_chain.len() as u64,
             parent_capability_id: parent_capability_id.map(ToOwned::to_owned),
+            federated_parent_capability_id: None,
+            provenance: CapabilitySnapshotProvenance::SignedToken,
+            signed_capability: Some(token.clone()),
         };
         self.snapshots
             .lock()
@@ -451,6 +454,7 @@ async fn full_flow_revocation_cascade() {
         timestamp: now,
         scope_hash: None,
         aggregate_budget: None,
+        cumulative_approval: None,
     };
     let link = DelegationLink::sign(link_body, &agent_a_kp).expect("sign delegation link");
 

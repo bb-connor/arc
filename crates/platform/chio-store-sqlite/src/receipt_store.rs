@@ -3192,7 +3192,7 @@ mod liability_market;
 #[path = "receipt_store/reports.rs"]
 mod reports;
 #[path = "receipt_store/support.rs"]
-mod support;
+pub(crate) mod support;
 #[cfg(test)]
 #[path = "receipt_store/tests.rs"]
 mod tests;

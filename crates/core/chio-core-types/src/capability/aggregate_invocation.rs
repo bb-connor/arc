@@ -14,7 +14,9 @@ use crate::signer_binding::{
     ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
 };
 
-use super::attenuation::{scope_hash, validate_delegation_chain, ScopeHash};
+use super::attenuation::{
+    scope_hash, validate_delegable_attenuation, validate_delegation_chain, ScopeHash,
+};
 use super::scope::ChioScope;
 use super::token::{CapabilityToken, CapabilityTokenBody};
 
@@ -231,6 +233,11 @@ pub(crate) fn validate_aggregate_budget_shape(
     let Some(budget) = budget else {
         return Ok(());
     };
+    if scope.has_cumulative_approval() {
+        return Err(violation(
+            "aggregate invocation and cumulative approval budgets cannot be combined without a joint root binding",
+        ));
+    }
     match budget.scope {
         AggregateInvocationScope::Capability => {
             if budget.root_binding.is_some() {
@@ -260,12 +267,12 @@ fn verify_direct(
     trusted_root_issuers: &[PublicKey],
 ) -> Result<Option<VerifiedAggregateInvocationBudget>> {
     validate_aggregate_budget_shape(&token.scope, token.aggregate_invocation_budget.as_ref())?;
+    if !trusted_root_issuers.contains(&token.issuer) {
+        return Err(violation("aggregate capability root issuer is not trusted"));
+    }
     let Some(budget) = token.aggregate_invocation_budget.as_ref() else {
         return Ok(None);
     };
-    if !trusted_root_issuers.contains(&token.issuer) {
-        return Err(violation("aggregate budget root issuer is not trusted"));
-    }
     match budget.scope {
         AggregateInvocationScope::Capability => Ok(Some(VerifiedAggregateInvocationBudget {
             scope: budget.scope,
@@ -330,8 +337,22 @@ fn verify_descendant(
             "first delegation link is outside the authenticated root validity window",
         ));
     }
+    if token.issued_at < final_link.timestamp {
+        return Err(violation(
+            "delegated capability was issued before its final delegation link",
+        ));
+    }
 
     let verified_root = verify_direct(root, trusted_root_issuers)?;
+    if token.delegation_chain.len() > 1
+        && (verified_root.is_some()
+            || token.aggregate_invocation_budget.is_some()
+            || chain_marker(token).is_some())
+    {
+        return Err(violation(
+            "multi-hop aggregate family delegation requires per-hop signed child-scope witnesses",
+        ));
+    }
     match verified_root {
         None => {
             if token.aggregate_invocation_budget.is_some() || chain_marker(token).is_some() {
@@ -339,6 +360,12 @@ fn verify_descendant(
                     "delegated capability created an aggregate family below an unbound root",
                 ));
             }
+            if token.expires_at > root.expires_at {
+                return Err(violation(
+                    "delegated capability expires after its authenticated root",
+                ));
+            }
+            validate_delegable_attenuation(&root.scope, &token.scope)?;
             Ok(None)
         }
         Some(root_budget) if root_budget.scope == AggregateInvocationScope::Capability => Err(
@@ -370,6 +397,7 @@ fn verify_descendant(
                     "delegated capability expires after its aggregate budget root",
                 ));
             }
+            validate_delegable_attenuation(&root.scope, &token.scope)?;
             verify_binding_matches_root(child_binding, root, child_budget.max_invocations)?;
             let marker = child_binding.delegation_marker()?;
             for link in &token.delegation_chain {

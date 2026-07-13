@@ -1361,10 +1361,14 @@ pub(crate) async fn handle_federated_issue(
                                 );
                             }
                         };
-                        let child_snapshot = match build_capability_snapshot(
+                        let signed_parent_capability_id = capability
+                            .delegation_chain
+                            .last()
+                            .map(|link| link.capability_id.clone());
+                        let mut child_snapshot = match build_capability_snapshot(
                             &capability,
-                            anchor_snapshot.delegation_depth.saturating_add(1),
-                            Some(anchor_snapshot.capability_id.clone()),
+                            capability.delegation_chain.len() as u64,
+                            signed_parent_capability_id,
                         ) {
                             Ok(snapshot) => snapshot,
                             Err(error) => {
@@ -1374,25 +1378,17 @@ pub(crate) async fn handle_federated_issue(
                                 );
                             }
                         };
-                        if let Err(error) = store.upsert_capability_snapshot(&anchor_snapshot) {
-                            return plain_http_error(
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                &error.to_string(),
-                            );
-                        }
-                        if let Some((share_id, parent_snapshot)) = upstream_parent.as_ref() {
-                            if let Err(error) = store.record_federated_lineage_bridge(
-                                &anchor_snapshot.capability_id,
-                                &parent_snapshot.capability_id,
-                                Some(share_id.as_str()),
-                            ) {
-                                return plain_http_error(
-                                    StatusCode::INTERNAL_SERVER_ERROR,
-                                    &error.to_string(),
-                                );
-                            }
-                        }
-                        if let Err(error) = store.upsert_capability_snapshot(&child_snapshot) {
+                        child_snapshot.federated_parent_capability_id =
+                            Some(anchor_snapshot.capability_id.clone());
+                        let upstream_bridge =
+                            upstream_parent.as_ref().map(|(share_id, parent_snapshot)| {
+                                (parent_snapshot.capability_id.as_str(), share_id.as_str())
+                            });
+                        if let Err(error) = store.persist_federated_delegation_lineage(
+                            &anchor_snapshot,
+                            upstream_bridge,
+                            &child_snapshot,
+                        ) {
                             return plain_http_error(
                                 StatusCode::INTERNAL_SERVER_ERROR,
                                 &error.to_string(),

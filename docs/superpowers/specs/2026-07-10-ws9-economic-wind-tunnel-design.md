@@ -235,13 +235,17 @@ account version, so derived exposure reports are never admission truth.
 existing composite `BudgetStore` hold. Its versioned signed constraint is:
 
 ```rust
-RequireApprovalAbove {
+RequireCumulativeApprovalAbove {
     threshold: MonetaryAmount,
     approval_budget_id: String,
     approval_budget_epoch: u64,
-    family_root_binding: Option<CumulativeApprovalRootBinding>,
+    cumulative_approval_root_binding: Option<CumulativeApprovalRootBinding>,
 }
 ```
+
+The existing `RequireApprovalAbove { threshold_units }` constraint remains
+per-request only. It is not accepted as cumulative approval authority and does
+not participate in the cumulative account.
 
 The authority-derived account key binds the authenticated constraint issuer and
 family owner, signed budget id and epoch, root grant identity, and currency. A
