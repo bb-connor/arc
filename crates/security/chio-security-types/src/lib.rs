@@ -38,9 +38,9 @@ pub use response::{
     PlannedResponseEffects, ResponseApprovalRequirement, ResponseEffectAppliedRecord,
     ResponseEffectFailedRecord, ResponseEffectKind, ResponseEffectProgress,
     ResponseEffectRequestedRecord, ResponseEffectSpec, ResponseFailureRecord, ResponseFinalRecord,
-    ResponseMutationLog, ResponseMutationRecord, ResponsePlan, ResponsePlanInput,
-    ResponseRequestedRecord, ResponseRollbackOutcome, ResponseRollbackRecord, ResponseShapeError,
-    ResponseSnapshot, ResponseState, ResponseTarget, ResponseTransitionCause,
+    ResponseMutationLog, ResponseMutationRecord, ResponsePlan, ResponsePlanAuthorizationBody,
+    ResponsePlanInput, ResponseRequestedRecord, ResponseRollbackOutcome, ResponseRollbackRecord,
+    ResponseShapeError, ResponseSnapshot, ResponseState, ResponseTarget, ResponseTransitionCause,
     ResponseTransitionRecord, MAX_RESPONSE_EFFECTS, MAX_RESPONSE_MUTATIONS,
     RESPONSE_STATE_SCHEMA_VERSION,
 };

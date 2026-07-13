@@ -1002,43 +1002,10 @@ fn derive_effect_id(
         .map_err(|_| StateMachineError::Canonical)
 }
 
-#[derive(Serialize)]
-struct PlanCommitment<'a> {
-    action_id: &'a str,
-    trigger_finding_id: &'a str,
-    tenant_id: &'a str,
-    policy_version: &'a str,
-    affected_ids: &'a [RecordId],
-    affected_set_hash: Digest32,
-    effects: &'a [PlannedResponseEffect],
-    ttl_ms: u64,
-    created_at_unix_ms: u64,
-    expires_at_unix_ms: u64,
-    operator_capability: &'a chio_security_types::OperatorCapabilityBinding,
-    approval_requirement: &'a chio_security_types::ResponseApprovalRequirement,
-    submitter: &'a str,
-    reason_hash: Digest32,
-}
-
 fn compute_plan_hash(plan: &ResponsePlan) -> Result<Digest32, StateMachineError> {
     domain_hash(
         CHIO_RESPONSE_PLAN_HASH_DOMAIN.as_bytes(),
-        &PlanCommitment {
-            action_id: plan.action_id.as_str(),
-            trigger_finding_id: plan.trigger_finding_id.as_str(),
-            tenant_id: plan.tenant_id.as_str(),
-            policy_version: plan.policy_version.as_str(),
-            affected_ids: plan.affected_ids.as_slice(),
-            affected_set_hash: plan.affected_set_hash,
-            effects: plan.effects.as_slice(),
-            ttl_ms: plan.ttl_ms,
-            created_at_unix_ms: plan.created_at_unix_ms,
-            expires_at_unix_ms: plan.expires_at_unix_ms,
-            operator_capability: &plan.operator_capability,
-            approval_requirement: &plan.approval_requirement,
-            submitter: plan.submitter.as_str(),
-            reason_hash: plan.reason_hash,
-        },
+        &plan.authorization_body(),
     )
 }
 

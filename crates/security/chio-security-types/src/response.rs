@@ -202,7 +202,51 @@ pub struct ResponsePlan {
     pub plan_hash: Digest32,
 }
 
+/// Complete canonical response-plan commitment used by authorization.
+///
+/// The resulting body deliberately excludes `plan_hash` so the hash cannot
+/// become part of its own preimage. Every field that can change execution,
+/// rollback, approval, or attribution remains present.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResponsePlanAuthorizationBody {
+    pub action_id: ActionId,
+    pub trigger_finding_id: RecordId,
+    pub tenant_id: TenantId,
+    pub policy_version: RecordId,
+    pub affected_ids: RecordIdSet,
+    pub affected_set_hash: Digest32,
+    pub effects: PlannedResponseEffects,
+    pub ttl_ms: u64,
+    pub created_at_unix_ms: u64,
+    pub expires_at_unix_ms: u64,
+    pub operator_capability: OperatorCapabilityBinding,
+    pub approval_requirement: ResponseApprovalRequirement,
+    pub submitter: RecordId,
+    pub reason_hash: Digest32,
+}
+
 impl ResponsePlan {
+    #[must_use]
+    pub fn authorization_body(&self) -> ResponsePlanAuthorizationBody {
+        ResponsePlanAuthorizationBody {
+            action_id: self.action_id.clone(),
+            trigger_finding_id: self.trigger_finding_id.clone(),
+            tenant_id: self.tenant_id.clone(),
+            policy_version: self.policy_version.clone(),
+            affected_ids: self.affected_ids.clone(),
+            affected_set_hash: self.affected_set_hash,
+            effects: self.effects.clone(),
+            ttl_ms: self.ttl_ms,
+            created_at_unix_ms: self.created_at_unix_ms,
+            expires_at_unix_ms: self.expires_at_unix_ms,
+            operator_capability: self.operator_capability.clone(),
+            approval_requirement: self.approval_requirement.clone(),
+            submitter: self.submitter.clone(),
+            reason_hash: self.reason_hash,
+        }
+    }
+
     pub fn validate_shape(&self) -> Result<(), ResponseShapeError> {
         if self.effects.is_empty() {
             return Err(ResponseShapeError::EmptyEffects);

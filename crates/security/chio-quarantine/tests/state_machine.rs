@@ -10,7 +10,7 @@ use chio_security_types::ports::{
 };
 use chio_security_types::{
     OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind, ResponseEffectSpec,
-    ResponsePlanInput, ResponseState, ResponseTarget,
+    ResponsePlanAuthorizationBody, ResponsePlanInput, ResponseState, ResponseTarget,
 };
 use proptest::prelude::*;
 use response_support::{record, TestResponseStore};
@@ -455,6 +455,22 @@ fn canonical_plan_effect_and_transition_ids_are_stable_and_cas_is_idempotent() {
             &transition(0, ResponseState::AwaitingApproval, 111),
         )
         .is_err());
+}
+
+#[test]
+fn response_plan_authorization_body_excludes_its_own_hash() {
+    let plan = build_response_plan(plan_input(2))
+        .unwrap_or_else(|failure| panic!("valid response plan rejected: {failure}"));
+    let body = plan.authorization_body();
+    let mut encoded = serde_json::to_value(&body)
+        .unwrap_or_else(|failure| panic!("authorization body encoding failed: {failure}"));
+
+    assert_eq!(body.action_id, plan.action_id);
+    assert_eq!(body.effects, plan.effects);
+    assert!(encoded.get("plan_hash").is_none());
+
+    encoded["plan_hash"] = serde_json::json!(plan.plan_hash);
+    assert!(serde_json::from_value::<ResponsePlanAuthorizationBody>(encoded).is_err());
 }
 
 #[test]
