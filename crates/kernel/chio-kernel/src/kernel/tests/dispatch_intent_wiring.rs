@@ -869,3 +869,156 @@ fn intent_and_receipt_tenant_ignore_a_foreign_thread_scope(
     let _ = std::fs::remove_file(&path);
     Ok(())
 }
+
+/// Store whose next consuming append parks until released, holding its
+/// caller inside the kernel-wide receipt write lock so a second receipt for
+/// the same request can race the intent-handle lookup. Consumes are keyed on
+/// request id alone: the test asserts WHICH path each receipt takes, not the
+/// store-side key match.
+struct ParkedConsumeStore {
+    open_intents: Mutex<std::collections::HashSet<String>>,
+    consumed: Mutex<Vec<String>>,
+    plain_appends: std::sync::atomic::AtomicU64,
+    park_next_consume: std::sync::atomic::AtomicBool,
+    entered_consume: std::sync::mpsc::Sender<()>,
+    release_consume: Mutex<std::sync::mpsc::Receiver<()>>,
+}
+
+impl crate::receipt_store::ReceiptStore for ParkedConsumeStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        self.plain_appends
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_chio_receipt_consuming_intent(
+        &self,
+        _receipt: &ChioReceipt,
+        key: &crate::receipt_store::DispatchIntentKey,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        if self
+            .park_next_consume
+            .swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
+            let _ = self.entered_consume.send(());
+            if let Ok(release) = self.release_consume.lock() {
+                let _ = release.recv_timeout(std::time::Duration::from_secs(30));
+            }
+        }
+        let mut open = self
+            .open_intents
+            .lock()
+            .map_err(|_| ReceiptStoreError::Conflict("open-intent lock poisoned".to_string()))?;
+        if open.remove(&key.request_id) {
+            self.consumed
+                .lock()
+                .map_err(|_| ReceiptStoreError::Conflict("consumed lock poisoned".to_string()))?
+                .push(key.request_id.clone());
+            Ok(None)
+        } else {
+            Err(ReceiptStoreError::Conflict(format!(
+                "dispatch intent for request `{}` not found",
+                key.request_id
+            )))
+        }
+    }
+}
+
+#[test]
+fn concurrent_receipts_for_one_request_consume_once_and_append_plainly(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // A request can persist more than one receipt (a cleanup-fault receipt
+    // racing the terminal outcome). Exactly one may take the consuming
+    // append; the other must observe the handle removal under the receipt
+    // write lock and append plainly, so BOTH audit records persist and the
+    // handle does not linger for later attempts.
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let store = std::sync::Arc::new(ParkedConsumeStore {
+        open_intents: Mutex::new(std::collections::HashSet::from([
+            "req-two-receipts".to_string()
+        ])),
+        consumed: Mutex::new(Vec::new()),
+        plain_appends: std::sync::atomic::AtomicU64::new(0),
+        park_next_consume: std::sync::atomic::AtomicBool::new(true),
+        entered_consume: entered_tx,
+        release_consume: Mutex::new(release_rx),
+    });
+    let mut kernel = make_kernel(make_config());
+    kernel.set_receipt_store_handle(
+        std::sync::Arc::clone(&store) as std::sync::Arc<dyn crate::receipt_store::ReceiptStore>
+    )?;
+
+    let kp = make_keypair();
+    let receipt_a = make_signed_receipt(&kp, "rcpt-race-a");
+    let receipt_b = make_signed_receipt(&kp, "rcpt-race-b");
+    let handle = crate::receipt_store::DispatchIntentHandle {
+        request_id: "req-two-receipts".to_string(),
+        parameter_hash: receipt_a.action.parameter_hash.clone(),
+        tenant_id: None,
+    };
+    let _intent_scope = kernel.scope_dispatch_intent_for_request("req-two-receipts", Some(handle));
+
+    let (first, second) = std::thread::scope(|threads| {
+        let kernel = &kernel;
+        let receipt_a = &receipt_a;
+        let receipt_b = &receipt_b;
+        let first = threads.spawn(move || {
+            kernel.record_chio_receipt_consuming_optional_intent(receipt_a, Some("req-two-receipts"))
+        });
+        // The first persist is now parked inside the consuming append,
+        // holding the receipt write lock.
+        entered_rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("first persist reaches the consuming append");
+        let second = threads.spawn(move || {
+            kernel.record_chio_receipt_consuming_optional_intent(receipt_b, Some("req-two-receipts"))
+        });
+        // Give the second persist time to enter and block on the receipt
+        // write lock while the first still holds it; releasing then drives
+        // the full contended interleaving. A slower spawn only makes the
+        // race narrower, never the assertions wrong.
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        release_tx.send(()).expect("release the parked consume");
+        (
+            first.join().expect("first persist thread"),
+            second.join().expect("second persist thread"),
+        )
+    });
+
+    first?;
+    second.map_err(|error| {
+        format!("the second receipt must append plainly once the intent is consumed: {error}")
+    })?;
+    let consumed = store
+        .consumed
+        .lock()
+        .map_err(|_| "consumed lock poisoned")?
+        .clone();
+    assert_eq!(
+        consumed,
+        vec!["req-two-receipts".to_string()],
+        "exactly one receipt consumes the intent"
+    );
+    assert_eq!(
+        store
+            .plain_appends
+            .load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the losing receipt persists through the plain append"
+    );
+    assert!(
+        kernel
+            .dispatch_intent_for_request(Some("req-two-receipts"))
+            .is_none(),
+        "the consumed handle must not linger for later receipts"
+    );
+    Ok(())
+}

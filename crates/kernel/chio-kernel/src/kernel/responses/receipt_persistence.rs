@@ -184,7 +184,6 @@ impl ChioKernel {
         receipt: &ChioReceipt,
         request_id: Option<&str>,
     ) -> Result<(), KernelError> {
-        let intent = self.dispatch_intent_for_request(request_id);
         // Scope the receipt-store write lock so it is released before the
         // settlement observer runs. Holding the mutex across
         // `run_settlement_observer` would serialize all concurrent receipt
@@ -196,6 +195,15 @@ impl ChioKernel {
             let _receipt_store_write = self.receipt_store_write_lock.lock().map_err(|_| {
                 KernelError::Internal("receipt store write lock poisoned".to_string())
             })?;
+            // Resolve the request's intent handle only under the write lock.
+            // A request can persist more than one receipt concurrently (a
+            // cleanup-fault receipt racing the terminal outcome), and the
+            // first to commit consumes the durable row and drops the handle
+            // below. A lookup before the lock would hand both callers the
+            // handle and send the loser into the consuming append against
+            // the already-deleted row; under the lock the loser observes the
+            // removal and appends plainly.
+            let intent = self.dispatch_intent_for_request(request_id);
             // Bound the commit round trip so a wedged writer cannot pin the
             // kernel-wide receipt write lock (and thus every subsequent tool
             // call) indefinitely. On timeout this fails closed with
