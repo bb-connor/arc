@@ -111,14 +111,27 @@ pub struct SqliteReceiptStore {
     pub(crate) strict_tenant_isolation: std::sync::atomic::AtomicBool,
     /// Staged-rollout flag: read-only after open.
     pub(crate) incremental_verification: bool,
-    /// Sidecar advisory lock marking this instance as a live writer on the
-    /// database file, held shared for the store's lifetime and released by
-    /// the OS when the process exits (cleanly or not). Boot reconciliation
-    /// upgrades it to exclusive to prove no sibling writer instance is live
-    /// before claiming open dispatch intents as restart orphans. `None` only
-    /// for an in-memory database, which has no on-disk file for siblings to
-    /// coordinate on.
-    writer_lifetime_lock: Option<std::fs::File>,
+    /// Sidecar advisory locks coordinating sibling writer instances on the
+    /// database file. `None` only for an in-memory database, which has no
+    /// on-disk file for siblings to coordinate on.
+    writer_lifetime_lock: Option<WriterLifetimeLock>,
+}
+
+/// Sidecar locks marking this instance as a live writer on a shared database
+/// file and coordinating dispatch-intent reconciliation with its siblings.
+pub(crate) struct WriterLifetimeLock {
+    /// Shared advisory lock held for the store's lifetime, released by the
+    /// OS when the process exits (cleanly or not): its continuous presence
+    /// is what proves this instance live to its siblings. Reconciliation
+    /// converts it to exclusive to prove no sibling is live before claiming
+    /// open dispatch intents as orphans, and only ever under the probe
+    /// mutex, because flock conversions are not atomic and drop the mark
+    /// for an instant while they resolve.
+    pub(crate) mark: std::fs::File,
+    /// Path of the sidecar mutex serializing sibling exclusivity probes.
+    /// Opened and locked per reconcile pass; closing the descriptor releases
+    /// it, so an aborted pass can never leave the mutex held.
+    pub(crate) probe_path: std::path::PathBuf,
 }
 
 type FederatedShareSubjectCorpus = (
@@ -3325,12 +3338,14 @@ impl SqliteReceiptStore {
     /// Claiming an open row asserts its writer is gone, but the database
     /// file may be shared with a live sibling instance whose in-flight calls
     /// own some of these rows. The pass therefore proves exclusivity first
-    /// by upgrading this instance's lifetime lock: a refused upgrade means a
-    /// live sibling holds its shared mark, so every row is deferred to its
-    /// owner (reported, never silent) instead of claimed, and a later
-    /// exclusive attach still reconciles any true orphans among them. A
-    /// single-instance restart holds the file exclusively and reconciles
-    /// exactly as before.
+    /// by converting this instance's lifetime mark to exclusive, under a
+    /// separate probe mutex that keeps sibling conversions from ever
+    /// overlapping: a refused conversion (or a probe already held by a
+    /// sibling's pass) means a live sibling owns some of the rows, so every
+    /// row is deferred to its owner (reported, never silent) instead of
+    /// claimed, and a later exclusive pass still reconciles any true
+    /// orphans among them. A single-instance restart holds the file
+    /// exclusively and reconciles exactly as before.
     pub fn reconcile_dispatch_intents(
         &self,
         reconciler: &dyn chio_kernel::receipt_store::DispatchIntentReconciler,
@@ -3347,15 +3362,45 @@ impl SqliteReceiptStore {
         if open.is_empty() {
             return Ok(report);
         }
+        let mut reconcile_probe: Option<std::fs::File> = None;
         if let Some(lock) = &self.writer_lifetime_lock {
-            match lock.try_lock() {
+            // Serialize sibling exclusivity probes on a separate sidecar
+            // mutex BEFORE touching the lifetime mark. flock conversions
+            // are not atomic: upgrading drops this instance's shared mark
+            // for an instant while the exclusive attempt resolves, so two
+            // instances probing concurrently could each observe the other
+            // markless, win exclusivity in turn, and dead-letter each
+            // other's LIVE in-flight intents. With the probe mutex held,
+            // every sibling's mark is continuously present (siblings only
+            // convert under this same mutex), so the conversion below races
+            // nothing. A refused probe means a live sibling is
+            // mid-reconcile: defer to it without disturbing this instance's
+            // own mark.
+            let probe = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(&lock.probe_path)?;
+            match probe.try_lock() {
+                Ok(()) => reconcile_probe = Some(probe),
+                Err(std::fs::TryLockError::WouldBlock) => {
+                    report.deferred_to_live_writer = report.open;
+                    return Ok(report);
+                }
+                // An errored probe must neither claim possibly live rows
+                // nor silently skip: fail closed, refusing the attach.
+                Err(std::fs::TryLockError::Error(error)) => return Err(error.into()),
+            }
+            match lock.mark.try_lock() {
                 Ok(()) => {}
                 Err(std::fs::TryLockError::WouldBlock) => {
-                    // A refused flock upgrade may have dropped the shared
-                    // mark (lock conversions are not atomic); re-mark before
-                    // deferring so this instance stays visible as a live
-                    // writer to its siblings' own reconcile passes.
-                    lock.lock_shared()?;
+                    // The refused conversion may have dropped the shared
+                    // mark; restore it before deferring so this instance
+                    // stays visible as a live writer. Only the probe holder
+                    // converts, so no sibling can misread this instance as
+                    // gone during the gap.
+                    lock.mark.lock_shared()?;
                     report.deferred_to_live_writer = report.open;
                     return Ok(report);
                 }
@@ -3420,9 +3465,12 @@ impl SqliteReceiptStore {
         // store's whole lifetime. The claim error outranks a downgrade error
         // (both refuse the attach).
         let downgrade = match &self.writer_lifetime_lock {
-            Some(lock) => lock.lock_shared().map_err(ReceiptStoreError::from),
+            Some(lock) => lock.mark.lock_shared().map_err(ReceiptStoreError::from),
             None => Ok(()),
         };
+        // Release the probe mutex only after the mark is shared again, so no
+        // sibling's probe can ever overlap this pass's conversion gaps.
+        drop(reconcile_probe);
         claim?;
         downgrade?;
         Ok(report)

@@ -152,21 +152,35 @@ pub(crate) fn sqlite_parent_dir_to_create(path: &Path) -> Option<PathBuf> {
 /// path so a `file:` URI and its plain-path spelling coordinate on the same
 /// lock.
 pub(crate) fn sqlite_writer_lock_path(path: &Path) -> Option<PathBuf> {
+    sqlite_sidecar_lock_path(path, ".writer-lock")
+}
+
+/// The sidecar path serializing dispatch-intent reconcile passes across
+/// sibling instances of the database at `path`. Separate from the writer
+/// mark on purpose: taking this mutex must never disturb any instance's
+/// lifetime mark, because the mark's continuous presence is what proves the
+/// instance live to its siblings.
+pub(crate) fn sqlite_reconcile_lock_path(path: &Path) -> Option<PathBuf> {
+    sqlite_sidecar_lock_path(path, ".reconcile-lock")
+}
+
+fn sqlite_sidecar_lock_path(path: &Path, extension: &str) -> Option<PathBuf> {
     let Some(text) = path.to_str() else {
         // A non-UTF8 path cannot be a `file:` URI, so use it verbatim.
-        return Some(append_writer_lock_extension(path.to_path_buf()));
+        return Some(append_lock_extension(path.to_path_buf(), extension));
     };
     if is_in_memory_sqlite_path(text) {
         return None;
     }
-    Some(append_writer_lock_extension(sqlite_uri_filesystem_path(
-        text,
-    )))
+    Some(append_lock_extension(
+        sqlite_uri_filesystem_path(text),
+        extension,
+    ))
 }
 
-fn append_writer_lock_extension(path: PathBuf) -> PathBuf {
+fn append_lock_extension(path: PathBuf, extension: &str) -> PathBuf {
     let mut path = path.into_os_string();
-    path.push(".writer-lock");
+    path.push(extension);
     PathBuf::from(path)
 }
 

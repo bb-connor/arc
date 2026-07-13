@@ -1259,26 +1259,32 @@ impl SqliteReceiptStore {
 
 /// Mark this instance as a live writer on the database file: a shared
 /// advisory lock on a sidecar file, held for the store's lifetime and
-/// released by the OS when the process exits, cleanly or not. Boot
-/// reconciliation upgrades the lock to exclusive to prove no sibling writer
-/// instance is live before claiming open dispatch intents as restart
-/// orphans; without the shared mark, one instance attaching to a shared
-/// database would dead-letter a sibling's in-flight intents. Blocks only
-/// while a sibling holds the exclusive upgrade for the duration of its
-/// bounded reconcile pass. In-memory databases have no on-disk file to
-/// coordinate on and take no lock.
-fn acquire_writer_lifetime_lock(path: &Path) -> Result<Option<std::fs::File>, ReceiptStoreError> {
-    let Some(lock_path) = crate::sqlite_writer_lock_path(path) else {
+/// released by the OS when the process exits, cleanly or not. Dispatch-
+/// intent reconciliation converts the lock to exclusive to prove no sibling
+/// writer instance is live before claiming open intents as orphans; without
+/// the shared mark, one instance reconciling a shared database would
+/// dead-letter a sibling's in-flight intents. The conversion happens only
+/// under the sibling-serializing probe mutex at `probe_path` (see
+/// `WriterLifetimeLock`). Blocks only while a sibling holds the exclusive
+/// conversion for the duration of its bounded reconcile pass. In-memory
+/// databases have no on-disk file to coordinate on and take no lock.
+fn acquire_writer_lifetime_lock(
+    path: &Path,
+) -> Result<Option<WriterLifetimeLock>, ReceiptStoreError> {
+    let (Some(lock_path), Some(probe_path)) = (
+        crate::sqlite_writer_lock_path(path),
+        crate::sqlite_reconcile_lock_path(path),
+    ) else {
         return Ok(None);
     };
-    let file = std::fs::OpenOptions::new()
+    let mark = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
         .truncate(false)
         .open(&lock_path)?;
-    file.lock_shared()?;
-    Ok(Some(file))
+    mark.lock_shared()?;
+    Ok(Some(WriterLifetimeLock { mark, probe_path }))
 }
 
 fn build_receipt_pool(

@@ -523,6 +523,72 @@ fn attach_defers_reconciliation_while_a_sibling_writer_is_live(
     Ok(())
 }
 
+#[test]
+fn concurrent_sibling_reconciles_never_claim_each_others_live_intents(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Two live sibling instances reconciling at the same time must both
+    // defer: each holds its shared lifetime mark, so neither can prove
+    // exclusivity. The hazard is the shared-to-exclusive flock conversion,
+    // which is not atomic: it can drop this instance's mark before the
+    // exclusive attempt resolves, and two unserialized probes can each
+    // observe the other markless, win exclusivity in turn, and dead-letter
+    // the other's LIVE in-flight intents. The race window is inside the
+    // conversion syscall and cannot be held open from outside, so this
+    // hammers concurrent passes and requires that no interleaving ever
+    // claims a row.
+    let path = unique_db_path("chio-intents-concurrent-reconcile");
+    let store_a = std::sync::Arc::new(SqliteReceiptStore::open(&path)?);
+    let store_b = std::sync::Arc::new(SqliteReceiptStore::open(&path)?);
+    store_a.record_dispatch_intent(&sample_intent("req-live-a"))?;
+    store_b.record_dispatch_intent(&sample_intent("req-live-b"))?;
+
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+    let claimed = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let mut workers = Vec::new();
+    for store in [
+        std::sync::Arc::clone(&store_a),
+        std::sync::Arc::clone(&store_b),
+    ] {
+        let barrier = std::sync::Arc::clone(&barrier);
+        let claimed = std::sync::Arc::clone(&claimed);
+        workers.push(std::thread::spawn(
+            move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+                // Record violations without breaking out of the loop: the
+                // peer parks on the rendezvous every pass, so an early exit
+                // would strand it instead of reporting the claim.
+                for _ in 0..4000 {
+                    // Rendezvous each pass so the two exclusivity probes run
+                    // as close to simultaneously as the scheduler allows.
+                    barrier.wait();
+                    let report = store.reconcile_dispatch_intents(&RecordingReconciler)?;
+                    claimed.fetch_add(report.dead_lettered, std::sync::atomic::Ordering::SeqCst);
+                }
+                Ok(())
+            },
+        ));
+    }
+    for worker in workers {
+        worker
+            .join()
+            .map_err(|_| "reconcile worker panicked")?
+            .map_err(|error| error.to_string())?;
+    }
+
+    assert_eq!(
+        claimed.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "no concurrent reconcile pass may ever claim a live sibling's intents"
+    );
+    assert_eq!(
+        open_intent_row_count(&store_a)?,
+        2,
+        "both live intents must survive every concurrent reconcile pass"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 /// Rail-aware reconciler: proves the outcome of monetary orphans against the
 /// rail and dead-letters everything else.
 struct RailProvingReconciler;
