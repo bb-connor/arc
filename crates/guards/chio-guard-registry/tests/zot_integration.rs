@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use chio_guard_registry::{
@@ -42,9 +42,9 @@ const MANIFEST_BYTES: &[u8] = br#"{
 }"#;
 const BUNDLE_BYTES: &[u8] = br#"{"bundle":"zot-integration"}"#;
 
-#[ignore = "requires a Docker daemon and pulls ghcr.io/project-zot/zot"]
 #[tokio::test]
 async fn zot_publish_pull_verify_and_offline_paths() -> TestResult<()> {
+    configure_container_host()?;
     let registry = start_zot_registry().await?;
     let credentials = RegistryCredentials::Anonymous;
     let client = registry.guard_client()?;
@@ -137,6 +137,34 @@ async fn zot_publish_pull_verify_and_offline_paths() -> TestResult<()> {
         other => panic!("expected offline cache miss, got {other:?}"),
     }
 
+    Ok(())
+}
+
+#[cfg(unix)]
+fn configure_container_host() -> TestResult<()> {
+    if std::env::var("DOCKER_HOST").is_ok_and(|value| !value.trim().is_empty()) {
+        return Ok(());
+    }
+    let mut candidates = vec![PathBuf::from("/var/run/docker.sock")];
+    if let Some(home) = std::env::var_os("HOME") {
+        let home = PathBuf::from(home);
+        candidates.extend([
+            home.join(".colima/default/docker.sock"),
+            home.join(".docker/run/docker.sock"),
+            home.join(".docker/desktop/docker.sock"),
+        ]);
+    }
+    for socket in candidates {
+        if std::os::unix::net::UnixStream::connect(&socket).is_ok() {
+            std::env::set_var("DOCKER_HOST", format!("unix://{}", socket.display()));
+            return Ok(());
+        }
+    }
+    Err("no reachable container socket".into())
+}
+
+#[cfg(not(unix))]
+fn configure_container_host() -> TestResult<()> {
     Ok(())
 }
 
