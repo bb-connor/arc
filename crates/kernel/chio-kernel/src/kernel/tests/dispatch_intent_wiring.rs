@@ -217,6 +217,116 @@ fn failed_boot_reconciliation_leaves_no_store_attached() -> Result<(), Box<dyn s
     Ok(())
 }
 
+/// Minimal store that counts reconcile passes, reporting sibling-writer
+/// recovery support (or not) per test.
+struct RecoveryProbeStore {
+    reconciles: std::sync::atomic::AtomicU64,
+    supports_recovery: bool,
+}
+
+impl RecoveryProbeStore {
+    fn new(supports_recovery: bool) -> Self {
+        Self {
+            reconciles: std::sync::atomic::AtomicU64::new(0),
+            supports_recovery,
+        }
+    }
+}
+
+impl crate::receipt_store::ReceiptStore for RecoveryProbeStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn reconcile_dispatch_intents(
+        &self,
+        _reconciler: &dyn crate::receipt_store::DispatchIntentReconciler,
+    ) -> Result<crate::receipt_store::DispatchIntentReconcileReport, ReceiptStoreError> {
+        self.reconciles
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(crate::receipt_store::DispatchIntentReconcileReport::default())
+    }
+
+    fn supports_dispatch_intent_recovery(&self) -> bool {
+        self.supports_recovery
+    }
+
+    fn load_latest_checkpoint(
+        &self,
+    ) -> Result<Option<checkpoint::KernelCheckpoint>, ReceiptStoreError> {
+        Ok(None)
+    }
+}
+
+#[test]
+fn recovery_worker_reruns_reconciliation_until_dropped() -> Result<(), Box<dyn std::error::Error>>
+{
+    // A sibling writer can crash at any point after this kernel attaches,
+    // so the recovery worker must keep re-running reconciliation for the
+    // store's whole life, not just once; dropping the handle joins the
+    // thread so a shutting-down kernel never leaves a stray reconciler
+    // behind.
+    let store = std::sync::Arc::new(RecoveryProbeStore::new(true));
+    let handle = crate::receipt_store::DispatchIntentRecoveryHandle::spawn(
+        std::sync::Arc::clone(&store) as std::sync::Arc<dyn crate::receipt_store::ReceiptStore>,
+        std::time::Duration::from_millis(10),
+    );
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while std::time::Instant::now() < deadline
+        && store.reconciles.load(std::sync::atomic::Ordering::SeqCst) < 2
+    {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    // Joins the worker thread; a wedged worker would hang the test here.
+    drop(handle);
+    assert!(
+        store.reconciles.load(std::sync::atomic::Ordering::SeqCst) >= 2,
+        "the recovery worker must re-run reconciliation on its cadence"
+    );
+    Ok(())
+}
+
+#[test]
+fn attach_spawns_the_recovery_worker_only_for_capable_stores(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // A store that coordinates sibling writers gets the background worker;
+    // one that cannot have siblings (or does not support re-running
+    // reconciliation while serving) must not, since its attach-time pass is
+    // already complete.
+    let mut kernel = make_kernel(make_config());
+    let store = std::sync::Arc::new(RecoveryProbeStore::new(true));
+    kernel.set_receipt_store_handle(
+        std::sync::Arc::clone(&store) as std::sync::Arc<dyn crate::receipt_store::ReceiptStore>
+    )?;
+    assert!(
+        kernel.dispatch_intent_recovery.is_some(),
+        "a sibling-coordinating store must get the background recovery worker"
+    );
+    let attach_passes = store.reconciles.load(std::sync::atomic::Ordering::SeqCst);
+    assert!(
+        attach_passes >= 1,
+        "the attach itself still runs the boot pass"
+    );
+
+    let mut kernel = make_kernel(make_config());
+    let store = std::sync::Arc::new(RecoveryProbeStore::new(false));
+    kernel.set_receipt_store_handle(
+        std::sync::Arc::clone(&store) as std::sync::Arc<dyn crate::receipt_store::ReceiptStore>
+    )?;
+    assert!(
+        kernel.dispatch_intent_recovery.is_none(),
+        "a store without sibling writers needs no background worker"
+    );
+    Ok(())
+}
+
 /// Tool server whose dispatch always requires URL elicitations, so the
 /// evaluation returns to the caller WITHOUT any tool side effect and without
 /// recording a terminal receipt.

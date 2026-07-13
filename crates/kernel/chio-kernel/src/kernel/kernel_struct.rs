@@ -568,6 +568,15 @@ pub struct ChioKernel {
     /// joined when this field is dropped (kernel drop). `None` when
     /// retention is unconfigured or before a store is attached.
     pub(super) retention_maintenance: Option<crate::receipt_store::RetentionMaintenanceHandle>,
+    /// Dispatch-intent recovery worker, spawned at store attach for stores
+    /// that coordinate sibling writer instances. Re-runs intent
+    /// reconciliation on a fixed cadence so a sibling that crashes while
+    /// this kernel stays up has its orphaned intents claimed and surfaced
+    /// (the attach-time pass correctly defers a live sibling's rows, and no
+    /// later attach may ever come). Joined when this field is dropped
+    /// (kernel drop). `None` for stores without sibling writers or before a
+    /// store is attached.
+    pub(super) dispatch_intent_recovery: Option<crate::receipt_store::DispatchIntentRecoveryHandle>,
     pub(super) payment_adapter: Option<Box<dyn PaymentAdapter>>,
     pub(super) price_oracle: Option<Box<dyn PriceOracle>>,
     pub(super) runtime_admission_hook: Option<Arc<dyn RuntimeAdmissionHook>>,

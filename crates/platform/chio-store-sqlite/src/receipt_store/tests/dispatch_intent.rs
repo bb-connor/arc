@@ -306,6 +306,7 @@ fn straddling_intent_commit_is_cleared_after_a_timeout_deny(
     let landed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let insert = super::super::support::dispatch_intent_insert_job_unless_abandoned(
         &intent,
+        store.instance_token.clone(),
         std::sync::Arc::clone(&abandoned),
         std::sync::Arc::clone(&landed),
     );
@@ -431,22 +432,28 @@ impl chio_kernel::receipt_store::DispatchIntentReconciler for RecordingReconcile
 #[test]
 fn reconcile_dead_letters_orphans_and_reports_counts() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-intents-reconcile");
+
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        // A clean run: no open intents means nothing to reconcile.
+        let clean = store.reconcile_dispatch_intents(&RecordingReconciler)?;
+        assert_eq!(clean.open, 0);
+        assert_eq!(clean.dead_lettered, 0);
+
+        // Two intents whose writer then crashes: one side-effecting, one
+        // monetary with a rail attached.
+        store.record_dispatch_intent(&sample_intent("orphan-se"))?;
+        let mut monetary = sample_intent("orphan-mon");
+        monetary.side_effect_class = chio_kernel::receipt_store::SideEffectClass::Monetary;
+        monetary.monetary = true;
+        monetary.rail = Some("x402".to_string());
+        monetary.rail_authorization_id = Some("auth-9".to_string());
+        store.record_dispatch_intent(&monetary)?;
+    }
+
+    // The restarted instance holds the file exclusively and both rows are
+    // foreign to it: true orphans.
     let store = SqliteReceiptStore::open(&path)?;
-
-    // A clean run: no open intents means nothing to reconcile.
-    let clean = store.reconcile_dispatch_intents(&RecordingReconciler)?;
-    assert_eq!(clean.open, 0);
-    assert_eq!(clean.dead_lettered, 0);
-
-    // Two orphans: one side-effecting, one monetary with a rail attached.
-    store.record_dispatch_intent(&sample_intent("orphan-se"))?;
-    let mut monetary = sample_intent("orphan-mon");
-    monetary.side_effect_class = chio_kernel::receipt_store::SideEffectClass::Monetary;
-    monetary.monetary = true;
-    monetary.rail = Some("x402".to_string());
-    monetary.rail_authorization_id = Some("auth-9".to_string());
-    store.record_dispatch_intent(&monetary)?;
-
     let report = store.reconcile_dispatch_intents(&RecordingReconciler)?;
     assert_eq!(report.open, 2);
     assert_eq!(report.dead_lettered, 2);
@@ -518,6 +525,69 @@ fn attach_defers_reconciliation_while_a_sibling_writer_is_live(
     );
     assert_eq!(report.deferred_to_live_writer, 0);
     assert_eq!(open_intent_row_count(&restarted)?, 0);
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn surviving_writer_reclaims_a_crashed_siblings_orphan_without_restarting(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // A sibling writer can crash while this instance stays up, leaving an
+    // outcome-unknown intent that no attach will ever revisit (attaches
+    // defer to live siblings, and the survivor may never restart). The
+    // survivor must therefore be able to re-run reconciliation while
+    // serving: its OWN in-flight intents are never candidates (they carry
+    // its owner token), and the crashed sibling's rows are claimed the
+    // moment exclusivity is provable, surfacing the orphan as an incident
+    // without every writer going down.
+    let path = unique_db_path("chio-intents-sibling-crash");
+    let survivor = SqliteReceiptStore::open(&path)?;
+    survivor.record_dispatch_intent(&sample_intent("req-survivor-live"))?;
+
+    let doomed = SqliteReceiptStore::open(&path)?;
+    doomed.record_dispatch_intent(&sample_intent("req-doomed-orphan"))?;
+
+    // While the sibling lives, the survivor's pass considers only the
+    // sibling's row (its own is not a reconciliation candidate) and defers
+    // it to its owner.
+    let deferred = survivor.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(
+        deferred.open, 1,
+        "the survivor's own in-flight intent is not a reconciliation candidate"
+    );
+    assert_eq!(deferred.dead_lettered, 0);
+    assert_eq!(deferred.deferred_to_live_writer, 1);
+
+    // The sibling crashes: the OS releases its lifetime mark, its open
+    // intent stays behind as the crash marker.
+    drop(doomed);
+
+    // The next recovery pass on the still-serving survivor proves
+    // exclusivity and claims exactly the orphan.
+    let recovered = survivor.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(
+        recovered.dead_lettered, 1,
+        "the crashed sibling's orphan must surface without a restart"
+    );
+    let connection = survivor.reader_connection_for_test()?;
+    let (survivor_state, orphan_state): (String, String) = (
+        connection.query_row(
+            "SELECT state FROM chio_dispatch_intents WHERE request_id = 'req-survivor-live'",
+            [],
+            |row| row.get(0),
+        )?,
+        connection.query_row(
+            "SELECT state FROM chio_dispatch_intents WHERE request_id = 'req-doomed-orphan'",
+            [],
+            |row| row.get(0),
+        )?,
+    );
+    assert_eq!(
+        survivor_state, "open",
+        "the survivor's own in-flight intent must never be claimed"
+    );
+    assert_eq!(orphan_state, "dead_letter");
 
     let _ = std::fs::remove_file(&path);
     Ok(())
@@ -621,17 +691,21 @@ impl chio_kernel::receipt_store::DispatchIntentReconciler for RailProvingReconci
 fn monetary_reconciled_intent_is_not_a_dead_letter_and_health_stays_green(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-intents-monetary-reconciled");
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        let mut monetary = sample_intent("orphan-reconciled");
+        monetary.side_effect_class = chio_kernel::receipt_store::SideEffectClass::Monetary;
+        monetary.monetary = true;
+        monetary.rail = Some("x402".to_string());
+        monetary.rail_authorization_id = Some("auth-7".to_string());
+        store.record_dispatch_intent(&monetary)?;
+    }
+
+    // The writer crashed; the restarted instance reconciles its orphan.
     let store = SqliteReceiptStore::open(&path)?;
     // One writer round trip so the later health sample observes the seeded
     // verified head rather than racing writer-thread startup.
     store.flush_receipt_writes()?;
-
-    let mut monetary = sample_intent("orphan-reconciled");
-    monetary.side_effect_class = chio_kernel::receipt_store::SideEffectClass::Monetary;
-    monetary.monetary = true;
-    monetary.rail = Some("x402".to_string());
-    monetary.rail_authorization_id = Some("auth-7".to_string());
-    store.record_dispatch_intent(&monetary)?;
 
     let report = store.reconcile_dispatch_intents(&RailProvingReconciler)?;
     assert_eq!(report.open, 1);
@@ -694,9 +768,13 @@ fn safe_to_replay_frees_the_request_id_for_a_fresh_dispatch(
     // request id is the journal's primary key, and any leftover row would
     // refuse the replay's insert and fail the request before the tool runs.
     let path = unique_db_path("chio-intents-safe-to-replay");
-    let store = SqliteReceiptStore::open(&path)?;
-    store.record_dispatch_intent(&sample_intent("req-replay"))?;
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.record_dispatch_intent(&sample_intent("req-replay"))?;
+    }
 
+    // The writer crashed; the restarted instance reconciles its orphan.
+    let store = SqliteReceiptStore::open(&path)?;
     let report = store.reconcile_dispatch_intents(&ReplayProvingReconciler)?;
     assert_eq!(report.open, 1);
     assert_eq!(report.replayed, 1);
@@ -722,28 +800,33 @@ fn safe_to_replay_frees_the_request_id_for_a_fresh_dispatch(
 #[test]
 fn dead_letter_intent_flips_store_unhealthy() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-intents-health");
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+
+        // Health folds in `writer_serving_closed`, which reads closed until
+        // the writer thread's one-time startup seed publishes a verified
+        // head. Wait for one writer round trip so the sample observes the
+        // seeded head rather than racing thread startup.
+        store.flush_receipt_writes()?;
+
+        // A clean store is healthy with zero intent counts.
+        let clean = store.receipt_store_health()?;
+        assert!(clean.healthy);
+        assert_eq!(clean.open_dispatch_intents, 0);
+        assert_eq!(clean.dead_letter_dispatch_intents, 0);
+
+        // An open intent alone does not flip health: it is in flight, not
+        // orphaned.
+        store.record_dispatch_intent(&sample_intent("open-1"))?;
+        let with_open = store.receipt_store_health()?;
+        assert_eq!(with_open.open_dispatch_intents, 1);
+        assert!(with_open.healthy, "an in-flight intent is not an incident");
+    }
+
+    // The writer crashed with the intent open. Reconciling the orphan into
+    // a dead-letter incident flips the restarted store unhealthy.
     let store = SqliteReceiptStore::open(&path)?;
-
-    // Health folds in `writer_serving_closed`, which reads closed until the
-    // writer thread's one-time startup seed publishes a verified head. Wait
-    // for one writer round trip so the sample observes the seeded head
-    // rather than racing thread startup.
     store.flush_receipt_writes()?;
-
-    // A clean store is healthy with zero intent counts.
-    let clean = store.receipt_store_health()?;
-    assert!(clean.healthy);
-    assert_eq!(clean.open_dispatch_intents, 0);
-    assert_eq!(clean.dead_letter_dispatch_intents, 0);
-
-    // An open intent alone does not flip health: it is in flight, not
-    // orphaned.
-    store.record_dispatch_intent(&sample_intent("open-1"))?;
-    let with_open = store.receipt_store_health()?;
-    assert_eq!(with_open.open_dispatch_intents, 1);
-    assert!(with_open.healthy, "an in-flight intent is not an incident");
-
-    // Reconciling it into a dead-letter incident flips the store unhealthy.
     store.reconcile_dispatch_intents(&RecordingReconciler)?;
     let after = store.receipt_store_health()?;
     assert_eq!(after.dead_letter_dispatch_intents, 1);

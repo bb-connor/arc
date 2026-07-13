@@ -45,6 +45,13 @@ const RECEIPT_STORE_GENERIC_LEGACY_ANCHOR_TABLES: &[&str] = &["http_receipts", "
 /// never entered into chio_tool_receipts, and never counted by checkpoints
 /// or retention. Shared by the create path and the `open_existing` additive
 /// migration from schema revision 0, so both produce identical DDL.
+///
+/// `owner_token` names the store instance that journaled the row (one fresh
+/// token per open, never reused across restarts). Reconciliation skips rows
+/// carrying the reconciling instance's own token, which is what makes the
+/// pass safe to re-run while serving: liveness comes from the sidecar
+/// writer mark, identity from the token, and neither involves a clock (a
+/// paused-but-live writer keeps both).
 const DISPATCH_INTENT_JOURNAL_DDL: &str = r#"
     CREATE TABLE IF NOT EXISTS chio_dispatch_intents (
         request_id            TEXT PRIMARY KEY,
@@ -59,7 +66,8 @@ const DISPATCH_INTENT_JOURNAL_DDL: &str = r#"
         tenant_id             TEXT,
         created_at_unix_ms    INTEGER NOT NULL,
         state                 TEXT NOT NULL DEFAULT 'open',
-        resolution_detail     TEXT
+        resolution_detail     TEXT,
+        owner_token           TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_chio_dispatch_intents_state
         ON chio_dispatch_intents(state);
@@ -248,6 +256,7 @@ impl SqliteReceiptStore {
                 strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
                 incremental_verification: options.incremental_verification,
                 writer_lifetime_lock,
+                instance_token: fresh_instance_token(),
             });
         }
 
@@ -1239,6 +1248,7 @@ impl SqliteReceiptStore {
             strict_tenant_isolation: std::sync::atomic::AtomicBool::new(true),
             incremental_verification: options.incremental_verification,
             writer_lifetime_lock,
+            instance_token: fresh_instance_token(),
         })
     }
 
@@ -1268,6 +1278,16 @@ impl SqliteReceiptStore {
 /// `WriterLifetimeLock`). Blocks only while a sibling holds the exclusive
 /// conversion for the duration of its bounded reconcile pass. In-memory
 /// databases have no on-disk file to coordinate on and take no lock.
+/// Identity of one store instance for the rows it journals, distinct across
+/// every open of every process (a fresh UUID, never persisted or reused).
+/// Reconciliation treats a row carrying a different token as another
+/// instance's work, so nothing about the token needs to survive a restart:
+/// a restarted instance's previous rows are foreign to it by construction,
+/// exactly as a crashed sibling's are.
+fn fresh_instance_token() -> String {
+    uuid::Uuid::now_v7().to_string()
+}
+
 fn acquire_writer_lifetime_lock(
     path: &Path,
 ) -> Result<Option<WriterLifetimeLock>, ReceiptStoreError> {

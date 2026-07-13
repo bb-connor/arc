@@ -303,6 +303,7 @@ impl ChioKernel {
             receipt_store: None,
             receipt_store_write_lock: Mutex::new(()),
             retention_maintenance: None,
+            dispatch_intent_recovery: None,
             payment_adapter: None,
             price_oracle: None,
             runtime_admission_hook: None,
@@ -835,6 +836,23 @@ impl ChioKernel {
                     config,
                 ));
         }
+        // The attach-time reconcile pass above defers rows owned by live
+        // sibling writers, and a sibling that crashes AFTER this attach
+        // leaves rows no attach will ever revisit while this kernel stays
+        // up. For stores that coordinate sibling writers, re-run
+        // reconciliation on a fixed cadence: each pass claims rows only
+        // under proven exclusivity (never a live writer's, never this
+        // instance's own), so a crashed sibling's orphans surface as
+        // incidents instead of sitting open and invisible until every
+        // writer restarts. Assigned unconditionally so replacing the store
+        // always retires the previous store's worker.
+        self.dispatch_intent_recovery =
+            receipt_store.supports_dispatch_intent_recovery().then(|| {
+                crate::receipt_store::DispatchIntentRecoveryHandle::spawn(
+                    Arc::clone(&receipt_store),
+                    crate::receipt_store::DISPATCH_INTENT_RECOVERY_INTERVAL,
+                )
+            });
         self.receipt_store = Some(receipt_store);
         Ok(())
     }

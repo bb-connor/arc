@@ -115,6 +115,13 @@ pub struct SqliteReceiptStore {
     /// database file. `None` only for an in-memory database, which has no
     /// on-disk file for siblings to coordinate on.
     writer_lifetime_lock: Option<WriterLifetimeLock>,
+    /// Fresh per-open identity stamped on every dispatch intent this
+    /// instance journals. Reconciliation skips rows carrying this token, so
+    /// the pass can run while serving without ever claiming this instance's
+    /// own in-flight work; rows from any other open (a sibling, or this
+    /// process before a restart) are foreign and claimable once exclusivity
+    /// is proven.
+    pub(crate) instance_token: String,
 }
 
 /// Sidecar locks marking this instance as a live writer on a shared database
@@ -3126,8 +3133,10 @@ impl SqliteReceiptStore {
         &self,
         intent: &chio_kernel::receipt_store::DispatchIntentRecord,
     ) -> Result<(), ReceiptStoreError> {
-        self.writer_handle()
-            .run_write(dispatch_intent_insert_job(intent))
+        self.writer_handle().run_write(dispatch_intent_insert_job(
+            intent,
+            self.instance_token.clone(),
+        ))
     }
 
     /// Bounded variant of [`Self::record_dispatch_intent`]: identical up to
@@ -3152,6 +3161,7 @@ impl SqliteReceiptStore {
         let landed = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let job = dispatch_intent_insert_job_unless_abandoned(
             intent,
+            self.instance_token.clone(),
             Arc::clone(&abandoned),
             Arc::clone(&landed),
         );
@@ -3330,10 +3340,17 @@ impl SqliteReceiptStore {
         select_open_dispatch_intents(&connection)
     }
 
-    /// Resolve every open intent that survived a restart. Reads run on the
-    /// reader pool and the reconciler runs on the calling thread (so a
-    /// rail-querying reconciler never blocks the single writer); the
-    /// resulting annotations are applied in one writer transaction.
+    /// Resolve every open intent journaled by another store instance (a
+    /// crashed prior incarnation, or a sibling on a shared database file).
+    /// Reads run on the reader pool and the reconciler runs on the calling
+    /// thread (so a rail-querying reconciler never blocks the single
+    /// writer); the resulting annotations are applied in one writer
+    /// transaction.
+    ///
+    /// Safe to run at any time, not only at attach: rows carrying this
+    /// instance's own owner token are its live in-flight work and are never
+    /// candidates, so a serving store can re-run the pass to pick up a
+    /// sibling that crashed after this instance attached.
     ///
     /// Claiming an open row asserts its writer is gone, but the database
     /// file may be shared with a live sibling instance whose in-flight calls
@@ -3346,6 +3363,15 @@ impl SqliteReceiptStore {
     /// claimed, and a later exclusive pass still reconciles any true
     /// orphans among them. A single-instance restart holds the file
     /// exclusively and reconciles exactly as before.
+    /// True when [`Self::reconcile_dispatch_intents`] is worth re-running
+    /// while the store serves: an on-disk database can gain and lose
+    /// sibling writer instances at any time, so a crashed sibling's orphans
+    /// only surface if some survivor re-reconciles. An in-memory database
+    /// can have no siblings; its attach-time pass is complete.
+    pub fn supports_dispatch_intent_recovery(&self) -> bool {
+        self.writer_lifetime_lock.is_some()
+    }
+
     pub fn reconcile_dispatch_intents(
         &self,
         reconciler: &dyn chio_kernel::receipt_store::DispatchIntentReconciler,
@@ -3353,7 +3379,7 @@ impl SqliteReceiptStore {
         use chio_kernel::receipt_store::{DispatchIntentReconcileReport, DispatchIntentResolution};
         let open = {
             let connection = self.connection()?;
-            select_open_dispatch_intents(&connection)?
+            select_open_dispatch_intents_excluding_owner(&connection, &self.instance_token)?
         };
         let mut report = DispatchIntentReconcileReport {
             open: open.len() as u64,

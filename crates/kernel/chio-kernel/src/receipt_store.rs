@@ -130,6 +130,110 @@ impl Drop for RetentionMaintenanceHandle {
     }
 }
 
+/// Cadence of the background dispatch-intent recovery worker. Each pass is
+/// one indexed read when nothing foreign is open, so the interval trades
+/// only how long a crashed sibling's orphans stay invisible.
+pub(crate) const DISPATCH_INTENT_RECOVERY_INTERVAL: std::time::Duration =
+    std::time::Duration::from_secs(30);
+
+/// Owns the dispatch-intent recovery worker thread; signals stop and joins
+/// on drop. Spawned by [`crate::kernel::ChioKernel::try_set_receipt_store_handle`]
+/// for stores that support sibling-writer recovery.
+///
+/// The attach-time reconcile pass correctly defers rows owned by live
+/// sibling writers, but a sibling that crashes AFTER this kernel attaches
+/// leaves open, outcome-unknown rows that no later attach may ever revisit
+/// (the survivor can stay up indefinitely). This worker re-runs
+/// reconciliation on a fixed cadence: each pass claims rows only under
+/// proven exclusivity and never touches this instance's own in-flight
+/// intents, so a live writer is never harmed while a crashed writer's
+/// orphans surface as durable incidents instead of staying invisible until
+/// every writer restarts.
+///
+/// The worker thread NEVER PANICS: each pass is wrapped in `catch_unwind`
+/// so a panic inside the store's reconcile path is caught, logged, and
+/// retried on the next interval rather than silently and permanently
+/// stopping recovery.
+pub struct DispatchIntentRecoveryHandle {
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    join: Option<std::thread::JoinHandle<()>>,
+}
+
+impl DispatchIntentRecoveryHandle {
+    /// Spawn the recovery worker. `store` is a dedicated `Arc` clone held by
+    /// the worker thread for its lifetime, independent of the kernel's own
+    /// `receipt_store` handle.
+    pub(crate) fn spawn(
+        store: std::sync::Arc<dyn ReceiptStore>,
+        interval: std::time::Duration,
+    ) -> Self {
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let worker_stop = std::sync::Arc::clone(&stop);
+        let join = std::thread::spawn(move || {
+            while !worker_stop.load(std::sync::atomic::Ordering::SeqCst) {
+                // Sleep in short slices so shutdown is responsive.
+                let mut waited = std::time::Duration::ZERO;
+                let slice = std::time::Duration::from_millis(200);
+                while waited < interval && !worker_stop.load(std::sync::atomic::Ordering::SeqCst) {
+                    std::thread::sleep(slice);
+                    waited += slice;
+                }
+                if worker_stop.load(std::sync::atomic::Ordering::SeqCst) {
+                    break;
+                }
+                let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    store.reconcile_dispatch_intents(&crate::DefaultDispatchIntentReconciler)
+                }));
+                match outcome {
+                    Ok(Ok(report)) => {
+                        if report.dead_lettered > 0
+                            || report.monetary_reconciled > 0
+                            || report.replayed > 0
+                        {
+                            // Mirror the attach-time log so a mid-serve
+                            // recovery is as visible as a boot one.
+                            tracing::warn!(
+                                target: "chio::dispatch_intent",
+                                dead_lettered = report.dead_lettered,
+                                monetary_reconciled = report.monetary_reconciled,
+                                replayed = report.replayed,
+                                "recovered dispatch intents orphaned by a crashed sibling \
+                                 writer; incidents recorded for operator review"
+                            );
+                        }
+                    }
+                    Ok(Err(error)) => {
+                        tracing::warn!(
+                            target: "chio::dispatch_intent",
+                            error = %redacted!(&error),
+                            "dispatch intent recovery pass failed; will retry next interval"
+                        );
+                    }
+                    Err(_panic) => {
+                        tracing::warn!(
+                            target: "chio::dispatch_intent",
+                            "dispatch intent recovery pass panicked; will retry next interval"
+                        );
+                    }
+                }
+            }
+        });
+        Self {
+            stop,
+            join: Some(join),
+        }
+    }
+}
+
+impl Drop for DispatchIntentRecoveryHandle {
+    fn drop(&mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::SeqCst);
+        if let Some(join) = self.join.take() {
+            let _ = join.join();
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ReceiptWriterCounters {
@@ -674,13 +778,27 @@ pub trait ReceiptStore: Send + Sync {
     ) -> Result<(), ReceiptStoreError> {
         self.clear_dispatch_intent(key)
     }
-    /// Reconcile every open intent surviving a restart. Default: a no-op
-    /// empty report, because a store without the journal has no orphans.
+    /// Reconcile every open intent whose writer is gone. Called once at
+    /// store attach and, for stores reporting
+    /// [`Self::supports_dispatch_intent_recovery`], again on a background
+    /// cadence while serving; an implementation must therefore never claim
+    /// a live writer's rows, including the calling instance's own in-flight
+    /// intents. Default: a no-op empty report, because a store without the
+    /// journal has no orphans.
     fn reconcile_dispatch_intents(
         &self,
         _reconciler: &dyn DispatchIntentReconciler,
     ) -> Result<DispatchIntentReconcileReport, ReceiptStoreError> {
         Ok(DispatchIntentReconcileReport::default())
+    }
+    /// True when `reconcile_dispatch_intents` is safe and worthwhile to
+    /// re-run while the store serves (a store whose file can be shared with
+    /// sibling writer instances that may crash at any time). The kernel
+    /// spawns the background dispatch-intent recovery worker only for such
+    /// stores. Default false: a store without sibling writers has nothing
+    /// to recover after its attach-time pass.
+    fn supports_dispatch_intent_recovery(&self) -> bool {
+        false
     }
     /// Count of open (in-flight or orphaned-but-unreconciled) dispatch
     /// intents. Default 0 for stores without the journal.

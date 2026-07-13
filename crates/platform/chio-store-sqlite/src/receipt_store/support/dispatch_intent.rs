@@ -15,17 +15,20 @@ fn side_effect_class_str(class: SideEffectClass) -> &'static str {
 
 /// Insert a dispatch intent. `request_id` is the primary key: a second insert
 /// for the same id collides and is rejected fail-closed rather than
-/// duplicating an effect record.
+/// duplicating an effect record. `owner_token` names the inserting store
+/// instance so reconciliation can tell this instance's live work from
+/// another instance's rows.
 pub(crate) fn insert_dispatch_intent_tx(
     tx: &rusqlite::Transaction<'_>,
     intent: &DispatchIntentRecord,
+    owner_token: &str,
 ) -> Result<(), ReceiptStoreError> {
     let changed = tx.execute(
         "INSERT INTO chio_dispatch_intents (
             request_id, capability_id, tool_server, tool_name, parameter_hash,
             side_effect_class, monetary, rail, rail_authorization_id, tenant_id,
-            created_at_unix_ms, state
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'open')
+            created_at_unix_ms, state, owner_token
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'open', ?12)
         ON CONFLICT(request_id) DO NOTHING",
         rusqlite::params![
             intent.request_id.as_str(),
@@ -42,6 +45,7 @@ pub(crate) fn insert_dispatch_intent_tx(
                 intent.created_at_unix_ms,
                 "dispatch intent created_at_unix_ms"
             )?,
+            owner_token,
         ],
     )?;
     if changed == 0 {
@@ -57,11 +61,12 @@ pub(crate) fn insert_dispatch_intent_tx(
 /// transaction. Used by the unbounded write path.
 pub(crate) fn dispatch_intent_insert_job(
     intent: &DispatchIntentRecord,
+    owner_token: String,
 ) -> impl FnOnce(&mut SqliteStoreConnection) -> Result<(), ReceiptStoreError> + Send + 'static {
     let intent = intent.clone();
     move |connection| {
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        insert_dispatch_intent_tx(&tx, &intent)?;
+        insert_dispatch_intent_tx(&tx, &intent, &owner_token)?;
         tx.commit()?;
         Ok(())
     }
@@ -82,6 +87,7 @@ pub(crate) fn dispatch_intent_insert_job(
 /// anything (see [`dispatch_intent_sweep_landed_job`]).
 pub(crate) fn dispatch_intent_insert_job_unless_abandoned(
     intent: &DispatchIntentRecord,
+    owner_token: String,
     abandoned: std::sync::Arc<std::sync::atomic::AtomicBool>,
     landed: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) -> impl FnOnce(&mut SqliteStoreConnection) -> Result<(), ReceiptStoreError> + Send + 'static {
@@ -97,7 +103,7 @@ pub(crate) fn dispatch_intent_insert_job_unless_abandoned(
             return Err(abandoned_error(&intent.request_id));
         }
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        insert_dispatch_intent_tx(&tx, &intent)?;
+        insert_dispatch_intent_tx(&tx, &intent, &owner_token)?;
         if abandoned.load(std::sync::atomic::Ordering::SeqCst) {
             // Dropping the transaction rolls the insert back.
             return Err(abandoned_error(&intent.request_id));
@@ -246,44 +252,79 @@ pub(crate) fn clear_dispatch_intent_tx(
     Ok(())
 }
 
-/// Load every open intent for boot reconciliation, oldest first. A missing
-/// table (a pre-journal database sampled over a read-only connection, which
-/// runs no migration) reports no open intents.
+/// Column list shared by the open-intent queries, in the order
+/// [`dispatch_intent_from_row`] reads them.
+const OPEN_DISPATCH_INTENT_COLUMNS: &str =
+    "request_id, capability_id, tool_server, tool_name, parameter_hash, \
+     side_effect_class, monetary, rail, rail_authorization_id, tenant_id, \
+     created_at_unix_ms";
+
+fn dispatch_intent_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<DispatchIntentRecord> {
+    let class_raw: String = row.get(5)?;
+    let side_effect_class = match class_raw.as_str() {
+        "read_only" => SideEffectClass::ReadOnly,
+        "monetary" => SideEffectClass::Monetary,
+        // Fail-safe: an unrecognized class string is treated as
+        // side-effecting, never demoted to read-only.
+        _ => SideEffectClass::SideEffecting,
+    };
+    Ok(DispatchIntentRecord {
+        request_id: row.get(0)?,
+        capability_id: row.get(1)?,
+        tool_server: row.get(2)?,
+        tool_name: row.get(3)?,
+        parameter_hash: row.get(4)?,
+        side_effect_class,
+        monetary: row.get::<_, i64>(6)? != 0,
+        rail: row.get(7)?,
+        rail_authorization_id: row.get(8)?,
+        tenant_id: row.get(9)?,
+        created_at_unix_ms: row.get::<_, i64>(10)?.max(0) as u64,
+    })
+}
+
+/// Load every open intent, oldest first: the operator view of work that is
+/// in flight or awaiting reconciliation. A missing table (a pre-journal
+/// database sampled over a read-only connection, which runs no migration)
+/// reports no open intents.
 pub(crate) fn select_open_dispatch_intents(
     connection: &rusqlite::Connection,
 ) -> Result<Vec<DispatchIntentRecord>, ReceiptStoreError> {
     if !dispatch_intents_table_exists(connection)? {
         return Ok(Vec::new());
     }
-    let mut statement = connection.prepare(
-        "SELECT request_id, capability_id, tool_server, tool_name, parameter_hash, \
-                side_effect_class, monetary, rail, rail_authorization_id, tenant_id, \
-                created_at_unix_ms \
+    let mut statement = connection.prepare(&format!(
+        "SELECT {OPEN_DISPATCH_INTENT_COLUMNS} \
          FROM chio_dispatch_intents WHERE state = 'open' ORDER BY created_at_unix_ms",
-    )?;
-    let rows = statement.query_map([], |row| {
-        let class_raw: String = row.get(5)?;
-        let side_effect_class = match class_raw.as_str() {
-            "read_only" => SideEffectClass::ReadOnly,
-            "monetary" => SideEffectClass::Monetary,
-            // Fail-safe: an unrecognized class string is treated as
-            // side-effecting, never demoted to read-only.
-            _ => SideEffectClass::SideEffecting,
-        };
-        Ok(DispatchIntentRecord {
-            request_id: row.get(0)?,
-            capability_id: row.get(1)?,
-            tool_server: row.get(2)?,
-            tool_name: row.get(3)?,
-            parameter_hash: row.get(4)?,
-            side_effect_class,
-            monetary: row.get::<_, i64>(6)? != 0,
-            rail: row.get(7)?,
-            rail_authorization_id: row.get(8)?,
-            tenant_id: row.get(9)?,
-            created_at_unix_ms: row.get::<_, i64>(10)?.max(0) as u64,
-        })
-    })?;
+    ))?;
+    let rows = statement.query_map([], dispatch_intent_from_row)?;
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row?);
+    }
+    Ok(out)
+}
+
+/// Load the open intents that are reconciliation candidates for the
+/// instance identified by `owner_token`: every open row journaled by some
+/// OTHER instance, oldest first. Rows carrying the caller's own token are
+/// its live in-flight work and are never candidates, which is what makes a
+/// reconcile pass safe to run while the store is serving. A NULL owner is
+/// foreign by definition (no live instance journals without its token).
+pub(crate) fn select_open_dispatch_intents_excluding_owner(
+    connection: &rusqlite::Connection,
+    owner_token: &str,
+) -> Result<Vec<DispatchIntentRecord>, ReceiptStoreError> {
+    if !dispatch_intents_table_exists(connection)? {
+        return Ok(Vec::new());
+    }
+    let mut statement = connection.prepare(&format!(
+        "SELECT {OPEN_DISPATCH_INTENT_COLUMNS} \
+         FROM chio_dispatch_intents \
+         WHERE state = 'open' AND (owner_token IS NULL OR owner_token <> ?1) \
+         ORDER BY created_at_unix_ms",
+    ))?;
+    let rows = statement.query_map(rusqlite::params![owner_token], dispatch_intent_from_row)?;
     let mut out = Vec::new();
     for row in rows {
         out.push(row?);
