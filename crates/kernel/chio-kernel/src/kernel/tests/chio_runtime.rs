@@ -72,8 +72,9 @@ struct IncompleteStreamAfterSideEffectServer {
     side_effects: std::sync::Arc<AtomicU64>,
 }
 
-// A registered server that performs a side effect before returning an untrusted
-// connector-level ToolNotRegistered error.
+// A registered server passes pre-dispatch validation, performs a side effect,
+// then returns ToolNotRegistered from dispatch. An unregistered server would be
+// denied before runtime admission and never reach the generic dispatch-error arm.
 struct ToolNotRegisteredDispatchServer {
     id: String,
     tools: Vec<String>,

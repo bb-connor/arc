@@ -59,11 +59,11 @@ impl ChioKernel {
                     metadata: merge_metadata_objects(
                         metadata,
                         Some(serde_json::json!({
-                        "budget_authority": {
-                            "lease_release_unconfirmed": true,
-                            "lease_retained": true,
-                            "lease_capability_id": cap.id
-                        }
+                            "budget_authority": {
+                                "lease_release_unconfirmed": true,
+                                "lease_retained": true,
+                                "lease_capability_id": cap.id
+                            }
                         })),
                     ),
                     confirmed: false,

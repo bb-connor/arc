@@ -63,6 +63,10 @@ the risk of an agent or a task and sell insurance against it, and claims pay out
 receipts that recorded what happened. Payments settle on-chain, anchored across EVM, Bitcoin,
 and Solana. Each of these clears against receipts the kernel signed when the calls ran.
 
+The formal model behind Chio is written up in [**Programmable Sovereignty**](docs/papers/programmable-sovereignty):
+Lean-attestable constitutions over capability-bounded, federated receipts, a machine-checked
+account of how agents and organizations govern themselves.
+
 ## The three pillars
 
 <p align="center">
@@ -427,26 +431,30 @@ receipts).
 
 ## Security and trust
 
-Chio exists for the non-repudiation story, so security is the design center:
+<p align="center">
+  <picture>
+    <source media="(max-width: 500px)" srcset="docs/assets/security-mobile.svg" />
+    <img src="docs/assets/security.svg" alt="Chio defense in depth: a trusted core, fail-closed admission, a guard pipeline, active defense, and signed evidence" width="900" />
+  </picture>
+</p>
 
+The kernel is the entire trusted base. Around it, five layers of defense, each one fail-closed:
+
+- **Trusted core.** Only the Runtime Kernel is trusted (the TCB). The agent and tool servers are
+  untrusted and isolated, and the kernel never leaks its address or signing key.
 - **Fail-closed by construction.** Errors deny access, invalid policy is rejected at load, and
   the kernel will not allow a call it cannot also sign a receipt for.
-- **A minimal trust boundary.** Only the Runtime Kernel is trusted (the TCB). The agent and
-  tool servers are untrusted and isolated, and the kernel never leaks its address or signing
-  key to the agent.
-- **Canonical, verifiable signing.** Signed payloads use canonical JSON (RFC 8785) so receipts
-  and attestations are byte-stable and verifiable across languages, with post-quantum hybrid
-  signatures available.
+- **Guard pipeline.** Native, data-layer, sandboxed WASM, and external guards screen every input
+  and output before it crosses a trust boundary.
 - **Active defense.** Information-flow control, deception (canary capabilities and honey-tools),
-  and reversible quarantine correlate and contain anomalous behavior before it crosses a trust
-  boundary.
-- **A modeled threat surface.** [spec/SECURITY.md](spec/SECURITY.md) names 20 threats, each with
-  shipped controls, required mitigations, and residual risk, tracked against conformance and
-  mutation evidence at [docs/security/threat-coverage.md](docs/security/threat-coverage.md).
+  and reversible quarantine correlate and contain anomalous behavior.
+- **Signed evidence.** Every decision is sealed into a canonical-JSON (RFC 8785),
+  post-quantum-ready receipt, so receipts and attestations verify byte-for-byte across languages.
 
-Report vulnerabilities privately per [SECURITY.md](SECURITY.md). The normative threat model
-lives in [spec/SECURITY.md](spec/SECURITY.md) and the coverage map in
-[docs/security/threat-coverage.md](docs/security/threat-coverage.md).
+Chio names 20 threats in [spec/SECURITY.md](spec/SECURITY.md), each with shipped controls,
+required mitigations, and residual risk, tracked at
+[docs/security/threat-coverage.md](docs/security/threat-coverage.md). Report vulnerabilities
+privately per [SECURITY.md](SECURITY.md).
 
 ## Roadmap
 
@@ -488,12 +496,20 @@ targeting completion by Q1 2027; the windows below are indicative.
 
 ## Choose your path
 
-- **Migrating an MCP server or coding-agent flow:**
-  [docs/guides/MIGRATING-FROM-MCP.md](docs/guides/MIGRATING-FROM-MCP.md)
-- **Protecting a web backend:**
-  [docs/guides/WEB_BACKEND_QUICKSTART.md](docs/guides/WEB_BACKEND_QUICKSTART.md)
-- **Authoring a native Chio tool server:**
-  [docs/start-here/NATIVE_ADOPTION_GUIDE.md](docs/start-here/NATIVE_ADOPTION_GUIDE.md)
+<p align="center">
+  <picture>
+    <source media="(max-width: 500px)" srcset="docs/assets/paths-mobile.svg" />
+    <img src="docs/assets/paths.svg" alt="Seven ways in: migrate from MCP, add to an agent framework, protect a web backend, author a native server, deploy to production, write a custom guard, or run the agent economy" width="900" />
+  </picture>
+</p>
+
+- **Migrate a coding agent from MCP** - [docs/guides/MIGRATING-FROM-MCP.md](docs/guides/MIGRATING-FROM-MCP.md)
+- **Add Chio to your agent framework** (LangChain, LangGraph, CrewAI, AutoGen) - [sdks/python](sdks/python)
+- **Protect a web backend** - [docs/guides/WEB_BACKEND_QUICKSTART.md](docs/guides/WEB_BACKEND_QUICKSTART.md)
+- **Author a native Chio tool server** - [docs/start-here/NATIVE_ADOPTION_GUIDE.md](docs/start-here/NATIVE_ADOPTION_GUIDE.md)
+- **Deploy to production** (Kubernetes, Lambda, Envoy/Istio) - [sdks/k8s](sdks/k8s)
+- **Write a custom guard** (fuel-metered WASM, any language) - [sdks/guard](sdks/guard)
+- **Run the agent economy** (metering, budgets, settlement) - [examples/agent-commerce-network](examples/agent-commerce-network)
 
 For a guided local walkthrough, start with the
 [progressive tutorial](docs/start-here/PROGRESSIVE_TUTORIAL.md).
