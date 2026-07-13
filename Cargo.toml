@@ -11,6 +11,7 @@ members = [
     # Portable active-defense security
     "crates/security/chio-security-types",
     "crates/security/chio-flow",
+    "crates/security/chio-quarantine",
     #
     # Kernel variants
     "crates/kernel/chio-kernel",
@@ -385,6 +386,7 @@ chio-cross-protocol = { path = "crates/protocol/chio-cross-protocol" }
 chio-custody-hw = { path = "crates/trust/chio-custody-hw", default-features = false }
 chio-data-guards = { path = "crates/guards/chio-data-guards" }
 chio-data-guards-redactors-default = { path = "crates/guards/chio-data-guards/redactors/default" }
+chio-quarantine = { path = "crates/security/chio-quarantine" }
 chio-did = { path = "crates/trust/chio-did" }
 chio-disclosure-lineage = { path = "crates/trust/chio-disclosure-lineage" }
 chio-edge-metrics = { path = "crates/protocol/chio-edge-metrics" }

@@ -4201,6 +4201,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-quarantine"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-security-types",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "chio-replay-corpus"
 version = "0.1.0"
 dependencies = [
