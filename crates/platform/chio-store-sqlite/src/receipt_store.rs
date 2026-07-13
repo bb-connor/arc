@@ -730,6 +730,21 @@ impl WriterHandle {
         }
     }
 
+    /// Enqueue one metadata write job without waiting for its outcome. For
+    /// compensating work whose result the caller cannot act on anyway: the
+    /// job still runs in FIFO order on the single writer with full health
+    /// accounting, but the caller spends no wall-clock on its response. The
+    /// only error surfaced is a refused enqueue (saturated or dead writer).
+    pub(crate) fn run_write_detached<F>(&self, job: F) -> Result<(), ReceiptStoreError>
+    where
+        F: FnOnce(&mut SqliteStoreConnection) -> Result<(), ReceiptStoreError> + Send + 'static,
+    {
+        // Dropping the receiver detaches the response; the writer actor
+        // tolerates a gone caller and still reconciles committed/failed for
+        // the job when it drains.
+        self.enqueue_write_job(job, false).map(drop)
+    }
+
     fn run_write_kind_with_timeout<T, F>(
         &self,
         job: F,
@@ -3141,15 +3156,18 @@ impl SqliteReceiptStore {
             // concurrent duplicate whose insert collided with a request's
             // pre-existing open intent must not delete that earlier
             // invocation's crash marker out from under its in-flight call.
-            // Even when this bounded confirmation wait expires as well, the
-            // queued sweep still drains with the writer, so a slow-but-alive
-            // writer cannot leave a row that would dead-letter as a false
-            // orphan for a call that never dispatched. NotFound is the
-            // common outcome (the insert refused via the marker); any other
-            // failure is already recorded in the writer health counters by
-            // the bounded write path, and the row is left for boot
-            // reconciliation, which at worst surfaces an extra
-            // operator-visible dead letter rather than losing a real orphan.
+            // The sweep is enqueued detached: the denial this caller is
+            // about to return does not depend on the sweep's outcome, and a
+            // bounded wait here would stack a second budget on top of the
+            // one the insert already consumed, doubling the pre-dispatch
+            // wall-clock cap on the same stalled writer. The queued sweep
+            // still drains with the writer, so a slow-but-alive writer
+            // cannot leave a row that would dead-letter as a false orphan
+            // for a call that never dispatched. NotFound is the common
+            // outcome (the insert refused via the marker); a refused
+            // enqueue leaves the row for boot reconciliation, which at
+            // worst surfaces an extra operator-visible dead letter rather
+            // than losing a real orphan.
             let key = chio_kernel::receipt_store::DispatchIntentKey {
                 request_id: intent.request_id.clone(),
                 parameter_hash: intent.parameter_hash.clone(),
@@ -3157,7 +3175,7 @@ impl SqliteReceiptStore {
             };
             let _ = self
                 .writer_handle()
-                .run_write_with_timeout(dispatch_intent_sweep_landed_job(&key, landed), budget);
+                .run_write_detached(dispatch_intent_sweep_landed_job(&key, landed));
         }
         result
     }

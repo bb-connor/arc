@@ -232,6 +232,60 @@ fn timed_out_intent_write_does_not_land_after_the_writer_drains(
 }
 
 #[test]
+fn timeout_deny_returns_within_one_budget_on_a_stalled_writer(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // The bounded intent write exists to cap the pre-dispatch wall-clock: a
+    // stalled writer must fail the caller closed after ONE budget. The
+    // compensating sweep enqueued on timeout needs no answer before the
+    // caller denies (FIFO order already runs it after the insert), so it
+    // must not spend a second budget waiting on the same stalled writer.
+    let path = unique_db_path("chio-intents-timeout-budget");
+    let store = SqliteReceiptStore::open(&path)?;
+
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    let blocker_handle = store.writer_handle();
+    let blocker = std::thread::spawn(move || {
+        blocker_handle.run_write(move |_connection| {
+            let _ = started_tx.send(());
+            let _ = release_rx.recv_timeout(std::time::Duration::from_secs(30));
+            Ok(())
+        })
+    });
+    started_rx.recv_timeout(std::time::Duration::from_secs(5))?;
+
+    let budget = std::time::Duration::from_millis(500);
+    let started = std::time::Instant::now();
+    let error = store.record_dispatch_intent_with_timeout(&sample_intent("req-budget"), budget);
+    let elapsed = started.elapsed();
+    assert!(
+        matches!(
+            error,
+            Err(chio_kernel::receipt_store::ReceiptStoreError::Timeout { .. })
+        ),
+        "the bounded intent write must fail closed on a stalled writer"
+    );
+    assert!(
+        elapsed < budget + std::time::Duration::from_millis(400),
+        "the timeout deny must not stack a second sweep wait on top of the \
+         insert's budget; elapsed {elapsed:?} for budget {budget:?}"
+    );
+
+    // The detached sweep still drains with the writer: no stale row survives.
+    release_tx.send(())?;
+    blocker.join().map_err(|_| "blocker thread panicked")??;
+    store.writer_handle().run_write(|_connection| Ok(()))?;
+    assert_eq!(
+        open_intent_row_count(&store)?,
+        0,
+        "the sweep must still run behind the insert after the writer drains"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
 fn straddling_intent_commit_is_cleared_after_a_timeout_deny(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // A slow-but-successful insert can pass its final abandoned check and be
