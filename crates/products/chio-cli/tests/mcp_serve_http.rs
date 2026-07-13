@@ -2966,7 +2966,6 @@ fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() 
 }
 
 #[test]
-#[ignore = "flaky on CI: TTL-bounded session restore race; passes locally"]
 fn mcp_serve_http_restores_sessions_with_fresh_capabilities_after_ttl_expiry() {
     skip_when_loopback_denied!(
         mcp_serve_http_restores_sessions_with_fresh_capabilities_after_ttl_expiry
