@@ -36,6 +36,7 @@ pub mod oracle;
 pub mod plan;
 #[cfg(feature = "pq")]
 pub mod pq;
+pub mod provider_attempt;
 pub mod receipt;
 pub mod runtime_attestation;
 mod schema_binding;
