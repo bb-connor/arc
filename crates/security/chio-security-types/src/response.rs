@@ -11,6 +11,8 @@ pub const MAX_RESPONSE_EFFECTS: usize = 64;
 pub const MAX_RESPONSE_MUTATIONS: usize = 1_024;
 
 pub type PlannedResponseEffects = BoundedVec<PlannedResponseEffect, MAX_RESPONSE_EFFECTS>;
+pub type ResponsePlanAuthorizationEffects =
+    BoundedVec<ResponsePlanAuthorizationEffect, MAX_RESPONSE_EFFECTS>;
 pub type ResponseMutationLog = BoundedVec<ResponseMutationRecord, MAX_RESPONSE_MUTATIONS>;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
@@ -202,11 +204,27 @@ pub struct ResponsePlan {
     pub plan_hash: Digest32,
 }
 
-/// Complete canonical response-plan commitment used by authorization.
+/// Compact effect commitment used by response authorization.
+///
+/// `contribution_hash` commits to the canonical contribution retained in the
+/// executable plan. The raw contribution is deliberately excluded from the
+/// governed authorization body.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResponsePlanAuthorizationEffect {
+    pub effect_id: EffectId,
+    pub ordinal: u16,
+    pub kind: ResponseEffectKind,
+    pub target: ResponseTarget,
+    pub contribution_hash: Digest32,
+    pub observed_base_version_hash: Digest32,
+}
+
+/// Complete compact response-plan commitment used by authorization.
 ///
 /// The resulting body deliberately excludes `plan_hash` so the hash cannot
-/// become part of its own preimage. Every field that can change execution,
-/// rollback, approval, or attribution remains present.
+/// become part of its own preimage. Every executable contribution remains
+/// bound by its validated canonical hash and derived effect identifier.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResponsePlanAuthorizationBody {
@@ -216,7 +234,7 @@ pub struct ResponsePlanAuthorizationBody {
     pub policy_version: RecordId,
     pub affected_ids: RecordIdSet,
     pub affected_set_hash: Digest32,
-    pub effects: PlannedResponseEffects,
+    pub effects: ResponsePlanAuthorizationEffects,
     pub ttl_ms: u64,
     pub created_at_unix_ms: u64,
     pub expires_at_unix_ms: u64,
@@ -236,7 +254,16 @@ impl ResponsePlan {
             policy_version: self.policy_version.clone(),
             affected_ids: self.affected_ids.clone(),
             affected_set_hash: self.affected_set_hash,
-            effects: self.effects.clone(),
+            effects: self
+                .effects
+                .map_ref(|effect| ResponsePlanAuthorizationEffect {
+                    effect_id: effect.effect_id.clone(),
+                    ordinal: effect.ordinal,
+                    kind: effect.kind,
+                    target: effect.target.clone(),
+                    contribution_hash: effect.contribution_hash,
+                    observed_base_version_hash: effect.observed_base_version_hash,
+                }),
             ttl_ms: self.ttl_ms,
             created_at_unix_ms: self.created_at_unix_ms,
             expires_at_unix_ms: self.expires_at_unix_ms,

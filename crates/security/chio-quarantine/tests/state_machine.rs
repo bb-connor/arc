@@ -466,11 +466,51 @@ fn response_plan_authorization_body_excludes_its_own_hash() {
         .unwrap_or_else(|failure| panic!("authorization body encoding failed: {failure}"));
 
     assert_eq!(body.action_id, plan.action_id);
-    assert_eq!(body.effects, plan.effects);
     assert!(encoded.get("plan_hash").is_none());
+    let canonical = serde_json::to_string(&body)
+        .unwrap_or_else(|failure| panic!("authorization body encoding failed: {failure}"));
+    assert!(!canonical.contains("canonical_contribution"));
+    assert!(!canonical.contains("posture_rank"));
 
     encoded["plan_hash"] = serde_json::json!(plan.plan_hash);
     assert!(serde_json::from_value::<ResponsePlanAuthorizationBody>(encoded).is_err());
+}
+
+#[test]
+fn response_plan_rejects_authorization_body_above_governance_ceiling() {
+    let mut input = plan_input(1);
+    input.affected_ids = (0..300)
+        .map(|index| record(&format!("affected-{index:04}-{}", "a".repeat(220))))
+        .collect();
+
+    assert!(build_response_plan(input).is_err());
+}
+
+#[test]
+fn response_plan_rejects_authorization_body_above_governance_node_ceiling() {
+    assert!(build_response_plan(plan_input(64)).is_err());
+}
+
+#[test]
+fn response_plan_hash_commits_to_the_validated_canonical_contribution() {
+    let first = build_response_plan(plan_input(1))
+        .unwrap_or_else(|failure| panic!("valid response plan rejected: {failure}"));
+
+    let mut changed_input = plan_input(1);
+    let changed_body = CanonicalBody::new(br#"{"posture_rank":99}"#.to_vec())
+        .unwrap_or_else(|failure| panic!("invalid contribution body: {failure}"));
+    changed_input.effects[0].contribution_hash =
+        Digest32::new(*chio_core_types::sha256(changed_body.as_bytes()).as_bytes());
+    changed_input.effects[0].canonical_contribution = changed_body;
+    let changed = build_response_plan(changed_input)
+        .unwrap_or_else(|failure| panic!("changed response plan rejected: {failure}"));
+
+    assert_ne!(first.plan_hash, changed.plan_hash);
+    assert_ne!(first.effects, changed.effects);
+
+    let mut mismatched_input = plan_input(1);
+    mismatched_input.effects[0].contribution_hash = digest(99);
+    assert!(build_response_plan(mismatched_input).is_err());
 }
 
 #[test]

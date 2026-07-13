@@ -338,6 +338,11 @@ impl<T, const MAX: usize> BoundedVec<T, MAX> {
     }
 
     #[must_use]
+    pub fn map_ref<U>(&self, map: impl FnMut(&T) -> U) -> BoundedVec<U, MAX> {
+        BoundedVec(self.0.iter().map(map).collect())
+    }
+
+    #[must_use]
     pub fn len(&self) -> usize {
         self.0.len()
     }

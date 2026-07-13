@@ -1,5 +1,5 @@
 use chio_core_types::{
-    canonical_json_bytes, capability::governance::CHIO_RESPONSE_PLAN_HASH_DOMAIN, sha256,
+    canonical_json_bytes, capability::governance::GovernedResponsePlanIntentBody, sha256,
 };
 use chio_security_types::ports::{
     BoundedVec, CanonicalBody, CreateOutcome, Digest32, EffectId, ErrorCode, PortError, RecordId,
@@ -1003,10 +1003,11 @@ fn derive_effect_id(
 }
 
 fn compute_plan_hash(plan: &ResponsePlan) -> Result<Digest32, StateMachineError> {
-    domain_hash(
-        CHIO_RESPONSE_PLAN_HASH_DOMAIN.as_bytes(),
-        &plan.authorization_body(),
-    )
+    let body = serde_json::to_value(plan.authorization_body())
+        .map_err(|_| StateMachineError::Canonical)?;
+    let digest = GovernedResponsePlanIntentBody::compute_plan_body_digest(&body)
+        .map_err(|_| StateMachineError::InvalidPlan)?;
+    Ok(Digest32::new(*digest.as_bytes()))
 }
 
 #[derive(Serialize)]

@@ -3,7 +3,7 @@
 use chio_core_types::capability::governance::{
     GovernedResponseEffect, GovernedResponsePlanIntentBody, GovernedToolInvocationIntentBody,
     GovernedTransactionIntent, CHIO_GOVERNED_TRANSACTION_INTENT_SCHEMA_V2,
-    CHIO_RESPONSE_PLAN_SCHEMA,
+    CHIO_RESPONSE_PLAN_SCHEMA, MAX_RESPONSE_PLAN_BODY_BYTES,
 };
 use chio_core_types::{canonical_json_bytes, sha256_hex, Keypair};
 use serde_json::{json, Value};
@@ -196,9 +196,30 @@ fn response_plan_rejects_unbounded_identifiers_and_canonical_bodies() {
 
     let mut huge_body = response_plan_json();
     huge_body["canonicalPlanBody"] = json!({"payload": "x".repeat(65_536)});
-    huge_body["planBodyHash"] = json!(GovernedResponsePlanIntentBody::compute_plan_body_hash(
+    assert!(GovernedResponsePlanIntentBody::compute_plan_body_hash(
         &huge_body["canonicalPlanBody"]
     )
-    .unwrap());
+    .is_err());
+    huge_body["planBodyHash"] = json!("a".repeat(64));
     assert!(serde_json::from_value::<GovernedResponsePlanIntentBody>(huge_body).is_err());
+}
+
+#[test]
+fn response_plan_hashing_rejects_bodies_above_the_governance_node_ceiling() {
+    let oversized = json!({"nodes": vec![false; 4_097]});
+
+    assert!(GovernedResponsePlanIntentBody::compute_plan_body_hash(&oversized).is_err());
+}
+
+#[test]
+fn response_plan_hashing_enforces_the_exact_canonical_byte_ceiling() {
+    let at_limit = json!({"payload": "x".repeat(MAX_RESPONSE_PLAN_BODY_BYTES - 14)});
+    let above_limit = json!({"payload": "x".repeat(MAX_RESPONSE_PLAN_BODY_BYTES - 13)});
+
+    assert_eq!(
+        canonical_json_bytes(&at_limit).unwrap().len(),
+        MAX_RESPONSE_PLAN_BODY_BYTES
+    );
+    assert!(GovernedResponsePlanIntentBody::compute_plan_body_hash(&at_limit).is_ok());
+    assert!(GovernedResponsePlanIntentBody::compute_plan_body_hash(&above_limit).is_err());
 }

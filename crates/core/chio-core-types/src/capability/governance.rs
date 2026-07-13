@@ -689,7 +689,8 @@ pub const CHIO_GOVERNED_TRANSACTION_INTENT_SCHEMA_V2: &str = "chio.governed-tran
 pub const CHIO_ACTIVE_RESPONSE_SERVER_ID: &str = "chio.control-plane.active-response";
 
 const MAX_RESPONSE_PLAN_IDENTIFIER_BYTES: usize = 256;
-const MAX_RESPONSE_PLAN_BODY_BYTES: usize = 64 * 1024;
+/// Maximum canonical JSON size accepted for a governed response-plan body.
+pub const MAX_RESPONSE_PLAN_BODY_BYTES: usize = 64 * 1024;
 const MAX_RESPONSE_PLAN_BINDING_BYTES: usize = 16 * 1024;
 const MAX_RESPONSE_PLAN_JSON_DEPTH: usize = 32;
 const MAX_RESPONSE_PLAN_JSON_NODES: usize = 4_096;
@@ -821,15 +822,27 @@ impl GovernedResponsePlanIntentBody {
         Ok(body)
     }
 
-    /// Compute the required domain-separated hash of the canonical plan body.
-    pub fn compute_plan_body_hash(canonical_plan_body: &serde_json::Value) -> Result<String> {
+    /// Validate and compute the required domain-separated digest of the canonical plan body.
+    pub fn compute_plan_body_digest(
+        canonical_plan_body: &serde_json::Value,
+    ) -> Result<crate::Hash> {
         validate_plan_body_shape(canonical_plan_body)?;
+        validate_bounded_json(
+            canonical_plan_body,
+            MAX_RESPONSE_PLAN_BODY_BYTES,
+            "canonical plan body",
+        )?;
         let canonical = canonical_json_bytes(canonical_plan_body)?;
         let mut preimage =
             Vec::with_capacity(CHIO_RESPONSE_PLAN_HASH_DOMAIN.len() + canonical.len());
         preimage.extend_from_slice(CHIO_RESPONSE_PLAN_HASH_DOMAIN.as_bytes());
         preimage.extend_from_slice(&canonical);
-        Ok(sha256_hex(&preimage))
+        Ok(crate::sha256(&preimage))
+    }
+
+    /// Validate and compute the lowercase-hex response-plan body digest.
+    pub fn compute_plan_body_hash(canonical_plan_body: &serde_json::Value) -> Result<String> {
+        Ok(Self::compute_plan_body_digest(canonical_plan_body)?.to_hex())
     }
 
     /// Revalidate invariants after crossing a trust boundary.
@@ -850,11 +863,6 @@ impl GovernedResponsePlanIntentBody {
                 "plan expiry must be nonzero and no later than operator capability expiry",
             ));
         }
-        validate_bounded_json(
-            &self.canonical_plan_body,
-            MAX_RESPONSE_PLAN_BODY_BYTES,
-            "canonical plan body",
-        )?;
         let expected_hash = Self::compute_plan_body_hash(&self.canonical_plan_body)?;
         validate_response_plan_digest(&self.plan_body_hash, "plan body hash")?;
         if self.plan_body_hash != expected_hash {
