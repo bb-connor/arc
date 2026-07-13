@@ -98,18 +98,18 @@ pub(crate) const BUDGET_AUTHORIZE_EXPOSURE_PATH: &str = "/v1/budgets/authorize-e
 pub(crate) const BUDGET_CAPTURE_INVOCATION_PATH: &str = "/v1/budgets/capture-invocation";
 pub(crate) const BUDGET_RELEASE_EXPOSURE_PATH: &str = "/v1/budgets/release-exposure";
 pub(crate) const BUDGET_RECONCILE_SPEND_PATH: &str = "/v1/budgets/reconcile-spend";
-pub(crate) const STRUCTURED_BUDGET_AUTHORIZE_PATH: &str = "/v2/budgets/holds/authorize";
+pub(crate) const STRUCTURED_BUDGET_AUTHORIZE_PATH: &str = "/v1/budgets/holds/authorize";
 pub(crate) const STRUCTURED_BUDGET_AUTHORIZE_CUMULATIVE_PATH: &str =
-    "/v2/budgets/holds/authorize-cumulative";
+    "/v1/budgets/holds/authorize-cumulative";
 pub(crate) const STRUCTURED_BUDGET_CUMULATIVE_OPERATION_PATH: &str =
-    "/v2/budgets/cumulative-approval/lookup";
-pub(crate) const STRUCTURED_BUDGET_CANCEL_CAPTURED_PATH: &str = "/v2/budgets/holds/cancel-captured";
+    "/v1/budgets/cumulative-approval/lookup";
+pub(crate) const STRUCTURED_BUDGET_CANCEL_CAPTURED_PATH: &str = "/v1/budgets/holds/cancel-captured";
 pub(crate) const STRUCTURED_BUDGET_CAPTURE_INVOCATION_PATH: &str =
-    "/v2/budgets/holds/capture-invocation";
-pub(crate) const STRUCTURED_BUDGET_FENCED_REVERSE_PATH: &str = "/v2/budgets/holds/reverse";
-pub(crate) const STRUCTURED_BUDGET_RELEASE_PATH: &str = "/v2/budgets/holds/release";
-pub(crate) const STRUCTURED_BUDGET_RECONCILE_PATH: &str = "/v2/budgets/holds/reconcile";
-pub(crate) const STRUCTURED_BUDGET_CAPTURE_SPEND_PATH: &str = "/v2/budgets/holds/capture-spend";
+    "/v1/budgets/holds/capture-invocation";
+pub(crate) const STRUCTURED_BUDGET_FENCED_REVERSE_PATH: &str = "/v1/budgets/holds/reverse";
+pub(crate) const STRUCTURED_BUDGET_RELEASE_PATH: &str = "/v1/budgets/holds/release";
+pub(crate) const STRUCTURED_BUDGET_RECONCILE_PATH: &str = "/v1/budgets/holds/reconcile";
+pub(crate) const STRUCTURED_BUDGET_CAPTURE_SPEND_PATH: &str = "/v1/budgets/holds/capture-spend";
 pub(crate) const INTERNAL_CLUSTER_STATUS_PATH: &str = "/v1/internal/cluster/status";
 pub(crate) const INTERNAL_CLUSTER_SNAPSHOT_PATH: &str = "/v1/internal/cluster/snapshot";
 pub(crate) const INTERNAL_CLUSTER_PARTITION_PATH: &str = "/v1/internal/cluster/partition";

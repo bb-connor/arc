@@ -367,7 +367,7 @@ fn remote_budget_store_round_trips_exact_structured_authorization(
         &requests[0],
         STRUCTURED_BUDGET_AUTHORIZE_PATH,
         &[
-            "\"schema\":\"chio.remote-budget-request.v2\"",
+            "\"schema\":\"chio.structured-budget-request.v1\"",
             "\"authorizationArtifactDigests\":[\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"]",
             "\"lastObservedRevocation\":{",
             "\"commitIndex\":11",
@@ -410,7 +410,7 @@ fn remote_budget_store_looks_up_exact_cumulative_operation_projection(
             request,
             STRUCTURED_BUDGET_CUMULATIVE_OPERATION_PATH,
             &[
-                "\"schema\":\"chio.remote-budget-request.v2\"",
+                "\"schema\":\"chio.structured-budget-request.v1\"",
                 "\"operationId\":\"op-lookup\"",
             ],
         );
@@ -711,7 +711,7 @@ fn all_rich_lifecycle_methods_fail_before_mutation_after_restart_on_old_server(
     assert_json_post(
         &requests[0],
         STRUCTURED_BUDGET_CAPTURE_SPEND_PATH,
-        &["\"schema\":\"chio.remote-budget-request.v2\""],
+        &["\"schema\":\"chio.structured-budget-request.v1\""],
     );
     assert_json_post(
         &requests[1],
@@ -722,7 +722,7 @@ fn all_rich_lifecycle_methods_fail_before_mutation_after_restart_on_old_server(
     assert_json_post(
         &requests[3],
         STRUCTURED_BUDGET_CAPTURE_INVOCATION_PATH,
-        &["\"schema\":\"chio.remote-budget-request.v2\""],
+        &["\"schema\":\"chio.structured-budget-request.v1\""],
     );
     assert_json_post(
         &requests[4],
@@ -773,7 +773,7 @@ fn structured_reconcile_uses_durable_server_state_after_client_restart(
         &[
             "\"exposedCostUnits\":100",
             "\"realizedSpendUnits\":75",
-            "\"schema\":\"chio.remote-budget-request.v2\"",
+            "\"schema\":\"chio.structured-budget-request.v1\"",
         ],
     );
     assert_json_post_omits(

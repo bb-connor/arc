@@ -1,7 +1,7 @@
 use super::*;
 
-pub(crate) const STRUCTURED_BUDGET_REQUEST_SCHEMA: &str = "chio.remote-budget-request.v2";
-pub(crate) const STRUCTURED_BUDGET_RESPONSE_SCHEMA: &str = "chio.remote-budget-response.v2";
+pub(crate) const STRUCTURED_BUDGET_REQUEST_SCHEMA: &str = "chio.structured-budget-request.v1";
+pub(crate) const STRUCTURED_BUDGET_RESPONSE_SCHEMA: &str = "chio.structured-budget-response.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
