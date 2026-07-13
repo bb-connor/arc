@@ -3368,6 +3368,7 @@ impl SqliteReceiptStore {
         let claim = (|| {
             let mut dead_letters: Vec<(String, String)> = Vec::new();
             let mut reconciled: Vec<(String, String)> = Vec::new();
+            let mut replayable: Vec<String> = Vec::new();
             for intent in &open {
                 match reconciler.resolve(intent)? {
                     DispatchIntentResolution::DeadLetter { detail } => {
@@ -3386,10 +3387,15 @@ impl SqliteReceiptStore {
                         ));
                     }
                     DispatchIntentResolution::SafeToReplay => {
-                        // A reconciler that proves replay safety leaves the
-                        // row open for its replay driver; it is counted but
-                        // not annotated here.
+                        // The reconciler proved the effect never ran, so the
+                        // resolution is to run the request again. The replay
+                        // journals its own intent under the same request id
+                        // (the journal's primary key), so the row must be
+                        // released outright: any survivor would refuse the
+                        // replay's pre-dispatch insert and fail the request
+                        // before the tool runs.
                         report.replayed += 1;
+                        replayable.push(intent.request_id.clone());
                     }
                 }
             }
@@ -3401,6 +3407,9 @@ impl SqliteReceiptStore {
                 }
                 for (request_id, detail) in &reconciled {
                     reconcile_dispatch_intent_tx(&tx, request_id, detail)?;
+                }
+                for request_id in &replayable {
+                    release_dispatch_intent_for_replay_tx(&tx, request_id)?;
                 }
                 tx.commit()?;
                 Ok(())

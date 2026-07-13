@@ -602,6 +602,57 @@ fn monetary_reconciled_intent_is_not_a_dead_letter_and_health_stays_green(
     Ok(())
 }
 
+/// Reconciler that proves every orphan's effect never ran, so each is safe
+/// to replay.
+struct ReplayProvingReconciler;
+
+impl chio_kernel::receipt_store::DispatchIntentReconciler for ReplayProvingReconciler {
+    fn resolve(
+        &self,
+        _intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+    ) -> Result<
+        chio_kernel::receipt_store::DispatchIntentResolution,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        Ok(chio_kernel::receipt_store::DispatchIntentResolution::SafeToReplay)
+    }
+}
+
+#[test]
+fn safe_to_replay_frees_the_request_id_for_a_fresh_dispatch(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // "Safe to replay" means the reconciler PROVED the effect never ran and
+    // the resolution is to run the request again. The replay travels the
+    // normal pre-dispatch path, which journals its own intent under the
+    // same request id, so the proven-effectless row must not survive: the
+    // request id is the journal's primary key, and any leftover row would
+    // refuse the replay's insert and fail the request before the tool runs.
+    let path = unique_db_path("chio-intents-safe-to-replay");
+    let store = SqliteReceiptStore::open(&path)?;
+    store.record_dispatch_intent(&sample_intent("req-replay"))?;
+
+    let report = store.reconcile_dispatch_intents(&ReplayProvingReconciler)?;
+    assert_eq!(report.open, 1);
+    assert_eq!(report.replayed, 1);
+    assert_eq!(report.dead_lettered, 0);
+    assert_eq!(
+        open_intent_row_count(&store)?,
+        0,
+        "a proven-effectless row must not linger as an open crash marker"
+    );
+
+    // The replayed request journals a fresh intent under the same id.
+    store.record_dispatch_intent(&sample_intent("req-replay"))?;
+    assert_eq!(
+        open_intent_row_count(&store)?,
+        1,
+        "the replay's own pre-dispatch insert must succeed after reconciliation"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 #[test]
 fn dead_letter_intent_flips_store_unhealthy() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-intents-health");

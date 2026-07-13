@@ -324,6 +324,24 @@ pub(crate) fn reconcile_dispatch_intent_tx(
     Ok(())
 }
 
+/// Delete an orphaned intent whose effect the reconciler PROVED never ran,
+/// so the request is safe to run again. The replay travels the normal
+/// pre-dispatch path and journals its own intent under the same request id
+/// (the journal's primary key), so no row may survive in any state: a
+/// leftover would refuse the replay's insert and fail the request before
+/// the tool runs. Zero rows changed is tolerated, matching the other
+/// resolution writes (the row was already consumed or cleared).
+pub(crate) fn release_dispatch_intent_for_replay_tx(
+    tx: &rusqlite::Transaction<'_>,
+    request_id: &str,
+) -> Result<(), ReceiptStoreError> {
+    tx.execute(
+        "DELETE FROM chio_dispatch_intents WHERE request_id = ?1 AND state = 'open'",
+        rusqlite::params![request_id],
+    )?;
+    Ok(())
+}
+
 /// Count of open (in-flight or unreconciled) dispatch intents, tolerant of a
 /// missing table on a pre-journal database.
 pub(crate) fn open_dispatch_intent_count_query(
