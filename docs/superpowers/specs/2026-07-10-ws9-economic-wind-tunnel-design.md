@@ -253,11 +253,16 @@ delegated capability requires the byte-preserved CA-signed
 `CumulativeApprovalRootBinding`; a nondelegable capability requires no family
 binding. Sibling grants therefore cannot reset the accumulator, and delegation
 without the binding rejects. The account stores
-`reserved_authorized_units`, monotonic `captured_authorized_units`, threshold,
-and version. In the same transaction that reserves the composite hold, the store
-checks the prospective cumulative total. At or above the threshold it records
-`PendingApproval` under the already persisted operation, including when no token
-was presented, so concurrent sub-threshold requests cannot both pass.
+`reserved_authorized_units`, monotonic `captured_authorized_units`, the immutable
+root authority threshold, and version. Each operation reservation stores the
+verified effective leaf threshold. A descendant may lower that effective
+threshold without changing the shared account or silently tightening a sibling.
+In the same transaction that reserves the composite hold, the store checks the
+prospective cumulative total against that operation's effective threshold. At or
+above it the store always records `PendingApproval` under the already persisted
+operation. A separate verified-approval compare-and-swap advances that same
+reservation to `Authorized` without repeating authorization, so concurrent
+sub-threshold requests cannot both pass.
 
 The operation-owned state is `PendingApproval -> Authorized -> Captured |
 ReversedBeforeDispatch`. The threshold proposal hash is derived from the durable

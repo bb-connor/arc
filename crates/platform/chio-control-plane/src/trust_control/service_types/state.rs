@@ -92,7 +92,8 @@ pub(crate) struct RemoteReceiptStore {
 
 pub(crate) struct RemoteBudgetStore {
     pub(crate) client: TrustControlClient,
-    pub(crate) cached_usage: Mutex<HashMap<(String, u32), BudgetUsageRecord>>,
+    pub(crate) cached_usage: Mutex<HashMap<(String, usize), BudgetUsageRecord>>,
+    pub(crate) captured_holds: Mutex<HashSet<(String, usize, String)>>,
 }
 
 impl TrustServiceState {

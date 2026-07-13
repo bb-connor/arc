@@ -13,6 +13,32 @@ pub(super) fn checked_committed_cost_units(
         })
 }
 
+pub(super) fn budget_u64_to_sqlite(
+    value: u64,
+    field_name: &'static str,
+) -> Result<i64, BudgetStoreError> {
+    i64::try_from(value).map_err(|_| {
+        BudgetStoreError::Overflow(format!(
+            "budget field `{field_name}` exceeds SQLite INTEGER range: {value}"
+        ))
+    })
+}
+
+pub(super) fn optional_budget_u64_to_sqlite(
+    value: Option<u64>,
+    field_name: &'static str,
+) -> Result<Option<i64>, BudgetStoreError> {
+    value
+        .map(|value| budget_u64_to_sqlite(value, field_name))
+        .transpose()
+}
+
+pub(super) fn validate_budget_grant_index(grant_index: usize) -> Result<(), BudgetStoreError> {
+    u32::try_from(grant_index)
+        .map(|_| ())
+        .map_err(|_| BudgetStoreError::Overflow("grant_index exceeds u32 range".to_string()))
+}
+
 pub(super) fn record_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<BudgetUsageRecord> {
     let total_cost_exposed = budget_u64_from_row(row, 5, "total_cost_exposed")?;
     let total_cost_realized_spend = budget_u64_from_row(row, 6, "total_cost_realized_spend")?;
@@ -41,18 +67,44 @@ pub(super) fn mutation_record_from_row(
             )),
         )
     })?;
+    if matches!(
+        kind,
+        BudgetMutationKind::ReserveInvocation
+            | BudgetMutationKind::AuthorizeCumulativeApproval
+            | BudgetMutationKind::ReverseInvocation
+            | BudgetMutationKind::CaptureSpend
+    ) {
+        return Err(rusqlite::Error::FromSqlConversionFailure(
+            4,
+            rusqlite::types::Type::Text,
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "budget mutation kind `{}` is unsupported by this sqlite schema",
+                    kind.as_str()
+                ),
+            )),
+        ));
+    }
     let authority = sqlite_budget_event_authority(row.get(17)?, row.get(18)?, row.get(19)?)?;
+    let exposure_units = budget_u64_from_row(row, 9, "exposure_units")?;
     Ok(BudgetMutationRecord {
         event_id: row.get(0)?,
         hold_id: row.get(1)?,
+        admission_binding: None,
         capability_id: row.get(2)?,
         grant_index: budget_u32_from_row(row, 3, "grant_index")?,
         kind,
         allowed: row.get::<_, Option<i64>>(5)?.map(|value| value > 0),
+        authorization_outcome: None,
+        invocation_state_before: BudgetInvocationState::Absent,
+        invocation_state_after: BudgetInvocationState::Absent,
+        monetary_state_before: BudgetMonetaryState::None,
+        monetary_state_after: BudgetMonetaryState::None,
         recorded_at: row.get(6)?,
         event_seq: budget_u64_from_row(row, 7, "event_seq")?,
         usage_seq: optional_budget_u64_from_row(row, 8, "usage_seq")?,
-        exposure_units: budget_u64_from_row(row, 9, "exposure_units")?,
+        exposure_units,
         realized_spend_units: budget_u64_from_row(row, 10, "realized_spend_units")?,
         max_invocations: optional_budget_u32_from_row(row, 11, "max_invocations")?,
         max_cost_per_invocation: optional_budget_u64_from_row(
@@ -62,6 +114,11 @@ pub(super) fn mutation_record_from_row(
         )?,
         max_total_cost_units: optional_budget_u64_from_row(row, 13, "max_total_exposure_units")?,
         invocation_count_after: budget_u32_from_row(row, 14, "invocation_count_after")?,
+        invocation_quota_usages: Vec::new(),
+        invocation_quota_mutations: Vec::new(),
+        cumulative_approval: None,
+        cumulative_approval_mutation: None,
+        cumulative_approval_set_digest: None,
         total_cost_exposed_after: budget_u64_from_row(row, 15, "total_cost_exposed_after")?,
         total_cost_realized_spend_after: budget_u64_from_row(
             row,

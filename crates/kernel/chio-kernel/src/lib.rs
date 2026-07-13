@@ -54,6 +54,7 @@ pub mod revocation_store;
 pub mod runtime;
 pub mod session;
 mod settlement_routing;
+pub mod supplemental_quota;
 pub mod transport;
 pub mod weights_binding;
 
@@ -434,6 +435,16 @@ pub use session::{
     InflightRegistry, InflightRequest, LateSessionEvent, PeerCapabilities, Session, SessionError,
     SessionOperationResponse, SessionPersistError, SessionState, SubscriptionRegistry,
     TerminalRegistry,
+};
+pub use supplemental_quota::{
+    supplemental_authorization_artifact_digest, supplemental_request_binding_hash,
+    CanonicalRevocationSet, SupplementalQuotaError, SupplementalQuotaVerificationContext,
+    SupplementalQuotaVerifier, SupplementalQuotaVerifierBinding, SupplementalQuotaVerifierError,
+    VerifiedSupplementalQuotaClaim, BROKER_CAPABILITY_EXECUTION_PROFILE,
+    MAX_ADMISSION_REVOCATION_IDS, MAX_SUPPLEMENTAL_AUTHORIZATION_BYTES,
+    MAX_SUPPLEMENTAL_CLAIM_FIELD_BYTES, MAX_SUPPLEMENTAL_CONTEXT_FIELD_BYTES,
+    MAX_SUPPLEMENTAL_NEGOTIATED_FEATURES, MAX_SUPPLEMENTAL_REVOCATION_IDS,
+    MAX_SUPPLEMENTAL_REVOCATION_ID_BYTES,
 };
 pub use weights_binding::{evaluate_weights_binding, WeightsBindingError, WeightsBindingRequest};
 

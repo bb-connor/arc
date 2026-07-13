@@ -148,6 +148,20 @@ impl crate::budget_store::BudgetStore for CommittingCaptureErrorBudgetStore {
         self.inner.authorize_budget_hold(request)
     }
 
+    fn reverse_budget_hold(
+        &self,
+        request: crate::budget_store::BudgetReverseHoldRequest,
+    ) -> Result<crate::budget_store::BudgetReverseHoldDecision, crate::budget_store::BudgetStoreError>
+    {
+        let decision = self.inner.reverse_budget_hold(request)?;
+        if self.failure == PostCommitBudgetFailure::Reverse {
+            return Err(crate::budget_store::BudgetStoreError::Io(
+                std::io::Error::other("reverse acknowledgement lost"),
+            ));
+        }
+        Ok(decision)
+    }
+
     fn capture_invocation_reservations(
         &self,
         request: crate::budget_store::BudgetCaptureInvocationRequest,
@@ -405,9 +419,9 @@ impl PaymentAdapter for NonceCleanupPaymentAdapter {
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
         match self.release_case {
-            NonceCleanupReleaseCase::Error => {
-                Err(PaymentError::RailError("release acknowledgement lost".to_string()))
-            }
+            NonceCleanupReleaseCase::Error => Err(PaymentError::RailError(
+                "release acknowledgement lost".to_string(),
+            )),
             NonceCleanupReleaseCase::Pending => Ok(PaymentResult {
                 transaction_id: "release_pending_reference".to_string(),
                 settlement_status: RailSettlementStatus::Pending,
@@ -432,10 +446,9 @@ fn signed_nonce_for_request(
     request: &ToolCallRequest,
     config: &crate::execution_nonce::ExecutionNonceConfig,
 ) -> Result<crate::execution_nonce::SignedExecutionNonce, Box<dyn std::error::Error>> {
-    let parameter_hash = chio_core::receipt::decision::ToolCallAction::from_parameters(
-        request.arguments.clone(),
-    )?
-    .parameter_hash;
+    let parameter_hash =
+        chio_core::receipt::decision::ToolCallAction::from_parameters(request.arguments.clone())?
+            .parameter_hash;
     let binding = crate::execution_nonce::NonceBinding {
         subject_id: request.capability.subject.to_hex(),
         request_id: request.request_id.clone(),
@@ -482,12 +495,7 @@ async fn evaluate_top_or_nested(
     kernel.begin_session_request(&context, OperationKind::ToolCall, true)?;
     let mut client = NoopNestedFlowClient;
     Ok(kernel
-        .evaluate_tool_call_with_nested_flow_client_async(
-            &context,
-            request,
-            &mut client,
-            None,
-        )
+        .evaluate_tool_call_with_nested_flow_client_async(&context, request, &mut client, None)
         .await?)
 }
 
@@ -1009,11 +1017,8 @@ async fn nonce_preflight_cleanup_lost_ack_denies_without_minting_nonce(
     for nested in [false, true] {
         let store = std::sync::Arc::new(CommittingCaptureErrorBudgetStore::reverse());
         let mut kernel = make_kernel(make_config());
-        kernel.set_budget_store_handle(store);
-        kernel.register_tool_server(Box::new(EchoServer::new(
-            "srv-a",
-            vec!["read_file"],
-        )));
+        kernel.set_budget_store_handle(store.clone());
+        kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
         let config = crate::execution_nonce::ExecutionNonceConfig {
             nonce_ttl_secs: 30,
             nonce_store_capacity: 1024,
@@ -1021,18 +1026,13 @@ async fn nonce_preflight_cleanup_lost_ack_denies_without_minting_nonce(
         };
         kernel.set_execution_nonce_store(
             config.clone(),
-            Box::new(crate::execution_nonce::InMemoryExecutionNonceStore::from_config(
-                &config,
-            )),
+            Box::new(crate::execution_nonce::InMemoryExecutionNonceStore::from_config(&config)),
         );
         let agent_kp = Keypair::generate();
         let mut grant = make_grant("srv-a", "read_file");
         grant.max_invocations = Some(1);
-        let capability = kernel.issue_capability(
-            &agent_kp.public_key(),
-            make_scope(vec![grant]),
-            3600,
-        )?;
+        let capability =
+            kernel.issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)?;
         let request = make_request_with_arguments(
             if nested {
                 "req-preflight-cleanup-nested"
@@ -1060,6 +1060,62 @@ async fn nonce_preflight_cleanup_lost_ack_denies_without_minting_nonce(
                 .and_then(|metadata| metadata["execution_nonce"]["cleanup_unconfirmed"].as_bool()),
             Some(true)
         );
+        let budget_metadata = response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata["budget_authority"].as_object())
+            .ok_or_else(|| std::io::Error::other("preflight budget metadata missing"))?;
+        let hold_id = format!(
+            "nonce-preflight-budget-hold:{}:{}:0",
+            request.request_id, capability.id
+        );
+        assert_eq!(
+            budget_metadata
+                .get("cleanup_mutation_kind")
+                .and_then(serde_json::Value::as_str),
+            Some("invocation")
+        );
+        assert_eq!(
+            budget_metadata
+                .get("cleanup_hold_id")
+                .and_then(serde_json::Value::as_str),
+            Some(hold_id.as_str())
+        );
+        assert!(budget_metadata
+            .get("cleanup_attempt_event_id")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|event_id| {
+                event_id.starts_with(&format!("{hold_id}:authorize:"))
+                    && event_id.contains(":rollback:")
+            }));
+        assert_eq!(
+            budget_metadata
+                .get("cleanup_attempt_event_id_available")
+                .and_then(serde_json::Value::as_bool),
+            Some(true)
+        );
+        let events = store.list_mutation_events(10, Some(&capability.id), Some(0))?;
+        assert!(events.iter().any(|event| {
+            event.kind == BudgetMutationKind::ReserveInvocation
+                && event.hold_id.as_deref() == Some(hold_id.as_str())
+        }));
+        assert!(events.iter().any(|event| {
+            event.kind == BudgetMutationKind::ReverseInvocation
+                && event.hold_id.as_deref() == Some(hold_id.as_str())
+        }));
+        assert!(!events
+            .iter()
+            .any(|event| event.kind == BudgetMutationKind::IncrementInvocation));
+        let replay = evaluate_top_or_nested(&kernel, &capability, &request, nested).await?;
+        assert_eq!(replay.verdict, Verdict::Deny);
+        assert!(replay.execution_nonce.is_none());
+        assert_eq!(
+            store
+                .list_mutation_events(10, Some(&capability.id), Some(0))?
+                .len(),
+            events.len()
+        );
     }
     Ok(())
 }
@@ -1085,10 +1141,7 @@ async fn nonce_preflight_runtime_release_failure_denies_without_minting_nonce(
                 lease_id: "lease-preflight-runtime-release",
             },
         ));
-        kernel.register_tool_server(Box::new(EchoServer::new(
-            "srv-a",
-            vec!["read_file"],
-        )));
+        kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
         let config = crate::execution_nonce::ExecutionNonceConfig {
             nonce_ttl_secs: 30,
             nonce_store_capacity: 1024,
@@ -1096,18 +1149,13 @@ async fn nonce_preflight_runtime_release_failure_denies_without_minting_nonce(
         };
         kernel.set_execution_nonce_store(
             config.clone(),
-            Box::new(crate::execution_nonce::InMemoryExecutionNonceStore::from_config(
-                &config,
-            )),
+            Box::new(crate::execution_nonce::InMemoryExecutionNonceStore::from_config(&config)),
         );
         let agent_kp = Keypair::generate();
         let mut grant = make_grant("srv-a", "read_file");
         grant.max_invocations = Some(1);
-        let capability = kernel.issue_capability(
-            &agent_kp.public_key(),
-            make_scope(vec![grant]),
-            3600,
-        )?;
+        let capability =
+            kernel.issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)?;
         let request = make_request_with_arguments(
             request_id,
             &capability,
@@ -1171,7 +1219,7 @@ fn predispatch_unwind_requires_confirmed_payment_release_status(
         request.model_metadata.as_ref(),
     )?;
     let (_, mutation) =
-        kernel.check_and_increment_budget(&request.request_id, &capability, &matching)?;
+        kernel.check_and_increment_budget(&request.request_id, &capability, &matching, false)?;
     let authorization = PaymentAuthorization {
         authorization_id: "auth-predispatch-unwind-pending".to_string(),
         settled: false,
@@ -1205,10 +1253,7 @@ async fn nonmonetary_nonce_cleanup_signs_post_commit_reverse_ambiguity(
         let store = std::sync::Arc::new(CommittingCaptureErrorBudgetStore::reverse());
         let mut kernel = make_kernel(make_config());
         kernel.set_budget_store_handle(store.clone());
-        kernel.register_tool_server(Box::new(EchoServer::new(
-            "srv-a",
-            vec!["read_file"],
-        )));
+        kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
         let config = crate::execution_nonce::ExecutionNonceConfig {
             nonce_ttl_secs: 30,
             nonce_store_capacity: 1024,
@@ -1216,18 +1261,13 @@ async fn nonmonetary_nonce_cleanup_signs_post_commit_reverse_ambiguity(
         };
         kernel.set_execution_nonce_store(
             config.clone(),
-            Box::new(crate::execution_nonce::InMemoryExecutionNonceStore::from_config(
-                &config,
-            )),
+            Box::new(crate::execution_nonce::InMemoryExecutionNonceStore::from_config(&config)),
         );
         let agent_kp = Keypair::generate();
         let mut grant = make_grant("srv-a", "read_file");
         grant.max_invocations = Some(1);
-        let capability = kernel.issue_capability(
-            &agent_kp.public_key(),
-            make_scope(vec![grant]),
-            3600,
-        )?;
+        let capability =
+            kernel.issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)?;
         let original = make_request_with_arguments(
             "req-nonmonetary-cleanup-original",
             &capability,
@@ -1312,9 +1352,7 @@ async fn nonce_request_id_mismatch_precedes_payment_and_capture_top_and_nested(
         };
         kernel.set_execution_nonce_store(
             config.clone(),
-            Box::new(crate::execution_nonce::InMemoryExecutionNonceStore::from_config(
-                &config,
-            )),
+            Box::new(crate::execution_nonce::InMemoryExecutionNonceStore::from_config(&config)),
         );
         let agent_kp = Keypair::generate();
         let capability = kernel.issue_capability(
@@ -1347,19 +1385,13 @@ async fn nonce_request_id_mismatch_precedes_payment_and_capture_top_and_nested(
             Some("pre-dispatch cleanup could not be confirmed")
         );
         assert_eq!(
-            response
-                .receipt
-                .metadata
-                .as_ref()
-                .and_then(|metadata| {
-                    metadata["budget_authority"]["pre_dispatch_cleanup_unconfirmed"].as_bool()
-                }),
+            response.receipt.metadata.as_ref().and_then(|metadata| {
+                metadata["budget_authority"]["pre_dispatch_cleanup_unconfirmed"].as_bool()
+            }),
             Some(true)
         );
         assert_eq!(
-            payment
-                .authorized
-                .load(std::sync::atomic::Ordering::SeqCst),
+            payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
             0
         );
         assert_eq!(
@@ -1404,9 +1436,7 @@ async fn nonce_cleanup_retains_payment_and_capture_when_release_is_unconfirmed(
             };
             kernel.set_execution_nonce_store(
                 config.clone(),
-                Box::new(crate::execution_nonce::InMemoryExecutionNonceStore::from_config(
-                    &config,
-                )),
+                Box::new(crate::execution_nonce::InMemoryExecutionNonceStore::from_config(&config)),
             );
             let agent_kp = Keypair::generate();
             let capability = kernel.issue_capability(
@@ -1427,14 +1457,9 @@ async fn nonce_cleanup_retains_payment_and_capture_when_release_is_unconfirmed(
                 "cost-srv",
                 serde_json::json!({}),
             );
-            request.execution_nonce = Some(consumed_nonce_for_request(
-                &kernel,
-                &request,
-                &config,
-            )?);
+            request.execution_nonce = Some(consumed_nonce_for_request(&kernel, &request, &config)?);
 
-            let response =
-                evaluate_top_or_nested(&kernel, &capability, &request, nested).await?;
+            let response = evaluate_top_or_nested(&kernel, &capability, &request, nested).await?;
             assert_eq!(response.verdict, Verdict::Deny);
             let metadata = response
                 .receipt
@@ -1454,8 +1479,7 @@ async fn nonce_cleanup_retains_payment_and_capture_when_release_is_unconfirmed(
                 Some(request.request_id.as_str())
             );
             assert_eq!(
-                metadata["budget_authority"]["invocation_capture"]["admission_retained"]
-                    .as_bool(),
+                metadata["budget_authority"]["invocation_capture"]["admission_retained"].as_bool(),
                 Some(true)
             );
             if matches!(release_case, NonceCleanupReleaseCase::Pending) {
@@ -1503,9 +1527,7 @@ async fn nonce_cleanup_signs_release_then_cancellation_lost_ack(
         };
         kernel.set_execution_nonce_store(
             config.clone(),
-            Box::new(crate::execution_nonce::InMemoryExecutionNonceStore::from_config(
-                &config,
-            )),
+            Box::new(crate::execution_nonce::InMemoryExecutionNonceStore::from_config(&config)),
         );
         let agent_kp = Keypair::generate();
         let capability = kernel.issue_capability(
@@ -1549,8 +1571,7 @@ async fn nonce_cleanup_signs_release_then_cancellation_lost_ack(
             Some(true)
         );
         assert_eq!(
-            metadata["budget_authority"]["invocation_capture"]["admission_retained"]
-                .as_bool(),
+            metadata["budget_authority"]["invocation_capture"]["admission_retained"].as_bool(),
             Some(true)
         );
         let cancellation = store
@@ -1559,8 +1580,7 @@ async fn nonce_cleanup_signs_release_then_cancellation_lost_ack(
             .find(|event| event.kind == BudgetMutationKind::CancelCapturedBeforeDispatch)
             .ok_or_else(|| std::io::Error::other("durable cancellation event missing"))?;
         assert_eq!(
-            metadata["budget_authority"]["cancel_captured_before_dispatch"]["event_id"]
-                .as_str(),
+            metadata["budget_authority"]["cancel_captured_before_dispatch"]["event_id"].as_str(),
             Some(cancellation.event_id.as_str())
         );
     }

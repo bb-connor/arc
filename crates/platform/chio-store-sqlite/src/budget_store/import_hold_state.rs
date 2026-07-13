@@ -102,6 +102,13 @@ impl SqliteBudgetStore {
                         "budget hold `{hold_id}` invocation was not captured"
                     )));
                 }
+                if record.exposure_units != hold.authorized_exposure_units
+                    || hold.remaining_exposure_units != hold.authorized_exposure_units
+                {
+                    return Err(BudgetStoreError::Invariant(format!(
+                        "budget hold `{hold_id}` does not match captured cancellation exposure"
+                    )));
+                }
                 Self::upsert_hold(
                     transaction,
                     hold_id,
@@ -135,6 +142,11 @@ impl SqliteBudgetStore {
                 if hold.invocation_captured {
                     return Err(BudgetStoreError::Invariant(format!(
                         "budget hold `{hold_id}` invocation was already captured by another event"
+                    )));
+                }
+                if record.exposure_units != hold.remaining_exposure_units {
+                    return Err(BudgetStoreError::Invariant(format!(
+                        "budget hold `{hold_id}` does not match invocation capture exposure"
                     )));
                 }
                 Self::upsert_hold(
@@ -194,6 +206,13 @@ impl SqliteBudgetStore {
                     record.authority.as_ref(),
                 )
             }
+            BudgetMutationKind::ReserveInvocation
+            | BudgetMutationKind::AuthorizeCumulativeApproval
+            | BudgetMutationKind::ReverseInvocation
+            | BudgetMutationKind::CaptureSpend => Err(BudgetStoreError::Invariant(format!(
+                "budget mutation `{}` uses state unsupported by the sqlite budget store",
+                record.kind.as_str()
+            ))),
         }
     }
 }

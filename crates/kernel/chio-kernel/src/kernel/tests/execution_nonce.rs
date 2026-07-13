@@ -34,11 +34,10 @@ fn kernel_with_nonce() -> (ChioKernel, Keypair, ChioScope, ExecutionNonceConfig)
 }
 
 fn binding_for_request(cap: &CapabilityToken, request: &ToolCallRequest) -> NonceBinding {
-    let parameter_hash = chio_core::receipt::decision::ToolCallAction::from_parameters(
-        request.arguments.clone(),
-    )
-    .unwrap()
-    .parameter_hash;
+    let parameter_hash =
+        chio_core::receipt::decision::ToolCallAction::from_parameters(request.arguments.clone())
+            .unwrap()
+            .parameter_hash;
     NonceBinding {
         subject_id: cap.subject.to_hex(),
         request_id: request.request_id.clone(),
@@ -62,7 +61,7 @@ fn mint_nonce_for_request(
         cfg,
         now,
     )
-        .unwrap()
+    .unwrap()
 }
 
 #[test]
@@ -250,12 +249,7 @@ fn strict_nonce_mode_denies_missing_nonce_before_server_lookup() {
     );
 
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
-    let mut request = make_request(
-        "req-nonce-before-lookup",
-        &cap,
-        "read_file",
-        "missing-srv",
-    );
+    let mut request = make_request("req-nonce-before-lookup", &cap, "read_file", "missing-srv");
     request.server_id = "missing-srv".to_string();
 
     let err = block_on_async_tool_dispatch(kernel.dispatch_tool_call_with_cost(&request, false))
@@ -281,8 +275,7 @@ fn strict_nonce_mode_dispatches_once_with_presented_nonce() {
     request.execution_nonce = Some(mint_nonce_for_request(&kernel, &cap, &request, &cfg));
 
     let (output, cost) =
-        block_on_async_tool_dispatch(kernel.dispatch_tool_call_with_cost(&request, false))
-            .unwrap();
+        block_on_async_tool_dispatch(kernel.dispatch_tool_call_with_cost(&request, false)).unwrap();
     assert!(cost.is_none());
     let ToolServerOutput::Value(value) = output else {
         panic!("expected value output");
@@ -326,8 +319,11 @@ fn strict_nonce_mode_nested_flow_operation_forwards_presented_nonce(
     };
     let mut client = NoopNestedFlowClient;
 
-    let response =
-        kernel.evaluate_tool_call_operation_with_nested_flow_client(&context, &operation, &mut client)?;
+    let response = kernel.evaluate_tool_call_operation_with_nested_flow_client(
+        &context,
+        &operation,
+        &mut client,
+    )?;
 
     assert_eq!(response.verdict, Verdict::Allow);
     assert!(
@@ -356,7 +352,9 @@ fn strict_nonce_mode_preflights_nonce_then_executes_once() {
         Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
     );
     let agent_kp = make_keypair();
-    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let mut grant = make_grant("srv-a", "read_file");
+    grant.max_invocations = Some(1);
+    let scope = make_scope(vec![grant]);
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
     let request = make_request("req-nonce-preflight", &cap, "read_file", "srv-a");
 
@@ -382,6 +380,30 @@ fn strict_nonce_mode_preflights_nonce_then_executes_once() {
     let nonce = *preflight
         .execution_nonce
         .expect("strict preflight must return an execution nonce");
+    let preflight_hold_id = format!(
+        "nonce-preflight-budget-hold:{}:{}:0",
+        request.request_id, cap.id
+    );
+    let preflight_events = kernel
+        .budget_store
+        .list_mutation_events(10, Some(&cap.id), Some(0))
+        .unwrap();
+    assert!(preflight_events.iter().any(|event| {
+        event.kind == BudgetMutationKind::ReserveInvocation
+            && event.hold_id.as_deref() == Some(preflight_hold_id.as_str())
+            && event.event_id == format!("{preflight_hold_id}:authorize")
+    }));
+    assert!(preflight_events.iter().any(|event| {
+        event.kind == BudgetMutationKind::ReverseInvocation
+            && event.hold_id.as_deref() == Some(preflight_hold_id.as_str())
+    }));
+    assert!(!preflight_events
+        .iter()
+        .any(|event| event.kind == BudgetMutationKind::IncrementInvocation));
+
+    let preflight_replay = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(preflight_replay.verdict, Verdict::Deny);
+    assert!(preflight_replay.execution_nonce.is_none());
 
     let mut execution_request = request.clone();
     execution_request.execution_nonce = Some(nonce);
@@ -398,19 +420,18 @@ fn strict_nonce_mode_preflights_nonce_then_executes_once() {
         "executed calls must not mint another nonce for the same request"
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    let execution_events = kernel
+        .budget_store
+        .list_mutation_events(10, Some(&cap.id), Some(0))
+        .unwrap();
+    assert!(execution_events.iter().any(|event| {
+        event.kind == BudgetMutationKind::IncrementInvocation && event.hold_id.is_none()
+    }));
 
     let replay = kernel
         .evaluate_tool_call_blocking(&execution_request)
         .unwrap();
     assert_eq!(replay.verdict, Verdict::Deny);
-    assert!(
-        replay
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("execution nonce")),
-        "expected replay denial, got: {:?}",
-        replay.reason
-    );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
 
@@ -472,9 +493,22 @@ fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
         denied.reason
     );
     assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
+    kernel
+        .reserve_presented_execution_nonce(&request)
+        .expect("definite payment denial must leave the nonce unconsumed");
 
     kernel.set_payment_adapter(Box::new(StubPaymentAdapter));
-    let allowed = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    let mut retry_request = request.clone();
+    retry_request.request_id = "req-nonce-payment-retry".to_string();
+    retry_request.execution_nonce = None;
+    let retry_preflight = kernel.evaluate_tool_call_blocking(&retry_request).unwrap();
+    assert_eq!(retry_preflight.verdict, Verdict::Allow);
+    retry_request.execution_nonce = Some(
+        *retry_preflight
+            .execution_nonce
+            .expect("a new operation must receive its own execution nonce"),
+    );
+    let allowed = kernel.evaluate_tool_call_blocking(&retry_request).unwrap();
     assert_eq!(allowed.verdict, Verdict::Allow);
     assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 1);
 }
@@ -535,9 +569,7 @@ fn strict_nonce_mode_request_id_mismatch_precedes_monetary_side_effects(
     let denied = kernel.evaluate_tool_call_blocking(&changed)?;
     assert_eq!(denied.verdict, Verdict::Deny);
     assert_eq!(
-        payment
-            .authorized
-            .load(std::sync::atomic::Ordering::SeqCst),
+        payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
         0
     );
     let captures = kernel

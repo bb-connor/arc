@@ -367,12 +367,7 @@ fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocati
         .expect("deny receipt should carry financial metadata");
     assert_eq!(financial["attempted_cost"].as_u64(), Some(100));
     assert_eq!(financial["budget_remaining"].as_u64(), Some(1000));
-    let usage = kernel
-
-        .budget_store
-        .get_usage(&cap.id, 0)
-        .unwrap()
-        .unwrap();
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.committed_cost_units().unwrap(), 0);
 }
@@ -417,12 +412,7 @@ fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
     assert_eq!(financial["settlement_status"], "settled");
     assert_eq!(financial["cost_charged"].as_u64(), Some(100));
     assert_eq!(financial["budget_remaining"].as_u64(), Some(900));
-    let usage = kernel
-
-        .budget_store
-        .get_usage(&cap.id, 0)
-        .unwrap()
-        .unwrap();
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(usage.committed_cost_units().unwrap(), 100);
 }
 
@@ -475,12 +465,7 @@ fn monetary_allow_receipt_contains_financial_metadata() {
         .expect("should have 'attribution' key");
     assert_eq!(attribution["grant_index"].as_u64(), Some(0));
 
-    let usage = kernel
-
-        .budget_store
-        .get_usage(&cap.id, 0)
-        .unwrap()
-        .unwrap();
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 1);
     assert_eq!(usage.committed_cost_units().unwrap(), 75);
 }
@@ -520,7 +505,6 @@ fn monetary_allow_records_budget_hold_and_append_only_events() {
     let authorize_event_id = format!("{hold_id}:authorize");
     let reconcile_event_id = format!("{hold_id}:reconcile");
     let events = kernel
-
         .budget_store
         .list_mutation_events(10, Some(&cap.id), Some(0))
         .unwrap();
@@ -542,9 +526,13 @@ fn monetary_allow_records_budget_hold_and_append_only_events() {
     assert_eq!(events[2].total_cost_exposed_after, 0);
     assert_eq!(events[2].total_cost_realized_spend_after, 75);
     assert_eq!(
-        response.receipt.metadata.as_ref().and_then(|metadata| metadata
-            ["budget_authority"]["invocation_capture"]["event_id"]
-            .as_str()),
+        response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(
+                |metadata| metadata["budget_authority"]["invocation_capture"]["event_id"].as_str()
+            ),
         Some(capture_event_id.as_str())
     );
 }
@@ -571,7 +559,8 @@ fn sibling_sum_denial_reverses_pre_execution_monetary_charge() {
         })
         .unwrap();
     assert_eq!(
-        allow_response.verdict, Verdict::Allow,
+        allow_response.verdict,
+        Verdict::Allow,
         "unexpected deny reason: {:?}",
         allow_response.reason
     );
@@ -642,7 +631,8 @@ fn sibling_sum_denial_reverses_pre_execution_invocation_increment() {
         })
         .unwrap();
     assert_eq!(
-        allow_response.verdict, Verdict::Allow,
+        allow_response.verdict,
+        Verdict::Allow,
         "unexpected deny reason: {:?}",
         allow_response.reason
     );
@@ -668,7 +658,10 @@ fn sibling_sum_denial_reverses_pre_execution_invocation_increment() {
         reason.contains("sibling-sum") || reason.contains("sibling sum")
     }));
 
-    let usage = kernel.budget_store.get_usage(&fixture.child_b.id, 0).unwrap();
+    let usage = kernel
+        .budget_store
+        .get_usage(&fixture.child_b.id, 0)
+        .unwrap();
     assert_eq!(usage.as_ref().map_or(0, |usage| usage.invocation_count), 0);
     assert_eq!(
         usage
@@ -687,7 +680,9 @@ fn sibling_sum_denial_reverses_pre_execution_invocation_increment() {
 fn nested_hosted_sibling_sum_denial_reverses_pre_execution_monetary_charge() {
     let fixture = make_sibling_sum_monetary_fixture("nested-sibling-sum-rollback");
     let kernel = fixture.kernel;
-    let session_id = kernel.open_session("nested-parent-agent".to_string(), Vec::new()).unwrap();
+    let session_id = kernel
+        .open_session("nested-parent-agent".to_string(), Vec::new())
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
     let parent_context = make_operation_context(
         &session_id,
@@ -735,7 +730,8 @@ fn nested_hosted_sibling_sum_denial_reverses_pre_execution_monetary_charge() {
         )
         .unwrap();
     assert_eq!(
-        allow_response.verdict, Verdict::Allow,
+        allow_response.verdict,
+        Verdict::Allow,
         "unexpected deny reason: {:?}",
         allow_response.reason
     );
@@ -849,7 +845,9 @@ fn nested_payment_authorization_denial_releases_delegated_sibling_budget() {
     let fixture = make_sibling_sum_monetary_fixture("nested-delegated-payment-deny-budget");
     let mut kernel = fixture.kernel;
     kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter));
-    let session_id = kernel.open_session("nested-parent-agent".to_string(), Vec::new()).unwrap();
+    let session_id = kernel
+        .open_session("nested-parent-agent".to_string(), Vec::new())
+        .unwrap();
     kernel.activate_session(&session_id).unwrap();
     let parent_context = make_operation_context(
         &session_id,
@@ -964,8 +962,7 @@ fn hosted_named_remote_without_fresh_peer_fails_before_dispatch() {
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.unwrap_or_default();
     assert!(
-        reason.contains("receipt negotiation downgrade")
-            || reason.contains("not pinned fresh"),
+        reason.contains("receipt negotiation downgrade") || reason.contains("not pinned fresh"),
         "unexpected deny reason: {reason}"
     );
 
@@ -986,13 +983,8 @@ fn portable_subject_denial_does_not_consume_sibling_budget() {
         agent_id: fixture.child_b_kp.public_key().to_hex(),
         arguments: serde_json::json!({}),
     };
-    let denied = kernel.evaluate_portable_verdict(
-        &fixture.child_a,
-        &wrong_subject,
-        &guards,
-        &clock,
-        None,
-    );
+    let denied =
+        kernel.evaluate_portable_verdict(&fixture.child_a, &wrong_subject, &guards, &clock, None);
     assert_eq!(denied.verdict, chio_kernel_core::Verdict::Deny);
 
     let valid_sibling = chio_kernel_core::PortableToolCallRequest {
@@ -1002,13 +994,8 @@ fn portable_subject_denial_does_not_consume_sibling_budget() {
         agent_id: fixture.child_b_kp.public_key().to_hex(),
         arguments: serde_json::json!({}),
     };
-    let allowed = kernel.evaluate_portable_verdict(
-        &fixture.child_b,
-        &valid_sibling,
-        &guards,
-        &clock,
-        None,
-    );
+    let allowed =
+        kernel.evaluate_portable_verdict(&fixture.child_b, &valid_sibling, &guards, &clock, None);
     assert_eq!(allowed.verdict, chio_kernel_core::Verdict::Allow);
 
     let _ = std::fs::remove_file(fixture.path);
@@ -1107,6 +1094,9 @@ fn captured_monetary_invocation_only_explicit_predispatch_cancel_can_release(
         capability_id: "cap-captured-no-effect".to_string(),
         grant_index: 0,
         max_invocations: Some(1),
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: None,
         requested_exposure_units: 100,
         max_cost_per_invocation: Some(100),
         max_total_cost_units: Some(100),
@@ -1123,30 +1113,24 @@ fn captured_monetary_invocation_only_explicit_predispatch_cancel_can_release(
         grant_index: 0,
         hold_id: hold_id.to_string(),
         event_id: format!("{hold_id}:capture-invocation"),
+        trusted_time: None,
         authority: None,
     })?;
     assert!(matches!(
         capture,
         BudgetInvocationCaptureDecision::Captured(_)
     ));
-    let different_capture_event =
+    assert!(matches!(
         store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
             capability_id: "cap-captured-no-effect".to_string(),
             grant_index: 0,
             hold_id: hold_id.to_string(),
             event_id: format!("{hold_id}:different-capture-event"),
+            trusted_time: None,
             authority: None,
-        })?;
-    let original_capture = match different_capture_event {
-        BudgetInvocationCaptureDecision::AlreadyCaptured(mutation) => mutation,
-        BudgetInvocationCaptureDecision::Captured(_) => {
-            return Err(std::io::Error::other("different event recaptured invocation").into())
-        }
-    };
-    assert_eq!(
-        original_capture.metadata.event_id.as_deref(),
-        Some(format!("{hold_id}:capture-invocation").as_str())
-    );
+        }),
+        Err(BudgetStoreError::Invariant(_))
+    ));
 
     assert!(store
         .reverse_budget_hold(BudgetReverseHoldRequest {
@@ -1155,6 +1139,7 @@ fn captured_monetary_invocation_only_explicit_predispatch_cancel_can_release(
             reversed_exposure_units: 100,
             hold_id: Some(hold_id.to_string()),
             event_id: Some(format!("{hold_id}:reverse")),
+            expected_cumulative_approval_state: None,
             authority: None,
         })
         .is_err());
@@ -1195,6 +1180,17 @@ fn captured_monetary_invocation_only_explicit_predispatch_cancel_can_release(
         store.cancel_captured_before_dispatch(cancellation_request)?,
         BudgetCapturedBeforeDispatchCancellationDecision::AlreadyCancelled(_)
     ));
+    assert!(matches!(
+        store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            capability_id: "cap-captured-no-effect".to_string(),
+            grant_index: 0,
+            hold_id: hold_id.to_string(),
+            event_id: format!("{hold_id}:capture-invocation"),
+            trusted_time: None,
+            authority: None,
+        }),
+        Err(BudgetStoreError::Invariant(_))
+    ));
     let cancelled = store
         .get_usage("cap-captured-no-effect", 0)?
         .ok_or_else(|| std::io::Error::other("cancelled usage missing"))?;
@@ -1217,6 +1213,9 @@ fn in_memory_capture_replay_preserves_historical_mutation_values(
                 capability_id: "cap-capture-history".to_string(),
                 grant_index: 0,
                 max_invocations: Some(2),
+                invocation_quotas: Vec::new(),
+                cumulative_approval: None,
+                admission_binding: None,
                 requested_exposure_units: 100,
                 max_cost_per_invocation: Some(100),
                 max_total_cost_units: Some(200),
@@ -1232,6 +1231,7 @@ fn in_memory_capture_replay_preserves_historical_mutation_values(
                 grant_index: 0,
                 hold_id: hold_id.to_string(),
                 event_id: format!("{hold_id}:capture-invocation"),
+                trusted_time: None,
                 authority: None,
             })?;
         }
@@ -1241,7 +1241,8 @@ fn in_memory_capture_replay_preserves_historical_mutation_values(
         capability_id: "cap-capture-history".to_string(),
         grant_index: 0,
         hold_id: "hold-capture-history-1".to_string(),
-        event_id: "hold-capture-history-1:different-capture".to_string(),
+        event_id: "hold-capture-history-1:capture-invocation".to_string(),
+        trusted_time: None,
         authority: None,
     })?;
     let BudgetInvocationCaptureDecision::AlreadyCaptured(mutation) = replay else {
@@ -1266,6 +1267,9 @@ fn captured_reconciled_hold_rejects_legacy_reverse_without_hold_id(
             capability_id: "cap-captured-reconciled".to_string(),
             grant_index: 0,
             max_invocations: Some(1),
+            invocation_quotas: Vec::new(),
+            cumulative_approval: None,
+            admission_binding: None,
             requested_exposure_units: 100,
             max_cost_per_invocation: Some(100),
             max_total_cost_units: Some(100),
@@ -1281,6 +1285,7 @@ fn captured_reconciled_hold_rejects_legacy_reverse_without_hold_id(
             grant_index: 0,
             hold_id: hold_id.to_string(),
             event_id: format!("{hold_id}:capture-invocation"),
+            trusted_time: None,
             authority: None,
         })?,
         BudgetInvocationCaptureDecision::Captured(_)
@@ -1310,8 +1315,8 @@ fn captured_reconciled_hold_rejects_legacy_reverse_without_hold_id(
 }
 
 #[test]
-fn monetary_tool_server_error_retains_precharged_budget(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn monetary_tool_server_error_retains_precharged_budget() -> Result<(), Box<dyn std::error::Error>>
+{
     let mut kernel = make_kernel(make_monetary_config());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(FailingMonetaryServer {
@@ -1319,25 +1324,22 @@ fn monetary_tool_server_error_retains_precharged_budget(
     }));
 
     let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
-    let cap = kernel
-        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
-        ?;
+    let cap = kernel.issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)?;
 
-    let response = kernel
-        .evaluate_tool_call_blocking(&ToolCallRequest {
-            request_id: "req-tool-error".to_string(),
-            capability: cap.clone(),
-            tool_name: "compute".to_string(),
-            server_id: "cost-srv".to_string(),
-            agent_id: agent_kp.public_key().to_hex(),
-            arguments: serde_json::json!({}),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-        })?;
+    let response = kernel.evaluate_tool_call_blocking(&ToolCallRequest {
+        request_id: "req-tool-error".to_string(),
+        capability: cap.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    })?;
 
     assert_eq!(response.verdict, Verdict::Deny);
     let usage = kernel

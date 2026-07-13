@@ -196,6 +196,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
         if matches!(
             self.budget_mutation,
             PreExecutionBudgetMutation::Invocation { .. }
+                | PreExecutionBudgetMutation::InvocationHold(_)
         ) {
             if let Err(error) = self
                 .kernel
@@ -212,7 +213,10 @@ impl<'a> PostAdmissionDropGuard<'a> {
                     reason,
                     // The invocation slot is keyed by the capability id; name it
                     // so the stuck slot is locatable from the fault entry.
-                    hold_ids: vec![self.cap.id.clone()],
+                    hold_ids: self.budget_mutation.durable_hold_result().map_or_else(
+                        || vec![self.cap.id.clone()],
+                        |hold| vec![hold.budget_hold_id.clone()],
+                    ),
                 });
             }
         }

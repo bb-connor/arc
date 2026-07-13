@@ -291,7 +291,10 @@ fn cumulative_approval_direct_nondelegable_constraint_has_no_family_binding() ->
 
     assert_eq!(verified.len(), 1);
     assert!(!verified[0].owner_id.is_empty());
+    assert_eq!(verified[0].authority_id, issuer.public_key());
+    assert!(verified[0].delegation_root_id.is_none());
     assert!(verified[0].root_binding_digest.is_none());
+    assert_eq!(verified[0].authority_threshold, verified[0].threshold);
     Ok(())
 }
 
@@ -314,11 +317,21 @@ fn cumulative_approval_family_root_and_sibling_share_owner() -> TestResult {
 
     assert_eq!(root_verified[0].owner_id, first_verified[0].owner_id);
     assert_eq!(first_verified[0].owner_id, second_verified[0].owner_id);
+    assert_eq!(second_verified[0].authority_id, issuer.public_key());
+    assert_eq!(
+        second_verified[0].delegation_root_id.as_deref(),
+        Some(root.id.as_str())
+    );
     assert_eq!(
         root_verified[0].root_grant_hash,
         first_verified[0].root_grant_hash
     );
     assert_eq!(second_verified[0].threshold.units, 80);
+    assert_eq!(second_verified[0].authority_threshold.units, 100);
+    assert_eq!(
+        first_verified[0].authority_threshold,
+        second_verified[0].authority_threshold
+    );
     assert_eq!(
         canonical_json_bytes(binding(&first)?)?,
         canonical_json_bytes(binding(&second)?)?

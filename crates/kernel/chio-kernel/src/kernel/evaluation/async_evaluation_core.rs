@@ -323,6 +323,7 @@ impl ChioKernel {
             &request.request_id,
             cap,
             &matching_grants,
+            self.execution_nonce_preflight_required(request),
         ) {
             Ok(result) => result,
             Err(e) => {

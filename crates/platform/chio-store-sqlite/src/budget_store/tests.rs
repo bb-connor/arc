@@ -137,6 +137,9 @@ fn sqlite_budget_store_rejects_pre_split_budget_schema() {
 #[path = "tests/durability.rs"]
 mod durability;
 
+#[path = "tests/authority_replay.rs"]
+mod authority_replay;
+
 #[test]
 fn budget_store_settle_with_ids_is_idempotent_and_append_only_sqlite() {
     let path = unique_db_path("chio-settle-charge-idempotent");
@@ -158,6 +161,16 @@ fn budget_store_settle_with_ids_is_idempotent_and_append_only_sqlite() {
         )
         .unwrap());
     store
+        .capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            capability_id: "cap-1".to_string(),
+            grant_index: 0,
+            hold_id: hold_id.to_string(),
+            event_id: "hold-cap-1-0:capture-invocation".to_string(),
+            trusted_time: None,
+            authority: None,
+        })
+        .unwrap();
+    store
         .settle_charge_cost_with_ids("cap-1", 0, 100, 75, Some(hold_id), Some(reconcile_event_id))
         .unwrap();
     store
@@ -171,15 +184,16 @@ fn budget_store_settle_with_ids_is_idempotent_and_append_only_sqlite() {
     let events = store
         .list_mutation_events(10, Some("cap-1"), Some(0))
         .unwrap();
-    assert_eq!(events.len(), 2);
+    assert_eq!(events.len(), 3);
     assert_eq!(events[0].event_id, authorize_event_id);
-    assert_eq!(events[1].event_id, reconcile_event_id);
-    assert_eq!(events[1].hold_id.as_deref(), Some(hold_id));
-    assert_eq!(events[1].kind, BudgetMutationKind::ReconcileSpend);
-    assert_eq!(events[1].exposure_units, 100);
-    assert_eq!(events[1].realized_spend_units, 75);
-    assert_eq!(events[1].total_cost_exposed_after, 0);
-    assert_eq!(events[1].total_cost_realized_spend_after, 75);
+    assert_eq!(events[1].kind, BudgetMutationKind::CaptureInvocation);
+    assert_eq!(events[2].event_id, reconcile_event_id);
+    assert_eq!(events[2].hold_id.as_deref(), Some(hold_id));
+    assert_eq!(events[2].kind, BudgetMutationKind::ReconcileSpend);
+    assert_eq!(events[2].exposure_units, 100);
+    assert_eq!(events[2].realized_spend_units, 75);
+    assert_eq!(events[2].total_cost_exposed_after, 0);
+    assert_eq!(events[2].total_cost_realized_spend_after, 75);
 
     let _ = fs::remove_file(path);
 }
@@ -324,6 +338,16 @@ fn budget_store_hold_authority_requires_exact_lease_inmemory() {
         )
         .unwrap();
     store
+        .capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            capability_id: "cap-lease".to_string(),
+            grant_index: 0,
+            hold_id: hold_id.to_string(),
+            event_id: "hold-cap-lease-0:capture-invocation".to_string(),
+            trusted_time: None,
+            authority: Some(initial.clone()),
+        })
+        .unwrap();
+    store
         .settle_charge_cost_with_ids_and_authority(
             "cap-lease",
             0,
@@ -342,14 +366,14 @@ fn budget_store_hold_authority_requires_exact_lease_inmemory() {
     let events = store
         .list_mutation_events(10, Some("cap-lease"), Some(0))
         .unwrap();
-    assert_eq!(events.len(), 3);
-    assert_eq!(events[0].authority.as_ref(), Some(&initial));
-    assert_eq!(events[1].authority.as_ref(), Some(&initial));
-    assert_eq!(events[2].authority.as_ref(), Some(&initial));
+    assert_eq!(events.len(), 4);
+    assert!(events
+        .iter()
+        .all(|event| event.authority.as_ref() == Some(&initial)));
 }
 
 #[test]
-fn budget_store_event_id_retry_survives_authority_rollover_sqlite() {
+fn budget_store_event_id_retry_rejects_authority_rollover_sqlite() {
     let path = unique_db_path("chio-hold-authority-event-reuse");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let hold_id = "hold-cap-lease-0";
@@ -371,7 +395,7 @@ fn budget_store_event_id_retry_survives_authority_rollover_sqlite() {
         )
         .unwrap());
 
-    assert!(store
+    let error = store
         .try_charge_cost_with_ids_and_authority(
             "cap-lease",
             0,
@@ -382,6 +406,22 @@ fn budget_store_event_id_retry_survives_authority_rollover_sqlite() {
             Some(hold_id),
             Some(event_id),
             Some(&changed),
+        )
+        .expect_err("exact replay must preserve the original authority");
+    assert!(error
+        .to_string()
+        .contains("authority metadata does not match the original mutation"));
+    assert!(store
+        .try_charge_cost_with_ids_and_authority(
+            "cap-lease",
+            0,
+            Some(10),
+            100,
+            Some(200),
+            Some(1000),
+            Some(hold_id),
+            Some(event_id),
+            Some(&initial),
         )
         .unwrap());
 
@@ -395,7 +435,7 @@ fn budget_store_event_id_retry_survives_authority_rollover_sqlite() {
             Some(1000),
             Some(hold_id),
             Some(event_id),
-            Some(&changed),
+            Some(&initial),
         )
         .expect_err("reused event id with a different mutation should fail closed");
     assert!(error
@@ -1159,10 +1199,16 @@ fn budget_ack_heads_reports_contiguous_prefix_only() -> Result<(), Box<dyn std::
     let event = |seq: u64| BudgetMutationRecord {
         event_id: format!("evt-{seq}"),
         hold_id: None,
+        admission_binding: None,
         capability_id: "cap-o".to_string(),
         grant_index: 0,
         kind: BudgetMutationKind::AuthorizeExposure,
         allowed: Some(true),
+        authorization_outcome: None,
+        invocation_state_before: BudgetInvocationState::Absent,
+        invocation_state_after: BudgetInvocationState::Absent,
+        monetary_state_before: BudgetMonetaryState::None,
+        monetary_state_after: BudgetMonetaryState::None,
         recorded_at: seq as i64,
         event_seq: seq,
         usage_seq: Some(seq),
@@ -1172,6 +1218,11 @@ fn budget_ack_heads_reports_contiguous_prefix_only() -> Result<(), Box<dyn std::
         max_cost_per_invocation: None,
         max_total_cost_units: None,
         invocation_count_after: 1,
+        invocation_quota_usages: Vec::new(),
+        invocation_quota_mutations: Vec::new(),
+        cumulative_approval: None,
+        cumulative_approval_mutation: None,
+        cumulative_approval_set_digest: None,
         total_cost_exposed_after: 1,
         total_cost_realized_spend_after: 0,
         authority: Some(BudgetEventAuthority {
@@ -1213,10 +1264,16 @@ fn budget_ack_heads_caps_partial_head_at_interior_gap() -> Result<(), Box<dyn st
     let event = |seq: u64| BudgetMutationRecord {
         event_id: format!("evt-{seq}"),
         hold_id: None,
+        admission_binding: None,
         capability_id: "cap-p".to_string(),
         grant_index: 0,
         kind: BudgetMutationKind::AuthorizeExposure,
         allowed: Some(true),
+        authorization_outcome: None,
+        invocation_state_before: BudgetInvocationState::Absent,
+        invocation_state_after: BudgetInvocationState::Absent,
+        monetary_state_before: BudgetMonetaryState::None,
+        monetary_state_after: BudgetMonetaryState::None,
         recorded_at: seq as i64,
         event_seq: seq,
         usage_seq: Some(seq),
@@ -1226,6 +1283,11 @@ fn budget_ack_heads_caps_partial_head_at_interior_gap() -> Result<(), Box<dyn st
         max_cost_per_invocation: None,
         max_total_cost_units: None,
         invocation_count_after: 1,
+        invocation_quota_usages: Vec::new(),
+        invocation_quota_mutations: Vec::new(),
+        cumulative_approval: None,
+        cumulative_approval_mutation: None,
+        cumulative_approval_set_digest: None,
         total_cost_exposed_after: 1,
         total_cost_realized_spend_after: 0,
         authority: Some(BudgetEventAuthority {
@@ -1272,10 +1334,16 @@ fn budget_ack_heads_stays_pinned_at_a_post_watermark_gap() -> Result<(), Box<dyn
     let event = |seq: u64| BudgetMutationRecord {
         event_id: format!("evt-{seq}"),
         hold_id: None,
+        admission_binding: None,
         capability_id: "cap-g".to_string(),
         grant_index: 0,
         kind: BudgetMutationKind::AuthorizeExposure,
         allowed: Some(true),
+        authorization_outcome: None,
+        invocation_state_before: BudgetInvocationState::Absent,
+        invocation_state_after: BudgetInvocationState::Absent,
+        monetary_state_before: BudgetMonetaryState::None,
+        monetary_state_after: BudgetMonetaryState::None,
         recorded_at: seq as i64,
         event_seq: seq,
         usage_seq: Some(seq),
@@ -1285,6 +1353,11 @@ fn budget_ack_heads_stays_pinned_at_a_post_watermark_gap() -> Result<(), Box<dyn
         max_cost_per_invocation: None,
         max_total_cost_units: None,
         invocation_count_after: 1,
+        invocation_quota_usages: Vec::new(),
+        invocation_quota_mutations: Vec::new(),
+        cumulative_approval: None,
+        cumulative_approval_mutation: None,
+        cumulative_approval_set_digest: None,
         total_cost_exposed_after: 1,
         total_cost_realized_spend_after: 0,
         authority: Some(BudgetEventAuthority {
@@ -1439,10 +1512,16 @@ fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
     let event = |seq: u64, origin: &str| BudgetMutationRecord {
         event_id: format!("evt-{origin}-{seq}"),
         hold_id: None,
+        admission_binding: None,
         capability_id: "cap-m".to_string(),
         grant_index: 0,
         kind: BudgetMutationKind::AuthorizeExposure,
         allowed: Some(true),
+        authorization_outcome: None,
+        invocation_state_before: BudgetInvocationState::Absent,
+        invocation_state_after: BudgetInvocationState::Absent,
+        monetary_state_before: BudgetMonetaryState::None,
+        monetary_state_after: BudgetMonetaryState::None,
         recorded_at: seq as i64,
         event_seq: seq,
         usage_seq: Some(seq),
@@ -1452,6 +1531,11 @@ fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
         max_cost_per_invocation: None,
         max_total_cost_units: None,
         invocation_count_after: 1,
+        invocation_quota_usages: Vec::new(),
+        invocation_quota_mutations: Vec::new(),
+        cumulative_approval: None,
+        cumulative_approval_mutation: None,
+        cumulative_approval_set_digest: None,
         total_cost_exposed_after: 1,
         total_cost_realized_spend_after: 0,
         authority: Some(BudgetEventAuthority {
@@ -1521,10 +1605,16 @@ fn ack_head_event(seq: u64, event_id: &str, origin: &str) -> BudgetMutationRecor
     BudgetMutationRecord {
         event_id: event_id.to_string(),
         hold_id: None,
+        admission_binding: None,
         capability_id: "cap-w".to_string(),
         grant_index: 0,
         kind: BudgetMutationKind::AuthorizeExposure,
         allowed: Some(true),
+        authorization_outcome: None,
+        invocation_state_before: BudgetInvocationState::Absent,
+        invocation_state_after: BudgetInvocationState::Absent,
+        monetary_state_before: BudgetMonetaryState::None,
+        monetary_state_after: BudgetMonetaryState::None,
         recorded_at: seq as i64,
         event_seq: seq,
         usage_seq: Some(seq),
@@ -1534,6 +1624,11 @@ fn ack_head_event(seq: u64, event_id: &str, origin: &str) -> BudgetMutationRecor
         max_cost_per_invocation: None,
         max_total_cost_units: None,
         invocation_count_after: 1,
+        invocation_quota_usages: Vec::new(),
+        invocation_quota_mutations: Vec::new(),
+        cumulative_approval: None,
+        cumulative_approval_mutation: None,
+        cumulative_approval_set_digest: None,
         total_cost_exposed_after: 1,
         total_cost_realized_spend_after: 0,
         authority: Some(BudgetEventAuthority {

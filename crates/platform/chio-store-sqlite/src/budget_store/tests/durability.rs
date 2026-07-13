@@ -1,6 +1,358 @@
 use super::*;
 
 #[test]
+fn sqlite_legacy_event_only_authorization_replays_once_with_invocation_limit(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-budget-legacy-event-replay");
+    let store = SqliteBudgetStore::open(&path)?;
+    for _ in 0..2 {
+        assert!(store.try_charge_cost_with_ids_and_authority(
+            "cap-legacy-event",
+            0,
+            Some(1),
+            10,
+            Some(10),
+            Some(10),
+            None,
+            Some("legacy-authorize-event"),
+            None,
+        )?);
+    }
+    let usage = store
+        .get_usage("cap-legacy-event", 0)?
+        .ok_or_else(|| std::io::Error::other("legacy event usage missing"))?;
+    assert_eq!(usage.invocation_count, 1);
+    assert_usage_totals(&usage, 10, 0);
+    let events = store.list_mutation_events(10, Some("cap-legacy-event"), Some(0))?;
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].event_id, "legacy-authorize-event");
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn sqlite_invocation_count_overflow_is_atomic() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-budget-invocation-overflow");
+    let store = SqliteBudgetStore::open(&path)?;
+    store.connection()?.execute(
+        r#"
+        INSERT INTO capability_grant_budgets (
+            capability_id, grant_index, invocation_count, updated_at, seq,
+            total_cost_exposed, total_cost_realized_spend
+        ) VALUES (?1, 0, ?2, 0, 0, 0, 0)
+        "#,
+        params!["cap-invocation-overflow", i64::from(u32::MAX)],
+    )?;
+    let result = store.try_increment_with_event_id(
+        "cap-invocation-overflow",
+        0,
+        None,
+        Some("invocation-overflow"),
+    );
+    assert!(result
+        .as_ref()
+        .is_err_and(|error| error.to_string().contains("invocation count overflowed")));
+    assert_eq!(store.max_mutation_event_seq()?, 0);
+    let usage = store
+        .get_usage("cap-invocation-overflow", 0)?
+        .ok_or_else(|| std::io::Error::other("overflow usage missing"))?;
+    assert_eq!(usage.invocation_count, u32::MAX);
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn sqlite_oversized_grant_index_fails_before_mutation() -> Result<(), Box<dyn std::error::Error>> {
+    let Ok(grant_index) = usize::try_from(u64::from(u32::MAX) + 1) else {
+        return Ok(());
+    };
+    let path = unique_db_path("chio-budget-grant-index-overflow");
+    let store = SqliteBudgetStore::open(&path)?;
+    let results = [
+        store.try_increment_with_event_id(
+            "cap-grant-overflow",
+            grant_index,
+            None,
+            Some("grant-overflow:increment"),
+        ),
+        store.try_charge_cost_with_ids(
+            "cap-grant-overflow",
+            grant_index,
+            None,
+            1,
+            None,
+            None,
+            None,
+            Some("grant-overflow:authorize"),
+        ),
+    ];
+    for result in results {
+        assert!(result
+            .as_ref()
+            .is_err_and(|error| error.to_string().contains("grant_index exceeds u32 range")));
+    }
+    assert!(store
+        .get_usage("cap-grant-overflow", grant_index)
+        .as_ref()
+        .is_err_and(|error| error.to_string().contains("grant_index exceeds u32 range")));
+    assert!(store
+        .list_mutation_events(10, Some("cap-grant-overflow"), Some(grant_index))
+        .as_ref()
+        .is_err_and(|error| error.to_string().contains("grant_index exceeds u32 range")));
+    assert_eq!(store.max_mutation_event_seq()?, 0);
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn sqlite_budget_store_rejects_composite_authorization_without_mutation(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-budget-composite-unsupported");
+    let store = SqliteBudgetStore::open(&path)?;
+    let error = match store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+        capability_id: "cap-composite".to_string(),
+        grant_index: 0,
+        max_invocations: Some(1),
+        invocation_quotas: vec![chio_kernel::budget_store::BudgetInvocationQuota {
+            key: chio_kernel::budget_store::BudgetQuotaKey::grant("cap-composite", 0),
+            max_invocations: 1,
+        }],
+        cumulative_approval: None,
+        admission_binding: Some(chio_kernel::budget_store::BudgetAdmissionBinding {
+            operation_id: "op-composite".to_string(),
+            revocation_set: chio_kernel::supplemental_quota::CanonicalRevocationSet::canonicalize(
+                vec!["cap-composite".to_string()],
+            )?,
+            supplemental_verifier_id: None,
+            supplemental_verifier_config_digest: None,
+            supplemental_authorization_artifact_digest: None,
+            supplemental_authorization_expires_at: None,
+        }),
+        requested_exposure_units: 10,
+        max_cost_per_invocation: Some(10),
+        max_total_cost_units: Some(10),
+        hold_id: Some("hold-composite".to_string()),
+        event_id: Some("hold-composite:authorize".to_string()),
+        authority: None,
+    }) {
+        Ok(_) => {
+            return Err(std::io::Error::other("sqlite accepted composite authorization").into())
+        }
+        Err(error) => error,
+    };
+    assert!(error
+        .to_string()
+        .contains("composite budget authorization is not supported"));
+    assert!(store.get_usage("cap-composite", 0)?.is_none());
+    assert_eq!(store.max_mutation_event_seq()?, 0);
+
+    let legacy = BudgetAuthorizeHoldRequest {
+        capability_id: "cap-composite".to_string(),
+        grant_index: 0,
+        max_invocations: Some(1),
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: None,
+        requested_exposure_units: 10,
+        max_cost_per_invocation: Some(10),
+        max_total_cost_units: Some(10),
+        hold_id: Some("hold-legacy".to_string()),
+        event_id: Some("hold-legacy:authorize".to_string()),
+        authority: None,
+    };
+    for (hold_id, event_id) in [
+        (Some(""), Some("hold-legacy:authorize")),
+        (Some("hold-legacy"), None),
+    ] {
+        let mut invalid = legacy.clone();
+        invalid.hold_id = hold_id.map(ToOwned::to_owned);
+        invalid.event_id = event_id.map(ToOwned::to_owned);
+        assert!(invalid
+            .validate()
+            .is_err_and(|error| error.to_string().contains("non-empty identifiers")));
+        assert!(store.authorize_budget_hold(invalid).is_err());
+    }
+    assert!(store.get_usage("cap-composite", 0)?.is_none());
+    assert_eq!(store.max_mutation_event_seq()?, 0);
+    assert!(matches!(
+        store.authorize_budget_hold(legacy)?,
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+    for (hold_id, event_id) in [("", "hold-legacy:capture"), ("hold-legacy", "")] {
+        assert!(store
+            .capture_invocation_reservations(BudgetCaptureInvocationRequest {
+                capability_id: "cap-composite".to_string(),
+                grant_index: 0,
+                hold_id: hold_id.to_string(),
+                event_id: event_id.to_string(),
+                trusted_time: None,
+                authority: None,
+            })
+            .is_err());
+        assert!(store
+            .cancel_captured_before_dispatch(BudgetCancelCapturedBeforeDispatchRequest {
+                capability_id: "cap-composite".to_string(),
+                grant_index: 0,
+                hold_id: hold_id.to_string(),
+                event_id: event_id.to_string(),
+                authority: None,
+            })
+            .is_err());
+    }
+    let capture_error =
+        match store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            capability_id: "cap-composite".to_string(),
+            grant_index: 0,
+            hold_id: "hold-legacy".to_string(),
+            event_id: "hold-legacy:capture".to_string(),
+            trusted_time: Some(1),
+            authority: None,
+        }) {
+            Ok(_) => {
+                return Err(std::io::Error::other("sqlite accepted trusted capture time").into())
+            }
+            Err(error) => error,
+        };
+    assert!(capture_error
+        .to_string()
+        .contains("trusted capture time is not supported"));
+    assert_eq!(store.max_mutation_event_seq()?, 1);
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn sqlite_budget_store_rejects_unsupported_imported_mutation_atomically(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-budget-composite-import-unsupported");
+    let store = SqliteBudgetStore::open(&path)?;
+    let mut event = ack_head_event(1, "event-composite", "http://origin");
+    event.kind = BudgetMutationKind::ReserveInvocation;
+
+    let error = match store.import_mutation_record(&event) {
+        Ok(()) => return Err(std::io::Error::other("sqlite imported composite mutation").into()),
+        Err(error) => error,
+    };
+    assert!(error
+        .to_string()
+        .contains("uses state unsupported by the sqlite budget store"));
+    assert_eq!(store.max_mutation_event_seq()?, 0);
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn sqlite_budget_store_rejects_unrepresentable_authorization_without_mutation(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-budget-authorization-sqlite-overflow");
+    let store = SqliteBudgetStore::open(&path)?;
+    let error = store
+        .authorize_budget_hold(BudgetAuthorizeHoldRequest {
+            capability_id: "cap-overflow".to_string(),
+            grant_index: 0,
+            max_invocations: Some(1),
+            invocation_quotas: Vec::new(),
+            cumulative_approval: None,
+            admission_binding: None,
+            requested_exposure_units: u64::MAX,
+            max_cost_per_invocation: Some(u64::MAX),
+            max_total_cost_units: Some(u64::MAX),
+            hold_id: Some("hold-overflow".to_string()),
+            event_id: Some("hold-overflow:authorize".to_string()),
+            authority: None,
+        })
+        .expect_err("unrepresentable monetary values must fail closed");
+    assert!(matches!(error, BudgetStoreError::Overflow(_)));
+    assert!(store.get_usage("cap-overflow", 0)?.is_none());
+    assert_eq!(store.max_mutation_event_seq()?, 0);
+
+    let mut connection = store.connection()?;
+    let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+    assert!(SqliteBudgetStore::load_hold(&transaction, "hold-overflow")?.is_none());
+    transaction.rollback()?;
+    drop(connection);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn sqlite_budget_store_rolls_back_snapshot_when_event_exceeds_integer_range(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-budget-import-sqlite-overflow");
+    let store = SqliteBudgetStore::open(&path)?;
+    let usage = usage_record("cap-import-overflow", 0, 1, 1, 1, 10, 0);
+    let mut event = ack_head_event(2, "event-import-overflow", "budget-primary");
+    event.exposure_units = u64::MAX;
+
+    let error = store
+        .import_snapshot_records(std::slice::from_ref(&usage), &[event])
+        .expect_err("unrepresentable imported values must roll back the snapshot");
+    assert!(matches!(error, BudgetStoreError::Overflow(_)));
+    assert!(store.get_usage("cap-import-overflow", 0)?.is_none());
+    assert_eq!(store.max_mutation_event_seq()?, 0);
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn sqlite_budget_store_capture_overflow_rolls_back_hold_transition(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-budget-capture-sqlite-overflow");
+    let store = SqliteBudgetStore::open(&path)?;
+    assert!(store.try_charge_cost_with_ids(
+        "cap-capture-overflow",
+        0,
+        Some(1),
+        10,
+        Some(10),
+        Some(10),
+        Some("hold-capture-overflow"),
+        Some("hold-capture-overflow:authorize"),
+    )?);
+    {
+        let connection = store.connection()?;
+        connection.execute(
+            "UPDATE budget_replication_meta SET next_seq = ?1 WHERE singleton = 1",
+            params![i64::MAX],
+        )?;
+    }
+
+    let error = store
+        .capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            capability_id: "cap-capture-overflow".to_string(),
+            grant_index: 0,
+            hold_id: "hold-capture-overflow".to_string(),
+            event_id: "hold-capture-overflow:capture".to_string(),
+            trusted_time: None,
+            authority: None,
+        })
+        .expect_err("unrepresentable capture sequence must fail closed");
+    assert!(matches!(error, BudgetStoreError::Overflow(_)));
+    assert_eq!(store.max_mutation_event_seq()?, 1);
+    let usage = store
+        .get_usage("cap-capture-overflow", 0)?
+        .ok_or_else(|| std::io::Error::other("capture usage disappeared"))?;
+    assert_eq!(usage.invocation_count, 1);
+    assert_usage_totals(&usage, 10, 0);
+
+    let mut connection = store.connection()?;
+    let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+    let hold = SqliteBudgetStore::load_hold(&transaction, "hold-capture-overflow")?
+        .ok_or_else(|| std::io::Error::other("capture hold disappeared"))?;
+    assert!(!hold.invocation_captured);
+    transaction.rollback()?;
+    drop(connection);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
 fn sqlite_budget_store_migrates_invocation_captured_column(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-budget-invocation-captured-migration");
@@ -146,6 +498,9 @@ fn rollback_shaped_unrelated_event_cannot_reopen_budget_hold(
         capability_id: "cap-fake-rollback".to_string(),
         grant_index: 0,
         max_invocations: Some(10),
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: None,
         requested_exposure_units: 100,
         max_cost_per_invocation: Some(100),
         max_total_cost_units: Some(1000),
@@ -187,6 +542,206 @@ fn rollback_shaped_unrelated_event_cannot_reopen_budget_hold(
         .ok_or_else(|| std::io::Error::other("fake rollback usage missing"))?;
     assert_eq!(usage.invocation_count, 1);
     assert_usage_totals(&usage, 0, 0);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn compensated_kernel_budget_holds_require_fresh_request_identity(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-budget-nonce-preflight-terminal");
+    let store = SqliteBudgetStore::open(&path)?;
+    for (prefix, capability_id) in [
+        ("nonce-preflight-budget-hold", "cap-preflight"),
+        ("budget-hold", "cap-executable"),
+    ] {
+        let hold_id = format!("{prefix}:req-1:{capability_id}:0");
+        let event_id = format!("{hold_id}:authorize:attempt-1");
+        assert!(store.try_charge_cost_with_ids(
+            capability_id,
+            0,
+            Some(1),
+            0,
+            None,
+            None,
+            Some(&hold_id),
+            Some(&event_id),
+        )?);
+        let authorize_seq = store
+            .list_mutation_events(10, Some(capability_id), Some(0))?
+            .into_iter()
+            .find(|event| event.event_id == event_id)
+            .ok_or_else(|| std::io::Error::other("kernel budget authorization missing"))?
+            .event_seq;
+        store.reverse_charge_cost_with_ids(
+            capability_id,
+            0,
+            0,
+            Some(&hold_id),
+            Some(&format!("{event_id}:rollback:{authorize_seq}")),
+        )?;
+
+        let terminal_seq = store.max_mutation_event_seq()?;
+        let next_event_id = format!("{hold_id}:authorize:attempt-2");
+        for retry_event_id in [event_id.as_str(), next_event_id.as_str()] {
+            let retry = store.try_charge_cost_with_ids(
+                capability_id,
+                0,
+                Some(1),
+                0,
+                None,
+                None,
+                Some(&hold_id),
+                Some(retry_event_id),
+            );
+            assert!(retry.as_ref().is_err_and(|error| {
+                error.to_string().contains("terminal after compensation")
+                    || error.to_string().contains("cannot be reopened")
+            }));
+            assert_eq!(store.max_mutation_event_seq()?, terminal_seq);
+        }
+
+        let fresh_hold_id = format!("{prefix}:req-2:{capability_id}:0");
+        assert!(store.try_charge_cost_with_ids(
+            capability_id,
+            0,
+            Some(1),
+            0,
+            None,
+            None,
+            Some(&fresh_hold_id),
+            Some(&format!("{fresh_hold_id}:authorize")),
+        )?);
+    }
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn sqlite_rich_reverse_supports_kernel_cleanup_with_durable_projection(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-budget-rich-kernel-reverse");
+    let store = SqliteBudgetStore::open(&path)?;
+    let hold_id = "nonce-preflight-budget-hold:req-1:cap-preflight:0";
+    store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+        capability_id: "cap-preflight".to_string(),
+        grant_index: 0,
+        max_invocations: Some(1),
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: None,
+        requested_exposure_units: 0,
+        max_cost_per_invocation: None,
+        max_total_cost_units: None,
+        hold_id: Some(hold_id.to_string()),
+        event_id: Some(format!("{hold_id}:authorize")),
+        authority: None,
+    })?;
+    let request = BudgetReverseHoldRequest {
+        capability_id: "cap-preflight".to_string(),
+        grant_index: 0,
+        reversed_exposure_units: 0,
+        hold_id: Some(hold_id.to_string()),
+        event_id: Some(format!("{hold_id}:rollback")),
+        expected_cumulative_approval_state: None,
+        authority: None,
+    };
+    let event_seq_before = store.max_mutation_event_seq()?;
+    let mut fenced = request.clone();
+    fenced.expected_cumulative_approval_state =
+        Some(chio_kernel::budget_store::BudgetCumulativeApprovalState::PendingApproval);
+    assert!(store
+        .reverse_budget_hold(fenced)
+        .as_ref()
+        .is_err_and(|error| error.to_string().contains("state-fenced reversal")));
+    assert_eq!(store.max_mutation_event_seq()?, event_seq_before);
+
+    let reversed = store.reverse_budget_hold(request.clone())?;
+    assert_eq!(reversed.hold_id.as_deref(), Some(hold_id));
+    assert_eq!(reversed.exposure_units, 0);
+    assert_eq!(reversed.committed_cost_units_after, 0);
+    assert_eq!(reversed.invocation_count_after, 0);
+    assert_eq!(reversed.invocation_state, BudgetInvocationState::Reversed);
+    assert_eq!(reversed.monetary_state, BudgetMonetaryState::None);
+    assert_eq!(
+        reversed.metadata.event_id.as_deref(),
+        Some("nonce-preflight-budget-hold:req-1:cap-preflight:0:rollback")
+    );
+    assert_eq!(store.reverse_budget_hold(request)?, reversed);
+    let usage = store
+        .get_usage("cap-preflight", 0)?
+        .ok_or_else(|| std::io::Error::other("kernel cleanup usage missing"))?;
+    assert_eq!(usage.invocation_count, 0);
+    assert_usage_totals(&usage, 0, 0);
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn sqlite_live_hold_blocks_unheld_legacy_mutations_without_state_drift(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-budget-live-hold-generic-fence");
+    let store = SqliteBudgetStore::open(&path)?;
+    let hold_id = "hold-live-generic-fence";
+    assert!(store.try_charge_cost_with_ids(
+        "cap-live-generic-fence",
+        0,
+        Some(1),
+        100,
+        Some(100),
+        Some(100),
+        Some(hold_id),
+        Some("hold-live-generic-fence:authorize"),
+    )?);
+    let event_seq = store.max_mutation_event_seq()?;
+
+    let mutations = [
+        store.reverse_charge_cost_with_ids(
+            "cap-live-generic-fence",
+            0,
+            100,
+            None,
+            Some("generic-reverse"),
+        ),
+        store.reduce_charge_cost_with_ids(
+            "cap-live-generic-fence",
+            0,
+            100,
+            None,
+            Some("generic-release"),
+        ),
+        store.settle_charge_cost_with_ids(
+            "cap-live-generic-fence",
+            0,
+            100,
+            75,
+            None,
+            Some("generic-reconcile"),
+        ),
+    ];
+    for mutation in mutations {
+        assert!(mutation.as_ref().is_err_and(|error| error
+            .to_string()
+            .contains("live budget hold blocks generic")));
+    }
+    assert_eq!(store.max_mutation_event_seq()?, event_seq);
+    let usage = store
+        .get_usage("cap-live-generic-fence", 0)?
+        .ok_or_else(|| std::io::Error::other("live hold usage missing"))?;
+    assert_eq!(usage.invocation_count, 1);
+    assert_usage_totals(&usage, 100, 0);
+    let mut connection = store.connection()?;
+    let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+    let hold = SqliteBudgetStore::load_hold(&transaction, hold_id)?
+        .ok_or_else(|| std::io::Error::other("live hold missing"))?;
+    assert_eq!(hold.disposition, HoldDisposition::Open);
+    assert_eq!(hold.remaining_exposure_units, 100);
+    assert!(hold.invocation_count_debited);
+    assert!(!hold.invocation_captured);
+    transaction.rollback()?;
+
     let _ = fs::remove_file(path);
     Ok(())
 }
@@ -623,34 +1178,40 @@ fn budget_store_capture_invocation_is_atomic_idempotent_and_persistent_sqlite(
             grant_index: 0,
             hold_id: hold_id.to_string(),
             event_id: capture_event_id.to_string(),
+            trusted_time: None,
             authority: Some(authority.clone()),
         };
-        assert!(matches!(
-            store.capture_invocation_reservations(request.clone())?,
-            BudgetInvocationCaptureDecision::Captured(_)
-        ));
-        assert!(matches!(
-            store.capture_invocation_reservations(request)?,
-            BudgetInvocationCaptureDecision::AlreadyCaptured(_)
-        ));
+        let BudgetInvocationCaptureDecision::Captured(captured) =
+            store.capture_invocation_reservations(request.clone())?
+        else {
+            return Err(std::io::Error::other("new invocation capture was replayed").into());
+        };
+        assert_eq!(captured.exposure_units, 100);
+        assert_eq!(captured.monetary_state, BudgetMonetaryState::Exposed);
+        let BudgetInvocationCaptureDecision::AlreadyCaptured(replayed) =
+            store.capture_invocation_reservations(request)?
+        else {
+            return Err(std::io::Error::other("invocation capture replay was recaptured").into());
+        };
+        assert_eq!(replayed.exposure_units, 100);
+        assert_eq!(replayed.monetary_state, BudgetMonetaryState::Exposed);
         let different_event =
-            store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            match store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
                 capability_id: "cap-capture".to_string(),
                 grant_index: 0,
                 hold_id: hold_id.to_string(),
                 event_id: "hold-cap-capture-0:different-capture".to_string(),
+                trusted_time: None,
                 authority: Some(authority.clone()),
-            })?;
-        let original_capture = match different_event {
-            BudgetInvocationCaptureDecision::AlreadyCaptured(mutation) => mutation,
-            BudgetInvocationCaptureDecision::Captured(_) => {
-                return Err(std::io::Error::other("different event recaptured invocation").into())
-            }
-        };
-        assert_eq!(
-            original_capture.metadata.event_id.as_deref(),
-            Some(capture_event_id)
-        );
+            }) {
+                Ok(_) => {
+                    return Err(
+                        std::io::Error::other("different event recaptured invocation").into(),
+                    )
+                }
+                Err(error) => error,
+            };
+        assert!(different_event.to_string().contains("different event"));
 
         let usage = store
             .get_usage("cap-capture", 0)?
@@ -668,10 +1229,24 @@ fn budget_store_capture_invocation_is_atomic_idempotent_and_persistent_sqlite(
             Some(authorize_event_id),
             Some(&authority),
         )?);
+        assert!(store
+            .try_charge_cost_with_ids_and_authority(
+                "cap-capture",
+                0,
+                Some(1),
+                100,
+                Some(100),
+                Some(1000),
+                Some(hold_id),
+                Some("hold-cap-capture-0:fresh-authorize"),
+                Some(&authority),
+            )
+            .is_err());
         let events = store.list_mutation_events(10, Some("cap-capture"), Some(0))?;
         assert_eq!(events.len(), 2);
         assert_eq!(events[1].event_id, capture_event_id);
         assert_eq!(events[1].kind, BudgetMutationKind::CaptureInvocation);
+        assert_eq!(events[1].exposure_units, 100);
         assert_eq!(events[1].invocation_count_after, 1);
         assert_eq!(events[1].total_cost_exposed_after, 100);
     }
@@ -682,6 +1257,7 @@ fn budget_store_capture_invocation_is_atomic_idempotent_and_persistent_sqlite(
         grant_index: 0,
         hold_id: hold_id.to_string(),
         event_id: capture_event_id.to_string(),
+        trusted_time: None,
         authority: Some(authority.clone()),
     };
     assert!(matches!(
@@ -765,6 +1341,24 @@ fn budget_store_capture_invocation_is_atomic_idempotent_and_persistent_sqlite(
         reopened.cancel_captured_before_dispatch(compensation)?,
         BudgetCapturedBeforeDispatchCancellationDecision::AlreadyCancelled(_)
     ));
+    let stale_capture =
+        match reopened.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+            capability_id: "cap-capture".to_string(),
+            grant_index: 0,
+            hold_id: hold_id.to_string(),
+            event_id: capture_event_id.to_string(),
+            trusted_time: None,
+            authority: Some(authority.clone()),
+        }) {
+            Ok(_) => {
+                return Err(std::io::Error::other(
+                    "cancelled invocation capture replayed as current",
+                )
+                .into())
+            }
+            Err(error) => error,
+        };
+    assert!(stale_capture.to_string().contains("no longer current"));
     let usage = reopened
         .get_usage("cap-capture", 0)?
         .ok_or_else(|| std::io::Error::other("compensated captured usage missing"))?;
@@ -817,6 +1411,7 @@ fn budget_store_import_reconstructs_captured_before_dispatch_cancellation_sqlite
         grant_index: 0,
         hold_id: hold_id.to_string(),
         event_id: "hold-cap-capture-import-0:capture-invocation".to_string(),
+        trusted_time: None,
         authority: Some(authority.clone()),
     })?;
     source.cancel_captured_before_dispatch(BudgetCancelCapturedBeforeDispatchRequest {
@@ -829,6 +1424,39 @@ fn budget_store_import_reconstructs_captured_before_dispatch_cancellation_sqlite
 
     let usages = source.list_all_usages()?;
     let events = source.list_mutation_events_after_seq(10, 0)?;
+    for (kind, suffix, expected_error) in [
+        (
+            BudgetMutationKind::CaptureInvocation,
+            "capture",
+            "does not match invocation capture exposure",
+        ),
+        (
+            BudgetMutationKind::CancelCapturedBeforeDispatch,
+            "cancellation",
+            "does not match captured cancellation exposure",
+        ),
+    ] {
+        let malformed_path = unique_db_path(&format!("chio-capture-import-{suffix}-mismatch"));
+        let malformed_target = SqliteBudgetStore::open(&malformed_path)?;
+        let mut malformed_events = events.clone();
+        malformed_events
+            .iter_mut()
+            .find(|event| event.kind == kind)
+            .ok_or_else(|| std::io::Error::other("import event missing"))?
+            .exposure_units = 99;
+        let error = match malformed_target.import_snapshot_records(&usages, &malformed_events) {
+            Ok(()) => {
+                return Err(std::io::Error::other(
+                    "malformed capture lifecycle import was accepted",
+                )
+                .into())
+            }
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains(expected_error));
+        assert_eq!(malformed_target.max_mutation_event_seq()?, 0);
+        let _ = fs::remove_file(malformed_path);
+    }
     let target = SqliteBudgetStore::open(&target_path)?;
     target.import_snapshot_records(&usages, &events)?;
 
@@ -871,9 +1499,10 @@ fn sqlite_captured_reconciled_hold_rejects_legacy_mutations_without_hold_id(
         grant_index: 0,
         hold_id: hold_id.to_string(),
         event_id: "hold-captured-reconciled:capture-invocation".to_string(),
+        trusted_time: None,
         authority: None,
     })?;
-    store.reconcile_budget_hold(BudgetReconcileHoldRequest {
+    let reconciled = store.reconcile_budget_hold(BudgetReconcileHoldRequest {
         capability_id: "cap-captured-reconciled".to_string(),
         grant_index: 0,
         exposed_cost_units: 100,
@@ -882,6 +1511,8 @@ fn sqlite_captured_reconciled_hold_rejects_legacy_mutations_without_hold_id(
         event_id: Some("hold-captured-reconciled:reconcile".to_string()),
         authority: None,
     })?;
+    assert_eq!(reconciled.invocation_state, BudgetInvocationState::Captured);
+    assert_eq!(reconciled.monetary_state, BudgetMonetaryState::Reconciled);
 
     assert!(store
         .reverse_charge_cost_with_ids(
@@ -899,6 +1530,16 @@ fn sqlite_captured_reconciled_hold_rejects_legacy_mutations_without_hold_id(
             0,
             None,
             Some("captured-reconciled:generic-release"),
+        )
+        .is_err());
+    assert!(store
+        .settle_charge_cost_with_ids(
+            "cap-captured-reconciled",
+            0,
+            0,
+            0,
+            None,
+            Some("captured-reconciled:generic-reconcile"),
         )
         .is_err());
     let usage = store
@@ -930,6 +1571,7 @@ fn historical_captured_hold_does_not_block_fresh_specific_hold_cleanup(
         grant_index: 0,
         hold_id: "hold-old-captured".to_string(),
         event_id: "hold-old-captured:capture-invocation".to_string(),
+        trusted_time: None,
         authority: None,
     })?;
     store.reconcile_budget_hold(BudgetReconcileHoldRequest {
@@ -957,13 +1599,16 @@ fn historical_captured_hold_does_not_block_fresh_specific_hold_cleanup(
             Some(&format!("{hold_id}:authorize")),
         )?);
         if release {
-            store.reduce_charge_cost_with_ids(
-                "cap-cross-hold",
-                0,
-                50,
-                Some(hold_id),
-                Some(&format!("{hold_id}:{event_suffix}")),
-            )?;
+            let released = store.release_budget_hold(BudgetReleaseHoldRequest {
+                capability_id: "cap-cross-hold".to_string(),
+                grant_index: 0,
+                released_exposure_units: 50,
+                hold_id: Some(hold_id.to_string()),
+                event_id: Some(format!("{hold_id}:{event_suffix}")),
+                authority: None,
+            })?;
+            assert_eq!(released.invocation_state, BudgetInvocationState::Authorized);
+            assert_eq!(released.monetary_state, BudgetMonetaryState::Released);
         } else {
             store.reverse_charge_cost_with_ids(
                 "cap-cross-hold",
@@ -974,6 +1619,55 @@ fn historical_captured_hold_does_not_block_fresh_specific_hold_cleanup(
             )?;
         }
     }
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn sqlite_partial_release_replay_preserves_event_time_state(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-partial-release-event-time");
+    let store = SqliteBudgetStore::open(&path)?;
+    let hold_id = "hold-partial-release";
+    assert!(store.try_charge_cost_with_ids(
+        "cap-partial-release",
+        0,
+        Some(1),
+        100,
+        Some(100),
+        Some(100),
+        Some(hold_id),
+        Some("hold-partial-release:authorize"),
+    )?);
+    let request = BudgetReleaseHoldRequest {
+        capability_id: "cap-partial-release".to_string(),
+        grant_index: 0,
+        released_exposure_units: 40,
+        hold_id: Some(hold_id.to_string()),
+        event_id: Some("hold-partial-release:release".to_string()),
+        authority: None,
+    };
+    let released = store.release_budget_hold(request.clone())?;
+    assert_eq!(released.invocation_state, BudgetInvocationState::Authorized);
+    assert_eq!(released.monetary_state, BudgetMonetaryState::Exposed);
+
+    store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+        capability_id: "cap-partial-release".to_string(),
+        grant_index: 0,
+        hold_id: hold_id.to_string(),
+        event_id: "hold-partial-release:capture".to_string(),
+        trusted_time: None,
+        authority: None,
+    })?;
+    let replayed = store.release_budget_hold(request)?;
+    assert_eq!(replayed.invocation_state, BudgetInvocationState::Authorized);
+    assert_eq!(replayed.monetary_state, BudgetMonetaryState::Exposed);
+    let usage = store
+        .get_usage("cap-partial-release", 0)?
+        .ok_or_else(|| std::io::Error::other("partial release usage missing"))?;
+    assert_eq!(usage.invocation_count, 1);
+    assert_usage_totals(&usage, 60, 0);
 
     let _ = fs::remove_file(path);
     Ok(())
@@ -1000,6 +1694,7 @@ fn sqlite_captured_before_dispatch_cancellation_rejects_partial_exposure(
         grant_index: 0,
         hold_id: hold_id.to_string(),
         event_id: "hold-captured-cancel-partial:capture-invocation".to_string(),
+        trusted_time: None,
         authority: None,
     })?;
     {

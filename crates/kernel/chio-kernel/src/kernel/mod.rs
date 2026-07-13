@@ -593,6 +593,7 @@ impl BudgetChargeResult {
 pub(crate) enum PreExecutionBudgetMutation {
     None,
     Invocation { grant_index: usize },
+    InvocationHold(BudgetChargeResult),
     Charge(BudgetChargeResult),
 }
 
@@ -600,6 +601,13 @@ impl PreExecutionBudgetMutation {
     fn charge_result(&self) -> Option<&BudgetChargeResult> {
         match self {
             Self::Charge(charge) => Some(charge),
+            Self::None | Self::Invocation { .. } | Self::InvocationHold(_) => None,
+        }
+    }
+
+    fn durable_hold_result(&self) -> Option<&BudgetChargeResult> {
+        match self {
+            Self::Charge(charge) | Self::InvocationHold(charge) => Some(charge),
             Self::None | Self::Invocation { .. } => None,
         }
     }
@@ -607,14 +615,14 @@ impl PreExecutionBudgetMutation {
     fn charge_result_mut(&mut self) -> Option<&mut BudgetChargeResult> {
         match self {
             Self::Charge(charge) => Some(charge),
-            Self::Invocation { .. } | Self::None => None,
+            Self::Invocation { .. } | Self::InvocationHold(_) | Self::None => None,
         }
     }
 
     fn into_charge_result(self) -> Option<BudgetChargeResult> {
         match self {
             Self::Charge(charge) => Some(charge),
-            Self::None | Self::Invocation { .. } => None,
+            Self::None | Self::Invocation { .. } | Self::InvocationHold(_) => None,
         }
     }
 }

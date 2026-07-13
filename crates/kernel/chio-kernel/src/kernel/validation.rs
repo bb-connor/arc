@@ -1024,6 +1024,7 @@ impl ChioKernel {
         request_id: &str,
         cap: &CapabilityToken,
         matching_grants: &[MatchingGrant<'_>],
+        nonce_preflight: bool,
     ) -> Result<(usize, PreExecutionBudgetMutation), KernelError> {
         let mut saw_exhausted_budget = false;
 
@@ -1032,7 +1033,7 @@ impl ChioKernel {
             let has_monetary =
                 grant.max_cost_per_invocation.is_some() || grant.max_total_cost.is_some();
 
-            if has_monetary {
+            if has_monetary || (nonce_preflight && grant.max_invocations.is_some()) {
                 // Use worst-case max_cost_per_invocation as the pre-execution debit.
                 let cost_units = grant
                     .max_cost_per_invocation
@@ -1048,8 +1049,14 @@ impl ChioKernel {
                 let max_total = grant.max_total_cost.as_ref().map(|m| m.units);
                 let max_per = grant.max_cost_per_invocation.as_ref().map(|m| m.units);
                 let budget_total = max_total.unwrap_or(u64::MAX);
-                let budget_hold_id =
-                    format!("budget-hold:{}:{}:{}", request_id, cap.id, matching.index);
+                let budget_hold_id = if nonce_preflight {
+                    format!(
+                        "nonce-preflight-budget-hold:{}:{}:{}",
+                        request_id, cap.id, matching.index
+                    )
+                } else {
+                    format!("budget-hold:{}:{}:{}", request_id, cap.id, matching.index)
+                };
                 let authorize_event_id = format!("{budget_hold_id}:authorize");
                 let authority = self.local_budget_event_authority();
 
@@ -1058,6 +1065,9 @@ impl ChioKernel {
                         capability_id: cap.id.clone(),
                         grant_index: matching.index,
                         max_invocations: grant.max_invocations,
+                        invocation_quotas: Vec::new(),
+                        cumulative_approval: None,
+                        admission_binding: None,
                         requested_exposure_units: cost_units,
                         max_cost_per_invocation: max_per,
                         max_total_cost_units: max_total,
@@ -1080,10 +1090,21 @@ impl ChioKernel {
                             authorize_metadata: authorized.metadata,
                             invocation_capture: None,
                         };
-                        return Ok((matching.index, PreExecutionBudgetMutation::Charge(charge)));
+                        let mutation = if has_monetary {
+                            PreExecutionBudgetMutation::Charge(charge)
+                        } else {
+                            PreExecutionBudgetMutation::InvocationHold(charge)
+                        };
+                        return Ok((matching.index, mutation));
                     }
                     BudgetAuthorizeHoldDecision::Denied(_) => {
                         saw_exhausted_budget = true;
+                    }
+                    BudgetAuthorizeHoldDecision::ApprovalRequired(_) => {
+                        return Err(KernelError::Internal(
+                            "cumulative approval reached the legacy monetary admission path"
+                                .to_string(),
+                        ));
                     }
                     BudgetAuthorizeHoldDecision::AlreadyCaptured(_) => {
                         return Err(KernelError::BudgetExhausted(cap.id.clone()));
@@ -1130,6 +1151,7 @@ impl ChioKernel {
                 reversed_exposure_units: charge.cost_charged,
                 hold_id: Some(charge.budget_hold_id.clone()),
                 event_id: Some(charge.reverse_event_id()),
+                expected_cumulative_approval_state: None,
                 authority,
             })?)
         })
@@ -1153,6 +1175,7 @@ impl ChioKernel {
                     grant_index: charge.grant_index,
                     hold_id: charge.budget_hold_id.clone(),
                     event_id: charge.capture_invocation_event_id(),
+                    trusted_time: None,
                     authority,
                 })?,
             )
@@ -1198,6 +1221,9 @@ impl ChioKernel {
         match budget_mutation {
             PreExecutionBudgetMutation::Charge(charge) => {
                 self.reverse_budget_charge(&cap.id, charge).map(Some)
+            }
+            PreExecutionBudgetMutation::InvocationHold(hold) => {
+                self.reverse_budget_charge(&cap.id, hold).map(Some)
             }
             PreExecutionBudgetMutation::Invocation { grant_index } => {
                 self.with_budget_store(|store| {

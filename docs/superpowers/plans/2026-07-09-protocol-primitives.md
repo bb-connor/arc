@@ -319,23 +319,70 @@ Commit: `feat(core-types): negotiate aggregate invocation budgets`
   design. Bind issuer/family owner, budget id/epoch, delegation-family root, and
   currency.
 - [ ] In the same composite-hold lock, checked-add reserved and captured
-  authorized units. At or above the threshold reserve `PendingApproval` even
-  when the request has no approval set, so concurrent sub-threshold calls cannot
-  bypass the policy.
+  authorized units. Store the immutable root authority threshold on the account
+  and the verified effective leaf threshold on the operation reservation. At or
+  above the effective threshold always reserve `PendingApproval`; a separate
+  verified-approval CAS advances that same reservation to `Authorized` without
+  repeating the hold. This prevents concurrent sub-threshold bypass without
+  silently tightening sibling constraints.
 - [ ] Define a kernel-owned `SupplementalQuotaVerifier` port over opaque signed extension bytes and a kernel-built verification context. Its installed trusted implementation returns a request-bound `VerifiedSupplementalQuotaClaim`; no request field directly supplies a quota key or maximum.
-- [ ] Recheck capability digest, subject, request, destination, arguments, expiry, supplemental revocation ids, artifact digest, and negotiated profile on the verifier result before deriving the broker quota key. Missing verifier, unknown profile, or mismatched context denies.
-- [ ] Build a canonical sorted revocation set from the leaf capability id, every verified delegation-chain ancestor capability id, and every supplemental revocation id. Bind its digest into the hold and `AdmissionOperation`; reject duplicates, omissions, additions, and post-verification mutation.
+- [ ] Recheck capability digest, subject, authenticated request namespace,
+  operation and request IDs, destination, complete normalized arguments digest,
+  expiry, supplemental revocation ids, artifact digest, and negotiated profile on
+  the verifier result before deriving the broker quota key. Bind the
+  composition-supplied verifier identity/configuration digest and exclusive
+  artifact expiry into the hold, then recheck expiry at trusted capture time.
+  Missing verifier, unknown profile, or mismatched context denies.
+- [ ] Build a canonical revocation set, sorted by UTF-8 bytes, from the leaf
+  capability id, every verified delegation-chain ancestor capability id, and
+  every supplemental revocation id. Bind its digest into the hold and
+  `AdmissionOperation`; reject duplicates, omissions, additions, and
+  post-verification mutation. Canonical storage reconstruction proves only
+  sort, uniqueness and digest consistency; the kernel coordinator derives
+  semantic completeness directly from validated lineage.
 - [ ] Extend `BudgetAuthorizeHoldRequest` with a sorted list bounded by `MAX_INVOCATION_QUOTAS_PER_ADMISSION = 8`.
 - [ ] Extend authorized, denied, reverse, capture, and mutation records with all affected quota keys and counts.
-- [ ] Record one immutable maximum with each quota key. Re-presenting an existing key with a different maximum is an invariant failure, not an update.
-- [ ] Extend `authorize_budget_hold`, `reverse_budget_hold`, `release_budget_hold`, `reconcile_budget_hold`, and `capture_budget_hold` so every transition preserves all quota members, both substates, authority lease metadata, guarantee level, and commit index.
-- [ ] Add `capture_invocation_reservations` as the dispatch-commit transition for invocation quotas. Do not overload monetary `capture_budget_hold` with an ambiguous whole-hold terminal state.
+- [ ] Record one immutable maximum with each quota key only when the all-or-none
+  authorization succeeds. A denial records its mutation event but creates no
+  absent quota or cumulative-account row and defines no maximum. Re-presenting
+  an existing key with a different maximum is an invariant failure, not an
+  update.
+- [ ] Extend `authorize_budget_hold`, `reverse_budget_hold`,
+  `release_budget_hold`, `reconcile_budget_hold`, and `capture_budget_hold` so
+  every implemented transition preserves all quota members, both substates,
+  cumulative approval state and approval-set digest, authority lease metadata,
+  guarantee level, and commit index. Rich terminal trait defaults fail closed. A
+  backend implements one only when it can return the truthful event-time
+  projection; it never synthesizes missing hold state or aliases one transition
+  to another. The unstructured single-grant authorization default remains a
+  compatibility adapter; production backends override it to return an atomic
+  event-time projection.
+- [ ] Add `capture_invocation_reservations` as the dispatch-commit transition
+  for invocation quotas. Do not overload monetary `capture_budget_hold` with an
+  ambiguous whole-hold terminal state. A hold authorized with positive monetary
+  exposure must still be `Exposed` with positive remaining exposure when its
+  invocation is captured; full pre-dispatch release makes capture fail closed.
 - [ ] Add mutation kinds for invocation reservation, capture, and reversal if the current kinds cannot represent them truthfully.
 - [ ] Keep `try_increment` as a compatibility wrapper through the same authoritative path.
 - [ ] In one lock acquisition, check every limit and mutate all or none.
 - [ ] Reject duplicate or ambiguous keys, more than eight invocation claims, unknown profiles, and arithmetic overflow.
 - [ ] Derive the broker key from the installed verifier's request-bound claim as a domain-separated digest of verified broker capability ID, issuer, destination, and request-constraint digest. Its maximum comes only from that verified signed artifact.
-- [ ] Make repeated `event_id` and `hold_id` calls idempotent only when every input matches. Reuse with different inputs is an invariant error.
+- [ ] Require nonempty paired `hold_id` and `event_id` values for structured
+  durable authorization, invocation capture, and captured-invocation
+  cancellation. Legacy rich mutation calls may omit both or use a nonempty
+  event-only identity for wire compatibility; a supplied hold always requires a
+  nonempty event. Empty or partial structured identities fail closed.
+- [ ] Replay only the exact stored `event_id` when every input matches. A new
+  event against a superseded hold state, reuse with different inputs, or replay
+  after a later terminal transition is an invariant error rather than an
+  idempotent success.
+- [ ] Make timeout reversal of a cumulative approval reservation compare and
+  swap from expected `PendingApproval`. Approval attachment compare and swaps
+  the same participant to `Authorized`; if they race, exactly one transition
+  succeeds and the loser observes the changed state.
+- [ ] Track legacy unheld reversible invocations per capability and grant, not
+  by exact exposure amount. Partial exposure release does not consume that
+  invocation's reversal right; only full reversal or settlement consumes it.
 - [ ] Preserve `BudgetEventAuthority`, `BudgetGuaranteeLevel`, and commit metadata.
 
 **Required state machine:**
@@ -351,7 +398,18 @@ monetary: none -> exposed -> released
                          -> reversed
 ```
 
-Invocation `captured` and `reversed` are terminal only for the invocation substate. Monetary terminal states are independent. The entire hold is terminal only when every present substate is terminal. Repeating the same substate transition is idempotent. Crossing between incompatible terminal states fails closed.
+Invocation `captured` and `reversed` are terminal only for the invocation substate. Monetary capture and reconciliation remain independent after invocation capture, but release and reverse cannot cross that dispatch commitment fence. Only the explicit legacy synthesized single-grant pre-dispatch cancellation may reverse captured invocation and exposure together; explicit composite and cumulative captures are terminal. The entire hold is terminal only when every present substate is terminal. Repeating the exact same transition event is idempotent. A different event or an incompatible terminal transition fails closed.
+
+Strict execution-nonce preflight uses a distinct deterministic internal hold
+namespace from an executable admission and derives its authorization event as
+`{hold_id}:authorize`. Cleanup derives a deterministic rollback event from that
+authorization event and commit index. Its compensated hold and event remain
+append-only tombstones, so a lost acknowledgement can replay the exact cleanup
+but a repeated nonce-free preflight cannot mint another nonce. The nonce-bearing
+execution uses its separate executable hold and cannot reopen the preflight hold.
+A confirmed payment decline likewise leaves that executable request identity
+terminal; a later attempt uses a fresh request identity and nonce rather than
+deleting or recycling the compensated authorization.
 
 **Tests:**
 
@@ -363,13 +421,22 @@ Invocation `captured` and `reversed` are terminal only for the invocation substa
   dispatch without the required approval
 - sibling delegated grants share the authenticated family-root accumulator
 - duplicate key rejected
+- denied authorization against absent quotas creates no quota or cumulative row
+- a later authorization may define a previously denied key's signed maximum
 - existing key with changed maximum rejected
 - nine quota claims rejected
+- empty and partial structured identities rejected; legacy event-only mutation accepted
 - same event retry stable
 - mismatched event retry rejected
+- different event after a later transition rejected
 - invocation capture preserves live monetary exposure
+- fully released positive exposure cannot capture invocation
 - monetary reconciliation preserves captured invocation counts
 - pre-dispatch reverse restores all invocation reservations and exposure
+- approval attachment racing pending-approval timeout has exactly one winner
+- strict nonce preflight retries one deterministic cleanup and cannot reopen its hold
+- legacy partial release does not consume the per-grant reversal right
+- unsupported rich transition defaults fail closed
 
 Commit: `feat(kernel): authorize composite invocation quotas atomically`
 
@@ -393,8 +460,9 @@ Commit: `feat(kernel): authorize composite invocation quotas atomically`
 - [ ] Use one `BEGIN IMMEDIATE` transaction to load, compare, reserve, and append all rows.
 - [ ] Persist invocation and monetary substates plus every quota member so crash recovery can finish, compensate, or reconcile deterministically.
 - [ ] Persist cumulative-approval authority accounts and operation reservations
-  in the same transaction. Enforce immutable budget id/epoch, threshold, root
-  grant, and currency; expose lookup by `operation_id`.
+  in the same transaction. Enforce immutable budget id/epoch, root authority
+  threshold, root grant, and currency; persist the verified effective threshold
+  per operation and expose lookup by `operation_id`.
 - [ ] Return counts, authority lease, guarantee level, and commit index from the same transaction.
 - [ ] Extend remote request and response DTOs without dropping authority metadata.
 - [ ] Let the kernel include only the installed supplemental verifier's result in the same composite request. Do not accept a caller-built broker claim, add a broker-only counter endpoint, or make the broker reserve that key a second time.
@@ -489,11 +557,12 @@ Commit: `feat(store-sqlite): persist composite invocation holds`
   authenticated `(request_namespace_digest, request_id)` replay key. Missing or
   unavailable storage denies before any reservation.
 - [ ] Look up that replay key and persist a fresh `Prepared` operation before any
-  authority mutation. Reserve any cumulative `PendingApproval` participant by
-  operation id; derive proposal time, threshold and budget epoch from its durable
-  result; then CAS-attach the exact proposal bytes/digest and persist
+  authority mutation. The later composite budget call reserves any cumulative
+  participant under the operation ID together with every quota and monetary
+  claim. Derive proposal time, effective threshold, and budget epoch from that
+  durable result; then CAS-attach the exact proposal bytes/digest and persist
   `ApprovalRequired` before returning. A crash between reservation and attachment
-  queries the participant and derives the same proposal; a matching retry returns
+  queries the same hold and derives the same proposal; a matching retry returns
   the stored proposal.
 - [ ] Advance saga state with compare-and-swap on `version` under a fenced coordinator lease so an executor and recovery worker cannot both commit dispatch.
 - [ ] Implement RFC-0006's pending shared serving-owner amendment. Privileged
@@ -508,13 +577,19 @@ Commit: `feat(store-sqlite): persist composite invocation holds`
   recovery owners before actors start.
 - [ ] Use SQLite only for single-node saga authority. Multi-worker deployment requires a shared linearizable operation store and fenced lease; configuration that combines multiple dispatch workers with a local-only store fails startup.
 - [ ] For supplemental broker authorization, call authenticated local `RegisterAttempt` after `Prepared` but before the remote budget call. It receives deterministic operation, attempt, hold, event, proof, and request digests, validates non-secret constraints, persists and fsyncs the broker intent, and returns an idempotent acknowledgement. Persist `BrokerAttemptRegistered`; failure consumes no budget.
-- [ ] Authorize the bounded grant, aggregate, broker, and monetary claims in one hold under `operation_id`; persist `BudgetAuthorized`.
+- [ ] Authorize the cumulative participant plus the bounded grant, aggregate,
+  broker, and monetary claims in one hold under `operation_id`. A
+  `PendingApproval` result retains that same hold and cannot capture. After a
+  separate verified-approval CAS advances it to `Authorized`, persist
+  `BudgetAuthorized` without repeating authorization.
 - [ ] Extend approval replay and nonce authorities with operation-owned `reserved`, `committed`, and `cancelled` states plus lookup by `operation_id`. A cancelled record remains a replay tombstone.
 - [ ] Reserve approval state, persist `ApprovalReserved`, reserve the execution nonce, then persist `ReadyToDispatch`. Only then may the registered broker attempt materialize and prepare credentials; it still cannot send upstream.
 - [ ] When cumulative approval is required, return only the stored proposal after
-  retaining the same immutable operation and `PendingApproval` reservation. On retry,
-  verify and compare-and-swap attach the approval set exactly once before
-  `ReadyToDispatch`; never derive a new operation from the approval membership.
+  retaining the same immutable operation and composite `PendingApproval` hold.
+  On retry, verify and compare-and-swap attach the approval set exactly once,
+  advance that existing cumulative substate to `Authorized`, and never mutate or
+  repeat the authorize request or derive a new operation from approval
+  membership.
 - [ ] Persist `CapturePending`, commit approval and nonce reservations, then perform the applicable capture. Ordinary dispatch calls `capture_invocation_reservations`; broker dispatch calls `AdmissionCaptureAuthority` with the hold, operation, canonical leaf-plus-ancestor-plus-supplemental revocation set and digest, and verified authorization-artifact digest. A capture denial compensates before dispatch while retaining replay tombstones.
 - [ ] After successful capture, persist `DispatchCommitted` and only then authorize the broker's upstream send or begin the ordinary tool-server side effect. Recovery may complete the state write after discovering a capture under `operation_id`, because code cannot send while the operation remains `CapturePending`. After `DispatchCommitted`, never resend without downstream idempotency. The enterprise broker performs no second reservation.
 - [ ] Make both exact invoke sites call one shared coordinator and immediately

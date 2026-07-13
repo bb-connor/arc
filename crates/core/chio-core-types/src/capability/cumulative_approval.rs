@@ -72,11 +72,14 @@ pub struct CumulativeApprovalDelegationMarker {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedCumulativeApprovalConstraint {
+    pub authority_id: PublicKey,
     pub owner_id: String,
     pub approval_budget_id: String,
     pub approval_budget_epoch: u64,
+    pub authority_threshold: MonetaryAmount,
     pub threshold: MonetaryAmount,
     pub root_grant_hash: String,
+    pub delegation_root_id: Option<String>,
     pub root_binding_digest: Option<String>,
 }
 
@@ -573,36 +576,51 @@ fn project_verified(token: &CapabilityToken) -> Result<Vec<VerifiedCumulativeApp
                 cumulative_approval_root_binding,
             } = constraint
             {
-                let (owner_id, root_grant_hash, root_binding_digest) =
-                    if let Some(binding) = cumulative_approval_root_binding {
-                        (
-                            binding.family_owner_id()?,
-                            binding.body.root_grant_hash.clone(),
-                            Some(binding.digest()?),
-                        )
-                    } else {
-                        (
-                            domain_hash(
-                                DIRECT_KEY_DOMAIN,
-                                &CumulativeApprovalDirectOwner {
-                                    root_capability_id: &token.id,
-                                    root_issuer: &token.issuer,
-                                    root_grant_hash: &direct_grant_hash,
-                                    approval_budget_id,
-                                    approval_budget_epoch: *approval_budget_epoch,
-                                    currency: &threshold.currency,
-                                },
-                            )?,
-                            direct_grant_hash.clone(),
-                            None,
-                        )
-                    };
+                let (
+                    authority_id,
+                    owner_id,
+                    authority_threshold,
+                    root_grant_hash,
+                    delegation_root_id,
+                    root_binding_digest,
+                ) = if let Some(binding) = cumulative_approval_root_binding {
+                    (
+                        binding.body.root_issuer.clone(),
+                        binding.family_owner_id()?,
+                        binding.body.threshold.clone(),
+                        binding.body.root_grant_hash.clone(),
+                        Some(binding.body.root_capability_id.clone()),
+                        Some(binding.digest()?),
+                    )
+                } else {
+                    (
+                        token.issuer.clone(),
+                        domain_hash(
+                            DIRECT_KEY_DOMAIN,
+                            &CumulativeApprovalDirectOwner {
+                                root_capability_id: &token.id,
+                                root_issuer: &token.issuer,
+                                root_grant_hash: &direct_grant_hash,
+                                approval_budget_id,
+                                approval_budget_epoch: *approval_budget_epoch,
+                                currency: &threshold.currency,
+                            },
+                        )?,
+                        threshold.clone(),
+                        direct_grant_hash.clone(),
+                        None,
+                        None,
+                    )
+                };
                 verified.push(VerifiedCumulativeApprovalConstraint {
+                    authority_id,
                     owner_id,
                     approval_budget_id: approval_budget_id.clone(),
                     approval_budget_epoch: *approval_budget_epoch,
+                    authority_threshold,
                     threshold: threshold.clone(),
                     root_grant_hash,
+                    delegation_root_id,
                     root_binding_digest,
                 });
             }

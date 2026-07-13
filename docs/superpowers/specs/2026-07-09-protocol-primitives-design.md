@@ -139,7 +139,7 @@ Implementations may encode this structure for a database key, but must not build
 
 The broker-capability owner is `SHA256("chio.broker-capability-execution.v1\0" || canonical_json(verified broker capability ID, issuer, destination and request-constraint digest))`. Its immutable maximum comes from the verified broker capability. Caller request fields cannot create the key or maximum.
 
-`chio-kernel` does not parse an enterprise broker type. It owns a `SupplementalQuotaVerifier` port whose trusted implementation is installed by the control-plane composition root. The port receives opaque authenticated extension bytes plus a kernel-built context containing capability id and digest, subject, request id, normalized destination, arguments hash, and negotiated features. It returns `VerifiedSupplementalQuotaClaim { profile, owner_id, max_invocations, authorization_artifact_digest, revocation_ids, expires_at, request_binding_hash }`. The kernel accepts this value only as the direct result of its installed verifier, rechecks every context binding, and derives the structured quota key itself. Supplemental authorization with no verifier, an unknown profile, or a mismatched binding denies. The enterprise adapter implements the port with the signed broker-capability verifier, so dependencies remain `control-plane -> chio-secret-broker` and `control-plane -> chio-kernel`.
+`chio-kernel` does not parse an enterprise broker type. It owns a `SupplementalQuotaVerifier` port whose trusted implementation is installed by the control-plane composition root. The port receives opaque authenticated extension bytes plus a kernel-built context containing capability id and digest, subject, authenticated request-namespace digest, operation and request IDs, normalized destination, canonical arguments digest, and negotiated features. The arguments digest covers the complete normalized tool arguments that can change outbound bytes or effect semantics; adapters cannot omit method, headers, body, options, or protocol extensions that live in that action. The port returns a `VerifiedSupplementalQuotaClaim` containing the verified broker capability ID, issuer, destination, request-constraint digest, maximum, authorization-artifact digest, revocation IDs, expiry, profile, and exact context bindings. It does not return an authoritative `owner_id`. The kernel accepts this value only as the direct result of its composition-installed verifier, rechecks every context binding, and derives the structured quota key itself from those verified components. The installed verifier identity and configuration digest are composition authority, not self-reported adapter fields, and are bound into the hold. Supplemental authorization with no installed verifier, an unknown profile, or a mismatched binding denies. The enterprise adapter implements the port with the signed broker-capability verifier, so dependencies remain `control-plane -> chio-secret-broker` and `control-plane -> chio-kernel`.
 
 ### 4.3 Delegation and attenuation
 
@@ -168,20 +168,41 @@ A nondelegable direct capability carries no family-root binding and derives its 
 
 The family owner is derived only after verifying the direct root token, root binding, and delegation origin. Delegation links and attenuation witnesses carry preservation markers as mutation evidence, but do not replace the signed direct-root lookup. Feature-disabled verifiers reject the cumulative form rather than interpreting it as the legacy per-request threshold.
 
+The shared cumulative account stores the immutable root authority threshold. Each
+operation reservation stores the verified effective leaf threshold and compares
+the prospective shared total against that value. Lowering a descendant threshold
+therefore cannot reset the family accumulator or silently tighten a sibling's
+policy. A direct nondelegable constraint uses the same value for both thresholds.
+
 Until a joint aggregate-and-cumulative pre-binding commitment is defined, v1 rejects every capability that combines `aggregate_invocation_budget` with `RequireCumulativeApprovalAbove`; the independent signing helpers cannot be composed into ambiguous roots.
 
 ### 4.4 Atomic store contract
 
-`BudgetStore` remains the single budget authority. `BudgetAuthorizeHoldRequest` is extended to carry a bounded, sorted set of invocation quota claims. `MAX_INVOCATION_QUOTAS_PER_ADMISSION` is 8 in v1. A broker-mediated call normally contributes three distinct claims: the matched grant quota, the parent capability or family aggregate quota, and the supplemental broker-capability quota. The backend must perform one compare-and-mutate transaction:
+`BudgetStore` remains the single budget authority. `BudgetAuthorizeHoldRequest` is extended to carry a bounded, sorted set of invocation quota claims. `MAX_INVOCATION_QUOTAS_PER_ADMISSION` is 8 in v1. Revocation IDs are ordered by their UTF-8 bytes before canonical JSON hashing. A broker-mediated call normally contributes three distinct claims: the matched grant quota, the parent capability or family aggregate quota, and the supplemental broker-capability quota. Its hold also binds the composition-supplied verifier identity and configuration digest, exact authorization-artifact digest, and exclusive artifact expiry. Capture rechecks that expiry against trusted capture time. The backend must perform one compare-and-mutate transaction:
 
 1. Load every quota row in a deterministic key order.
 2. Verify the maximum recorded for an existing key equals the presented signed maximum. A key's maximum is immutable; mismatch is an invariant failure.
 3. Verify each committed count plus live reservations is below its maximum.
-4. On any exhausted quota, record one denied mutation and change no usage row.
+4. On any exhausted quota, record one denied mutation, change no usage row, and
+   create no absent quota or cumulative-account row. A denial does not define an
+   immutable maximum for a key that has never been authorized.
 5. On success, create one idempotent hold covering every quota key.
 6. Return the post-admission counts and `BudgetCommitMetadata` from the same commit.
 
-The existing `try_increment` entry point remains a compatibility wrapper over the same transaction with one grant quota. It must not become a second authority path.
+Structured durable authorization, invocation capture, and captured-invocation
+cancellation require nonempty paired `hold_id` and `event_id` values. Legacy
+rich mutation entry points retain compatibility with requests that omit both
+identifiers or provide only a nonempty event ID. They reject empty identifiers
+and any hold ID without an event ID. An exact stored event replays only when all
+request inputs match. A different event against a superseded hold state, an
+event reused with different inputs, or a replay after a later terminal
+transition fails closed.
+
+The existing `try_increment` entry point remains a compatibility wrapper over
+the same transaction with one grant quota. It must not become a second authority
+path. Its unheld compatibility accounting tracks reversible invocations per
+capability and grant rather than per exact exposure amount. A partial monetary
+release leaves that count available; full reversal or settlement consumes one.
 
 The extension covers the complete existing lifecycle: `authorize_budget_hold`, `reverse_budget_hold`, `release_budget_hold`, `reconcile_budget_hold`, and `capture_budget_hold`, plus an explicit invocation-capture transition. Aggregate and broker quota membership and authority metadata must survive every transition. No caller, including the enterprise broker, may implement execution reservation by calling `try_increment` and then performing side effects outside the hold lifecycle.
 
@@ -192,7 +213,46 @@ invocation: absent | authorized | captured | reversed | denied
 monetary:   none   | exposed    | released | reconciled | captured | reversed
 ```
 
-`capture_invocation_reservations` consumes every invocation quota at dispatch commitment. Existing `capture_budget_hold`, `release_budget_hold`, and `reconcile_budget_hold` continue to describe monetary exposure and spend. `reverse_budget_hold` may reverse still-authorized invocation reservations and monetary exposure only while dispatch is proven not to have begun. Invocation `captured` or `reversed` is terminal for the invocation substate, but the whole hold is not terminal while monetary exposure still requires release, capture, or reconciliation.
+`capture_invocation_reservations` consumes every invocation quota at dispatch
+commitment. A hold authorized with positive monetary exposure must remain
+`Exposed` with positive remaining exposure through invocation capture. Partial
+pre-dispatch release may leave it `Exposed`; full release makes invocation
+capture fail closed. Existing `capture_budget_hold`, `release_budget_hold`, and
+`reconcile_budget_hold` continue to describe monetary exposure and spend.
+`reverse_budget_hold` may reverse still-authorized invocation reservations and
+monetary exposure only while dispatch is proven not to have begun. After
+invocation capture, exposed money may only capture or reconcile; a generic
+release cannot cross the dispatch commitment fence. The only v1 compatibility
+exception is the explicit pre-dispatch cancellation for a legacy synthesized
+single-grant hold, which reverses its captured grant quota and exposure together.
+Explicit composite or cumulative captures are terminal and cannot use that
+exception. Invocation `captured` or `reversed` is terminal for the invocation
+substate, but the whole hold is not terminal while permitted monetary capture or
+reconciliation remains.
+
+A cumulative operation at or above its effective threshold remains
+`PendingApproval` until one compare-and-swap transition wins. Verified approval
+attachment expects `PendingApproval` and advances it to `Authorized`. Timeout
+reversal also expects `PendingApproval` and advances it to
+`ReversedBeforeDispatch`. If they race, exactly one succeeds and the other fails
+closed against the changed state.
+
+Rich terminal `BudgetStore` transition defaults fail closed. A backend implements
+rich reverse, release, reconciliation, or monetary capture only when it can
+return the truthful event-time quota, invocation, monetary, cumulative,
+authority, and commit projection. A default never fabricates empty state and one
+transition is never aliased to another. The unstructured single-grant
+authorization default remains a compatibility adapter; production backends
+override it to return an atomic event-time projection.
+
+Strict execution-nonce preflight authorizes a bounded grant through a separate
+deterministic `nonce-preflight-budget-hold:{request_id}:{capability_id}:{grant}`
+namespace and event `{hold_id}:authorize`. Cleanup derives its rollback event
+from that authorization event and commit index. Authorization and compensation
+remain append-only terminal records. A lost cleanup acknowledgement may retry the
+exact rollback event, but a repeated nonce-free request cannot mint another
+nonce. The nonce-bearing execution uses a separate executable hold and cannot
+reopen the preflight hold.
 
 In v1, a broker quota supplements one kernel invocation. Trusted broker preverification contributes `chio.broker-capability-execution.v1` to the kernel's composite hold. The broker does not reserve another quota at its outbound boundary; it captures the already-authorized invocation reservations once, immediately before sending the upstream request. Standalone broker execution without a kernel `AdmissionOperation` and the combined capture authority cannot claim production `max_executions` enforcement.
 
@@ -279,16 +339,10 @@ The kernel order is:
    mutating replay or budget state. On retry, compare-and-swap each verified
    supplemental authorization, approval-set, or nonce binding from null exactly
    once; reject a mismatch with an existing binding.
-6. If approval is required but absent, reserve any cumulative-approval participant
-   under `operation_id`. Its durable result supplies the authoritative
-   `reserved_at`, threshold and budget epoch used to derive the proposal. CAS
-   attach the exact signed proposal/hash and persist operation-local
-   `ApprovalRequired`, then return it. A crash between participant reservation
-   and attachment queries by operation id and derives the same proposal from that
-   durable result; it never creates new timestamps or a second operation.
-7. For broker dispatch, call authenticated local `RegisterAttempt` with deterministic operation, attempt, hold, event, proof, and request digests. The broker validates non-secret request constraints, persists and fsyncs its pending intent, and returns an idempotent acknowledgement. This control IPC is not upstream execution and cannot materialize or transmit a credential. Persist `BrokerAttemptRegistered`. A failure consumes no budget.
-8. Atomically reserve the bounded grant, aggregate, broker, and monetary claims in `BudgetStore`; persist `BudgetAuthorized`.
-9. Reserve the approval set under `operation_id`; persist `ApprovalReserved`.
+6. For broker dispatch, call authenticated local `RegisterAttempt` with deterministic operation, attempt, hold, event, proof, and request digests. The broker validates non-secret request constraints, persists and fsyncs its pending intent, and returns an idempotent acknowledgement. This control IPC is not upstream execution and cannot materialize or transmit a credential. Persist `BrokerAttemptRegistered`. A failure consumes no budget.
+7. In one `BudgetStore` call, atomically reserve the cumulative-approval participant and the bounded grant, aggregate, broker, and monetary claims under `operation_id`. The durable cumulative result supplies the authoritative `reserved_at`, effective threshold, and budget epoch. Below the threshold the cumulative substate is `Authorized`; at or above it the substate is `PendingApproval` and invocation capture is forbidden.
+8. For `PendingApproval`, CAS-attach the exact authority-signed proposal and persist operation-local `ApprovalRequired`, then return it. A crash between the composite reservation and proposal attachment queries the hold by operation ID and derives the same proposal from that durable result. On retry, attach the verified approval set through a separate CAS that advances the existing cumulative substate to `Authorized`; never mutate or repeat the authorize request.
+9. Persist `BudgetAuthorized`, reserve the approval set under `operation_id`, and persist `ApprovalReserved`.
 10. Reserve the execution nonce under `operation_id`; persist `ReadyToDispatch`. The broker may now materialize and prepare the credentialed request but still cannot send it upstream.
 11. Persist `CapturePending`, then commit the approval and nonce reservations. Ordinary dispatch captures invocation reservations through the budget authority. Broker dispatch calls `AdmissionCaptureAuthority`, which rechecks the leaf, every delegation ancestor, and every supplemental revocation id and captures all invocation quotas in one linearizable commit. A denial compensates the still-authorized hold and tells the broker to terminate the pending attempt; approval and nonce tombstones remain consumed.
 12. After successful capture, persist `DispatchCommitted` and only then authorize the broker's upstream send or begin the ordinary tool-server side effect. A crash after capture but before this state write is recoverable by querying capture under `operation_id`, because code cannot send before the write. Once `DispatchCommitted` is durable, recovery does not resend without downstream idempotency and invocation quotas remain consumed even if the process crashed before the actual send or the response was lost.

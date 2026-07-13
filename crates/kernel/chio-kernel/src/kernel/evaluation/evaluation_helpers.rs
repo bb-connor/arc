@@ -197,7 +197,7 @@ impl ChioKernel {
                     reason = %redacted!(&error),
                     "pre-dispatch cleanup could not be confirmed"
                 );
-                let metadata = match denial.budget_mutation.charge_result() {
+                let metadata = match denial.budget_mutation.durable_hold_result() {
                     Some(charge) if charge.invocation_capture.is_some() => self
                         .captured_admission_retained_receipt_metadata(
                             charge,
@@ -218,17 +218,18 @@ impl ChioKernel {
                             "admission_may_be_retained": true,
                             "cleanup_mutation_kind": match denial.budget_mutation {
                                 PreExecutionBudgetMutation::Charge(_) => "charge",
-                                PreExecutionBudgetMutation::Invocation { .. } => "invocation",
+                                PreExecutionBudgetMutation::Invocation { .. }
+                                | PreExecutionBudgetMutation::InvocationHold(_) => "invocation",
                                 PreExecutionBudgetMutation::None => "none",
                             },
                             "cleanup_capability_id": denial.cap.id,
                             "cleanup_grant_index": denial.matched_grant_index,
-                            "cleanup_hold_id": denial.budget_mutation.charge_result()
+                            "cleanup_hold_id": denial.budget_mutation.durable_hold_result()
                                 .map(|charge| charge.budget_hold_id.as_str()),
-                            "cleanup_attempt_event_id": denial.budget_mutation.charge_result()
+                            "cleanup_attempt_event_id": denial.budget_mutation.durable_hold_result()
                                 .map(BudgetChargeResult::reverse_event_id),
                             "cleanup_attempt_event_id_available": denial.budget_mutation
-                                .charge_result().is_some()
+                                .durable_hold_result().is_some()
                         }
                     })),
                 );
@@ -489,7 +490,7 @@ impl ChioKernel {
                     "execution nonce preflight cleanup could not be confirmed"
                 );
                 let budget_metadata = budget_mutation
-                    .charge_result()
+                    .durable_hold_result()
                     .map(|charge| self.budget_execution_receipt_metadata(charge, None));
                 let metadata = merge_metadata_objects(
                     merge_metadata_objects(runtime_admission_metadata, budget_metadata),
@@ -504,17 +505,18 @@ impl ChioKernel {
                             "admission_may_be_retained": true,
                             "cleanup_mutation_kind": match budget_mutation {
                                 PreExecutionBudgetMutation::Charge(_) => "charge",
-                                PreExecutionBudgetMutation::Invocation { .. } => "invocation",
+                                PreExecutionBudgetMutation::Invocation { .. }
+                                | PreExecutionBudgetMutation::InvocationHold(_) => "invocation",
                                 PreExecutionBudgetMutation::None => "none",
                             },
                             "cleanup_capability_id": cap.id,
                             "cleanup_grant_index": matched_grant_index,
-                            "cleanup_hold_id": budget_mutation.charge_result()
+                            "cleanup_hold_id": budget_mutation.durable_hold_result()
                                 .map(|charge| charge.budget_hold_id.as_str()),
-                            "cleanup_attempt_event_id": budget_mutation.charge_result()
+                            "cleanup_attempt_event_id": budget_mutation.durable_hold_result()
                                 .map(BudgetChargeResult::reverse_event_id),
                             "cleanup_attempt_event_id_available": budget_mutation
-                                .charge_result().is_some()
+                                .durable_hold_result().is_some()
                         }
                     })),
                 );
@@ -527,7 +529,7 @@ impl ChioKernel {
                 );
             }
         };
-        let budget_metadata = match (budget_mutation.charge_result(), reverse.as_ref()) {
+        let budget_metadata = match (budget_mutation.durable_hold_result(), reverse.as_ref()) {
             (Some(charge), Some(reverse)) => {
                 Some(self.budget_execution_receipt_metadata(charge, Some(("reversed", reverse))))
             }

@@ -19,6 +19,21 @@ fn budget_internal_error(error: &BudgetStoreError, public_message: &'static str)
     plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, public_message)
 }
 
+fn validate_budget_request_identity(
+    hold_id: Option<&str>,
+    event_id: Option<&str>,
+) -> Result<(), Response> {
+    match (hold_id, event_id) {
+        (None, None) => Ok(()),
+        (None, Some(event_id)) if !event_id.is_empty() => Ok(()),
+        (Some(hold_id), Some(event_id)) if !hold_id.is_empty() && !event_id.is_empty() => Ok(()),
+        _ => Err(plain_http_error(
+            StatusCode::BAD_REQUEST,
+            "budget holdId requires a non-empty eventId and supplied identifiers must be non-empty",
+        )),
+    }
+}
+
 pub(crate) async fn handle_list_budgets(
     State(state): State<TrustServiceState>,
     Query(query): Query<BudgetQuery>,
@@ -213,6 +228,11 @@ pub(crate) async fn handle_try_charge_cost(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
+    if let Err(response) =
+        validate_budget_request_identity(payload.hold_id.as_deref(), payload.event_id.as_deref())
+    {
+        return response;
+    }
     match forward_post_to_leader(&state, BUDGET_AUTHORIZE_EXPOSURE_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
@@ -226,53 +246,137 @@ pub(crate) async fn handle_try_charge_cost(
         Ok(store) => store,
         Err(response) => return response,
     };
-    // Mint an event_id when the caller omitted one, and use it for BOTH the write
-    // and the witness token so the quorum wait targets THIS write's exact
-    // event_seq, never a concurrent same-authority write's higher seq.
     let effective_event_id = payload
         .event_id
         .clone()
         .unwrap_or_else(generated_budget_event_id);
-    let decision = match store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
-        capability_id: payload.capability_id.clone(),
-        grant_index: payload.grant_index,
-        max_invocations: payload.max_invocations,
-        requested_exposure_units: payload.cost_units,
-        max_cost_per_invocation: payload.max_cost_per_invocation,
-        max_total_cost_units: payload.max_total_cost_units,
-        hold_id: payload.hold_id.clone(),
-        event_id: Some(effective_event_id.clone()),
-        authority: authority.clone(),
-    }) {
-        Ok(decision) => decision,
-        Err(error) => {
-            return budget_internal_error(&error, "budget authorization failed");
+    let (already_captured, admission, denied) = if payload.hold_id.is_none() {
+        let allowed = match store.try_charge_cost_with_ids_and_authority(
+            &payload.capability_id,
+            payload.grant_index,
+            payload.max_invocations,
+            payload.cost_units,
+            payload.max_cost_per_invocation,
+            payload.max_total_cost_units,
+            None,
+            Some(&effective_event_id),
+            authority.as_ref(),
+        ) {
+            Ok(allowed) => allowed,
+            Err(error) => return budget_internal_error(&error, "budget authorization failed"),
+        };
+        let event = match store.mutation_event_for_event_id(&effective_event_id) {
+            Ok(Some(event)) => event,
+            Ok(None) => {
+                return plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "budget authorization did not retain its event identity",
+                )
+            }
+            Err(error) => {
+                return budget_internal_error(&error, "budget authorization event lookup failed")
+            }
+        };
+        let committed_cost_units_after = match event
+            .total_cost_exposed_after
+            .checked_add(event.total_cost_realized_spend_after)
+        {
+            Some(committed) => committed,
+            None => {
+                return budget_internal_error(
+                    &BudgetStoreError::Overflow("committed budget cost overflowed u64".to_string()),
+                    "budget authorization projection failed",
+                )
+            }
+        };
+        let metadata = BudgetCommitMetadata {
+            authority: event.authority,
+            guarantee_level: store.budget_guarantee_level(),
+            budget_profile: store.budget_authority_profile(),
+            metering_profile: store.budget_metering_profile(),
+            budget_commit_index: Some(event.event_seq),
+            event_id: Some(event.event_id),
+        };
+        if allowed {
+            (
+                false,
+                Some((
+                    metadata,
+                    event.exposure_units,
+                    event.realized_spend_units,
+                    event.invocation_count_after,
+                    committed_cost_units_after,
+                )),
+                None,
+            )
+        } else {
+            (
+                false,
+                None,
+                Some((
+                    metadata,
+                    event.invocation_count_after,
+                    committed_cost_units_after,
+                )),
+            )
         }
-    };
-    let (already_captured, admission, denied) = match decision {
-        BudgetAuthorizeHoldDecision::Authorized(authorized) => (
-            false,
-            Some((
-                authorized.metadata,
-                authorized.authorized_exposure_units,
-                0,
-                authorized.invocation_count_after,
-                authorized.committed_cost_units_after,
-            )),
-            None,
-        ),
-        BudgetAuthorizeHoldDecision::AlreadyCaptured(mutation) => (
-            true,
-            Some((
-                mutation.metadata,
-                mutation.exposure_units,
-                mutation.realized_spend_units,
-                mutation.invocation_count_after,
-                mutation.committed_cost_units_after,
-            )),
-            None,
-        ),
-        BudgetAuthorizeHoldDecision::Denied(denied) => (false, None, Some(denied)),
+    } else {
+        let decision = match store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+            capability_id: payload.capability_id.clone(),
+            grant_index: payload.grant_index,
+            max_invocations: payload.max_invocations,
+            invocation_quotas: Vec::new(),
+            cumulative_approval: None,
+            admission_binding: None,
+            requested_exposure_units: payload.cost_units,
+            max_cost_per_invocation: payload.max_cost_per_invocation,
+            max_total_cost_units: payload.max_total_cost_units,
+            hold_id: payload.hold_id.clone(),
+            event_id: Some(effective_event_id),
+            authority: authority.clone(),
+        }) {
+            Ok(decision) => decision,
+            Err(error) => return budget_internal_error(&error, "budget authorization failed"),
+        };
+        match decision {
+            BudgetAuthorizeHoldDecision::Authorized(authorized) => (
+                false,
+                Some((
+                    authorized.metadata,
+                    authorized.authorized_exposure_units,
+                    0,
+                    authorized.invocation_count_after,
+                    authorized.committed_cost_units_after,
+                )),
+                None,
+            ),
+            BudgetAuthorizeHoldDecision::AlreadyCaptured(mutation) => (
+                true,
+                Some((
+                    mutation.metadata,
+                    mutation.exposure_units,
+                    mutation.realized_spend_units,
+                    mutation.invocation_count_after,
+                    mutation.committed_cost_units_after,
+                )),
+                None,
+            ),
+            BudgetAuthorizeHoldDecision::ApprovalRequired(_) => {
+                return plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "legacy budget endpoint received an unsupported cumulative approval decision",
+                )
+            }
+            BudgetAuthorizeHoldDecision::Denied(denied) => (
+                false,
+                None,
+                Some((
+                    denied.metadata,
+                    denied.invocation_count_after,
+                    denied.committed_cost_units_after,
+                )),
+            ),
+        }
     };
     if let Some((
         admission_metadata,
@@ -306,6 +410,7 @@ pub(crate) async fn handle_try_charge_cost(
                 } else {
                     BudgetAuthorizeExposureDecision::Authorized
                 },
+                hold_id: payload.hold_id.clone(),
                 event_id: Some(event_id),
                 exposure_units: Some(exposure_units),
                 realized_spend_units: Some(realized_spend_units),
@@ -365,7 +470,9 @@ pub(crate) async fn handle_try_charge_cost(
             }
         };
         json_response_with_leader_visibility_and_budget_commit(&state, response, budget_commit)
-    } else if let Some(denied) = denied {
+    } else if let Some((denied_metadata, invocation_count_after, committed_cost_units_after)) =
+        denied
+    {
         respond_after_leader_visible_write(
             &state,
             "budget exposure state was not visible on the leader after write",
@@ -378,11 +485,12 @@ pub(crate) async fn handle_try_charge_cost(
                     grant_index: payload.grant_index,
                     allowed: false,
                     decision: BudgetAuthorizeExposureDecision::Denied,
-                    event_id: denied.metadata.event_id.clone(),
+                    hold_id: payload.hold_id.clone(),
+                    event_id: denied_metadata.event_id.clone(),
                     exposure_units: None,
                     realized_spend_units: None,
-                    mutation_invocation_count_after: Some(denied.invocation_count_after),
-                    mutation_committed_cost_units_after: Some(denied.committed_cost_units_after),
+                    mutation_invocation_count_after: Some(invocation_count_after),
+                    mutation_committed_cost_units_after: Some(committed_cost_units_after),
                     usage_seq: usage.as_ref().map(|usage| usage.seq),
                     invocation_count: usage.as_ref().map(|usage| usage.invocation_count),
                     total_cost_exposed: usage.as_ref().map(|usage| usage.total_cost_exposed),
@@ -409,6 +517,11 @@ pub(crate) async fn handle_reverse_charge_cost(
     Json(payload): Json<ReverseChargeCostRequest>,
 ) -> Response {
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    if let Err(response) =
+        validate_budget_request_identity(payload.hold_id.as_deref(), payload.event_id.as_deref())
+    {
         return response;
     }
     match forward_post_to_leader(&state, BUDGET_RELEASE_EXPOSURE_PATH, &payload).await {
@@ -454,6 +567,8 @@ pub(crate) async fn handle_reverse_charge_cost(
             ReverseChargeCostResponse {
                 capability_id: payload.capability_id.clone(),
                 grant_index: payload.grant_index,
+                hold_id: payload.hold_id.clone(),
+                event_id: Some(effective_event_id.clone()),
                 invocation_count: Some(usage.invocation_count),
                 total_cost_exposed: Some(usage.total_cost_exposed),
                 total_cost_realized_spend: Some(usage.total_cost_realized_spend),
@@ -508,6 +623,7 @@ pub(crate) async fn handle_capture_invocation(
             grant_index: payload.grant_index,
             hold_id: payload.hold_id.clone(),
             event_id: payload.event_id.clone(),
+            trusted_time: None,
             authority: authority.clone(),
         }) {
             Ok(BudgetInvocationCaptureDecision::Captured(mutation)) => {
@@ -581,6 +697,11 @@ pub(crate) async fn handle_reduce_charge_cost(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
+    if let Err(response) =
+        validate_budget_request_identity(payload.hold_id.as_deref(), payload.event_id.as_deref())
+    {
+        return response;
+    }
     let released_exposure_units = payload.release_units();
     match forward_post_to_leader(&state, BUDGET_RECONCILE_SPEND_PATH, &payload).await {
         Ok(Some(response)) => return response,
@@ -640,6 +761,8 @@ pub(crate) async fn handle_reduce_charge_cost(
             ReduceChargeCostResponse {
                 capability_id: payload.capability_id.clone(),
                 grant_index: payload.grant_index,
+                hold_id: payload.hold_id.clone(),
+                event_id: Some(effective_event_id.clone()),
                 invocation_count: Some(usage.invocation_count),
                 total_cost_exposed: Some(usage.total_cost_exposed),
                 total_cost_realized_spend: Some(usage.total_cost_realized_spend),
@@ -689,7 +812,8 @@ fn resolve_budget_hold_authority(
 
 #[cfg(test)]
 mod budget_handlers_tests {
-    use super::generated_budget_event_id;
+    use super::{generated_budget_event_id, validate_budget_request_identity};
+    use axum::http::StatusCode;
     use std::collections::HashSet;
 
     #[test]
@@ -705,5 +829,28 @@ mod budget_handlers_tests {
         // the monotonic counter.
         let ids: HashSet<String> = (0..10_000).map(|_| generated_budget_event_id()).collect();
         assert_eq!(ids.len(), 10_000, "all minted ids must be unique");
+    }
+
+    #[test]
+    fn optional_budget_identity_rejects_partial_or_empty_values() {
+        for (hold_id, event_id) in [
+            (None, None),
+            (None, Some("event-only")),
+            (Some("hold"), Some("hold:event")),
+        ] {
+            assert!(validate_budget_request_identity(hold_id, event_id).is_ok());
+        }
+        for (hold_id, event_id) in [
+            (Some("hold"), None),
+            (Some(""), Some("event")),
+            (Some("hold"), Some("")),
+            (None, Some("")),
+        ] {
+            let response = match validate_budget_request_identity(hold_id, event_id) {
+                Ok(()) => panic!("invalid budget identity was accepted"),
+                Err(response) => response,
+            };
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        }
     }
 }
