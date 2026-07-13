@@ -538,3 +538,80 @@ fn hitl_token_verification_rejects_expired_tokens() {
     let err = approval_token.verify_against(&req, 100).unwrap_err();
     assert!(err.to_string().contains("expired"));
 }
+
+#[test]
+fn governed_approval_token_binds_every_authorization_field_and_time_window(
+) -> Result<(), Box<dyn std::error::Error>> {
+    #[derive(Clone, Copy, Debug)]
+    enum Mutation {
+        RequestId,
+        IntentHash,
+        Subject,
+        Approver,
+        Decision,
+        IssuedAt,
+        ExpiresAt,
+    }
+
+    let approver = CoreKeypair::generate();
+    let subject = CoreKeypair::generate();
+    let token = GovernedApprovalToken::sign(
+        GovernedApprovalTokenBody {
+            id: "governed-token-binding".to_string(),
+            approver: approver.public_key(),
+            subject: subject.public_key(),
+            governed_intent_hash: "intent-hash".to_string(),
+            request_id: "request-1".to_string(),
+            issued_at: 1_000,
+            expires_at: 2_000,
+            decision: GovernedApprovalDecision::Approved,
+        },
+        &approver,
+    )?;
+
+    assert!(token.verify_signature_at(1_500)?);
+
+    for mutation in [
+        Mutation::RequestId,
+        Mutation::IntentHash,
+        Mutation::Subject,
+        Mutation::Approver,
+        Mutation::Decision,
+        Mutation::IssuedAt,
+        Mutation::ExpiresAt,
+    ] {
+        let mut mutated = token.clone();
+        match mutation {
+            Mutation::RequestId => mutated.request_id = "request-2".to_string(),
+            Mutation::IntentHash => {
+                mutated.governed_intent_hash = "different-intent-hash".to_string();
+            }
+            Mutation::Subject => mutated.subject = CoreKeypair::generate().public_key(),
+            Mutation::Approver => mutated.approver = CoreKeypair::generate().public_key(),
+            Mutation::Decision => mutated.decision = GovernedApprovalDecision::Denied,
+            Mutation::IssuedAt => mutated.issued_at = 999,
+            Mutation::ExpiresAt => mutated.expires_at = 2_001,
+        }
+        assert!(
+            matches!(mutated.verify_signature_at(1_500), Ok(false)),
+            "{mutation:?} mutation must invalidate the signature"
+        );
+    }
+
+    let not_yet_valid = token.verify_signature_at(999);
+    assert!(
+        not_yet_valid
+            .as_ref()
+            .is_err_and(|error| error.to_string().contains("not yet valid")),
+        "unexpected not-yet-valid result: {not_yet_valid:?}"
+    );
+    let expired = token.verify_signature_at(2_000);
+    assert!(
+        expired
+            .as_ref()
+            .is_err_and(|error| error.to_string().contains("expired")),
+        "unexpected expiry result: {expired:?}"
+    );
+
+    Ok(())
+}

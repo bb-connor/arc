@@ -1590,3 +1590,96 @@ fn nested_missing_session_roots_lookup_reverses_pre_execution_budget() {
         "missing-session roots lookup must reverse the invocation reservation, got {usage:?}"
     );
 }
+
+#[test]
+fn missing_approval_replay_store_denies_before_dispatch_and_reverses_monetary_admission(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let payment = TrackingPaymentAdapter::new();
+    let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.register_tool_server(Box::new(CountingMonetaryServer {
+        id: "cost-srv".to_string(),
+        invocations: std::sync::Arc::clone(&invocations),
+    }));
+
+    let agent_kp = Keypair::generate();
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 100, 1_000, "USD", 50);
+    let capability = kernel.issue_capability(
+        &agent_kp.public_key(),
+        make_scope(vec![grant]),
+        3_600,
+    )?;
+    let request_id = "req-governed-missing-replay-store";
+    let intent = make_governed_intent(
+        "intent-governed-missing-replay-store",
+        "cost-srv",
+        "compute",
+        "execute governed compute",
+        100,
+        "USD",
+    );
+    let approval_token = make_governed_approval_token(
+        &kernel.config.keypair,
+        &agent_kp.public_key(),
+        &intent,
+        request_id,
+    );
+    kernel.approval_replay_store = None;
+
+    let response = kernel.evaluate_tool_call_blocking(&ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: capability.clone(),
+        tool_name: "compute".to_string(),
+        server_id: "cost-srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({ "work": "governed" }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: Some(intent),
+        approval_token: Some(approval_token),
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    })?;
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("approval replay store not configured")),
+        "unexpected denial reason: {:?}",
+        response.reason
+    );
+    assert_eq!(
+        invocations.load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
+    assert_eq!(
+        payment
+            .authorized
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
+    assert_eq!(
+        payment.released.load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
+    assert_eq!(
+        payment.refunded.load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
+
+    let usage = kernel.budget_store.get_usage(&capability.id, 0)?;
+    assert_eq!(
+        usage.as_ref().map_or(0, |usage| usage.invocation_count),
+        0
+    );
+    let committed_cost = match usage.as_ref() {
+        Some(usage) => usage.committed_cost_units()?,
+        None => 0,
+    };
+    assert_eq!(committed_cost, 0);
+
+    Ok(())
+}
