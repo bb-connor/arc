@@ -1,3 +1,8 @@
+pub use crate::deception::{
+    DecoyArtifactLookup, DecoyScan, SealedDecoyCasRequest, SealedDecoyPage, SealedDecoyRecord,
+    SealedMarkerLookup, SealedPublicRefLookup, WatermarkObservation, WatermarkObservationResult,
+    WatermarkSequenceReservation, WatermarkSequenceReservationResult,
+};
 use crate::InformationLabel;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -37,6 +42,38 @@ impl PortError {
     #[must_use]
     pub const fn code(&self) -> &ErrorCode {
         &self.code
+    }
+
+    #[must_use]
+    pub fn unavailable() -> Self {
+        Self::new(
+            PortErrorKind::Unavailable,
+            ErrorCode("store.unavailable".to_string()),
+        )
+    }
+
+    #[must_use]
+    pub fn conflict() -> Self {
+        Self::new(
+            PortErrorKind::Conflict,
+            ErrorCode("store.conflict".to_string()),
+        )
+    }
+
+    #[must_use]
+    pub fn invalid_data() -> Self {
+        Self::new(
+            PortErrorKind::InvalidData,
+            ErrorCode("store.invalid_data".to_string()),
+        )
+    }
+
+    #[must_use]
+    pub fn integrity_failure() -> Self {
+        Self::new(
+            PortErrorKind::IntegrityFailure,
+            ErrorCode("store.integrity_failure".to_string()),
+        )
     }
 }
 
@@ -367,8 +404,56 @@ where
 pub type ClassificationFindings = BoundedVec<ClassificationFinding, 256>;
 pub type VerifiedEventBatch = BoundedVec<VerifiedSecurityEvent, 4_096>;
 pub type OverlayContributions = BoundedVec<OverlayContribution, 256>;
-pub type RecordIdSet = BoundedVec<RecordId, 4_096>;
 pub type BlastRadiusSeeds = BoundedVec<RecordId, 256>;
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(transparent)]
+pub struct RecordIdSet(BoundedVec<RecordId, 4_096>);
+
+impl RecordIdSet {
+    pub fn new(values: Vec<RecordId>) -> Result<Self, RecordIdSetError> {
+        if values.windows(2).any(|pair| pair[0] >= pair[1]) {
+            return Err(RecordIdSetError::NotStrictlySorted);
+        }
+        BoundedVec::new(values)
+            .map(Self)
+            .map_err(|_| RecordIdSetError::TooManyItems)
+    }
+
+    #[must_use]
+    pub fn as_slice(&self) -> &[RecordId] {
+        self.0.as_slice()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RecordIdSetError {
+    TooManyItems,
+    NotStrictlySorted,
+}
+
+impl fmt::Display for RecordIdSetError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TooManyItems => formatter.write_str("record id set exceeds the item limit"),
+            Self::NotStrictlySorted => {
+                formatter.write_str("record ids are not strictly sorted and unique")
+            }
+        }
+    }
+}
+
+impl core::error::Error for RecordIdSetError {}
+
+impl<'de> Deserialize<'de> for RecordIdSet {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let values = BoundedVec::<RecordId, 4_096>::deserialize(deserializer)?.into_vec();
+        Self::new(values).map_err(de::Error::custom)
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -423,9 +508,17 @@ pub struct IsolationEpochTransition {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+pub struct VerifiedIsolationEvidence {
+    pub verifier_id: RecordId,
+    pub receipt_ref: OpaqueReceiptRef,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct EgressFenceRequest {
     pub key: FlowStateKey,
     pub request_id: RequestId,
+    pub request_hash: Digest32,
     pub expected_context_generation: u64,
     pub expires_at_unix_ms: u64,
 }
@@ -436,6 +529,7 @@ pub struct EgressFence {
     pub fence_id: RecordId,
     pub key: FlowStateKey,
     pub request_id: RequestId,
+    pub request_hash: Digest32,
     pub context_generation: u64,
     pub expires_at_unix_ms: u64,
 }
@@ -453,6 +547,7 @@ pub struct EgressFenceCommit {
 pub struct CommittedEgressFence {
     pub fence_id: RecordId,
     pub request_id: RequestId,
+    pub request_hash: Digest32,
     pub context_generation: u64,
     pub dispatch_commitment_id: RecordId,
     pub committed_at_unix_ms: u64,
@@ -486,6 +581,9 @@ pub struct ByteRange {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClassificationResult {
+    pub tenant_id: TenantId,
+    pub request_id: RequestId,
+    pub payload_digest: Digest32,
     pub classifier_id: ClassifierId,
     pub classifier_version: ClassifierVersion,
     pub findings: ClassificationFindings,
@@ -509,6 +607,9 @@ pub struct TripwireInput {
     pub tenant_id: TenantId,
     pub request_id: RequestId,
     pub kind: TripwireKind,
+    /// Bounded presented bytes. The detector verifies `content_digest`
+    /// before interpreting this value.
+    pub content: CanonicalBody,
     pub content_digest: Digest32,
     pub canonical_context_digest: Digest32,
 }
@@ -619,9 +720,18 @@ pub struct EventPartitionScan {
     pub tenant_id: TenantId,
     pub rule_id: RuleId,
     pub partition_hash: Digest32,
-    pub after_event_time_unix_ms: u64,
+    pub after_event_time_unix_ms: Option<u64>,
+    pub after_event_id: Option<EventId>,
     pub through_event_time_unix_ms: u64,
     pub max_results: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct CorrelationEventIndexRequest {
+    pub key: CorrelationPartitionKey,
+    pub event_id: EventId,
+    pub transition_id: RecordId,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -646,6 +756,8 @@ pub struct CorrelationPartial {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CorrelationCasRequest {
+    pub scan: EventPartitionScan,
+    pub observed_partition_generation: u64,
     pub partial: CorrelationPartial,
     pub expected_generation: Option<u64>,
     pub transition_id: RecordId,
@@ -653,47 +765,17 @@ pub struct CorrelationCasRequest {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+pub struct CorrelationScan {
+    pub events: VerifiedEventBatch,
+    pub partition_generation: u64,
+    pub truncated: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct CorrelationDeleteRequest {
     pub key: CorrelationPartitionKey,
     pub expected_generation: u64,
-    pub transition_id: RecordId,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DecoyLifecycle {
-    Pending,
-    Active,
-    Suspended,
-    Expired,
-    Retired,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct DecoyRecord {
-    pub tenant_id: TenantId,
-    pub artifact_id: ArtifactId,
-    pub marker_digest: Digest32,
-    pub version_hash: Digest32,
-    pub encrypted_material_ref: RecordId,
-    pub lifecycle: DecoyLifecycle,
-    pub generation: u64,
-    pub expires_at_unix_ms: u64,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct MarkerLookup {
-    pub tenant_id: TenantId,
-    pub marker_digest: Digest32,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct DecoyCasRequest {
-    pub record: DecoyRecord,
-    pub expected_generation: Option<u64>,
     pub transition_id: RecordId,
 }
 
@@ -718,6 +800,13 @@ pub struct ResponsePlanRecord {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+pub struct ResponsePlanKey {
+    pub tenant_id: TenantId,
+    pub action_id: ActionId,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ResponseCasRequest {
     pub record: ResponsePlanRecord,
     pub expected_generation: u64,
@@ -730,6 +819,7 @@ pub struct ResponseEffectRecord {
     pub tenant_id: TenantId,
     pub action_id: ActionId,
     pub effect_id: EffectId,
+    pub generation: u64,
     pub scheduler_fencing_token: u64,
     pub state: RecordId,
     pub canonical_body: CanonicalBody,
@@ -739,8 +829,24 @@ pub struct ResponseEffectRecord {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+pub struct ResponseEffectKey {
+    pub tenant_id: TenantId,
+    pub effect_id: EffectId,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResponseEffectCasRequest {
+    pub record: ResponseEffectRecord,
+    pub expected_generation: u64,
+    pub transition_id: RecordId,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct SchedulerClaimRequest {
     pub tenant_id: TenantId,
+    pub claim_id: RecordId,
     pub lease_owner_id: LeaseOwnerId,
     pub now_unix_ms: u64,
     pub lease_expires_at_unix_ms: u64,
@@ -759,6 +865,63 @@ pub struct ScheduledWork {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+pub struct SchedulerWorkKey {
+    pub tenant_id: TenantId,
+    pub action_id: ActionId,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SchedulerRetryState {
+    pub key: SchedulerWorkKey,
+    pub attempts: u32,
+    pub last_error: ErrorCode,
+    pub first_failure_at_unix_ms: u64,
+    pub not_before_unix_ms: u64,
+    pub health_event_id: Option<RecordId>,
+    pub health_event_delivered: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SchedulerLeaseRenewRequest {
+    pub work: ScheduledWork,
+    pub now_unix_ms: u64,
+    pub lease_expires_at_unix_ms: u64,
+    pub transition_id: RecordId,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SchedulerRetryRequest {
+    pub work: ScheduledWork,
+    pub expected_attempts: u32,
+    pub error_code: ErrorCode,
+    pub first_failure_at_unix_ms: u64,
+    pub now_unix_ms: u64,
+    pub not_before_unix_ms: u64,
+    pub health_event_id: Option<RecordId>,
+    pub transition_id: RecordId,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SchedulerHealthAckRequest {
+    pub key: SchedulerWorkKey,
+    pub event_id: RecordId,
+    pub transition_id: RecordId,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SchedulerLeaseReleaseRequest {
+    pub work: ScheduledWork,
+    pub clear_retry_state: bool,
+    pub transition_id: RecordId,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct OverlayContribution {
     pub effect_id: EffectId,
     pub posture_rank: u32,
@@ -770,6 +933,7 @@ pub struct OverlayContribution {
 #[serde(deny_unknown_fields)]
 pub struct OverlayApplyRequest {
     pub target: TenantScopedId,
+    pub action_id: ActionId,
     pub contribution: OverlayContribution,
     pub expected_generation: u64,
     pub scheduler_fencing_token: u64,
@@ -779,6 +943,7 @@ pub struct OverlayApplyRequest {
 #[serde(deny_unknown_fields)]
 pub struct OverlayRemoveRequest {
     pub target: TenantScopedId,
+    pub action_id: ActionId,
     pub effect_id: EffectId,
     pub expected_generation: u64,
     pub scheduler_fencing_token: u64,
@@ -876,6 +1041,28 @@ pub struct ApprovalReservationMutation {
     pub transition_id: RecordId,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ApprovalReservationCreate {
+    pub reservation: ApprovalReservation,
+    pub transition_id: RecordId,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApprovalReservationState {
+    Reserved,
+    Committed,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct StoredApprovalReservation {
+    pub reservation: ApprovalReservation,
+    pub state: ApprovalReservationState,
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EffectOperation {
@@ -906,6 +1093,26 @@ pub struct EffectResult {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+pub struct EffectResultQuery {
+    pub tenant_id: TenantId,
+    pub effect_id: EffectId,
+    pub operation: EffectOperation,
+    pub idempotency_key: RecordId,
+    pub expected_version_hash: Digest32,
+    pub scheduler_fencing_token: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case", tag = "status", deny_unknown_fields)]
+pub enum EffectExecutionStatus {
+    NotExecuted,
+    Completed { result: EffectResult },
+    Failed { error_code: ErrorCode },
+    Unknown,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ReceiptAppendRequest {
     pub tenant_id: TenantId,
     pub evidence_type: RecordId,
@@ -922,6 +1129,24 @@ pub struct SecurityAlert {
     pub finding_id_hash: Digest32,
     pub action_id_hash: Option<Digest32>,
     pub evidence_hash: Digest32,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SchedulerHealthPageRequest {
+    pub event_id: RecordId,
+    pub tenant_id: TenantId,
+    pub action_id: ActionId,
+    pub first_failure_at_unix_ms: u64,
+    pub alert: SecurityAlert,
+}
+
+#[cfg(feature = "std")]
+pub trait IsolationEpochEvidenceVerifierPort: Send + Sync {
+    fn verify(
+        &self,
+        transition: &IsolationEpochTransition,
+    ) -> PortResult<VerifiedIsolationEvidence>;
 }
 
 #[cfg(feature = "std")]
@@ -968,7 +1193,8 @@ pub trait SecurityEventVerifierPort: Send + Sync {
 pub trait SecurityEventStore: Send + Sync {
     fn append_verified(&self, event: &VerifiedSecurityEvent) -> PortResult<EventAppend>;
     fn append_advisory(&self, event: &AdvisorySecurityEvent) -> PortResult<EventAppend>;
-    fn scan_partition(&self, scan: &EventPartitionScan) -> PortResult<VerifiedEventBatch>;
+    fn index_partition_event(&self, request: &CorrelationEventIndexRequest) -> PortResult<()>;
+    fn scan_partition(&self, scan: &EventPartitionScan) -> PortResult<CorrelationScan>;
     fn load_correlation(
         &self,
         key: &CorrelationPartitionKey,
@@ -981,18 +1207,63 @@ pub trait SecurityEventStore: Send + Sync {
 }
 
 #[cfg(feature = "std")]
-pub trait DecoyRegistryStore: Send + Sync {
-    fn load_by_id(&self, id: &TenantScopedId) -> PortResult<Option<DecoyRecord>>;
-    fn load_by_marker(&self, lookup: &MarkerLookup) -> PortResult<Option<DecoyRecord>>;
-    fn compare_and_swap(&self, request: &DecoyCasRequest) -> PortResult<DecoyRecord>;
+pub trait SealedDecoyRegistryStore: Send + Sync {
+    fn load_by_id(&self, id: &DecoyArtifactLookup) -> PortResult<Option<SealedDecoyRecord>>;
+    fn load_by_marker(&self, lookup: &SealedMarkerLookup) -> PortResult<Option<SealedDecoyRecord>>;
+    fn load_by_public_ref(
+        &self,
+        lookup: &SealedPublicRefLookup,
+    ) -> PortResult<Option<SealedDecoyRecord>>;
+    fn compare_and_swap(&self, request: &SealedDecoyCasRequest) -> PortResult<SealedDecoyRecord>;
+    fn scan(&self, scan: &DecoyScan) -> PortResult<SealedDecoyPage>;
+}
+
+#[cfg(feature = "std")]
+pub trait WatermarkSequenceStore: Send + Sync {
+    fn reserve(
+        &self,
+        request: &WatermarkSequenceReservation,
+    ) -> PortResult<WatermarkSequenceReservationResult>;
+}
+
+#[cfg(feature = "std")]
+pub trait WatermarkObservationStore: Send + Sync {
+    fn record_first(
+        &self,
+        observation: &WatermarkObservation,
+    ) -> PortResult<WatermarkObservationResult>;
 }
 
 #[cfg(feature = "std")]
 pub trait ResponseStore: Send + Sync {
+    fn load_plan(&self, key: &ResponsePlanKey) -> PortResult<Option<ResponsePlanRecord>>;
     fn create(&self, record: &ResponsePlanRecord) -> PortResult<CreateOutcome>;
     fn compare_and_swap(&self, request: &ResponseCasRequest) -> PortResult<ResponsePlanRecord>;
+    fn load_effect(&self, key: &ResponseEffectKey) -> PortResult<Option<ResponseEffectRecord>>;
     fn persist_effect(&self, record: &ResponseEffectRecord) -> PortResult<CreateOutcome>;
+    fn compare_and_swap_effect(
+        &self,
+        request: &ResponseEffectCasRequest,
+    ) -> PortResult<ResponseEffectRecord>;
     fn claim_due(&self, request: &SchedulerClaimRequest) -> PortResult<Vec<ScheduledWork>>;
+}
+
+#[cfg(feature = "std")]
+pub trait ResponseSchedulerStore: ResponseStore {
+    fn load_retry(&self, key: &SchedulerWorkKey) -> PortResult<Option<SchedulerRetryState>>;
+    fn validate_lease(&self, work: &ScheduledWork) -> PortResult<()>;
+    fn renew_lease(&self, request: &SchedulerLeaseRenewRequest) -> PortResult<ScheduledWork>;
+    fn record_retry(&self, request: &SchedulerRetryRequest) -> PortResult<SchedulerRetryState>;
+    fn acknowledge_health_event(
+        &self,
+        request: &SchedulerHealthAckRequest,
+    ) -> PortResult<SchedulerRetryState>;
+    fn release_lease(&self, request: &SchedulerLeaseReleaseRequest) -> PortResult<()>;
+}
+
+#[cfg(feature = "std")]
+pub trait SchedulerHealthPort: Send + Sync {
+    fn page_once(&self, request: &SchedulerHealthPageRequest) -> PortResult<()>;
 }
 
 #[cfg(feature = "std")]
@@ -1011,6 +1282,13 @@ pub trait BlastRadiusPort: Send + Sync {
 }
 
 #[cfg(feature = "std")]
+pub trait LineageFenceStore: Send + Sync {
+    fn acquire(&self, request: &LineageFenceRequest) -> PortResult<LineageFence>;
+    fn query(&self, action: &TenantScopedId) -> PortResult<Option<LineageFence>>;
+    fn release(&self, release: &LineageFenceRelease) -> PortResult<()>;
+}
+
+#[cfg(feature = "std")]
 pub trait ApprovalVerifierPort: Send + Sync {
     fn verify_and_reserve(&self, request: &ApprovalRequest) -> PortResult<ApprovalReservation>;
     fn commit(&self, mutation: &ApprovalReservationMutation) -> PortResult<()>;
@@ -1018,9 +1296,20 @@ pub trait ApprovalVerifierPort: Send + Sync {
 }
 
 #[cfg(feature = "std")]
+pub trait ApprovalReservationStore: Send + Sync {
+    fn reserve(&self, request: &ApprovalReservationCreate) -> PortResult<CreateOutcome>;
+    fn load_reservation(
+        &self,
+        action: &TenantScopedId,
+    ) -> PortResult<Option<StoredApprovalReservation>>;
+    fn commit_reservation(&self, mutation: &ApprovalReservationMutation) -> PortResult<()>;
+    fn cancel_reservation(&self, mutation: &ApprovalReservationMutation) -> PortResult<()>;
+}
+
+#[cfg(feature = "std")]
 pub trait EffectPort: Send + Sync {
-    fn apply(&self, request: &EffectRequest) -> PortResult<EffectResult>;
-    fn remove(&self, request: &EffectRequest) -> PortResult<EffectResult>;
+    fn execute(&self, request: &EffectRequest) -> PortResult<EffectResult>;
+    fn load_result(&self, query: &EffectResultQuery) -> PortResult<EffectExecutionStatus>;
 }
 
 #[cfg(feature = "std")]

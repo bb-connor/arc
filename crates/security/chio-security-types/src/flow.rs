@@ -1,4 +1,4 @@
-use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 use alloc::format;
 use alloc::string::String;
 use core::fmt;
@@ -8,6 +8,29 @@ use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 const MAX_IDENTIFIER_BYTES: usize = 256;
+
+fn deserialize_present_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
+}
+
+fn deserialize_non_empty_vec<'de, D, T>(deserializer: D) -> Result<alloc::vec::Vec<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    let values = alloc::vec::Vec::<T>::deserialize(deserializer)?;
+    if values.is_empty() {
+        Err(de::Error::custom(
+            "explicit empty array is not a canonical flow representation",
+        ))
+    } else {
+        Ok(values)
+    }
+}
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct PrincipalId(String);
@@ -220,12 +243,184 @@ macro_rules! identifier_type {
 identifier_type!(PrincipalId);
 identifier_type!(Compartment);
 
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct DeclassificationPurpose(String);
+
+identifier_type!(DeclassificationPurpose);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ToolFlowValidationError {
+    TopOutputLabel,
+    TopInputClearance,
+}
+
+impl fmt::Display for ToolFlowValidationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::TopOutputLabel => "tool output label cannot be top",
+            Self::TopInputClearance => "tool input clearance cannot be top",
+        })
+    }
+}
+
+impl core::error::Error for ToolFlowValidationError {}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ToolFlowDeclaration {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_label: Option<InformationLabel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_clearance: Option<InformationLabel>,
+    pub egress: bool,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub declassification_purposes: BTreeSet<DeclassificationPurpose>,
+}
+
+impl ToolFlowDeclaration {
+    pub fn new(
+        output_label: Option<InformationLabel>,
+        input_clearance: Option<InformationLabel>,
+        egress: bool,
+        declassification_purposes: BTreeSet<DeclassificationPurpose>,
+    ) -> Result<Self, ToolFlowValidationError> {
+        let declaration = Self {
+            output_label,
+            input_clearance,
+            egress,
+            declassification_purposes,
+        };
+        declaration.validate()?;
+        Ok(declaration)
+    }
+
+    #[must_use]
+    pub fn public_egress() -> Self {
+        Self {
+            output_label: Some(InformationLabel::bottom()),
+            input_clearance: Some(InformationLabel::bottom()),
+            egress: true,
+            declassification_purposes: BTreeSet::new(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), ToolFlowValidationError> {
+        if self.output_label == Some(InformationLabel::Top) {
+            return Err(ToolFlowValidationError::TopOutputLabel);
+        }
+        if self.input_clearance == Some(InformationLabel::Top) {
+            return Err(ToolFlowValidationError::TopInputClearance);
+        }
+        Ok(())
+    }
+}
+
+impl<'de> Deserialize<'de> for ToolFlowDeclaration {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct WireDeclaration {
+            #[serde(default, deserialize_with = "deserialize_present_option")]
+            output_label: Option<InformationLabel>,
+            #[serde(default, deserialize_with = "deserialize_present_option")]
+            input_clearance: Option<InformationLabel>,
+            egress: bool,
+            #[serde(default, deserialize_with = "deserialize_non_empty_vec")]
+            declassification_purposes: alloc::vec::Vec<DeclassificationPurpose>,
+        }
+
+        let wire = WireDeclaration::deserialize(deserializer)?;
+        let mut purposes = BTreeSet::new();
+        for purpose in wire.declassification_purposes {
+            if !purposes.insert(purpose.clone()) {
+                return Err(de::Error::custom(format!(
+                    "duplicate declassification purpose `{purpose}`"
+                )));
+            }
+        }
+        Self::new(
+            wire.output_label,
+            wire.input_clearance,
+            wire.egress,
+            purposes,
+        )
+        .map_err(de::Error::custom)
+    }
+}
+
 impl InformationLabel {
     #[must_use]
     pub fn bottom() -> Self {
         Self::Known {
             owners: BTreeMap::new(),
             compartments: BTreeSet::new(),
+        }
+    }
+
+    pub fn join_restrictions(&self, other: &Self) -> Result<Self, LabelValidationError> {
+        let (
+            Self::Known {
+                owners: left_owners,
+                compartments: left_compartments,
+            },
+            Self::Known {
+                owners: right_owners,
+                compartments: right_compartments,
+            },
+        ) = (self, other)
+        else {
+            return Ok(Self::Top);
+        };
+
+        let mut owners = left_owners.clone();
+        for (owner, right_readers) in right_owners {
+            match owners.entry(owner.clone()) {
+                Entry::Vacant(entry) => {
+                    entry.insert(right_readers.clone());
+                }
+                Entry::Occupied(mut entry) => {
+                    let readers = entry
+                        .get()
+                        .intersection(right_readers)
+                        .cloned()
+                        .collect::<BTreeSet<_>>();
+                    entry.insert(readers);
+                }
+            }
+        }
+        let compartments = left_compartments
+            .union(right_compartments)
+            .cloned()
+            .collect();
+        Self::try_known(owners, compartments)
+    }
+
+    #[must_use]
+    pub fn flows_to(&self, destination: &Self) -> bool {
+        match (self, destination) {
+            (_, Self::Top) => true,
+            (Self::Top, Self::Known { .. }) => false,
+            (
+                Self::Known {
+                    owners: source_owners,
+                    compartments: source_compartments,
+                },
+                Self::Known {
+                    owners: destination_owners,
+                    compartments: destination_compartments,
+                },
+            ) => {
+                source_compartments.is_subset(destination_compartments)
+                    && source_owners.iter().all(|(owner, source_readers)| {
+                        destination_owners
+                            .get(owner)
+                            .is_some_and(|destination_readers| {
+                                destination_readers.is_subset(source_readers)
+                            })
+                    })
+            }
         }
     }
 
@@ -535,7 +730,7 @@ impl<'de> Deserialize<'de> for InformationLabel {
 mod tests {
     use super::{
         Compartment, InformationLabel, LabelLimits, LabelValidationError, PrincipalId,
-        DEFAULT_LABEL_LIMITS, MAX_IDENTIFIER_BYTES,
+        ToolFlowDeclaration, DEFAULT_LABEL_LIMITS, MAX_IDENTIFIER_BYTES,
     };
     use alloc::collections::{BTreeMap, BTreeSet};
     use alloc::format;
@@ -665,6 +860,37 @@ mod tests {
         let top_payload = r#"{"kind":"top","owners":{}}"#;
         assert!(from_str::<InformationLabel>(unknown).is_err());
         assert!(from_str::<InformationLabel>(top_payload).is_err());
+    }
+
+    #[test]
+    fn tool_flow_declaration_is_strict_and_canonical() {
+        let declaration: ToolFlowDeclaration = from_str(
+            r#"{"output_label":{"kind":"known","owners":{},"compartments":["pii"]},"input_clearance":{"kind":"known","owners":{},"compartments":["pii"]},"egress":true,"declassification_purposes":["support","billing"]}"#,
+        )
+        .unwrap_or_else(|error| panic!("flow declaration parses: {error}"));
+        let encoded = to_string(&declaration)
+            .unwrap_or_else(|error| panic!("flow declaration serializes: {error}"));
+        assert_eq!(
+            encoded,
+            r#"{"output_label":{"kind":"known","owners":{},"compartments":["pii"]},"input_clearance":{"kind":"known","owners":{},"compartments":["pii"]},"egress":true,"declassification_purposes":["billing","support"]}"#
+        );
+
+        assert!(from_str::<ToolFlowDeclaration>(
+            r#"{"egress":true,"declassification_purposes":["billing","billing"]}"#
+        )
+        .is_err());
+        assert!(from_str::<ToolFlowDeclaration>(
+            r#"{"egress":true,"declassification_purposes":[],"unknown":true}"#
+        )
+        .is_err());
+        assert!(from_str::<ToolFlowDeclaration>(
+            r#"{"output_label":{"kind":"top"},"egress":false,"declassification_purposes":[]}"#
+        )
+        .is_err());
+        assert!(from_str::<ToolFlowDeclaration>(
+            r#"{"input_clearance":{"kind":"top"},"egress":false,"declassification_purposes":[]}"#
+        )
+        .is_err());
     }
 
     #[test]

@@ -39,6 +39,12 @@ impl FlowStateStore for FakePorts {
     }
 }
 
+impl IsolationEpochEvidenceVerifierPort for FakePorts {
+    fn verify(&self, _: &IsolationEpochTransition) -> PortResult<VerifiedIsolationEvidence> {
+        unavailable!()
+    }
+}
+
 impl ClassificationPort for FakePorts {
     fn classify(&self, _: &ClassificationRequest) -> PortResult<ClassificationResult> {
         unavailable!()
@@ -76,7 +82,11 @@ impl SecurityEventStore for FakePorts {
         unavailable!()
     }
 
-    fn scan_partition(&self, _: &EventPartitionScan) -> PortResult<VerifiedEventBatch> {
+    fn index_partition_event(&self, _: &CorrelationEventIndexRequest) -> PortResult<()> {
+        unavailable!()
+    }
+
+    fn scan_partition(&self, _: &EventPartitionScan) -> PortResult<CorrelationScan> {
         unavailable!()
     }
 
@@ -99,21 +109,36 @@ impl SecurityEventStore for FakePorts {
     }
 }
 
-impl DecoyRegistryStore for FakePorts {
-    fn load_by_id(&self, _: &TenantScopedId) -> PortResult<Option<DecoyRecord>> {
+impl SealedDecoyRegistryStore for FakePorts {
+    fn load_by_id(&self, _: &DecoyArtifactLookup) -> PortResult<Option<SealedDecoyRecord>> {
         unavailable!()
     }
 
-    fn load_by_marker(&self, _: &MarkerLookup) -> PortResult<Option<DecoyRecord>> {
+    fn load_by_marker(&self, _: &SealedMarkerLookup) -> PortResult<Option<SealedDecoyRecord>> {
         unavailable!()
     }
 
-    fn compare_and_swap(&self, _: &DecoyCasRequest) -> PortResult<DecoyRecord> {
+    fn load_by_public_ref(
+        &self,
+        _: &SealedPublicRefLookup,
+    ) -> PortResult<Option<SealedDecoyRecord>> {
+        unavailable!()
+    }
+
+    fn compare_and_swap(&self, _: &SealedDecoyCasRequest) -> PortResult<SealedDecoyRecord> {
+        unavailable!()
+    }
+
+    fn scan(&self, _: &DecoyScan) -> PortResult<SealedDecoyPage> {
         unavailable!()
     }
 }
 
 impl ResponseStore for FakePorts {
+    fn load_plan(&self, _: &ResponsePlanKey) -> PortResult<Option<ResponsePlanRecord>> {
+        unavailable!()
+    }
+
     fn create(&self, _: &ResponsePlanRecord) -> PortResult<CreateOutcome> {
         unavailable!()
     }
@@ -122,11 +147,57 @@ impl ResponseStore for FakePorts {
         unavailable!()
     }
 
+    fn load_effect(&self, _: &ResponseEffectKey) -> PortResult<Option<ResponseEffectRecord>> {
+        unavailable!()
+    }
+
     fn persist_effect(&self, _: &ResponseEffectRecord) -> PortResult<CreateOutcome> {
         unavailable!()
     }
 
+    fn compare_and_swap_effect(
+        &self,
+        _: &ResponseEffectCasRequest,
+    ) -> PortResult<ResponseEffectRecord> {
+        unavailable!()
+    }
+
     fn claim_due(&self, _: &SchedulerClaimRequest) -> PortResult<Vec<ScheduledWork>> {
+        unavailable!()
+    }
+}
+
+impl ResponseSchedulerStore for FakePorts {
+    fn load_retry(&self, _: &SchedulerWorkKey) -> PortResult<Option<SchedulerRetryState>> {
+        unavailable!()
+    }
+
+    fn validate_lease(&self, _: &ScheduledWork) -> PortResult<()> {
+        unavailable!()
+    }
+
+    fn renew_lease(&self, _: &SchedulerLeaseRenewRequest) -> PortResult<ScheduledWork> {
+        unavailable!()
+    }
+
+    fn record_retry(&self, _: &SchedulerRetryRequest) -> PortResult<SchedulerRetryState> {
+        unavailable!()
+    }
+
+    fn acknowledge_health_event(
+        &self,
+        _: &SchedulerHealthAckRequest,
+    ) -> PortResult<SchedulerRetryState> {
+        unavailable!()
+    }
+
+    fn release_lease(&self, _: &SchedulerLeaseReleaseRequest) -> PortResult<()> {
+        unavailable!()
+    }
+}
+
+impl SchedulerHealthPort for FakePorts {
+    fn page_once(&self, _: &SchedulerHealthPageRequest) -> PortResult<()> {
         unavailable!()
     }
 }
@@ -163,6 +234,20 @@ impl BlastRadiusPort for FakePorts {
     }
 }
 
+impl LineageFenceStore for FakePorts {
+    fn acquire(&self, _: &LineageFenceRequest) -> PortResult<LineageFence> {
+        unavailable!()
+    }
+
+    fn query(&self, _: &TenantScopedId) -> PortResult<Option<LineageFence>> {
+        unavailable!()
+    }
+
+    fn release(&self, _: &LineageFenceRelease) -> PortResult<()> {
+        unavailable!()
+    }
+}
+
 impl ApprovalVerifierPort for FakePorts {
     fn verify_and_reserve(&self, _: &ApprovalRequest) -> PortResult<ApprovalReservation> {
         unavailable!()
@@ -177,12 +262,33 @@ impl ApprovalVerifierPort for FakePorts {
     }
 }
 
-impl EffectPort for FakePorts {
-    fn apply(&self, _: &EffectRequest) -> PortResult<EffectResult> {
+impl ApprovalReservationStore for FakePorts {
+    fn reserve(&self, _: &ApprovalReservationCreate) -> PortResult<CreateOutcome> {
         unavailable!()
     }
 
-    fn remove(&self, _: &EffectRequest) -> PortResult<EffectResult> {
+    fn load_reservation(
+        &self,
+        _: &TenantScopedId,
+    ) -> PortResult<Option<StoredApprovalReservation>> {
+        unavailable!()
+    }
+
+    fn commit_reservation(&self, _: &ApprovalReservationMutation) -> PortResult<()> {
+        unavailable!()
+    }
+
+    fn cancel_reservation(&self, _: &ApprovalReservationMutation) -> PortResult<()> {
+        unavailable!()
+    }
+}
+
+impl EffectPort for FakePorts {
+    fn execute(&self, _: &EffectRequest) -> PortResult<EffectResult> {
+        unavailable!()
+    }
+
+    fn load_result(&self, _: &EffectResultQuery) -> PortResult<EffectExecutionStatus> {
         unavailable!()
     }
 }
@@ -202,16 +308,21 @@ impl SecurityAlertPort for FakePorts {
 fn assert_every_port<T>()
 where
     T: FlowStateStore
+        + IsolationEpochEvidenceVerifierPort
         + ClassificationPort
         + TripwireDetectorPort
         + DeclassificationUseStore
         + SecurityEventVerifierPort
         + SecurityEventStore
-        + DecoyRegistryStore
+        + SealedDecoyRegistryStore
         + ResponseStore
+        + ResponseSchedulerStore
+        + SchedulerHealthPort
         + ContainmentOverlayStore
         + BlastRadiusPort
+        + LineageFenceStore
         + ApprovalVerifierPort
+        + ApprovalReservationStore
         + EffectPort
         + SecurityReceiptSink
         + SecurityAlertPort,
@@ -271,4 +382,11 @@ fn strict_port_shapes_reject_unknown_fields() {
         "unexpected":true
     }"#;
     assert!(serde_json::from_str::<ClassificationRequest>(json).is_err());
+}
+
+#[test]
+fn authoritative_record_sets_are_strictly_sorted_and_unique() {
+    assert!(serde_json::from_str::<RecordIdSet>(r#"["a","b"]"#).is_ok());
+    assert!(serde_json::from_str::<RecordIdSet>(r#"["b","a"]"#).is_err());
+    assert!(serde_json::from_str::<RecordIdSet>(r#"["a","a"]"#).is_err());
 }
