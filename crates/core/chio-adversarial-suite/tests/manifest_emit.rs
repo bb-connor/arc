@@ -115,37 +115,10 @@ fn manifest_json_on_disk_matches_emitter() {
     let path = manifest_path();
     let on_disk = match fs::read_to_string(&path) {
         Ok(s) => s,
-        Err(err) => panic!(
-            "missing {}: {err}. Regenerate with `cargo test -p chio-adversarial-suite --test manifest_emit -- --ignored regenerate`",
-            path.display()
-        ),
+        Err(err) => panic!("missing {}: {err}", path.display()),
     };
 
     if canonical != on_disk {
-        panic!(
-            "manifest drift detected at {}.\n\
-             Regenerate with: cargo test -p chio-adversarial-suite --test manifest_emit -- --ignored regenerate",
-            path.display()
-        );
-    }
-}
-
-/// Regenerate `manifest.json` on disk. Marked `#[ignore]` so a normal
-/// `cargo test` run never silently rewrites the source file; the
-/// drift-detection test above guards against forgotten regenerations.
-#[test]
-#[ignore = "regenerator: invoke explicitly with `-- --ignored regenerate`"]
-fn regenerate() {
-    let manifest = match Manifest::from_bundled() {
-        Ok(manifest) => manifest,
-        Err(err) => panic!("Manifest::from_bundled failed: {err}"),
-    };
-    let canonical = match manifest.to_canonical_json() {
-        Ok(s) => s,
-        Err(err) => panic!("to_canonical_json failed: {err}"),
-    };
-    let path = manifest_path();
-    if let Err(err) = fs::write(&path, canonical) {
-        panic!("failed to write {}: {err}", path.display());
+        panic!("manifest drift detected at {}", path.display());
     }
 }
