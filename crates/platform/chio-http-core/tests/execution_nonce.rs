@@ -217,7 +217,7 @@ fn evaluate_response_serializes_execution_nonce_field() {
 
     let json = serde_json::to_string(&response).unwrap();
     assert!(json.contains("execution_nonce"));
-    assert!(json.contains("chio.execution_nonce.v2"));
+    assert!(json.contains("chio.execution_nonce.v1"));
 
     let back: EvaluateResponse = serde_json::from_str(&json).unwrap();
     let recovered = back.execution_nonce.expect("nonce round-trips");

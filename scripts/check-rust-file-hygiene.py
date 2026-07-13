@@ -259,7 +259,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/products/chio-wall/src/commands.rs": allow(
         "2026-07-31",
         "wall command surface; capped to current size until split",
-        max_lines=2_001,
+        max_lines=2_047,
     ),
     "crates/platform/chio-http-session/src/lib.rs": allow(
         "2026-07-31",

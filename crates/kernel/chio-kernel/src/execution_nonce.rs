@@ -44,7 +44,7 @@ use uuid::Uuid;
 use crate::KernelError;
 
 /// Schema identifier for Chio execution nonces.
-pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v2";
+pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v1";
 
 /// Default TTL for a freshly minted execution nonce.
 pub const DEFAULT_EXECUTION_NONCE_TTL_SECS: u64 = 30;
