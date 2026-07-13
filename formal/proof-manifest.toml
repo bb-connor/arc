@@ -47,6 +47,8 @@ gate_commands = [
   "./scripts/check-aeneas-equivalence.sh",
   "./scripts/check-rust-verification-gates.sh",
   "./scripts/check-kani-public-core.sh",
+  "./scripts/run-kani-manifest.sh --lane pr --crate chio-kernel-core",
+  "./scripts/check-protocol-primitives-concurrency.sh",
   "./scripts/check-adapter-no-bypass.sh",
   "cargo test -p chio-formal-diff-tests",
   "./scripts/check-portable-kernel.sh",
@@ -86,6 +88,10 @@ covered_rust_symbols = [
   "chio_core_types::delegation_receipt::DelegationReceipt::canonical_bytes",
   "chio_kernel_core::revocation_view::RevocationView::install_if_newer",
   "chio_revocation_oracle::api::InclusionProof::verify",
+  "chio_kernel_core::formal_core::authorize_composite_quotas",
+  "chio_kernel_core::formal_core::admit_quota_maximum",
+  "chio_kernel_core::formal_core::family_binding_is_preserved",
+  "chio_kernel_core::formal_core::validate_threshold_signers",
 ]
 
 shell_entrypoints = [

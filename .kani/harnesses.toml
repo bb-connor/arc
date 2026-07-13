@@ -186,6 +186,38 @@ default_unwind = 8
 timeout_secs = 1800
 lane = "pr"
 
+[[harness]]
+crate = "chio-kernel-core"
+harness = "verify_composite_quota_all_or_nothing"
+default_unwind = 8
+timeout_secs = 1800
+lane = "pr"
+notes = "Bounded three-key authorization changes every applicable count or none."
+
+[[harness]]
+crate = "chio-kernel-core"
+harness = "verify_quota_maximum_immutable"
+default_unwind = 8
+timeout_secs = 1800
+lane = "pr"
+notes = "An existing quota key rejects every changed signed maximum."
+
+[[harness]]
+crate = "chio-kernel-core"
+harness = "verify_family_binding_preservation"
+default_unwind = 8
+timeout_secs = 1800
+lane = "pr"
+notes = "Delegation-family authority requires exact binding, lineage, expiry, and maximum preservation."
+
+[[harness]]
+crate = "chio-kernel-core"
+harness = "verify_threshold_distinct_signers"
+default_unwind = 8
+timeout_secs = 1800
+lane = "pr"
+notes = "Threshold admission rejects duplicate and ineligible signer keys."
+
 
 # ---------------------------------------------------------------------
 # Per-crate sections land with their harness source

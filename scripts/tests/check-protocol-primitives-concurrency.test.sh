@@ -46,13 +46,18 @@ cat > "${work}/bin/cargo" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 : "${CHIO_LOOM_COMMAND_CAPTURE:?capture path is required}"
+: "${CHIO_LOOM_ENV_CAPTURE:?environment capture path is required}"
 for argument in "$@"; do
   printf '%s\0' "${argument}"
 done > "${CHIO_LOOM_COMMAND_CAPTURE}"
+printf '%s' "${CARGO_INCREMENTAL:-}" > "${CHIO_LOOM_ENV_CAPTURE}.incremental"
+printf '%s' "${RUSTFLAGS:-}" > "${CHIO_LOOM_ENV_CAPTURE}.rustflags"
+echo 'running 5 tests'
 EOF
 chmod +x "${work}/bin/cargo"
 
 export CHIO_LOOM_COMMAND_CAPTURE="${work}/cargo-arguments"
+export CHIO_LOOM_ENV_CAPTURE="${work}/cargo-environment"
 PATH="${work}/bin:${PATH}" "./${runner}"
 
 python3 - "${CHIO_LOOM_COMMAND_CAPTURE}" <<'PY'
@@ -68,12 +73,11 @@ expected = [
     "test",
     "-p",
     "chio-kernel",
-    "--lib",
     "--features",
     "loom-tests",
-    "budget_store::property_tests::loom_production_composite_quota_authorization_is_all_or_none",
-    "--",
-    "--exact",
+    "--test",
+    "loom_concurrency",
+    "protocol_primitives_",
 ]
 if arguments != expected:
     raise SystemExit(
@@ -82,5 +86,14 @@ if arguments != expected:
         f"  expected: {expected!r}"
     )
 PY
+
+if [[ "$(cat "${CHIO_LOOM_ENV_CAPTURE}.incremental")" != "0" ]]; then
+  echo "protocol-primitives concurrency runner did not disable incremental compilation" >&2
+  exit 1
+fi
+if [[ "$(cat "${CHIO_LOOM_ENV_CAPTURE}.rustflags")" != *"--cfg chio_kernel_loom"* ]]; then
+  echo "protocol-primitives concurrency runner did not enable chio_kernel_loom" >&2
+  exit 1
+fi
 
 echo "protocol-primitives concurrency gate contract passed"

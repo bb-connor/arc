@@ -14,8 +14,9 @@ name: CI
 # elsewhere: the Lean 4 / Aeneas / Creusot proof report, portable browser and
 # mobile qualification, the polyglot SDK-parity lane, and workspace coverage
 # run nightly in nightly.yml; formal model checking is path-scoped in
-# apalache-safety.yml; the Kani lanes run nightly (kani-public-nightly); the
-# JVM SDK build is path-scoped in jvm.yml; macOS coverage stays in
+# apalache-safety.yml; the bounded Kani PR lane runs below while the complete
+# Kani manifest runs nightly (kani-public-nightly); the JVM SDK build is
+# path-scoped in jvm.yml; macOS coverage stays in
 # release-binaries.yml for tag releases, where macOS artifact behavior is
 # actually exercised.
 
@@ -35,6 +36,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   CHIO_CI_RUSTFLAGS: "-D warnings -C link-arg=-Wl,--threads=1"
+  CHIO_KANI_VERSION: 0.67.0
   # PR-tier proptest case count for the named invariants. The nightly tier
   # (4096) lives in .github/workflows/nightly.yml.
   PROPTEST_CASES: "256"
@@ -113,6 +115,9 @@ jobs:
           bash ./scripts/check-agent-web-proof-envelope-schema.sh
           bash ./scripts/tests/check-agent-web-proof-envelope-schema.test.sh
           bash ./scripts/tests/check-protocol-primitives-concurrency.test.sh
+          bash ./scripts/tests/check-flow-security.test.sh
+          bash ./scripts/tests/check-deception-security.test.sh
+          bash ./scripts/tests/check-response-recovery.test.sh
 
       - name: Anchor batch async witness lint
         run: bash ./scripts/check-anchor-batch-async-witness.sh
@@ -224,6 +229,44 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0 --cfg tokio_unstable"
         run: cargo test -p chio-kernel --features tokio-console-smoke --test tokio_console_smoke
+
+  kani-public-pr:
+    name: kani-public-pr (chio-kernel-core lanes.pr)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install --profile minimal
+          rustup show active-toolchain
+
+      - name: Install protobuf compiler
+        uses: ./.github/actions/apt-install
+        with:
+          packages: protobuf-compiler
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+
+      - name: Install cargo-kani
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/chio-kani-tool-target
+        run: |
+          set -euo pipefail
+          cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
+          cargo kani setup
+          cargo kani --version
+
+      - name: Verify chio-kernel-core PR harness manifest
+        env:
+          CARGO_BUILD_JOBS: "1"
+          CARGO_INCREMENTAL: "0"
+        run: ./scripts/run-kani-manifest.sh --lane pr --crate chio-kernel-core
 
   msrv:
     name: MSRV build and test

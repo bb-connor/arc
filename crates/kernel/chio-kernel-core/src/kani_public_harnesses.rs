@@ -18,9 +18,10 @@ use crate::capability_verify::CapabilityError;
 use crate::clock::FixedClock;
 use crate::evaluate::EvaluateInput;
 use crate::formal_core::{
+    admit_quota_maximum, authorize_composite_quotas, family_binding_is_preserved,
     guard_pipeline_allows, monetary_cap_is_subset_by_parts, optional_u32_cap_is_subset,
     receipt_fields_coupled, required_true_is_preserved, revocation_snapshot_denies,
-    time_window_valid, GuardStep,
+    time_window_valid, validate_threshold_signers, FamilyBindingPreservation, GuardStep,
 };
 use crate::guard::PortableToolCallRequest;
 use crate::normalized::{NormalizedOperation, NormalizedScope, NormalizedToolGrant};
@@ -1279,4 +1280,129 @@ pub fn verify_oracle_inclusion_soundness() {
         }],
     );
     assert_eq!(retry, verifier_accepts);
+}
+
+#[kani::proof]
+pub fn verify_composite_quota_all_or_nothing() {
+    let counts: [u32; 3] = kani::any();
+    let maxima: [u32; 3] = kani::any();
+    let applicable: [bool; 3] = kani::any();
+
+    let result = authorize_composite_quotas(counts, maxima, applicable);
+    let mut every_quota_admits = true;
+    let mut index = 0;
+    while index < counts.len() {
+        if counts[index] > maxima[index] || (applicable[index] && counts[index] >= maxima[index]) {
+            every_quota_admits = false;
+        }
+        index += 1;
+    }
+
+    assert_eq!(result.accepted, every_quota_admits);
+    let mut index = 0;
+    while index < counts.len() {
+        if result.accepted && applicable[index] {
+            assert_eq!(result.counts[index], counts[index] + 1);
+            assert!(result.counts[index] <= maxima[index]);
+        } else {
+            assert_eq!(result.counts[index], counts[index]);
+        }
+        index += 1;
+    }
+}
+
+#[kani::proof]
+pub fn verify_quota_maximum_immutable() {
+    let key_exists = kani::any::<bool>();
+    let stored_maximum = kani::any::<u32>();
+    let presented_maximum = kani::any::<u32>();
+
+    let result = admit_quota_maximum(key_exists, stored_maximum, presented_maximum);
+    if key_exists {
+        assert_eq!(result.maximum, stored_maximum);
+        assert_eq!(result.accepted, stored_maximum == presented_maximum);
+    } else {
+        assert!(result.accepted);
+        assert_eq!(result.maximum, presented_maximum);
+    }
+}
+
+#[kani::proof]
+pub fn verify_family_binding_preservation() {
+    let binding = FamilyBindingPreservation {
+        root_binding_matches: kani::any(),
+        root_capability_matches: kani::any(),
+        root_subject_matches: kani::any(),
+        root_scope_matches: kani::any(),
+        descendant_expiry_within_root: kani::any(),
+        parent_maximum: kani::any(),
+        descendant_maximum: kani::any(),
+    };
+
+    let preserved = family_binding_is_preserved(binding);
+    let exact_authority = binding.root_binding_matches
+        && binding.root_capability_matches
+        && binding.root_subject_matches
+        && binding.root_scope_matches
+        && binding.descendant_expiry_within_root
+        && binding.parent_maximum == binding.descendant_maximum;
+    assert_eq!(preserved, exact_authority);
+    if preserved {
+        assert_eq!(binding.parent_maximum, binding.descendant_maximum);
+    }
+}
+
+#[kani::proof]
+pub fn verify_threshold_distinct_signers() {
+    let signers: [u8; 4] = kani::any();
+    let signer_count = kani::any::<u8>();
+    let eligible: [u8; 4] = kani::any();
+    let eligible_count = kani::any::<u8>();
+    let required = kani::any::<u8>();
+    kani::assume(signer_count <= 4);
+    kani::assume(eligible_count <= 4);
+
+    let mut left = 0_usize;
+    while left < usize::from(eligible_count) {
+        let mut right = left + 1;
+        while right < usize::from(eligible_count) {
+            kani::assume(eligible[left] != eligible[right]);
+            right += 1;
+        }
+        left += 1;
+    }
+
+    let result =
+        validate_threshold_signers(signers, signer_count, eligible, eligible_count, required);
+
+    let mut expected_valid = required > 0;
+    let mut signer_index = 0_usize;
+    while signer_index < usize::from(signer_count) {
+        let mut signer_is_eligible = false;
+        let mut eligible_index = 0_usize;
+        while eligible_index < usize::from(eligible_count) {
+            if signers[signer_index] == eligible[eligible_index] {
+                signer_is_eligible = true;
+            }
+            eligible_index += 1;
+        }
+        if !signer_is_eligible {
+            expected_valid = false;
+        }
+
+        let mut prior_index = 0_usize;
+        while prior_index < signer_index {
+            if signers[prior_index] == signers[signer_index] {
+                expected_valid = false;
+            }
+            prior_index += 1;
+        }
+        signer_index += 1;
+    }
+
+    assert_eq!(result.valid, expected_valid);
+    assert_eq!(result.accepted, expected_valid && signer_count >= required);
+    if result.accepted {
+        assert_eq!(result.distinct_signers, signer_count);
+    }
 }

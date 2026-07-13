@@ -212,3 +212,214 @@ pub fn receipt_fields_coupled(
         evidence_class_matches,
     )
 }
+
+/// Result of one bounded composite invocation-quota authorization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompositeQuotaAuthorization {
+    pub accepted: bool,
+    pub counts: [u32; 3],
+}
+
+/// Atomically reserve one unit from every applicable quota.
+///
+/// Corrupt pre-state and exhaustion both fail without changing any count.
+#[must_use]
+pub fn authorize_composite_quotas(
+    counts: [u32; 3],
+    maxima: [u32; 3],
+    applicable: [bool; 3],
+) -> CompositeQuotaAuthorization {
+    let mut accepted = true;
+    let mut index = 0;
+    while index < counts.len() {
+        if counts[index] > maxima[index] || (applicable[index] && counts[index] >= maxima[index]) {
+            accepted = false;
+        }
+        index += 1;
+    }
+
+    if !accepted {
+        return CompositeQuotaAuthorization {
+            accepted: false,
+            counts,
+        };
+    }
+
+    let mut next = counts;
+    let mut index = 0;
+    while index < next.len() {
+        if applicable[index] {
+            next[index] += 1;
+        }
+        index += 1;
+    }
+
+    CompositeQuotaAuthorization {
+        accepted: true,
+        counts: next,
+    }
+}
+
+/// Result of presenting an immutable maximum for one quota key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QuotaMaximumAdmission {
+    pub accepted: bool,
+    pub maximum: u32,
+}
+
+/// Admit a quota maximum without permitting an existing key to change it.
+#[must_use]
+pub fn admit_quota_maximum(
+    key_exists: bool,
+    stored_maximum: u32,
+    presented_maximum: u32,
+) -> QuotaMaximumAdmission {
+    if key_exists && stored_maximum != presented_maximum {
+        QuotaMaximumAdmission {
+            accepted: false,
+            maximum: stored_maximum,
+        }
+    } else {
+        QuotaMaximumAdmission {
+            accepted: true,
+            maximum: if key_exists {
+                stored_maximum
+            } else {
+                presented_maximum
+            },
+        }
+    }
+}
+
+/// Authenticated fields required to preserve a delegation-family quota.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FamilyBindingPreservation {
+    pub root_binding_matches: bool,
+    pub root_capability_matches: bool,
+    pub root_subject_matches: bool,
+    pub root_scope_matches: bool,
+    pub descendant_expiry_within_root: bool,
+    pub parent_maximum: u32,
+    pub descendant_maximum: u32,
+}
+
+/// Require exact family authority and immutable-maximum preservation.
+#[must_use]
+pub fn family_binding_is_preserved(binding: FamilyBindingPreservation) -> bool {
+    binding.root_binding_matches
+        && binding.root_capability_matches
+        && binding.root_subject_matches
+        && binding.root_scope_matches
+        && binding.descendant_expiry_within_root
+        && binding.parent_maximum == binding.descendant_maximum
+}
+
+/// Result of bounded threshold signer validation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ThresholdSignerValidation {
+    pub valid: bool,
+    pub accepted: bool,
+    pub distinct_signers: u8,
+}
+
+/// Validate a bounded signer list against a bounded eligible-key set.
+///
+/// Both slices are represented as fixed arrays plus lengths so the same
+/// routine remains tractable for bounded model checking. Duplicate or
+/// ineligible signers invalidate the complete set.
+#[must_use]
+pub fn validate_threshold_signers(
+    signers: [u8; 4],
+    signer_count: u8,
+    eligible: [u8; 4],
+    eligible_count: u8,
+    required: u8,
+) -> ThresholdSignerValidation {
+    if signer_count > 4 || eligible_count > 4 || required == 0 {
+        return ThresholdSignerValidation {
+            valid: false,
+            accepted: false,
+            distinct_signers: 0,
+        };
+    }
+
+    let mut distinct_signers = 0_u8;
+    let mut signer_index = 0_usize;
+    while signer_index < usize::from(signer_count) {
+        let signer = signers[signer_index];
+        let mut is_eligible = false;
+        let mut eligible_index = 0_usize;
+        while eligible_index < usize::from(eligible_count) {
+            if eligible[eligible_index] == signer {
+                is_eligible = true;
+            }
+            eligible_index += 1;
+        }
+
+        let mut duplicate = false;
+        let mut prior_index = 0_usize;
+        while prior_index < signer_index {
+            if signers[prior_index] == signer {
+                duplicate = true;
+            }
+            prior_index += 1;
+        }
+
+        if !is_eligible || duplicate {
+            return ThresholdSignerValidation {
+                valid: false,
+                accepted: false,
+                distinct_signers,
+            };
+        }
+
+        distinct_signers += 1;
+        signer_index += 1;
+    }
+
+    ThresholdSignerValidation {
+        valid: true,
+        accepted: distinct_signers >= required,
+        distinct_signers,
+    }
+}
+
+#[cfg(test)]
+mod protocol_primitive_tests {
+    use super::{
+        admit_quota_maximum, authorize_composite_quotas, family_binding_is_preserved,
+        validate_threshold_signers, FamilyBindingPreservation,
+    };
+
+    #[test]
+    fn composite_quota_authorization_changes_every_applicable_count_or_none() {
+        let accepted = authorize_composite_quotas([0, 1, 4], [1, 2, 5], [true; 3]);
+        assert!(accepted.accepted);
+        assert_eq!(accepted.counts, [1, 2, 5]);
+
+        let denied = authorize_composite_quotas([0, 2, 4], [1, 2, 5], [true; 3]);
+        assert!(!denied.accepted);
+        assert_eq!(denied.counts, [0, 2, 4]);
+    }
+
+    #[test]
+    fn family_maximum_and_threshold_signers_are_authority_bound() {
+        assert!(!family_binding_is_preserved(FamilyBindingPreservation {
+            root_binding_matches: true,
+            root_capability_matches: true,
+            root_subject_matches: true,
+            root_scope_matches: true,
+            descendant_expiry_within_root: true,
+            parent_maximum: 3,
+            descendant_maximum: 2,
+        }));
+
+        let maximum = admit_quota_maximum(true, 3, 2);
+        assert!(!maximum.accepted);
+        assert_eq!(maximum.maximum, 3);
+
+        let threshold = validate_threshold_signers([7, 7, 0, 0], 2, [7, 8, 0, 0], 2, 2);
+        assert!(!threshold.valid);
+        assert!(!threshold.accepted);
+    }
+}
