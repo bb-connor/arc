@@ -540,19 +540,6 @@ fn verifier_trust_bundle_v3_requires_authority_roots() {
 }
 
 #[test]
-#[ignore = "v1-only collapse: v1 is now the strict schema, not a historical one"]
-fn historical_v1_trust_bundle_is_not_strict_verifier_input() {
-    // Ignored while v1 is the only trust-bundle schema: there is no older
-    // version for the strict verifier to reject. Guards the rejection
-    // contract for any future revision that reintroduces multiple versions.
-    let mut document = trust_bundle_document_from_fixture();
-    document.schema = VERIFIER_TRUST_BUNDLE_SCHEMA.to_string();
-
-    let error = ChioVerifierTrustBundle::from_document(document).unwrap_err();
-    assert!(error.to_string().contains("historical"));
-}
-
-#[test]
 fn forged_lease_signer_fails_even_when_embedded_signature_is_valid() {
     let mut package = proof_package_from_json(include_str!(
         "../../../../examples/chio-3vendor/fixtures/buyer-auditor-proof-package.json"
