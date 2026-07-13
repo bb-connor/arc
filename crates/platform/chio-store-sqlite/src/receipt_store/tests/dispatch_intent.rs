@@ -144,6 +144,33 @@ fn same_request_id_journals_independently_across_tenants() -> Result<(), Box<dyn
 }
 
 #[test]
+fn journal_durability_follows_the_database_backing() -> Result<(), Box<dyn std::error::Error>> {
+    // A file-backed database commits intent rows through WAL with
+    // synchronous FULL, so the journal outlives the process and the store
+    // claims crash durability to the kernel's dispatch gate.
+    let path = unique_db_path("chio-intents-durability");
+    let file_backed = SqliteReceiptStore::open(&path)?;
+    assert!(
+        file_backed.supports_durable_dispatch_intent_journal(),
+        "a file-backed store keeps journal rows across a crash"
+    );
+    drop(file_backed);
+    let _ = std::fs::remove_file(&path);
+
+    // An in-memory database never gets far enough to make the claim: the
+    // durability pragmas require WAL, which in-memory SQLite cannot
+    // provide, so the open itself is refused and a volatile receipt store
+    // never comes into existence.
+    let in_memory =
+        SqliteReceiptStore::open("file:chio-intents-durability-mem?mode=memory&cache=shared");
+    assert!(
+        in_memory.is_err(),
+        "an in-memory receipt store must be refused at open"
+    );
+    Ok(())
+}
+
+#[test]
 fn consume_intent_removes_row_and_persists_receipt_atomically(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use chio_kernel::receipt_store::{DispatchIntentKey, ReceiptStore};

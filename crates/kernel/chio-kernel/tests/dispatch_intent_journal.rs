@@ -146,6 +146,12 @@ mod support {
             self.inner.as_ref().append_child_receipt(receipt)
         }
 
+        fn supports_durable_dispatch_intent_journal(&self) -> bool {
+            self.inner
+                .as_ref()
+                .supports_durable_dispatch_intent_journal()
+        }
+
         fn record_dispatch_intent(
             &self,
             intent: &chio_kernel::DispatchIntentRecord,
@@ -587,6 +593,192 @@ impl chio_kernel::ToolServerConnection for UnannotatedServer {
     ) -> Result<serde_json::Value, chio_kernel::KernelError> {
         Ok(serde_json::json!({}))
     }
+}
+
+/// Single-tool server that only counts invocations, for asserting that a
+/// denied dispatch never reached the tool.
+struct CountingServer {
+    invoked: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
+
+#[async_trait::async_trait]
+impl chio_kernel::ToolServerConnection for CountingServer {
+    fn server_id(&self) -> &str {
+        "srv"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["tool".to_string()]
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
+    ) -> Result<serde_json::Value, chio_kernel::KernelError> {
+        self.invoked
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(serde_json::json!({}))
+    }
+}
+
+fn single_tool_scope(server_id: &str, tool_name: &str) -> chio_core::capability::scope::ChioScope {
+    chio_core::capability::scope::ChioScope {
+        grants: vec![chio_core::capability::scope::ToolGrant {
+            server_id: server_id.to_string(),
+            tool_name: tool_name.to_string(),
+            operations: vec![chio_core::capability::scope::Operation::Invoke],
+            constraints: vec![],
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }],
+        ..Default::default()
+    }
+}
+
+fn tool_request(
+    request_id: &str,
+    capability: &chio_core::capability::token::CapabilityToken,
+) -> chio_kernel::ToolCallRequest {
+    chio_kernel::ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: capability.clone(),
+        tool_name: "tool".to_string(),
+        server_id: "srv".to_string(),
+        agent_id: capability.subject.to_hex(),
+        arguments: serde_json::json!({ "payload": "hello" }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    }
+}
+
+/// Store that accepts every journal write into process memory. Attached
+/// directly to a kernel it passes the store-attached check, yet its rows
+/// die with the process - exactly the loss the journal exists to prevent.
+/// It deliberately keeps the default (false) durability claim.
+struct VolatileJournalStore {
+    open_intents: std::sync::Mutex<std::collections::HashSet<String>>,
+}
+
+impl VolatileJournalStore {
+    fn new() -> Self {
+        Self {
+            open_intents: std::sync::Mutex::new(std::collections::HashSet::new()),
+        }
+    }
+}
+
+impl ReceiptStore for VolatileJournalStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &chio_core::receipt::lineage::ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn record_dispatch_intent(
+        &self,
+        intent: &DispatchIntentRecord,
+    ) -> Result<(), ReceiptStoreError> {
+        self.open_intents
+            .lock()
+            .expect("volatile journal lock")
+            .insert(intent.request_id.clone());
+        Ok(())
+    }
+
+    fn append_chio_receipt_consuming_intent(
+        &self,
+        _receipt: &ChioReceipt,
+        key: &DispatchIntentKey,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        if self
+            .open_intents
+            .lock()
+            .expect("volatile journal lock")
+            .remove(&key.request_id)
+        {
+            Ok(None)
+        } else {
+            Err(ReceiptStoreError::Conflict(format!(
+                "dispatch intent for request `{}` not found",
+                key.request_id
+            )))
+        }
+    }
+}
+
+#[test]
+fn non_durable_store_denies_side_effecting_dispatch_when_journal_on(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::Verdict;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    // With the journal on, side-effecting dispatch must fail closed against
+    // a store that accepts the intent write without claiming it survives a
+    // crash: the write would "succeed" and the marker would still be gone
+    // exactly when reconciliation needs it.
+    let invoked = Arc::new(AtomicUsize::new(0));
+    let mut kernel = chio_kernel::ChioKernel::new(support::journal_config(Keypair::generate()));
+    kernel.register_tool_server(Box::new(CountingServer {
+        invoked: Arc::clone(&invoked),
+    }));
+    kernel.set_receipt_store_handle(Arc::new(VolatileJournalStore::new()))?;
+    let agent = Keypair::generate();
+    let capability =
+        kernel.issue_capability(&agent.public_key(), single_tool_scope("srv", "tool"), 300)?;
+
+    let denied = kernel.evaluate_tool_call_blocking(&tool_request("req-volatile", &capability))?;
+    assert!(
+        matches!(denied.verdict, Verdict::Deny),
+        "a non-durable journal store must deny side-effecting dispatch, got {:?}: {:?}",
+        denied.verdict,
+        denied.reason
+    );
+    let reason = denied.reason.unwrap_or_default();
+    assert!(
+        reason.contains("across a crash"),
+        "the deny names the durability gap: {reason}"
+    );
+    assert_eq!(
+        invoked.load(Ordering::SeqCst),
+        0,
+        "the tool must not run without a durable intent"
+    );
+
+    // Journal Off writes no intents, so the same store keeps serving
+    // side-effecting calls.
+    let mut config = support::journal_config(Keypair::generate());
+    config.dispatch_intent_journal = chio_kernel::DispatchIntentJournalMode::Off;
+    let mut kernel = chio_kernel::ChioKernel::new(config);
+    kernel.register_tool_server(Box::new(CountingServer {
+        invoked: Arc::clone(&invoked),
+    }));
+    kernel.set_receipt_store_handle(Arc::new(VolatileJournalStore::new()))?;
+    let agent = Keypair::generate();
+    let capability =
+        kernel.issue_capability(&agent.public_key(), single_tool_scope("srv", "tool"), 300)?;
+    let allowed =
+        kernel.evaluate_tool_call_blocking(&tool_request("req-journal-off", &capability))?;
+    assert!(
+        matches!(allowed.verdict, Verdict::Allow),
+        "journal Off keeps a non-durable store serving: {:?}",
+        allowed.reason
+    );
+    assert_eq!(invoked.load(Ordering::SeqCst), 1);
+    Ok(())
 }
 
 #[test]

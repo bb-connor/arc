@@ -3483,6 +3483,15 @@ impl SqliteReceiptStore {
         self.writer_lifetime_lock.is_some()
     }
 
+    /// True when a journaled dispatch intent survives a process crash: the
+    /// database is file-backed, so a committed row (WAL, synchronous FULL)
+    /// outlives the process. An in-memory database loses the journal with
+    /// the process and can never honor the crash-marker guarantee the
+    /// journal exists to provide.
+    pub fn supports_durable_dispatch_intent_journal(&self) -> bool {
+        self.writer_lifetime_lock.is_some()
+    }
+
     /// Resolve every open intent journaled by another store instance (a
     /// crashed prior incarnation, or a sibling on a shared database file).
     /// Reads run on the reader pool and the reconciler runs on the calling

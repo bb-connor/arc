@@ -461,6 +461,12 @@ impl ReceiptStore for SqliteReceiptStore {
         Ok(())
     }
 
+    fn supports_durable_dispatch_intent_journal(&self) -> bool {
+        // The test double writes to a WAL file on disk, so its journal rows
+        // survive a crash like the production store's.
+        true
+    }
+
     fn record_dispatch_intent(
         &self,
         intent: &crate::receipt_store::DispatchIntentRecord,

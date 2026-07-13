@@ -93,6 +93,32 @@ impl ChioKernel {
             return Ok(None);
         }
 
+        // The journal's entire value is a marker that outlives a crash. A
+        // store can accept the intent write into volatile memory, passing
+        // every later check while the row is guaranteed to be gone exactly
+        // when reconciliation needs it, so the class gate requires a
+        // positive crash-durability claim before any effecting dispatch
+        // proceeds.
+        match self
+            .with_receipt_store(|store| Ok(store.supports_durable_dispatch_intent_journal()))?
+        {
+            Some(true) => {}
+            Some(false) => {
+                return Err(KernelError::DispatchIntentPersistence(
+                    "dispatch-intent journal is enabled but the attached receipt store does not \
+                     keep journaled intents across a crash; attach a durable store or turn the \
+                     journal off"
+                        .to_string(),
+                ));
+            }
+            None => {
+                return Err(KernelError::DispatchIntentPersistence(
+                    "dispatch-intent journal is enabled but no durable receipt store is attached"
+                        .to_string(),
+                ));
+            }
+        }
+
         // The same canonical parameter hash the eventual receipt commits, so
         // the consume can prove the intent matches the exact attested call.
         let action = chio_core::receipt::decision::ToolCallAction::from_parameters(

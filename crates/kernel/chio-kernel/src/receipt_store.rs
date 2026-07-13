@@ -803,6 +803,16 @@ pub trait ReceiptStore: Send + Sync {
     fn supports_dispatch_intent_recovery(&self) -> bool {
         false
     }
+    /// True when a journaled dispatch intent survives a process crash. The
+    /// journal exists to leave a durable marker for an effect whose
+    /// terminal receipt never committed, so the kernel refuses to journal
+    /// into a store that would lose the row with the process (an in-memory
+    /// database): such a write "succeeds" and still vanishes exactly when
+    /// reconciliation needs it. Default false, so a store must positively
+    /// claim crash durability before side-effecting dispatch trusts it.
+    fn supports_durable_dispatch_intent_journal(&self) -> bool {
+        false
+    }
     /// Count of open (in-flight or orphaned-but-unreconciled) dispatch
     /// intents. Default 0 for stores without the journal.
     fn open_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {

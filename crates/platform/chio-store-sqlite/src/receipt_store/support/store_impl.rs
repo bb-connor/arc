@@ -454,6 +454,10 @@ impl ReceiptStore for SqliteReceiptStore {
         SqliteReceiptStore::supports_dispatch_intent_recovery(self)
     }
 
+    fn supports_durable_dispatch_intent_journal(&self) -> bool {
+        SqliteReceiptStore::supports_durable_dispatch_intent_journal(self)
+    }
+
     fn open_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
         SqliteReceiptStore::open_dispatch_intent_count(self)
     }
