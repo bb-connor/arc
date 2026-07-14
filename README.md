@@ -186,13 +186,23 @@ claude plugin install chio@chio
 pip install chio-hermes
 ```
 
-Then enable it under `plugins` in `~/.hermes/config.yaml` and run `hermes setup` to supply the
-sidecar URL and capability id:
+Enable the plugin and select its toolset in `~/.hermes/config.yaml` (the `toolsets` entry is
+required, otherwise the `chio_*` tools never surface):
 
 ```yaml
 plugins:
   enabled:
     - chio
+toolsets:
+  - chio
+```
+
+`hermes setup` does not prompt for entry-point plugins, so set the sidecar URL and capability id
+yourself, or write them to `~/.hermes/.env`. Mint the capability with `hermes chio issue`:
+
+```sh
+export CHIO_SIDECAR_URL=http://127.0.0.1:9090
+export CHIO_CAPABILITY_ID=<id from `hermes chio issue --json`>
 ```
 
 ### 3. Read the receipts
