@@ -9,8 +9,9 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::admission_operation::{
-    AdmissionDigest, AdmissionDispatchCommitBindingV1, AdmissionDispatchState, AdmissionIdentifier,
-    AdmissionOperationId, AdmissionOperationV1, AdmissionProjectionContext,
+    AdmissionAttachment, AdmissionDigest, AdmissionDispatchCommitBindingV1, AdmissionDispatchState,
+    AdmissionIdentifier, AdmissionOperationCommand, AdmissionOperationId, AdmissionOperationState,
+    AdmissionOperationV1, AdmissionProjectionContext, AdmissionRecoveryLease,
 };
 use crate::dispatch_status::{
     DispatchStatusQuery, QualifiedDispatchStatusProvider, VerifiedProviderNotAccepted,
@@ -771,7 +772,7 @@ impl ToolOutcomeRecordV1 {
         let commit = operation
             .dispatch_commit()
             .ok_or(ToolOutcomeError::Binding("outcome.dispatch_commit"))?;
-        validate_committed_operation(operation, commit)?;
+        validate_retained_dispatch_commit(operation, commit)?;
         if self.operation_id != *operation.binding().operation_id()
             || self.request_id != operation.replay_key().request_id
             || self.dispatch_operation_version != commit.committed_version
@@ -787,14 +788,45 @@ impl ToolOutcomeRecordV1 {
     pub fn validate_for_store_insert(
         &self,
         operation: &AdmissionOperationV1,
+        blob: &CanonicalInvocationBlobV1,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<(), ToolOutcomeError> {
-        self.validate_against(operation)?;
+        let commit = operation
+            .dispatch_commit()
+            .ok_or(ToolOutcomeError::Binding("outcome.dispatch_commit"))?;
+        validate_committed_operation(operation, commit)?;
+        self.validate_canonical_blob(operation, blob)?;
         validate_store_fence(active_fence)?;
         positive("outcome.store_trusted_now", trusted_now_unix_ms)?;
         if active_fence != &self.recording_fence || trusted_now_unix_ms < self.recorded_at_unix_ms {
             return Err(ToolOutcomeError::Binding("outcome.store_mutation_context"));
+        }
+        Ok(())
+    }
+
+    pub fn validate_canonical_blob(
+        &self,
+        operation: &AdmissionOperationV1,
+        blob: &CanonicalInvocationBlobV1,
+    ) -> Result<(), ToolOutcomeError> {
+        self.validate_against(operation)?;
+        let raw = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())?;
+        blob.verify(&raw)?;
+        let raw = raw.to_persisted();
+        if raw.operation_id != self.operation_id
+            || raw.request_id != self.request_id
+            || raw.dispatch_operation_version != self.dispatch_operation_version
+            || raw.dispatch_fence != self.dispatch_fence
+            || raw.tool_server != self.tool_server
+            || raw.tool_name != self.tool_name
+            || raw.provider_attempt != self.provider_attempt
+            || raw.transport_terminal_evidence_digest != self.transport_terminal_evidence_digest
+            || raw.reported_cost != self.reported_cost
+            || blob.blob_ref() != &self.raw_output
+            || u64::try_from(blob.bytes().len()).ok() != Some(self.raw_output_size_bytes)
+        {
+            return Err(ToolOutcomeError::Binding("outcome.raw_invocation_blob"));
         }
         Ok(())
     }
@@ -876,7 +908,6 @@ impl ToolOutcomeRecordV1 {
         self.outcome_id == other.outcome_id
     }
 
-    #[cfg(test)]
     #[allow(dead_code)]
     pub(crate) fn transition(
         &self,
@@ -935,7 +966,6 @@ impl ToolOutcomeRecordV1 {
     }
 }
 
-#[cfg(test)]
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) enum ToolOutcomeTransitionV1 {
@@ -943,7 +973,6 @@ pub(crate) enum ToolOutcomeTransitionV1 {
     Freeze(PostReturnFreezeEvidenceV1),
 }
 
-#[cfg(test)]
 impl ToolOutcomeTransitionV1 {
     #[allow(dead_code)]
     fn name(&self) -> &'static str {
@@ -959,8 +988,39 @@ pub use post_return::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum ToolOutcomeInsertResultV1 {
-    Inserted(ToolOutcomeRecordV1),
-    ExactReplay(ToolOutcomeRecordV1),
+    Inserted {
+        outcome: ToolOutcomeRecordV1,
+        operation: AdmissionOperationV1,
+    },
+    ExactReplay {
+        outcome: ToolOutcomeRecordV1,
+        operation: AdmissionOperationV1,
+    },
+}
+
+impl ToolOutcomeInsertResultV1 {
+    #[must_use]
+    pub fn outcome(&self) -> &ToolOutcomeRecordV1 {
+        match self {
+            Self::Inserted { outcome, .. } | Self::ExactReplay { outcome, .. } => outcome,
+        }
+    }
+
+    #[must_use]
+    pub fn operation(&self) -> &AdmissionOperationV1 {
+        match self {
+            Self::Inserted { operation, .. } | Self::ExactReplay { operation, .. } => operation,
+        }
+    }
+
+    #[must_use]
+    pub fn into_parts(self) -> (ToolOutcomeRecordV1, AdmissionOperationV1) {
+        match self {
+            Self::Inserted { outcome, operation } | Self::ExactReplay { outcome, operation } => {
+                (outcome, operation)
+            }
+        }
+    }
 }
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -984,6 +1044,8 @@ pub trait ToolOutcomeStore: Send + Sync {
     fn record_tool_returned(
         &self,
         operation: &AdmissionOperationV1,
+        recovery_lease: &AdmissionRecoveryLease,
+        blob: &CanonicalInvocationBlobV1,
         record: &ToolOutcomeRecordV1,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
@@ -994,8 +1056,19 @@ pub trait ToolOutcomeStore: Send + Sync {
         operation_id: &AdmissionOperationId,
     ) -> Result<Option<ToolOutcomeRecordV1>, ToolOutcomeStoreError>;
 
+    fn load_raw_invocation_by_operation(
+        &self,
+        operation_id: &AdmissionOperationId,
+    ) -> Result<Option<RawInvocationOutcomeV1>, ToolOutcomeStoreError>;
+
+    fn lookup_post_return_evaluation(
+        &self,
+        operation_id: &AdmissionOperationId,
+    ) -> Result<Option<PostReturnEvaluationRecordV1>, ToolOutcomeStoreError>;
+
     fn begin_post_return_evaluation(
         &self,
+        recovery_lease: &AdmissionRecoveryLease,
         record: &PostReturnEvaluationRecordV1,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
@@ -1005,6 +1078,7 @@ pub trait ToolOutcomeStore: Send + Sync {
         &self,
         operation_id: &AdmissionOperationId,
         expected_version: u64,
+        recovery_lease: &AdmissionRecoveryLease,
         next: &PostReturnEvaluationRecordV1,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
@@ -1016,6 +1090,7 @@ pub trait ToolOutcomeStore: Send + Sync {
         &self,
         operation_id: &AdmissionOperationId,
         expected_evaluation_version: u64,
+        recovery_lease: &AdmissionRecoveryLease,
         terminal_evaluation: &PostReturnEvaluationRecordV1,
         expected_outcome_version: u64,
         terminal_outcome: &ToolOutcomeRecordV1,
@@ -1024,8 +1099,120 @@ pub trait ToolOutcomeStore: Send + Sync {
     ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError>;
 }
 
+/// Explicit trust boundary for stores that atomically bind a returned tool
+/// outcome to the durable admission operation.
+///
+/// Implementations must persist the canonical blob and outcome record in the
+/// same fenced commit that attaches the outcome ID and advances the operation
+/// from `DispatchCommitted` to `Finalizing`. Exact replay must return the
+/// already-bound operation without mutating it.
+pub trait QualifiedToolOutcomeStore: ToolOutcomeStore {}
+
+pub fn validate_evaluation_store_successor(
+    current: &PostReturnEvaluationRecordV1,
+    next: &PostReturnEvaluationRecordV1,
+) -> Result<(), ToolOutcomeError> {
+    current.validate()?;
+    next.validate()?;
+    let current_persisted = current.to_persisted();
+    let next_persisted = next.to_persisted();
+    if next.version()
+        != current
+            .version()
+            .checked_add(1)
+            .ok_or(ToolOutcomeError::Overflow("post_return_evaluation.version"))?
+        || current_persisted.schema != next_persisted.schema
+        || current_persisted.evaluation_id != next_persisted.evaluation_id
+        || current_persisted.operation_id != next_persisted.operation_id
+        || current_persisted.tool_outcome_id != next_persisted.tool_outcome_id
+        || current_persisted.tool_outcome_version != next_persisted.tool_outcome_version
+        || current_persisted.raw_output_digest != next_persisted.raw_output_digest
+        || current_persisted.plan_digest != next_persisted.plan_digest
+        || current_persisted.trusted_time_unix_ms != next_persisted.trusted_time_unix_ms
+        || current_persisted.exact_inputs_digest != next_persisted.exact_inputs_digest
+        || current_persisted.exact_inputs != next_persisted.exact_inputs
+        || current_persisted.frozen_steps != next_persisted.frozen_steps
+    {
+        return Err(ToolOutcomeError::Binding(
+            "evaluation.store_successor_identity",
+        ));
+    }
+    let valid_transition = match (&current_persisted.state, &next_persisted.state) {
+        (PostReturnEvaluationStateV1::Evaluating, PostReturnEvaluationStateV1::Evaluating) => {
+            next_persisted.step_results.len() == current_persisted.step_results.len() + 1
+                && next_persisted
+                    .step_results
+                    .starts_with(&current_persisted.step_results)
+        }
+        (
+            PostReturnEvaluationStateV1::Evaluating,
+            PostReturnEvaluationStateV1::Resolved { .. }
+            | PostReturnEvaluationStateV1::Frozen { .. },
+        ) => next_persisted.step_results == current_persisted.step_results,
+        _ => false,
+    };
+    if !valid_transition {
+        return Err(ToolOutcomeError::Transition {
+            state: "post_return_evaluation",
+            transition: "store_successor",
+        });
+    }
+    Ok(())
+}
+
+pub fn validate_terminal_store_pair(
+    operation: &AdmissionOperationV1,
+    current_outcome: &ToolOutcomeRecordV1,
+    current_evaluation: &PostReturnEvaluationRecordV1,
+    terminal_evaluation: &PostReturnEvaluationRecordV1,
+    terminal_outcome: &ToolOutcomeRecordV1,
+) -> Result<(), ToolOutcomeError> {
+    current_outcome.validate_against(operation)?;
+    current_evaluation.validate_against(operation, current_outcome)?;
+    validate_evaluation_store_successor(current_evaluation, terminal_evaluation)?;
+    terminal_outcome.validate_against(operation)?;
+    terminal_evaluation.validate_against(operation, terminal_outcome)?;
+    let transition = match terminal_evaluation.state() {
+        PostReturnEvaluationStateV1::Resolved { .. } => {
+            ToolOutcomeTransitionV1::Resolve(terminal_evaluation.terminal_evidence()?)
+        }
+        PostReturnEvaluationStateV1::Frozen { .. } => {
+            ToolOutcomeTransitionV1::Freeze(terminal_evaluation.freeze_evidence()?)
+        }
+        PostReturnEvaluationStateV1::Evaluating => {
+            return Err(ToolOutcomeError::Invalid("terminal_store_pair.evaluation"));
+        }
+    };
+    let expected = current_outcome.transition(current_outcome.version(), transition)?;
+    if expected != *terminal_outcome {
+        return Err(ToolOutcomeError::Binding("terminal_store_pair.outcome"));
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub(crate) fn finalizing_outcome_command(
+    operation: &AdmissionOperationV1,
+    recovery_lease: AdmissionRecoveryLease,
+    outcome_id: AdmissionDigest,
+) -> Result<AdmissionOperationCommand, ToolOutcomeError> {
+    AdmissionOperationCommand::new(
+        operation.binding().operation_id().clone(),
+        operation.version(),
+        recovery_lease,
+        vec![AdmissionAttachment::ToolOutcomeId(outcome_id)],
+        Some(AdmissionOperationState::Finalizing),
+        None,
+        None,
+    )
+    .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))
+}
+
 mod release;
 pub use release::*;
+
+#[cfg(feature = "admission-test-support")]
+pub mod test_support;
 
 #[cfg(test)]
 #[path = "tool_outcome_tests.rs"]

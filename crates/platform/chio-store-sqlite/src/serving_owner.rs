@@ -209,6 +209,8 @@ impl SqliteAuthorityStore {
             crate::admission_operation_store::initialize_admission_operation_schema(
                 &mut connection,
             )?;
+            crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
+                .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
             initialize_global_commit_schema(&connection)?;
             seed_global_baseline(&mut connection)?;
             reset_derived_budget_ack_cache(&connection)?;
@@ -241,6 +243,10 @@ impl SqliteAuthorityStore {
                 "admission_operation",
                 crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
             ),
+            (
+                "tool_outcome",
+                crate::tool_outcome_store::TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
+            ),
         ] {
             crate::check_schema_version(
                 &connection,
@@ -255,6 +261,8 @@ impl SqliteAuthorityStore {
         verify_serving_owner_schema(&connection)?;
         initialize_serving_lease_schema(&connection)?;
         crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
+        crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
+            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
 
         let store_uuid = uuid::Uuid::now_v7().to_string();
         let lock_path = lock_root.join(format!("{store_uuid}.lock"));
@@ -375,6 +383,8 @@ impl SqliteAuthorityStore {
         )?;
         initialize_serving_lease_schema(&connection)?;
         crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
+        crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
+            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
         verify_global_commit_schema(&connection)?;
         reset_derived_budget_ack_cache(&connection)?;
         for (key, supported) in [
@@ -383,6 +393,10 @@ impl SqliteAuthorityStore {
             (
                 "admission_operation",
                 crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
+            ),
+            (
+                "tool_outcome",
+                crate::tool_outcome_store::TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
             ),
         ] {
             crate::check_schema_version(
@@ -548,6 +562,14 @@ impl SqliteAuthorityStore {
         &self,
     ) -> crate::admission_operation_store::SqliteAdmissionOperationStore {
         crate::admission_operation_store::SqliteAdmissionOperationStore::open_alongside(
+            self.connection.clone(),
+            self.owner.clone(),
+        )
+    }
+
+    #[must_use]
+    pub fn tool_outcome_store(&self) -> crate::tool_outcome_store::SqliteToolOutcomeStore {
+        crate::tool_outcome_store::SqliteToolOutcomeStore::open_alongside(
             self.connection.clone(),
             self.owner.clone(),
         )
@@ -1220,6 +1242,8 @@ fn verify_authority_store_invariants(
     verify_admission_authority_invariants(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     crate::admission_operation_store::verify_admission_operation_invariants(connection)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::tool_outcome_store::verify_tool_outcome_invariants(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     Ok(())
 }

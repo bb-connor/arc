@@ -14,6 +14,10 @@ use crate::admission_operation::{
 };
 use crate::budget_store::{BudgetAdmissionBinding, BudgetEventAuthority};
 use crate::supplemental_quota::CanonicalRevocationSet;
+use crate::tool_outcome::{
+    InvocationOutputV1, QualifiedToolOutcomeStore, RawInvocationOutcomeV1, ToolOutcomeRecordV1,
+    ToolOutcomeStoreError,
+};
 
 const RECOVERY_LEASE_DURATION_MS: u64 = 60_000;
 const I_JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
@@ -21,6 +25,7 @@ const I_JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 #[derive(Clone)]
 pub(crate) struct DurableAdmissionRuntime {
     store: Arc<dyn QualifiedAdmissionOperationStore>,
+    outcome_store: Arc<dyn QualifiedToolOutcomeStore>,
     fence: StoreMutationFence,
     claimant_id: AdmissionIdentifier,
 }
@@ -38,6 +43,7 @@ impl fmt::Debug for DurableAdmissionRuntime {
 impl DurableAdmissionRuntime {
     pub(crate) fn new(
         store: Arc<dyn QualifiedAdmissionOperationStore>,
+        outcome_store: Arc<dyn QualifiedToolOutcomeStore>,
         fence: StoreMutationFence,
         kernel_id: &str,
     ) -> Result<Self, crate::admission_operation::AdmissionOperationError> {
@@ -50,6 +56,7 @@ impl DurableAdmissionRuntime {
             AdmissionIdentifier::try_new("admission_claimant_id", format!("kernel:{kernel_id}"))?;
         Ok(Self {
             store,
+            outcome_store,
             fence,
             claimant_id,
         })
@@ -66,6 +73,15 @@ impl DurableAdmissionRuntime {
 
 pub(crate) struct DurableToolAdmission {
     operation: AdmissionOperationV1,
+}
+
+#[derive(Serialize)]
+struct LocalToolReturnEvidence<'a> {
+    schema: &'static str,
+    operation_id: &'a str,
+    provider_attempt: &'a ProviderAttemptBindingV1,
+    output: &'a InvocationOutputV1,
+    reported_cost: &'a Option<ToolInvocationCost>,
 }
 
 impl DurableToolAdmission {
@@ -384,6 +400,133 @@ impl ChioKernel {
         Ok(())
     }
 
+    pub(crate) fn record_durable_tool_return(
+        &self,
+        admission: &mut DurableToolAdmission,
+        request: &ToolCallRequest,
+        output: &ToolServerOutput,
+        reported_cost: Option<ToolInvocationCost>,
+        trusted_now_unix_ms: u64,
+    ) -> Result<ToolOutcomeRecordV1, KernelError> {
+        let runtime = self.durable_runtime()?;
+        if admission.operation.state() != AdmissionOperationState::DispatchCommitted {
+            return Err(KernelError::DurableAdmission(format!(
+                "tool return cannot be recorded from state {:?}",
+                admission.operation.state()
+            )));
+        }
+        let provider_attempt =
+            admission
+                .operation
+                .provider_attempt()
+                .cloned()
+                .ok_or_else(|| {
+                    KernelError::DurableAdmission(
+                        "durable tool return has no registered provider attempt".to_owned(),
+                    )
+                })?;
+        let invocation_output = match output {
+            ToolServerOutput::Value(value) => InvocationOutputV1::Value {
+                value: value.clone(),
+            },
+            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => {
+                InvocationOutputV1::CompleteStream {
+                    chunks: stream
+                        .chunks
+                        .iter()
+                        .map(|chunk| chunk.data.clone())
+                        .collect(),
+                }
+            }
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => {
+                InvocationOutputV1::IncompleteStream {
+                    chunks: stream
+                        .chunks
+                        .iter()
+                        .map(|chunk| chunk.data.clone())
+                        .collect(),
+                    reason: reason.clone(),
+                }
+            }
+        };
+        let transport_terminal_evidence_digest = admission_digest(
+            "transport_terminal_evidence_digest",
+            &LocalToolReturnEvidence {
+                schema: "chio.local-tool-return-evidence.v1",
+                operation_id: admission.operation_id(),
+                provider_attempt: &provider_attempt,
+                output: &invocation_output,
+                reported_cost: &reported_cost,
+            },
+        )?;
+        let monetary_cost =
+            reported_cost
+                .as_ref()
+                .map(|cost| chio_core::capability::scope::MonetaryAmount {
+                    units: cost.units,
+                    currency: cost.currency.clone(),
+                });
+        let commit = admission
+            .operation
+            .dispatch_commit()
+            .cloned()
+            .ok_or_else(|| {
+                KernelError::DurableAdmission(
+                    "durable tool return lost its dispatch commit".to_owned(),
+                )
+            })?;
+        let raw = RawInvocationOutcomeV1::from_committed_dispatch(
+            &admission.operation,
+            &commit,
+            AdmissionIdentifier::try_new("tool_server", request.server_id.clone())?,
+            AdmissionIdentifier::try_new("tool_name", request.tool_name.clone())?,
+            provider_attempt,
+            transport_terminal_evidence_digest,
+            invocation_output,
+            monetary_cost,
+        )
+        .map_err(tool_outcome_error)?;
+        let blob = raw.canonical_blob().map_err(tool_outcome_error)?;
+        let record = ToolOutcomeRecordV1::record_tool_returned(
+            &admission.operation,
+            &raw,
+            &blob,
+            runtime.fence.clone(),
+            trusted_now_unix_ms,
+        )
+        .map_err(tool_outcome_error)?;
+        let expires_at_unix_ms = trusted_now_unix_ms
+            .checked_add(RECOVERY_LEASE_DURATION_MS)
+            .ok_or_else(|| {
+                KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
+            })?;
+        let lease = runtime
+            .store
+            .claim_recovery(
+                admission.operation.binding().operation_id(),
+                admission.operation.version(),
+                &runtime.claimant_id,
+                trusted_now_unix_ms,
+                expires_at_unix_ms,
+                &runtime.fence,
+            )
+            .map_err(durable_store_error)?;
+        let (stored, finalizing) = runtime
+            .outcome_store
+            .record_tool_returned(
+                &admission.operation,
+                &lease,
+                &blob,
+                &record,
+                &runtime.fence,
+                trusted_now_unix_ms,
+            )
+            .map_err(durable_outcome_store_error)?
+            .into_parts();
+        admission.operation = finalizing;
+        Ok(stored)
+    }
+
     fn apply_admission_command(
         &self,
         operation: AdmissionOperationV1,
@@ -445,5 +588,13 @@ fn admission_digest(
 fn durable_store_error(
     error: crate::admission_operation::AdmissionOperationStoreError,
 ) -> KernelError {
+    KernelError::DurableAdmission(error.to_string())
+}
+
+fn durable_outcome_store_error(error: ToolOutcomeStoreError) -> KernelError {
+    KernelError::DurableAdmission(error.to_string())
+}
+
+fn tool_outcome_error(error: crate::tool_outcome::ToolOutcomeError) -> KernelError {
     KernelError::DurableAdmission(error.to_string())
 }

@@ -1050,6 +1050,23 @@ impl ChioKernel {
                 );
             }
         };
+        if let Some(admission) = durable_admission.as_mut() {
+            let recorded_at_unix_ms = current_unix_timestamp_ms().max(now_unix_ms);
+            if let Err(error) = self.record_durable_tool_return(
+                admission,
+                request,
+                &tool_output,
+                None,
+                recorded_at_unix_ms,
+            ) {
+                warn!(
+                    request_id = %request.request_id,
+                    reason = %redacted!(&error),
+                    "nested tool return could not be durably recorded"
+                );
+                return Err(error);
+            }
+        }
         self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
             self.finalize_budgeted_tool_output_with_cost_and_metadata(
                 request,

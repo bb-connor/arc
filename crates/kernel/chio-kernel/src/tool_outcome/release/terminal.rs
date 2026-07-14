@@ -30,7 +30,7 @@ pub struct ToolOutcomeTerminalEvidenceV1 {
 }
 
 impl ToolOutcomeTerminalEvidenceV1 {
-    #[cfg(test)]
+    #[allow(dead_code)]
     pub(crate) fn from_records(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,

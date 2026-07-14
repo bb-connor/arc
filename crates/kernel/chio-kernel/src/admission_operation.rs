@@ -584,6 +584,11 @@ impl AdmissionOperationV1 {
         self.terminal_replay.as_ref()
     }
 
+    #[must_use]
+    pub fn tool_outcome_id(&self) -> Option<&AdmissionDigest> {
+        self.attachments.tool_outcome_id()
+    }
+
     #[allow(dead_code)]
     pub(crate) fn has_attachment(&self, kind: AdmissionAttachmentKind) -> bool {
         self.attachments.has_slot(kind.slot())

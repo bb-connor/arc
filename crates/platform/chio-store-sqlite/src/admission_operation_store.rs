@@ -5,14 +5,15 @@ use chio_core::canonical::canonical_json_bytes;
 use chio_core::receipt::{body::ChioReceipt, lineage::ChildRequestReceipt};
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_kernel::admission_operation::{
-    AdmissionBeginResult, AdmissionCommandResult, AdmissionIdentifier, AdmissionOperationCommand,
-    AdmissionOperationError, AdmissionOperationId, AdmissionOperationState,
-    AdmissionOperationStore, AdmissionOperationStoreError, AdmissionOperationV1,
-    AdmissionProjectionCapabilities, AdmissionProjectionManifestV1, AdmissionProjectionRecordKind,
-    AdmissionReplayClassification, AdmissionReplayKey, AdmissionTerminal,
-    AdmissionTerminalProjection, AdmissionTerminalReplay, CanonicalAdmissionProjectionRecord,
-    CanonicalAdmissionTerminalProjection, PersistedAdmissionOperationV1,
-    QualifiedAdmissionOperationStore, UntrustedAdmissionRecoveryClaim,
+    AdmissionAttachment, AdmissionBeginResult, AdmissionCommandResult, AdmissionDigest,
+    AdmissionIdentifier, AdmissionOperationCommand, AdmissionOperationError, AdmissionOperationId,
+    AdmissionOperationState, AdmissionOperationStore, AdmissionOperationStoreError,
+    AdmissionOperationV1, AdmissionProjectionCapabilities, AdmissionProjectionManifestV1,
+    AdmissionProjectionRecordKind, AdmissionRecoveryLease, AdmissionReplayClassification,
+    AdmissionReplayKey, AdmissionTerminal, AdmissionTerminalProjection, AdmissionTerminalReplay,
+    CanonicalAdmissionProjectionRecord, CanonicalAdmissionTerminalProjection,
+    PersistedAdmissionOperationV1, QualifiedAdmissionOperationStore,
+    UntrustedAdmissionRecoveryClaim,
 };
 use chio_kernel::receipt_store::{
     AuthorizationReceiptConsumption, PendingSettlementObservation, ReceiptStore, ReceiptStoreError,
@@ -31,7 +32,7 @@ pub(crate) use commit_chain::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 2;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 3;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "chio_serving_owner",
@@ -225,6 +226,136 @@ impl SqliteAdmissionOperationStore {
         self.sync_after_write(&connection)?;
         terminal_from_operation(&updated)
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn advance_tool_outcome_tx(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    expected: &AdmissionOperationV1,
+    recovery_lease: &AdmissionRecoveryLease,
+    outcome_id: AdmissionDigest,
+    participant_digest: &str,
+    trusted_now_unix_ms: u64,
+) -> Result<AdmissionOperationV1, AdmissionOperationStoreError> {
+    let stored = load_by_operation_id_tx(transaction, expected.binding().operation_id())?
+        .ok_or(AdmissionOperationStoreError::NotFound)?;
+    if stored.operation != *expected || trusted_now_unix_ms < stored.updated_at_unix_ms {
+        return Err(AdmissionOperationStoreError::Fenced);
+    }
+    verify_stored_recovery_claim(
+        transaction,
+        owner,
+        &stored,
+        recovery_lease.untrusted_claim(),
+        trusted_now_unix_ms,
+        recovery_lease.store_fence(),
+    )?;
+    let command = AdmissionOperationCommand::new(
+        expected.binding().operation_id().clone(),
+        expected.version(),
+        recovery_lease.clone(),
+        vec![AdmissionAttachment::ToolOutcomeId(outcome_id.clone())],
+        Some(AdmissionOperationState::Finalizing),
+        None,
+        None,
+    )?;
+    let updated = expected
+        .apply_command(&command, trusted_now_unix_ms)?
+        .into_operation();
+    if updated.state() != AdmissionOperationState::Finalizing
+        || updated.tool_outcome_id() != Some(&outcome_id)
+    {
+        return Err(invariant(
+            "tool outcome transition did not bind the finalizing operation",
+        ));
+    }
+    let encoded = encode_operation(&updated)?;
+    let changed = transaction
+        .execute(
+            r#"
+            UPDATE admission_operations
+            SET operation_json = ?1, state = ?2, terminal = 0,
+                coordinator_lease_epoch = ?3, version = ?4,
+                updated_at_unix_ms = ?5
+            WHERE operation_id = ?6 AND version = ?7 AND terminal = 0
+            "#,
+            params![
+                &encoded,
+                state_name(updated.state()),
+                sqlite_i64(updated.coordinator_lease_epoch(), "coordinator_lease_epoch")?,
+                sqlite_i64(updated.version(), "version")?,
+                sqlite_i64(trusted_now_unix_ms, "trusted_now_unix_ms")?,
+                updated.binding().operation_id().as_str(),
+                sqlite_i64(expected.version(), "expected_version")?,
+            ],
+        )
+        .map_err(sqlite_error)?;
+    if changed != 1 {
+        return Err(AdmissionOperationStoreError::Fenced);
+    }
+    commit_chain::append_operation_commit_with_participant(
+        transaction,
+        &updated,
+        &encoded,
+        stored.recovery_claim.as_ref(),
+        "compare_and_swap",
+        Some(participant_digest),
+        owner,
+        trusted_now_unix_ms,
+    )?;
+    Ok(updated)
+}
+
+pub(crate) fn append_participant_update_tx(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    expected: &AdmissionOperationV1,
+    recovery_lease: &AdmissionRecoveryLease,
+    participant_digest: &str,
+    trusted_now_unix_ms: u64,
+) -> Result<(), AdmissionOperationStoreError> {
+    let stored = load_by_operation_id_tx(transaction, expected.binding().operation_id())?
+        .ok_or(AdmissionOperationStoreError::NotFound)?;
+    if stored.operation != *expected || trusted_now_unix_ms < stored.updated_at_unix_ms {
+        return Err(AdmissionOperationStoreError::Fenced);
+    }
+    verify_stored_recovery_claim(
+        transaction,
+        owner,
+        &stored,
+        recovery_lease.untrusted_claim(),
+        trusted_now_unix_ms,
+        recovery_lease.store_fence(),
+    )?;
+    let changed = transaction
+        .execute(
+            r#"
+            UPDATE admission_operations
+            SET updated_at_unix_ms = ?1
+            WHERE operation_id = ?2 AND version = ?3 AND terminal = 0
+            "#,
+            params![
+                sqlite_i64(trusted_now_unix_ms, "trusted_now_unix_ms")?,
+                expected.binding().operation_id().as_str(),
+                sqlite_i64(expected.version(), "expected_version")?,
+            ],
+        )
+        .map_err(sqlite_error)?;
+    if changed != 1 {
+        return Err(AdmissionOperationStoreError::Fenced);
+    }
+    let encoded = encode_operation(expected)?;
+    commit_chain::append_operation_commit_with_participant(
+        transaction,
+        expected,
+        &encoded,
+        stored.recovery_claim.as_ref(),
+        "participant_update",
+        Some(participant_digest),
+        owner,
+        trusted_now_unix_ms,
+    )
 }
 
 fn full_projection_capabilities() -> AdmissionProjectionCapabilities {
@@ -1582,6 +1713,9 @@ pub(crate) fn initialize_admission_operation_schema(
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
+    if on_disk == 2 {
+        migrate_admission_commit_participant_digest(&transaction)?;
+    }
     transaction
         .execute_batch(ADMISSION_OPERATION_SCHEMA)
         .map_err(sqlite_error)?;
@@ -1593,6 +1727,51 @@ pub(crate) fn initialize_admission_operation_schema(
     .map_err(|error| invariant(error.to_string()))?;
     verify_admission_operation_invariants(&transaction)?;
     transaction.commit().map_err(sqlite_error)
+}
+
+fn migrate_admission_commit_participant_digest(
+    transaction: &Transaction<'_>,
+) -> Result<(), AdmissionOperationStoreError> {
+    transaction
+        .execute_batch(
+            r#"
+            DROP TRIGGER admission_operation_commits_exact_lease;
+            DROP TRIGGER admission_operation_commits_immutable;
+            DROP TRIGGER admission_operation_commits_no_delete;
+            DROP INDEX admission_operation_commits_operation;
+            ALTER TABLE admission_operation_commits
+                RENAME TO admission_operation_commits_v2;
+            "#,
+        )
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(ADMISSION_OPERATION_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch("DROP TRIGGER admission_operation_commits_exact_lease;")
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(
+            r#"
+            INSERT INTO admission_operation_commits (
+                commit_sequence, operation_id, operation_version, mutation_kind,
+                operation_digest, recovery_claim_digest, participant_digest,
+                previous_chain_digest, chain_digest,
+                store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
+            )
+            SELECT commit_sequence, operation_id, operation_version, mutation_kind,
+                   operation_digest, recovery_claim_digest, NULL,
+                   previous_chain_digest, chain_digest,
+                   store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
+            FROM admission_operation_commits_v2
+            ORDER BY commit_sequence;
+            DROP TABLE admission_operation_commits_v2;
+            "#,
+        )
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(ADMISSION_OPERATION_SCHEMA)
+        .map_err(sqlite_error)
 }
 
 pub(crate) fn verify_admission_operation_invariants(
@@ -1703,6 +1882,8 @@ pub(crate) fn verify_admission_operation_invariants(
                        AND (mutation_kind = 'begin'
                             OR (mutation_kind = 'recovery_claim'
                                 AND operation_version <> previous_version)
+                            OR (mutation_kind = 'participant_update'
+                                AND operation_version <> previous_version)
                             OR (mutation_kind = 'compare_and_swap'
                                 AND operation_version <> previous_version + 1)
                             OR recorded_at_unix_ms < previous_time))
@@ -1766,7 +1947,7 @@ pub(crate) fn verify_admission_operation_invariants(
     Ok(())
 }
 
-fn verify_trusted_time(
+pub(crate) fn verify_trusted_time(
     transaction: &Transaction<'_>,
     trusted_now_unix_ms: u64,
 ) -> Result<(), AdmissionOperationStoreError> {
@@ -1921,7 +2102,7 @@ fn recovery_claim_digest(
     Ok(sha256_hex(&canonical))
 }
 
-fn verify_active_owner(
+pub(crate) fn verify_active_owner(
     transaction: &Transaction<'_>,
     owner: &SqliteServingOwner,
     requested: Option<&StoreMutationFence>,
@@ -2185,6 +2366,14 @@ fn load_by_operation_id_tx(
         verify_stored_terminal_projection(transaction, stored)?;
     }
     Ok(stored)
+}
+
+pub(crate) fn load_operation_for_participant_tx(
+    transaction: &Transaction<'_>,
+    operation_id: &AdmissionOperationId,
+) -> Result<Option<AdmissionOperationV1>, AdmissionOperationStoreError> {
+    load_by_operation_id_tx(transaction, operation_id)
+        .map(|stored| stored.map(|stored| stored.operation))
 }
 
 fn load_by_replay_key_tx(

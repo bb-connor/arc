@@ -84,7 +84,9 @@ CREATE TABLE IF NOT EXISTS admission_operation_commits (
     operation_id TEXT NOT NULL,
     operation_version INTEGER NOT NULL CHECK (operation_version > 0),
     mutation_kind TEXT NOT NULL CHECK (
-        mutation_kind IN ('begin', 'compare_and_swap', 'recovery_claim')
+        mutation_kind IN (
+            'begin', 'compare_and_swap', 'recovery_claim', 'participant_update'
+        )
     ),
     operation_digest TEXT NOT NULL
         CHECK (length(operation_digest) = 64
@@ -93,6 +95,11 @@ CREATE TABLE IF NOT EXISTS admission_operation_commits (
         recovery_claim_digest IS NULL
         OR (length(recovery_claim_digest) = 64
             AND recovery_claim_digest NOT GLOB '*[^0-9a-f]*')
+    ),
+    participant_digest TEXT CHECK (
+        participant_digest IS NULL
+        OR (length(participant_digest) = 64
+            AND participant_digest NOT GLOB '*[^0-9a-f]*')
     ),
     previous_chain_digest TEXT NOT NULL CHECK (
         length(previous_chain_digest) = 64
@@ -109,8 +116,19 @@ CREATE TABLE IF NOT EXISTS admission_operation_commits (
     FOREIGN KEY (operation_id) REFERENCES admission_operations(operation_id),
     FOREIGN KEY (store_uuid, store_owner_epoch)
         REFERENCES chio_serving_leases(store_uuid, owner_epoch),
-    CHECK ((mutation_kind = 'begin' AND recovery_claim_digest IS NULL)
-           OR (mutation_kind <> 'begin' AND recovery_claim_digest IS NOT NULL))
+    CHECK (
+        (mutation_kind = 'begin'
+         AND recovery_claim_digest IS NULL
+         AND participant_digest IS NULL)
+        OR (mutation_kind = 'recovery_claim'
+            AND recovery_claim_digest IS NOT NULL
+            AND participant_digest IS NULL)
+        OR (mutation_kind = 'compare_and_swap'
+            AND recovery_claim_digest IS NOT NULL)
+        OR (mutation_kind = 'participant_update'
+            AND recovery_claim_digest IS NOT NULL
+            AND participant_digest IS NOT NULL)
+    )
 );
 
 CREATE INDEX IF NOT EXISTS admission_operation_commits_operation

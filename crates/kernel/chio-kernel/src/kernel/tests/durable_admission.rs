@@ -5,6 +5,11 @@ use crate::admission_operation::{
     AdmissionReplayClassification, AdmissionReplayKey, AdmissionTerminalReplay,
     QualifiedAdmissionOperationStore, StoreMutationFence, UntrustedAdmissionRecoveryClaim,
 };
+use crate::tool_outcome::{
+    CanonicalInvocationBlobV1, PostReturnEvaluationRecordV1, QualifiedToolOutcomeStore,
+    RawInvocationOutcomeV1, ToolOutcomeInsertResultV1, ToolOutcomeRecordV1, ToolOutcomeStore,
+    ToolOutcomeStoreError,
+};
 
 #[test]
 fn durable_admission_runtime_defaults_closed_and_off_requires_explicit_unsafe_ephemeral_mode() {
@@ -44,10 +49,13 @@ fn durable_admission_runtime_defaults_closed_and_off_requires_explicit_unsafe_ep
 struct TestAdmissionState {
     operation: Option<AdmissionOperationV1>,
     claim: Option<UntrustedAdmissionRecoveryClaim>,
+    raw_outcome: Option<RawInvocationOutcomeV1>,
+    tool_outcome: Option<ToolOutcomeRecordV1>,
 }
 
 struct TestAdmissionOperationStore {
     fence: StoreMutationFence,
+    fail_next_outcome_write: std::sync::atomic::AtomicBool,
     state: std::sync::Mutex<TestAdmissionState>,
 }
 
@@ -55,8 +63,13 @@ impl TestAdmissionOperationStore {
     fn new(fence: StoreMutationFence) -> Self {
         Self {
             fence,
+            fail_next_outcome_write: std::sync::atomic::AtomicBool::new(false),
             state: std::sync::Mutex::new(TestAdmissionState::default()),
         }
+    }
+
+    fn fail_next_outcome_write(&self) {
+        self.fail_next_outcome_write.store(true, Ordering::SeqCst);
     }
 
     fn operation(&self) -> AdmissionOperationV1 {
@@ -248,6 +261,140 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
 
 impl QualifiedAdmissionOperationStore for TestAdmissionOperationStore {}
 
+impl ToolOutcomeStore for TestAdmissionOperationStore {
+    fn record_tool_returned(
+        &self,
+        operation: &AdmissionOperationV1,
+        recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+        blob: &CanonicalInvocationBlobV1,
+        record: &ToolOutcomeRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<ToolOutcomeInsertResultV1, ToolOutcomeStoreError> {
+        self.require_fence(active_fence)
+            .map_err(|_| ToolOutcomeStoreError::Fenced)?;
+        record
+            .validate_for_store_insert(
+                operation,
+                blob,
+                active_fence,
+                trusted_now_unix_ms,
+            )
+            .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?;
+        if self.fail_next_outcome_write.swap(false, Ordering::SeqCst) {
+            return Err(ToolOutcomeStoreError::Unavailable(
+                "injected tool outcome write failure".to_owned(),
+            ));
+        }
+        let mut state = self.state.lock().expect("test admission state lock");
+        let current = state
+            .operation
+            .as_ref()
+            .filter(|current| *current == operation)
+            .cloned()
+            .ok_or(ToolOutcomeStoreError::CasConflict)?;
+        if let Some(existing) = state.tool_outcome.as_ref() {
+            if !existing.same_immutable_outcome(record) {
+                return Err(ToolOutcomeStoreError::Conflict);
+            }
+            return Ok(ToolOutcomeInsertResultV1::ExactReplay {
+                outcome: existing.clone(),
+                operation: current,
+            });
+        }
+        let command = crate::tool_outcome::finalizing_outcome_command(
+            operation,
+            recovery_lease.clone(),
+            record.outcome_id().clone(),
+        )
+        .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?;
+        let finalizing = current
+            .apply_command(&command, trusted_now_unix_ms)
+            .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?
+            .into_operation();
+        let raw = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())
+            .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?;
+        state.raw_outcome = Some(raw);
+        state.tool_outcome = Some(record.clone());
+        state.operation = Some(finalizing.clone());
+        Ok(ToolOutcomeInsertResultV1::Inserted {
+            outcome: record.clone(),
+            operation: finalizing,
+        })
+    }
+
+    fn lookup_by_operation(
+        &self,
+        operation_id: &AdmissionOperationId,
+    ) -> Result<Option<ToolOutcomeRecordV1>, ToolOutcomeStoreError> {
+        Ok(self
+            .state
+            .lock()
+            .expect("test admission state lock")
+            .tool_outcome
+            .as_ref()
+            .filter(|outcome| outcome.operation_id() == operation_id)
+            .cloned())
+    }
+
+    fn load_raw_invocation_by_operation(
+        &self,
+        operation_id: &AdmissionOperationId,
+    ) -> Result<Option<RawInvocationOutcomeV1>, ToolOutcomeStoreError> {
+        let state = self.state.lock().expect("test admission state lock");
+        Ok(state
+            .tool_outcome
+            .as_ref()
+            .filter(|outcome| outcome.operation_id() == operation_id)
+            .and(state.raw_outcome.clone()))
+    }
+
+    fn lookup_post_return_evaluation(
+        &self,
+        _operation_id: &AdmissionOperationId,
+    ) -> Result<Option<PostReturnEvaluationRecordV1>, ToolOutcomeStoreError> {
+        Ok(None)
+    }
+
+    fn begin_post_return_evaluation(
+        &self,
+        _recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+        _record: &PostReturnEvaluationRecordV1,
+        _active_fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeStoreError> {
+        Err(ToolOutcomeStoreError::Unavailable("unused in test".to_owned()))
+    }
+
+    fn stage_post_return_evaluation(
+        &self,
+        _operation_id: &AdmissionOperationId,
+        _expected_version: u64,
+        _recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+        _next: &PostReturnEvaluationRecordV1,
+        _active_fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeStoreError> {
+        Err(ToolOutcomeStoreError::Unavailable("unused in test".to_owned()))
+    }
+
+    fn finalize_post_return(
+        &self,
+        _operation_id: &AdmissionOperationId,
+        _expected_evaluation_version: u64,
+        _recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+        _terminal_evaluation: &PostReturnEvaluationRecordV1,
+        _expected_outcome_version: u64,
+        _terminal_outcome: &ToolOutcomeRecordV1,
+        _active_fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
+        Err(ToolOutcomeStoreError::Unavailable("unused in test".to_owned()))
+    }
+}
+
+impl QualifiedToolOutcomeStore for TestAdmissionOperationStore {}
+
 fn admission_test_fence() -> StoreMutationFence {
     StoreMutationFence {
         store_uuid: "test-admission-authority".to_string(),
@@ -304,7 +451,7 @@ fn durable_admission_fixture(
     let fence = admission_test_fence();
     let store = std::sync::Arc::new(TestAdmissionOperationStore::new(fence.clone()));
     kernel
-        .set_durable_admission_store(store.clone(), fence)
+        .set_durable_admission_store(store.clone(), store.clone(), fence)
         .expect("qualified admission store");
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
@@ -340,7 +487,7 @@ fn top_level_durable_admission_commits_before_dispatch_and_blocks_replay() {
     assert_eq!(response.verdict, Verdict::Allow);
     assert_eq!(
         store.operation().state(),
-        AdmissionOperationState::DispatchCommitted
+        AdmissionOperationState::Finalizing
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 
@@ -360,12 +507,43 @@ fn top_level_durable_admission_commits_before_dispatch_and_blocks_replay() {
 }
 
 #[test]
+fn failed_tool_return_persistence_retains_dispatch_and_blocks_redispatch() {
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture("durable-return-write-failure");
+    store.fail_next_outcome_write();
+
+    let error = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect_err("tool return journal failure must fail closed");
+    assert!(matches!(
+        error,
+        KernelError::DurableAdmission(ref reason)
+            if reason.contains("injected tool outcome write failure")
+    ));
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::DispatchCommitted
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let replay = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("retained dispatch must produce a denial");
+    assert_eq!(replay.verdict, Verdict::Deny);
+    assert!(replay
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("DispatchCommitted")));
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
 fn durable_admission_binds_the_first_budget_eligible_matching_grant() {
     let mut kernel = make_kernel(make_config());
     let fence = admission_test_fence();
     let store = std::sync::Arc::new(TestAdmissionOperationStore::new(fence.clone()));
     kernel
-        .set_durable_admission_store(store.clone(), fence)
+        .set_durable_admission_store(store.clone(), store.clone(), fence)
         .expect("qualified admission store");
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
@@ -437,7 +615,7 @@ fn nested_durable_admission_commits_before_dispatch_and_blocks_replay() {
     assert_eq!(response.verdict, Verdict::Allow);
     assert_eq!(
         store.operation().state(),
-        AdmissionOperationState::DispatchCommitted
+        AdmissionOperationState::Finalizing
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 

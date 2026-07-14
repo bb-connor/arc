@@ -32,6 +32,8 @@ struct ChainEntry<'a> {
     mutation_kind: &'a str,
     operation_digest: &'a str,
     recovery_claim_digest: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    participant_digest: Option<&'a str>,
     store_uuid: &'a str,
     store_lease_id: &'a str,
     store_owner_epoch: u64,
@@ -45,6 +47,7 @@ struct CommitRow {
     mutation_kind: String,
     operation_digest: String,
     recovery_claim_digest: Option<String>,
+    participant_digest: Option<String>,
     previous_chain_digest: String,
     chain_digest: String,
     store_uuid: String,
@@ -62,6 +65,32 @@ pub(super) fn append_operation_commit(
     owner: &SqliteServingOwner,
     recorded_at_unix_ms: u64,
 ) -> Result<(), AdmissionOperationStoreError> {
+    append_operation_commit_with_participant(
+        transaction,
+        operation,
+        encoded,
+        recovery_claim,
+        mutation_kind,
+        None,
+        owner,
+        recorded_at_unix_ms,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn append_operation_commit_with_participant(
+    transaction: &Transaction<'_>,
+    operation: &AdmissionOperationV1,
+    encoded: &[u8],
+    recovery_claim: Option<&UntrustedAdmissionRecoveryClaim>,
+    mutation_kind: &'static str,
+    participant_digest: Option<&str>,
+    owner: &SqliteServingOwner,
+    recorded_at_unix_ms: u64,
+) -> Result<(), AdmissionOperationStoreError> {
+    if participant_digest.is_some_and(|digest| !is_digest(digest)) {
+        return Err(invariant("admission participant digest is malformed"));
+    }
     let current = load_admission_commit_head(transaction)?;
     validate_trusted_time(recorded_at_unix_ms, "recorded_at_unix_ms")?;
     if recorded_at_unix_ms < current.trusted_time_high_water_unix_ms {
@@ -82,6 +111,7 @@ pub(super) fn append_operation_commit(
         mutation_kind,
         operation_digest: &operation_digest,
         recovery_claim_digest: claim_digest.as_deref(),
+        participant_digest,
         store_uuid: &owner.fence.store_uuid,
         store_lease_id: &owner.fence.lease_id,
         store_owner_epoch: owner.fence.owner_epoch,
@@ -92,10 +122,10 @@ pub(super) fn append_operation_commit(
             r#"
             INSERT INTO admission_operation_commits (
                 commit_sequence, operation_id, operation_version, mutation_kind,
-                operation_digest, recovery_claim_digest,
+                operation_digest, recovery_claim_digest, participant_digest,
                 previous_chain_digest, chain_digest,
                 store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
             "#,
             params![
                 sqlite_i64(next, "commit_sequence")?,
@@ -104,6 +134,7 @@ pub(super) fn append_operation_commit(
                 mutation_kind,
                 operation_digest,
                 claim_digest,
+                participant_digest,
                 &current.chain_digest,
                 &chain_digest,
                 &owner.fence.store_uuid,
@@ -192,7 +223,7 @@ pub(crate) fn verify_admission_commit_chain(
         .prepare(
             r#"
             SELECT commit_sequence, operation_id, operation_version, mutation_kind,
-                   operation_digest, recovery_claim_digest,
+                   operation_digest, recovery_claim_digest, participant_digest,
                    previous_chain_digest, chain_digest,
                    store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
             FROM admission_operation_commits ORDER BY commit_sequence
@@ -241,7 +272,7 @@ pub(crate) fn verify_admission_commit_suffix(
         .prepare(
             r#"
             SELECT commit_sequence, operation_id, operation_version, mutation_kind,
-                   operation_digest, recovery_claim_digest,
+                   operation_digest, recovery_claim_digest, participant_digest,
                    previous_chain_digest, chain_digest,
                    store_uuid, store_lease_id, store_owner_epoch, recorded_at_unix_ms
             FROM admission_operation_commits
@@ -331,12 +362,13 @@ fn read_commit(row: &Row<'_>) -> Result<CommitRow, AdmissionOperationStoreError>
         mutation_kind: row.get(3).map_err(sqlite_error)?,
         operation_digest: row.get(4).map_err(sqlite_error)?,
         recovery_claim_digest: row.get(5).map_err(sqlite_error)?,
-        previous_chain_digest: row.get(6).map_err(sqlite_error)?,
-        chain_digest: row.get(7).map_err(sqlite_error)?,
-        store_uuid: row.get(8).map_err(sqlite_error)?,
-        store_lease_id: row.get(9).map_err(sqlite_error)?,
-        store_owner_epoch: stored_u64(row.get(10).map_err(sqlite_error)?, "store_owner_epoch")?,
-        recorded_at_unix_ms: stored_u64(row.get(11).map_err(sqlite_error)?, "recorded_at_unix_ms")?,
+        participant_digest: row.get(6).map_err(sqlite_error)?,
+        previous_chain_digest: row.get(7).map_err(sqlite_error)?,
+        chain_digest: row.get(8).map_err(sqlite_error)?,
+        store_uuid: row.get(9).map_err(sqlite_error)?,
+        store_lease_id: row.get(10).map_err(sqlite_error)?,
+        store_owner_epoch: stored_u64(row.get(11).map_err(sqlite_error)?, "store_owner_epoch")?,
+        recorded_at_unix_ms: stored_u64(row.get(12).map_err(sqlite_error)?, "recorded_at_unix_ms")?,
     })
 }
 
@@ -354,6 +386,10 @@ fn advance_chain(
             .recovery_claim_digest
             .as_deref()
             .is_some_and(|digest| !is_digest(digest))
+        || commit
+            .participant_digest
+            .as_deref()
+            .is_some_and(|digest| !is_digest(digest))
     {
         return Err(invariant("admission operation commit chain is invalid"));
     }
@@ -366,6 +402,7 @@ fn advance_chain(
         mutation_kind: &commit.mutation_kind,
         operation_digest: &commit.operation_digest,
         recovery_claim_digest: commit.recovery_claim_digest.as_deref(),
+        participant_digest: commit.participant_digest.as_deref(),
         store_uuid: &commit.store_uuid,
         store_lease_id: &commit.store_lease_id,
         store_owner_epoch: commit.store_owner_epoch,

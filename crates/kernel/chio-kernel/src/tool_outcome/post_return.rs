@@ -35,7 +35,6 @@ pub struct PostReturnNormalizedRequestContextV1 {
 }
 
 impl PostReturnNormalizedRequestContextV1 {
-    #[cfg(test)]
     #[allow(dead_code)]
     pub(crate) fn from_verified_normalization(normalized: Value) -> Result<Self, ToolOutcomeError> {
         let bytes = bounded(
@@ -218,7 +217,6 @@ pub struct ExternalEvaluationResultRefV1 {
 }
 
 impl ExternalEvaluationResultRefV1 {
-    #[cfg(test)]
     #[allow(dead_code)]
     pub(crate) fn new(
         step_index: u32,
@@ -287,7 +285,6 @@ pub struct EvaluationStepResultV1 {
 }
 
 impl EvaluationStepResultV1 {
-    #[cfg(test)]
     #[allow(dead_code)]
     pub(crate) fn pure(
         step_index: u32,
@@ -302,7 +299,6 @@ impl EvaluationStepResultV1 {
         }
     }
 
-    #[cfg(test)]
     #[allow(dead_code)]
     pub(crate) fn external(
         input_dependency_digest: AdmissionDigest,
@@ -403,7 +399,6 @@ pub struct PostReturnResolutionV1 {
 }
 
 impl PostReturnResolutionV1 {
-    #[cfg(test)]
     #[allow(dead_code)]
     pub(crate) fn from_output(
         evaluation: &PostReturnEvaluationRecordV1,
@@ -422,7 +417,6 @@ impl PostReturnResolutionV1 {
         )
     }
 
-    #[cfg(test)]
     #[allow(dead_code)]
     fn from_output_bounded(
         evaluation: &PostReturnEvaluationRecordV1,
@@ -617,7 +611,6 @@ impl PostReturnEvaluationRecordV1 {
         Ok(record)
     }
 
-    #[cfg(test)]
     #[allow(dead_code)]
     pub(crate) fn prepare(
         operation: &AdmissionOperationV1,
@@ -703,7 +696,7 @@ impl PostReturnEvaluationRecordV1 {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn validate_against(
+    pub fn validate_against(
         &self,
         operation: &AdmissionOperationV1,
         outcome: &ToolOutcomeRecordV1,
@@ -815,7 +808,6 @@ impl PostReturnEvaluationRecordV1 {
         }
     }
 
-    #[cfg(test)]
     #[allow(dead_code)]
     pub(crate) fn transition(
         &self,
@@ -938,7 +930,6 @@ impl PostReturnEvaluationRecordV1 {
     }
 
     #[allow(dead_code)]
-    #[cfg(test)]
     pub(crate) fn terminal_evidence(
         &self,
     ) -> Result<PostReturnTerminalEvidenceV1, ToolOutcomeError> {
@@ -962,7 +953,6 @@ impl PostReturnEvaluationRecordV1 {
     }
 
     #[allow(dead_code)]
-    #[cfg(test)]
     pub(crate) fn freeze_evidence(&self) -> Result<PostReturnFreezeEvidenceV1, ToolOutcomeError> {
         self.validate()?;
         let PostReturnEvaluationStateV1::Frozen { freeze } = &self.state else {
@@ -1079,7 +1069,6 @@ fn validate_freeze(
     Ok(())
 }
 
-#[cfg(test)]
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) enum PostReturnEvaluationTransitionV1 {
@@ -1088,7 +1077,6 @@ pub(crate) enum PostReturnEvaluationTransitionV1 {
     Freeze(EvaluationFreezeV1),
 }
 
-#[cfg(test)]
 impl PostReturnEvaluationTransitionV1 {
     #[allow(dead_code)]
     fn name(&self) -> &'static str {

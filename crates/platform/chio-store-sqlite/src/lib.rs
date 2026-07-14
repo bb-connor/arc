@@ -46,6 +46,7 @@ pub mod revocation_store;
 pub mod schema_version;
 pub mod serving_owner;
 pub mod settle_attempts;
+pub mod tool_outcome_store;
 
 pub use chio_core::crypto::SharedCanonicalBytes;
 pub use chio_core::{CanonicalBytes, CanonicalJsonWitness};
@@ -199,6 +200,7 @@ pub use schema_version::{
 };
 pub use serving_owner::{SqliteAuthorityStore, SqliteServingOwnerError};
 pub use settle_attempts::{SqliteSettlementOutcomeStore, SETTLE_ATTEMPTS_MIGRATION};
+pub use tool_outcome_store::SqliteToolOutcomeStore;
 
 #[cfg(test)]
 mod tests {

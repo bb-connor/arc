@@ -664,10 +664,12 @@ impl ChioKernel {
     pub fn set_durable_admission_store(
         &mut self,
         store: Arc<dyn crate::admission_operation::QualifiedAdmissionOperationStore>,
+        outcome_store: Arc<dyn crate::tool_outcome::QualifiedToolOutcomeStore>,
         fence: crate::admission_operation::StoreMutationFence,
     ) -> Result<(), crate::admission_operation::AdmissionOperationError> {
         self.durable_admission_runtime = Some(DurableAdmissionRuntime::new(
             store,
+            outcome_store,
             fence,
             &self.config.keypair.public_key().to_hex(),
         )?);

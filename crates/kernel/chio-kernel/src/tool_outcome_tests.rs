@@ -16,9 +16,9 @@ use crate::admission_operation::{
     AdmissionOperationBindingInputV1, AdmissionOperationBindingV1, AdmissionOperationCommand,
     AdmissionOperationId, AdmissionOperationKind, AdmissionOperationState,
     AdmissionParticipantRequirements, AdmissionProjectionContext, AdmissionReceiptMetadataV1,
-    AdmissionReceiptSchema, AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
-    SideEffectClass, UntrustedAdmissionRecoveryClaim, VerifiedAdmissionReceipt,
-    ADMISSION_RECEIPT_METADATA_KEY,
+    AdmissionReceiptSchema, AdmissionRecoveryLease, AdmissionRequestBindingV1,
+    AuthenticatedRequestNamespace, SideEffectClass, UntrustedAdmissionRecoveryClaim,
+    VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
 };
 
 fn sha(label: &str) -> String {
@@ -218,51 +218,57 @@ pub(super) fn returned(operation: &AdmissionOperationV1, output: Value) -> ToolO
     returned_under(operation, output, fence(), 900)
 }
 
+fn returned_with_blob(
+    operation: &AdmissionOperationV1,
+    output: Value,
+) -> (CanonicalInvocationBlobV1, ToolOutcomeRecordV1) {
+    returned_with_blob_under(operation, output, fence(), 900)
+}
+
 fn returned_under(
     operation: &AdmissionOperationV1,
     output: Value,
     recording_fence: StoreMutationFence,
     recorded_at_unix_ms: u64,
 ) -> ToolOutcomeRecordV1 {
+    returned_with_blob_under(operation, output, recording_fence, recorded_at_unix_ms).1
+}
+
+fn returned_with_blob_under(
+    operation: &AdmissionOperationV1,
+    output: Value,
+    recording_fence: StoreMutationFence,
+    recorded_at_unix_ms: u64,
+) -> (CanonicalInvocationBlobV1, ToolOutcomeRecordV1) {
     let raw = raw_for(operation, output);
     let blob = raw.canonical_blob().unwrap();
-    ToolOutcomeRecordV1::record_tool_returned(
+    let record = ToolOutcomeRecordV1::record_tool_returned(
         operation,
         &raw,
         &blob,
         recording_fence,
         recorded_at_unix_ms,
     )
-    .unwrap()
+    .unwrap();
+    (blob, record)
 }
 
-fn rebind_outcome_identity(record: &mut ToolOutcomeRecordV1) {
-    record.outcome_id = domain_digest(
-        "chio.tool-outcome.identity.v1",
-        &OutcomeIdentity {
-            operation_id: &record.operation_id,
-            request_id: &record.request_id,
-            dispatch_operation_version: record.dispatch_operation_version,
-            dispatch_fence: record.dispatch_fence,
-            dispatch_commit: &record.dispatch_commit,
-            tool_server: &record.tool_server,
-            tool_name: &record.tool_name,
-            provider_attempt: &record.provider_attempt,
-            transport_terminal_evidence_digest: &record.transport_terminal_evidence_digest,
-            raw_output: &record.raw_output,
-            raw_output_size_bytes: record.raw_output_size_bytes,
-            reported_cost: &record.reported_cost,
-        },
+fn recovery_lease(
+    operation: &AdmissionOperationV1,
+    store_fence: &StoreMutationFence,
+    trusted_now_unix_ms: u64,
+) -> AdmissionRecoveryLease {
+    let claim = UntrustedAdmissionRecoveryClaim::new(
+        operation.binding().operation_id().clone(),
+        id("outcome-worker"),
+        id("outcome-coordinator-lease"),
+        operation.coordinator_lease_epoch(),
+        operation.version(),
+        trusted_now_unix_ms + 10_000,
+        store_fence.clone(),
     )
     .unwrap();
-    record.lifecycle_digest = outcome_lifecycle_digest(
-        &record.outcome_id,
-        &record.disposition,
-        &record.recording_fence,
-        record.recorded_at_unix_ms,
-        record.version,
-    )
-    .unwrap();
+    qualify_recovery_claim_for_test(operation, claim, trusted_now_unix_ms, store_fence).unwrap()
 }
 
 fn plan() -> Vec<FrozenEvaluationStepV1> {
@@ -699,22 +705,40 @@ impl ToolOutcomeStore for MemoryOutcomeStore {
     fn record_tool_returned(
         &self,
         operation: &AdmissionOperationV1,
+        recovery_lease: &AdmissionRecoveryLease,
+        blob: &CanonicalInvocationBlobV1,
         record: &ToolOutcomeRecordV1,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<ToolOutcomeInsertResultV1, ToolOutcomeStoreError> {
         self.authorize(active_fence, trusted_now_unix_ms)?;
         record
-            .validate_for_store_insert(operation, active_fence, trusted_now_unix_ms)
+            .validate_for_store_insert(operation, blob, active_fence, trusted_now_unix_ms)
             .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?;
+        let command = finalizing_outcome_command(
+            operation,
+            recovery_lease.clone(),
+            record.outcome_id().clone(),
+        )
+        .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?;
+        let finalizing = operation
+            .apply_command(&command, trusted_now_unix_ms)
+            .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?
+            .into_operation();
         let mut stored = self.outcome.lock().unwrap();
         match stored.as_ref() {
             None => {
                 *stored = Some(record.clone());
-                Ok(ToolOutcomeInsertResultV1::Inserted(record.clone()))
+                Ok(ToolOutcomeInsertResultV1::Inserted {
+                    outcome: record.clone(),
+                    operation: finalizing,
+                })
             }
             Some(existing) if existing.same_immutable_outcome(record) => {
-                Ok(ToolOutcomeInsertResultV1::ExactReplay(existing.clone()))
+                Ok(ToolOutcomeInsertResultV1::ExactReplay {
+                    outcome: existing.clone(),
+                    operation: finalizing,
+                })
             }
             Some(_) => Err(ToolOutcomeStoreError::Conflict),
         }
@@ -733,8 +757,23 @@ impl ToolOutcomeStore for MemoryOutcomeStore {
             .cloned())
     }
 
+    fn load_raw_invocation_by_operation(
+        &self,
+        _operation_id: &AdmissionOperationId,
+    ) -> Result<Option<RawInvocationOutcomeV1>, ToolOutcomeStoreError> {
+        Ok(None)
+    }
+
+    fn lookup_post_return_evaluation(
+        &self,
+        _operation_id: &AdmissionOperationId,
+    ) -> Result<Option<PostReturnEvaluationRecordV1>, ToolOutcomeStoreError> {
+        Ok(None)
+    }
+
     fn begin_post_return_evaluation(
         &self,
+        _recovery_lease: &AdmissionRecoveryLease,
         record: &PostReturnEvaluationRecordV1,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
@@ -750,6 +789,7 @@ impl ToolOutcomeStore for MemoryOutcomeStore {
         &self,
         _operation_id: &AdmissionOperationId,
         _expected_version: u64,
+        _recovery_lease: &AdmissionRecoveryLease,
         next: &PostReturnEvaluationRecordV1,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
@@ -764,6 +804,7 @@ impl ToolOutcomeStore for MemoryOutcomeStore {
         &self,
         _operation_id: &AdmissionOperationId,
         _expected_evaluation_version: u64,
+        _recovery_lease: &AdmissionRecoveryLease,
         terminal_evaluation: &PostReturnEvaluationRecordV1,
         _expected_outcome_version: u64,
         _terminal_outcome: &ToolOutcomeRecordV1,
@@ -781,23 +822,32 @@ impl ToolOutcomeStore for MemoryOutcomeStore {
 #[test]
 fn store_insert_is_once_replay_or_conflict() {
     let operation = committed_operation("request-store");
-    let first = returned(&operation, json!(1));
-    let conflicting = returned(&operation, json!(2));
+    let (first_blob, first) = returned_with_blob(&operation, json!(1));
+    let (conflicting_blob, conflicting) = returned_with_blob(&operation, json!(2));
+    let lease = recovery_lease(&operation, &fence(), 900);
     let store = MemoryOutcomeStore::default();
     assert!(matches!(
         store
-            .record_tool_returned(&operation, &first, &fence(), 900)
+            .record_tool_returned(&operation, &lease, &first_blob, &first, &fence(), 900)
             .unwrap(),
-        ToolOutcomeInsertResultV1::Inserted(_)
+        ToolOutcomeInsertResultV1::Inserted { operation, .. }
+            if operation.state() == AdmissionOperationState::Finalizing
     ));
     assert!(matches!(
         store
-            .record_tool_returned(&operation, &first, &fence(), 900)
+            .record_tool_returned(&operation, &lease, &first_blob, &first, &fence(), 900)
             .unwrap(),
-        ToolOutcomeInsertResultV1::ExactReplay(_)
+        ToolOutcomeInsertResultV1::ExactReplay { .. }
     ));
     assert_eq!(
-        store.record_tool_returned(&operation, &conflicting, &fence(), 900),
+        store.record_tool_returned(
+            &operation,
+            &lease,
+            &conflicting_blob,
+            &conflicting,
+            &fence(),
+            900,
+        ),
         Err(ToolOutcomeStoreError::Conflict)
     );
 }
@@ -805,35 +855,50 @@ fn store_insert_is_once_replay_or_conflict() {
 #[test]
 fn exact_replay_rejects_immutable_semantic_substitution() {
     let operation = committed_operation("request-replay-substitution");
-    let original = returned(&operation, json!({"same": "bytes"}));
+    let (original_blob, original) = returned_with_blob(&operation, json!({"same": "bytes"}));
+    let lease = recovery_lease(&operation, &fence(), 900);
     let store = MemoryOutcomeStore::default();
     store
-        .record_tool_returned(&operation, &original, &fence(), 900)
+        .record_tool_returned(&operation, &lease, &original_blob, &original, &fence(), 900)
         .unwrap();
 
-    let mut substitutions = Vec::new();
-    let mut cost = original.clone();
-    cost.reported_cost.as_mut().unwrap().units += 1;
-    substitutions.push(cost);
-    let mut server = original.clone();
-    server.tool_server = id("substituted-server");
-    substitutions.push(server);
-    let mut tool = original.clone();
-    tool.tool_name = id("substituted-tool");
-    substitutions.push(tool);
-    let mut size = original.clone();
-    size.raw_output_size_bytes += 1;
-    substitutions.push(size);
-    let mut blob_ref = original.clone();
-    blob_ref.raw_output = ContentAddressedBlobRefV1::new(admission_digest("substituted-blob"));
-    substitutions.push(blob_ref);
-
-    for mut substituted in substitutions {
-        rebind_outcome_identity(&mut substituted);
-        assert!(substituted.validate_against(&operation).is_ok());
-        assert!(!original.same_immutable_outcome(&substituted));
+    let substitutions = [
+        (id("server-1"), id("tool-1"), 26, json!({"same": "bytes"})),
+        (
+            id("substituted-server"),
+            id("tool-1"),
+            25,
+            json!({"same": "bytes"}),
+        ),
+        (
+            id("server-1"),
+            id("substituted-tool"),
+            25,
+            json!({"same": "bytes"}),
+        ),
+        (id("server-1"), id("tool-1"), 25, json!({"other": true})),
+    ];
+    for (server, tool, units, output) in substitutions {
+        let raw = RawInvocationOutcomeV1::from_committed_dispatch(
+            &operation,
+            operation.dispatch_commit().unwrap(),
+            server,
+            tool,
+            operation.provider_attempt().unwrap().clone(),
+            admission_digest("transport-terminal"),
+            InvocationOutputV1::Value { value: output },
+            Some(MonetaryAmount {
+                units,
+                currency: "USD".to_owned(),
+            }),
+        )
+        .unwrap();
+        let blob = raw.canonical_blob().unwrap();
+        let substituted =
+            ToolOutcomeRecordV1::record_tool_returned(&operation, &raw, &blob, fence(), 900)
+                .unwrap();
         assert_eq!(
-            store.record_tool_returned(&operation, &substituted, &fence(), 900),
+            store.record_tool_returned(&operation, &lease, &blob, &substituted, &fence(), 900,),
             Err(ToolOutcomeStoreError::Conflict)
         );
     }
@@ -854,45 +919,63 @@ fn recovered_return_keeps_identity_across_owner_rotation() {
     let mut other_store = owner_n_plus_one.clone();
     other_store.store_uuid = "other-store".to_owned();
     assert!(validate_successor_fence(&owner_n, &other_store).is_err());
-    let recovered = returned_under(
+    let (recovered_blob, recovered) = returned_with_blob_under(
         &operation,
         json!({"completed": true}),
         owner_n_plus_one.clone(),
         900,
     );
+    let owner_n_plus_one_lease = recovery_lease(&operation, &owner_n_plus_one, 900);
     let store = MemoryOutcomeStore::with_fence(owner_n_plus_one.clone());
     assert!(matches!(
         store
-            .record_tool_returned(&operation, &recovered, &owner_n_plus_one, 900,)
+            .record_tool_returned(
+                &operation,
+                &owner_n_plus_one_lease,
+                &recovered_blob,
+                &recovered,
+                &owner_n_plus_one,
+                900,
+            )
             .unwrap(),
-        ToolOutcomeInsertResultV1::Inserted(_)
+        ToolOutcomeInsertResultV1::Inserted { .. }
     ));
     assert_eq!(
-        store.record_tool_returned(&operation, &recovered, &owner_n, 900),
+        store.record_tool_returned(
+            &operation,
+            &owner_n_plus_one_lease,
+            &recovered_blob,
+            &recovered,
+            &owner_n,
+            900,
+        ),
         Err(ToolOutcomeStoreError::Fenced)
     );
 
     let owner_n_plus_two = successor_fence(owner_n.owner_epoch + 2);
     store.rotate_to(owner_n_plus_two.clone());
-    let replay = returned_under(
+    let (replay_blob, replay) = returned_with_blob_under(
         &operation,
         json!({"completed": true}),
         owner_n_plus_two.clone(),
         901,
     );
+    let owner_n_plus_two_lease = recovery_lease(&operation, &owner_n_plus_two, 901);
     assert_ne!(recovered.recording_fence(), replay.recording_fence());
     assert!(recovered.same_immutable_outcome(&replay));
     assert!(matches!(
         store
             .record_tool_returned(
                 &operation,
+                &owner_n_plus_two_lease,
+                &replay_blob,
                 &replay,
                 &owner_n_plus_two,
                 901,
             )
             .unwrap(),
-        ToolOutcomeInsertResultV1::ExactReplay(existing)
-            if existing.recording_fence() == &owner_n_plus_one
+        ToolOutcomeInsertResultV1::ExactReplay { outcome, .. }
+            if outcome.recording_fence() == &owner_n_plus_one
     ));
 }
 
@@ -966,13 +1049,15 @@ fn post_return_store_mutations_require_current_owner_fence() {
     let store = MemoryOutcomeStore::default();
     let mut stale = fence();
     stale.owner_epoch -= 1;
+    let stale_lease = recovery_lease(&operation, &stale, 1_000);
+    let lease = recovery_lease(&operation, &fence(), 1_000);
     assert_eq!(
-        store.begin_post_return_evaluation(&evaluation, &stale, 1_000),
+        store.begin_post_return_evaluation(&stale_lease, &evaluation, &stale, 1_000),
         Err(ToolOutcomeStoreError::Fenced)
     );
     assert_eq!(
         store
-            .begin_post_return_evaluation(&evaluation, &fence(), 1_000)
+            .begin_post_return_evaluation(&lease, &evaluation, &fence(), 1_000)
             .unwrap(),
         evaluation
     );
@@ -1125,10 +1210,12 @@ fn external_results_are_bounded_by_frozen_and_store_time() {
         )
         .unwrap();
     let store = MemoryOutcomeStore::default();
+    let lease = recovery_lease(&operation, &fence(), 1_099);
     assert!(store
         .stage_post_return_evaluation(
             operation.binding().operation_id(),
             evaluation.version(),
+            &lease,
             &with_future,
             &fence(),
             1_099,
@@ -1138,13 +1225,14 @@ fn external_results_are_bounded_by_frozen_and_store_time() {
         .stage_post_return_evaluation(
             operation.binding().operation_id(),
             evaluation.version(),
+            &lease,
             &with_future,
             &fence(),
             1_100,
         )
         .is_ok());
     assert!(store
-        .begin_post_return_evaluation(&evaluation, &fence(), 1_099)
+        .begin_post_return_evaluation(&lease, &evaluation, &fence(), 1_099)
         .is_err());
     assert!(ExternalEvaluationResultRefV1::new(
         1,
