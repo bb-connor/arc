@@ -175,6 +175,107 @@ fn reopen(path: &Path) -> SqliteBudgetStore {
 }
 
 #[test]
+fn denied_candidate_does_not_claim_the_operation_authorization_slot() {
+    let path = unique_db_path("chio-composite-denied-candidate");
+    let store = reopen(&path);
+    let mut denied = authorize_request("candidate", 10, 2);
+    denied.max_cost_per_invocation = Some(1);
+    let denied_decision = store
+        .authorize_budget_hold(owned(&store, denied.clone()))
+        .expect("deny first candidate");
+    assert!(matches!(
+        denied_decision,
+        BudgetAuthorizeHoldDecision::Denied(_)
+    ));
+    assert_eq!(
+        store
+            .authorize_budget_hold(owned(&store, denied.clone()))
+            .expect("replay denied candidate"),
+        denied_decision
+    );
+
+    let mut authorized = denied.clone();
+    authorized.max_cost_per_invocation = Some(10);
+    authorized.hold_id = Some("hold-candidate-fallback".to_string());
+    authorized.event_id = Some("event-candidate-fallback-authorize".to_string());
+    assert!(matches!(
+        store
+            .authorize_budget_hold(owned(&store, authorized))
+            .expect("authorize fallback candidate"),
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+
+    let mut conflicting = denied;
+    conflicting.max_cost_per_invocation = Some(10);
+    conflicting.hold_id = Some("hold-candidate-conflict".to_string());
+    conflicting.event_id = Some("event-candidate-conflict-authorize".to_string());
+    assert!(store
+        .authorize_budget_hold(owned(&store, conflicting))
+        .is_err());
+
+    drop(store);
+    let _ = fs::remove_dir_all(path);
+}
+
+#[test]
+fn v6_operation_authorization_index_migrates_to_ignore_denials() {
+    let path = unique_db_path("chio-composite-v6-operation-index");
+    let store = reopen(&path);
+    let mut denied = authorize_request("candidate-migration", 10, 2);
+    denied.max_cost_per_invocation = Some(1);
+    assert!(matches!(
+        store
+            .authorize_budget_hold(owned(&store, denied.clone()))
+            .expect("deny first candidate"),
+        BudgetAuthorizeHoldDecision::Denied(_)
+    ));
+    drop(store);
+
+    let database = path.join("authority.sqlite3");
+    let connection = Connection::open(&database).expect("open v7 database for downgrade fixture");
+    connection
+        .execute_batch(
+            r#"
+            DROP INDEX idx_budget_events_operation_authorize;
+            CREATE UNIQUE INDEX idx_budget_events_operation_authorize
+                ON budget_mutation_events(operation_id)
+                WHERE operation_id IS NOT NULL
+                  AND kind IN ('reserve_invocation', 'authorize_exposure');
+            "#,
+        )
+        .expect("install v6 operation index");
+    crate::stamp_schema_version(&connection, "budget", 6).expect("stamp v6 budget schema");
+    drop(connection);
+
+    let store = reopen(&path);
+    let mut authorized = denied;
+    authorized.max_cost_per_invocation = Some(10);
+    authorized.hold_id = Some("hold-candidate-migration-fallback".to_string());
+    authorized.event_id = Some("event-candidate-migration-fallback".to_string());
+    assert!(matches!(
+        store
+            .authorize_budget_hold(owned(&store, authorized))
+            .expect("authorize fallback after v6 migration"),
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+
+    let connection = store
+        .connection()
+        .expect("inspect migrated operation index");
+    let index_sql: String = connection
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?1",
+            params!["idx_budget_events_operation_authorize"],
+            |row| row.get(0),
+        )
+        .expect("load migrated operation index");
+    assert!(index_sql.contains("authorization_outcome IS NOT 'denied'"));
+    drop(connection);
+    drop(store);
+    let _ = fs::remove_dir_all(path);
+}
+
+#[test]
 fn composite_authorize_capture_and_settlement_survive_response_loss_and_restart() {
     for (id, monetary_capture) in [("reconcile", false), ("capture-spend", true)] {
         let path = unique_db_path(&format!("chio-composite-{id}"));

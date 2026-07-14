@@ -631,13 +631,15 @@ impl InMemoryBudgetStoreInner {
             self.hold_authorizations
                 .insert(hold_id.to_string(), mutation.clone());
         }
-        if let Some(operation_id) = request
-            .admission_binding
-            .as_ref()
-            .map(|binding| binding.operation_id.as_str())
-        {
-            self.operation_authorizations
-                .insert(operation_id.to_string(), mutation);
+        if allowed {
+            if let Some(operation_id) = request
+                .admission_binding
+                .as_ref()
+                .map(|binding| binding.operation_id.as_str())
+            {
+                self.operation_authorizations
+                    .insert(operation_id.to_string(), mutation);
+            }
         }
         self.events.last().cloned().ok_or_else(|| {
             BudgetStoreError::Invariant("authorization event disappeared after append".to_string())

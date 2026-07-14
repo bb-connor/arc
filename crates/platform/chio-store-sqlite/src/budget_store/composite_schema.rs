@@ -2,7 +2,7 @@ use super::*;
 
 mod state_invariants;
 
-const COMPOSITE_SCHEMA_VERSION: i32 = 6;
+const COMPOSITE_SCHEMA_VERSION: i32 = 7;
 
 pub(super) fn ensure_composite_budget_schema(
     transaction: &rusqlite::Transaction<'_>,
@@ -127,10 +127,6 @@ pub(super) fn ensure_composite_budget_schema(
             WHERE operation_id IS NOT NULL;
         CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_holds_operation_hold
             ON budget_authorization_holds(operation_id, hold_id);
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_events_operation_authorize
-            ON budget_mutation_events(operation_id)
-            WHERE operation_id IS NOT NULL
-              AND kind IN ('reserve_invocation', 'authorize_exposure');
 
         CREATE TABLE IF NOT EXISTS budget_invocation_quotas (
             profile TEXT NOT NULL,
@@ -556,6 +552,16 @@ pub(super) fn ensure_composite_budget_schema(
     ensure_cumulative_operation_composite_fk(transaction)?;
 
     if on_disk_schema_version < COMPOSITE_SCHEMA_VERSION {
+        transaction.execute_batch(
+            r#"
+            DROP INDEX IF EXISTS idx_budget_events_operation_authorize;
+            CREATE UNIQUE INDEX idx_budget_events_operation_authorize
+                ON budget_mutation_events(operation_id)
+                WHERE operation_id IS NOT NULL
+                  AND kind IN ('reserve_invocation', 'authorize_exposure')
+                  AND authorization_outcome IS NOT 'denied';
+            "#,
+        )?;
         transaction.execute(
             "INSERT OR IGNORE INTO budget_usage_anchor_migration_gate(singleton) VALUES (1)",
             [],

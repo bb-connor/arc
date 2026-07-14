@@ -1,7 +1,7 @@
 use super::*;
 
 /// Budget-store schema revision. Bump on every schema-affecting change.
-pub(crate) const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 6;
+pub(crate) const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 7;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table, distinct from any co-located store's key.
 const BUDGET_STORE_SCHEMA_KEY: &str = "budget";

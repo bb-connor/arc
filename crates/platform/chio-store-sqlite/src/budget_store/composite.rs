@@ -202,7 +202,13 @@ impl SqliteBudgetStore {
             }
         }
         let operation_exists = transaction.query_row(
-            "SELECT EXISTS(SELECT 1 FROM budget_mutation_events WHERE operation_id = ?1)",
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM budget_mutation_events
+                WHERE operation_id = ?1
+                  AND authorization_outcome IS NOT 'denied'
+            )
+            "#,
             params![&admission.operation_id],
             |row| row.get::<_, bool>(0),
         )?;
