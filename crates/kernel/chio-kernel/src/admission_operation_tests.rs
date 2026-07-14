@@ -2240,14 +2240,12 @@ fn terminal_replay_reference_is_typed_and_retained() {
             Some(AdmissionOperationState::OutcomeUnknownAfterDispatch),
             Some(AdmissionTerminalReplay::Incident {
                 incident_id: identifier("incident_id", "incident-1"),
+                projection_digest: digest("projection_digest", REQUEST_HASH),
             }),
             None,
         ),
         Err(AdmissionOperationError::TerminalProjectionRequired)
     );
-    let replay = AdmissionTerminalReplay::Incident {
-        incident_id: identifier("incident_id", "incident-1"),
-    };
     let context = AdmissionProjectionContext {
         operation_id: operation.binding.operation_id.clone(),
         request_id: operation.binding.request_id.clone(),
@@ -2266,8 +2264,50 @@ fn terminal_replay_reference_is_typed_and_retained() {
     )
     .expect("incident must bind to the exact terminal projection");
     let projection = AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
-        context,
+        context: context.clone(),
         incident: Box::new(incident),
+    };
+    let canonical_projection = projection
+        .canonical_projection()
+        .expect("terminal projection must have a canonical commitment");
+    assert_eq!(canonical_projection.records().len(), 1);
+    assert_eq!(
+        canonical_projection.records()[0].commitment().kind(),
+        AdmissionProjectionRecordKind::Incident
+    );
+    let restored_manifest =
+        AdmissionProjectionManifestV1::from_canonical_bytes(canonical_projection.manifest_bytes())
+            .expect("projection manifest must round trip canonically");
+    restored_manifest
+        .verify_projection_body(canonical_projection.projection_bytes())
+        .expect("projection body must match its manifest");
+    assert_eq!(
+        restored_manifest
+            .projection_digest()
+            .expect("manifest must derive its digest"),
+        *canonical_projection.projection_digest()
+    );
+    let substituted_incident = AdmissionIncident::from_verified(
+        &operation,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        identifier("incident_id", "incident-1"),
+        digest("incident_digest", REQUEST_HASH),
+    )
+    .expect("substituted incident remains structurally bound");
+    let substituted_projection = AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
+        context,
+        incident: Box::new(substituted_incident),
+    };
+    assert_ne!(
+        substituted_projection
+            .projection_digest()
+            .expect("substituted projection must derive"),
+        *canonical_projection.projection_digest()
+    );
+    let replay = AdmissionTerminalReplay::Incident {
+        incident_id: identifier("incident_id", "incident-1"),
+        projection_digest: canonical_projection.projection_digest().clone(),
     };
     operation = operation
         .apply_terminal_projection(&projection, &full_projection_capabilities())

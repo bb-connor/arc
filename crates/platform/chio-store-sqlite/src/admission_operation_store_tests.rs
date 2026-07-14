@@ -4,13 +4,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::admission_operation::{
     AdmissionAttachment, AdmissionBeginResult, AdmissionDigest, AdmissionIdentifier,
-    AdmissionOperationBindingInputV1, AdmissionOperationBindingV1, AdmissionOperationCommand,
-    AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStore,
-    AdmissionOperationStoreError, AdmissionOperationV1, AdmissionParticipantRequirements,
-    AdmissionRecoveryLease, AdmissionRequestBindingV1, AdmissionTerminalReplay,
+    AdmissionIncident, AdmissionOperationBindingInputV1, AdmissionOperationBindingV1,
+    AdmissionOperationCommand, AdmissionOperationKind, AdmissionOperationState,
+    AdmissionOperationStore, AdmissionOperationStoreError, AdmissionOperationV1,
+    AdmissionParticipantRequirements, AdmissionProjectionContext, AdmissionRecoveryLease,
+    AdmissionRequestBindingV1, AdmissionTerminalProjection, AdmissionTerminalReplay,
     AuthenticatedRequestNamespace, ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt,
     SideEffectClass, UntrustedAdmissionRecoveryClaim,
 };
+use chio_kernel::receipt_store::{ReceiptStore, ReceiptStoreError};
 use rusqlite::{params, Connection};
 use tempfile::TempDir;
 
@@ -155,6 +157,94 @@ fn command(
     .expect("command")
 }
 
+fn finalizing_tool_operation(
+    fixture: &Fixture,
+    request_id: &str,
+    capability_id: &str,
+    begun_at: u64,
+) -> AdmissionOperationV1 {
+    let mut operation = prepared_operation(
+        &fixture.fence,
+        AdmissionOperationKind::ToolDispatch,
+        request_id,
+        capability_id,
+    );
+    fixture
+        .store
+        .begin(&operation, &fixture.fence, begun_at)
+        .expect("begin durable operation");
+    let transitions = [
+        (
+            AdmissionOperationState::BrokerAttemptRegistered,
+            vec![AdmissionAttachment::BrokerAttempt(provider_attempt(
+                &operation,
+                "projection-attempt",
+            ))],
+        ),
+        (
+            AdmissionOperationState::BudgetAuthorized,
+            vec![AdmissionAttachment::BudgetHoldId(identifier(
+                "budget_hold_id",
+                "projection-hold",
+            ))],
+        ),
+        (AdmissionOperationState::ReadyToDispatch, Vec::new()),
+        (AdmissionOperationState::CapturePending, Vec::new()),
+        (AdmissionOperationState::DispatchCommitted, Vec::new()),
+        (
+            AdmissionOperationState::Finalizing,
+            vec![AdmissionAttachment::ToolOutcomeId(digest(
+                "tool_outcome_id",
+                'f',
+            ))],
+        ),
+    ];
+    for (index, (next_state, attachments)) in transitions.into_iter().enumerate() {
+        let at = begun_at + 1 + u64::try_from(index).expect("transition index") * 2;
+        let recovery = claim(fixture, &operation, "projection-worker", at);
+        operation = fixture
+            .store
+            .compare_and_swap(
+                &command(&operation, recovery, attachments, next_state, None),
+                at + 1,
+            )
+            .expect("advance durable operation")
+            .into_operation();
+    }
+    operation
+}
+
+fn unknown_projection(
+    fixture: &Fixture,
+    operation: &AdmissionOperationV1,
+    incident_id: &str,
+    incident_digest: char,
+    at: u64,
+) -> AdmissionTerminalProjection {
+    let recovery = claim(fixture, operation, "projection-worker", at);
+    let context = AdmissionProjectionContext {
+        operation_id: operation.binding().operation_id().clone(),
+        request_id: operation.replay_key().request_id,
+        expected_operation_version: operation.version(),
+        trusted_time_unix_ms: at + 1,
+        coordinator_lease_id: recovery.coordinator_lease_id().clone(),
+        coordinator_lease_epoch: recovery.coordinator_lease_epoch(),
+        store_fence: recovery.store_fence().clone(),
+    };
+    let incident = AdmissionIncident::from_verified(
+        operation,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        identifier("incident_id", incident_id),
+        digest("incident_digest", incident_digest),
+    )
+    .expect("bind durable incident");
+    AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
+        context,
+        incident: Box::new(incident),
+    }
+}
+
 #[test]
 fn fresh_provision_creates_the_operation_schema_after_serving_lease_schema() {
     let fixture = fixture();
@@ -186,6 +276,62 @@ fn fresh_provision_creates_the_operation_schema_after_serving_lease_schema() {
     assert_eq!(high_water, 0);
     assert!(lease_table);
     verify_admission_operation_invariants(&connection).expect("fresh invariants");
+}
+
+#[test]
+fn provision_migrates_v1_operation_state_without_losing_replay_identity() {
+    let fixture = fixture();
+    let operation = prepared_operation(
+        &fixture.fence,
+        AdmissionOperationKind::ToolDispatch,
+        "request-v1-migration",
+        "capability-v1-migration",
+    );
+    fixture
+        .store
+        .begin(&operation, &fixture.fence, now_ms())
+        .expect("persist v1 operation");
+
+    let Fixture {
+        _temp,
+        database,
+        lock_root,
+        authority,
+        store,
+        ..
+    } = fixture;
+    drop(store);
+    drop(authority);
+
+    let connection = Connection::open(&database).expect("open offline database");
+    connection
+        .execute_batch(
+            r#"
+            DROP TABLE admission_operation_observer_attempts;
+            DROP TABLE admission_operation_authorization_consumptions;
+            DROP TABLE admission_operation_terminal_records;
+            DROP TABLE admission_operation_terminal_projections;
+            UPDATE chio_store_schema_versions
+            SET version = 1
+            WHERE store_key = 'admission_operation';
+            "#,
+        )
+        .expect("shape database as v1");
+    drop(connection);
+
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("migrate v1 authority");
+    let authority =
+        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open migrated authority");
+    let store = authority.admission_operation_store();
+    assert_eq!(
+        store
+            .load_by_operation_id(operation.binding().operation_id())
+            .expect("load preserved operation"),
+        Some(operation)
+    );
+    let connection = store.connection().expect("migrated connection");
+    verify_admission_operation_invariants(&connection).expect("migrated invariants");
+    drop(_temp);
 }
 
 #[test]
@@ -438,6 +584,152 @@ fn legal_transitions_round_trip_through_versioned_cas() {
         assert_eq!(loaded.state(), case.state);
         assert_eq!(loaded.version(), 2);
     }
+}
+
+#[test]
+fn terminal_projection_is_atomic_replayable_and_retained() {
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let first = finalizing_tool_operation(
+        &fixture,
+        "request-projection-first",
+        "capability-projection-first",
+        begun_at,
+    );
+    let first_projection = unknown_projection(
+        &fixture,
+        &first,
+        "projection-shared-incident",
+        'c',
+        begun_at + 20,
+    );
+    let committed = fixture
+        .store
+        .commit_terminal_projection(&first_projection)
+        .expect("commit terminal projection");
+    assert_eq!(
+        committed.state,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch
+    );
+    assert_eq!(
+        fixture
+            .store
+            .commit_terminal_projection(&first_projection)
+            .expect("replay identical projection"),
+        committed
+    );
+    assert_eq!(
+        fixture
+            .store
+            .load_terminal_replay(&first.replay_key())
+            .expect("load terminal replay"),
+        Some(committed.replay.clone())
+    );
+
+    let second = finalizing_tool_operation(
+        &fixture,
+        "request-projection-second",
+        "capability-projection-second",
+        begun_at + 30,
+    );
+    let conflicting = unknown_projection(
+        &fixture,
+        &second,
+        "projection-shared-incident",
+        'd',
+        begun_at + 50,
+    );
+    assert!(fixture
+        .store
+        .commit_terminal_projection(&conflicting)
+        .is_err());
+    assert_eq!(
+        fixture
+            .store
+            .load_by_operation_id(second.binding().operation_id())
+            .expect("load operation after rollback"),
+        Some(second.clone())
+    );
+
+    let retry = AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
+        context: conflicting.context().clone(),
+        incident: Box::new(
+            AdmissionIncident::from_verified(
+                &second,
+                conflicting.context(),
+                AdmissionOperationState::OutcomeUnknownAfterDispatch,
+                identifier("incident_id", "projection-second-incident"),
+                digest("incident_digest", 'd'),
+            )
+            .expect("bind retry incident"),
+        ),
+    };
+    fixture
+        .store
+        .commit_terminal_projection(&retry)
+        .expect("retry clean terminal projection");
+
+    let replay_key = first.replay_key();
+    let Fixture {
+        _temp,
+        database,
+        lock_root,
+        authority,
+        store,
+        ..
+    } = fixture;
+    drop(store);
+    drop(authority);
+    let reopened =
+        SqliteAuthorityStore::open_serving(&database, &lock_root).expect("reopen authority");
+    assert!(reopened
+        .admission_operation_store()
+        .load_terminal_replay(&replay_key)
+        .expect("load retained replay")
+        .is_some());
+    drop(reopened);
+    drop(_temp);
+}
+
+#[test]
+fn receipt_lookup_rejects_records_outside_the_terminal_manifest() {
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let operation = finalizing_tool_operation(
+        &fixture,
+        "request-forged-receipt",
+        "capability-forged-receipt",
+        begun_at,
+    );
+    fixture
+        .store
+        .commit_terminal_projection(&unknown_projection(
+            &fixture,
+            &operation,
+            "projection-forged-receipt-incident",
+            'e',
+            begun_at + 20,
+        ))
+        .expect("commit terminal projection");
+
+    let connection = fixture.store.connection().expect("connection");
+    connection
+        .execute(
+            r#"
+            INSERT INTO admission_operation_terminal_records (
+                operation_id, record_kind, record_id, record_digest, record_json
+            ) VALUES (?1, 'receipt', 'forged-receipt', ?2, X'7B7D')
+            "#,
+            params![operation.binding().operation_id().as_str(), "a".repeat(64),],
+        )
+        .expect("inject out-of-manifest record");
+    drop(connection);
+
+    assert!(matches!(
+        fixture.store.load_chio_receipt("forged-receipt"),
+        Err(ReceiptStoreError::Conflict(detail))
+            if detail.contains("record count differs from its manifest")
+    ));
 }
 
 #[test]

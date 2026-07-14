@@ -2,14 +2,20 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
+use chio_core::receipt::{body::ChioReceipt, lineage::ChildRequestReceipt};
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_kernel::admission_operation::{
     AdmissionBeginResult, AdmissionCommandResult, AdmissionIdentifier, AdmissionOperationCommand,
     AdmissionOperationError, AdmissionOperationId, AdmissionOperationState,
     AdmissionOperationStore, AdmissionOperationStoreError, AdmissionOperationV1,
-    AdmissionReplayClassification, AdmissionReplayKey, AdmissionTerminalReplay,
-    PersistedAdmissionOperationV1, QualifiedAdmissionOperationStore,
-    UntrustedAdmissionRecoveryClaim,
+    AdmissionProjectionCapabilities, AdmissionProjectionManifestV1, AdmissionProjectionRecordKind,
+    AdmissionReplayClassification, AdmissionReplayKey, AdmissionTerminal,
+    AdmissionTerminalProjection, AdmissionTerminalReplay, CanonicalAdmissionProjectionRecord,
+    CanonicalAdmissionTerminalProjection, PersistedAdmissionOperationV1,
+    QualifiedAdmissionOperationStore, UntrustedAdmissionRecoveryClaim,
+};
+use chio_kernel::receipt_store::{
+    AuthorizationReceiptConsumption, PendingSettlementObservation, ReceiptStore, ReceiptStoreError,
 };
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction, TransactionBehavior};
 use serde::Serialize;
@@ -25,13 +31,17 @@ pub(crate) use commit_chain::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 1;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 2;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "chio_serving_owner",
     "capability_grant_budgets",
 ];
 const MAX_PERSISTED_OPERATION_BYTES: usize = 256 * 1024;
+const MAX_TERMINAL_PROJECTION_BYTES: usize = 4 * 1024 * 1024;
+const MAX_TERMINAL_MANIFEST_BYTES: usize = 256 * 1024;
+const MAX_TERMINAL_RECORD_BYTES: usize = 1024 * 1024;
+const MAX_TERMINAL_RECORDS: usize = 32;
 const MAX_RECOVERY_BATCH: usize = 256;
 const MAX_TRUSTED_UNIX_MS: u64 = (1_u64 << 53) - 1;
 const MAX_TRUSTED_CLOCK_SKEW_MS: u64 = 5 * 60 * 1_000;
@@ -112,9 +122,1063 @@ impl SqliteAdmissionOperationStore {
             )))
         })
     }
+
+    pub fn commit_terminal_projection(
+        &self,
+        projection: &AdmissionTerminalProjection,
+    ) -> Result<AdmissionTerminal, AdmissionOperationStoreError> {
+        let canonical = projection.canonical_projection()?;
+        validate_canonical_projection_size(&canonical)?;
+        let context = projection.context();
+        context.validate()?;
+
+        let mut connection = self.connection()?;
+        let transaction = self.begin_write(&mut connection, Some(&context.store_fence))?;
+        verify_trusted_time(&transaction, context.trusted_time_unix_ms)?;
+        let stored = load_by_operation_id_tx(&transaction, &context.operation_id)?
+            .ok_or(AdmissionOperationStoreError::NotFound)?;
+
+        if stored.operation.state().is_terminal() {
+            let terminal = verify_exact_terminal_replay(
+                &transaction,
+                &stored.operation,
+                projection,
+                &canonical,
+            )?;
+            transaction.commit().map_err(sqlite_error)?;
+            return Ok(terminal);
+        }
+        if context.request_id != stored.operation.replay_key().request_id
+            || context.expected_operation_version != stored.operation.version()
+            || context.coordinator_lease_epoch != stored.operation.coordinator_lease_epoch()
+            || context.trusted_time_unix_ms < stored.updated_at_unix_ms
+        {
+            return Err(AdmissionOperationError::TerminalProjectionBindingMismatch.into());
+        }
+        let recovery_claim = stored
+            .recovery_claim
+            .as_ref()
+            .ok_or(AdmissionOperationStoreError::Fenced)?;
+        if recovery_claim.coordinator_lease_id() != &context.coordinator_lease_id
+            || recovery_claim.coordinator_lease_epoch() != context.coordinator_lease_epoch
+            || recovery_claim.store_fence() != &context.store_fence
+        {
+            return Err(AdmissionOperationStoreError::Fenced);
+        }
+        verify_stored_recovery_claim(
+            &transaction,
+            &self.serving_owner,
+            &stored,
+            recovery_claim,
+            context.trusted_time_unix_ms,
+            &context.store_fence,
+        )?;
+        ensure_projection_absent(&transaction, &context.operation_id)?;
+
+        let capabilities = full_projection_capabilities();
+        let updated = stored
+            .operation
+            .apply_terminal_projection(projection, &capabilities)?;
+        if updated
+            .terminal_replay()
+            .is_none_or(|replay| replay.projection_digest() != canonical.projection_digest())
+        {
+            return Err(invariant(
+                "terminal operation does not retain its exact projection digest",
+            ));
+        }
+        let encoded = encode_operation(&updated)?;
+        let changed = transaction
+            .execute(
+                r#"
+                UPDATE admission_operations
+                SET operation_json = ?1, state = ?2, terminal = 1,
+                    coordinator_lease_epoch = ?3, version = ?4,
+                    updated_at_unix_ms = ?5
+                WHERE operation_id = ?6 AND version = ?7 AND terminal = 0
+                "#,
+                params![
+                    &encoded,
+                    state_name(updated.state()),
+                    sqlite_i64(updated.coordinator_lease_epoch(), "coordinator_lease_epoch")?,
+                    sqlite_i64(updated.version(), "terminal_operation_version")?,
+                    sqlite_i64(context.trusted_time_unix_ms, "trusted_now_unix_ms")?,
+                    context.operation_id.as_str(),
+                    sqlite_i64(stored.operation.version(), "expected_operation_version")?,
+                ],
+            )
+            .map_err(sqlite_error)?;
+        if changed != 1 {
+            return Err(AdmissionOperationStoreError::Fenced);
+        }
+        insert_terminal_projection(&transaction, projection, &canonical, &updated)?;
+        append_operation_commit(
+            &transaction,
+            &updated,
+            &encoded,
+            Some(recovery_claim),
+            "compare_and_swap",
+            &self.serving_owner,
+            context.trusted_time_unix_ms,
+        )?;
+        self.commit_write(transaction)?;
+        self.sync_after_write(&connection)?;
+        terminal_from_operation(&updated)
+    }
+}
+
+fn full_projection_capabilities() -> AdmissionProjectionCapabilities {
+    AdmissionProjectionCapabilities {
+        operation_terminal: true,
+        incident_terminal: true,
+        tool_outcome: true,
+        payment_terminal: true,
+        authorization_consumption: true,
+        outcome_eligibility: true,
+        observation_attempt_zero: true,
+        obligation: true,
+        economic_mutation_terminal: true,
+    }
+}
+
+fn validate_canonical_projection_size(
+    projection: &CanonicalAdmissionTerminalProjection,
+) -> Result<(), AdmissionOperationStoreError> {
+    if projection.projection_bytes().is_empty()
+        || projection.projection_bytes().len() > MAX_TERMINAL_PROJECTION_BYTES
+        || projection.manifest_bytes().is_empty()
+        || projection.manifest_bytes().len() > MAX_TERMINAL_MANIFEST_BYTES
+        || projection.records().is_empty()
+        || projection.records().len() > MAX_TERMINAL_RECORDS
+        || projection.records().iter().any(|record| {
+            record.canonical_bytes().is_empty()
+                || record.canonical_bytes().len() > MAX_TERMINAL_RECORD_BYTES
+        })
+    {
+        return Err(invariant("terminal projection exceeds its storage bounds"));
+    }
+    Ok(())
+}
+
+fn ensure_projection_absent(
+    transaction: &Transaction<'_>,
+    operation_id: &AdmissionOperationId,
+) -> Result<(), AdmissionOperationStoreError> {
+    let present: bool = transaction
+        .query_row(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM admission_operation_terminal_projections
+                WHERE operation_id = ?1
+                UNION ALL
+                SELECT 1 FROM admission_operation_terminal_records
+                WHERE operation_id = ?1
+                UNION ALL
+                SELECT 1 FROM admission_operation_authorization_consumptions
+                WHERE operation_id = ?1
+                UNION ALL
+                SELECT 1 FROM admission_operation_observer_attempts
+                WHERE operation_id = ?1
+            )
+            "#,
+            [operation_id.as_str()],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if present {
+        return Err(invariant(
+            "nonterminal admission operation has a partial terminal projection",
+        ));
+    }
+    Ok(())
+}
+
+fn insert_terminal_projection(
+    transaction: &Transaction<'_>,
+    projection: &AdmissionTerminalProjection,
+    canonical: &CanonicalAdmissionTerminalProjection,
+    terminal_operation: &AdmissionOperationV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    let context = projection.context();
+    let inserted = transaction
+        .execute(
+            r#"
+            INSERT INTO admission_operation_terminal_projections (
+                operation_id, source_operation_version, terminal_operation_version,
+                terminal_state, projection_body_digest, projection_digest,
+                projection_json, manifest_json, record_count, committed_at_unix_ms,
+                store_uuid, store_lease_id, store_owner_epoch
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+            "#,
+            params![
+                context.operation_id.as_str(),
+                sqlite_i64(
+                    context.expected_operation_version,
+                    "source_operation_version"
+                )?,
+                sqlite_i64(terminal_operation.version(), "terminal_operation_version")?,
+                state_name(terminal_operation.state()),
+                canonical.manifest().projection_body_digest().as_str(),
+                canonical.projection_digest().as_str(),
+                canonical.projection_bytes(),
+                canonical.manifest_bytes(),
+                i64::try_from(canonical.records().len())
+                    .map_err(|_| invariant("terminal record count overflow"))?,
+                sqlite_i64(context.trusted_time_unix_ms, "committed_at_unix_ms")?,
+                &context.store_fence.store_uuid,
+                &context.store_fence.lease_id,
+                sqlite_i64(context.store_fence.owner_epoch, "store_owner_epoch")?,
+            ],
+        )
+        .map_err(sqlite_error)?;
+    if inserted != 1 {
+        return Err(invariant(
+            "terminal projection did not insert exactly one row",
+        ));
+    }
+
+    for record in canonical.records() {
+        let commitment = record.commitment();
+        let inserted = transaction
+            .execute(
+                r#"
+                INSERT INTO admission_operation_terminal_records (
+                    operation_id, record_kind, record_id, record_digest, record_json
+                ) VALUES (?1, ?2, ?3, ?4, ?5)
+                "#,
+                params![
+                    context.operation_id.as_str(),
+                    commitment.kind().as_str(),
+                    commitment.record_id().as_str(),
+                    commitment.record_digest().as_str(),
+                    record.canonical_bytes(),
+                ],
+            )
+            .map_err(sqlite_error)?;
+        if inserted != 1 {
+            return Err(invariant(
+                "terminal projection record did not insert exactly one row",
+            ));
+        }
+    }
+
+    if let AdmissionTerminalProjection::Completed(completed) = projection {
+        if let Some(authorization) = &completed.authorization {
+            let record = require_canonical_record(
+                canonical,
+                AdmissionProjectionRecordKind::AuthorizationConsumption,
+            )?;
+            let consumption = authorization.consumption();
+            let inserted = transaction
+                .execute(
+                    r#"
+                    INSERT INTO admission_operation_authorization_consumptions (
+                        operation_id, authorization_receipt_id, consumer_receipt_id,
+                        request_id, session_id, tool_call_id, tenant_id,
+                        parameter_hash, consumed_at_unix_ms, record_digest, record_json
+                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                    "#,
+                    params![
+                        context.operation_id.as_str(),
+                        &consumption.authorization_receipt_id,
+                        &consumption.consumer_receipt_id,
+                        &consumption.request_id,
+                        &consumption.session_id,
+                        &consumption.tool_call_id,
+                        consumption.tenant_id.as_deref(),
+                        &consumption.parameter_hash,
+                        sqlite_i64(consumption.consumed_at_unix_ms, "consumed_at_unix_ms")?,
+                        record.commitment().record_digest().as_str(),
+                        record.canonical_bytes(),
+                    ],
+                )
+                .map_err(sqlite_error)?;
+            if inserted != 1 {
+                return Err(invariant(
+                    "authorization consumption did not insert exactly one row",
+                ));
+            }
+        }
+        if let Some(observer) = &completed.observer_work {
+            let record = require_canonical_record(
+                canonical,
+                AdmissionProjectionRecordKind::ObservationAttemptZero,
+            )?;
+            let inserted = transaction
+                .execute(
+                    r#"
+                    INSERT INTO admission_operation_observer_attempts (
+                        operation_id, receipt_id, work_state, attempts,
+                        next_visible_at_unix_ms, row_version, last_error,
+                        record_digest, record_json, created_at_unix_ms,
+                        updated_at_unix_ms, store_uuid, store_lease_id,
+                        store_owner_epoch
+                    ) VALUES (?1, ?2, 'pending', 0, ?3, 0, NULL, ?4, ?5,
+                              ?6, ?6, ?7, ?8, ?9)
+                    "#,
+                    params![
+                        context.operation_id.as_str(),
+                        &completed.receipt.receipt().id,
+                        sqlite_i64(
+                            observer.pending().next_visible_at_ms,
+                            "observer_next_visible_at_unix_ms"
+                        )?,
+                        record.commitment().record_digest().as_str(),
+                        record.canonical_bytes(),
+                        sqlite_i64(context.trusted_time_unix_ms, "observer_created_at_unix_ms")?,
+                        &context.store_fence.store_uuid,
+                        &context.store_fence.lease_id,
+                        sqlite_i64(context.store_fence.owner_epoch, "store_owner_epoch")?,
+                    ],
+                )
+                .map_err(sqlite_error)?;
+            if inserted != 1 {
+                return Err(invariant(
+                    "observer attempt zero did not insert exactly one row",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn require_canonical_record(
+    projection: &CanonicalAdmissionTerminalProjection,
+    kind: AdmissionProjectionRecordKind,
+) -> Result<&CanonicalAdmissionProjectionRecord, AdmissionOperationStoreError> {
+    let mut matches = projection
+        .records()
+        .iter()
+        .filter(|record| record.commitment().kind() == kind);
+    let record = matches
+        .next()
+        .ok_or_else(|| invariant(format!("terminal projection lacks {}", kind.as_str())))?;
+    if matches.next().is_some() {
+        return Err(invariant(format!(
+            "terminal projection repeats {}",
+            kind.as_str()
+        )));
+    }
+    Ok(record)
+}
+
+fn terminal_from_operation(
+    operation: &AdmissionOperationV1,
+) -> Result<AdmissionTerminal, AdmissionOperationStoreError> {
+    if !operation.state().is_terminal() {
+        return Err(invariant("admission operation is not terminal"));
+    }
+    let replay = operation
+        .terminal_replay()
+        .cloned()
+        .ok_or_else(|| invariant("terminal admission operation lacks replay evidence"))?;
+    Ok(AdmissionTerminal {
+        operation_id: operation.binding().operation_id().clone(),
+        state: operation.state(),
+        replay,
+    })
+}
+
+struct StoredTerminalProjection {
+    source_operation_version: i64,
+    terminal_operation_version: i64,
+    terminal_state: String,
+    projection_body_digest: String,
+    projection_digest: String,
+    projection_json: Vec<u8>,
+    manifest_json: Vec<u8>,
+    record_count: i64,
+    committed_at_unix_ms: i64,
+    store_uuid: String,
+    store_lease_id: String,
+    store_owner_epoch: i64,
+}
+
+fn load_terminal_projection_tx(
+    connection: &Connection,
+    operation_id: &AdmissionOperationId,
+) -> Result<Option<StoredTerminalProjection>, AdmissionOperationStoreError> {
+    connection
+        .query_row(
+            r#"
+            SELECT source_operation_version, terminal_operation_version,
+                   terminal_state, projection_body_digest, projection_digest,
+                   projection_json, manifest_json, record_count,
+                   committed_at_unix_ms, store_uuid, store_lease_id,
+                   store_owner_epoch
+            FROM admission_operation_terminal_projections
+            WHERE operation_id = ?1
+            "#,
+            [operation_id.as_str()],
+            |row| {
+                Ok(StoredTerminalProjection {
+                    source_operation_version: row.get(0)?,
+                    terminal_operation_version: row.get(1)?,
+                    terminal_state: row.get(2)?,
+                    projection_body_digest: row.get(3)?,
+                    projection_digest: row.get(4)?,
+                    projection_json: row.get(5)?,
+                    manifest_json: row.get(6)?,
+                    record_count: row.get(7)?,
+                    committed_at_unix_ms: row.get(8)?,
+                    store_uuid: row.get(9)?,
+                    store_lease_id: row.get(10)?,
+                    store_owner_epoch: row.get(11)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(sqlite_error)
+}
+
+fn verify_exact_terminal_replay(
+    transaction: &Transaction<'_>,
+    operation: &AdmissionOperationV1,
+    projection: &AdmissionTerminalProjection,
+    canonical: &CanonicalAdmissionTerminalProjection,
+) -> Result<AdmissionTerminal, AdmissionOperationStoreError> {
+    let context = projection.context();
+    if context.operation_id != *operation.binding().operation_id()
+        || context.request_id != operation.replay_key().request_id
+        || context
+            .expected_operation_version
+            .checked_add(1)
+            .is_none_or(|version| version != operation.version())
+        || projected_terminal_state(projection) != operation.state()
+        || operation
+            .terminal_replay()
+            .is_none_or(|replay| replay.projection_digest() != canonical.projection_digest())
+    {
+        return Err(AdmissionOperationError::TerminalProjectionBindingMismatch.into());
+    }
+
+    let stored = load_terminal_projection_tx(transaction, operation.binding().operation_id())?
+        .ok_or_else(|| invariant("terminal admission operation lacks its projection"))?;
+    if stored.source_operation_version
+        != sqlite_i64(
+            context.expected_operation_version,
+            "source_operation_version",
+        )?
+        || stored.terminal_operation_version
+            != sqlite_i64(operation.version(), "terminal_operation_version")?
+        || stored.terminal_state != state_name(operation.state())
+        || stored.projection_body_digest != canonical.manifest().projection_body_digest().as_str()
+        || stored.projection_digest != canonical.projection_digest().as_str()
+        || stored.projection_json != canonical.projection_bytes()
+        || stored.manifest_json != canonical.manifest_bytes()
+        || stored.record_count
+            != i64::try_from(canonical.records().len())
+                .map_err(|_| invariant("terminal record count overflow"))?
+        || stored.committed_at_unix_ms
+            != sqlite_i64(context.trusted_time_unix_ms, "committed_at_unix_ms")?
+        || stored.store_uuid != context.store_fence.store_uuid
+        || stored.store_lease_id != context.store_fence.lease_id
+        || stored.store_owner_epoch
+            != sqlite_i64(context.store_fence.owner_epoch, "store_owner_epoch")?
+    {
+        return Err(invariant(
+            "terminal admission operation projection differs from its replay",
+        ));
+    }
+    verify_exact_terminal_records(transaction, &context.operation_id, canonical)?;
+    verify_exact_typed_projection_rows(transaction, projection, canonical)?;
+    terminal_from_operation(operation)
+}
+
+fn projected_terminal_state(projection: &AdmissionTerminalProjection) -> AdmissionOperationState {
+    match projection {
+        AdmissionTerminalProjection::Completed(_) => AdmissionOperationState::Completed,
+        AdmissionTerminalProjection::CompensatedBeforeDispatch { .. } => {
+            AdmissionOperationState::CompensatedBeforeDispatch
+        }
+        AdmissionTerminalProjection::NotAcceptedAfterDispatchCommit { .. } => {
+            AdmissionOperationState::NotAcceptedAfterDispatchCommit
+        }
+        AdmissionTerminalProjection::OutcomeUnknownAfterDispatch { .. } => {
+            AdmissionOperationState::OutcomeUnknownAfterDispatch
+        }
+        AdmissionTerminalProjection::EconomicMutationApplied { .. } => {
+            AdmissionOperationState::EconomicMutationApplied
+        }
+        AdmissionTerminalProjection::EconomicMutationNotApplied { .. } => {
+            AdmissionOperationState::EconomicMutationNotApplied
+        }
+    }
+}
+
+fn verify_exact_terminal_records(
+    connection: &Connection,
+    operation_id: &AdmissionOperationId,
+    canonical: &CanonicalAdmissionTerminalProjection,
+) -> Result<(), AdmissionOperationStoreError> {
+    let mut statement = connection
+        .prepare(
+            r#"
+            SELECT record_kind, record_id, record_digest, record_json
+            FROM admission_operation_terminal_records
+            WHERE operation_id = ?1
+            ORDER BY record_kind, record_id
+            "#,
+        )
+        .map_err(sqlite_error)?;
+    let stored = statement
+        .query_map([operation_id.as_str()], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, Vec<u8>>(3)?,
+            ))
+        })
+        .map_err(sqlite_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(sqlite_error)?;
+    if stored.len() != canonical.records().len()
+        || stored
+            .iter()
+            .zip(canonical.records())
+            .any(|(stored, expected)| {
+                let commitment = expected.commitment();
+                stored.0 != commitment.kind().as_str()
+                    || stored.1 != commitment.record_id().as_str()
+                    || stored.2 != commitment.record_digest().as_str()
+                    || stored.3 != expected.canonical_bytes()
+            })
+    {
+        return Err(invariant(
+            "terminal projection records differ from their manifest",
+        ));
+    }
+    Ok(())
+}
+
+fn verify_exact_typed_projection_rows(
+    connection: &Connection,
+    projection: &AdmissionTerminalProjection,
+    canonical: &CanonicalAdmissionTerminalProjection,
+) -> Result<(), AdmissionOperationStoreError> {
+    let context = projection.context();
+    let authorization = connection
+        .query_row(
+            r#"
+            SELECT authorization_receipt_id, consumer_receipt_id, request_id,
+                   session_id, tool_call_id, tenant_id, parameter_hash,
+                   consumed_at_unix_ms, record_digest, record_json
+            FROM admission_operation_authorization_consumptions
+            WHERE operation_id = ?1
+            "#,
+            [context.operation_id.as_str()],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, i64>(7)?,
+                    row.get::<_, String>(8)?,
+                    row.get::<_, Vec<u8>>(9)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    let observer = connection
+        .query_row(
+            r#"
+            SELECT receipt_id, work_state, attempts, next_visible_at_unix_ms,
+                   row_version, last_error, record_digest, record_json,
+                   created_at_unix_ms, updated_at_unix_ms, store_uuid,
+                   store_lease_id, store_owner_epoch
+            FROM admission_operation_observer_attempts
+            WHERE operation_id = ?1
+            "#,
+            [context.operation_id.as_str()],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, Vec<u8>>(7)?,
+                    row.get::<_, i64>(8)?,
+                    row.get::<_, i64>(9)?,
+                    row.get::<_, String>(10)?,
+                    row.get::<_, String>(11)?,
+                    row.get::<_, i64>(12)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+
+    let AdmissionTerminalProjection::Completed(completed) = projection else {
+        if authorization.is_some() || observer.is_some() {
+            return Err(invariant(
+                "non-completed projection has completed-only sidecars",
+            ));
+        }
+        return Ok(());
+    };
+    match (&completed.authorization, authorization) {
+        (None, None) => {}
+        (Some(expected), Some(stored)) => {
+            let record = require_canonical_record(
+                canonical,
+                AdmissionProjectionRecordKind::AuthorizationConsumption,
+            )?;
+            let expected = expected.consumption();
+            if stored.0 != expected.authorization_receipt_id
+                || stored.1 != expected.consumer_receipt_id
+                || stored.2 != expected.request_id
+                || stored.3 != expected.session_id
+                || stored.4 != expected.tool_call_id
+                || stored.5 != expected.tenant_id
+                || stored.6 != expected.parameter_hash
+                || stored_u64(stored.7, "consumed_at_unix_ms")? != expected.consumed_at_unix_ms
+                || stored.8 != record.commitment().record_digest().as_str()
+                || stored.9 != record.canonical_bytes()
+            {
+                return Err(invariant(
+                    "authorization consumption differs from terminal projection",
+                ));
+            }
+        }
+        _ => {
+            return Err(invariant(
+                "authorization consumption presence differs from terminal projection",
+            ));
+        }
+    }
+    match (&completed.observer_work, observer) {
+        (None, None) => {}
+        (Some(_), Some(stored)) => {
+            let record = require_canonical_record(
+                canonical,
+                AdmissionProjectionRecordKind::ObservationAttemptZero,
+            )?;
+            let committed_at = sqlite_i64(context.trusted_time_unix_ms, "committed_at_unix_ms")?;
+            if stored.0 != completed.receipt.receipt().id
+                || stored.6 != record.commitment().record_digest().as_str()
+                || stored.7 != record.canonical_bytes()
+                || stored.8 != committed_at
+                || stored.10 != context.store_fence.store_uuid
+            {
+                return Err(invariant(
+                    "observer attempt zero differs from terminal projection",
+                ));
+            }
+        }
+        _ => {
+            return Err(invariant(
+                "observer attempt presence differs from terminal projection",
+            ));
+        }
+    }
+    Ok(())
+}
+
+struct StoredProjectionRecord {
+    kind: String,
+    record_id: String,
+    record_digest: String,
+    record_json: Vec<u8>,
+}
+
+fn load_terminal_records(
+    connection: &Connection,
+    operation_id: &AdmissionOperationId,
+) -> Result<Vec<StoredProjectionRecord>, AdmissionOperationStoreError> {
+    let mut statement = connection
+        .prepare(
+            r#"
+            SELECT record_kind, record_id, record_digest, record_json
+            FROM admission_operation_terminal_records
+            WHERE operation_id = ?1
+            ORDER BY record_kind, record_id
+            "#,
+        )
+        .map_err(sqlite_error)?;
+    let records = statement
+        .query_map([operation_id.as_str()], |row| {
+            Ok(StoredProjectionRecord {
+                kind: row.get(0)?,
+                record_id: row.get(1)?,
+                record_digest: row.get(2)?,
+                record_json: row.get(3)?,
+            })
+        })
+        .map_err(sqlite_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(sqlite_error)?;
+    Ok(records)
+}
+
+fn verify_stored_terminal_projection(
+    connection: &Connection,
+    stored_operation: &StoredOperation,
+) -> Result<(), AdmissionOperationStoreError> {
+    let operation = &stored_operation.operation;
+    let projection = load_terminal_projection_tx(connection, operation.binding().operation_id())?;
+    if !operation.state().is_terminal() {
+        if projection.is_some() || projection_sidecar_count(connection, operation)? != 0 {
+            return Err(invariant(
+                "nonterminal admission operation has terminal projection rows",
+            ));
+        }
+        return Ok(());
+    }
+    let projection = projection
+        .ok_or_else(|| invariant("terminal admission operation lacks its projection row"))?;
+    if projection.projection_json.is_empty()
+        || projection.projection_json.len() > MAX_TERMINAL_PROJECTION_BYTES
+        || projection.manifest_json.is_empty()
+        || projection.manifest_json.len() > MAX_TERMINAL_MANIFEST_BYTES
+    {
+        return Err(invariant("stored terminal projection exceeds its bounds"));
+    }
+    let manifest = AdmissionProjectionManifestV1::from_canonical_bytes(&projection.manifest_json)?;
+    manifest.verify_projection_body(&projection.projection_json)?;
+    let projection_digest = manifest.projection_digest()?;
+    let replay_digest = operation
+        .terminal_replay()
+        .ok_or_else(|| invariant("terminal operation lacks replay evidence"))?
+        .projection_digest();
+    let source_version = operation
+        .version()
+        .checked_sub(1)
+        .ok_or_else(|| invariant("terminal operation version underflow"))?;
+    let exact_lease: i64 = connection
+        .query_row(
+            r#"
+            SELECT COUNT(*) FROM chio_serving_leases
+            WHERE store_uuid = ?1 AND owner_epoch = ?2 AND lease_id = ?3
+            "#,
+            params![
+                &projection.store_uuid,
+                projection.store_owner_epoch,
+                &projection.store_lease_id,
+            ],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if stored_u64(
+        projection.source_operation_version,
+        "source_operation_version",
+    )? != source_version
+        || stored_u64(
+            projection.terminal_operation_version,
+            "terminal_operation_version",
+        )? != operation.version()
+        || projection.terminal_state != state_name(operation.state())
+        || projection.projection_body_digest != manifest.projection_body_digest().as_str()
+        || projection.projection_digest != projection_digest.as_str()
+        || replay_digest != &projection_digest
+        || stored_u64(projection.record_count, "terminal_record_count")?
+            != u64::try_from(manifest.records().len())
+                .map_err(|_| invariant("terminal record count overflow"))?
+        || stored_u64(
+            projection.committed_at_unix_ms,
+            "projection_committed_at_unix_ms",
+        )? != stored_operation.updated_at_unix_ms
+        || exact_lease != 1
+    {
+        return Err(invariant(
+            "terminal projection does not match its admission operation",
+        ));
+    }
+
+    let records = load_terminal_records(connection, operation.binding().operation_id())?;
+    if records.len() != manifest.records().len() {
+        return Err(invariant(
+            "terminal projection record count differs from its manifest",
+        ));
+    }
+    for (record, commitment) in records.iter().zip(manifest.records()) {
+        let value: serde_json::Value = serde_json::from_slice(&record.record_json)
+            .map_err(|error| invariant(format!("terminal record is invalid: {error}")))?;
+        let canonical = canonical_json_bytes(&value)
+            .map_err(|error| invariant(format!("terminal record encoding failed: {error}")))?;
+        if record.record_json.is_empty()
+            || record.record_json.len() > MAX_TERMINAL_RECORD_BYTES
+            || canonical != record.record_json
+            || sha256_hex(&record.record_json) != record.record_digest
+            || record.kind != commitment.kind().as_str()
+            || record.record_id != commitment.record_id().as_str()
+            || record.record_digest != commitment.record_digest().as_str()
+        {
+            return Err(invariant(
+                "terminal projection record differs from its commitment",
+            ));
+        }
+    }
+    verify_stored_authorization_projection(connection, operation, &records)?;
+    verify_stored_observer_projection(connection, operation, &projection, &records)?;
+    Ok(())
+}
+
+fn projection_sidecar_count(
+    connection: &Connection,
+    operation: &AdmissionOperationV1,
+) -> Result<i64, AdmissionOperationStoreError> {
+    connection
+        .query_row(
+            r#"
+            SELECT
+                (SELECT COUNT(*) FROM admission_operation_terminal_records
+                 WHERE operation_id = ?1)
+              + (SELECT COUNT(*) FROM admission_operation_authorization_consumptions
+                 WHERE operation_id = ?1)
+              + (SELECT COUNT(*) FROM admission_operation_observer_attempts
+                 WHERE operation_id = ?1)
+            "#,
+            [operation.binding().operation_id().as_str()],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)
+}
+
+fn projection_record(
+    records: &[StoredProjectionRecord],
+    kind: AdmissionProjectionRecordKind,
+) -> Result<Option<&StoredProjectionRecord>, AdmissionOperationStoreError> {
+    let mut matches = records.iter().filter(|record| record.kind == kind.as_str());
+    let first = matches.next();
+    if matches.next().is_some() {
+        return Err(invariant(format!(
+            "terminal projection repeats {}",
+            kind.as_str()
+        )));
+    }
+    Ok(first)
+}
+
+fn verify_stored_authorization_projection(
+    connection: &Connection,
+    operation: &AdmissionOperationV1,
+    records: &[StoredProjectionRecord],
+) -> Result<(), AdmissionOperationStoreError> {
+    let record = projection_record(
+        records,
+        AdmissionProjectionRecordKind::AuthorizationConsumption,
+    )?;
+    let stored = connection
+        .query_row(
+            r#"
+            SELECT authorization_receipt_id, consumer_receipt_id, request_id,
+                   session_id, tool_call_id, tenant_id, parameter_hash,
+                   consumed_at_unix_ms, record_digest, record_json
+            FROM admission_operation_authorization_consumptions
+            WHERE operation_id = ?1
+            "#,
+            [operation.binding().operation_id().as_str()],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, i64>(7)?,
+                    row.get::<_, String>(8)?,
+                    row.get::<_, Vec<u8>>(9)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    match (record, stored) {
+        (None, None) => Ok(()),
+        (Some(record), Some(stored)) => {
+            let consumption: AuthorizationReceiptConsumption =
+                serde_json::from_slice(&record.record_json).map_err(|error| {
+                    invariant(format!("authorization consumption is invalid: {error}"))
+                })?;
+            if stored.0 != consumption.authorization_receipt_id
+                || stored.0 != record.record_id
+                || stored.1 != consumption.consumer_receipt_id
+                || stored.2 != consumption.request_id
+                || stored.2 != operation.replay_key().request_id.as_str()
+                || stored.3 != consumption.session_id
+                || stored.4 != consumption.tool_call_id
+                || stored.5 != consumption.tenant_id
+                || stored.6 != consumption.parameter_hash
+                || stored_u64(stored.7, "consumed_at_unix_ms")? != consumption.consumed_at_unix_ms
+                || stored.8 != record.record_digest
+                || stored.9 != record.record_json
+            {
+                return Err(invariant(
+                    "authorization consumption projection is inconsistent",
+                ));
+            }
+            Ok(())
+        }
+        _ => Err(invariant("authorization consumption projection is partial")),
+    }
+}
+
+fn verify_stored_observer_projection(
+    connection: &Connection,
+    operation: &AdmissionOperationV1,
+    projection: &StoredTerminalProjection,
+    records: &[StoredProjectionRecord],
+) -> Result<(), AdmissionOperationStoreError> {
+    let record = projection_record(
+        records,
+        AdmissionProjectionRecordKind::ObservationAttemptZero,
+    )?;
+    let stored = connection
+        .query_row(
+            r#"
+            SELECT receipt_id, work_state, attempts, next_visible_at_unix_ms,
+                   row_version, last_error, record_digest, record_json,
+                   created_at_unix_ms, updated_at_unix_ms, store_uuid,
+                   store_lease_id, store_owner_epoch
+            FROM admission_operation_observer_attempts
+            WHERE operation_id = ?1
+            "#,
+            [operation.binding().operation_id().as_str()],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, Vec<u8>>(7)?,
+                    row.get::<_, i64>(8)?,
+                    row.get::<_, i64>(9)?,
+                    row.get::<_, String>(10)?,
+                    row.get::<_, String>(11)?,
+                    row.get::<_, i64>(12)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    match (record, stored) {
+        (None, None) => Ok(()),
+        (Some(record), Some(stored)) => {
+            let pending: PendingSettlementObservation = serde_json::from_slice(&record.record_json)
+                .map_err(|error| invariant(format!("observer attempt zero is invalid: {error}")))?;
+            let lease_exists: i64 = connection
+                .query_row(
+                    r#"
+                    SELECT COUNT(*) FROM chio_serving_leases
+                    WHERE store_uuid = ?1 AND lease_id = ?2 AND owner_epoch = ?3
+                    "#,
+                    params![&stored.10, &stored.11, stored.12],
+                    |row| row.get(0),
+                )
+                .map_err(sqlite_error)?;
+            let created_at = stored_u64(stored.8, "observer_created_at_unix_ms")?;
+            let updated_at = stored_u64(stored.9, "observer_updated_at_unix_ms")?;
+            let row_version = stored_u64(stored.4, "observer_row_version")?;
+            if stored.0 != record.record_id
+                || stored.6 != record.record_digest
+                || stored.7 != record.record_json
+                || created_at
+                    != stored_u64(
+                        projection.committed_at_unix_ms,
+                        "projection_committed_at_unix_ms",
+                    )?
+                || updated_at < created_at
+                || stored.10 != projection.store_uuid
+                || lease_exists != 1
+                || (row_version == 0
+                    && (stored.1 != "pending"
+                        || stored.2 != 0
+                        || stored_u64(stored.3, "observer_next_visible_at_unix_ms")?
+                            != pending.next_visible_at_ms
+                        || stored.5.is_some()))
+            {
+                return Err(invariant("observer attempt projection is inconsistent"));
+            }
+            Ok(())
+        }
+        _ => Err(invariant("observer attempt projection is partial")),
+    }
 }
 
 impl QualifiedAdmissionOperationStore for SqliteAdmissionOperationStore {}
+
+impl ReceiptStore for SqliteAdmissionOperationStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Unsupported(
+            "receipts must be committed through an admission terminal projection".to_string(),
+        ))
+    }
+
+    fn admission_projection_capabilities(&self) -> AdmissionProjectionCapabilities {
+        full_projection_capabilities()
+    }
+
+    fn commit_admission_projection(
+        &self,
+        projection: &AdmissionTerminalProjection,
+    ) -> Result<AdmissionTerminal, ReceiptStoreError> {
+        self.commit_terminal_projection(projection)
+            .map_err(receipt_projection_error)
+    }
+
+    fn load_chio_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        let receipt_id = AdmissionIdentifier::try_new("receipt_id", receipt_id.to_owned())
+            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        let mut connection = self.connection().map_err(receipt_projection_error)?;
+        let transaction = self
+            .begin_read(&mut connection)
+            .map_err(receipt_projection_error)?;
+        let stored = transaction
+            .query_row(
+                r#"
+                SELECT operation_id, record_json
+                FROM admission_operation_terminal_records
+                WHERE record_kind = 'receipt' AND record_id = ?1
+                "#,
+                [receipt_id.as_str()],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?)),
+            )
+            .optional()?;
+        let receipt = match stored {
+            None => None,
+            Some((operation_id, bytes)) => {
+                let operation_id = AdmissionOperationId::from_persisted(operation_id)
+                    .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+                load_by_operation_id_tx(&transaction, &operation_id)
+                    .map_err(receipt_projection_error)?
+                    .ok_or_else(|| {
+                        ReceiptStoreError::Conflict(
+                            "admission receipt references a missing operation".to_string(),
+                        )
+                    })?;
+                Some(decode_projection_receipt(bytes)?)
+            }
+        };
+        transaction.commit()?;
+        Ok(receipt)
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Unsupported(
+            "child receipts are not admission terminal projections".to_string(),
+        ))
+    }
+}
 
 impl AdmissionOperationStore for SqliteAdmissionOperationStore {
     fn begin(
@@ -697,6 +1761,7 @@ pub(crate) fn verify_admission_operation_invariants(
     while let Some(row) = rows.next().map_err(sqlite_error)? {
         let stored = decode_row(read_raw_row(row).map_err(sqlite_error)?)?;
         verify_latest_commit(connection, &stored)?;
+        verify_stored_terminal_projection(connection, &stored)?;
     }
     Ok(())
 }
@@ -1117,6 +2182,7 @@ fn load_by_operation_id_tx(
     let stored = raw.map(decode_row).transpose()?;
     if let Some(stored) = &stored {
         verify_latest_commit(transaction, stored)?;
+        verify_stored_terminal_projection(transaction, stored)?;
     }
     Ok(stored)
 }
@@ -1149,6 +2215,7 @@ fn load_by_replay_key_tx(
     let stored = raw.map(decode_row).transpose()?;
     if let Some(stored) = &stored {
         verify_latest_commit(transaction, stored)?;
+        verify_stored_terminal_projection(transaction, stored)?;
     }
     Ok(stored)
 }
@@ -1200,6 +2267,39 @@ fn stored_u64(value: i64, field: &'static str) -> Result<u64, AdmissionOperation
 
 fn invariant(detail: impl Into<String>) -> AdmissionOperationStoreError {
     AdmissionOperationStoreError::Invariant(detail.into())
+}
+
+fn receipt_projection_error(error: AdmissionOperationStoreError) -> ReceiptStoreError {
+    match error {
+        AdmissionOperationStoreError::Unavailable(detail) => ReceiptStoreError::Pool(detail),
+        AdmissionOperationStoreError::Fenced => ReceiptStoreError::Fenced,
+        AdmissionOperationStoreError::NotFound => {
+            ReceiptStoreError::NotFound("admission operation".to_string())
+        }
+        AdmissionOperationStoreError::Invariant(detail) => ReceiptStoreError::Conflict(detail),
+        AdmissionOperationStoreError::OutcomeUnknown(detail) => {
+            ReceiptStoreError::OutcomeUnknown(detail)
+        }
+        AdmissionOperationStoreError::Operation(error) => {
+            ReceiptStoreError::Conflict(error.to_string())
+        }
+    }
+}
+
+fn decode_projection_receipt(bytes: Vec<u8>) -> Result<ChioReceipt, ReceiptStoreError> {
+    let receipt: ChioReceipt = serde_json::from_slice(&bytes)?;
+    if canonical_json_bytes(&receipt)
+        .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
+        != bytes
+        || !receipt
+            .verify_signature()
+            .map_err(|error| ReceiptStoreError::CryptoDecode(error.to_string()))?
+    {
+        return Err(ReceiptStoreError::Conflict(
+            "persisted admission receipt is invalid".to_string(),
+        ));
+    }
+    Ok(receipt)
 }
 
 fn map_owner_error(error: SqliteServingOwnerError) -> AdmissionOperationStoreError {

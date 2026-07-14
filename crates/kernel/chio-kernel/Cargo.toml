@@ -23,6 +23,7 @@ name = "chio_kernel"
 default = ["delegation"]
 dhat-heap = []
 sustained-p99-nightly = []
+admission-test-support = []
 otel = ["dep:opentelemetry-semantic-conventions"]
 tokio-console-smoke = ["tokio/tracing"]
 # Hybrid signing path: pulls the pq cargo feature on chio-core-types so

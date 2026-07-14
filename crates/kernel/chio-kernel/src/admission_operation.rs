@@ -406,14 +406,34 @@ impl<'de> Deserialize<'de> for AdmissionOperationAttachmentsV1 {
 pub enum AdmissionTerminalReplay {
     Receipt {
         receipt_id: AdmissionIdentifier,
+        projection_digest: AdmissionDigest,
     },
     Incident {
         incident_id: AdmissionIdentifier,
+        projection_digest: AdmissionDigest,
     },
     EconomicMutation {
         result_id: AdmissionIdentifier,
         result_digest: AdmissionDigest,
+        projection_digest: AdmissionDigest,
     },
+}
+
+impl AdmissionTerminalReplay {
+    #[must_use]
+    pub const fn projection_digest(&self) -> &AdmissionDigest {
+        match self {
+            Self::Receipt {
+                projection_digest, ..
+            }
+            | Self::Incident {
+                projection_digest, ..
+            }
+            | Self::EconomicMutation {
+                projection_digest, ..
+            } => projection_digest,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

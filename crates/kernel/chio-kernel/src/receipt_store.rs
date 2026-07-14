@@ -331,6 +331,12 @@ pub enum ReceiptStoreError {
     #[error("unsupported receipt-store operation: {0}")]
     Unsupported(String),
 
+    #[error("receipt-store mutation was fenced")]
+    Fenced,
+
+    #[error("receipt-store durable outcome is unknown: {0}")]
+    OutcomeUnknown(String),
+
     #[error("retention co-archival incomplete for {table}: {live} live rows, {archived} archived; aborting delete to preserve inclusion-proof integrity")]
     RetentionArchiveIncomplete {
         table: &'static str,
@@ -363,7 +369,7 @@ pub enum AtomicReceiptProjection {
 }
 
 /// Initial settlement work committed with a receipt.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PendingSettlementObservation {
     /// Earliest time at which a worker may claim the observation.
     pub next_visible_at_ms: u64,

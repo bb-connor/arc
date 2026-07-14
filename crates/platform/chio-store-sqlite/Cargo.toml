@@ -41,6 +41,7 @@ uuid = { workspace = true, features = ["v7"] }
 zeroize = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
+chio-kernel = { workspace = true, features = ["admission-test-support"] }
 chio-test-support = { workspace = true }
 criterion = { workspace = true }
 loom = { workspace = true }

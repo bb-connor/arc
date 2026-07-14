@@ -259,7 +259,201 @@ impl AdmissionProjectionCapabilities {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AdmissionProjectionRecordKind {
+    Receipt,
+    Incident,
+    ToolOutcome,
+    PaymentTerminal,
+    AuthorizationConsumption,
+    OutcomeEligibility,
+    ObservationAttemptZero,
+    Obligation,
+    ReleaseProof,
+    EconomicMutationResult,
+    MutationAudit,
+}
+
+impl AdmissionProjectionRecordKind {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Receipt => "receipt",
+            Self::Incident => "incident",
+            Self::ToolOutcome => "tool_outcome",
+            Self::PaymentTerminal => "payment_terminal",
+            Self::AuthorizationConsumption => "authorization_consumption",
+            Self::OutcomeEligibility => "outcome_eligibility",
+            Self::ObservationAttemptZero => "observation_attempt_zero",
+            Self::Obligation => "obligation",
+            Self::ReleaseProof => "release_proof",
+            Self::EconomicMutationResult => "economic_mutation_result",
+            Self::MutationAudit => "mutation_audit",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AdmissionProjectionManifestSchema {
+    #[serde(rename = "chio.admission-projection-manifest.v1")]
+    V1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdmissionProjectionRecordCommitmentV1 {
+    kind: AdmissionProjectionRecordKind,
+    record_id: AdmissionIdentifier,
+    record_digest: AdmissionDigest,
+}
+
+impl AdmissionProjectionRecordCommitmentV1 {
+    #[must_use]
+    pub const fn kind(&self) -> AdmissionProjectionRecordKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub const fn record_id(&self) -> &AdmissionIdentifier {
+        &self.record_id
+    }
+
+    #[must_use]
+    pub const fn record_digest(&self) -> &AdmissionDigest {
+        &self.record_digest
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdmissionProjectionManifestV1 {
+    schema: AdmissionProjectionManifestSchema,
+    projection_body_digest: AdmissionDigest,
+    records: Vec<AdmissionProjectionRecordCommitmentV1>,
+}
+
+impl AdmissionProjectionManifestV1 {
+    pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, AdmissionOperationError> {
+        let manifest: Self = serde_json::from_slice(bytes)
+            .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?;
+        manifest.validate()?;
+        if canonical_json_bytes(&manifest)
+            .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?
+            != bytes
+        {
+            return Err(AdmissionOperationError::CanonicalJson(
+                "admission projection manifest is not canonical".to_string(),
+            ));
+        }
+        Ok(manifest)
+    }
+
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, AdmissionOperationError> {
+        self.validate()?;
+        canonical_json_bytes(self)
+            .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))
+    }
+
+    pub fn projection_digest(&self) -> Result<AdmissionDigest, AdmissionOperationError> {
+        AdmissionDigest::try_new(
+            "terminal_projection_digest",
+            sha256_hex(&self.canonical_bytes()?),
+        )
+    }
+
+    pub fn verify_projection_body(&self, bytes: &[u8]) -> Result<(), AdmissionOperationError> {
+        let value: serde_json::Value = serde_json::from_slice(bytes)
+            .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?;
+        if canonical_json_bytes(&value)
+            .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?
+            != bytes
+            || sha256_hex(bytes) != self.projection_body_digest.as_str()
+        {
+            return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
+        }
+        Ok(())
+    }
+
+    #[must_use]
+    pub const fn projection_body_digest(&self) -> &AdmissionDigest {
+        &self.projection_body_digest
+    }
+
+    #[must_use]
+    pub fn records(&self) -> &[AdmissionProjectionRecordCommitmentV1] {
+        &self.records
+    }
+
+    fn validate(&self) -> Result<(), AdmissionOperationError> {
+        if self.records.is_empty()
+            || self.records.windows(2).any(|pair| {
+                let left = (pair[0].kind.as_str(), pair[0].record_id.as_str());
+                let right = (pair[1].kind.as_str(), pair[1].record_id.as_str());
+                left >= right
+            })
+        {
+            return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CanonicalAdmissionProjectionRecord {
+    commitment: AdmissionProjectionRecordCommitmentV1,
+    canonical_bytes: Vec<u8>,
+}
+
+impl CanonicalAdmissionProjectionRecord {
+    #[must_use]
+    pub const fn commitment(&self) -> &AdmissionProjectionRecordCommitmentV1 {
+        &self.commitment
+    }
+
+    #[must_use]
+    pub fn canonical_bytes(&self) -> &[u8] {
+        &self.canonical_bytes
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CanonicalAdmissionTerminalProjection {
+    projection_bytes: Vec<u8>,
+    manifest: AdmissionProjectionManifestV1,
+    manifest_bytes: Vec<u8>,
+    projection_digest: AdmissionDigest,
+    records: Vec<CanonicalAdmissionProjectionRecord>,
+}
+
+impl CanonicalAdmissionTerminalProjection {
+    #[must_use]
+    pub fn projection_bytes(&self) -> &[u8] {
+        &self.projection_bytes
+    }
+
+    #[must_use]
+    pub const fn manifest(&self) -> &AdmissionProjectionManifestV1 {
+        &self.manifest
+    }
+
+    #[must_use]
+    pub fn manifest_bytes(&self) -> &[u8] {
+        &self.manifest_bytes
+    }
+
+    #[must_use]
+    pub const fn projection_digest(&self) -> &AdmissionDigest {
+        &self.projection_digest
+    }
+
+    #[must_use]
+    pub fn records(&self) -> &[CanonicalAdmissionProjectionRecord] {
+        &self.records
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct AdmissionProjectionContext {
     pub operation_id: AdmissionOperationId,
     pub request_id: AdmissionIdentifier,
@@ -390,9 +584,9 @@ macro_rules! admission_projection_binding {
         }
 
         impl $name {
-            #[cfg(test)]
+            #[cfg(any(test, feature = "admission-test-support"))]
             #[allow(dead_code)]
-            pub(crate) fn from_verified(
+            pub fn from_verified(
                 operation: &AdmissionOperationV1,
                 context: &AdmissionProjectionContext,
                 projected_state: AdmissionOperationState,
@@ -788,7 +982,7 @@ impl ObservationAttemptZero {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct AdmissionCompletedProjection {
     pub context: AdmissionProjectionContext,
     pub receipt: VerifiedAdmissionReceipt,
@@ -815,13 +1009,15 @@ pub(super) fn validate_completed_participant_presence(
     Ok(())
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum AdmissionReceiptOrIncident {
     Receipt(Box<VerifiedAdmissionReceipt>),
     Incident(Box<AdmissionIncident>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "terminal", rename_all = "snake_case")]
 pub enum AdmissionTerminalProjection {
     Completed(Box<AdmissionCompletedProjection>),
     CompensatedBeforeDispatch {
@@ -851,16 +1047,21 @@ pub enum AdmissionTerminalProjection {
 }
 
 impl AdmissionReceiptOrIncident {
-    fn replay(&self) -> Result<AdmissionTerminalReplay, AdmissionOperationError> {
+    fn replay(
+        &self,
+        projection_digest: &AdmissionDigest,
+    ) -> Result<AdmissionTerminalReplay, AdmissionOperationError> {
         match self {
             Self::Receipt(receipt) => Ok(AdmissionTerminalReplay::Receipt {
                 receipt_id: AdmissionIdentifier::try_new(
                     "receipt_id",
                     receipt.receipt().id.clone(),
                 )?,
+                projection_digest: projection_digest.clone(),
             }),
             Self::Incident(incident) => Ok(AdmissionTerminalReplay::Incident {
                 incident_id: incident.record_id.clone(),
+                projection_digest: projection_digest.clone(),
             }),
         }
     }
@@ -958,7 +1159,8 @@ fn validate_receipt_projection(
 }
 
 impl AdmissionTerminalProjection {
-    fn context(&self) -> &AdmissionProjectionContext {
+    #[must_use]
+    pub fn context(&self) -> &AdmissionProjectionContext {
         match self {
             Self::Completed(projection) => &projection.context,
             Self::CompensatedBeforeDispatch { context, .. }
@@ -968,6 +1170,238 @@ impl AdmissionTerminalProjection {
             | Self::EconomicMutationNotApplied { context, .. } => context,
         }
     }
+
+    pub fn canonical_projection(
+        &self,
+    ) -> Result<CanonicalAdmissionTerminalProjection, AdmissionOperationError> {
+        let projection_bytes = canonical_json_bytes(self)
+            .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?;
+        let projection_body_digest = AdmissionDigest::try_new(
+            "terminal_projection_body_digest",
+            sha256_hex(&projection_bytes),
+        )?;
+        let mut records = self.canonical_records()?;
+        records.sort_by(|left, right| {
+            let left = (
+                left.commitment.kind.as_str(),
+                left.commitment.record_id.as_str(),
+            );
+            let right = (
+                right.commitment.kind.as_str(),
+                right.commitment.record_id.as_str(),
+            );
+            left.cmp(&right)
+        });
+        let manifest = AdmissionProjectionManifestV1 {
+            schema: AdmissionProjectionManifestSchema::V1,
+            projection_body_digest,
+            records: records
+                .iter()
+                .map(|record| record.commitment.clone())
+                .collect(),
+        };
+        let manifest_bytes = manifest.canonical_bytes()?;
+        let projection_digest =
+            AdmissionDigest::try_new("terminal_projection_digest", sha256_hex(&manifest_bytes))?;
+        Ok(CanonicalAdmissionTerminalProjection {
+            projection_bytes,
+            manifest,
+            manifest_bytes,
+            projection_digest,
+            records,
+        })
+    }
+
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, AdmissionOperationError> {
+        self.canonical_projection()
+            .map(|projection| projection.projection_bytes)
+    }
+
+    pub fn projection_digest(&self) -> Result<AdmissionDigest, AdmissionOperationError> {
+        self.canonical_projection()
+            .map(|projection| projection.projection_digest)
+    }
+
+    fn canonical_records(
+        &self,
+    ) -> Result<Vec<CanonicalAdmissionProjectionRecord>, AdmissionOperationError> {
+        let mut records = Vec::new();
+        match self {
+            Self::Completed(completed) => {
+                records.push(canonical_projection_record(
+                    AdmissionProjectionRecordKind::Receipt,
+                    AdmissionIdentifier::try_new(
+                        "projection_receipt_id",
+                        completed.receipt.receipt().id.clone(),
+                    )?,
+                    completed.receipt.receipt(),
+                )?);
+                if let Some(outcome) = &completed.tool_outcome {
+                    records.push(canonical_projection_record(
+                        AdmissionProjectionRecordKind::ToolOutcome,
+                        AdmissionIdentifier::try_new(
+                            "projection_tool_outcome_id",
+                            outcome.outcome_id().as_str().to_owned(),
+                        )?,
+                        outcome,
+                    )?);
+                }
+                let operation_record_id = || {
+                    AdmissionIdentifier::try_new(
+                        "projection_operation_record_id",
+                        completed.context.operation_id.as_str().to_owned(),
+                    )
+                };
+                if let Some(payment) = &completed.payment_evidence {
+                    records.push(canonical_projection_record(
+                        AdmissionProjectionRecordKind::PaymentTerminal,
+                        operation_record_id()?,
+                        payment,
+                    )?);
+                }
+                if let Some(authorization) = &completed.authorization {
+                    records.push(canonical_projection_record(
+                        AdmissionProjectionRecordKind::AuthorizationConsumption,
+                        AdmissionIdentifier::try_new(
+                            "projection_authorization_receipt_id",
+                            authorization.consumption().authorization_receipt_id.clone(),
+                        )?,
+                        authorization.consumption(),
+                    )?);
+                }
+                if let Some(eligibility) = &completed.eligibility {
+                    records.push(canonical_projection_record(
+                        AdmissionProjectionRecordKind::OutcomeEligibility,
+                        operation_record_id()?,
+                        eligibility,
+                    )?);
+                }
+                if let Some(observer) = &completed.observer_work {
+                    records.push(canonical_projection_record(
+                        AdmissionProjectionRecordKind::ObservationAttemptZero,
+                        AdmissionIdentifier::try_new(
+                            "projection_observer_receipt_id",
+                            completed.receipt.receipt().id.clone(),
+                        )?,
+                        observer.pending(),
+                    )?);
+                }
+                if let Some(obligation) = &completed.obligation {
+                    records.push(canonical_projection_record(
+                        AdmissionProjectionRecordKind::Obligation,
+                        operation_record_id()?,
+                        obligation,
+                    )?);
+                }
+            }
+            Self::CompensatedBeforeDispatch {
+                context,
+                proof,
+                evidence,
+            } => {
+                records.push(canonical_projection_record(
+                    AdmissionProjectionRecordKind::ReleaseProof,
+                    AdmissionIdentifier::try_new(
+                        "projection_release_proof_id",
+                        context.operation_id.as_str().to_owned(),
+                    )?,
+                    proof,
+                )?);
+                records.push(canonical_receipt_or_incident_record(evidence)?);
+            }
+            Self::NotAcceptedAfterDispatchCommit {
+                context,
+                proof,
+                evidence,
+            } => {
+                records.push(canonical_projection_record(
+                    AdmissionProjectionRecordKind::ReleaseProof,
+                    AdmissionIdentifier::try_new(
+                        "projection_release_proof_id",
+                        context.operation_id.as_str().to_owned(),
+                    )?,
+                    proof,
+                )?);
+                records.push(canonical_receipt_or_incident_record(evidence)?);
+            }
+            Self::OutcomeUnknownAfterDispatch { incident, .. } => {
+                records.push(canonical_projection_record(
+                    AdmissionProjectionRecordKind::Incident,
+                    incident.record_id.clone(),
+                    incident,
+                )?);
+            }
+            Self::EconomicMutationApplied {
+                result,
+                audit_event,
+                ..
+            } => {
+                records.push(canonical_projection_record(
+                    AdmissionProjectionRecordKind::EconomicMutationResult,
+                    result.0.record_id.clone(),
+                    result,
+                )?);
+                records.push(canonical_projection_record(
+                    AdmissionProjectionRecordKind::MutationAudit,
+                    audit_event.record_id.clone(),
+                    audit_event,
+                )?);
+            }
+            Self::EconomicMutationNotApplied {
+                result,
+                audit_event,
+                ..
+            } => {
+                records.push(canonical_projection_record(
+                    AdmissionProjectionRecordKind::EconomicMutationResult,
+                    result.0.record_id.clone(),
+                    result,
+                )?);
+                records.push(canonical_projection_record(
+                    AdmissionProjectionRecordKind::MutationAudit,
+                    audit_event.record_id.clone(),
+                    audit_event,
+                )?);
+            }
+        }
+        Ok(records)
+    }
+}
+
+fn canonical_receipt_or_incident_record(
+    evidence: &AdmissionReceiptOrIncident,
+) -> Result<CanonicalAdmissionProjectionRecord, AdmissionOperationError> {
+    match evidence {
+        AdmissionReceiptOrIncident::Receipt(receipt) => canonical_projection_record(
+            AdmissionProjectionRecordKind::Receipt,
+            AdmissionIdentifier::try_new("projection_receipt_id", receipt.receipt().id.clone())?,
+            receipt.receipt(),
+        ),
+        AdmissionReceiptOrIncident::Incident(incident) => canonical_projection_record(
+            AdmissionProjectionRecordKind::Incident,
+            incident.record_id.clone(),
+            incident,
+        ),
+    }
+}
+
+fn canonical_projection_record<T: Serialize>(
+    kind: AdmissionProjectionRecordKind,
+    record_id: AdmissionIdentifier,
+    value: &T,
+) -> Result<CanonicalAdmissionProjectionRecord, AdmissionOperationError> {
+    let canonical_bytes = canonical_json_bytes(value)
+        .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?;
+    let record_digest =
+        AdmissionDigest::try_new("projection_record_digest", sha256_hex(&canonical_bytes))?;
+    Ok(CanonicalAdmissionProjectionRecord {
+        commitment: AdmissionProjectionRecordCommitmentV1 {
+            kind,
+            record_id,
+            record_digest,
+        },
+        canonical_bytes,
+    })
 }
 
 impl AdmissionOperationV1 {
@@ -994,6 +1428,7 @@ impl AdmissionOperationV1 {
         self.validate()?;
         capabilities.validate_for(self, projection)?;
         let context = projection.context();
+        let projection_digest = projection.projection_digest()?;
         context.validate()?;
         if context.operation_id != self.binding.operation_id
             || context.request_id != self.binding.request_id
@@ -1093,6 +1528,7 @@ impl AdmissionOperationV1 {
                             "receipt_id",
                             completed.receipt.receipt().id.clone(),
                         )?,
+                        projection_digest: projection_digest.clone(),
                     },
                 )
             }
@@ -1110,7 +1546,7 @@ impl AdmissionOperationV1 {
                 )?;
                 (
                     AdmissionOperationState::CompensatedBeforeDispatch,
-                    evidence.replay()?,
+                    evidence.replay(&projection_digest)?,
                 )
             }
             AdmissionTerminalProjection::NotAcceptedAfterDispatchCommit {
@@ -1127,7 +1563,7 @@ impl AdmissionOperationV1 {
                 )?;
                 (
                     AdmissionOperationState::NotAcceptedAfterDispatchCommit,
-                    evidence.replay()?,
+                    evidence.replay(&projection_digest)?,
                 )
             }
             AdmissionTerminalProjection::OutcomeUnknownAfterDispatch { incident, .. } => {
@@ -1140,6 +1576,7 @@ impl AdmissionOperationV1 {
                     AdmissionOperationState::OutcomeUnknownAfterDispatch,
                     AdmissionTerminalReplay::Incident {
                         incident_id: incident.record_id.clone(),
+                        projection_digest: projection_digest.clone(),
                     },
                 )
             }
@@ -1159,6 +1596,7 @@ impl AdmissionOperationV1 {
                     AdmissionTerminalReplay::EconomicMutation {
                         result_id: result.0.record_id.clone(),
                         result_digest: result.0.record_digest.clone(),
+                        projection_digest: projection_digest.clone(),
                     },
                 )
             }
@@ -1178,6 +1616,7 @@ impl AdmissionOperationV1 {
                     AdmissionTerminalReplay::EconomicMutation {
                         result_id: result.0.record_id.clone(),
                         result_digest: result.0.record_digest.clone(),
+                        projection_digest,
                     },
                 )
             }

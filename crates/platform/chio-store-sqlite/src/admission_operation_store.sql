@@ -191,3 +191,216 @@ WHEN OLD.terminal = 1
 BEGIN
     SELECT RAISE(ABORT, 'terminal admission operation cannot be recovery-claimed');
 END;
+
+CREATE TABLE IF NOT EXISTS admission_operation_terminal_projections (
+    operation_id TEXT NOT NULL PRIMARY KEY,
+    source_operation_version INTEGER NOT NULL CHECK (source_operation_version > 0),
+    terminal_operation_version INTEGER NOT NULL CHECK (
+        terminal_operation_version = source_operation_version + 1
+    ),
+    terminal_state TEXT NOT NULL CHECK (terminal_state IN (
+        'completed', 'compensated_before_dispatch',
+        'not_accepted_after_dispatch_commit', 'outcome_unknown_after_dispatch',
+        'economic_mutation_applied', 'economic_mutation_not_applied'
+    )),
+    projection_body_digest TEXT NOT NULL CHECK (
+        length(projection_body_digest) = 64
+        AND projection_body_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    projection_digest TEXT NOT NULL CHECK (
+        length(projection_digest) = 64
+        AND projection_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    projection_json BLOB NOT NULL CHECK (
+        length(projection_json) BETWEEN 1 AND 4194304
+    ),
+    manifest_json BLOB NOT NULL CHECK (
+        length(manifest_json) BETWEEN 1 AND 262144
+    ),
+    record_count INTEGER NOT NULL CHECK (record_count BETWEEN 1 AND 32),
+    committed_at_unix_ms INTEGER NOT NULL CHECK (committed_at_unix_ms > 0),
+    store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),
+    store_lease_id TEXT NOT NULL CHECK (store_lease_id <> ''),
+    store_owner_epoch INTEGER NOT NULL CHECK (store_owner_epoch > 0),
+    FOREIGN KEY (operation_id) REFERENCES admission_operations(operation_id),
+    FOREIGN KEY (store_uuid, store_owner_epoch)
+        REFERENCES chio_serving_leases(store_uuid, owner_epoch)
+);
+
+CREATE TRIGGER IF NOT EXISTS admission_operation_terminal_projections_exact_lease
+BEFORE INSERT ON admission_operation_terminal_projections
+WHEN NOT EXISTS (
+    SELECT 1 FROM chio_serving_leases
+    WHERE store_uuid = NEW.store_uuid
+      AND owner_epoch = NEW.store_owner_epoch
+      AND lease_id = NEW.store_lease_id
+      AND end_head_index IS NULL
+)
+BEGIN
+    SELECT RAISE(ABORT, 'admission terminal projection has no exact serving lease');
+END;
+
+CREATE TRIGGER IF NOT EXISTS admission_operation_terminal_projections_immutable
+BEFORE UPDATE ON admission_operation_terminal_projections
+BEGIN
+    SELECT RAISE(ABORT, 'admission terminal projection is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS admission_operation_terminal_projections_no_delete
+BEFORE DELETE ON admission_operation_terminal_projections
+BEGIN
+    SELECT RAISE(ABORT, 'admission terminal projection is immutable');
+END;
+
+CREATE TABLE IF NOT EXISTS admission_operation_terminal_records (
+    operation_id TEXT NOT NULL,
+    record_kind TEXT NOT NULL CHECK (record_kind IN (
+        'receipt', 'incident', 'tool_outcome', 'payment_terminal',
+        'authorization_consumption', 'outcome_eligibility',
+        'observation_attempt_zero', 'obligation', 'release_proof',
+        'economic_mutation_result', 'mutation_audit'
+    )),
+    record_id TEXT NOT NULL CHECK (length(record_id) BETWEEN 1 AND 512),
+    record_digest TEXT NOT NULL CHECK (
+        length(record_digest) = 64
+        AND record_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    record_json BLOB NOT NULL CHECK (length(record_json) BETWEEN 1 AND 1048576),
+    PRIMARY KEY (operation_id, record_kind, record_id),
+    UNIQUE (record_kind, record_id),
+    FOREIGN KEY (operation_id)
+        REFERENCES admission_operation_terminal_projections(operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS admission_operation_terminal_records_kind
+    ON admission_operation_terminal_records(record_kind, operation_id);
+
+CREATE TRIGGER IF NOT EXISTS admission_operation_terminal_records_immutable
+BEFORE UPDATE ON admission_operation_terminal_records
+BEGIN
+    SELECT RAISE(ABORT, 'admission terminal record is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS admission_operation_terminal_records_no_delete
+BEFORE DELETE ON admission_operation_terminal_records
+BEGIN
+    SELECT RAISE(ABORT, 'admission terminal record is immutable');
+END;
+
+CREATE TABLE IF NOT EXISTS admission_operation_authorization_consumptions (
+    operation_id TEXT NOT NULL PRIMARY KEY,
+    authorization_receipt_id TEXT NOT NULL UNIQUE
+        CHECK (length(authorization_receipt_id) BETWEEN 1 AND 512),
+    consumer_receipt_id TEXT NOT NULL
+        CHECK (length(consumer_receipt_id) BETWEEN 1 AND 512),
+    request_id TEXT NOT NULL CHECK (length(request_id) BETWEEN 1 AND 512),
+    session_id TEXT NOT NULL CHECK (length(session_id) BETWEEN 1 AND 512),
+    tool_call_id TEXT NOT NULL CHECK (length(tool_call_id) BETWEEN 1 AND 512),
+    tenant_id TEXT CHECK (tenant_id IS NULL OR length(tenant_id) BETWEEN 1 AND 512),
+    parameter_hash TEXT NOT NULL CHECK (
+        length(parameter_hash) = 64
+        AND parameter_hash NOT GLOB '*[^0-9a-f]*'
+    ),
+    consumed_at_unix_ms INTEGER NOT NULL CHECK (consumed_at_unix_ms > 0),
+    record_digest TEXT NOT NULL CHECK (
+        length(record_digest) = 64
+        AND record_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    record_json BLOB NOT NULL CHECK (length(record_json) BETWEEN 1 AND 1048576),
+    FOREIGN KEY (operation_id)
+        REFERENCES admission_operation_terminal_projections(operation_id)
+);
+
+CREATE INDEX IF NOT EXISTS admission_operation_authorization_consumer
+    ON admission_operation_authorization_consumptions(consumer_receipt_id);
+
+CREATE TRIGGER IF NOT EXISTS admission_operation_authorization_consumptions_immutable
+BEFORE UPDATE ON admission_operation_authorization_consumptions
+BEGIN
+    SELECT RAISE(ABORT, 'admission authorization consumption is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS admission_operation_authorization_consumptions_no_delete
+BEFORE DELETE ON admission_operation_authorization_consumptions
+BEGIN
+    SELECT RAISE(ABORT, 'admission authorization consumption is immutable');
+END;
+
+CREATE TABLE IF NOT EXISTS admission_operation_observer_attempts (
+    operation_id TEXT NOT NULL PRIMARY KEY,
+    receipt_id TEXT NOT NULL UNIQUE CHECK (length(receipt_id) BETWEEN 1 AND 512),
+    work_state TEXT NOT NULL CHECK (work_state IN (
+        'pending', 'claimed', 'completed', 'failed'
+    )),
+    attempts INTEGER NOT NULL CHECK (attempts >= 0),
+    next_visible_at_unix_ms INTEGER NOT NULL CHECK (next_visible_at_unix_ms > 0),
+    row_version INTEGER NOT NULL CHECK (row_version >= 0),
+    last_error TEXT CHECK (last_error IS NULL OR length(last_error) BETWEEN 1 AND 2048),
+    record_digest TEXT NOT NULL CHECK (
+        length(record_digest) = 64
+        AND record_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    record_json BLOB NOT NULL CHECK (length(record_json) BETWEEN 1 AND 1048576),
+    created_at_unix_ms INTEGER NOT NULL CHECK (created_at_unix_ms > 0),
+    updated_at_unix_ms INTEGER NOT NULL CHECK (
+        updated_at_unix_ms >= created_at_unix_ms
+    ),
+    store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),
+    store_lease_id TEXT NOT NULL CHECK (store_lease_id <> ''),
+    store_owner_epoch INTEGER NOT NULL CHECK (store_owner_epoch > 0),
+    FOREIGN KEY (operation_id)
+        REFERENCES admission_operation_terminal_projections(operation_id),
+    FOREIGN KEY (store_uuid, store_owner_epoch)
+        REFERENCES chio_serving_leases(store_uuid, owner_epoch)
+);
+
+CREATE INDEX IF NOT EXISTS admission_operation_observer_attempts_ready
+    ON admission_operation_observer_attempts(
+        work_state, next_visible_at_unix_ms, operation_id
+    );
+
+CREATE TRIGGER IF NOT EXISTS admission_operation_observer_attempts_exact_lease_insert
+BEFORE INSERT ON admission_operation_observer_attempts
+WHEN NOT EXISTS (
+    SELECT 1 FROM chio_serving_leases
+    WHERE store_uuid = NEW.store_uuid
+      AND owner_epoch = NEW.store_owner_epoch
+      AND lease_id = NEW.store_lease_id
+      AND end_head_index IS NULL
+)
+BEGIN
+    SELECT RAISE(ABORT, 'admission observer attempt has no exact serving lease');
+END;
+
+CREATE TRIGGER IF NOT EXISTS admission_operation_observer_attempts_exact_lease_update
+BEFORE UPDATE ON admission_operation_observer_attempts
+WHEN NOT EXISTS (
+    SELECT 1 FROM chio_serving_leases
+    WHERE store_uuid = NEW.store_uuid
+      AND owner_epoch = NEW.store_owner_epoch
+      AND lease_id = NEW.store_lease_id
+      AND end_head_index IS NULL
+)
+BEGIN
+    SELECT RAISE(ABORT, 'admission observer attempt has no exact serving lease');
+END;
+
+CREATE TRIGGER IF NOT EXISTS admission_operation_observer_attempts_immutable_evidence
+BEFORE UPDATE OF operation_id, receipt_id, record_digest, record_json, created_at_unix_ms
+ON admission_operation_observer_attempts
+BEGIN
+    SELECT RAISE(ABORT, 'admission observer evidence is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS admission_operation_observer_attempts_versioned
+BEFORE UPDATE ON admission_operation_observer_attempts
+WHEN NEW.row_version <> OLD.row_version + 1
+BEGIN
+    SELECT RAISE(ABORT, 'admission observer attempt requires one version increment');
+END;
+
+CREATE TRIGGER IF NOT EXISTS admission_operation_observer_attempts_no_delete
+BEFORE DELETE ON admission_operation_observer_attempts
+BEGIN
+    SELECT RAISE(ABORT, 'admission observer attempt must be retained');
+END;
