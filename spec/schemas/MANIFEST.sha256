@@ -1,4 +1,4 @@
-122ed283a74794387221ca0361124610af5fb4419abd20c8e661f8d8f9b49247  spec/schemas/MANIFEST.sha256
+54b37d12b5f3daebdedd53f579d0a7755507aeedefe795ec1b1d948a3280dbd3  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -64,7 +64,7 @@ fb33f0a18894dc039ea4a2d71c01469e9ef5a691f850235f32797cdfc99cfb9e  spec/schemas/c
 ade3a51b38ddb1df2f1f4658e9d3c5ead3743993392c3858a8cab2e2c01144bd  spec/schemas/chio-frost/v1/authorization-slot-checkpoint.schema.json
 d48a82273a4fbb4a4de7ae90a1100aaece681905224b30746db4e95c1d5c9005  spec/schemas/chio-frost/v1/authorization.schema.json
 bf6b555c5ca8ea65c1e312f3e8f6e74813c81dd81250a24b8c810d473427d659  spec/schemas/chio-frost/v1/epoch-checkpoint.schema.json
-aecb19858d216e4aa60cc4f72b1c0fc84f3f6d2d33e3fdcd86be62b337b5b0fa  spec/schemas/chio-frost/v1/roster.schema.json
+f4ff7a5cf78ad0dc0ee4a4def36c6661962cedc1ba12a10f7e240130ec0989c7  spec/schemas/chio-frost/v1/roster.schema.json
 8485e3d08cdfce8736e8f898fff5a212b1432ba0224a43cdf8df996c96721809  spec/schemas/chio-http/v1/caller-identity.schema.json
 57a3244c167440f71409d97ffc7c9c3e3142a28f512535e7a0d277bb7ebc8b19  spec/schemas/chio-http/v1/chio-http-request.schema.json
 24688da03454d2352781d352f4bf15dc25af77bdc74765248454f7c26cad5923  spec/schemas/chio-http/v1/error-envelope.schema.json

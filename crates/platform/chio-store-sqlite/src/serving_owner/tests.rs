@@ -168,6 +168,87 @@ fn joint_store_owns_budget_and_revocation_with_one_fence() {
 }
 
 #[test]
+fn legacy_global_projection_constraint_migrates_without_rewriting_history() {
+    let (_temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    let connection = Connection::open(&database).expect("open authority database");
+    let original_rows = connection
+        .query_row("SELECT COUNT(*) FROM authority_global_commits", [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .expect("global commit count");
+    let table_sql = connection
+        .query_row(
+            "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = 'authority_global_commits'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .expect("global commit table SQL");
+    let legacy_table_sql = table_sql.replace(
+        "'baseline', 'admission', 'budget', 'revocation', 'frost'",
+        "'baseline', 'admission', 'budget', 'revocation'",
+    );
+    let transaction = connection
+        .unchecked_transaction()
+        .expect("begin migration fixture");
+    transaction
+        .execute_batch(
+            r#"
+            DROP TRIGGER authority_global_commits_immutable;
+            DROP TRIGGER authority_global_commits_no_delete;
+            DROP INDEX authority_global_commits_projection;
+            ALTER TABLE authority_global_commits
+                RENAME TO authority_global_commits_current;
+            "#,
+        )
+        .expect("remove current global commit schema");
+    transaction
+        .execute_batch(&legacy_table_sql)
+        .expect("create legacy global commit table");
+    transaction
+        .execute_batch(concat!(
+            "INSERT INTO authority_global_commits\n",
+            "SELECT * FROM authority_global_commits_current;\n",
+            "DROP TABLE authority_global_commits_current;\n",
+            "CREATE INDEX authority_global_commits_projection\n",
+            "ON authority_global_commits(\n",
+            "    projection_kind, projection_key, projection_sequence\n",
+            ");\n",
+            "CREATE TRIGGER authority_global_commits_immutable\n",
+            "BEFORE UPDATE ON authority_global_commits\n",
+            "BEGIN\n",
+            "    SELECT RAISE(ABORT, 'global authority commit is immutable');\n",
+            "END;\n",
+            "CREATE TRIGGER authority_global_commits_no_delete\n",
+            "BEFORE DELETE ON authority_global_commits\n",
+            "BEGIN\n",
+            "    SELECT RAISE(ABORT, 'global authority commit is immutable');\n",
+            "END;",
+        ))
+        .expect("populate legacy global commit table");
+    transaction.commit().expect("commit legacy fixture");
+
+    super::global_commit_chain::initialize_global_commit_schema(&connection)
+        .expect("migrate supported legacy schema");
+    super::global_commit_chain::verify_global_commit_chain(&connection)
+        .expect("verify migrated global history");
+    let migrated_rows = connection
+        .query_row("SELECT COUNT(*) FROM authority_global_commits", [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .expect("migrated global commit count");
+    assert_eq!(migrated_rows, original_rows);
+    let migrated_sql = connection
+        .query_row(
+            "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = 'authority_global_commits'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .expect("migrated global commit table SQL");
+    assert!(migrated_sql.contains("'frost'"));
+}
+
+#[test]
 fn budget_only_snapshot_rollback_is_rejected_by_the_global_anchor() {
     let (temp, database, lock_root) = fixture();
     let snapshot = temp.path().join("before-budget.db");

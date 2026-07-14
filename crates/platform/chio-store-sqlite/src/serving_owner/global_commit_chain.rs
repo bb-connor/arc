@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS authority_global_commits (
     commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     projection_kind TEXT NOT NULL CHECK (
-        projection_kind IN ('baseline', 'admission', 'budget', 'revocation')
+        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost')
     ),
     projection_key TEXT NOT NULL,
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence >= 0),
@@ -167,7 +167,27 @@ type SchemaCatalogEntry = (String, String, String, Option<String>);
 pub(crate) fn initialize_global_commit_schema(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
-    connection.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
+    let table_exists = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'authority_global_commits')",
+        [],
+        |row| row.get::<_, bool>(0),
+    )?;
+    if table_exists {
+        let actual = global_schema_catalog(connection)?;
+        if actual == expected_global_schema_catalog(GLOBAL_COMMIT_SCHEMA)? {
+            return Ok(());
+        }
+        let legacy_schema = legacy_global_commit_schema();
+        let expected_legacy = expected_global_schema_catalog(&legacy_schema)?;
+        if actual != expected_legacy {
+            return Err(invalid(
+                "global authority commit schema is neither current nor a supported legacy definition",
+            ));
+        }
+        migrate_legacy_global_commit_schema(connection)?;
+    } else {
+        connection.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
+    }
     verify_global_commit_schema(connection)
 }
 
@@ -179,6 +199,70 @@ pub(crate) fn verify_global_commit_schema(
     if global_schema_catalog(connection)? != global_schema_catalog(&expected)? {
         return Err(invalid("global authority commit schema is not canonical"));
     }
+    Ok(())
+}
+
+fn legacy_global_commit_schema() -> String {
+    GLOBAL_COMMIT_SCHEMA.replace(
+        "'baseline', 'admission', 'budget', 'revocation', 'frost'",
+        "'baseline', 'admission', 'budget', 'revocation'",
+    )
+}
+
+fn expected_global_schema_catalog(
+    schema: &str,
+) -> Result<Vec<SchemaCatalogEntry>, SqliteServingOwnerError> {
+    let expected = Connection::open_in_memory()?;
+    expected.execute_batch(schema)?;
+    global_schema_catalog(&expected)
+}
+
+fn migrate_legacy_global_commit_schema(
+    connection: &Connection,
+) -> Result<(), SqliteServingOwnerError> {
+    let transaction = connection.unchecked_transaction()?;
+    let expected_rows =
+        transaction.query_row("SELECT COUNT(*) FROM authority_global_commits", [], |row| {
+            row.get::<_, i64>(0)
+        })?;
+    transaction.execute_batch(
+        r#"
+        DROP TRIGGER authority_global_commits_immutable;
+        DROP TRIGGER authority_global_commits_no_delete;
+        DROP INDEX authority_global_commits_projection;
+        ALTER TABLE authority_global_commits
+            RENAME TO authority_global_commits_legacy;
+        "#,
+    )?;
+    transaction.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
+    transaction.execute(
+        r#"
+        INSERT INTO authority_global_commits (
+            commit_sequence, mutation_kind, projection_kind, projection_key,
+            projection_sequence, projection_reference_digest,
+            authority_projection_digest, previous_chain_digest, chain_digest,
+            store_uuid, store_lease_id, store_owner_epoch
+        )
+        SELECT commit_sequence, mutation_kind, projection_kind, projection_key,
+               projection_sequence, projection_reference_digest,
+               authority_projection_digest, previous_chain_digest, chain_digest,
+               store_uuid, store_lease_id, store_owner_epoch
+        FROM authority_global_commits_legacy
+        ORDER BY commit_sequence
+        "#,
+        [],
+    )?;
+    let migrated_rows =
+        transaction.query_row("SELECT COUNT(*) FROM authority_global_commits", [], |row| {
+            row.get::<_, i64>(0)
+        })?;
+    if migrated_rows != expected_rows {
+        return Err(invalid(
+            "legacy global authority commit migration changed the row count",
+        ));
+    }
+    transaction.execute("DROP TABLE authority_global_commits_legacy", [])?;
+    transaction.commit()?;
     Ok(())
 }
 
@@ -675,6 +759,17 @@ fn projection_reference_digest(
             .ok_or_else(|| invalid("admission projection reference is absent")),
         "budget" => budget_event_reference_digest(connection, key, sequence),
         "revocation" => revocation_reference_digest(connection, key, sequence),
+        "frost" => connection
+            .query_row(
+                r#"
+                SELECT chain_digest FROM frost_projection_commits
+                WHERE projection_key = ?1 AND projection_sequence = ?2
+                "#,
+                params![key, sqlite_u64(sequence, "FROST projection sequence")?],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or_else(|| invalid("FROST projection reference is absent")),
         _ => Err(invalid("unknown global authority projection kind")),
     }
 }
@@ -897,12 +992,66 @@ fn verify_live_baseline_projection(connection: &Connection) -> Result<(), Sqlite
         [],
         |row| row.get::<_, String>(0),
     )?;
-    if committed != baseline_projection_digest(connection)? {
-        return Err(invalid(
-            "global authority baseline does not match its live projection",
-        ));
+    if committed == baseline_projection_digest(connection)? {
+        return Ok(());
     }
-    Ok(())
+    if frost_projection_is_empty(connection)?
+        && committed == legacy_baseline_projection_digest(connection)?
+    {
+        return Ok(());
+    }
+    Err(invalid(
+        "global authority baseline does not match its live projection",
+    ))
+}
+
+fn legacy_baseline_projection_digest(
+    connection: &Connection,
+) -> Result<String, SqliteServingOwnerError> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT name FROM sqlite_schema
+        WHERE type = 'table'
+          AND (
+              name = 'capability_grant_budgets'
+              OR name = 'revoked_capabilities'
+              OR name = 'chio_authority_migrations'
+              OR name GLOB 'admission_operation*'
+              OR name GLOB 'admission_authority_*'
+              OR name GLOB 'budget_*'
+          )
+          AND name NOT IN ('budget_ack_head_watermark', 'budget_origin_ack_heads')
+        ORDER BY name
+        "#,
+    )?;
+    let tables = statement
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut snapshots = Vec::with_capacity(tables.len());
+    for table in tables {
+        snapshots.push(table_snapshot(connection, &table, None)?);
+    }
+    digest(&AuthoritySnapshot {
+        format: "chio.sqlite-authority-projection.v1",
+        tables: snapshots,
+    })
+}
+
+fn frost_projection_is_empty(connection: &Connection) -> Result<bool, SqliteServingOwnerError> {
+    for table in table_names(connection, false)? {
+        if !table.starts_with("frost_") {
+            continue;
+        }
+        let count = connection.query_row(
+            &format!("SELECT COUNT(*) FROM {}", quote_identifier(&table)),
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
+        if count != 0 {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 fn verify_global_projection_coverage(
@@ -937,7 +1086,16 @@ fn verify_global_projection_coverage(
                       WHERE global.projection_kind = 'revocation'
                         AND global.projection_key = local.capability_id
                         AND global.projection_sequence = local.commit_index
-                  ) <> 1
+                ) <> 1
+            )
+            OR EXISTS(
+                SELECT 1 FROM frost_projection_commits AS local
+                WHERE (
+                    SELECT COUNT(*) FROM authority_global_commits AS global
+                    WHERE global.projection_kind = 'frost'
+                      AND global.projection_key = local.projection_key
+                      AND global.projection_sequence = local.projection_sequence
+                ) <> 1
             )
         "#,
         [],
@@ -971,6 +1129,7 @@ fn table_names(
               OR name GLOB 'admission_operation*'
               OR name GLOB 'admission_authority_*'
               OR name GLOB 'budget_*'
+              OR name GLOB 'frost_*'
           )
           AND name NOT IN ('budget_ack_head_watermark', 'budget_origin_ack_heads')
         ORDER BY name

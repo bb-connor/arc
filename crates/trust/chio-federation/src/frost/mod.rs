@@ -3,6 +3,8 @@
 mod action;
 mod registry;
 mod roster;
+mod rotation;
+mod slot;
 mod trust;
 mod types;
 mod verify;
@@ -20,9 +22,20 @@ pub use action::{
 pub use registry::{frost_action_registration, registered_frost_actions, FrostActionRegistration};
 pub use roster::{
     ActiveFrostRosterResolver, FrostAnchorError, FrostEpochAnchor, FrostEpochCheckpointV1,
-    FrostHistoricalRosterResolver, FrostParticipantV1, FrostRosterError,
+    FrostHistoricalRosterResolver, FrostParticipantV1, FrostRosterError, FrostRosterKeyOrigin,
     FrostRosterResolutionError, FrostRosterV1, VerifiedActiveFrostRoster,
     CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA, CHIO_FROST_ROSTER_SCHEMA, FROST_ED25519_SHA512_SUITE_ID,
+};
+pub use rotation::{
+    verify_frost_epoch_advance, FrostEpochAdvanceError, FrostEpochAnchorWriter,
+    FrostSessionBurnSummaryV1, VerifiedFrostEpochAdvance, CHIO_FROST_SESSION_BURN_SUMMARY_SCHEMA,
+};
+pub use slot::{
+    verify_frost_authorization_slot_bind, verify_frost_authorization_slot_burn,
+    verify_frost_authorization_slot_completion, FrostAuthorizationSlotAnchorWriter,
+    FrostAuthorizationSlotBind, FrostAuthorizationSlotBurn, FrostAuthorizationSlotCompletion,
+    FrostAuthorizationSlotTransitionError, VerifiedFrostAuthorizationSlotBind,
+    VerifiedFrostAuthorizationSlotBurn, VerifiedFrostAuthorizationSlotCompletion,
 };
 pub use trust::{
     FrostArtifactAuthorityRole, FrostArtifactTrustError, FrostArtifactTrustRoot,

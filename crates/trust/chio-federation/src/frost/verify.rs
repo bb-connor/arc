@@ -352,7 +352,8 @@ impl FrostAuthorizationSlotCheckpointV1 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FrostAnchoredAuthorizationSlot {
     pub checkpoint: FrostAuthorizationSlotCheckpointV1,
     pub authorization_blob: Option<Vec<u8>>,
@@ -402,6 +403,58 @@ impl VerifiedFrostAuthorization {
     }
 
     #[must_use]
+    pub const fn domain(&self) -> FrostAuthorizationDomain {
+        self.body.domain
+    }
+
+    #[must_use]
+    pub const fn resource_version(&self) -> u64 {
+        self.body.resource_version
+    }
+
+    #[must_use]
+    pub const fn resource_fence(&self) -> u64 {
+        self.body.resource_fence
+    }
+
+    #[must_use]
+    pub fn action_digest(&self) -> &str {
+        &self.body.action_digest
+    }
+
+    #[must_use]
+    pub fn roster_digest(&self) -> &str {
+        &self.body.roster_digest
+    }
+
+    #[must_use]
+    pub const fn key_epoch(&self) -> u64 {
+        self.body.key_epoch
+    }
+
+    #[must_use]
+    pub const fn quorum_n(&self) -> u16 {
+        self.body.quorum_n
+    }
+
+    #[must_use]
+    pub const fn quorum_m(&self) -> u16 {
+        self.body.quorum_m
+    }
+
+    #[must_use]
+    pub fn quorum_scope(&self) -> &str {
+        &self.body.quorum_scope
+    }
+
+    pub fn verify_action_preimage(
+        &self,
+        preimage: &super::action::FrostActionPreimageV1,
+    ) -> Result<(), FrostAuthorizationError> {
+        self.body.validate_action_preimage(preimage)
+    }
+
+    #[must_use]
     pub const fn is_current_at(&self, now: u64) -> bool {
         self.body.issued_at <= now && now < self.body.expires_at
     }
@@ -442,6 +495,7 @@ pub fn resolve_active_roster_for_execution(
     artifact_trust
         .verify_roster(&roster)
         .map_err(|error| FrostVerificationError::ArtifactTrust(error.to_string()))?;
+    roster.validate_for_active_resolution()?;
     if roster.scope_id != scope_id {
         return Err(FrostVerificationError::EpochMismatch(
             "resolver returned another scope",
@@ -615,7 +669,7 @@ fn verify_expected(
     Ok(())
 }
 
-fn verify_roster_binding(
+pub(super) fn verify_roster_binding(
     proof: &FrostAuthorizationV1,
     roster: &FrostRosterV1,
 ) -> Result<(), FrostVerificationError> {
@@ -720,7 +774,7 @@ fn verify_completed_slot(
     Ok(())
 }
 
-fn verify_current_epoch(
+pub(super) fn verify_current_epoch(
     active_roster: &VerifiedActiveFrostRoster,
     epoch_anchor: &dyn FrostEpochAnchor,
     artifact_trust: &FrostArtifactTrustStore,
@@ -747,7 +801,7 @@ fn verify_current_epoch(
     Ok(())
 }
 
-fn verify_group_signature(
+pub(super) fn verify_group_signature(
     proof: &FrostAuthorizationV1,
     roster: &FrostRosterV1,
 ) -> Result<(), FrostVerificationError> {

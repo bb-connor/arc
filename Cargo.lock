@@ -3067,6 +3067,7 @@ dependencies = [
  "chio-enterprise-export",
  "chio-errors",
  "chio-external-guards",
+ "chio-federation",
  "chio-guards",
  "chio-http-serve",
  "chio-kernel",
@@ -3443,10 +3444,14 @@ dependencies = [
  "chio-core-types",
  "chio-federation",
  "chio-governance",
+ "frost-ed25519",
  "hex",
+ "rand_chacha 0.3.1",
+ "rand_core 0.6.4",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "zeroize",
 ]
 
 [[package]]
@@ -4438,17 +4443,23 @@ dependencies = [
  "chacha20poly1305",
  "chio-core-types",
  "chio-credit",
+ "chio-federation",
+ "chio-federation-authority",
  "chio-kernel",
  "chio-settle",
  "chio-supervisor",
  "chio-test-support",
  "criterion",
+ "frost-ed25519",
+ "hex",
  "libc",
  "loom",
  "nix",
  "proptest",
  "r2d2",
  "r2d2_sqlite",
+ "rand_chacha 0.3.1",
+ "rand_core 0.6.4",
  "rusqlite",
  "serde",
  "serde_json",
@@ -15631,6 +15642,7 @@ version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13c156562582aa81c60cb29407084cdb54c4164760106ab78e6c5b0858cf64e"
 dependencies = [
+ "serde",
  "zeroize_derive",
 ]
 

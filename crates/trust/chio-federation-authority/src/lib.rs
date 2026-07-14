@@ -36,7 +36,16 @@ use chio_governance::lease::{
 };
 use serde::{Deserialize, Serialize};
 
+mod frost_ceremony;
 mod profile;
+
+pub use frost_ceremony::{
+    advance_frost_ceremony, begin_frost_ceremony, complete_frost_ceremony,
+    verify_frost_ceremony_round1_transcript, verify_frost_ceremony_transcript,
+    FrostAuthenticatedDkgPackage, FrostCeremonyCompletion, FrostCeremonyConfig, FrostCeremonyError,
+    FrostCeremonyParticipant, FrostCeremonySecret, FrostCeremonySecretKind, FrostDkgRound,
+    FrostRound1Transition, FrostRound2Transition,
+};
 
 pub const AUTHORITY_PROFILE_SCHEMA: &str = "chio.federation.authority-profile.v1";
 pub const ISSUANCE_REQUEST_SCHEMA: &str = "chio.federation.issuance-request.v1";

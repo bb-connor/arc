@@ -36,6 +36,7 @@ pub mod dead_letters;
 pub mod encrypted_blob;
 pub mod evidence_export;
 pub mod execution_nonce_store;
+pub mod frost_store;
 pub mod iou_store;
 #[cfg(feature = "lineage")]
 pub mod lineage_cte;
@@ -191,6 +192,12 @@ pub use encrypted_blob::{
     EncryptedBlob, SqliteEncryptedBlobStore, TenantId, TenantKey,
 };
 pub use execution_nonce_store::{SqliteExecutionNonceStore, SqliteExecutionNonceStoreError};
+pub use frost_store::{
+    FrostActiveRosterRecord, FrostCeremonyRecord, FrostCeremonyRound1Record,
+    FrostCeremonyRound2Record, FrostCeremonyState, FrostCustodyKey, FrostRotationRecord,
+    FrostRotationState, FrostStoreError, SqliteFrostStore, StagedFrostRotation,
+    StoredFrostCeremonyCompletion,
+};
 pub use iou_store::{SqliteIouEnvelopeStore, IOU_ENVELOPE_MIGRATION};
 pub use memory_provenance_store::{SqliteMemoryProvenanceStore, SqliteMemoryProvenanceStoreError};
 pub use receipt_store::{BackgroundCheckpointSigner, SqliteReceiptStore};

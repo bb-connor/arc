@@ -6,6 +6,7 @@
   "ceremonyTranscriptDigest": "4444444444444444444444444444444444444444444444444444444444444444",
   "groupPublicKey": "15d21ccd7ee42959562fc8aa63224c8851fb3ec85a3faf66040d380fb9738673",
   "keyEpoch": 4,
+  "keyOrigin": "distributed_dkg",
   "participantCount": 3,
   "participants": [
     {
@@ -23,9 +24,9 @@
   ],
   "predecessorRosterDigest": "5555555555555555555555555555555555555555555555555555555555555555",
   "rosterAuthorityKeyId": "authority.treaty.v1",
-  "rosterAuthoritySignature": "661d011b7408ff59442bc185a2fcbc51af96d1aee50b5823c8fafb3375eee550f03a3da557a2a2a3171c309ef6341773311820f1c6d6db14064bafce519d2b05",
-  "rosterDigest": "d08ce85abb2cbbfe3ea44252e1d0735617e63ea4010fc0b69e80c5dc6332a7ea",
-  "rosterId": "053eaed606fd438858bf2efe5df0de53d2a3c1f35c4d707925a428b671e264d9",
+  "rosterAuthoritySignature": "9e2a5f8b6eaf78a5c2c2fb6634885f4a05a2099ef62bfc8764418def15e833c688913288a76dde82ac16320eaea4499b1c46782222ca9533fef8f8728b9d590b",
+  "rosterDigest": "a04a7d92d998c5feec90b3d5b9a0998123fcdca040fe3a3da1d07d3051ab7340",
+  "rosterId": "3338bafe137cc11e24137c9434a5e6f74b266863067895c36597ed74565063ca",
   "schema": "chio.frost.roster.v1",
   "scopeId": "treaty.atlantic.v1",
   "suiteId": "FROST-ED25519-SHA512-v1",

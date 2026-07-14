@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use chio_core_types::{Keypair, PublicKey};
 use chio_federation::frost::{
     registered_frost_actions, FrostArtifactAuthorityRole, FrostArtifactTrustRoot,
-    FrostArtifactTrustStore, FrostAuthorizationDomain, FrostParticipantV1, FrostRosterV1,
-    CHIO_FROST_ROSTER_SCHEMA, FROST_ED25519_SHA512_SUITE_ID,
+    FrostArtifactTrustStore, FrostAuthorizationDomain, FrostParticipantV1, FrostRosterKeyOrigin,
+    FrostRosterV1, CHIO_FROST_ROSTER_SCHEMA, FROST_ED25519_SHA512_SUITE_ID,
 };
 use frost_ed25519::keys::{SigningShare, VerifyingShare};
 
@@ -65,6 +65,7 @@ fn signed_roster() -> FrostRosterV1 {
             .collect(),
         group_public_key: OFFICIAL_VERIFYING_KEY.to_string(),
         suite_id: FROST_ED25519_SHA512_SUITE_ID.to_string(),
+        key_origin: FrostRosterKeyOrigin::DistributedDkg,
         ceremony_transcript_digest: "44".repeat(32),
         predecessor_roster_digest: Some("55".repeat(32)),
         valid_from: 100,
@@ -86,6 +87,30 @@ fn signed_roster() -> FrostRosterV1 {
         .recompute_roster_digest()
         .unwrap_or_else(|error| panic!("roster digest must compute: {error}"));
     roster
+}
+
+#[test]
+fn dealer_fixture_roster_is_never_active_resolution_material() {
+    let mut roster = signed_roster();
+    roster.key_origin = FrostRosterKeyOrigin::DealerFixture;
+    roster.roster_id = roster
+        .recompute_roster_id()
+        .unwrap_or_else(|error| panic!("fixture roster id must compute: {error}"));
+    roster.roster_authority_signature = authority()
+        .sign(
+            &roster
+                .signing_bytes()
+                .unwrap_or_else(|error| panic!("fixture roster must canonicalize: {error}")),
+        )
+        .to_hex();
+    roster.roster_digest = roster
+        .recompute_roster_digest()
+        .unwrap_or_else(|error| panic!("fixture roster digest must compute: {error}"));
+
+    trust_store(authority().public_key())
+        .verify_roster(&roster)
+        .unwrap_or_else(|error| panic!("fixture origin remains signed evidence: {error}"));
+    assert!(roster.validate_for_active_resolution().is_err());
 }
 
 #[test]

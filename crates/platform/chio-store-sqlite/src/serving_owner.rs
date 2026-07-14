@@ -247,6 +247,10 @@ impl SqliteAuthorityStore {
                 "tool_outcome",
                 crate::tool_outcome_store::TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
             ),
+            (
+                "frost",
+                crate::frost_store::FROST_STORE_SUPPORTED_SCHEMA_VERSION,
+            ),
         ] {
             crate::check_schema_version(
                 &connection,
@@ -397,6 +401,10 @@ impl SqliteAuthorityStore {
             (
                 "tool_outcome",
                 crate::tool_outcome_store::TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
+            ),
+            (
+                "frost",
+                crate::frost_store::FROST_STORE_SUPPORTED_SCHEMA_VERSION,
             ),
         ] {
             crate::check_schema_version(
@@ -574,6 +582,14 @@ impl SqliteAuthorityStore {
             self.owner.clone(),
         )
     }
+
+    #[must_use]
+    pub fn frost_store(&self) -> crate::frost_store::SqliteFrostStore {
+        crate::frost_store::SqliteFrostStore::open_alongside(
+            self.connection.clone(),
+            self.owner.clone(),
+        )
+    }
 }
 
 fn initialize_offline_authority_schemas(
@@ -610,6 +626,8 @@ fn initialize_offline_authority_schemas(
         REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
     )
     .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::frost_store::initialize_frost_schema(connection)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     Ok(())
 }
 
@@ -1244,6 +1262,8 @@ fn verify_authority_store_invariants(
     crate::admission_operation_store::verify_admission_operation_invariants(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     crate::tool_outcome_store::verify_tool_outcome_invariants(connection)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::frost_store::verify_frost_store_invariants(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     Ok(())
 }

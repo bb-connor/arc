@@ -1,5 +1,7 @@
 #![allow(clippy::result_large_err)]
 
+#[path = "trust_control/frost.rs"]
+pub mod frost;
 #[path = "trust_control/health.rs"]
 mod trust_control_health;
 

@@ -61,6 +61,13 @@ pub struct FrostParticipantV1 {
     pub verification_share: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FrostRosterKeyOrigin {
+    DistributedDkg,
+    DealerFixture,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FrostRosterV1 {
@@ -76,6 +83,7 @@ pub struct FrostRosterV1 {
     pub participants: Vec<FrostParticipantV1>,
     pub group_public_key: String,
     pub suite_id: String,
+    pub key_origin: FrostRosterKeyOrigin,
     pub ceremony_transcript_digest: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub predecessor_roster_digest: Option<String>,
@@ -98,6 +106,7 @@ struct FrostRosterIdPreimage<'a> {
     participants: &'a [FrostParticipantV1],
     group_public_key: &'a str,
     suite_id: &'a str,
+    key_origin: FrostRosterKeyOrigin,
     ceremony_transcript_digest: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     predecessor_roster_digest: Option<&'a str>,
@@ -225,6 +234,16 @@ impl FrostRosterV1 {
         Ok(())
     }
 
+    pub fn validate_for_active_resolution(&self) -> Result<(), FrostRosterError> {
+        self.validate()?;
+        if self.key_origin != FrostRosterKeyOrigin::DistributedDkg {
+            return Err(FrostRosterError::ContractMismatch(
+                "active rosters must originate from distributed DKG",
+            ));
+        }
+        Ok(())
+    }
+
     fn validate_domains(&self) -> Result<(), FrostRosterError> {
         if self.allowed_domains.is_empty() {
             return Err(FrostRosterError::InvalidField {
@@ -303,6 +322,7 @@ impl FrostRosterV1 {
             participants: &self.participants,
             group_public_key: &self.group_public_key,
             suite_id: &self.suite_id,
+            key_origin: self.key_origin,
             ceremony_transcript_digest: &self.ceremony_transcript_digest,
             predecessor_roster_digest: self.predecessor_roster_digest.as_deref(),
             valid_from: self.valid_from,
