@@ -12,10 +12,11 @@ use chio_kernel::admission_operation::{
     SideEffectClass, StoreMutationFence,
 };
 use chio_kernel::tool_outcome::test_support::{
-    prepared_evaluation, record_external_step, record_pure_step, resolve, returned_value,
+    prepared_evaluation, record_external_step, record_pure_step, resolve_with_blob, returned_value,
 };
 use chio_kernel::tool_outcome::{
-    SettlementDispositionV1, ToolOutcomeInsertResultV1, ToolOutcomeStore, ToolOutcomeStoreError,
+    CanonicalResolvedOutputBlobV1, SettlementDispositionV1, ToolOutcomeInsertResultV1,
+    ToolOutcomeStore, ToolOutcomeStoreError,
 };
 use tempfile::TempDir;
 
@@ -335,9 +336,61 @@ fn post_return_evaluation_is_fenced_staged_and_finalized_by_cas() {
             begun_at + 25,
         )
         .expect("stage external result");
-    let (terminal_evaluation, terminal_outcome) =
-        resolve(&outcome, &external, SettlementDispositionV1::NotApplicable)
+    let (terminal_evaluation, terminal_outcome, resolved_blob) =
+        resolve_with_blob(&outcome, &external, SettlementDispositionV1::NotApplicable)
             .expect("terminal records");
+    assert!(matches!(
+        fixture.outcomes.finalize_post_return(
+            operation.binding().operation_id(),
+            external.version(),
+            &lease,
+            &terminal_evaluation,
+            outcome.version(),
+            &terminal_outcome,
+            None,
+            &fixture.fence,
+            begun_at + 26,
+        ),
+        Err(ToolOutcomeStoreError::Invariant(_))
+    ));
+    let substituted_blob =
+        CanonicalResolvedOutputBlobV1::from_signing_preimage(b"substitute".to_vec())
+            .expect("substituted blob");
+    assert!(matches!(
+        fixture.outcomes.finalize_post_return(
+            operation.binding().operation_id(),
+            external.version(),
+            &lease,
+            &terminal_evaluation,
+            outcome.version(),
+            &terminal_outcome,
+            Some(&substituted_blob),
+            &fixture.fence,
+            begun_at + 26,
+        ),
+        Err(ToolOutcomeStoreError::Invariant(_))
+    ));
+    assert_eq!(
+        fixture
+            .outcomes
+            .lookup_post_return_evaluation(operation.binding().operation_id())
+            .expect("lookup uncommitted evaluation"),
+        Some(external.clone())
+    );
+    assert_eq!(
+        fixture
+            .outcomes
+            .lookup_by_operation(operation.binding().operation_id())
+            .expect("lookup uncommitted outcome"),
+        Some(outcome.clone())
+    );
+    assert_eq!(
+        fixture
+            .outcomes
+            .load_resolved_output_by_operation(operation.binding().operation_id())
+            .expect("lookup uncommitted resolved output"),
+        None
+    );
     let finalized = fixture
         .outcomes
         .finalize_post_return(
@@ -347,6 +400,7 @@ fn post_return_evaluation_is_fenced_staged_and_finalized_by_cas() {
             &terminal_evaluation,
             outcome.version(),
             &terminal_outcome,
+            Some(&resolved_blob),
             &fixture.fence,
             begun_at + 26,
         )
@@ -368,6 +422,13 @@ fn post_return_evaluation_is_fenced_staged_and_finalized_by_cas() {
             .lookup_by_operation(operation.binding().operation_id())
             .expect("lookup outcome"),
         Some(terminal_outcome)
+    );
+    assert_eq!(
+        fixture
+            .outcomes
+            .load_resolved_output_by_operation(operation.binding().operation_id())
+            .expect("lookup resolved output"),
+        Some(resolved_blob)
     );
 }
 

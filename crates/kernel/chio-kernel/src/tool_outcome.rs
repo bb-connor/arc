@@ -435,6 +435,52 @@ impl CanonicalInvocationBlobV1 {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CanonicalResolvedOutputBlobV1 {
+    blob_ref: ContentAddressedBlobRefV1,
+    bytes: Vec<u8>,
+}
+
+impl CanonicalResolvedOutputBlobV1 {
+    pub fn from_signing_preimage(bytes: Vec<u8>) -> Result<Self, ToolOutcomeError> {
+        if bytes.len() > MAX_RESOLVED_OUTPUT_BYTES {
+            return Err(ToolOutcomeError::TooLarge {
+                field: "resolved_output",
+                actual: bytes.len(),
+                maximum: MAX_RESOLVED_OUTPUT_BYTES,
+            });
+        }
+        Ok(Self {
+            blob_ref: ContentAddressedBlobRefV1::new(digest_bytes(
+                "resolved_output_digest",
+                &bytes,
+            )?),
+            bytes,
+        })
+    }
+
+    pub fn blob_ref(&self) -> &ContentAddressedBlobRefV1 {
+        &self.blob_ref
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    fn verify(
+        &self,
+        expected: &ContentAddressedBlobRefV1,
+        expected_size_bytes: u64,
+    ) -> Result<(), ToolOutcomeError> {
+        if &self.blob_ref != expected
+            || u64::try_from(self.bytes.len()).ok() != Some(expected_size_bytes)
+        {
+            return Err(ToolOutcomeError::Binding("resolved_output_blob"));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SettlementDispositionV1 {
@@ -495,10 +541,6 @@ impl ResolvedToolOutcomeV1 {
                 ..
             } => {
                 resolved_output.validate()?;
-                positive(
-                    "outcome.resolved_output_size_bytes",
-                    *resolved_output_size_bytes,
-                )?;
                 if usize::try_from(*resolved_output_size_bytes)
                     .map_or(true, |size| size > MAX_RESOLVED_OUTPUT_BYTES)
                 {
@@ -751,6 +793,17 @@ impl ToolOutcomeRecordV1 {
 
     pub fn raw_output_digest(&self) -> &AdmissionDigest {
         self.raw_output.digest()
+    }
+
+    pub fn resolved_output_ref(&self) -> Option<(&ContentAddressedBlobRefV1, u64)> {
+        match &self.disposition {
+            ResolvedToolOutcomeV1::Resolved {
+                resolved_output,
+                resolved_output_size_bytes,
+                ..
+            } => Some((resolved_output, *resolved_output_size_bytes)),
+            ResolvedToolOutcomeV1::Returned | ResolvedToolOutcomeV1::Frozen { .. } => None,
+        }
     }
 
     pub fn recording_fence(&self) -> &StoreMutationFence {
@@ -1094,9 +1147,15 @@ pub trait ToolOutcomeStore: Send + Sync {
         terminal_evaluation: &PostReturnEvaluationRecordV1,
         expected_outcome_version: u64,
         terminal_outcome: &ToolOutcomeRecordV1,
+        resolved_output: Option<&CanonicalResolvedOutputBlobV1>,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError>;
+
+    fn load_resolved_output_by_operation(
+        &self,
+        operation_id: &AdmissionOperationId,
+    ) -> Result<Option<CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError>;
 }
 
 /// Explicit trust boundary for stores that atomically bind a returned tool
@@ -1166,6 +1225,7 @@ pub fn validate_terminal_store_pair(
     current_evaluation: &PostReturnEvaluationRecordV1,
     terminal_evaluation: &PostReturnEvaluationRecordV1,
     terminal_outcome: &ToolOutcomeRecordV1,
+    resolved_output: Option<&CanonicalResolvedOutputBlobV1>,
 ) -> Result<(), ToolOutcomeError> {
     current_outcome.validate_against(operation)?;
     current_evaluation.validate_against(operation, current_outcome)?;
@@ -1186,6 +1246,19 @@ pub fn validate_terminal_store_pair(
     let expected = current_outcome.transition(current_outcome.version(), transition)?;
     if expected != *terminal_outcome {
         return Err(ToolOutcomeError::Binding("terminal_store_pair.outcome"));
+    }
+    match terminal_outcome.resolved_output_ref() {
+        Some((expected, expected_size)) => resolved_output
+            .ok_or(ToolOutcomeError::Binding(
+                "terminal_store_pair.resolved_output",
+            ))?
+            .verify(expected, expected_size)?,
+        None if resolved_output.is_none() => {}
+        None => {
+            return Err(ToolOutcomeError::Binding(
+                "terminal_store_pair.unexpected_resolved_output",
+            ));
+        }
     }
     Ok(())
 }

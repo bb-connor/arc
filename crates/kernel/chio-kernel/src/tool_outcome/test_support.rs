@@ -1,3 +1,4 @@
+use chio_core::canonical::canonical_json_bytes;
 use chio_core::capability::scope::MonetaryAmount;
 use chio_core::sha256_hex;
 use serde_json::{json, Value};
@@ -132,9 +133,27 @@ pub fn resolve(
     evaluation: &PostReturnEvaluationRecordV1,
     settlement_disposition: SettlementDispositionV1,
 ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeError> {
-    let resolution = PostReturnResolutionV1::from_output(
+    let (terminal_evaluation, terminal_outcome, _) =
+        resolve_with_blob(outcome, evaluation, settlement_disposition)?;
+    Ok((terminal_evaluation, terminal_outcome))
+}
+
+pub fn resolve_with_blob(
+    outcome: &ToolOutcomeRecordV1,
+    evaluation: &PostReturnEvaluationRecordV1,
+    settlement_disposition: SettlementDispositionV1,
+) -> Result<
+    (
+        PostReturnEvaluationRecordV1,
+        ToolOutcomeRecordV1,
+        CanonicalResolvedOutputBlobV1,
+    ),
+    ToolOutcomeError,
+> {
+    let (resolution, blob) = PostReturnResolutionV1::from_signing_preimage(
         evaluation,
-        &json!({"allowed": true}),
+        canonical_json_bytes(&json!({"allowed": true}))
+            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
         digest("test-output-guard-decision"),
         digest("test-pricing-verdict"),
         settlement_disposition,
@@ -147,5 +166,5 @@ pub fn resolve(
         outcome.version(),
         ToolOutcomeTransitionV1::Resolve(terminal_evaluation.terminal_evidence()?),
     )?;
-    Ok((terminal_evaluation, terminal_outcome))
+    Ok((terminal_evaluation, terminal_outcome, blob))
 }

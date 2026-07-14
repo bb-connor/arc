@@ -386,10 +386,19 @@ impl ToolOutcomeStore for TestAdmissionOperationStore {
         _terminal_evaluation: &PostReturnEvaluationRecordV1,
         _expected_outcome_version: u64,
         _terminal_outcome: &ToolOutcomeRecordV1,
+        _resolved_output: Option<&crate::tool_outcome::CanonicalResolvedOutputBlobV1>,
         _active_fence: &StoreMutationFence,
         _trusted_now_unix_ms: u64,
     ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
         Err(ToolOutcomeStoreError::Unavailable("unused in test".to_owned()))
+    }
+
+    fn load_resolved_output_by_operation(
+        &self,
+        _operation_id: &AdmissionOperationId,
+    ) -> Result<Option<crate::tool_outcome::CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError>
+    {
+        Ok(None)
     }
 }
 

@@ -426,6 +426,24 @@ impl PostReturnResolutionV1 {
         settlement_disposition: SettlementDispositionV1,
         maximum: usize,
     ) -> Result<Self, ToolOutcomeError> {
+        let bytes = bounded("resolved_output", output, maximum)?;
+        Self::from_signing_preimage(
+            evaluation,
+            bytes,
+            post_guard_decision_digest,
+            pricing_verdict_digest,
+            settlement_disposition,
+        )
+        .map(|(resolution, _)| resolution)
+    }
+
+    pub(crate) fn from_signing_preimage(
+        evaluation: &PostReturnEvaluationRecordV1,
+        signing_preimage: Vec<u8>,
+        post_guard_decision_digest: AdmissionDigest,
+        pricing_verdict_digest: AdmissionDigest,
+        settlement_disposition: SettlementDispositionV1,
+    ) -> Result<(Self, CanonicalResolvedOutputBlobV1), ToolOutcomeError> {
         evaluation.validate()?;
         if !matches!(evaluation.state, PostReturnEvaluationStateV1::Evaluating)
             || evaluation.step_results.len() != evaluation.frozen_steps.len()
@@ -435,13 +453,10 @@ impl PostReturnResolutionV1 {
             ));
         }
         settlement_disposition.validate()?;
-        let bytes = bounded("resolved_output", output, maximum)?;
+        let blob = CanonicalResolvedOutputBlobV1::from_signing_preimage(signing_preimage)?;
         let record = Self {
-            resolved_output: ContentAddressedBlobRefV1::new(digest_bytes(
-                "resolved_output_digest",
-                &bytes,
-            )?),
-            resolved_output_size_bytes: u64::try_from(bytes.len())
+            resolved_output: blob.blob_ref().clone(),
+            resolved_output_size_bytes: u64::try_from(blob.bytes().len())
                 .map_err(|_| ToolOutcomeError::Overflow("resolved_output_size_bytes"))?,
             terminal_dependency_root_digest: evaluation.step_result_root()?,
             post_guard_decision_digest,
@@ -449,15 +464,11 @@ impl PostReturnResolutionV1 {
             settlement_disposition,
         };
         record.validate()?;
-        Ok(record)
+        Ok((record, blob))
     }
 
     fn validate(&self) -> Result<(), ToolOutcomeError> {
         self.resolved_output.validate()?;
-        positive(
-            "resolution.resolved_output_size_bytes",
-            self.resolved_output_size_bytes,
-        )?;
         if usize::try_from(self.resolved_output_size_bytes)
             .map_or(true, |size| size > MAX_RESOLVED_OUTPUT_BYTES)
         {

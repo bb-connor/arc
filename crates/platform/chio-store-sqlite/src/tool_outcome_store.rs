@@ -7,7 +7,8 @@ use chio_kernel::admission_operation::{
     AdmissionOperationV1, AdmissionRecoveryLease, StoreMutationFence,
 };
 use chio_kernel::tool_outcome::{
-    CanonicalInvocationBlobV1, PersistedPostReturnEvaluationRecordV1, PersistedToolOutcomeRecordV1,
+    CanonicalInvocationBlobV1, CanonicalResolvedOutputBlobV1,
+    PersistedPostReturnEvaluationRecordV1, PersistedToolOutcomeRecordV1,
     PostReturnEvaluationRecordV1, QualifiedToolOutcomeStore, RawInvocationOutcomeV1,
     ToolOutcomeInsertResultV1, ToolOutcomeRecordV1, ToolOutcomeStore, ToolOutcomeStoreError,
 };
@@ -326,6 +327,7 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
         terminal_evaluation: &PostReturnEvaluationRecordV1,
         expected_outcome_version: u64,
         terminal_outcome: &ToolOutcomeRecordV1,
+        resolved_output: Option<&CanonicalResolvedOutputBlobV1>,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
@@ -350,6 +352,7 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
             &current_evaluation,
             terminal_evaluation,
             terminal_outcome,
+            resolved_output,
         )
         .and_then(|_| terminal_evaluation.validate_for_store_mutation(trusted_now_unix_ms))
         .map_err(|error| invariant(error.to_string()))?;
@@ -361,6 +364,15 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
             &outcome_json,
             &evaluation_json,
         )?;
+        if let Some(blob) = resolved_output {
+            insert_blob_bytes_tx(
+                &transaction,
+                blob.blob_ref().digest().as_str(),
+                blob.bytes(),
+                active_fence,
+                trusted_now_unix_ms,
+            )?;
+        }
         update_outcome_tx(
             &transaction,
             operation_id,
@@ -393,6 +405,22 @@ impl ToolOutcomeStore for SqliteToolOutcomeStore {
         self.commit_write(transaction)?;
         self.sync_after_write(&connection)?;
         Ok((terminal_evaluation.clone(), terminal_outcome.clone()))
+    }
+
+    fn load_resolved_output_by_operation(
+        &self,
+        operation_id: &AdmissionOperationId,
+    ) -> Result<Option<CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let outcome = load_outcome_tx(&transaction, operation_id)?;
+        let resolved = outcome
+            .as_ref()
+            .map(|outcome| load_resolved_blob_connection(&transaction, outcome))
+            .transpose()?
+            .flatten();
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(resolved)
     }
 }
 
@@ -576,6 +604,12 @@ fn verify_outcome_projection(
             "tool outcome projection is not bound to the admission commit chain",
         ));
     }
+    let resolved = load_resolved_blob_connection(connection, &outcome)?;
+    if resolved.is_some() != outcome.resolved_output_ref().is_some() {
+        return Err(invariant(
+            "tool outcome resolved-output projection is incomplete",
+        ));
+    }
     Ok(())
 }
 
@@ -599,7 +633,28 @@ fn insert_blob_tx(
     fence: &StoreMutationFence,
     recorded_at_unix_ms: u64,
 ) -> Result<(), ToolOutcomeStoreError> {
-    let size = i64::try_from(blob.bytes().len())
+    insert_blob_bytes_tx(
+        transaction,
+        blob.blob_ref().digest().as_str(),
+        blob.bytes(),
+        fence,
+        recorded_at_unix_ms,
+    )
+}
+
+fn insert_blob_bytes_tx(
+    transaction: &Transaction<'_>,
+    digest: &str,
+    bytes: &[u8],
+    fence: &StoreMutationFence,
+    recorded_at_unix_ms: u64,
+) -> Result<(), ToolOutcomeStoreError> {
+    if sha256_hex(bytes) != digest {
+        return Err(invariant(
+            "content-addressed blob digest does not match its bytes",
+        ));
+    }
+    let size = i64::try_from(bytes.len())
         .map_err(|_| invariant("tool outcome blob size overflowed SQLite"))?;
     transaction
         .execute(
@@ -611,9 +666,9 @@ fn insert_blob_tx(
             ON CONFLICT(digest) DO NOTHING
             "#,
             params![
-                blob.blob_ref().digest().as_str(),
+                digest,
                 size,
-                blob.bytes(),
+                bytes,
                 sqlite_u64(recorded_at_unix_ms, "recorded_at_unix_ms")?,
                 &fence.store_uuid,
                 &fence.lease_id,
@@ -621,12 +676,44 @@ fn insert_blob_tx(
             ],
         )
         .map_err(sqlite_error)?;
-    let stored = load_blob_tx(transaction, blob.blob_ref().digest())?
-        .ok_or_else(|| invariant("tool outcome blob insert disappeared"))?;
-    if stored.bytes() != blob.bytes() {
+    let stored: Vec<u8> = transaction
+        .query_row(
+            "SELECT canonical_bytes FROM tool_outcome_blobs WHERE digest = ?1",
+            [digest],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if stored != bytes {
         return Err(invariant("content-addressed blob digest collision"));
     }
     Ok(())
+}
+
+fn load_resolved_blob_connection(
+    connection: &Connection,
+    outcome: &ToolOutcomeRecordV1,
+) -> Result<Option<CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError> {
+    let Some((expected, expected_size)) = outcome.resolved_output_ref() else {
+        return Ok(None);
+    };
+    let bytes = connection
+        .query_row(
+            "SELECT canonical_bytes FROM tool_outcome_blobs WHERE digest = ?1",
+            [expected.digest().as_str()],
+            |row| row.get::<_, Vec<u8>>(0),
+        )
+        .optional()
+        .map_err(sqlite_error)?
+        .ok_or_else(|| invariant("resolved tool output blob is absent"))?;
+    let blob = CanonicalResolvedOutputBlobV1::from_signing_preimage(bytes)
+        .map_err(|error| invariant(error.to_string()))?;
+    if blob.blob_ref() != expected || u64::try_from(blob.bytes().len()).ok() != Some(expected_size)
+    {
+        return Err(invariant(
+            "resolved tool output blob does not match its terminal record",
+        ));
+    }
+    Ok(Some(blob))
 }
 
 fn insert_outcome_tx(

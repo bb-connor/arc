@@ -808,6 +808,7 @@ impl ToolOutcomeStore for MemoryOutcomeStore {
         terminal_evaluation: &PostReturnEvaluationRecordV1,
         _expected_outcome_version: u64,
         _terminal_outcome: &ToolOutcomeRecordV1,
+        _resolved_output: Option<&CanonicalResolvedOutputBlobV1>,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
@@ -816,6 +817,13 @@ impl ToolOutcomeStore for MemoryOutcomeStore {
             .validate_for_store_mutation(trusted_now_unix_ms)
             .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?;
         Err(ToolOutcomeStoreError::Unavailable("unused".to_owned()))
+    }
+
+    fn load_resolved_output_by_operation(
+        &self,
+        _operation_id: &AdmissionOperationId,
+    ) -> Result<Option<CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError> {
+        Ok(None)
     }
 }
 
@@ -1246,6 +1254,64 @@ fn external_results_are_bounded_by_frozen_and_store_time() {
 }
 
 #[test]
+fn terminal_pair_binds_the_exact_resolved_signing_preimage() {
+    let operation = committed_operation("request-resolved-signing-preimage");
+    let outcome = returned(&operation, json!([]));
+    let evaluation = record_external(&record_pure(&prepared_evaluation(&operation, &outcome)));
+    let (resolution, empty_stream_preimage) = PostReturnResolutionV1::from_signing_preimage(
+        &evaluation,
+        Vec::new(),
+        admission_digest("guard-decision"),
+        admission_digest("pricing-verdict"),
+        SettlementDispositionV1::NotApplicable,
+    )
+    .unwrap();
+    assert_eq!(resolution.resolved_output_size_bytes, 0);
+    let terminal_evaluation = evaluation
+        .transition(
+            evaluation.version(),
+            PostReturnEvaluationTransitionV1::Resolve(resolution),
+        )
+        .unwrap();
+    let terminal_outcome = outcome
+        .transition(
+            outcome.version(),
+            ToolOutcomeTransitionV1::Resolve(terminal_evaluation.terminal_evidence().unwrap()),
+        )
+        .unwrap();
+
+    validate_terminal_store_pair(
+        &operation,
+        &outcome,
+        &evaluation,
+        &terminal_evaluation,
+        &terminal_outcome,
+        Some(&empty_stream_preimage),
+    )
+    .unwrap();
+    let substituted =
+        CanonicalResolvedOutputBlobV1::from_signing_preimage(b"null".to_vec()).unwrap();
+    assert!(validate_terminal_store_pair(
+        &operation,
+        &outcome,
+        &evaluation,
+        &terminal_evaluation,
+        &terminal_outcome,
+        Some(&substituted),
+    )
+    .is_err());
+    assert!(validate_terminal_store_pair(
+        &operation,
+        &outcome,
+        &evaluation,
+        &terminal_evaluation,
+        &terminal_outcome,
+        None,
+    )
+    .is_err());
+}
+
+#[test]
 fn cas_transitions_are_terminal_and_freeze_prevents_rerun() {
     let operation = committed_operation("request-cas");
     let outcome = returned(&operation, json!(1));
@@ -1300,6 +1366,25 @@ fn cas_transitions_are_terminal_and_freeze_prevents_rerun() {
             ToolOutcomeTransitionV1::Freeze(frozen.freeze_evidence().unwrap()),
         )
         .unwrap();
+    validate_terminal_store_pair(
+        &operation,
+        &outcome,
+        &evaluation,
+        &frozen,
+        &frozen_outcome,
+        None,
+    )
+    .unwrap();
+    let unexpected_blob = CanonicalResolvedOutputBlobV1::from_signing_preimage(Vec::new()).unwrap();
+    assert!(validate_terminal_store_pair(
+        &operation,
+        &outcome,
+        &evaluation,
+        &frozen,
+        &frozen_outcome,
+        Some(&unexpected_blob),
+    )
+    .is_err());
     let mut wrong_frozen_version = frozen_outcome.to_persisted();
     wrong_frozen_version.version += 1;
     assert!(ToolOutcomeRecordV1::from_persisted(wrong_frozen_version).is_err());
