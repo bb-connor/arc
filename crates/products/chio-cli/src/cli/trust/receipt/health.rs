@@ -538,6 +538,7 @@ mod receipt_operator_tests {
             writer_restart_total: 4,
             retention_watermark_entry_seq: Some(6),
             retention_error: Some("archive path is unwritable".to_string()),
+            ..chio_kernel::ReceiptStoreHealthReport::default()
         };
         let health_output = render_receipt_health_human(&health);
         assert!(health_output.contains("checkpoint_seq: 2"));
