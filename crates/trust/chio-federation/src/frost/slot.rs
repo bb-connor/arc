@@ -2,7 +2,10 @@ use chio_core_types::sha256_hex;
 use serde::Serialize;
 
 use super::types::{validate_identifier, FrostAuthorizationBodyV1, FrostAuthorizationError};
-use super::verify::{verify_current_epoch, verify_group_signature, verify_roster_binding};
+use super::verify::{
+    verify_completed_slot_artifact, verify_current_epoch, verify_group_signature,
+    verify_roster_binding,
+};
 use super::{
     frost_authorization_session_id, frost_authorization_slot_id, FrostAnchorError,
     FrostAnchoredAuthorizationSlot, FrostArtifactTrustStore, FrostAuthorizationDomain,
@@ -93,6 +96,21 @@ impl FrostAuthorizationSlotCompletion {
     }
 
     #[must_use]
+    pub fn aggregate_signature_digest(&self) -> &str {
+        &self.aggregate_signature_digest
+    }
+
+    #[must_use]
+    pub fn authorization_blob_digest(&self) -> &str {
+        &self.authorization_blob_digest
+    }
+
+    #[must_use]
+    pub fn availability_receipt(&self) -> &str {
+        &self.availability_receipt
+    }
+
+    #[must_use]
     pub const fn clock_high_water(&self) -> u64 {
         self.clock_high_water
     }
@@ -134,6 +152,41 @@ pub struct VerifiedFrostAuthorizationSlotBurn {
     request: FrostAuthorizationSlotBurn,
 }
 
+#[derive(Debug, Clone)]
+pub struct VerifiedBoundFrostAuthorizationSlot {
+    checkpoint: FrostAuthorizationSlotCheckpointV1,
+}
+
+#[derive(Debug, Clone)]
+pub struct VerifiedCompletedFrostAuthorizationSlot {
+    checkpoint: FrostAuthorizationSlotCheckpointV1,
+    proof: FrostAuthorizationV1,
+}
+
+impl VerifiedBoundFrostAuthorizationSlot {
+    #[must_use]
+    pub fn checkpoint(&self) -> &FrostAuthorizationSlotCheckpointV1 {
+        &self.checkpoint
+    }
+
+    #[must_use]
+    pub fn checkpoint_digest(&self) -> &str {
+        &self.checkpoint.checkpoint_digest
+    }
+}
+
+impl VerifiedCompletedFrostAuthorizationSlot {
+    #[must_use]
+    pub fn checkpoint(&self) -> &FrostAuthorizationSlotCheckpointV1 {
+        &self.checkpoint
+    }
+
+    #[must_use]
+    pub fn proof(&self) -> &FrostAuthorizationV1 {
+        &self.proof
+    }
+}
+
 impl VerifiedFrostAuthorizationSlotBurn {
     #[must_use]
     pub fn request(&self) -> &FrostAuthorizationSlotBurn {
@@ -156,6 +209,119 @@ pub trait FrostAuthorizationSlotAnchorWriter: FrostAuthorizationSlotAnchor {
         &self,
         burn: &VerifiedFrostAuthorizationSlotBurn,
     ) -> Result<FrostAnchoredAuthorizationSlot, FrostAnchorError>;
+}
+
+pub fn verify_bound_frost_authorization_slot(
+    body: &FrostAuthorizationBodyV1,
+    active_roster: &VerifiedActiveFrostRoster,
+    epoch_anchor: &dyn FrostEpochAnchor,
+    anchored: &FrostAnchoredAuthorizationSlot,
+    artifact_trust: &FrostArtifactTrustStore,
+    now: u64,
+) -> Result<VerifiedBoundFrostAuthorizationSlot, FrostAuthorizationSlotTransitionError> {
+    body.validate()?;
+    if now < body.issued_at || now >= body.expires_at {
+        return Err(FrostAuthorizationSlotTransitionError::Invalid(
+            "authorization is not current",
+        ));
+    }
+    if body.scope_id != active_roster.roster.scope_id
+        || body.roster_digest != active_roster.roster.roster_digest
+        || body.key_epoch != active_roster.roster.key_epoch
+    {
+        return Err(FrostAuthorizationSlotTransitionError::Invalid(
+            "authorization does not use the active roster",
+        ));
+    }
+    verify_current_epoch(active_roster, epoch_anchor, artifact_trust, now)?;
+    let checkpoint = &anchored.checkpoint;
+    artifact_trust
+        .verify_authorization_slot_checkpoint(checkpoint)
+        .map_err(|error| FrostAuthorizationSlotTransitionError::ArtifactTrust(error.to_string()))?;
+    let signing_bytes = body.signing_bytes()?;
+    if checkpoint.state != FrostAuthorizationSlotState::Bound
+        || checkpoint.slot_version != 1
+        || checkpoint.predecessor_digest.is_some()
+        || anchored.authorization_blob.is_some()
+        || checkpoint.aggregate_signature_digest.is_some()
+        || checkpoint.authorization_blob_digest.is_some()
+        || checkpoint.availability_receipt.is_some()
+        || checkpoint.scope_id != body.scope_id
+        || checkpoint.slot_id != frost_authorization_slot_id(body)?
+        || checkpoint.domain != body.domain
+        || checkpoint.ladder_action_class != body.ladder_action_class
+        || checkpoint.resource_id != body.resource_id
+        || checkpoint.resource_version != body.resource_version
+        || checkpoint.resource_fence != body.resource_fence
+        || checkpoint.authorization_id != body.authorization_id
+        || checkpoint.signing_message_digest != sha256_hex(&signing_bytes)
+        || checkpoint.action_digest != body.action_digest
+        || checkpoint.roster_digest != body.roster_digest
+        || checkpoint.key_epoch != body.key_epoch
+        || checkpoint.session_id != frost_authorization_session_id(body)?
+        || checkpoint.clock_high_water > now
+    {
+        return Err(FrostAuthorizationSlotTransitionError::Invalid(
+            "authorization slot is not the exact bound message",
+        ));
+    }
+    Ok(VerifiedBoundFrostAuthorizationSlot {
+        checkpoint: checkpoint.clone(),
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn verify_completed_frost_authorization_slot(
+    body: &FrostAuthorizationBodyV1,
+    active_roster: &VerifiedActiveFrostRoster,
+    epoch_anchor: &dyn FrostEpochAnchor,
+    anchored: &FrostAnchoredAuthorizationSlot,
+    artifact_trust: &FrostArtifactTrustStore,
+    expected_bound_checkpoint_digest: &str,
+    now: u64,
+) -> Result<VerifiedCompletedFrostAuthorizationSlot, FrostAuthorizationSlotTransitionError> {
+    body.validate()?;
+    let authorization_blob = anchored.authorization_blob.as_deref().ok_or(
+        FrostAuthorizationSlotTransitionError::Invalid(
+            "completed slot lacks rollback-independent authorization bytes",
+        ),
+    )?;
+    let proof: FrostAuthorizationV1 = serde_json::from_slice(authorization_blob).map_err(|_| {
+        FrostAuthorizationSlotTransitionError::Invalid(
+            "completed slot authorization bytes are not valid JSON",
+        )
+    })?;
+    proof.validate()?;
+    if proof.body != *body {
+        return Err(FrostAuthorizationSlotTransitionError::Invalid(
+            "completed slot authorization differs from the signer message",
+        ));
+    }
+    if now < body.issued_at
+        || now >= body.expires_at
+        || now < active_roster.roster.valid_from
+        || now >= active_roster.roster.valid_until
+    {
+        return Err(FrostAuthorizationSlotTransitionError::Invalid(
+            "completed slot authorization is not current",
+        ));
+    }
+    verify_current_epoch(active_roster, epoch_anchor, artifact_trust, now)?;
+    verify_roster_binding(&proof, &active_roster.roster)?;
+    verify_group_signature(&proof, &active_roster.roster)?;
+    verify_completed_slot_artifact(&proof, anchored, artifact_trust, now)?;
+    if anchored.checkpoint.slot_version != 2
+        || anchored.checkpoint.predecessor_digest.as_deref()
+            != Some(expected_bound_checkpoint_digest)
+    {
+        return Err(FrostAuthorizationSlotTransitionError::Invalid(
+            "completed slot is not the exact bound-checkpoint successor",
+        ));
+    }
+    Ok(VerifiedCompletedFrostAuthorizationSlot {
+        checkpoint: anchored.checkpoint.clone(),
+        proof,
+    })
 }
 
 pub fn verify_frost_authorization_slot_bind(

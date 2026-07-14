@@ -706,6 +706,16 @@ fn verify_completed_slot(
 ) -> Result<(), FrostVerificationError> {
     let slot_id = frost_authorization_slot_id(&proof.body)?;
     let anchored = slot_anchor.resolve_authorization_slot(&proof.body.scope_id, &slot_id)?;
+    verify_completed_slot_artifact(proof, &anchored, artifact_trust, now)
+}
+
+pub(super) fn verify_completed_slot_artifact(
+    proof: &FrostAuthorizationV1,
+    anchored: &FrostAnchoredAuthorizationSlot,
+    artifact_trust: &FrostArtifactTrustStore,
+    now: u64,
+) -> Result<(), FrostVerificationError> {
+    let slot_id = frost_authorization_slot_id(&proof.body)?;
     artifact_trust
         .verify_authorization_slot_checkpoint(&anchored.checkpoint)
         .map_err(|error| FrostVerificationError::ArtifactTrust(error.to_string()))?;

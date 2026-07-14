@@ -14,6 +14,7 @@ mod commit;
 mod rotation;
 mod rotation_validation;
 mod schema;
+mod signer;
 
 use schema::FROST_STORE_SCHEMA;
 
@@ -217,6 +218,77 @@ pub struct StagedFrostRotation {
     advance: chio_federation::frost::VerifiedFrostEpochAdvance,
 }
 
+pub struct FrostSignerSessionRequest<'a> {
+    pub body: &'a chio_federation::frost::FrostAuthorizationBodyV1,
+    pub active_roster: &'a chio_federation::frost::VerifiedActiveFrostRoster,
+    pub epoch_anchor: &'a dyn chio_federation::frost::FrostEpochAnchor,
+    pub slot_anchor: &'a dyn chio_federation::frost::FrostAuthorizationSlotAnchorWriter,
+    pub artifact_trust: &'a chio_federation::frost::FrostArtifactTrustStore,
+    pub ceremony_id: &'a str,
+    pub participant_id: &'a str,
+    pub coordinator_id: &'a str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FrostSignerSessionRecord {
+    pub session_id: String,
+    pub participant_id: String,
+    pub authorization_slot_id: String,
+    pub state: FrostSignerSessionState,
+    pub state_version: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FrostSignerCommitment {
+    pub session_id: String,
+    pub participant_id: String,
+    pub signer_identifier: Vec<u8>,
+    pub commitment_bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FrostSignerShare {
+    pub session_id: String,
+    pub participant_id: String,
+    pub share_bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FrostSignerSessionState {
+    Prepared,
+    CommitmentPublished,
+    ShareReady,
+    Completed,
+    Burned,
+}
+
+impl FrostSignerSessionState {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Prepared => "prepared",
+            Self::CommitmentPublished => "commitment_published",
+            Self::ShareReady => "share_ready",
+            Self::Completed => "completed",
+            Self::Burned => "burned",
+        }
+    }
+
+    pub(super) fn parse(value: &str) -> Result<Self, FrostStoreError> {
+        match value {
+            "prepared" => Ok(Self::Prepared),
+            "commitment_published" => Ok(Self::CommitmentPublished),
+            "share_ready" => Ok(Self::ShareReady),
+            "completed" => Ok(Self::Completed),
+            "burned" => Ok(Self::Burned),
+            _ => Err(FrostStoreError::InvalidState(
+                "unknown FROST signer state".to_string(),
+            )),
+        }
+    }
+}
+
 impl StagedFrostRotation {
     #[must_use]
     pub fn rotation_id(&self) -> &str {
@@ -336,7 +408,8 @@ pub(crate) fn verify_frost_store_invariants(
         ));
     }
     ceremony::verify_ceremony_invariants(connection)?;
-    rotation::verify_rotation_invariants(connection)
+    rotation::verify_rotation_invariants(connection)?;
+    signer::verify_signer_invariants(connection)
 }
 
 type FrostSchemaCatalogEntry = (String, String, String, Option<String>);

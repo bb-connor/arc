@@ -230,11 +230,27 @@ pub(super) fn verify_local_burn_summary(
         .map_err(super::sqlite_error)?
         .collect::<Result<Vec<_>, _>>()
         .map_err(super::sqlite_error)?;
-    let mut burned = Vec::new();
+    let burned = signer_burn_tombstones(rows)?;
+    if burned != summary.burned_session_ids {
+        return Err(FrostStoreError::Conflict(
+            "burn summary does not match old-epoch signer tombstones",
+        ));
+    }
+    Ok(())
+}
+
+fn signer_burn_tombstones(
+    rows: impl IntoIterator<Item = (String, String)>,
+) -> Result<Vec<String>, FrostStoreError> {
+    let mut sessions = BTreeMap::new();
     for (session_id, state) in rows {
         match state.as_str() {
-            "burned" => burned.push(session_id),
-            "completed" => {}
+            "burned" => {
+                sessions.insert(session_id, true);
+            }
+            "completed" => {
+                sessions.entry(session_id).or_insert(false);
+            }
             _ => {
                 return Err(FrostStoreError::Conflict(
                     "live old-epoch signer session remains",
@@ -242,12 +258,11 @@ pub(super) fn verify_local_burn_summary(
             }
         }
     }
-    if burned != summary.burned_session_ids {
-        return Err(FrostStoreError::Conflict(
-            "burn summary does not match old-epoch signer tombstones",
-        ));
-    }
-    Ok(())
+    let burned = sessions
+        .into_iter()
+        .filter_map(|(session_id, is_burned)| is_burned.then_some(session_id))
+        .collect::<Vec<_>>();
+    Ok(burned)
 }
 
 pub(super) fn verify_stored_rotation_matches_advance(
@@ -269,4 +284,32 @@ pub(super) fn verify_stored_rotation_matches_advance(
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::signer_burn_tombstones;
+
+    #[test]
+    fn burn_tombstones_are_unique_per_group_session() {
+        let burned = signer_burn_tombstones([
+            ("session-a".to_string(), "burned".to_string()),
+            ("session-a".to_string(), "burned".to_string()),
+            ("session-b".to_string(), "completed".to_string()),
+            ("session-b".to_string(), "completed".to_string()),
+            ("session-c".to_string(), "completed".to_string()),
+            ("session-c".to_string(), "burned".to_string()),
+        ])
+        .unwrap_or_else(|error| panic!("summarize tombstones: {error}"));
+        assert_eq!(burned, ["session-a", "session-c"]);
+    }
+
+    #[test]
+    fn burn_tombstones_reject_any_live_participant() {
+        assert!(signer_burn_tombstones([
+            ("session-a".to_string(), "burned".to_string()),
+            ("session-a".to_string(), "share_ready".to_string()),
+        ])
+        .is_err());
+    }
 }

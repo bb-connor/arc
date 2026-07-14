@@ -217,6 +217,101 @@ CREATE UNIQUE INDEX IF NOT EXISTS frost_roster_rotations_live_scope
 ON frost_roster_rotations(scope_id)
 WHERE state IN ('staged', 'anchor_advanced');
 
+CREATE TABLE IF NOT EXISTS frost_signer_sessions (
+    session_id TEXT NOT NULL CHECK (
+        length(session_id) = 64 AND session_id NOT GLOB '*[^0-9a-f]*'
+    ),
+    participant_id TEXT NOT NULL CHECK (participant_id <> ''),
+    authorization_slot_id TEXT NOT NULL CHECK (
+        length(authorization_slot_id) = 64
+        AND authorization_slot_id NOT GLOB '*[^0-9a-f]*'
+    ),
+    scope_id TEXT NOT NULL CHECK (scope_id <> ''),
+    key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
+    authorization_id TEXT NOT NULL CHECK (
+        length(authorization_id) = 64
+        AND authorization_id NOT GLOB '*[^0-9a-f]*'
+    ),
+    signing_message_digest TEXT NOT NULL CHECK (
+        length(signing_message_digest) = 64
+        AND signing_message_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    roster_digest TEXT NOT NULL CHECK (
+        length(roster_digest) = 64 AND roster_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    coordinator_id TEXT NOT NULL CHECK (coordinator_id <> ''),
+    resource_fence INTEGER NOT NULL CHECK (resource_fence > 0),
+    ceremony_id TEXT NOT NULL CHECK (
+        length(ceremony_id) = 64 AND ceremony_id NOT GLOB '*[^0-9a-f]*'
+    ),
+    authorization_body_json BLOB NOT NULL CHECK (length(authorization_body_json) > 0),
+    bound_checkpoint_digest TEXT NOT NULL CHECK (
+        length(bound_checkpoint_digest) = 64
+        AND bound_checkpoint_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    bound_checkpoint_json BLOB NOT NULL CHECK (length(bound_checkpoint_json) > 0),
+    signer_identifier BLOB NOT NULL CHECK (length(signer_identifier) > 0),
+    verification_share TEXT NOT NULL CHECK (
+        length(verification_share) = 64
+        AND verification_share NOT GLOB '*[^0-9a-f]*'
+    ),
+    state TEXT NOT NULL CHECK (
+        state IN ('prepared', 'commitment_published', 'share_ready', 'completed', 'burned')
+    ),
+    state_version INTEGER NOT NULL CHECK (state_version BETWEEN 1 AND 4),
+    custody_generation TEXT NOT NULL CHECK (custody_generation <> ''),
+    nonce_aad BLOB NOT NULL CHECK (length(nonce_aad) > 0),
+    nonce_ciphertext BLOB,
+    nonce_nonce BLOB CHECK (nonce_nonce IS NULL OR length(nonce_nonce) = 12),
+    commitment_bytes BLOB NOT NULL CHECK (length(commitment_bytes) > 0),
+    commitment_digest TEXT NOT NULL CHECK (
+        length(commitment_digest) = 64
+        AND commitment_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    signing_package_digest TEXT CHECK (
+        signing_package_digest IS NULL
+        OR (length(signing_package_digest) = 64
+            AND signing_package_digest NOT GLOB '*[^0-9a-f]*')
+    ),
+    signature_share BLOB,
+    burn_reason TEXT,
+    source_store_uuid TEXT NOT NULL CHECK (source_store_uuid <> ''),
+    source_lease_id TEXT NOT NULL CHECK (source_lease_id <> ''),
+    source_owner_epoch INTEGER NOT NULL CHECK (source_owner_epoch > 0),
+    created_at_unix_ms INTEGER NOT NULL CHECK (created_at_unix_ms > 0),
+    updated_at_unix_ms INTEGER NOT NULL CHECK (updated_at_unix_ms >= created_at_unix_ms),
+    record_digest TEXT NOT NULL CHECK (
+        length(record_digest) = 64 AND record_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    PRIMARY KEY (session_id, participant_id),
+    UNIQUE (authorization_slot_id, participant_id),
+    CHECK (
+        (state = 'prepared' AND state_version = 1
+         AND nonce_ciphertext IS NOT NULL AND nonce_nonce IS NOT NULL
+         AND signing_package_digest IS NULL AND signature_share IS NULL
+         AND burn_reason IS NULL)
+        OR
+        (state = 'commitment_published' AND state_version = 2
+         AND nonce_ciphertext IS NOT NULL AND nonce_nonce IS NOT NULL
+         AND signing_package_digest IS NULL AND signature_share IS NULL
+         AND burn_reason IS NULL)
+        OR
+        (state = 'share_ready' AND state_version = 3
+         AND nonce_ciphertext IS NOT NULL AND nonce_nonce IS NOT NULL
+         AND signing_package_digest IS NOT NULL AND signature_share IS NOT NULL
+         AND burn_reason IS NULL)
+        OR
+        (state = 'completed' AND state_version = 4
+         AND nonce_ciphertext IS NULL AND nonce_nonce IS NULL
+         AND signing_package_digest IS NOT NULL AND signature_share IS NOT NULL
+         AND burn_reason IS NULL)
+        OR
+        (state = 'burned' AND state_version BETWEEN 2 AND 4
+         AND nonce_ciphertext IS NULL AND nonce_nonce IS NULL
+         AND signature_share IS NULL AND burn_reason IS NOT NULL)
+    )
+);
+
 CREATE TABLE IF NOT EXISTS frost_projection_commits (
     projection_key TEXT NOT NULL CHECK (projection_key <> ''),
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence > 0),
@@ -315,6 +410,94 @@ WHEN NEW.rotation_id <> OLD.rotation_id
   )
 BEGIN
     SELECT RAISE(ABORT, 'invalid FROST rotation transition');
+END;
+
+CREATE TRIGGER IF NOT EXISTS frost_signer_sessions_no_delete
+BEFORE DELETE ON frost_signer_sessions
+BEGIN
+    SELECT RAISE(ABORT, 'FROST signer tombstones cannot be deleted');
+END;
+
+CREATE TRIGGER IF NOT EXISTS frost_signer_sessions_transition
+BEFORE UPDATE ON frost_signer_sessions
+WHEN NEW.session_id <> OLD.session_id
+  OR NEW.participant_id <> OLD.participant_id
+  OR NEW.authorization_slot_id <> OLD.authorization_slot_id
+  OR NEW.scope_id <> OLD.scope_id
+  OR NEW.key_epoch <> OLD.key_epoch
+  OR NEW.authorization_id <> OLD.authorization_id
+  OR NEW.signing_message_digest <> OLD.signing_message_digest
+  OR NEW.roster_digest <> OLD.roster_digest
+  OR NEW.coordinator_id <> OLD.coordinator_id
+  OR NEW.resource_fence <> OLD.resource_fence
+  OR NEW.ceremony_id <> OLD.ceremony_id
+  OR NEW.authorization_body_json <> OLD.authorization_body_json
+  OR NEW.bound_checkpoint_digest <> OLD.bound_checkpoint_digest
+  OR NEW.bound_checkpoint_json <> OLD.bound_checkpoint_json
+  OR NEW.signer_identifier <> OLD.signer_identifier
+  OR NEW.verification_share <> OLD.verification_share
+  OR NEW.custody_generation <> OLD.custody_generation
+  OR NEW.nonce_aad <> OLD.nonce_aad
+  OR NEW.commitment_bytes <> OLD.commitment_bytes
+  OR NEW.commitment_digest <> OLD.commitment_digest
+  OR NEW.source_store_uuid <> OLD.source_store_uuid
+  OR NEW.source_owner_epoch < OLD.source_owner_epoch
+  OR NEW.created_at_unix_ms <> OLD.created_at_unix_ms
+  OR NEW.updated_at_unix_ms < OLD.updated_at_unix_ms
+  OR NOT (
+      (OLD.state = 'prepared'
+       AND (
+           (NEW.state = 'commitment_published' AND NEW.state_version = 2
+            AND NEW.nonce_ciphertext = OLD.nonce_ciphertext
+            AND NEW.nonce_nonce = OLD.nonce_nonce
+            AND NEW.signing_package_digest IS NULL
+            AND NEW.signature_share IS NULL
+            AND NEW.burn_reason IS NULL)
+           OR
+           (NEW.state = 'burned' AND NEW.state_version = 2
+            AND NEW.nonce_ciphertext IS NULL
+            AND NEW.nonce_nonce IS NULL
+            AND NEW.signing_package_digest IS NULL
+            AND NEW.signature_share IS NULL
+            AND NEW.burn_reason IS NOT NULL)
+       ))
+      OR
+      (OLD.state = 'commitment_published'
+       AND (
+           (NEW.state = 'share_ready' AND NEW.state_version = 3
+            AND NEW.nonce_ciphertext = OLD.nonce_ciphertext
+            AND NEW.nonce_nonce = OLD.nonce_nonce
+            AND NEW.signing_package_digest IS NOT NULL
+            AND NEW.signature_share IS NOT NULL
+            AND NEW.burn_reason IS NULL)
+           OR
+           (NEW.state = 'burned' AND NEW.state_version = 3
+            AND NEW.nonce_ciphertext IS NULL
+            AND NEW.nonce_nonce IS NULL
+            AND NEW.signing_package_digest IS NULL
+            AND NEW.signature_share IS NULL
+            AND NEW.burn_reason IS NOT NULL)
+       ))
+      OR
+      (OLD.state = 'share_ready'
+       AND (
+           (NEW.state = 'completed' AND NEW.state_version = 4
+            AND NEW.nonce_ciphertext IS NULL
+            AND NEW.nonce_nonce IS NULL
+            AND NEW.signing_package_digest = OLD.signing_package_digest
+            AND NEW.signature_share = OLD.signature_share
+            AND NEW.burn_reason IS NULL)
+           OR
+           (NEW.state = 'burned' AND NEW.state_version = 4
+            AND NEW.nonce_ciphertext IS NULL
+            AND NEW.nonce_nonce IS NULL
+            AND NEW.signing_package_digest = OLD.signing_package_digest
+            AND NEW.signature_share IS NULL
+            AND NEW.burn_reason IS NOT NULL)
+       ))
+  )
+BEGIN
+    SELECT RAISE(ABORT, 'invalid FROST signer transition');
 END;
 
 CREATE TRIGGER IF NOT EXISTS frost_projection_commits_immutable

@@ -1,7 +1,8 @@
 use chio_core_types::{sha256_hex, Keypair};
 use chio_federation::frost::{
     frost_action_registration, frost_authorization_session_id, frost_authorization_slot_id,
-    resolve_active_roster_for_execution, verify_for_execution,
+    resolve_active_roster_for_execution, verify_bound_frost_authorization_slot,
+    verify_completed_frost_authorization_slot, verify_for_execution,
     verify_frost_authorization_slot_bind, verify_frost_authorization_slot_burn,
     verify_frost_authorization_slot_completion, verify_frost_epoch_advance,
     ActiveFrostRosterResolver, ExpectedFrostAuthorization, FrostActionPreimageV1, FrostAnchorError,
@@ -334,6 +335,19 @@ fn verified_rotation(
     bound.checkpoint_digest = bound
         .recompute_checkpoint_digest()
         .unwrap_or_else(|error| panic!("compute slot digest: {error}"));
+    let verified_bound = verify_bound_frost_authorization_slot(
+        &proof.body,
+        &active,
+        &EpochAnchor(governance_checkpoint.clone()),
+        &FrostAnchoredAuthorizationSlot {
+            checkpoint: bound.clone(),
+            authorization_blob: None,
+        },
+        &trust_store(),
+        150,
+    )
+    .unwrap_or_else(|error| panic!("verify bound slot: {error}"));
+    assert_eq!(verified_bound.checkpoint_digest(), bound.checkpoint_digest);
     let burn = verify_frost_authorization_slot_burn(&bound, &trust_store(), 151)
         .unwrap_or_else(|error| panic!("verify slot burn: {error}"));
     assert_eq!(
@@ -356,9 +370,10 @@ fn verified_rotation(
     );
     assert_eq!(completion.request().authorization_blob(), proof_bytes);
 
+    let bound_checkpoint_digest = bound.checkpoint_digest.clone();
     let mut slot = FrostAuthorizationSlotCheckpointV1 {
         slot_version: 2,
-        predecessor_digest: Some(bound.checkpoint_digest),
+        predecessor_digest: Some(bound_checkpoint_digest.clone()),
         state: FrostAuthorizationSlotState::Completed,
         aggregate_signature_digest: Some(sha256_hex(&signature_bytes)),
         authorization_blob_digest: Some(sha256_hex(&proof_bytes)),
@@ -378,6 +393,47 @@ fn verified_rotation(
     slot.checkpoint_digest = slot
         .recompute_checkpoint_digest()
         .unwrap_or_else(|error| panic!("compute slot digest: {error}"));
+    let anchored = FrostAnchoredAuthorizationSlot {
+        checkpoint: slot.clone(),
+        authorization_blob: Some(proof_bytes.clone()),
+    };
+    let completed = verify_completed_frost_authorization_slot(
+        &proof.body,
+        &active,
+        &EpochAnchor(governance_checkpoint.clone()),
+        &anchored,
+        &trust_store(),
+        &bound_checkpoint_digest,
+        200,
+    )
+    .unwrap_or_else(|error| panic!("verify exact completed slot: {error}"));
+    assert_eq!(completed.proof(), &proof);
+
+    let mut wrong_predecessor = slot.clone();
+    wrong_predecessor.predecessor_digest = Some("ff".repeat(32));
+    wrong_predecessor.anchor_signature = slot_authority()
+        .sign(
+            &wrong_predecessor
+                .signing_bytes()
+                .unwrap_or_else(|error| panic!("canonicalize wrong predecessor: {error}")),
+        )
+        .to_hex();
+    wrong_predecessor.checkpoint_digest = wrong_predecessor
+        .recompute_checkpoint_digest()
+        .unwrap_or_else(|error| panic!("compute wrong predecessor digest: {error}"));
+    assert!(verify_completed_frost_authorization_slot(
+        &proof.body,
+        &active,
+        &EpochAnchor(governance_checkpoint.clone()),
+        &FrostAnchoredAuthorizationSlot {
+            checkpoint: wrong_predecessor,
+            authorization_blob: Some(proof_bytes.clone()),
+        },
+        &trust_store(),
+        &bound_checkpoint_digest,
+        200,
+    )
+    .is_err());
     let expected = ExpectedFrostAuthorization {
         domain: proof.body.domain,
         ladder_action_class: &proof.body.ladder_action_class,
@@ -393,10 +449,7 @@ fn verified_rotation(
         &expected,
         &active,
         &EpochAnchor(governance_checkpoint.clone()),
-        &SlotAnchor(FrostAnchoredAuthorizationSlot {
-            checkpoint: slot,
-            authorization_blob: Some(proof_bytes),
-        }),
+        &SlotAnchor(anchored),
         &trust_store(),
         200,
     )

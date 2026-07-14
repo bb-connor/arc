@@ -195,8 +195,9 @@ pub use execution_nonce_store::{SqliteExecutionNonceStore, SqliteExecutionNonceS
 pub use frost_store::{
     FrostActiveRosterRecord, FrostCeremonyRecord, FrostCeremonyRound1Record,
     FrostCeremonyRound2Record, FrostCeremonyState, FrostCustodyKey, FrostRotationRecord,
-    FrostRotationState, FrostStoreError, SqliteFrostStore, StagedFrostRotation,
-    StoredFrostCeremonyCompletion,
+    FrostRotationState, FrostSignerCommitment, FrostSignerSessionRecord, FrostSignerSessionRequest,
+    FrostSignerSessionState, FrostSignerShare, FrostStoreError, SqliteFrostStore,
+    StagedFrostRotation, StoredFrostCeremonyCompletion,
 };
 pub use iou_store::{SqliteIouEnvelopeStore, IOU_ENVELOPE_MIGRATION};
 pub use memory_provenance_store::{SqliteMemoryProvenanceStore, SqliteMemoryProvenanceStoreError};

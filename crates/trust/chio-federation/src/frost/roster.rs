@@ -530,6 +530,15 @@ impl VerifiedActiveFrostRoster {
     pub fn roster_digest(&self) -> &str {
         &self.roster.roster_digest
     }
+
+    #[must_use]
+    pub fn participant_verification_share(&self, participant_id: &str) -> Option<&str> {
+        self.roster
+            .participants
+            .iter()
+            .find(|participant| participant.participant_id == participant_id)
+            .map(|participant| participant.verification_share.as_str())
+    }
 }
 
 fn canonical_digest<T: Serialize>(prefix: &[u8], value: &T) -> Result<String, FrostRosterError> {
