@@ -225,6 +225,7 @@ impl ChioKernel {
         let mut kernel = Self {
             config,
             durable_admission_mode: crate::admission_operation::DurableAdmissionMode::default(),
+            durable_admission_runtime: None,
             guards: std::sync::Arc::new(Vec::new()),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
             budget_store: Arc::new(InMemoryBudgetStore::new()),
@@ -658,6 +659,19 @@ impl ChioKernel {
     #[must_use]
     pub fn durable_admission_mode(&self) -> crate::admission_operation::DurableAdmissionMode {
         self.durable_admission_mode
+    }
+
+    pub fn set_durable_admission_store(
+        &mut self,
+        store: Arc<dyn crate::admission_operation::QualifiedAdmissionOperationStore>,
+        fence: crate::admission_operation::StoreMutationFence,
+    ) -> Result<(), crate::admission_operation::AdmissionOperationError> {
+        self.durable_admission_runtime = Some(DurableAdmissionRuntime::new(
+            store,
+            fence,
+            &self.config.keypair.public_key().to_hex(),
+        )?);
+        Ok(())
     }
 
     pub fn set_receipt_store_handle(

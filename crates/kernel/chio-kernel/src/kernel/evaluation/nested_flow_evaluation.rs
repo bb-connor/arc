@@ -248,6 +248,25 @@ impl ChioKernel {
             );
         }
 
+        let mut durable_admission = match self.begin_durable_tool_admission(
+            request,
+            &matching_grants,
+            now_unix_ms,
+        ) {
+            Ok(admission) => admission,
+            Err(error) => {
+                let reason = error.to_string();
+                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable admission denied (nested flow)");
+                return self.build_deny_response_with_metadata(
+                    request,
+                    &reason,
+                    now,
+                    None,
+                    extra_metadata.clone(),
+                );
+            }
+        };
+
         // Persistence is confirmed healthy, so the writer-backed lineage write can
         // run without racing a dead writer.
         if let Err(error) = self.record_observed_capability_snapshot(cap) {
@@ -261,6 +280,7 @@ impl ChioKernel {
             cap,
             &matching_grants,
             self.execution_nonce_preflight_required(request),
+            durable_admission.as_ref(),
         ) {
             Ok(result) => result,
             Err(e) => {
@@ -276,6 +296,25 @@ impl ChioKernel {
                 );
             }
         };
+
+        if let Some(admission) = durable_admission.as_mut() {
+            if let Err(error) =
+                self.record_durable_budget_authorized(admission, &budget_mutation, now_unix_ms)
+            {
+                let reason = error.to_string();
+                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable budget binding could not be confirmed (nested flow)");
+                return self.build_deny_response_with_metadata(
+                    request,
+                    &reason,
+                    now,
+                    Some(matched_grant_index),
+                    self.retained_admission_receipt_metadata(
+                        &budget_mutation,
+                        extra_metadata.clone(),
+                    ),
+                );
+            }
+        }
 
         let matched_grant = matching_grants
             .iter()
@@ -609,10 +648,28 @@ impl ChioKernel {
                 })
             });
         };
-        if budget_mutation.charge_result().is_some() {
-            let capture = self.capture_monetary_invocation(cap, &mut budget_mutation);
+        if let Some(admission) = durable_admission.as_mut() {
+            if let Err(error) = self.mark_durable_capture_pending(admission, now_unix_ms) {
+                let reason = error.to_string();
+                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable capture boundary could not be confirmed (nested flow)");
+                return self.build_deny_response_with_metadata(
+                    request,
+                    &reason,
+                    now,
+                    Some(matched_grant_index),
+                    self.retained_admission_receipt_metadata(
+                        &budget_mutation,
+                        runtime_admission_metadata.clone(),
+                    ),
+                );
+            }
+        }
+        if budget_mutation.durable_hold_result().is_some() {
+            let capture = self.capture_invocation(cap, &mut budget_mutation);
             match capture {
                 Ok(BudgetInvocationCaptureDecision::Captured(_)) => {}
+                Ok(BudgetInvocationCaptureDecision::AlreadyCaptured(_))
+                    if durable_admission.is_some() => {}
                 Ok(BudgetInvocationCaptureDecision::AlreadyCaptured(_)) => {
                     let reason = "monetary invocation was already dispatched";
                     return self.with_pre_invocation_guard_evidence(
@@ -741,6 +798,29 @@ impl ChioKernel {
                             runtime_admission_metadata,
                             budget_lease_acquired,
                         })
+                    },
+                );
+            }
+        }
+
+        if let Some(admission) = durable_admission.as_mut() {
+            if let Err(error) = self.commit_durable_dispatch(admission, now_unix_ms) {
+                let reason = error.to_string();
+                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable dispatch commit could not be confirmed (nested flow)");
+                return self.with_pre_invocation_guard_evidence(
+                    &pre_invocation_guard_evidence,
+                    || {
+                        self.build_deny_response_with_metadata(
+                            request,
+                            &reason,
+                            now,
+                            Some(matched_grant_index),
+                            self.ambiguous_dispatch_receipt_metadata(
+                                &budget_mutation,
+                                payment_authorization.as_ref(),
+                                runtime_admission_metadata,
+                            ),
+                        )
                     },
                 );
             }

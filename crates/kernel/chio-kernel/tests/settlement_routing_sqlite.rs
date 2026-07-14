@@ -8,6 +8,7 @@ use chio_core::capability::{
 };
 use chio_core::crypto::Keypair;
 use chio_core::receipt::body::ChioReceipt;
+use chio_kernel::admission_operation::DurableAdmissionMode;
 use chio_kernel::settlement_observer::{run_observer, SettlementObserverStatus};
 use chio_kernel::{
     ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ReceiptStore, ToolCallRequest,
@@ -206,6 +207,9 @@ fn kernel(
     hook: Arc<dyn SettlementHook>,
 ) -> Result<(ChioKernel, CapabilityToken), KernelError> {
     let mut kernel = ChioKernel::new(kernel_config());
+    kernel
+        .configure_durable_admission(DurableAdmissionMode::Monetary, false)
+        .map_err(KernelError::from)?;
     kernel.register_tool_server(Box::new(EchoServer));
     let capability = kernel.issue_capability(&Keypair::generate().public_key(), scope(), 300)?;
     let receipt_store: Arc<dyn ReceiptStore> = receipts.clone();

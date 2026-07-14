@@ -1025,15 +1025,24 @@ impl ChioKernel {
         cap: &CapabilityToken,
         matching_grants: &[MatchingGrant<'_>],
         nonce_preflight: bool,
+        durable_admission: Option<&DurableToolAdmission>,
     ) -> Result<(usize, PreExecutionBudgetMutation), KernelError> {
         let mut saw_exhausted_budget = false;
+        let mut eligible_grant_seen = false;
 
         for matching in matching_grants {
+            if durable_admission.is_some_and(|admission| !admission.permits_grant(matching.index)) {
+                continue;
+            }
+            eligible_grant_seen = true;
             let grant = matching.grant;
             let has_monetary =
                 grant.max_cost_per_invocation.is_some() || grant.max_total_cost.is_some();
 
-            if has_monetary || (nonce_preflight && grant.max_invocations.is_some()) {
+            if has_monetary
+                || (nonce_preflight && grant.max_invocations.is_some())
+                || durable_admission.is_some()
+            {
                 // Use worst-case max_cost_per_invocation as the pre-execution debit.
                 let cost_units = grant
                     .max_cost_per_invocation
@@ -1049,16 +1058,31 @@ impl ChioKernel {
                 let max_total = grant.max_total_cost.as_ref().map(|m| m.units);
                 let max_per = grant.max_cost_per_invocation.as_ref().map(|m| m.units);
                 let budget_total = max_total.unwrap_or(u64::MAX);
-                let budget_hold_id = if nonce_preflight {
-                    format!(
-                        "nonce-preflight-budget-hold:{}:{}:{}",
-                        request_id, cap.id, matching.index
-                    )
-                } else {
-                    format!("budget-hold:{}:{}:{}", request_id, cap.id, matching.index)
-                };
-                let authorize_event_id = format!("{budget_hold_id}:authorize");
-                let authority = self.local_budget_event_authority();
+                let (budget_hold_id, authorize_event_id, admission_binding, authority) =
+                    if let Some(admission) = durable_admission {
+                        let (binding, authority) = self.durable_budget_binding(admission, cap)?;
+                        (
+                            admission.budget_hold_id(matching.index),
+                            admission.budget_authorize_event_id(matching.index),
+                            Some(binding),
+                            authority,
+                        )
+                    } else {
+                        let budget_hold_id = if nonce_preflight {
+                            format!(
+                                "nonce-preflight-budget-hold:{}:{}:{}",
+                                request_id, cap.id, matching.index
+                            )
+                        } else {
+                            format!("budget-hold:{}:{}:{}", request_id, cap.id, matching.index)
+                        };
+                        (
+                            budget_hold_id.clone(),
+                            format!("{budget_hold_id}:authorize"),
+                            None,
+                            self.local_budget_event_authority(),
+                        )
+                    };
 
                 let decision = self.with_budget_store(|store| {
                     Ok(store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
@@ -1067,7 +1091,7 @@ impl ChioKernel {
                         max_invocations: grant.max_invocations,
                         invocation_quotas: Vec::new(),
                         cumulative_approval: None,
-                        admission_binding: None,
+                        admission_binding,
                         requested_exposure_units: cost_units,
                         max_cost_per_invocation: max_per,
                         max_total_cost_units: max_total,
@@ -1106,8 +1130,31 @@ impl ChioKernel {
                                 .to_string(),
                         ));
                     }
-                    BudgetAuthorizeHoldDecision::AlreadyCaptured(_) => {
-                        return Err(KernelError::BudgetExhausted(cap.id.clone()));
+                    BudgetAuthorizeHoldDecision::AlreadyCaptured(captured) => {
+                        if !durable_admission
+                            .is_some_and(DurableToolAdmission::can_resume_captured_hold)
+                        {
+                            return Err(KernelError::BudgetExhausted(cap.id.clone()));
+                        }
+                        let charge = BudgetChargeResult {
+                            grant_index: matching.index,
+                            cost_charged: cost_units,
+                            currency,
+                            budget_total,
+                            new_committed_cost_units: captured.committed_cost_units_after,
+                            budget_hold_id: captured
+                                .hold_id
+                                .clone()
+                                .unwrap_or_else(|| budget_hold_id.clone()),
+                            authorize_metadata: captured.metadata.clone(),
+                            invocation_capture: Some(Box::new(captured)),
+                        };
+                        let mutation = if has_monetary {
+                            PreExecutionBudgetMutation::Charge(charge)
+                        } else {
+                            PreExecutionBudgetMutation::InvocationHold(charge)
+                        };
+                        return Ok((matching.index, mutation));
                     }
                 }
             } else {
@@ -1129,7 +1176,11 @@ impl ChioKernel {
             }
         }
 
-        if saw_exhausted_budget {
+        if durable_admission.is_some() && !eligible_grant_seen {
+            Err(KernelError::DurableAdmission(
+                "retained budget hold does not identify a matching grant".to_string(),
+            ))
+        } else if saw_exhausted_budget {
             Err(KernelError::BudgetExhausted(cap.id.clone()))
         } else {
             // No matching grant had any limit -- allow with the first grant's index.
@@ -1157,14 +1208,14 @@ impl ChioKernel {
         })
     }
 
-    pub(crate) fn capture_monetary_invocation(
+    pub(crate) fn capture_invocation(
         &self,
         cap: &CapabilityToken,
         budget_mutation: &mut PreExecutionBudgetMutation,
     ) -> Result<BudgetInvocationCaptureDecision, KernelError> {
-        let charge = budget_mutation.charge_result_mut().ok_or_else(|| {
+        let charge = budget_mutation.durable_hold_result_mut().ok_or_else(|| {
             KernelError::Internal(
-                "monetary invocation capture requires an authorized budget hold".to_string(),
+                "invocation capture requires an authorized budget hold".to_string(),
             )
         })?;
         let authority = charge.authorize_metadata.authority.clone();

@@ -7,6 +7,8 @@ use dashmap::DashMap;
 use crate::budget_store::BudgetCommitMetadata;
 use crate::*;
 
+#[path = "admission_coordinator.rs"]
+mod admission_coordinator;
 mod error;
 mod kernel_drop_guard;
 mod kernel_scopes;
@@ -25,6 +27,7 @@ pub use kernel_struct::{
     MIN_RECEIPT_APPEND_BUDGET_MS,
 };
 
+pub(crate) use admission_coordinator::{DurableAdmissionRuntime, DurableToolAdmission};
 pub(crate) use kernel_drop_guard::{PostAdmissionDropGuard, PostAdmissionReceiptContext};
 pub(crate) use kernel_scopes::{
     current_scoped_receipt_federation_admission, current_scoped_receipt_tenant_id,
@@ -612,10 +615,10 @@ impl PreExecutionBudgetMutation {
         }
     }
 
-    fn charge_result_mut(&mut self) -> Option<&mut BudgetChargeResult> {
+    fn durable_hold_result_mut(&mut self) -> Option<&mut BudgetChargeResult> {
         match self {
-            Self::Charge(charge) => Some(charge),
-            Self::Invocation { .. } | Self::InvocationHold(_) | Self::None => None,
+            Self::Charge(charge) | Self::InvocationHold(charge) => Some(charge),
+            Self::Invocation { .. } | Self::None => None,
         }
     }
 

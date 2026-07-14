@@ -229,6 +229,9 @@ pub enum KernelError {
     #[error("budget store error: {0}")]
     BudgetStore(#[from] BudgetStoreError),
 
+    #[error("durable admission failed: {0}")]
+    DurableAdmission(String),
+
     #[error(
         "cross-currency budget enforcement failed: no price oracle configured for {base}/{quote}"
     )]
@@ -530,6 +533,11 @@ impl KernelError {
                 serde_json::json!({ "source": error.to_string() }),
                 "Check the configured budget store connectivity, permissions, and schema health before retrying.",
             ),
+            Self::DurableAdmission(reason) => self.report_with_context(
+                "CHIO-KERNEL-DURABLE-ADMISSION",
+                serde_json::json!({ "reason": reason }),
+                "Repair the fenced admission authority and reconcile the retained operation before retrying this request ID.",
+            ),
             Self::NoCrossCurrencyOracle { base, quote } => self.report_with_context(
                 "CHIO-KERNEL-NO-CROSS-CURRENCY-ORACLE",
                 serde_json::json!({ "base": base, "quote": quote }),
@@ -581,6 +589,12 @@ impl KernelError {
                 "The receipt commit writer is not durably accepting writes; repair or restart the writer. Requests deny until liveness recovers.",
             ),
         }
+    }
+}
+
+impl From<crate::admission_operation::AdmissionOperationError> for KernelError {
+    fn from(error: crate::admission_operation::AdmissionOperationError) -> Self {
+        Self::DurableAdmission(error.to_string())
     }
 }
 

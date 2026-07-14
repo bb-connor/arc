@@ -1219,7 +1219,13 @@ fn predispatch_unwind_requires_confirmed_payment_release_status(
         request.model_metadata.as_ref(),
     )?;
     let (_, mutation) =
-        kernel.check_and_increment_budget(&request.request_id, &capability, &matching, false)?;
+        kernel.check_and_increment_budget(
+            &request.request_id,
+            &capability,
+            &matching,
+            false,
+            None,
+        )?;
     let authorization = PaymentAuthorization {
         authorization_id: "auth-predispatch-unwind-pending".to_string(),
         settled: false,

@@ -1,7 +1,7 @@
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::sha256_hex;
 pub use chio_core_types::provider_attempt::ProviderAttemptBindingV1;
-use chio_core_types::StoreMutationFence;
+pub use chio_core_types::StoreMutationFence;
 use serde::{Deserialize, Deserializer, Serialize};
 
 mod capture;
@@ -599,6 +599,13 @@ impl AdmissionOperationV1 {
     pub(crate) fn provider_attempt(&self) -> Option<&ProviderAttemptBindingV1> {
         match self.attachment(AdmissionAttachmentKind::BrokerAttempt) {
             Some(AdmissionAttachment::BrokerAttempt(attempt)) => Some(attempt),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn budget_hold_id(&self) -> Option<&AdmissionIdentifier> {
+        match self.attachment(AdmissionAttachmentKind::BudgetHold) {
+            Some(AdmissionAttachment::BudgetHoldId(hold_id)) => Some(hold_id),
             _ => None,
         }
     }
