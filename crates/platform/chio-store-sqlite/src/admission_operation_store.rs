@@ -1026,12 +1026,17 @@ fn validate_trusted_now(
     field: &'static str,
 ) -> Result<(), AdmissionOperationStoreError> {
     validate_trusted_time(value, field)?;
-    let system_now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| invariant("system clock precedes the Unix epoch"))?
-        .as_millis();
-    let system_now = u64::try_from(system_now)
-        .map_err(|_| invariant("system clock exceeds the persisted trusted-time range"))?;
+    let system_now = match chio_kernel::fixed_runtime_unix_secs_for_current_thread() {
+        Some(fixed) => fixed.saturating_mul(1_000),
+        None => {
+            let system_now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(|_| invariant("system clock precedes the Unix epoch"))?
+                .as_millis();
+            u64::try_from(system_now)
+                .map_err(|_| invariant("system clock exceeds the persisted trusted-time range"))?
+        }
+    };
     if value.abs_diff(system_now) > MAX_TRUSTED_CLOCK_SKEW_MS {
         return Err(invariant(format!(
             "{field} exceeds the permitted system-clock skew"

@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -45,6 +47,74 @@ CREATE TABLE chio_serving_owner (
     opened_at_ms INTEGER
 );
 "#;
+
+struct FixedAuthorityIds {
+    store_uuid: String,
+    lease_ids: VecDeque<String>,
+}
+
+thread_local! {
+    static FIXED_AUTHORITY_IDS: RefCell<Option<FixedAuthorityIds>> = const { RefCell::new(None) };
+}
+
+pub struct FixedAuthorityIdScope {
+    previous: Option<FixedAuthorityIds>,
+    _not_send: std::marker::PhantomData<std::rc::Rc<()>>,
+}
+
+impl Drop for FixedAuthorityIdScope {
+    fn drop(&mut self) {
+        let previous = self.previous.take();
+        FIXED_AUTHORITY_IDS.with(|slot| {
+            *slot.borrow_mut() = previous;
+        });
+    }
+}
+
+pub fn scope_fixed_authority_ids_for_current_thread(
+    store_uuid: impl Into<String>,
+    lease_ids: impl IntoIterator<Item = String>,
+) -> Result<FixedAuthorityIdScope, SqliteServingOwnerError> {
+    let store_uuid = store_uuid.into();
+    validate_uuid_v7(&store_uuid, "fixed authority store UUID")?;
+    let lease_ids = lease_ids
+        .into_iter()
+        .map(|lease_id| validate_uuid_v7(&lease_id, "fixed authority lease ID").map(|_| lease_id))
+        .collect::<Result<VecDeque<_>, _>>()?;
+    let previous = FIXED_AUTHORITY_IDS.with(|slot| {
+        slot.replace(Some(FixedAuthorityIds {
+            store_uuid,
+            lease_ids,
+        }))
+    });
+    Ok(FixedAuthorityIdScope {
+        previous,
+        _not_send: std::marker::PhantomData,
+    })
+}
+
+fn next_store_uuid() -> String {
+    FIXED_AUTHORITY_IDS.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .map(|ids| ids.store_uuid.clone())
+            .unwrap_or_else(|| uuid::Uuid::now_v7().to_string())
+    })
+}
+
+fn next_lease_id() -> Result<String, SqliteServingOwnerError> {
+    FIXED_AUTHORITY_IDS.with(|slot| {
+        let mut ids = slot.borrow_mut();
+        match ids.as_mut() {
+            Some(ids) => ids.lease_ids.pop_front().ok_or_else(|| {
+                SqliteServingOwnerError::Invalid(
+                    "fixed authority lease ID set is exhausted".to_string(),
+                )
+            }),
+            None => Ok(uuid::Uuid::now_v7().to_string()),
+        }
+    })
+}
 
 type SchemaCatalogEntry = (String, String, String, Option<String>);
 
@@ -268,7 +338,7 @@ impl SqliteAuthorityStore {
         crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
 
-        let store_uuid = uuid::Uuid::now_v7().to_string();
+        let store_uuid = next_store_uuid();
         let lock_path = lock_root.join(format!("{store_uuid}.lock"));
         let lock_file = create_lock_file(&lock_path)?;
         let lock_metadata = lock_file.metadata()?;
@@ -430,7 +500,7 @@ impl SqliteAuthorityStore {
         let owner_epoch = record.owner_epoch.checked_add(1).ok_or_else(|| {
             SqliteServingOwnerError::Invalid("serving owner epoch overflowed u64".to_string())
         })?;
-        let lease_id = uuid::Uuid::now_v7().to_string();
+        let lease_id = next_lease_id()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let current = load_provisioning_record_tx(&transaction)?.ok_or_else(|| {
             SqliteServingOwnerError::NotProvisioned(database_path.display().to_string())
@@ -1002,15 +1072,17 @@ fn validate_open_lock_file(
 }
 
 fn validate_store_uuid(value: &str) -> Result<(), SqliteServingOwnerError> {
+    validate_uuid_v7(value, "provisioned store UUID")
+}
+
+fn validate_uuid_v7(value: &str, field: &str) -> Result<(), SqliteServingOwnerError> {
     let parsed = uuid::Uuid::parse_str(value).map_err(|_| {
-        SqliteServingOwnerError::Invalid(
-            "provisioned store UUID is not canonical UUID-v7".to_string(),
-        )
+        SqliteServingOwnerError::Invalid(format!("{field} is not canonical UUID-v7"))
     })?;
     if parsed.get_version_num() != 7 || parsed.to_string() != value {
-        return Err(SqliteServingOwnerError::Invalid(
-            "provisioned store UUID is not canonical UUID-v7".to_string(),
-        ));
+        return Err(SqliteServingOwnerError::Invalid(format!(
+            "{field} is not canonical UUID-v7"
+        )));
     }
     Ok(())
 }

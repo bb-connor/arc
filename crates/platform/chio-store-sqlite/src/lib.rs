@@ -209,7 +209,10 @@ pub use revocation_store::SqliteRevocationStore;
 pub use schema_version::{
     check_schema_version, stamp_schema_version, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID,
 };
-pub use serving_owner::{SqliteAuthorityStore, SqliteServingOwnerError};
+pub use serving_owner::{
+    scope_fixed_authority_ids_for_current_thread, FixedAuthorityIdScope, SqliteAuthorityStore,
+    SqliteServingOwnerError,
+};
 
 impl chio_kernel::QualifiedAdmissionProjectionStore
     for admission_operation_store::SqliteAdmissionOperationStore

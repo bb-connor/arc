@@ -1,13 +1,30 @@
 mod support;
 
 use chio_runtime_core::{
-    compute_ladder_intersection, evaluate_cross_boundary_admission,
-    validate_cross_boundary_admission_report, validate_governance_ladder_manifest,
-    validate_ladder_intersection, CrossBoundaryAdmissionInput, CrossBoundaryAdmissionReport,
-    CrossBoundaryEvidenceRef,
+    bilateral_dsse_consistency_model, compute_ladder_intersection,
+    evaluate_cross_boundary_admission, validate_cross_boundary_admission_report,
+    validate_governance_ladder_manifest, validate_ladder_intersection, CrossBoundaryAdmissionInput,
+    CrossBoundaryAdmissionReport, CrossBoundaryEvidenceRef,
 };
 use std::io;
 use support::treaty::{treaty_action_class, treaty_manifest, treaty_scope};
+
+#[test]
+fn bilateral_dsse_consistency_models_use_wire_vocabulary() {
+    for (runtime, wire) in [
+        ("crdt_commutative", "crdt-commutative"),
+        ("totally_ordered", "totally-ordered"),
+        ("single_kernel", "single-kernel"),
+        ("quorum_required", "quorum-required"),
+    ] {
+        let actual = match bilateral_dsse_consistency_model(runtime) {
+            Ok(actual) => actual,
+            Err(error) => panic!("{runtime} failed to map to DSSE: {error}"),
+        };
+        assert_eq!(actual, wire);
+    }
+    assert!(bilateral_dsse_consistency_model("totally-ordered").is_err());
+}
 
 fn accepted_admission_report() -> CrossBoundaryAdmissionReport {
     CrossBoundaryAdmissionReport {

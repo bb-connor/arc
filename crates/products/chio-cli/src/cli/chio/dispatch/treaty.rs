@@ -505,6 +505,7 @@ mod tests {
                 destructive: false,
                 consistency_model: "totally_ordered".to_string(),
                 co_sign: "bilateral_required".to_string(),
+                co_sign_quorum: None,
                 evidence_required: vec!["receipt_lineage".to_string()],
                 aliases: Vec::new(),
             }],

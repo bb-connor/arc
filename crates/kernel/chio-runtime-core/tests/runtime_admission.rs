@@ -2095,6 +2095,10 @@ fn treaty_runtime_fixture_with_policy(
         bilateral_invocation_binding_sha256
     );
     let bilateral_invocation_sha256 = bilateral_invocation_binding_sha256;
+    let dsse_consistency_model = chio_runtime_core::bilateral_dsse_consistency_model(
+        &bilateral_invocation.consistency_model,
+    )?
+    .to_string();
     let bilateral_dsse = sign_chio_bilateral_dsse_envelope(
         &receipt,
         &signer_a,
@@ -2120,7 +2124,7 @@ fn treaty_runtime_fixture_with_policy(
                 },
             }),
             consistency_anchor: Some("anchor-live".to_string()),
-            consistency_model: Some(bilateral_invocation.consistency_model.clone()),
+            consistency_model: Some(dsse_consistency_model.clone()),
             cross_org_visibility: Some("treaty_only".to_string()),
             treaty_binding_ref: Some(TreatyBindingRef {
                 treaty_id: bilateral_invocation.treaty_id.clone(),
@@ -2130,7 +2134,7 @@ fn treaty_runtime_fixture_with_policy(
                 continuation_sha256: continuation_sha256.clone(),
                 lineage_bundle_sha256: lineage_bundle_sha256.clone(),
                 action_class_id: bilateral_invocation.action_class_id.clone(),
-                consistency_model: bilateral_invocation.consistency_model.clone(),
+                consistency_model: dsse_consistency_model,
                 request_sha256: bilateral_invocation.request_sha256.clone(),
                 outcome_sha256: bilateral_invocation.outcome_sha256.clone(),
                 local_receipt_sha256: bilateral_invocation.local_receipt_sha256.clone(),

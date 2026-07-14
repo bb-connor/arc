@@ -739,14 +739,20 @@ fn ladder_mode_rank(mode: &str) -> Result<u8, ChioRuntimeError> {
         ),
     }
 }
-fn validate_consistency_model(model: &str) -> Result<(), ChioRuntimeError> {
+pub fn bilateral_dsse_consistency_model(model: &str) -> Result<&'static str, ChioRuntimeError> {
     match model {
-        "crdt_commutative" | "totally_ordered" | "single_kernel" | "quorum_required" => Ok(()),
+        "crdt_commutative" => Ok("crdt-commutative"),
+        "totally_ordered" => Ok("totally-ordered"),
+        "single_kernel" => Ok("single-kernel"),
+        "quorum_required" => Ok("quorum-required"),
         _ => rejected(
             "chio_ladder_invalid_consistency_model",
             "governance ladder consistency model is not supported",
         ),
     }
+}
+fn validate_consistency_model(model: &str) -> Result<(), ChioRuntimeError> {
+    bilateral_dsse_consistency_model(model).map(|_| ())
 }
 fn validate_co_sign_mode(mode: &str) -> Result<(), ChioRuntimeError> {
     match mode {

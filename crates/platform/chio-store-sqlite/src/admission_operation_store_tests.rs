@@ -1339,6 +1339,27 @@ fn trusted_time_high_water_rejects_regression_across_operations() {
 }
 
 #[test]
+fn scoped_runtime_clock_qualifies_deterministic_admission_time() {
+    let fixture = fixture();
+    let operation = prepared_operation(
+        &fixture.fence,
+        AdmissionOperationKind::ToolDispatch,
+        "request-fixed-runtime-time",
+        "capability-fixed-runtime-time",
+    );
+    let fixed_now_unix_ms = 1_700_000_001_000;
+    let _scope = chio_kernel::scope_fixed_runtime_for_current_thread(
+        fixed_now_unix_ms / 1_000,
+        std::iter::empty(),
+    );
+
+    fixture
+        .store
+        .begin(&operation, &fixture.fence, fixed_now_unix_ms)
+        .expect("fixed runtime clock");
+}
+
+#[test]
 fn post_open_tampering_is_rejected_by_every_read_path_and_rows_cannot_be_deleted() {
     let fixture = fixture();
     let operation = prepared_operation(

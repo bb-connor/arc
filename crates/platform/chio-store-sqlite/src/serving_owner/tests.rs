@@ -1992,5 +1992,7 @@ fn concurrent_provisioning_creates_one_owner_and_one_lock() {
 
 #[path = "tests/provisioning.rs"]
 mod provisioning;
+#[path = "tests/scoped_identity.rs"]
+mod scoped_identity;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;

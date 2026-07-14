@@ -568,13 +568,23 @@ pub(crate) fn assemble_runtime_loopback_outputs(
             )?;
         }
 
-        let expected_buyer_closure_parity =
-            buyer_closure
-                .as_ref()
-                .map(|closure| ExpectedBuyerClosureParity {
+        let expected_buyer_closure_parity = buyer_closure
+            .as_ref()
+            .map(|closure| {
+                chio_runtime_core::bilateral_dsse_consistency_model(
+                    &closure.admission_report.consistency_model,
+                )
+                .map(|consistency_model| ExpectedBuyerClosureParity {
                     step_index: closure.step_index,
-                    consistency_model: closure.admission_report.consistency_model.clone(),
-                });
+                    consistency_model: consistency_model.to_string(),
+                })
+                .map_err(|error| {
+                    RuntimeLoopbackError::message(format!(
+                        "Chio runtime proof parity DSSE consistency model: {error}"
+                    ))
+                })
+            })
+            .transpose()?;
         let final_parity_report = materialize_final_runtime_proof_parity_report(
             run_id,
             now_unix_ms,
