@@ -3444,6 +3444,7 @@ dependencies = [
  "chio-core-types",
  "chio-federation",
  "chio-governance",
+ "frost-core",
  "frost-ed25519",
  "hex",
  "rand_chacha 0.3.1",

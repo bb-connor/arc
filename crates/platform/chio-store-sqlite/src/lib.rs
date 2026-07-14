@@ -194,8 +194,11 @@ pub use encrypted_blob::{
 pub use execution_nonce_store::{SqliteExecutionNonceStore, SqliteExecutionNonceStoreError};
 pub use frost_store::{
     FrostActiveRosterRecord, FrostCeremonyRecord, FrostCeremonyRound1Record,
-    FrostCeremonyRound2Record, FrostCeremonyState, FrostCustodyKey, FrostRotationRecord,
-    FrostRotationState, FrostSignerCommitment, FrostSignerSessionRecord, FrostSignerSessionRequest,
+    FrostCeremonyRound2Record, FrostCeremonyState, FrostCoordinatorCancellation,
+    FrostCoordinatorCommitment, FrostCoordinatorLease, FrostCoordinatorSessionRecord,
+    FrostCoordinatorSessionRequest, FrostCoordinatorSessionState, FrostCoordinatorShare,
+    FrostCoordinatorSigningPackage, FrostCustodyKey, FrostRotationRecord, FrostRotationState,
+    FrostSignerCommitment, FrostSignerSessionRecord, FrostSignerSessionRequest,
     FrostSignerSessionState, FrostSignerShare, FrostStoreError, SqliteFrostStore,
     StagedFrostRotation, StoredFrostCeremonyCompletion,
 };

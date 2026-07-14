@@ -11,6 +11,7 @@ use crate::serving_owner::SqliteServingOwner;
 
 mod ceremony;
 mod commit;
+mod coordinator;
 mod rotation;
 mod rotation_validation;
 mod schema;
@@ -229,6 +230,104 @@ pub struct FrostSignerSessionRequest<'a> {
     pub coordinator_id: &'a str,
 }
 
+pub struct FrostCoordinatorSessionRequest<'a> {
+    pub body: &'a chio_federation::frost::FrostAuthorizationBodyV1,
+    pub active_roster: &'a chio_federation::frost::VerifiedActiveFrostRoster,
+    pub epoch_anchor: &'a dyn chio_federation::frost::FrostEpochAnchor,
+    pub slot_anchor: &'a dyn chio_federation::frost::FrostAuthorizationSlotAnchorWriter,
+    pub artifact_trust: &'a chio_federation::frost::FrostArtifactTrustStore,
+    pub coordinator_id: &'a str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FrostCoordinatorLease {
+    pub session_id: String,
+    pub authorization_slot_id: String,
+    pub coordinator_id: String,
+    pub worker_id: String,
+    pub lease_id: String,
+    pub owner_epoch: u64,
+    pub expires_at_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FrostCoordinatorCommitment {
+    pub participant_id: String,
+    pub signer_identifier: Vec<u8>,
+    pub commitment_bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FrostCoordinatorShare {
+    pub participant_id: String,
+    pub share_bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FrostCoordinatorSigningPackage {
+    pub session_id: String,
+    pub participant_ids: Vec<String>,
+    pub signing_package_bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FrostCoordinatorSessionRecord {
+    pub session_id: String,
+    pub authorization_slot_id: String,
+    pub state: FrostCoordinatorSessionState,
+    pub row_version: u64,
+    pub commitment_count: usize,
+    pub share_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FrostCoordinatorCancellation {
+    pub session: FrostCoordinatorSessionRecord,
+    pub participant_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FrostCoordinatorSessionState {
+    CollectingCommitments,
+    PackageReady,
+    AuthorizationReady,
+    Completed,
+    Burned,
+}
+
+impl FrostCoordinatorSessionState {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::CollectingCommitments => "collecting_commitments",
+            Self::PackageReady => "package_ready",
+            Self::AuthorizationReady => "authorization_ready",
+            Self::Completed => "completed",
+            Self::Burned => "burned",
+        }
+    }
+
+    pub(super) fn parse(value: &str) -> Result<Self, FrostStoreError> {
+        match value {
+            "collecting_commitments" => Ok(Self::CollectingCommitments),
+            "package_ready" => Ok(Self::PackageReady),
+            "authorization_ready" => Ok(Self::AuthorizationReady),
+            "completed" => Ok(Self::Completed),
+            "burned" => Ok(Self::Burned),
+            _ => Err(FrostStoreError::InvalidState(
+                "unknown FROST coordinator state".to_string(),
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FrostSignerSessionRecord {
     pub session_id: String,
@@ -409,7 +508,8 @@ pub(crate) fn verify_frost_store_invariants(
     }
     ceremony::verify_ceremony_invariants(connection)?;
     rotation::verify_rotation_invariants(connection)?;
-    signer::verify_signer_invariants(connection)
+    signer::verify_signer_invariants(connection)?;
+    coordinator::verify_coordinator_invariants(connection)
 }
 
 type FrostSchemaCatalogEntry = (String, String, String, Option<String>);

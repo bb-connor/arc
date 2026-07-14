@@ -163,6 +163,11 @@ pub struct VerifiedCompletedFrostAuthorizationSlot {
     proof: FrostAuthorizationV1,
 }
 
+#[derive(Debug, Clone)]
+pub struct VerifiedBurnedFrostAuthorizationSlot {
+    checkpoint: FrostAuthorizationSlotCheckpointV1,
+}
+
 impl VerifiedBoundFrostAuthorizationSlot {
     #[must_use]
     pub fn checkpoint(&self) -> &FrostAuthorizationSlotCheckpointV1 {
@@ -184,6 +189,13 @@ impl VerifiedCompletedFrostAuthorizationSlot {
     #[must_use]
     pub fn proof(&self) -> &FrostAuthorizationV1 {
         &self.proof
+    }
+}
+
+impl VerifiedBurnedFrostAuthorizationSlot {
+    #[must_use]
+    pub fn checkpoint(&self) -> &FrostAuthorizationSlotCheckpointV1 {
+        &self.checkpoint
     }
 }
 
@@ -321,6 +333,60 @@ pub fn verify_completed_frost_authorization_slot(
     Ok(VerifiedCompletedFrostAuthorizationSlot {
         checkpoint: anchored.checkpoint.clone(),
         proof,
+    })
+}
+
+pub fn verify_burned_frost_authorization_slot(
+    bound: &FrostAuthorizationSlotCheckpointV1,
+    anchored: &FrostAnchoredAuthorizationSlot,
+    artifact_trust: &FrostArtifactTrustStore,
+    now: u64,
+) -> Result<VerifiedBurnedFrostAuthorizationSlot, FrostAuthorizationSlotTransitionError> {
+    artifact_trust
+        .verify_authorization_slot_checkpoint(bound)
+        .map_err(|error| FrostAuthorizationSlotTransitionError::ArtifactTrust(error.to_string()))?;
+    artifact_trust
+        .verify_authorization_slot_checkpoint(&anchored.checkpoint)
+        .map_err(|error| FrostAuthorizationSlotTransitionError::ArtifactTrust(error.to_string()))?;
+    let burned = &anchored.checkpoint;
+    if bound.state != FrostAuthorizationSlotState::Bound
+        || bound.slot_version != 1
+        || bound.predecessor_digest.is_some()
+        || bound.aggregate_signature_digest.is_some()
+        || bound.authorization_blob_digest.is_some()
+        || bound.availability_receipt.is_some()
+        || burned.schema != bound.schema
+        || burned.anchor_id != bound.anchor_id
+        || burned.anchor_key_id != bound.anchor_key_id
+        || burned.state != FrostAuthorizationSlotState::Burned
+        || burned.slot_version != 2
+        || burned.predecessor_digest.as_deref() != Some(bound.checkpoint_digest.as_str())
+        || burned.scope_id != bound.scope_id
+        || burned.slot_id != bound.slot_id
+        || burned.domain != bound.domain
+        || burned.ladder_action_class != bound.ladder_action_class
+        || burned.resource_id != bound.resource_id
+        || burned.resource_version != bound.resource_version
+        || burned.resource_fence != bound.resource_fence
+        || burned.authorization_id != bound.authorization_id
+        || burned.signing_message_digest != bound.signing_message_digest
+        || burned.action_digest != bound.action_digest
+        || burned.roster_digest != bound.roster_digest
+        || burned.key_epoch != bound.key_epoch
+        || burned.session_id != bound.session_id
+        || burned.aggregate_signature_digest.is_some()
+        || burned.authorization_blob_digest.is_some()
+        || burned.availability_receipt.is_some()
+        || anchored.authorization_blob.is_some()
+        || burned.clock_high_water < bound.clock_high_water
+        || burned.clock_high_water > now
+    {
+        return Err(FrostAuthorizationSlotTransitionError::Invalid(
+            "authorization slot is not the exact burned successor",
+        ));
+    }
+    Ok(VerifiedBurnedFrostAuthorizationSlot {
+        checkpoint: burned.clone(),
     })
 }
 

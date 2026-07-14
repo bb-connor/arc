@@ -31,11 +31,12 @@ pub use rotation::{
     FrostSessionBurnSummaryV1, VerifiedFrostEpochAdvance, CHIO_FROST_SESSION_BURN_SUMMARY_SCHEMA,
 };
 pub use slot::{
-    verify_bound_frost_authorization_slot, verify_completed_frost_authorization_slot,
-    verify_frost_authorization_slot_bind, verify_frost_authorization_slot_burn,
-    verify_frost_authorization_slot_completion, FrostAuthorizationSlotAnchorWriter,
-    FrostAuthorizationSlotBind, FrostAuthorizationSlotBurn, FrostAuthorizationSlotCompletion,
-    FrostAuthorizationSlotTransitionError, VerifiedBoundFrostAuthorizationSlot,
+    verify_bound_frost_authorization_slot, verify_burned_frost_authorization_slot,
+    verify_completed_frost_authorization_slot, verify_frost_authorization_slot_bind,
+    verify_frost_authorization_slot_burn, verify_frost_authorization_slot_completion,
+    FrostAuthorizationSlotAnchorWriter, FrostAuthorizationSlotBind, FrostAuthorizationSlotBurn,
+    FrostAuthorizationSlotCompletion, FrostAuthorizationSlotTransitionError,
+    VerifiedBoundFrostAuthorizationSlot, VerifiedBurnedFrostAuthorizationSlot,
     VerifiedCompletedFrostAuthorizationSlot, VerifiedFrostAuthorizationSlotBind,
     VerifiedFrostAuthorizationSlotBurn, VerifiedFrostAuthorizationSlotCompletion,
 };

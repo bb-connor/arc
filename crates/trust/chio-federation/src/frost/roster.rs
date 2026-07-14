@@ -517,6 +517,11 @@ pub struct VerifiedActiveFrostRoster {
 
 impl VerifiedActiveFrostRoster {
     #[must_use]
+    pub fn roster(&self) -> &FrostRosterV1 {
+        &self.roster
+    }
+
+    #[must_use]
     pub fn scope_id(&self) -> &str {
         &self.roster.scope_id
     }

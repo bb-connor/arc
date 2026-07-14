@@ -37,6 +37,7 @@ use chio_governance::lease::{
 use serde::{Deserialize, Serialize};
 
 mod frost_ceremony;
+mod frost_coordinator;
 mod frost_signer;
 mod profile;
 
@@ -46,6 +47,11 @@ pub use frost_ceremony::{
     FrostAuthenticatedDkgPackage, FrostCeremonyCompletion, FrostCeremonyConfig, FrostCeremonyError,
     FrostCeremonyParticipant, FrostCeremonySecret, FrostCeremonySecretKind, FrostDkgRound,
     FrostRound1Transition, FrostRound2Transition,
+};
+pub use frost_coordinator::{
+    aggregate_frost_authorization, build_frost_signing_package, frost_participant_identifier_bytes,
+    validate_frost_signing_commitment, verify_frost_signature_share, FrostCoordinatorError,
+    FrostCoordinatorSigningPackage,
 };
 pub use frost_signer::{
     create_frost_signature_share, inspect_frost_signer_key, prepare_frost_signer,

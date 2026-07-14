@@ -2,15 +2,16 @@ use chio_core_types::{sha256_hex, Keypair};
 use chio_federation::frost::{
     frost_action_registration, frost_authorization_session_id, frost_authorization_slot_id,
     resolve_active_roster_for_execution, verify_bound_frost_authorization_slot,
-    verify_completed_frost_authorization_slot, verify_for_execution,
-    verify_frost_authorization_slot_bind, verify_frost_authorization_slot_burn,
-    verify_frost_authorization_slot_completion, verify_frost_epoch_advance,
-    ActiveFrostRosterResolver, ExpectedFrostAuthorization, FrostActionPreimageV1, FrostAnchorError,
-    FrostAnchoredAuthorizationSlot, FrostArtifactAuthorityRole, FrostArtifactTrustRoot,
-    FrostArtifactTrustStore, FrostAuthorizationBodyV1, FrostAuthorizationDomain,
-    FrostAuthorizationSlotAnchor, FrostAuthorizationSlotCheckpointV1, FrostAuthorizationSlotState,
-    FrostAuthorizationV1, FrostEpochAnchor, FrostEpochCheckpointV1, FrostParticipantV1,
-    FrostRosterKeyOrigin, FrostRosterResolutionError, FrostRosterRotateActionV1, FrostRosterV1,
+    verify_burned_frost_authorization_slot, verify_completed_frost_authorization_slot,
+    verify_for_execution, verify_frost_authorization_slot_bind,
+    verify_frost_authorization_slot_burn, verify_frost_authorization_slot_completion,
+    verify_frost_epoch_advance, ActiveFrostRosterResolver, ExpectedFrostAuthorization,
+    FrostActionPreimageV1, FrostAnchorError, FrostAnchoredAuthorizationSlot,
+    FrostArtifactAuthorityRole, FrostArtifactTrustRoot, FrostArtifactTrustStore,
+    FrostAuthorizationBodyV1, FrostAuthorizationDomain, FrostAuthorizationSlotAnchor,
+    FrostAuthorizationSlotCheckpointV1, FrostAuthorizationSlotState, FrostAuthorizationV1,
+    FrostEpochAnchor, FrostEpochCheckpointV1, FrostParticipantV1, FrostRosterKeyOrigin,
+    FrostRosterResolutionError, FrostRosterRotateActionV1, FrostRosterV1,
     FrostSessionBurnSummaryV1, CHIO_FROST_AUTHORIZATION_BODY_SCHEMA,
     CHIO_FROST_AUTHORIZATION_SCHEMA, CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
     CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA, CHIO_FROST_ROSTER_ROTATE_ACTION_SCHEMA,
@@ -353,6 +354,39 @@ fn verified_rotation(
     assert_eq!(
         burn.request().expected_bound_checkpoint_digest(),
         bound.checkpoint_digest
+    );
+    let mut burned = FrostAuthorizationSlotCheckpointV1 {
+        slot_version: 2,
+        predecessor_digest: Some(bound.checkpoint_digest.clone()),
+        state: FrostAuthorizationSlotState::Burned,
+        clock_high_water: 151,
+        anchor_signature: String::new(),
+        checkpoint_digest: String::new(),
+        ..bound.clone()
+    };
+    burned.anchor_signature = slot_authority()
+        .sign(
+            &burned
+                .signing_bytes()
+                .unwrap_or_else(|error| panic!("canonicalize burned slot: {error}")),
+        )
+        .to_hex();
+    burned.checkpoint_digest = burned
+        .recompute_checkpoint_digest()
+        .unwrap_or_else(|error| panic!("compute burned slot digest: {error}"));
+    let burned_anchor = FrostAnchoredAuthorizationSlot {
+        checkpoint: burned.clone(),
+        authorization_blob: None,
+    };
+    assert_eq!(
+        verify_burned_frost_authorization_slot(&bound, &burned_anchor, &trust_store(), 151)
+            .unwrap_or_else(|error| panic!("verify burned successor: {error}"))
+            .checkpoint(),
+        &burned
+    );
+    assert!(
+        verify_burned_frost_authorization_slot(&bound, &burned_anchor, &trust_store(), 150)
+            .is_err()
     );
     let completion = verify_frost_authorization_slot_completion(
         &bound,

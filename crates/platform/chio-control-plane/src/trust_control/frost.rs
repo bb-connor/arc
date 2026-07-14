@@ -13,6 +13,11 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use url::Url;
 
+#[path = "frost/coordinator.rs"]
+mod coordinator;
+
+pub use coordinator::*;
+
 const MAX_ANCHOR_RESPONSE_BYTES: u64 = 2 * 1024 * 1024;
 
 #[derive(Clone)]

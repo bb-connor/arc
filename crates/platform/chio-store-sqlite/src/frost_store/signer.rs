@@ -2,9 +2,9 @@ use chio_core::canonical::canonical_json_bytes;
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_federation::frost::{
     frost_authorization_session_id, frost_authorization_slot_id,
-    verify_bound_frost_authorization_slot, verify_completed_frost_authorization_slot,
-    verify_frost_authorization_slot_bind, verify_frost_authorization_slot_burn,
-    FrostAnchoredAuthorizationSlot, FrostAuthorizationSlotCheckpointV1,
+    verify_bound_frost_authorization_slot, verify_burned_frost_authorization_slot,
+    verify_completed_frost_authorization_slot, verify_frost_authorization_slot_bind,
+    verify_frost_authorization_slot_burn, FrostAuthorizationSlotCheckpointV1,
     FrostAuthorizationSlotState,
 };
 use chio_federation_authority::{
@@ -565,7 +565,13 @@ impl SqliteFrostStore {
                 let bound: FrostAuthorizationSlotCheckpointV1 =
                     serde_json::from_slice(&stored.bound_checkpoint_json)
                         .map_err(|error| invalid(error.to_string()))?;
-                verify_burned_successor(&bound, &anchored, request)?;
+                verify_burned_frost_authorization_slot(
+                    &bound,
+                    &anchored,
+                    request.artifact_trust,
+                    trusted_now_unix_ms,
+                )
+                .map_err(transition_error)?;
                 if !matches!(
                     stored.state,
                     FrostSignerSessionState::Completed | FrostSignerSessionState::Burned
@@ -697,7 +703,13 @@ impl SqliteFrostStore {
             .slot_anchor
             .compare_and_swap_burn(&burn)
             .map_err(anchor_error)?;
-        verify_burned_successor(&bound, &anchored, request)?;
+        verify_burned_frost_authorization_slot(
+            &bound,
+            &anchored,
+            request.artifact_trust,
+            trusted_now_unix_ms,
+        )
+        .map_err(transition_error)?;
         let previous_state = stored.state;
         let previous_version = stored.state_version;
         stored.state = FrostSignerSessionState::Burned;
@@ -893,45 +905,6 @@ fn signer_nonce_aad(
         store_owner_epoch: fence.owner_epoch,
     })
     .map_err(|error| invalid(error.to_string()))
-}
-
-fn verify_burned_successor(
-    bound: &FrostAuthorizationSlotCheckpointV1,
-    anchored: &FrostAnchoredAuthorizationSlot,
-    request: &FrostSignerSessionRequest<'_>,
-) -> Result<(), FrostStoreError> {
-    request
-        .artifact_trust
-        .verify_authorization_slot_checkpoint(&anchored.checkpoint)
-        .map_err(|error| invalid(error.to_string()))?;
-    let burned = &anchored.checkpoint;
-    if burned.state != FrostAuthorizationSlotState::Burned
-        || burned.slot_version != 2
-        || burned.predecessor_digest.as_deref() != Some(bound.checkpoint_digest.as_str())
-        || burned.scope_id != bound.scope_id
-        || burned.slot_id != bound.slot_id
-        || burned.domain != bound.domain
-        || burned.ladder_action_class != bound.ladder_action_class
-        || burned.resource_id != bound.resource_id
-        || burned.resource_version != bound.resource_version
-        || burned.resource_fence != bound.resource_fence
-        || burned.action_digest != bound.action_digest
-        || burned.authorization_id != bound.authorization_id
-        || burned.signing_message_digest != bound.signing_message_digest
-        || burned.roster_digest != bound.roster_digest
-        || burned.key_epoch != bound.key_epoch
-        || burned.session_id != bound.session_id
-        || burned.aggregate_signature_digest.is_some()
-        || burned.authorization_blob_digest.is_some()
-        || burned.availability_receipt.is_some()
-        || anchored.authorization_blob.is_some()
-        || burned.clock_high_water < bound.clock_high_water
-    {
-        return Err(FrostStoreError::Conflict(
-            "external slot did not retain the exact burned successor",
-        ));
-    }
-    Ok(())
 }
 
 fn advance_record(

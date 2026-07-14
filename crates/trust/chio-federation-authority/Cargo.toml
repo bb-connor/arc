@@ -17,6 +17,7 @@ chio-core-types = { workspace = true }
 chio-federation = { workspace = true }
 chio-governance = { workspace = true }
 frost-ed25519 = { workspace = true }
+frost-core = { workspace = true }
 hex = { workspace = true }
 rand_core = { workspace = true }
 serde = { workspace = true }
