@@ -187,6 +187,18 @@ pub struct BudgetInvocationQuotaMutation {
 }
 
 impl BudgetInvocationQuotaUsage {
+    pub fn validate(&self) -> Result<(), BudgetStoreError> {
+        self.quota.key.validate()?;
+        if self.quota.max_invocations == 0
+            || self.invocation_count_after()? > self.quota.max_invocations
+        {
+            return Err(BudgetStoreError::Invariant(
+                "invocation quota usage exceeds its immutable positive maximum".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     pub fn invocation_count_after(&self) -> Result<u32, BudgetStoreError> {
         self.reserved_invocations
             .checked_add(self.captured_invocations)
@@ -327,6 +339,17 @@ pub struct BudgetEventAuthority {
     pub lease_epoch: u64,
 }
 
+impl BudgetEventAuthority {
+    pub fn validate(&self) -> Result<(), BudgetStoreError> {
+        if self.authority_id.is_empty() || self.lease_id.is_empty() || self.lease_epoch == 0 {
+            return Err(BudgetStoreError::Invariant(
+                "budget event authority requires a non-empty fenced lease".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BudgetMutationRecord {
     pub event_id: String,
@@ -377,10 +400,8 @@ pub struct RevocationCommitMetadata {
 
 impl RevocationCommitMetadata {
     pub fn validate(&self) -> Result<(), BudgetStoreError> {
-        if self.authority.authority_id.is_empty()
-            || self.authority.lease_id.is_empty()
-            || self.authority.lease_epoch == 0
-            || self.commit_index == 0
+        self.authority.validate()?;
+        if self.commit_index == 0
             || !matches!(
                 self.guarantee_level,
                 BudgetGuaranteeLevel::SingleNodeAtomic | BudgetGuaranteeLevel::HaLinearizable

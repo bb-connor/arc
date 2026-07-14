@@ -244,6 +244,11 @@ impl SqliteBudgetStore {
     ) -> Result<rusqlite::Transaction<'a>, BudgetStoreError> {
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         crate::serving_owner::verify_budget_fence(&transaction, self.serving_owner.as_deref())?;
+        if let Some(owner) = self.serving_owner.as_ref() {
+            owner
+                .verify_authority_anchor(&transaction)
+                .map_err(map_serving_owner_error)?;
+        }
         Ok(transaction)
     }
 
@@ -253,7 +258,56 @@ impl SqliteBudgetStore {
     ) -> Result<rusqlite::Transaction<'a>, BudgetStoreError> {
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
         crate::serving_owner::verify_budget_fence(&transaction, self.serving_owner.as_deref())?;
+        if let Some(owner) = self.serving_owner.as_ref() {
+            owner
+                .verify_authority_anchor(&transaction)
+                .map_err(map_serving_owner_error)?;
+        }
         Ok(transaction)
+    }
+
+    pub(super) fn append_joint_commit(
+        &self,
+        transaction: &rusqlite::Transaction<'_>,
+        kind: BudgetMutationKind,
+        event_id: &str,
+        event_seq: u64,
+    ) -> Result<(), BudgetStoreError> {
+        let owner = self.serving_owner.as_ref().ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "structured sqlite mutation requires a joint serving owner".to_string(),
+            )
+        })?;
+        owner
+            .append_global_commit(transaction, kind.as_str(), "budget", event_id, event_seq)
+            .map_err(map_serving_owner_error)
+    }
+
+    pub(super) fn sync_joint_anchor(
+        &self,
+        connection: &Connection,
+    ) -> Result<(), BudgetStoreError> {
+        let owner = self.serving_owner.as_ref().ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "structured sqlite mutation requires a joint serving owner".to_string(),
+            )
+        })?;
+        owner
+            .sync_authority_anchor(connection)
+            .map_err(map_serving_owner_error)
+    }
+
+    pub(super) fn commit_joint_transaction(
+        &self,
+        transaction: rusqlite::Transaction<'_>,
+    ) -> Result<(), BudgetStoreError> {
+        transaction.commit().map_err(|error| {
+            let detail = format!("sqlite budget commit outcome is unknown: {error}");
+            match self.serving_owner.as_ref() {
+                Some(owner) => map_serving_owner_error(owner.outcome_unknown(detail)),
+                None => BudgetStoreError::OutcomeUnknown(detail),
+            }
+        })
     }
 
     /// Per-origin contiguous ack head, anchored on the peer's GLOBAL contiguous
@@ -1854,5 +1908,16 @@ impl SqliteBudgetStore {
         )?;
         transaction.commit()?;
         Ok(true)
+    }
+}
+
+pub(super) fn map_serving_owner_error(
+    error: crate::serving_owner::SqliteServingOwnerError,
+) -> BudgetStoreError {
+    match error {
+        crate::serving_owner::SqliteServingOwnerError::OutcomeUnknown(detail) => {
+            BudgetStoreError::OutcomeUnknown(detail)
+        }
+        error => BudgetStoreError::Invariant(error.to_string()),
     }
 }

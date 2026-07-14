@@ -78,8 +78,7 @@ pub(super) fn captured_authorization_decision(
 impl SqliteBudgetStore {
     pub(crate) fn is_structured_hold(&self, hold_id: &str) -> Result<bool, BudgetStoreError> {
         let mut connection = self.connection()?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
-        crate::serving_owner::verify_budget_fence(&transaction, self.serving_owner.as_deref())?;
+        let transaction = self.begin_read(&mut connection)?;
         let marker = transaction
             .query_row(
                 r#"

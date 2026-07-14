@@ -21,6 +21,7 @@
 
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 
+pub mod admission_operation;
 pub mod approval;
 pub mod approval_channels;
 pub mod authority;
@@ -32,6 +33,7 @@ pub mod compliance_certificate;
 pub mod compliance_score;
 pub mod cost_attribution;
 pub mod custody;
+pub mod dispatch_status;
 pub mod dpop;
 pub mod evidence_export;
 pub mod execution_nonce;
@@ -55,6 +57,7 @@ pub mod runtime;
 pub mod session;
 mod settlement_routing;
 pub mod supplemental_quota;
+pub mod tool_outcome;
 pub mod transport;
 pub mod weights_binding;
 

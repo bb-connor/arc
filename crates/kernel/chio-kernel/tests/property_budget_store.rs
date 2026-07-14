@@ -145,6 +145,7 @@ fn error_kind(error: &BudgetStoreError) -> &'static str {
         BudgetStoreError::Invariant(_) => "invariant",
         BudgetStoreError::Sqlite(_) => "sqlite",
         BudgetStoreError::Io(_) => "io",
+        BudgetStoreError::OutcomeUnknown(_) => "outcome_unknown",
     }
 }
 

@@ -1,4 +1,4 @@
-use std::fs;
+use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Barrier};
 
@@ -27,6 +27,28 @@ fn fixture() -> (TempDir, PathBuf, PathBuf) {
     (temp, database, lock_root)
 }
 
+fn database_snapshot(authority: &SqliteAuthorityStore, database: &Path, target: &Path) {
+    let connection = authority.connection.lock().expect("authority connection");
+    connection
+        .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+        .expect("checkpoint snapshot");
+    fs::copy(database, target).expect("copy snapshot");
+}
+
+fn restore_database_in_place(database: &Path, snapshot: &Path) {
+    let mut input = File::open(snapshot).expect("open snapshot");
+    let mut output = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(database)
+        .expect("open database for restore");
+    std::io::copy(&mut input, &mut output).expect("restore database");
+    output.sync_all().expect("sync restored database");
+    for suffix in ["-wal", "-shm"] {
+        let _ = fs::remove_file(PathBuf::from(format!("{}{suffix}", database.display())));
+    }
+}
+
 fn only_serving_lock(lock_root: &Path) -> PathBuf {
     fs::read_dir(lock_root)
         .expect("read lock root")
@@ -36,6 +58,27 @@ fn only_serving_lock(lock_root: &Path) -> PathBuf {
                 .is_some_and(|extension| extension == "lock")
         })
         .expect("serving lock")
+}
+
+fn serving_lock_paths(lock_root: &Path) -> Vec<PathBuf> {
+    let mut paths = fs::read_dir(lock_root)
+        .expect("read lock root")
+        .map(|entry| entry.expect("lock entry").path())
+        .filter(|path| {
+            path.extension()
+                .is_some_and(|extension| extension == "lock")
+        })
+        .collect::<Vec<_>>();
+    paths.sort();
+    paths
+}
+
+fn path_identity_marker(database: &Path, lock_root: &Path) -> PathBuf {
+    super::path_identity::marker_path(
+        lock_root,
+        &fs::canonicalize(database).expect("canonical database path"),
+    )
+    .expect("path identity marker")
 }
 
 fn active_authority(authority: &SqliteAuthorityStore) -> BudgetEventAuthority {
@@ -121,6 +164,178 @@ fn joint_store_owns_budget_and_revocation_with_one_fence() {
     assert!(matches!(
         SqliteAuthorityStore::open_serving(&database, &lock_root),
         Err(SqliteServingOwnerError::AlreadyServing(_))
+    ));
+}
+
+#[test]
+fn budget_only_snapshot_rollback_is_rejected_by_the_global_anchor() {
+    let (temp, database, lock_root) = fixture();
+    let snapshot = temp.path().join("before-budget.db");
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open");
+    database_snapshot(&authority, &database, &snapshot);
+    authority
+        .budget_store()
+        .authorize_budget_hold(structured_request(Some(active_authority(&authority))))
+        .expect("budget mutation");
+    drop(authority);
+
+    restore_database_in_place(&database, &snapshot);
+    assert!(matches!(
+        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        Err(SqliteServingOwnerError::Invalid(_))
+    ));
+}
+
+#[test]
+fn revocation_only_snapshot_rollback_is_rejected_by_the_global_anchor() {
+    let (temp, database, lock_root) = fixture();
+    let snapshot = temp.path().join("before-revocation.db");
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open");
+    database_snapshot(&authority, &database, &snapshot);
+    authority
+        .revocation_store()
+        .revoke("rollback-revocation")
+        .expect("revocation mutation");
+    drop(authority);
+
+    restore_database_in_place(&database, &snapshot);
+    assert!(matches!(
+        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        Err(SqliteServingOwnerError::Invalid(_))
+    ));
+}
+
+#[test]
+fn budget_database_ahead_of_anchor_recovers_only_a_valid_chain_extension() {
+    let (_temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open");
+    let lock = only_serving_lock(&lock_root);
+    let prior_anchor = fs::read(&lock).expect("read prior anchor");
+    authority
+        .budget_store()
+        .authorize_budget_hold(structured_request(Some(active_authority(&authority))))
+        .expect("budget mutation");
+    drop(authority);
+
+    fs::write(&lock, prior_anchor).expect("restore prior anchor");
+    File::open(&lock)
+        .expect("open anchor")
+        .sync_all()
+        .expect("sync anchor");
+    let recovered = SqliteAuthorityStore::open_serving(&database, &lock_root)
+        .expect("recover DB-ahead global chain");
+    assert!(recovered
+        .budget_store()
+        .get_usage("cap-structured", 0)
+        .expect("read recovered usage")
+        .is_some());
+}
+
+#[test]
+fn baseline_verification_rejects_live_projection_tampering() {
+    let (_temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    Connection::open(&database)
+        .expect("tamper connection")
+        .execute(
+            r#"
+            UPDATE chio_authority_migrations
+            SET completed_index = 2
+            WHERE migration_key = 'revocation-admission-authority-v1'
+            "#,
+            [],
+        )
+        .expect("tamper baseline projection");
+
+    assert!(matches!(
+        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        Err(SqliteServingOwnerError::Invalid(message))
+            if message.contains("baseline does not match its live projection")
+    ));
+}
+
+#[test]
+fn initial_provision_refuses_nonempty_legacy_authority_state() {
+    let (_temp, database, lock_root) = fixture();
+    let legacy = SqliteBudgetStore::open(&database).expect("legacy budget store");
+    assert!(legacy
+        .try_increment("legacy-capability", 0, Some(1))
+        .expect("legacy usage mutation"));
+    drop(legacy);
+    fs::set_permissions(&database, fs::Permissions::from_mode(0o600))
+        .expect("secure database mode");
+
+    let error = SqliteAuthorityStore::provision(&database, &lock_root)
+        .expect_err("legacy authority state must be rejected");
+    assert!(
+        matches!(
+            &error,
+            SqliteServingOwnerError::Invalid(message)
+                if message.contains("baseline refuses nonempty safety table")
+        ),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn serving_open_rejects_unjournaled_valid_revocation_commit() {
+    let (_temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root).expect("open");
+    assert!(authority
+        .revocation_store()
+        .revoke("journaled-revocation")
+        .expect("journaled revoke"));
+    drop(authority);
+
+    let mut connection = Connection::open(&database).expect("direct connection");
+    connection
+        .execute_batch("PRAGMA foreign_keys = ON;")
+        .expect("enable foreign keys");
+    let transaction = connection.transaction().expect("tamper transaction");
+    let next_index: i64 = transaction
+        .query_row(
+            "SELECT head_index + 1 FROM admission_authority_meta WHERE singleton = 1",
+            [],
+            |row| row.get(0),
+        )
+        .expect("next authority index");
+    transaction
+        .execute(
+            r#"
+            INSERT INTO revoked_capabilities (
+                capability_id, revoked_at, admission_authority_commit_index
+            ) VALUES ('unjournaled-revocation', 42, ?1)
+            "#,
+            [next_index],
+        )
+        .expect("insert valid revocation projection");
+    transaction
+        .execute(
+            r#"
+            INSERT INTO admission_authority_commits (
+                commit_index, kind, capability_id
+            ) VALUES (?1, 'revocation', 'unjournaled-revocation')
+            "#,
+            [next_index],
+        )
+        .expect("insert valid revocation commit");
+    transaction
+        .execute(
+            "UPDATE admission_authority_meta SET head_index = ?1 WHERE singleton = 1",
+            [next_index],
+        )
+        .expect("advance authority head");
+    transaction.commit().expect("commit local mutation");
+    drop(connection);
+
+    assert!(matches!(
+        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        Err(SqliteServingOwnerError::Invalid(message))
+            if message.contains("projection coverage is not exact")
     ));
 }
 
@@ -487,6 +702,13 @@ fn serving_open_rejects_forged_historical_budget_authority() {
     let second = SqliteAuthorityStore::open_serving(&database, &lock_root).expect("second owner");
     request.authority = Some(active_authority(&second));
     let connection = Connection::open(&database).expect("tamper connection");
+    let global_head_before: i64 = connection
+        .query_row(
+            "SELECT head_sequence FROM authority_global_commit_meta WHERE singleton = 1",
+            [],
+            |row| row.get(0),
+        )
+        .expect("global head");
     connection
         .execute(
             "UPDATE budget_authorization_holds SET lease_id = 'forged-old-lease'",
@@ -499,12 +721,23 @@ fn serving_open_rejects_forged_historical_budget_authority() {
             [],
         )
         .expect("corrupt event authority");
+    assert!(matches!(
+        second.budget_store().get_usage("capability-a", 0),
+        Err(chio_kernel::BudgetStoreError::OutcomeUnknown(_))
+    ));
+    assert!(matches!(
+        second.budget_store().authorize_budget_hold(request),
+        Err(chio_kernel::BudgetStoreError::OutcomeUnknown(_))
+    ));
+    let global_head_after: i64 = connection
+        .query_row(
+            "SELECT head_sequence FROM authority_global_commit_meta WHERE singleton = 1",
+            [],
+            |row| row.get(0),
+        )
+        .expect("global head after tamper");
+    assert_eq!(global_head_after, global_head_before);
     drop(connection);
-    assert!(second
-        .budget_store()
-        .authorize_budget_hold(request)
-        .as_ref()
-        .is_err_and(|error| error.to_string().contains("durable serving lease")));
     drop(second);
 
     assert!(matches!(
@@ -1097,6 +1330,107 @@ fn database_symlink_and_hardlink_aliases_are_rejected() {
 }
 
 #[test]
+fn preprovision_snapshot_cannot_reset_local_path_identity() {
+    let (temp, database, lock_root) = fixture();
+    let snapshot = temp.path().join("preprovision.db");
+    let database_file = create_database_file(&database).expect("create preprovision database");
+    database_file
+        .sync_all()
+        .expect("sync preprovision database");
+    drop(database_file);
+    fs::copy(&database, &snapshot).expect("snapshot preprovision database");
+
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    let marker = path_identity_marker(&database, &lock_root);
+    assert!(marker.exists());
+    let original_locks = serving_lock_paths(&lock_root);
+    assert_eq!(original_locks.len(), 1);
+
+    restore_database_in_place(&database, &snapshot);
+    let error = SqliteAuthorityStore::provision(&database, &lock_root)
+        .expect_err("preprovision rollback must not mint a new identity");
+    assert!(
+        matches!(
+            &error,
+            SqliteServingOwnerError::Invalid(message)
+                if message.contains("local path identity continuity marker remains")
+                    && message.contains("not independent rollback protection")
+        ),
+        "unexpected error: {error}"
+    );
+    assert_eq!(serving_lock_paths(&lock_root), original_locks);
+    assert!(marker.exists());
+    let connection = Connection::open(&database).expect("open restored database");
+    assert!(!owner_table_exists(&connection).expect("owner table probe"));
+}
+
+#[test]
+fn missing_path_identity_migrates_only_after_anchor_proof_and_is_idempotent() {
+    let (_temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    let marker = path_identity_marker(&database, &lock_root);
+    fs::remove_file(&marker).expect("simulate crash before marker creation");
+    File::open(&lock_root)
+        .expect("open lock root")
+        .sync_all()
+        .expect("sync marker removal");
+
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("migrate marker");
+    let migrated = fs::read(&marker).expect("read migrated marker");
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("repeat provision");
+    assert_eq!(fs::read(&marker).expect("read stable marker"), migrated);
+    fs::remove_file(&marker).expect("simulate pre-marker open");
+    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)
+        .expect("migrate marker while opening");
+    assert!(marker.exists());
+    drop(authority);
+
+    let (_temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision corrupt fixture");
+    let marker = path_identity_marker(&database, &lock_root);
+    fs::remove_file(&marker).expect("remove marker before anchor corruption");
+    let anchor = only_serving_lock(&lock_root);
+    fs::write(&anchor, b"corrupt-anchor").expect("corrupt rollback anchor");
+    File::open(&anchor)
+        .expect("open corrupt anchor")
+        .sync_all()
+        .expect("sync corrupt anchor");
+
+    assert!(SqliteAuthorityStore::provision(&database, &lock_root).is_err());
+    assert!(!marker.exists());
+}
+
+#[test]
+fn replaced_or_hardlinked_path_identity_marker_is_rejected() {
+    let (_temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision hardlink fixture");
+    let marker = path_identity_marker(&database, &lock_root);
+    fs::hard_link(&marker, lock_root.join("extra-identity-link"))
+        .expect("hardlink path identity marker");
+    assert!(matches!(
+        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        Err(SqliteServingOwnerError::Invalid(message))
+            if message.contains("local path identity continuity marker security check")
+    ));
+
+    let (temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision replacement fixture");
+    let marker = path_identity_marker(&database, &lock_root);
+    let replacement = temp.path().join("replacement.identity");
+    fs::write(&replacement, fs::read(&marker).expect("read marker"))
+        .expect("write replacement marker");
+    fs::set_permissions(&replacement, fs::Permissions::from_mode(0o600))
+        .expect("secure replacement mode");
+    fs::rename(&replacement, &marker).expect("replace path identity marker");
+
+    assert!(matches!(
+        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        Err(SqliteServingOwnerError::Invalid(message))
+            if message.contains("local path identity continuity marker inode changed")
+    ));
+}
+
+#[test]
 fn provisioning_rejects_unsafe_database_and_lock_root_modes() {
     let (temp, database, lock_root) = fixture();
     let target = temp.path().join("target.db");
@@ -1333,6 +1667,124 @@ fn normalized_schema_rejects_cross_hold_operations_and_invalid_quota_indices() {
             [],
         )
         .is_err());
+}
+
+#[test]
+fn serving_open_rejects_substituted_lease_history_trigger() {
+    let (_temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    Connection::open(&database)
+        .expect("tamper connection")
+        .execute_batch(
+            r#"
+            DROP TRIGGER chio_serving_leases_close_only;
+            CREATE TRIGGER chio_serving_leases_close_only
+            BEFORE UPDATE ON chio_serving_leases
+            BEGIN
+                SELECT 1;
+            END;
+            "#,
+        )
+        .expect("replace lease trigger");
+
+    assert!(matches!(
+        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        Err(SqliteServingOwnerError::Invalid(message))
+            if message.contains("serving lease schema")
+    ));
+}
+
+#[test]
+fn serving_open_rejects_unexpected_lease_history_trigger() {
+    let (_temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    Connection::open(&database)
+        .expect("tamper connection")
+        .execute_batch(
+            r#"
+            CREATE TRIGGER unrelated_lease_delete_hook
+            BEFORE DELETE ON chio_serving_leases
+            BEGIN
+                SELECT 1;
+            END;
+            "#,
+        )
+        .expect("add lease trigger");
+
+    assert!(matches!(
+        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        Err(SqliteServingOwnerError::Invalid(message))
+            if message.contains("serving lease schema")
+    ));
+}
+
+#[test]
+fn serving_open_rejects_owner_update_trigger_before_epoch_mutation() {
+    let (_temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    Connection::open(&database)
+        .expect("tamper connection")
+        .execute_batch(
+            r#"
+            CREATE TABLE owner_update_probe (value INTEGER NOT NULL);
+            INSERT INTO owner_update_probe (value) VALUES (0);
+            CREATE TRIGGER capture_trusted_owner_epoch
+            AFTER UPDATE ON chio_serving_owner
+            BEGIN
+                UPDATE owner_update_probe SET value = NEW.owner_epoch;
+            END;
+            "#,
+        )
+        .expect("install owner update trigger");
+
+    assert!(matches!(
+        SqliteAuthorityStore::open_serving(&database, &lock_root),
+        Err(SqliteServingOwnerError::Invalid(message))
+            if message.contains("serving owner schema")
+    ));
+    let connection = Connection::open(&database).expect("verify no mutation");
+    let (owner_epoch, probe, leases): (i64, i64, i64) = connection
+        .query_row(
+            r#"
+            SELECT
+                (SELECT owner_epoch FROM chio_serving_owner WHERE singleton = 1),
+                (SELECT value FROM owner_update_probe),
+                (SELECT COUNT(*) FROM chio_serving_leases)
+            "#,
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .expect("unchanged owner state");
+    assert_eq!((owner_epoch, probe, leases), (0, 0, 0));
+}
+
+#[test]
+fn serving_open_rejects_weakened_lease_history_table() {
+    let (_temp, database, lock_root) = fixture();
+    SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
+    let connection = Connection::open(&database).expect("tamper connection");
+    connection
+        .execute_batch("PRAGMA writable_schema = ON")
+        .expect("enable writable schema");
+    assert_eq!(
+        connection
+            .execute(
+                r#"
+                UPDATE sqlite_schema
+                SET sql = 'CREATE TABLE chio_serving_leases (store_uuid TEXT)'
+                WHERE type = 'table' AND name = 'chio_serving_leases'
+                "#,
+                [],
+            )
+            .expect("weaken lease table"),
+        1
+    );
+    connection
+        .execute_batch("PRAGMA writable_schema = OFF")
+        .expect("disable writable schema");
+    drop(connection);
+
+    assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
 }
 
 #[test]

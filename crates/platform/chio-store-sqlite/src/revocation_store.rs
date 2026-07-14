@@ -124,6 +124,11 @@ impl SqliteRevocationStore {
     ) -> Result<Transaction<'a>, RevocationStoreError> {
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         crate::serving_owner::verify_revocation_fence(&transaction, self.serving_owner.as_deref())?;
+        if let Some(owner) = self.serving_owner.as_ref() {
+            owner
+                .verify_authority_anchor(&transaction)
+                .map_err(map_serving_owner_error)?;
+        }
         Ok(transaction)
     }
 
@@ -134,6 +139,11 @@ impl SqliteRevocationStore {
         let mut connection = self.connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
         crate::serving_owner::verify_revocation_fence(&transaction, self.serving_owner.as_deref())?;
+        if let Some(owner) = self.serving_owner.as_ref() {
+            owner
+                .verify_authority_anchor(&transaction)
+                .map_err(map_serving_owner_error)?;
+        }
         let value = query(&transaction)?;
         transaction.rollback()?;
         Ok(value)
@@ -247,6 +257,21 @@ impl SqliteRevocationStore {
                 revocation_index,
                 &record.capability_id,
             )?;
+            self.serving_owner
+                .as_ref()
+                .ok_or_else(|| {
+                    RevocationStoreError::Sync(
+                        "joint revocation mutation lost its serving owner".to_string(),
+                    )
+                })?
+                .append_global_commit(
+                    &transaction,
+                    "revocation_upsert",
+                    "revocation",
+                    &record.capability_id,
+                    stored_index(revocation_index)?,
+                )
+                .map_err(map_serving_owner_error)?;
         } else {
             transaction.execute(
                 r#"
@@ -260,7 +285,12 @@ impl SqliteRevocationStore {
                 params![record.capability_id, record.revoked_at, revocation_index],
             )?;
         }
-        transaction.commit()?;
+        commit_mutation(self, transaction)?;
+        if let Some(owner) = self.serving_owner.as_ref() {
+            owner
+                .sync_authority_anchor(&connection)
+                .map_err(map_serving_owner_error)?;
+        }
         Ok(())
     }
 
@@ -336,8 +366,28 @@ impl RevocationStore for SqliteRevocationStore {
         if inserted.is_some() {
             if joint {
                 append_admission_revocation_commit(&transaction, revocation_index, capability_id)?;
+                self.serving_owner
+                    .as_ref()
+                    .ok_or_else(|| {
+                        RevocationStoreError::Sync(
+                            "joint revocation mutation lost its serving owner".to_string(),
+                        )
+                    })?
+                    .append_global_commit(
+                        &transaction,
+                        "revocation_revoke",
+                        "revocation",
+                        capability_id,
+                        stored_index(revocation_index)?,
+                    )
+                    .map_err(map_serving_owner_error)?;
             }
-            transaction.commit()?;
+            commit_mutation(self, transaction)?;
+            if let Some(owner) = self.serving_owner.as_ref() {
+                owner
+                    .sync_authority_anchor(&connection)
+                    .map_err(map_serving_owner_error)?;
+            }
         } else {
             transaction.rollback()?;
         }
@@ -713,6 +763,35 @@ fn append_admission_revocation_commit(
         params![commit_index, capability_id],
     )?;
     Ok(())
+}
+
+fn stored_index(value: i64) -> Result<u64, RevocationStoreError> {
+    u64::try_from(value)
+        .map_err(|_| RevocationStoreError::Sync("negative revocation index".to_string()))
+}
+
+fn map_serving_owner_error(
+    error: crate::serving_owner::SqliteServingOwnerError,
+) -> RevocationStoreError {
+    match error {
+        crate::serving_owner::SqliteServingOwnerError::OutcomeUnknown(detail) => {
+            RevocationStoreError::OutcomeUnknown(detail)
+        }
+        error => RevocationStoreError::Sync(error.to_string()),
+    }
+}
+
+fn commit_mutation(
+    store: &SqliteRevocationStore,
+    transaction: Transaction<'_>,
+) -> Result<(), RevocationStoreError> {
+    transaction.commit().map_err(|error| {
+        let detail = format!("sqlite revocation commit outcome is unknown: {error}");
+        match store.serving_owner.as_ref() {
+            Some(owner) => map_serving_owner_error(owner.outcome_unknown(detail)),
+            None => RevocationStoreError::OutcomeUnknown(detail),
+        }
+    })
 }
 
 pub(crate) fn verify_admission_authority_invariants(

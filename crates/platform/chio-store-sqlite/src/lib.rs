@@ -26,6 +26,7 @@
 
 use std::path::{Path, PathBuf};
 
+pub mod admission_operation_store;
 pub mod approval_store;
 pub mod authority;
 pub mod batch_approval_store;
@@ -179,6 +180,7 @@ fn sqlite_uri_filesystem_path(text: &str) -> PathBuf {
     PathBuf::from(filesystem)
 }
 
+pub use admission_operation_store::SqliteAdmissionOperationStore;
 pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use batch_approval_store::SqliteBatchApprovalStore;

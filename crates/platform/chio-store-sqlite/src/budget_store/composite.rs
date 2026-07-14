@@ -435,6 +435,7 @@ impl SqliteBudgetStore {
             !request.invocation_quotas.is_empty(),
             request.requested_exposure_units,
         )?;
+        self.append_joint_commit(&transaction, authorization_kind, event_id, event_seq)?;
         let decision = authorization_decision(
             self,
             request,
@@ -445,7 +446,8 @@ impl SqliteBudgetStore {
             cumulative_state,
             cumulative_after,
         )?;
-        transaction.commit()?;
+        self.commit_joint_transaction(transaction)?;
+        self.sync_joint_anchor(&connection)?;
         Ok(decision)
     }
 

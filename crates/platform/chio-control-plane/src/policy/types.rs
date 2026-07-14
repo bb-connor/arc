@@ -183,6 +183,12 @@ pub struct KernelPolicyConfig {
     #[serde(default)]
     pub allow_ephemeral_revocation_store: bool,
 
+    #[serde(default)]
+    pub durable_admission_mode: chio_kernel::admission_operation::DurableAdmissionMode,
+
+    #[serde(default)]
+    pub allow_unsafe_durable_admission_off: bool,
+
     /// Number of receipts between Merkle checkpoint snapshots.
     #[serde(default = "default_checkpoint_batch_size")]
     pub checkpoint_batch_size: u64,
@@ -199,8 +205,36 @@ impl Default for KernelPolicyConfig {
             require_web3_evidence: false,
             allow_ephemeral_receipt_log: false,
             allow_ephemeral_revocation_store: false,
+            durable_admission_mode: chio_kernel::admission_operation::DurableAdmissionMode::default(
+            ),
+            allow_unsafe_durable_admission_off: false,
             checkpoint_batch_size: default_checkpoint_batch_size(),
         }
+    }
+}
+
+impl KernelPolicyConfig {
+    pub(super) fn validate(&self) -> Result<(), PolicyError> {
+        use chio_kernel::admission_operation::{AdmissionReceiptPersistence, DurableAdmissionMode};
+
+        let receipts = if self.allow_ephemeral_receipt_log {
+            AdmissionReceiptPersistence::Ephemeral
+        } else {
+            AdmissionReceiptPersistence::Durable
+        };
+        self.durable_admission_mode
+            .validate_configuration(self.allow_unsafe_durable_admission_off, receipts)
+            .map(|_| ())
+            .map_err(|error| PolicyError::Invalid(error.to_string()))?;
+        if self.allow_unsafe_durable_admission_off
+            && self.durable_admission_mode != DurableAdmissionMode::Off
+        {
+            return Err(PolicyError::Invalid(
+                "allow_unsafe_durable_admission_off requires durable_admission_mode: off"
+                    .to_string(),
+            ));
+        }
+        Ok(())
     }
 }
 

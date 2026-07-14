@@ -529,6 +529,7 @@ fn read_process_rss_bytes() -> Option<u64> {
 /// signing key, address, or internal state to the agent.
 pub struct ChioKernel {
     pub(super) config: KernelConfig,
+    pub(super) durable_admission_mode: crate::admission_operation::DurableAdmissionMode,
     /// Guards are stored behind `Arc` so a single guard can be cloned into a
     /// `spawn_blocking` task without moving the whole pipeline, letting the
     /// deadline wrapper bound a blocking guard off the async worker.

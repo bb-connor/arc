@@ -365,7 +365,7 @@ fn every_quota_participant_exhausts_atomically_and_maximum_is_immutable() {
 }
 
 #[test]
-fn structured_grant_quota_preserves_legacy_limit_and_usage() {
+fn provision_refuses_populated_legacy_budget_state() {
     let path = unique_db_path("chio-composite-legacy-quota");
     fs::create_dir_all(&path).expect("create legacy authority root");
     let database = path.join("authority.sqlite3");
@@ -377,68 +377,18 @@ fn structured_grant_quota_preserves_legacy_limit_and_usage() {
     }
     fs::set_permissions(&database, fs::Permissions::from_mode(0o600))
         .expect("secure legacy database mode");
+    let lock_root = path.join("locks");
+    fs::create_dir_all(&lock_root).expect("create lock root");
 
-    let store = reopen(&path);
-    assert!(matches!(
-        store
-            .authorize_budget_hold(owned(&store, authorize_request("legacy-bridge", 0, 2)))
-            .expect("bridge legacy quota"),
-        BudgetAuthorizeHoldDecision::Authorized(_)
-    ));
-    let grant = store
-        .get_invocation_quota_usage(&BudgetQuotaKey::grant("cap-composite", 0))
-        .expect("grant quota")
-        .expect("grant quota row");
-    assert_eq!(grant.reserved_invocations, 1);
-    assert_eq!(grant.captured_invocations, 1);
-    drop(store);
-    drop(reopen(&path));
+    let error = SqliteAuthorityStore::provision(&database, &lock_root)
+        .expect_err("populated legacy safety state must not acquire an unproven baseline");
+    assert!(
+        error
+            .to_string()
+            .contains("baseline refuses nonempty safety table `budget_mutation_events`"),
+        "unexpected provisioning error: {error}"
+    );
     let _ = fs::remove_dir_all(path);
-}
-
-#[test]
-fn structured_grant_quota_rejects_legacy_omission_conflict_and_overuse() {
-    for (case, limits, unbounded, requested_max, omit_grant) in [
-        ("omit", vec![2], 0, 2, true),
-        ("conflict", vec![3, 4], 0, 4, false),
-        ("overuse", vec![1], 2, 1, false),
-    ] {
-        let path = unique_db_path(&format!("chio-composite-legacy-quota-{case}"));
-        fs::create_dir_all(&path).expect("create legacy authority root");
-        let database = path.join("authority.sqlite3");
-        {
-            let legacy = SqliteBudgetStore::open(&database).expect("open legacy store");
-            for _ in 0..unbounded {
-                assert!(legacy
-                    .try_increment("cap-composite", 0, None)
-                    .expect("unbounded legacy increment"));
-            }
-            for limit in limits {
-                let _ = legacy
-                    .try_increment("cap-composite", 0, Some(limit))
-                    .expect("bounded legacy increment");
-            }
-        }
-        fs::set_permissions(&database, fs::Permissions::from_mode(0o600))
-            .expect("secure legacy database mode");
-
-        let store = reopen(&path);
-        let mut request = authorize_request(case, 0, requested_max);
-        if omit_grant {
-            request
-                .invocation_quotas
-                .retain(|quota| quota.key.profile != BudgetQuotaProfile::GrantInvocation);
-        }
-        let error = store
-            .authorize_budget_hold(owned(&store, request))
-            .expect_err("invalid legacy quota bridge must fail closed");
-        assert!(
-            error.to_string().contains("legacy")
-                || error.to_string().contains("untracked invocations"),
-            "unexpected {case} error: {error}"
-        );
-        let _ = fs::remove_dir_all(path);
-    }
 }
 
 #[test]

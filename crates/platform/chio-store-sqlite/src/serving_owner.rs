@@ -1,5 +1,6 @@
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -17,6 +18,36 @@ use crate::revocation_store::{
 };
 use crate::{SqliteBudgetStore, SqliteRevocationStore};
 
+mod global_commit_chain;
+mod lease_history;
+mod path_identity;
+mod rollback_anchor;
+
+use global_commit_chain::{
+    append_global_commit, initialize_global_commit_schema, reset_derived_budget_ack_cache,
+    seed_global_baseline, verify_global_commit_schema,
+};
+use lease_history::{initialize_serving_lease_schema, verify_serving_lease_history};
+use rollback_anchor::RollbackAnchor;
+
+const SERVING_OWNER_SCHEMA: &str = r#"
+CREATE TABLE chio_serving_owner (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    store_uuid TEXT UNIQUE NOT NULL,
+    database_path TEXT NOT NULL,
+    database_device INTEGER NOT NULL CHECK (database_device >= 0),
+    database_inode INTEGER NOT NULL CHECK (database_inode >= 0),
+    lock_root TEXT NOT NULL,
+    lock_device INTEGER NOT NULL CHECK (lock_device >= 0),
+    lock_inode INTEGER NOT NULL CHECK (lock_inode >= 0),
+    owner_epoch INTEGER NOT NULL DEFAULT 0 CHECK (owner_epoch >= 0),
+    lease_id TEXT,
+    opened_at_ms INTEGER
+);
+"#;
+
+type SchemaCatalogEntry = (String, String, String, Option<String>);
+
 #[derive(Debug, thiserror::Error)]
 pub enum SqliteServingOwnerError {
     #[error("sqlite error: {0}")]
@@ -31,11 +62,84 @@ pub enum SqliteServingOwnerError {
     AlreadyServing(String),
     #[error("invalid sqlite authority store: {0}")]
     Invalid(String),
+    #[error("sqlite authority durable outcome is unknown: {0}")]
+    OutcomeUnknown(String),
 }
 
 pub(crate) struct SqliteServingOwner {
-    _lock_file: File,
+    rollback_anchor: RollbackAnchor,
     pub(crate) fence: StoreMutationFence,
+    poisoned: AtomicBool,
+    expected_data_version: AtomicU64,
+}
+
+impl SqliteServingOwner {
+    pub(crate) fn outcome_unknown(&self, detail: impl Into<String>) -> SqliteServingOwnerError {
+        self.poisoned.store(true, Ordering::Release);
+        SqliteServingOwnerError::OutcomeUnknown(detail.into())
+    }
+
+    pub(crate) fn verify_authority_anchor(
+        &self,
+        connection: &Connection,
+    ) -> Result<(), SqliteServingOwnerError> {
+        if self.poisoned.load(Ordering::Acquire) {
+            return Err(SqliteServingOwnerError::OutcomeUnknown(
+                "sqlite authority owner is poisoned after an outcome-unknown anchor sync"
+                    .to_string(),
+            ));
+        }
+        let actual = authority_data_version(connection)?;
+        if actual != self.expected_data_version.load(Ordering::Acquire) {
+            self.poisoned.store(true, Ordering::Release);
+            return Err(SqliteServingOwnerError::OutcomeUnknown(
+                "authority database changed outside its serving-owner connection".to_string(),
+            ));
+        }
+        self.rollback_anchor.verify_current(connection)
+    }
+
+    pub(crate) fn append_global_commit(
+        &self,
+        transaction: &Transaction<'_>,
+        mutation_kind: &str,
+        projection_kind: &str,
+        projection_key: &str,
+        projection_sequence: u64,
+    ) -> Result<(), SqliteServingOwnerError> {
+        append_global_commit(
+            transaction,
+            mutation_kind,
+            projection_kind,
+            projection_key,
+            projection_sequence,
+            &self.fence,
+        )
+    }
+
+    pub(crate) fn sync_authority_anchor(
+        &self,
+        connection: &Connection,
+    ) -> Result<(), SqliteServingOwnerError> {
+        if self.poisoned.load(Ordering::Acquire) {
+            return Err(SqliteServingOwnerError::OutcomeUnknown(
+                "sqlite authority owner is poisoned after an outcome-unknown anchor sync"
+                    .to_string(),
+            ));
+        }
+        if authority_data_version(connection)? != self.expected_data_version.load(Ordering::Acquire)
+        {
+            self.poisoned.store(true, Ordering::Release);
+            return Err(SqliteServingOwnerError::OutcomeUnknown(
+                "authority database changed outside its serving-owner connection".to_string(),
+            ));
+        }
+        if let Err(error) = self.rollback_anchor.sync_after_commit(connection) {
+            self.poisoned.store(true, Ordering::Release);
+            return Err(SqliteServingOwnerError::OutcomeUnknown(error.to_string()));
+        }
+        Ok(())
+    }
 }
 
 pub struct SqliteAuthorityStore {
@@ -82,12 +186,18 @@ impl SqliteAuthorityStore {
         let mut connection = open_existing_database(&canonical_database_path)?;
         validate_database_identity(&canonical_database_path, &expected_database)?;
         if owner_table_exists(&connection)? {
+            verify_serving_owner_schema(&connection)?;
             let record = load_provisioning_record(&connection)?.ok_or_else(|| {
                 SqliteServingOwnerError::PartialProvision(
                     canonical_database_path.display().to_string(),
                 )
             })?;
             validate_provisioning_record(&canonical_database_path, &lock_root, &record)?;
+            path_identity::inspect(
+                &lock_root,
+                &canonical_database_path,
+                Some(&record.store_uuid),
+            )?;
             let lock_path = lock_root.join(format!("{}.lock", record.store_uuid));
             let lock_file = open_lock_file(&lock_path)?;
             validate_open_lock_file(&lock_root, &lock_file, &record)?;
@@ -96,20 +206,41 @@ impl SqliteAuthorityStore {
             validate_provisioning_record(&canonical_database_path, &lock_root, &record)?;
             initialize_offline_authority_schemas(&mut connection)?;
             initialize_serving_lease_schema(&connection)?;
+            crate::admission_operation_store::initialize_admission_operation_schema(
+                &mut connection,
+            )?;
+            initialize_global_commit_schema(&connection)?;
+            seed_global_baseline(&mut connection)?;
+            reset_derived_budget_ack_cache(&connection)?;
             verify_authority_store_invariants(&connection)?;
             validate_database_identity(&canonical_database_path, &expected_database)?;
             connection.execute_batch("PRAGMA wal_checkpoint(FULL);")?;
             File::open(&canonical_database_path)?.sync_all()?;
             File::open(database_parent(&canonical_database_path))?.sync_all()?;
             validate_database_identity(&canonical_database_path, &expected_database)?;
+            let rollback_anchor = RollbackAnchor::new(
+                lock_file,
+                &lock_root,
+                &record.store_uuid,
+                record.lock_device,
+                record.lock_inode,
+            )?;
+            rollback_anchor.migrate_offline(&connection)?;
+            validate_database_identity(&canonical_database_path, &expected_database)?;
+            path_identity::ensure(&lock_root, &canonical_database_path, &record.store_uuid)?;
             return Ok(());
         }
+        verify_path_available_for_new_identity(&lock_root, &canonical_database_path)?;
         initialize_offline_authority_schemas(&mut connection)?;
         validate_database_identity(&canonical_database_path, &expected_database)?;
         let database_path = canonical_database_path;
         for (key, supported) in [
             ("budget", BUDGET_STORE_SUPPORTED_SCHEMA_VERSION),
             ("revocation", REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION),
+            (
+                "admission_operation",
+                crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
+            ),
         ] {
             crate::check_schema_version(
                 &connection,
@@ -119,25 +250,11 @@ impl SqliteAuthorityStore {
             )
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
         }
-        connection.execute_batch(
-            r#"
-            PRAGMA foreign_keys = ON;
-            CREATE TABLE chio_serving_owner (
-                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-                store_uuid TEXT UNIQUE NOT NULL,
-                database_path TEXT NOT NULL,
-                database_device INTEGER NOT NULL CHECK (database_device >= 0),
-                database_inode INTEGER NOT NULL CHECK (database_inode >= 0),
-                lock_root TEXT NOT NULL,
-                lock_device INTEGER NOT NULL CHECK (lock_device >= 0),
-                lock_inode INTEGER NOT NULL CHECK (lock_inode >= 0),
-                owner_epoch INTEGER NOT NULL DEFAULT 0 CHECK (owner_epoch >= 0),
-                lease_id TEXT,
-                opened_at_ms INTEGER
-            );
-            "#,
-        )?;
+        connection.execute_batch("PRAGMA foreign_keys = ON;")?;
+        connection.execute_batch(SERVING_OWNER_SCHEMA)?;
+        verify_serving_owner_schema(&connection)?;
         initialize_serving_lease_schema(&connection)?;
+        crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
 
         let store_uuid = uuid::Uuid::now_v7().to_string();
         let lock_path = lock_root.join(format!("{store_uuid}.lock"));
@@ -175,15 +292,24 @@ impl SqliteAuthorityStore {
                     "serving-owner insert did not affect exactly one row".to_string(),
                 ));
             }
-            transaction.commit()?;
+            transaction.commit().map_err(|error| {
+                SqliteServingOwnerError::OutcomeUnknown(format!(
+                    "sqlite authority provisioning commit outcome is unknown: {error}"
+                ))
+            })?;
             Ok(())
         })();
         if let Err(error) = owner_insert {
-            drop(lock_file);
-            let _ = fs::remove_file(&lock_path);
-            let _ = File::open(&lock_root).and_then(|directory| directory.sync_all());
+            if !matches!(error, SqliteServingOwnerError::OutcomeUnknown(_)) {
+                drop(lock_file);
+                let _ = fs::remove_file(&lock_path);
+                let _ = File::open(&lock_root).and_then(|directory| directory.sync_all());
+            }
             return Err(error);
         }
+        initialize_global_commit_schema(&connection)?;
+        seed_global_baseline(&mut connection)?;
+        reset_derived_budget_ack_cache(&connection)?;
         verify_authority_store_invariants(&connection)?;
         validate_database_identity(&database_path, &expected_database)?;
         File::open(&database_path)?.sync_all()?;
@@ -192,6 +318,16 @@ impl SqliteAuthorityStore {
             File::open(parent)?.sync_all()?;
         }
         validate_database_identity(&database_path, &expected_database)?;
+        let rollback_anchor = RollbackAnchor::new(
+            lock_file,
+            &lock_root,
+            &store_uuid,
+            read_u64(metadata_device(&lock_metadata)?, "lock_device")?,
+            read_u64(metadata_inode(&lock_metadata)?, "lock_inode")?,
+        )?;
+        rollback_anchor.seed_new(&connection)?;
+        validate_database_identity(&database_path, &expected_database)?;
+        path_identity::ensure(&lock_root, &database_path, &store_uuid)?;
         Ok(())
     }
 
@@ -208,21 +344,20 @@ impl SqliteAuthorityStore {
         validate_secure_directory(database_parent(&database_path), "authority database parent")?;
         let expected_database = fs::metadata(&database_path)?;
         let mut connection = open_existing_database(&database_path)?;
+        let expected_data_version = authority_data_version(&connection)?;
         validate_database_identity(&database_path, &expected_database)?;
-        let record = match load_provisioning_record(&connection)? {
-            Some(record) => record,
-            None if owner_table_exists(&connection)? => {
-                return Err(SqliteServingOwnerError::PartialProvision(path_text(
-                    &database_path,
-                )?));
-            }
-            None => {
-                return Err(SqliteServingOwnerError::NotProvisioned(path_text(
-                    &database_path,
-                )?));
-            }
-        };
+        if !owner_table_exists(&connection)? {
+            verify_path_available_for_new_identity(&lock_root, &database_path)?;
+            return Err(SqliteServingOwnerError::NotProvisioned(path_text(
+                &database_path,
+            )?));
+        }
+        verify_serving_owner_schema(&connection)?;
+        let record = load_provisioning_record(&connection)?.ok_or_else(|| {
+            SqliteServingOwnerError::PartialProvision(database_path.display().to_string())
+        })?;
         validate_provisioning_record(&database_path, &lock_root, &record)?;
+        path_identity::inspect(&lock_root, &database_path, Some(&record.store_uuid))?;
         let lock_path = lock_root.join(format!("{}.lock", record.store_uuid));
         let lock_file = open_lock_file(&lock_path)?;
         validate_open_lock_file(&lock_root, &lock_file, &record)?;
@@ -239,9 +374,16 @@ impl SqliteAuthorityStore {
             "#,
         )?;
         initialize_serving_lease_schema(&connection)?;
+        crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
+        verify_global_commit_schema(&connection)?;
+        reset_derived_budget_ack_cache(&connection)?;
         for (key, supported) in [
             ("budget", BUDGET_STORE_SUPPORTED_SCHEMA_VERSION),
             ("revocation", REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION),
+            (
+                "admission_operation",
+                crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
+            ),
         ] {
             crate::check_schema_version(
                 &connection,
@@ -252,6 +394,16 @@ impl SqliteAuthorityStore {
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
         }
         verify_authority_store_invariants(&connection)?;
+        let rollback_anchor = RollbackAnchor::new(
+            lock_file,
+            &lock_root,
+            &record.store_uuid,
+            record.lock_device,
+            record.lock_inode,
+        )?;
+        rollback_anchor.reconcile_startup(&connection)?;
+        validate_database_identity(&database_path, &expected_database)?;
+        path_identity::ensure(&lock_root, &database_path, &record.store_uuid)?;
 
         let owner_epoch = record.owner_epoch.checked_add(1).ok_or_else(|| {
             SqliteServingOwnerError::Invalid("serving owner epoch overflowed u64".to_string())
@@ -349,14 +501,26 @@ impl SqliteAuthorityStore {
             ));
         }
         verify_authority_store_invariants(&transaction)?;
-        transaction.commit()?;
+        transaction.commit().map_err(|error| {
+            SqliteServingOwnerError::OutcomeUnknown(format!(
+                "sqlite serving-owner epoch commit outcome is unknown: {error}"
+            ))
+        })?;
+        rollback_anchor.sync_after_commit(&connection)?;
+        if authority_data_version(&connection)? != expected_data_version {
+            return Err(SqliteServingOwnerError::Invalid(
+                "authority database changed concurrently while opening".to_string(),
+            ));
+        }
         let owner = Arc::new(SqliteServingOwner {
-            _lock_file: lock_file,
+            rollback_anchor,
             fence: StoreMutationFence {
                 store_uuid: record.store_uuid,
                 lease_id,
                 owner_epoch,
             },
+            poisoned: AtomicBool::new(false),
+            expected_data_version: AtomicU64::new(expected_data_version),
         });
         Ok(Self {
             connection: Arc::new(Mutex::new(connection)),
@@ -377,6 +541,16 @@ impl SqliteAuthorityStore {
     #[must_use]
     pub fn revocation_store(&self) -> SqliteRevocationStore {
         SqliteRevocationStore::open_alongside(self.connection.clone(), self.owner.clone())
+    }
+
+    #[must_use]
+    pub fn admission_operation_store(
+        &self,
+    ) -> crate::admission_operation_store::SqliteAdmissionOperationStore {
+        crate::admission_operation_store::SqliteAdmissionOperationStore::open_alongside(
+            self.connection.clone(),
+            self.owner.clone(),
+        )
     }
 }
 
@@ -460,178 +634,48 @@ fn owner_table_exists(connection: &Connection) -> Result<bool, rusqlite::Error> 
     )
 }
 
-fn initialize_serving_lease_schema(connection: &Connection) -> Result<(), SqliteServingOwnerError> {
-    connection.execute_batch(
-        r#"
-        CREATE TABLE IF NOT EXISTS chio_serving_leases (
-            store_uuid TEXT NOT NULL,
-            owner_epoch INTEGER NOT NULL CHECK (owner_epoch > 0),
-            lease_id TEXT NOT NULL CHECK (lease_id <> ''),
-            start_head_index INTEGER NOT NULL CHECK (start_head_index > 0),
-            end_head_index INTEGER CHECK (
-                end_head_index IS NULL OR end_head_index >= start_head_index
-            ),
-            opened_at_ms INTEGER NOT NULL CHECK (opened_at_ms > 0),
-            PRIMARY KEY (store_uuid, owner_epoch),
-            UNIQUE (lease_id),
-            FOREIGN KEY (store_uuid) REFERENCES chio_serving_owner(store_uuid)
-        );
-
-        CREATE TRIGGER IF NOT EXISTS chio_serving_leases_close_only
-        BEFORE UPDATE ON chio_serving_leases
-        WHEN NOT (
-            OLD.store_uuid IS NEW.store_uuid
-            AND OLD.owner_epoch IS NEW.owner_epoch
-            AND OLD.lease_id IS NEW.lease_id
-            AND OLD.start_head_index IS NEW.start_head_index
-            AND OLD.opened_at_ms IS NEW.opened_at_ms
-            AND OLD.end_head_index IS NULL
-            AND NEW.end_head_index IS NOT NULL
-            AND NEW.end_head_index >= OLD.start_head_index
-        )
-        BEGIN
-            SELECT RAISE(ABORT, 'serving lease history is immutable');
-        END;
-
-        CREATE TRIGGER IF NOT EXISTS chio_serving_leases_no_delete
-        BEFORE DELETE ON chio_serving_leases
-        BEGIN
-            SELECT RAISE(ABORT, 'serving lease history is immutable');
-        END;
-        "#,
-    )?;
+fn verify_path_available_for_new_identity(
+    lock_root: &Path,
+    canonical_database_path: &Path,
+) -> Result<(), SqliteServingOwnerError> {
+    if path_identity::inspect(lock_root, canonical_database_path, None)?
+        == path_identity::MarkerStatus::Present
+    {
+        return Err(SqliteServingOwnerError::Invalid(format!(
+            "local path identity continuity marker remains for `{}` but the database lost its provisioning record; refusing to mint a replacement store UUID (this marker is local continuity evidence, not independent rollback protection)",
+            canonical_database_path.display()
+        )));
+    }
     Ok(())
 }
 
-struct ServingLeaseRecord {
-    store_uuid: String,
-    owner_epoch: u64,
-    lease_id: String,
-    start_head_index: u64,
-    end_head_index: Option<u64>,
-    opened_at_ms: u64,
-}
-
-fn verify_serving_lease_history(connection: &Connection) -> Result<(), SqliteServingOwnerError> {
-    let (store_uuid, owner_epoch, active_lease_id, active_opened_at_ms) = connection.query_row(
-        r#"
-        SELECT store_uuid, owner_epoch, lease_id, opened_at_ms
-        FROM chio_serving_owner WHERE singleton = 1
-        "#,
-        [],
-        |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, i64>(1)?,
-                row.get::<_, Option<String>>(2)?,
-                row.get::<_, Option<i64>>(3)?,
-            ))
-        },
-    )?;
-    let owner_epoch = read_u64(owner_epoch, "owner_epoch")?;
-    let authority_head = connection.query_row(
-        "SELECT head_index FROM admission_authority_meta WHERE singleton = 1",
-        [],
-        |row| row.get::<_, i64>(0),
-    )?;
-    let authority_head = read_u64(authority_head, "admission authority head")?;
-
-    let mut statement = connection.prepare(
-        r#"
-        SELECT store_uuid, owner_epoch, lease_id,
-               start_head_index, end_head_index, opened_at_ms
-        FROM chio_serving_leases
-        ORDER BY owner_epoch ASC
-        "#,
-    )?;
-    let leases = statement.query_map([], |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, i64>(1)?,
-            row.get::<_, String>(2)?,
-            row.get::<_, i64>(3)?,
-            row.get::<_, Option<i64>>(4)?,
-            row.get::<_, i64>(5)?,
-        ))
-    })?;
-
-    let mut expected_epoch = 1_u64;
-    let mut previous_end = None;
-    for lease in leases {
-        let lease = lease?;
-        let lease = ServingLeaseRecord {
-            store_uuid: lease.0,
-            owner_epoch: read_u64(lease.1, "serving lease owner_epoch")?,
-            lease_id: lease.2,
-            start_head_index: read_u64(lease.3, "serving lease start_head_index")?,
-            end_head_index: lease
-                .4
-                .map(|value| read_u64(value, "serving lease end_head_index"))
-                .transpose()?,
-            opened_at_ms: read_u64(lease.5, "serving lease opened_at_ms")?,
-        };
-        if lease.store_uuid != store_uuid
-            || lease.owner_epoch != expected_epoch
-            || lease.lease_id.is_empty()
-            || lease.start_head_index == 0
-            || lease.start_head_index > authority_head
-            || lease.opened_at_ms == 0
-            || previous_end.is_some_and(|end| end != lease.start_head_index)
-        {
-            return Err(SqliteServingOwnerError::Invalid(
-                "serving lease history is not a dense authority chain".to_string(),
-            ));
-        }
-        if lease.owner_epoch < owner_epoch {
-            let end = lease.end_head_index.ok_or_else(|| {
-                SqliteServingOwnerError::Invalid("a prior serving lease remains open".to_string())
-            })?;
-            if end < lease.start_head_index || end > authority_head {
-                return Err(SqliteServingOwnerError::Invalid(
-                    "a prior serving lease has an invalid authority interval".to_string(),
-                ));
-            }
-            previous_end = Some(end);
-        } else if lease.owner_epoch == owner_epoch {
-            let active_opened_at_ms = active_opened_at_ms
-                .ok_or_else(|| {
-                    SqliteServingOwnerError::Invalid(
-                        "active serving owner has no open timestamp".to_string(),
-                    )
-                })
-                .and_then(|value| read_u64(value, "active serving owner opened_at_ms"))?;
-            if lease.end_head_index.is_some()
-                || active_lease_id.as_deref() != Some(lease.lease_id.as_str())
-                || active_opened_at_ms != lease.opened_at_ms
-            {
-                return Err(SqliteServingOwnerError::Invalid(
-                    "active serving lease does not match its owner fence".to_string(),
-                ));
-            }
-            previous_end = None;
-        } else {
-            return Err(SqliteServingOwnerError::Invalid(
-                "serving lease history extends beyond its owner epoch".to_string(),
-            ));
-        }
-        expected_epoch = expected_epoch.checked_add(1).ok_or_else(|| {
-            SqliteServingOwnerError::Invalid("serving lease epoch overflowed u64".to_string())
-        })?;
-    }
-
-    let lease_count = expected_epoch - 1;
-    if owner_epoch == 0 {
-        if lease_count != 0 || active_lease_id.is_some() || active_opened_at_ms.is_some() {
-            return Err(SqliteServingOwnerError::Invalid(
-                "inactive serving owner has lease history".to_string(),
-            ));
-        }
-    } else if lease_count != owner_epoch || previous_end.is_some() {
+fn verify_serving_owner_schema(connection: &Connection) -> Result<(), SqliteServingOwnerError> {
+    let expected = Connection::open_in_memory()?;
+    expected.execute_batch(SERVING_OWNER_SCHEMA)?;
+    if serving_owner_schema_catalog(connection)? != serving_owner_schema_catalog(&expected)? {
         return Err(SqliteServingOwnerError::Invalid(
-            "serving lease history does not end at the active owner epoch".to_string(),
+            "serving owner schema differs from the canonical definition".to_string(),
         ));
     }
     Ok(())
+}
+
+fn serving_owner_schema_catalog(
+    connection: &Connection,
+) -> Result<Vec<SchemaCatalogEntry>, SqliteServingOwnerError> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT type, name, tbl_name, sql FROM sqlite_schema
+        WHERE name = 'chio_serving_owner' OR tbl_name = 'chio_serving_owner'
+        ORDER BY type, name, tbl_name
+        "#,
+    )?;
+    let catalog = statement
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(catalog)
 }
 
 pub(crate) fn verify_historical_revocation_commit(
@@ -1131,7 +1175,7 @@ fn sqlite_u64(value: u64, field: &str) -> Result<i64, SqliteServingOwnerError> {
     })
 }
 
-fn read_u64(value: i64, field: &str) -> Result<u64, SqliteServingOwnerError> {
+pub(super) fn read_u64(value: i64, field: &str) -> Result<u64, SqliteServingOwnerError> {
     u64::try_from(value)
         .map_err(|_| SqliteServingOwnerError::Invalid(format!("{field} is negative")))
 }
@@ -1151,9 +1195,15 @@ fn now_ms() -> Result<i64, SqliteServingOwnerError> {
         .map_err(|_| SqliteServingOwnerError::Invalid("wall clock overflowed i64".to_string()))
 }
 
+fn authority_data_version(connection: &Connection) -> Result<u64, SqliteServingOwnerError> {
+    let version = connection.query_row("PRAGMA data_version", [], |row| row.get::<_, i64>(0))?;
+    read_u64(version, "sqlite data_version")
+}
+
 fn verify_authority_store_invariants(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
+    verify_serving_owner_schema(connection)?;
     let foreign_key_violation = connection
         .query_row("PRAGMA foreign_key_check", [], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
@@ -1168,6 +1218,8 @@ fn verify_authority_store_invariants(
     crate::budget_store::composite_schema::verify_budget_projection_invariants(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     verify_admission_authority_invariants(connection)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::admission_operation_store::verify_admission_operation_invariants(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     Ok(())
 }

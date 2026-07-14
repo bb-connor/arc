@@ -163,7 +163,14 @@ impl SqliteBudgetStore {
             None,
         )?;
         let decision = transition_decision_from_event(self, &transaction, event)?;
-        transaction.commit()?;
+        self.append_joint_commit(
+            &transaction,
+            BudgetMutationKind::ReleaseExposure,
+            event_id,
+            event_seq,
+        )?;
+        self.commit_joint_transaction(transaction)?;
+        self.sync_joint_anchor(&connection)?;
         Ok(decision)
     }
 
@@ -399,7 +406,9 @@ impl SqliteBudgetStore {
             request.expected_cumulative_approval_state,
         )?;
         let decision = transition_decision_from_event(self, &transaction, event)?;
-        transaction.commit()?;
+        self.append_joint_commit(&transaction, reverse_kind, event_id, event_seq)?;
+        self.commit_joint_transaction(transaction)?;
+        self.sync_joint_anchor(&connection)?;
         Ok(decision)
     }
 
@@ -558,7 +567,9 @@ impl SqliteBudgetStore {
             None,
         )?;
         let decision = transition_decision_from_event(self, &transaction, event)?;
-        transaction.commit()?;
+        self.append_joint_commit(&transaction, kind, event_id, event_seq)?;
+        self.commit_joint_transaction(transaction)?;
+        self.sync_joint_anchor(&connection)?;
         Ok(decision)
     }
 

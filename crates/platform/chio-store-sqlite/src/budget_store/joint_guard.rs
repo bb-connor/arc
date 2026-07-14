@@ -11,6 +11,11 @@ impl SqliteBudgetStore {
         let mut connection = self.connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
         crate::serving_owner::verify_budget_fence(&transaction, self.serving_owner.as_deref())?;
+        if let Some(owner) = self.serving_owner.as_ref() {
+            owner
+                .verify_authority_anchor(&transaction)
+                .map_err(crate::budget_store::store::map_serving_owner_error)?;
+        }
         transaction.rollback()?;
         Err(BudgetStoreError::Invariant(format!(
             "joint sqlite authority rejects legacy {operation} mutation"

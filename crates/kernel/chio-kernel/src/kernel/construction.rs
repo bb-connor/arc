@@ -224,6 +224,7 @@ impl ChioKernel {
         let federation_dsse_envelopes_gauge;
         let mut kernel = Self {
             config,
+            durable_admission_mode: crate::admission_operation::DurableAdmissionMode::default(),
             guards: std::sync::Arc::new(Vec::new()),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
             budget_store: Arc::new(InMemoryBudgetStore::new()),
@@ -638,6 +639,25 @@ impl ChioKernel {
         receipt_store: Box<dyn ReceiptStore>,
     ) -> Result<(), KernelError> {
         self.set_receipt_store_handle(Arc::from(receipt_store))
+    }
+
+    pub fn configure_durable_admission(
+        &mut self,
+        mode: crate::admission_operation::DurableAdmissionMode,
+        unsafe_development: bool,
+    ) -> Result<(), crate::admission_operation::AdmissionOperationError> {
+        let receipts = if self.config.allow_ephemeral_receipt_log {
+            crate::admission_operation::AdmissionReceiptPersistence::Ephemeral
+        } else {
+            crate::admission_operation::AdmissionReceiptPersistence::Durable
+        };
+        self.durable_admission_mode = mode.validate_configuration(unsafe_development, receipts)?;
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn durable_admission_mode(&self) -> crate::admission_operation::DurableAdmissionMode {
+        self.durable_admission_mode
     }
 
     pub fn set_receipt_store_handle(

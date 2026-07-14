@@ -9,6 +9,9 @@ pub enum RevocationStoreError {
     #[error("revocation store synchronization error: {0}")]
     Sync(String),
 
+    #[error("revocation mutation durable outcome is unknown: {0}")]
+    OutcomeUnknown(String),
+
     #[error(
         "revocation store serving owner fenced (expected epoch {expected_epoch}, actual {actual_epoch:?})"
     )]

@@ -135,6 +135,10 @@ fn parse_example_policy() {
     assert!(!policy.kernel.allow_elicitation);
     assert!(!policy.kernel.require_web3_evidence);
     assert_eq!(
+        policy.kernel.durable_admission_mode,
+        chio_kernel::admission_operation::DurableAdmissionMode::SideEffecting
+    );
+    assert_eq!(
         policy.kernel.checkpoint_batch_size,
         chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE
     );
@@ -156,6 +160,53 @@ kernel:
     let policy = parse_policy(yaml).test_unwrap();
     assert!(policy.kernel.require_web3_evidence);
     assert_eq!(policy.kernel.checkpoint_batch_size, 32);
+}
+
+#[test]
+fn durable_admission_policy_supports_qualification_modes_and_rejects_unsafe_off() {
+    use chio_kernel::admission_operation::DurableAdmissionMode;
+
+    let monetary = parse_policy(
+        r#"
+kernel:
+  durable_admission_mode: monetary
+"#,
+    )
+    .test_unwrap();
+    assert_eq!(
+        monetary.kernel.durable_admission_mode,
+        DurableAdmissionMode::Monetary
+    );
+
+    for yaml in [
+        r#"
+kernel:
+  durable_admission_mode: off
+"#,
+        r#"
+kernel:
+  durable_admission_mode: off
+  allow_unsafe_durable_admission_off: true
+"#,
+        r#"
+kernel:
+  allow_ephemeral_receipt_log: true
+  allow_unsafe_durable_admission_off: true
+"#,
+    ] {
+        assert!(parse_policy(yaml).is_err());
+    }
+
+    let off = parse_policy(
+        r#"
+kernel:
+  durable_admission_mode: off
+  allow_ephemeral_receipt_log: true
+  allow_unsafe_durable_admission_off: true
+"#,
+    )
+    .test_unwrap();
+    assert_eq!(off.kernel.durable_admission_mode, DurableAdmissionMode::Off);
 }
 
 #[test]

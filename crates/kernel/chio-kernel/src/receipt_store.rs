@@ -363,7 +363,7 @@ pub enum AtomicReceiptProjection {
 }
 
 /// Initial settlement work committed with a receipt.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct PendingSettlementObservation {
     /// Earliest time at which a worker may claim the observation.
     pub next_visible_at_ms: u64,
@@ -408,6 +408,19 @@ fn receipt_writer_liveness_unknown_label() -> String {
 
 pub trait ReceiptStore: Send + Sync {
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError>;
+    fn admission_projection_capabilities(
+        &self,
+    ) -> crate::admission_operation::AdmissionProjectionCapabilities {
+        crate::admission_operation::AdmissionProjectionCapabilities::default()
+    }
+    fn commit_admission_projection(
+        &self,
+        _projection: &crate::admission_operation::AdmissionTerminalProjection,
+    ) -> Result<crate::admission_operation::AdmissionTerminal, ReceiptStoreError> {
+        Err(ReceiptStoreError::Unsupported(
+            "atomic admission terminal projection".to_string(),
+        ))
+    }
     /// Identify the durable writer shared with a settlement outcome store.
     fn settlement_store_binding(&self) -> Option<chio_settle::SettlementStoreBinding> {
         None

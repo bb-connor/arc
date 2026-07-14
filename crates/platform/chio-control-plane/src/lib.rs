@@ -348,6 +348,15 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
     };
 
     let mut kernel = ChioKernel::new(config);
+    if kernel
+        .configure_durable_admission(
+            kernel_policy.durable_admission_mode,
+            kernel_policy.allow_unsafe_durable_admission_off,
+        )
+        .is_err()
+    {
+        tracing::error!("invalid durable admission configuration; retaining side-effecting mode");
+    }
 
     let default_guard_profile = chio_guards::default_runtime_guard_profile();
     if !default_guard_profile.pre_invocation_guards.is_empty() {

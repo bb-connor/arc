@@ -23,6 +23,9 @@ pub enum BudgetStoreError {
 
     #[error("budget state invariant violated: {0}")]
     Invariant(String),
+
+    #[error("budget mutation durable outcome is unknown: {0}")]
+    OutcomeUnknown(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
