@@ -305,11 +305,13 @@ mod tests {
     }
 
     #[test]
-    fn burn_tombstones_reject_any_live_participant() {
-        assert!(signer_burn_tombstones([
-            ("session-a".to_string(), "burned".to_string()),
-            ("session-a".to_string(), "share_ready".to_string()),
-        ])
-        .is_err());
+    fn burn_tombstones_reject_every_live_signer_state() {
+        for state in ["prepared", "commitment_published", "share_ready"] {
+            assert!(signer_burn_tombstones([
+                ("session-a".to_string(), "burned".to_string()),
+                ("session-a".to_string(), state.to_string()),
+            ])
+            .is_err());
+        }
     }
 }

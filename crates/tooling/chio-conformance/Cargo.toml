@@ -104,6 +104,9 @@ serde_yaml = { workspace = true }
 # browser kernel through its native (non-wasm32) cargo test surface.
 chio-kernel-browser = { workspace = true }
 chio-federation = { workspace = true, features = ["demo"] }
+frost-ed25519 = { workspace = true }
+rand_chacha = { workspace = true }
+rand_core = { workspace = true }
 # Attenuation chain-binding conformance test exercises
 # verify_capability_with_floor_and_trust_root via chio-kernel-core directly.
 # Sibling-sum budget conformance tests exercise

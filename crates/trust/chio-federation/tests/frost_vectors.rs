@@ -414,6 +414,11 @@ fn upstream_official_vector_and_active_execution_authorization_verify() {
         verified.authorization_id(),
         fixture.proof.body.authorization_id
     );
+    assert_eq!(
+        verified.authorization_slot_id(),
+        frost_authorization_slot_id(&fixture.proof.body)
+            .unwrap_or_else(|error| panic!("fixture slot id must compute: {error}"))
+    );
 }
 
 #[test]

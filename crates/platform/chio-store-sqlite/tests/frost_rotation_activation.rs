@@ -584,7 +584,7 @@ fn verified_rotation_authorization(
 }
 
 #[test]
-fn anchored_rotation_recovers_after_crash_before_local_acknowledgement() {
+fn frost_anchored_rotation_recovers_after_crash_before_local_acknowledgement() {
     let fixture = StoreFixture::new();
     let (authority, frost) = fixture.open();
     let current_group = threshold_group(1, 2, 3);
@@ -697,7 +697,7 @@ fn anchored_rotation_recovers_after_crash_before_local_acknowledgement() {
 }
 
 #[test]
-fn unanchored_rotation_is_discarded_after_restart() {
+fn frost_unanchored_rotation_is_discarded_after_restart() {
     let fixture = StoreFixture::new();
     let (authority, frost) = fixture.open();
     let current_group = threshold_group(4, 2, 3);

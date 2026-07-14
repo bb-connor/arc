@@ -373,6 +373,7 @@ pub trait FrostAuthorizationSlotAnchor: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct VerifiedFrostAuthorization {
     body: FrostAuthorizationBodyV1,
+    authorization_slot_id: String,
     proof_digest: String,
 }
 
@@ -380,6 +381,11 @@ impl VerifiedFrostAuthorization {
     #[must_use]
     pub fn authorization_id(&self) -> &str {
         &self.body.authorization_id
+    }
+
+    #[must_use]
+    pub fn authorization_slot_id(&self) -> &str {
+        &self.authorization_slot_id
     }
 
     #[must_use]
@@ -573,6 +579,7 @@ pub fn verify_for_execution(
     let canonical = proof.canonical_bytes()?;
     Ok(VerifiedFrostAuthorization {
         body: proof.body.clone(),
+        authorization_slot_id: frost_authorization_slot_id(&proof.body)?,
         proof_digest: sha256_hex(&canonical),
     })
 }

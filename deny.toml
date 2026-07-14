@@ -350,6 +350,12 @@ name = "rustls-platform-verifier"
 name = "spin"
 
 [[bans.skip]]
+# last-checked = 2026-07-13. frost-core 3.0 requires serdect 0.2 while the
+# iroh Ed25519 stack requires serdect 0.4. Both are pinned transitive crypto
+# serialization contracts, so neither side can be unified locally.
+name = "serdect"
+
+[[bans.skip]]
 name = "strum"
 
 [[bans.skip]]

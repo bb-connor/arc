@@ -656,7 +656,7 @@ fn restore_database_in_place(database: &Path, snapshot: &Path) {
 }
 
 #[test]
-fn signer_persists_exact_outputs_across_every_restart_and_zeroizes_nonce() {
+fn frost_signer_persists_exact_outputs_across_every_restart_and_zeroizes_nonce() {
     let fixture = StoreFixture::new();
     let (mut authority, mut frost) = fixture.open();
     let completion = complete_ceremony(&authority, &frost);
@@ -815,7 +815,7 @@ fn signer_persists_exact_outputs_across_every_restart_and_zeroizes_nonce() {
 }
 
 #[test]
-fn conflicting_signing_package_burns_external_slot_and_local_nonce() {
+fn frost_conflicting_signing_package_burns_external_slot_and_local_nonce() {
     let fixture = StoreFixture::new();
     let (authority, frost) = fixture.open();
     let completion = complete_ceremony(&authority, &frost);
@@ -883,7 +883,7 @@ fn conflicting_signing_package_burns_external_slot_and_local_nonce() {
 }
 
 #[test]
-fn restart_reconciles_external_burn_before_releasing_a_live_commitment() {
+fn frost_restart_reconciles_external_burn_before_releasing_a_live_commitment() {
     let fixture = StoreFixture::new();
     let (authority, frost) = fixture.open();
     let completion = complete_ceremony(&authority, &frost);
@@ -958,7 +958,7 @@ fn restart_reconciles_external_burn_before_releasing_a_live_commitment() {
 }
 
 #[test]
-fn signer_rejects_a_different_valid_bound_checkpoint_for_the_same_message() {
+fn frost_signer_rejects_different_valid_bound_checkpoint_for_same_message() {
     let fixture = StoreFixture::new();
     let (authority, frost) = fixture.open();
     let completion = complete_ceremony(&authority, &frost);
@@ -1009,7 +1009,7 @@ fn signer_rejects_a_different_valid_bound_checkpoint_for_the_same_message() {
 }
 
 #[test]
-fn restart_after_external_completion_replays_the_share_and_erases_the_nonce() {
+fn frost_restart_after_external_completion_replays_share_and_erases_nonce() {
     let fixture = StoreFixture::new();
     let (authority, frost) = fixture.open();
     let completion = complete_ceremony(&authority, &frost);
@@ -1159,7 +1159,7 @@ fn restart_after_external_completion_replays_the_share_and_erases_the_nonce() {
 }
 
 #[test]
-fn restoring_a_pre_transition_signer_snapshot_is_rejected_by_the_global_anchor() {
+fn frost_restored_pre_transition_signer_snapshot_is_rejected_by_global_anchor() {
     let fixture = StoreFixture::new();
     let snapshot = fixture._temp.path().join("bound-signer.db");
     let (authority, frost) = fixture.open();

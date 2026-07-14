@@ -1,15 +1,16 @@
 use std::collections::BTreeMap;
-use std::fs;
-use std::path::PathBuf;
+use std::fs::{self, File, OpenOptions};
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use chio_core::{sha256_hex, Keypair};
 use chio_federation::frost::{
     frost_action_registration, frost_authorization_session_id, frost_authorization_slot_id,
-    resolve_active_roster_for_execution, ActiveFrostRosterResolver, FrostActionPreimageV1,
-    FrostAnchorError, FrostAnchoredAuthorizationSlot, FrostArtifactAuthorityRole,
-    FrostArtifactTrustRoot, FrostArtifactTrustStore, FrostAuthorizationBodyV1,
-    FrostAuthorizationDomain, FrostAuthorizationSlotAnchor, FrostAuthorizationSlotAnchorWriter,
+    resolve_active_roster_for_execution, verify_frost_authorization_slot_completion,
+    ActiveFrostRosterResolver, FrostActionPreimageV1, FrostAnchorError,
+    FrostAnchoredAuthorizationSlot, FrostArtifactAuthorityRole, FrostArtifactTrustRoot,
+    FrostArtifactTrustStore, FrostAuthorizationBodyV1, FrostAuthorizationDomain,
+    FrostAuthorizationSlotAnchor, FrostAuthorizationSlotAnchorWriter,
     FrostAuthorizationSlotCheckpointV1, FrostAuthorizationSlotState, FrostEpochAnchor,
     FrostEpochCheckpointV1, FrostParticipantV1, FrostRosterKeyOrigin, FrostRosterResolutionError,
     FrostRosterV1, FrostSettleCommitmentActionV1, VerifiedActiveFrostRoster,
@@ -19,10 +20,13 @@ use chio_federation::frost::{
     CHIO_FROST_ROSTER_SCHEMA, CHIO_FROST_SETTLE_COMMITMENT_ACTION_SCHEMA,
     FROST_ED25519_SHA512_SUITE_ID,
 };
-use chio_federation_authority::frost_participant_identifier_bytes;
+use chio_federation_authority::{
+    aggregate_frost_authorization, frost_participant_identifier_bytes,
+};
 use chio_store_sqlite::{
     FrostCoordinatorCommitment, FrostCoordinatorLease, FrostCoordinatorSessionRequest,
-    FrostCoordinatorSessionState, FrostCoordinatorShare, SqliteAuthorityStore, SqliteFrostStore,
+    FrostCoordinatorSessionState, FrostCoordinatorShare, FrostStoreError, SqliteAuthorityStore,
+    SqliteFrostStore,
 };
 use frost_ed25519::keys::{IdentifierList, KeyPackage};
 use frost_ed25519::{keys, round1, round2, Identifier, SigningKey, SigningPackage};
@@ -629,8 +633,36 @@ fn reopen(
     fixture.open()
 }
 
+fn database_snapshot(database: &Path, target: &Path) {
+    let connection = rusqlite::Connection::open(database)
+        .unwrap_or_else(|error| panic!("open coordinator database for snapshot: {error}"));
+    connection
+        .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+        .unwrap_or_else(|error| panic!("checkpoint coordinator snapshot: {error}"));
+    drop(connection);
+    fs::copy(database, target).unwrap_or_else(|error| panic!("copy coordinator snapshot: {error}"));
+}
+
+fn restore_database_in_place(database: &Path, snapshot: &Path) {
+    let mut input =
+        File::open(snapshot).unwrap_or_else(|error| panic!("open coordinator snapshot: {error}"));
+    let mut output = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(database)
+        .unwrap_or_else(|error| panic!("open coordinator database for restore: {error}"));
+    std::io::copy(&mut input, &mut output)
+        .unwrap_or_else(|error| panic!("restore coordinator snapshot: {error}"));
+    output
+        .sync_all()
+        .unwrap_or_else(|error| panic!("sync coordinator restore: {error}"));
+    for suffix in ["-wal", "-shm"] {
+        let _ = fs::remove_file(PathBuf::from(format!("{}{suffix}", database.display())));
+    }
+}
+
 #[test]
-fn coordinator_recovers_every_persisted_transition_and_exact_terminal_proof() {
+fn frost_coordinator_recovers_every_persisted_transition_and_exact_terminal_proof() {
     let stores = StoreFixture::new();
     let crypto = crypto_fixture();
     let epoch = FixedEpoch(crypto.epoch.clone());
@@ -766,7 +798,7 @@ fn coordinator_recovers_every_persisted_transition_and_exact_terminal_proof() {
 }
 
 #[test]
-fn coordinator_burns_changed_messages_before_local_cancellation_and_rejects_late_shares() {
+fn frost_coordinator_burns_changed_messages_and_rejects_late_shares() {
     let stores = StoreFixture::new();
     let crypto = crypto_fixture();
     let epoch = FixedEpoch(crypto.epoch.clone());
@@ -835,7 +867,7 @@ fn coordinator_burns_changed_messages_before_local_cancellation_and_rejects_late
 }
 
 #[test]
-fn coordinator_cancellation_publishes_the_external_tombstone_before_fanout() {
+fn frost_coordinator_cancellation_publishes_external_tombstone_before_fanout() {
     let stores = StoreFixture::new();
     let crypto = crypto_fixture();
     let epoch = FixedEpoch(crypto.epoch.clone());
@@ -880,4 +912,167 @@ fn coordinator_cancellation_publishes_the_external_tombstone_before_fanout() {
         cancellation.participant_ids,
         vec![commitments[0].participant_id.clone()]
     );
+}
+
+#[test]
+fn frost_preaggregate_snapshot_recovers_exact_external_completion_without_resigning() {
+    let stores = StoreFixture::new();
+    let snapshot = stores._temp.path().join("coordinator-package-ready.db");
+    let crypto = crypto_fixture();
+    let epoch = FixedEpoch(crypto.epoch.clone());
+    let trust = trust_store();
+    let slot = MutableSlotAnchor::new(crypto.body.clone());
+    let (authority, frost) = stores.open();
+    let lease = frost
+        .claim_coordinator_session(
+            &request(&crypto, &crypto.body, &epoch, &slot, &trust),
+            "worker-1",
+            "lease-1",
+            5_000,
+            &authority.mutation_fence(),
+            1_000,
+        )
+        .unwrap_or_else(|error| panic!("claim coordinator: {error}"));
+    let (commitments, nonces) = commitments(&crypto);
+    for commitment in &commitments {
+        frost
+            .submit_coordinator_commitment(
+                &request(&crypto, &crypto.body, &epoch, &slot, &trust),
+                &lease,
+                commitment,
+                &authority.mutation_fence(),
+                1_100,
+            )
+            .unwrap_or_else(|error| panic!("submit commitment: {error}"));
+    }
+    let package = frost
+        .build_coordinator_signing_package(
+            &request(&crypto, &crypto.body, &epoch, &slot, &trust),
+            &lease,
+            &authority.mutation_fence(),
+            1_200,
+        )
+        .unwrap_or_else(|error| panic!("build package: {error}"));
+    let shares = signature_shares(
+        &crypto,
+        &package.signing_package_bytes,
+        &package.participant_ids,
+        &nonces,
+    );
+    for share in &shares {
+        let record = frost
+            .submit_coordinator_share(
+                &request(&crypto, &crypto.body, &epoch, &slot, &trust),
+                &lease,
+                share,
+                &authority.mutation_fence(),
+                1_300,
+            )
+            .unwrap_or_else(|error| panic!("submit share: {error}"));
+        assert_eq!(record.state, FrostCoordinatorSessionState::PackageReady);
+    }
+    drop(frost);
+    drop(authority);
+    database_snapshot(&stores.database, &snapshot);
+
+    let shares_by_participant = shares
+        .iter()
+        .map(|share| (share.participant_id.clone(), share.share_bytes.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let proof = aggregate_frost_authorization(
+        &crypto.body,
+        crypto.active.roster(),
+        &package.signing_package_bytes,
+        &shares_by_participant,
+    )
+    .unwrap_or_else(|error| panic!("aggregate external authorization: {error}"));
+    let bound = slot
+        .resolve_authorization_slot(
+            &crypto.body.scope_id,
+            &frost_authorization_slot_id(&crypto.body)
+                .unwrap_or_else(|error| panic!("authorization slot id: {error}")),
+        )
+        .unwrap_or_else(|error| panic!("resolve bound slot: {error}"));
+    let completion = verify_frost_authorization_slot_completion(
+        &bound.checkpoint,
+        &proof,
+        &crypto.active,
+        &epoch,
+        &trust,
+        "availability.coordinator.v1",
+        1_400,
+    )
+    .unwrap_or_else(|error| panic!("verify external completion: {error}"));
+    slot.compare_and_swap_complete(&completion)
+        .unwrap_or_else(|error| panic!("complete external slot: {error}"));
+
+    restore_database_in_place(&stores.database, &snapshot);
+    let (authority, frost) = stores.open();
+    frost
+        .claim_coordinator_session(
+            &request(&crypto, &crypto.body, &epoch, &slot, &trust),
+            "worker-1",
+            "lease-1",
+            5_000,
+            &authority.mutation_fence(),
+            1_401,
+        )
+        .unwrap_or_else(|error| panic!("reconcile completed coordinator: {error}"));
+    let recovered = frost
+        .complete_coordinator_session(
+            &request(&crypto, &crypto.body, &epoch, &slot, &trust),
+            &lease,
+            "availability.coordinator.v1",
+            &authority.mutation_fence(),
+            1_402,
+        )
+        .unwrap_or_else(|error| panic!("recover exact external authorization: {error}"));
+    assert_eq!(recovered, proof);
+    let record = frost
+        .load_coordinator_session(&lease.session_id)
+        .unwrap_or_else(|error| panic!("load recovered coordinator: {error}"))
+        .unwrap_or_else(|| panic!("recovered coordinator exists"));
+    assert_eq!(record.state, FrostCoordinatorSessionState::Completed);
+}
+
+#[test]
+fn frost_stale_sqlite_serving_owner_cannot_advance_coordinator() {
+    let stores = StoreFixture::new();
+    let crypto = crypto_fixture();
+    let epoch = FixedEpoch(crypto.epoch.clone());
+    let trust = trust_store();
+    let slot = MutableSlotAnchor::new(crypto.body.clone());
+    let (authority, frost) = stores.open();
+    let fence = authority.mutation_fence();
+    let lease = frost
+        .claim_coordinator_session(
+            &request(&crypto, &crypto.body, &epoch, &slot, &trust),
+            "worker-1",
+            "lease-1",
+            5_000,
+            &fence,
+            1_000,
+        )
+        .unwrap_or_else(|error| panic!("claim coordinator: {error}"));
+    let connection = rusqlite::Connection::open(&stores.database)
+        .unwrap_or_else(|error| panic!("open replacement serving owner: {error}"));
+    connection
+        .execute(
+            "UPDATE chio_serving_owner SET owner_epoch = ?1, lease_id = 'replacement-lease' WHERE singleton = 1",
+            [i64::try_from(fence.owner_epoch + 1)
+                .unwrap_or_else(|error| panic!("replacement owner epoch: {error}"))],
+        )
+        .unwrap_or_else(|error| panic!("advance serving owner: {error}"));
+    let (commitments, _) = commitments(&crypto);
+    assert!(matches!(
+        frost.submit_coordinator_commitment(
+            &request(&crypto, &crypto.body, &epoch, &slot, &trust),
+            &lease,
+            &commitments[0],
+            &fence,
+            1_100,
+        ),
+        Err(FrostStoreError::Fenced)
+    ));
+    assert_eq!(slot.current_state(), FrostAuthorizationSlotState::Bound);
 }
