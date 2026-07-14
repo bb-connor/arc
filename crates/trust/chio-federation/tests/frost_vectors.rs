@@ -1,9 +1,10 @@
-use chio_core_types::crypto::sha256_hex;
+use chio_core_types::{sha256_hex, Keypair};
 use chio_federation::frost::{
     frost_action_registration, frost_authorization_session_id, frost_authorization_slot_id,
     resolve_active_roster_for_execution, verify_for_execution, verify_historical_evidence,
     ActiveFrostRosterResolver, ExpectedFrostAuthorization, FrostAnchorError,
-    FrostAnchoredAuthorizationSlot, FrostAuthorizationBodyV1, FrostAuthorizationDomain,
+    FrostAnchoredAuthorizationSlot, FrostArtifactAuthorityRole, FrostArtifactTrustRoot,
+    FrostArtifactTrustStore, FrostAuthorizationBodyV1, FrostAuthorizationDomain,
     FrostAuthorizationSlotAnchor, FrostAuthorizationSlotCheckpointV1, FrostAuthorizationSlotState,
     FrostAuthorizationV1, FrostEpochAnchor, FrostEpochCheckpointV1, FrostHistoricalRosterResolver,
     FrostParticipantV1, FrostRosterResolutionError, FrostRosterV1,
@@ -29,6 +30,39 @@ const OFFICIAL_SHARES: [&str; 3] = [
     "a91e66e012e4364ac9aaa405fcafd370402d9859f7b6685c07eed76bf409e80d",
     "d3cb090a075eb154e82fdb4b3cb507f110040905468bb9c46da8bdea643a9a02",
 ];
+
+fn roster_authority() -> Keypair {
+    Keypair::from_seed(&[0x42; 32])
+}
+
+fn epoch_anchor_authority() -> Keypair {
+    Keypair::from_seed(&[0x43; 32])
+}
+
+fn slot_anchor_authority() -> Keypair {
+    Keypair::from_seed(&[0x44; 32])
+}
+
+fn artifact_trust() -> FrostArtifactTrustStore {
+    FrostArtifactTrustStore::new([
+        FrostArtifactTrustRoot {
+            role: FrostArtifactAuthorityRole::Roster,
+            key_id: "authority.treaty.v1".to_string(),
+            public_key: roster_authority().public_key(),
+        },
+        FrostArtifactTrustRoot {
+            role: FrostArtifactAuthorityRole::EpochAnchor,
+            key_id: "epoch-anchor-key.v1".to_string(),
+            public_key: epoch_anchor_authority().public_key(),
+        },
+        FrostArtifactTrustRoot {
+            role: FrostArtifactAuthorityRole::AuthorizationSlotAnchor,
+            key_id: "slot-anchor-key.v1".to_string(),
+            public_key: slot_anchor_authority().public_key(),
+        },
+    ])
+    .unwrap_or_else(|error| panic!("fixture artifact trust must build: {error}"))
+}
 
 #[derive(Clone)]
 struct TestActiveResolver {
@@ -141,6 +175,7 @@ impl Fixture {
             &TestEpochAnchor {
                 checkpoint: self.epoch_checkpoint.clone(),
             },
+            &artifact_trust(),
             now,
         )
         .unwrap_or_else(|error| panic!("fixture active roster must resolve: {error}"))
@@ -188,21 +223,33 @@ fn roster(group_public_key: &str, key_epoch: u64) -> FrostRosterV1 {
         valid_from: 100,
         valid_until: 1_000,
         roster_authority_key_id: "authority.treaty.v1".to_string(),
-        roster_authority_signature: "66".repeat(64),
+        roster_authority_signature: String::new(),
     };
-    roster.roster_id = roster
-        .recompute_roster_id()
-        .unwrap_or_else(|error| panic!("fixture roster id must compute: {error}"));
-    roster.roster_digest = roster
-        .recompute_roster_digest()
-        .unwrap_or_else(|error| panic!("fixture roster digest must compute: {error}"));
+    sign_roster(&mut roster);
     roster
 }
 
+fn sign_roster(roster: &mut FrostRosterV1) {
+    roster.roster_id = roster
+        .recompute_roster_id()
+        .unwrap_or_else(|error| panic!("fixture roster id must compute: {error}"));
+    roster.roster_authority_signature = roster_authority()
+        .sign(
+            &roster
+                .signing_bytes()
+                .unwrap_or_else(|error| panic!("fixture roster must canonicalize: {error}")),
+        )
+        .to_hex();
+    roster.roster_digest = roster
+        .recompute_roster_digest()
+        .unwrap_or_else(|error| panic!("fixture roster digest must compute: {error}"));
+}
+
 fn epoch_checkpoint(roster: &FrostRosterV1) -> FrostEpochCheckpointV1 {
-    FrostEpochCheckpointV1 {
+    let mut checkpoint = FrostEpochCheckpointV1 {
         schema: CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA.to_string(),
         anchor_id: "epoch-anchor.primary".to_string(),
+        checkpoint_digest: String::new(),
         scope_id: roster.scope_id.clone(),
         checkpoint_sequence: roster.key_epoch,
         predecessor_digest: Some("77".repeat(32)),
@@ -214,8 +261,23 @@ fn epoch_checkpoint(roster: &FrostRosterV1) -> FrostEpochCheckpointV1 {
         activation_fence: 19,
         clock_high_water: 200,
         anchor_key_id: "epoch-anchor-key.v1".to_string(),
-        anchor_signature: "99".repeat(64),
-    }
+        anchor_signature: String::new(),
+    };
+    sign_epoch_checkpoint(&mut checkpoint);
+    checkpoint
+}
+
+fn sign_epoch_checkpoint(checkpoint: &mut FrostEpochCheckpointV1) {
+    checkpoint.anchor_signature = epoch_anchor_authority()
+        .sign(
+            &checkpoint
+                .signing_bytes()
+                .unwrap_or_else(|error| panic!("epoch checkpoint must canonicalize: {error}")),
+        )
+        .to_hex();
+    checkpoint.checkpoint_digest = checkpoint
+        .recompute_checkpoint_digest()
+        .unwrap_or_else(|error| panic!("epoch checkpoint digest must compute: {error}"));
 }
 
 fn fixture_with_keys(roster_key: &str, signing_key: &str) -> Fixture {
@@ -269,6 +331,7 @@ fn fixture_with_keys(roster_key: &str, signing_key: &str) -> Fixture {
     let checkpoint = FrostAuthorizationSlotCheckpointV1 {
         schema: CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA.to_string(),
         anchor_id: "slot-anchor.primary".to_string(),
+        checkpoint_digest: String::new(),
         scope_id: proof.body.scope_id.clone(),
         slot_id: frost_authorization_slot_id(&proof.body)
             .unwrap_or_else(|error| panic!("slot id must compute: {error}")),
@@ -292,8 +355,19 @@ fn fixture_with_keys(roster_key: &str, signing_key: &str) -> Fixture {
         availability_receipt: Some("availability.slot-anchor.primary.v1".to_string()),
         clock_high_water: 200,
         anchor_key_id: "slot-anchor-key.v1".to_string(),
-        anchor_signature: "cc".repeat(64),
+        anchor_signature: String::new(),
     };
+    let mut checkpoint = checkpoint;
+    checkpoint.anchor_signature = slot_anchor_authority()
+        .sign(
+            &checkpoint
+                .signing_bytes()
+                .unwrap_or_else(|error| panic!("slot checkpoint must canonicalize: {error}")),
+        )
+        .to_hex();
+    checkpoint.checkpoint_digest = checkpoint
+        .recompute_checkpoint_digest()
+        .unwrap_or_else(|error| panic!("slot checkpoint digest must compute: {error}"));
     Fixture {
         proof,
         epoch_checkpoint: epoch_checkpoint(&roster),
@@ -325,9 +399,13 @@ fn upstream_official_vector_and_active_execution_authorization_verify() {
         &fixture.proof,
         &fixture.expected(),
         &active_roster,
+        &TestEpochAnchor {
+            checkpoint: fixture.epoch_checkpoint.clone(),
+        },
         &TestSlotAnchor {
             slot: fixture.slot.clone(),
         },
+        &artifact_trust(),
         250,
     )
     .unwrap_or_else(|error| panic!("active FROST authorization must verify: {error}"));
@@ -354,9 +432,13 @@ fn active_verification_rejects_wrong_group_key_and_altered_body() {
             &wrong_key_fixture.proof,
             &wrong_key_fixture.expected(),
             &wrong_key_fixture.active_roster(250),
+            &TestEpochAnchor {
+                checkpoint: wrong_key_fixture.epoch_checkpoint.clone(),
+            },
             &TestSlotAnchor {
                 slot: wrong_key_fixture.slot.clone(),
             },
+            &artifact_trust(),
             250,
         )
         .is_err(),
@@ -370,14 +452,62 @@ fn active_verification_rejects_wrong_group_key_and_altered_body() {
             &altered.proof,
             &altered.expected(),
             &altered.active_roster(250),
+            &TestEpochAnchor {
+                checkpoint: altered.epoch_checkpoint.clone(),
+            },
             &TestSlotAnchor {
                 slot: altered.slot.clone(),
             },
+            &artifact_trust(),
             250,
         )
         .is_err(),
         "a body changed after signing must reject"
     );
+}
+
+#[test]
+fn active_verification_rejects_forged_epoch_and_slot_checkpoints() {
+    let fixture = fixture();
+    let resolver = TestActiveResolver {
+        roster: fixture.roster.clone(),
+        scope_classification: "treaty".to_string(),
+    };
+    let mut forged_epoch = fixture.epoch_checkpoint.clone();
+    forged_epoch.clock_high_water += 1;
+    forged_epoch.checkpoint_digest = forged_epoch
+        .recompute_checkpoint_digest()
+        .unwrap_or_else(|error| panic!("forged epoch digest must compute: {error}"));
+    assert!(resolve_active_roster_for_execution(
+        &fixture.proof.body.scope_id,
+        &resolver,
+        &TestEpochAnchor {
+            checkpoint: forged_epoch,
+        },
+        &artifact_trust(),
+        250,
+    )
+    .is_err());
+
+    let active_roster = fixture.active_roster(250);
+    let mut forged_slot = fixture.slot.clone();
+    forged_slot.checkpoint.clock_high_water += 1;
+    forged_slot.checkpoint.checkpoint_digest = forged_slot
+        .checkpoint
+        .recompute_checkpoint_digest()
+        .unwrap_or_else(|error| panic!("forged slot digest must compute: {error}"));
+    assert!(verify_for_execution(
+        &fixture.proof,
+        &fixture.expected(),
+        &active_roster,
+        &TestEpochAnchor {
+            checkpoint: fixture.epoch_checkpoint.clone(),
+        },
+        &TestSlotAnchor { slot: forged_slot },
+        &artifact_trust(),
+        250,
+    )
+    .is_err());
 }
 
 #[test]
@@ -390,9 +520,13 @@ fn active_verification_rejects_wrong_domain_stale_epoch_and_expiry() {
         &fixture.proof,
         &wrong_expected,
         &active_roster,
+        &TestEpochAnchor {
+            checkpoint: fixture.epoch_checkpoint.clone(),
+        },
         &TestSlotAnchor {
             slot: fixture.slot.clone(),
         },
+        &artifact_trust(),
         250,
     )
     .is_err());
@@ -410,10 +544,38 @@ fn active_verification_rejects_wrong_domain_stale_epoch_and_expiry() {
             &TestEpochAnchor {
                 checkpoint: stale_checkpoint,
             },
+            &artifact_trust(),
             250,
         )
         .is_err(),
         "local roster state behind the external epoch must reject"
+    );
+
+    let mut rotated_checkpoint = fixture.epoch_checkpoint.clone();
+    rotated_checkpoint.checkpoint_sequence += 1;
+    rotated_checkpoint.predecessor_digest =
+        Some(fixture.epoch_checkpoint.checkpoint_digest.clone());
+    rotated_checkpoint.active_roster_id = "dd".repeat(32);
+    rotated_checkpoint.active_roster_digest = "ee".repeat(32);
+    rotated_checkpoint.key_epoch += 1;
+    rotated_checkpoint.activation_fence += 1;
+    sign_epoch_checkpoint(&mut rotated_checkpoint);
+    assert!(
+        verify_for_execution(
+            &fixture.proof,
+            &fixture.expected(),
+            &active_roster,
+            &TestEpochAnchor {
+                checkpoint: rotated_checkpoint,
+            },
+            &TestSlotAnchor {
+                slot: fixture.slot.clone(),
+            },
+            &artifact_trust(),
+            250,
+        )
+        .is_err(),
+        "a retained roster handle must fail after the external epoch rotates"
     );
 
     assert!(
@@ -421,9 +583,13 @@ fn active_verification_rejects_wrong_domain_stale_epoch_and_expiry() {
             &fixture.proof,
             &fixture.expected(),
             &active_roster,
+            &TestEpochAnchor {
+                checkpoint: fixture.epoch_checkpoint.clone(),
+            },
             &TestSlotAnchor {
                 slot: fixture.slot.clone(),
             },
+            &artifact_trust(),
             400,
         )
         .is_err(),
@@ -437,12 +603,7 @@ fn retired_epoch_is_historical_evidence_but_not_execution_authority() {
     let mut current_roster = retired.roster.clone();
     current_roster.key_epoch += 1;
     current_roster.predecessor_roster_digest = Some(retired.roster.roster_digest.clone());
-    current_roster.roster_id = current_roster
-        .recompute_roster_id()
-        .unwrap_or_else(|error| panic!("current roster id must compute: {error}"));
-    current_roster.roster_digest = current_roster
-        .recompute_roster_digest()
-        .unwrap_or_else(|error| panic!("current roster digest must compute: {error}"));
+    sign_roster(&mut current_roster);
     let current_checkpoint = epoch_checkpoint(&current_roster);
     let current_scope_id = current_roster.scope_id.clone();
     let current = resolve_active_roster_for_execution(
@@ -454,6 +615,7 @@ fn retired_epoch_is_historical_evidence_but_not_execution_authority() {
         &TestEpochAnchor {
             checkpoint: current_checkpoint,
         },
+        &artifact_trust(),
         250,
     )
     .unwrap_or_else(|error| panic!("current roster must resolve: {error}"));
@@ -463,9 +625,13 @@ fn retired_epoch_is_historical_evidence_but_not_execution_authority() {
             &retired.proof,
             &retired.expected(),
             &current,
+            &TestEpochAnchor {
+                checkpoint: epoch_checkpoint(&retired.roster),
+            },
             &TestSlotAnchor {
                 slot: retired.slot.clone(),
             },
+            &artifact_trust(),
             250,
         )
         .is_err(),
@@ -476,6 +642,7 @@ fn retired_epoch_is_historical_evidence_but_not_execution_authority() {
         &TestHistoricalResolver {
             roster: retired.roster.clone(),
         },
+        &artifact_trust(),
     )
     .unwrap_or_else(|error| panic!("retired proof must remain valid historical evidence: {error}"));
     assert_eq!(

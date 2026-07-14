@@ -95,6 +95,8 @@ pub use signed_artifact::{
     built_in_signed_artifact_registry, is_supported_signed_artifact_schema,
     validate_signed_artifact_schema, SignedArtifactSchemaEntry, CHIO_ANCHOR_BATCH_V1_SCHEMA,
     CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA, CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA,
+    CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_V1_SCHEMA, CHIO_FROST_AUTHORIZATION_V1_SCHEMA,
+    CHIO_FROST_EPOCH_CHECKPOINT_V1_SCHEMA, CHIO_FROST_ROSTER_V1_SCHEMA,
     CHIO_TRANSACTION_CLAIM_SET_V1_SCHEMA, KNOWN_SIGNED_ARTIFACT_SCHEMAS,
 };
 pub use store_fence::StoreMutationFence;

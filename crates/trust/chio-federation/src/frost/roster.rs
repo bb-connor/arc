@@ -15,6 +15,9 @@ pub const CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA: &str = "chio.frost.epoch-checkpoin
 pub const FROST_ED25519_SHA512_SUITE_ID: &str = "FROST-ED25519-SHA512-v1";
 const CHIO_FROST_ROSTER_ID_PREFIX: &[u8] = b"chio.frost.roster.id.v1\0";
 const CHIO_FROST_ROSTER_DIGEST_PREFIX: &[u8] = b"chio.frost.roster.digest.v1\0";
+const CHIO_FROST_ROSTER_SIGNING_PREFIX: &[u8] = b"CHIO-FROST-ROSTER-V1\0";
+const CHIO_FROST_EPOCH_CHECKPOINT_DIGEST_PREFIX: &[u8] = b"chio.frost.epoch-checkpoint.digest.v1\0";
+const CHIO_FROST_EPOCH_CHECKPOINT_SIGNING_PREFIX: &[u8] = b"CHIO-FROST-EPOCH-CHECKPOINT-V1\0";
 
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
 pub enum FrostRosterError {
@@ -112,6 +115,14 @@ struct FrostRosterDigestPreimage<'a> {
     roster_authority_signature: &'a str,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FrostRosterSigningPreimage<'a> {
+    roster_id: &'a str,
+    #[serde(flatten)]
+    body: FrostRosterIdPreimage<'a>,
+}
+
 impl FrostRosterV1 {
     pub fn recompute_roster_id(&self) -> Result<String, FrostRosterError> {
         canonical_digest(CHIO_FROST_ROSTER_ID_PREFIX, &self.id_preimage())
@@ -124,6 +135,16 @@ impl FrostRosterV1 {
                 roster_id: &self.roster_id,
                 body: self.id_preimage(),
                 roster_authority_signature: &self.roster_authority_signature,
+            },
+        )
+    }
+
+    pub fn signing_bytes(&self) -> Result<Vec<u8>, FrostRosterError> {
+        canonical_prefixed_bytes(
+            CHIO_FROST_ROSTER_SIGNING_PREFIX,
+            &FrostRosterSigningPreimage {
+                roster_id: &self.roster_id,
+                body: self.id_preimage(),
             },
         )
     }
@@ -296,6 +317,7 @@ impl FrostRosterV1 {
 pub struct FrostEpochCheckpointV1 {
     pub schema: String,
     pub anchor_id: String,
+    pub checkpoint_digest: String,
     pub scope_id: String,
     pub checkpoint_sequence: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -312,45 +334,133 @@ pub struct FrostEpochCheckpointV1 {
     pub anchor_signature: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FrostEpochCheckpointSigningPreimage<'a> {
+    schema: &'a str,
+    anchor_id: &'a str,
+    scope_id: &'a str,
+    checkpoint_sequence: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    predecessor_digest: Option<&'a str>,
+    active_roster_id: &'a str,
+    active_roster_digest: &'a str,
+    key_epoch: u64,
+    group_public_key_digest: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rotation_authorization_digest: Option<&'a str>,
+    activation_fence: u64,
+    clock_high_water: u64,
+    anchor_key_id: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FrostEpochCheckpointDigestPreimage<'a> {
+    #[serde(flatten)]
+    body: FrostEpochCheckpointSigningPreimage<'a>,
+    anchor_signature: &'a str,
+}
+
 impl FrostEpochCheckpointV1 {
+    pub fn signing_bytes(&self) -> Result<Vec<u8>, FrostRosterError> {
+        canonical_prefixed_bytes(
+            CHIO_FROST_EPOCH_CHECKPOINT_SIGNING_PREFIX,
+            &self.signing_preimage(),
+        )
+    }
+
+    pub fn recompute_checkpoint_digest(&self) -> Result<String, FrostRosterError> {
+        canonical_digest(
+            CHIO_FROST_EPOCH_CHECKPOINT_DIGEST_PREFIX,
+            &FrostEpochCheckpointDigestPreimage {
+                body: self.signing_preimage(),
+                anchor_signature: &self.anchor_signature,
+            },
+        )
+    }
+
     pub fn validate(&self) -> Result<(), FrostRosterError> {
         if self.schema != CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA {
             return Err(FrostRosterError::UnsupportedSchema(self.schema.clone()));
         }
         roster_identifier(&self.anchor_id, "anchor_id")?;
+        roster_digest(&self.checkpoint_digest, "checkpoint_digest")?;
         roster_identifier(&self.scope_id, "scope_id")?;
         roster_nonzero(self.checkpoint_sequence, "checkpoint_sequence")?;
-        if self.checkpoint_sequence > 1 && self.predecessor_digest.is_none() {
-            return Err(FrostRosterError::InvalidField {
-                field: "predecessor_digest",
-                detail: "is required after the first checkpoint",
-            });
-        }
-        if let Some(digest) = self.predecessor_digest.as_deref() {
-            roster_digest(digest, "predecessor_digest")?;
+        match (self.checkpoint_sequence, self.predecessor_digest.as_deref()) {
+            (1, None) => {}
+            (1, Some(_)) => {
+                return Err(FrostRosterError::InvalidField {
+                    field: "predecessor_digest",
+                    detail: "must be absent for the first checkpoint",
+                });
+            }
+            (_, Some(digest)) => roster_digest(digest, "predecessor_digest")?,
+            (_, None) => {
+                return Err(FrostRosterError::InvalidField {
+                    field: "predecessor_digest",
+                    detail: "is required after the first checkpoint",
+                });
+            }
         }
         roster_digest(&self.active_roster_id, "active_roster_id")?;
         roster_digest(&self.active_roster_digest, "active_roster_digest")?;
         roster_nonzero(self.key_epoch, "key_epoch")?;
         roster_digest(&self.group_public_key_digest, "group_public_key_digest")?;
-        if self.key_epoch > 1 && self.rotation_authorization_digest.is_none() {
-            return Err(FrostRosterError::InvalidField {
-                field: "rotation_authorization_digest",
-                detail: "is required after the first key epoch",
-            });
-        }
-        if let Some(digest) = self.rotation_authorization_digest.as_deref() {
-            roster_digest(digest, "rotation_authorization_digest")?;
+        match (
+            self.key_epoch,
+            self.rotation_authorization_digest.as_deref(),
+        ) {
+            (1, None) => {}
+            (1, Some(_)) => {
+                return Err(FrostRosterError::InvalidField {
+                    field: "rotation_authorization_digest",
+                    detail: "must be absent for the first key epoch",
+                });
+            }
+            (_, Some(digest)) => roster_digest(digest, "rotation_authorization_digest")?,
+            (_, None) => {
+                return Err(FrostRosterError::InvalidField {
+                    field: "rotation_authorization_digest",
+                    detail: "is required after the first key epoch",
+                });
+            }
         }
         roster_nonzero(self.activation_fence, "activation_fence")?;
         roster_nonzero(self.clock_high_water, "clock_high_water")?;
         roster_identifier(&self.anchor_key_id, "anchor_key_id")?;
-        validate_fixed_hex(&self.anchor_signature, 128, "anchor_signature")
+        validate_fixed_hex(&self.anchor_signature, 128, "anchor_signature")?;
+        if self.recompute_checkpoint_digest()? != self.checkpoint_digest {
+            return Err(FrostRosterError::InvalidField {
+                field: "checkpoint_digest",
+                detail: "does not match the canonical signed checkpoint",
+            });
+        }
+        Ok(())
+    }
+
+    fn signing_preimage(&self) -> FrostEpochCheckpointSigningPreimage<'_> {
+        FrostEpochCheckpointSigningPreimage {
+            schema: &self.schema,
+            anchor_id: &self.anchor_id,
+            scope_id: &self.scope_id,
+            checkpoint_sequence: self.checkpoint_sequence,
+            predecessor_digest: self.predecessor_digest.as_deref(),
+            active_roster_id: &self.active_roster_id,
+            active_roster_digest: &self.active_roster_digest,
+            key_epoch: self.key_epoch,
+            group_public_key_digest: &self.group_public_key_digest,
+            rotation_authorization_digest: self.rotation_authorization_digest.as_deref(),
+            activation_fence: self.activation_fence,
+            clock_high_water: self.clock_high_water,
+            anchor_key_id: &self.anchor_key_id,
+        }
     }
 }
 
 pub trait ActiveFrostRosterResolver: Send + Sync {
-    /// The implementation authenticates roster-authority signatures before return.
+    /// Return the candidate signed roster; the caller verifies its pinned authority.
     fn resolve_active_roster(
         &self,
         scope_id: &str,
@@ -361,7 +471,7 @@ pub trait ActiveFrostRosterResolver: Send + Sync {
 }
 
 pub trait FrostHistoricalRosterResolver: Send + Sync {
-    /// The implementation authenticates historical roster-authority signatures.
+    /// Return a historical candidate; the caller verifies its pinned authority.
     fn resolve_historical_roster(
         &self,
         roster_digest: &str,
@@ -371,7 +481,9 @@ pub trait FrostHistoricalRosterResolver: Send + Sync {
 }
 
 pub trait FrostEpochAnchor: Send + Sync {
-    /// Return an authenticated checkpoint from rollback-independent storage.
+    /// Return the current checkpoint from rollback-independent storage.
+    ///
+    /// The caller verifies its pinned anchor authority and exact roster binding.
     fn resolve_epoch_checkpoint(
         &self,
         scope_id: &str,
@@ -401,12 +513,19 @@ impl VerifiedActiveFrostRoster {
 }
 
 fn canonical_digest<T: Serialize>(prefix: &[u8], value: &T) -> Result<String, FrostRosterError> {
+    Ok(sha256_hex(&canonical_prefixed_bytes(prefix, value)?))
+}
+
+fn canonical_prefixed_bytes<T: Serialize>(
+    prefix: &[u8],
+    value: &T,
+) -> Result<Vec<u8>, FrostRosterError> {
     let canonical = canonical_json_bytes(value)
         .map_err(|error| FrostRosterError::Canonical(error.to_string()))?;
     let mut bytes = Vec::with_capacity(prefix.len() + canonical.len());
     bytes.extend_from_slice(prefix);
     bytes.extend_from_slice(&canonical);
-    Ok(sha256_hex(&bytes))
+    Ok(bytes)
 }
 
 fn decode_hex(value: &str, field: &'static str) -> Result<Vec<u8>, FrostRosterError> {

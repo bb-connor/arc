@@ -441,12 +441,18 @@ body; it also binds domain, action class, authority scope, resource id, resource
 version, lifecycle fence, roster digest and key epoch. It additionally signs the
 canonical ladder-entry digest and exact quorum `n`, `m`, and scope. The active
 roster threshold/count and trusted scope classification MUST match that entry.
-The trusted roster commits
-the group key, and an external monotonic epoch checkpoint prevents a restored
-local roster database from reactivating an older key. A separate external
-authorization-slot checkpoint permanently binds the exact domain/action/message
-for one scope/resource/version/fence before any commitment is published. The
-verifier rejects a domain/action pair absent from its exhaustive registry. The manifest
+The trusted roster commits the group key. Its `chio.frost.roster.v1` signature
+is verified against a pinned roster-authority key, not artifact-supplied key
+material. An external signed monotonic `chio.frost.epoch-checkpoint.v1`
+checkpoint prevents a restored local roster database from reactivating an older
+key. Every execution rereads that checkpoint so a retained verified-roster
+handle cannot survive rotation. A separate external signed
+`chio.frost.authorization-slot-checkpoint.v1` checkpoint permanently binds the
+exact domain/action/message for one scope/resource/version/fence before any
+commitment is published. The roster, epoch, and slot authority keys are
+role-separated pinned trust roots; embedded authority keys and cross-role key
+reuse are rejected. The verifier rejects a domain/action pair absent from its
+exhaustive registry. The manifest
 uses `consistency_anchor: "frost-quorum"` and declares quorum scope in
 `co_sign_quorum`. Bilateral trees are **insufficient** and MUST be rejected for
 this model.

@@ -1,4 +1,4 @@
-1d2bcd9d6e6d84d6dbfc3920d1d0ad10479579f32c774c54ed3605d7200e8704  spec/schemas/MANIFEST.sha256
+122ed283a74794387221ca0361124610af5fb4419abd20c8e661f8d8f9b49247  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -61,6 +61,10 @@ a86a3d95260eb73000977b85db001239620138e99879a91ef2f84a48898d1637  spec/schemas/c
 a090c94daf60128bfbb637c141d4c6eb97f6d7dabca256ed2fcaeeea1a5ad0b1  spec/schemas/chio-federation/v1/treaty-scope.schema.json
 d3cd392ecaca10668edd360b7ce1e5479f2bfab784f63499879914dd876524e8  spec/schemas/chio-federation/v1/verification-context.schema.json
 fb33f0a18894dc039ea4a2d71c01469e9ef5a691f850235f32797cdfc99cfb9e  spec/schemas/chio-federation/v1/verifier-trust-bundle.schema.json
+ade3a51b38ddb1df2f1f4658e9d3c5ead3743993392c3858a8cab2e2c01144bd  spec/schemas/chio-frost/v1/authorization-slot-checkpoint.schema.json
+d48a82273a4fbb4a4de7ae90a1100aaece681905224b30746db4e95c1d5c9005  spec/schemas/chio-frost/v1/authorization.schema.json
+bf6b555c5ca8ea65c1e312f3e8f6e74813c81dd81250a24b8c810d473427d659  spec/schemas/chio-frost/v1/epoch-checkpoint.schema.json
+aecb19858d216e4aa60cc4f72b1c0fc84f3f6d2d33e3fdcd86be62b337b5b0fa  spec/schemas/chio-frost/v1/roster.schema.json
 8485e3d08cdfce8736e8f898fff5a212b1432ba0224a43cdf8df996c96721809  spec/schemas/chio-http/v1/caller-identity.schema.json
 57a3244c167440f71409d97ffc7c9c3e3142a28f512535e7a0d277bb7ebc8b19  spec/schemas/chio-http/v1/chio-http-request.schema.json
 24688da03454d2352781d352f4bf15dc25af77bdc74765248454f7c26cad5923  spec/schemas/chio-http/v1/error-envelope.schema.json
@@ -295,4 +299,4 @@ ff4f655a0f0c7afda5c0674f3afde1e3961f1d58292584ed39f8bb5b96e30c8b  spec/schemas/c
 63540f55a91b96cf071cece6b3465e8c3bba82512a91a5f83b05affc757033f4  spec/schemas/chio-wire/v1/trust-control/terminate.schema.json
 4646a51a6d23c27f0ba3951923e029ab9568bfa87f1b373ad2b1334be0ca7f62  spec/schemas/chio-workflow/v1/preflight-plan.schema.json
 3374b9d40520b66cae420da1f9c8bb07fed6bfbd62ae918615e2f88b6e1b7700  spec/schemas/chio-workflow/v1/preflight-report.schema.json
-232f7ec0d8c89b5f48a4543209152d996f4f4a49cc7a051be4ad26fb0652efc8  spec/schemas/registry.json
+d8cb99e46f0f8b4a5d561d6b1f2978c4ab4ea31340e8356831ead8b4eba2c46e  spec/schemas/registry.json

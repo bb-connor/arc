@@ -169,6 +169,7 @@ the per-file schemas live in their respective subtrees.
 |-------------------------|-------|--------|
 | `chio-attest/v1/`       |   10  | Buyer-attestation packets, proof packages, selective-disclosure proofs, and verifier reports. |
 | `chio-federation/v1/`   |   22  | Treaty scopes, capability leases, issuance bundles, governance receipts, peer pins, and revocation publication artifacts. |
+| `chio-frost/v1/`        |    4  | Signed rosters, rollback-independent epoch and authorization-slot checkpoints, and threshold authorizations. |
 | `chio-pheromone/v1/`    |   85  | Pheromone deposits, gossip and catchup envelopes, relay configuration, relay-alert and relay-assurance reports, and observation-cost telemetry. |
 | `chio-runtime/v1/`      |   36  | Admission profiles and reports, orchestration plans and run reports, evidence manifests, proof parity and regeneration reports, and trust-floor state. |
 | `chio-replay-report/`   |    1  | `chio-replay-report/v1.schema.json`: the stable JSON report shape emitted by `chio replay --json`. |
@@ -183,7 +184,7 @@ Loose schema files at the root of `spec/schemas/`.
 | `model-card.v1.json`          |    68 | Signed declaration binding a model's loaded weights to an allowed capability set, banned tools, and training-data class. |
 | `receipt-provenance-v1.json`  |    29 | Receipt-provenance record shape. |
 | `chio-tee-frame-v1.json`      |   151 | Capture frame emitted by the chio-tee shadow runner per kernel evaluation. |
-| `registry.json`               |   963 | Verifier-facing registry of signed artifact schema IDs and their schema files. |
+| `registry.json`               |  1533 | Verifier-facing registry of signed artifact schema IDs and their schema files. |
 
 ## Conformance and vector coverage
 

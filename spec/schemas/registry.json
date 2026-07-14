@@ -228,6 +228,30 @@
       "schemaFile": "spec/schemas/chio-federation/v1/verifier-trust-bundle.schema.json"
     },
     {
+      "schema": "chio.frost.authorization-slot-checkpoint.v1",
+      "artifactKind": "frost_authorization_slot_checkpoint",
+      "introducedBy": "frost-quorum-substrate-v1",
+      "schemaFile": "spec/schemas/chio-frost/v1/authorization-slot-checkpoint.schema.json"
+    },
+    {
+      "schema": "chio.frost.authorization.v1",
+      "artifactKind": "frost_authorization",
+      "introducedBy": "frost-quorum-substrate-v1",
+      "schemaFile": "spec/schemas/chio-frost/v1/authorization.schema.json"
+    },
+    {
+      "schema": "chio.frost.epoch-checkpoint.v1",
+      "artifactKind": "frost_epoch_checkpoint",
+      "introducedBy": "frost-quorum-substrate-v1",
+      "schemaFile": "spec/schemas/chio-frost/v1/epoch-checkpoint.schema.json"
+    },
+    {
+      "schema": "chio.frost.roster.v1",
+      "artifactKind": "frost_roster",
+      "introducedBy": "frost-quorum-substrate-v1",
+      "schemaFile": "spec/schemas/chio-frost/v1/roster.schema.json"
+    },
+    {
       "schema": "chio.governance-receipt.v1",
       "artifactKind": "chio_federation_governance_receipt",
       "introducedBy": "chio-final-architecture/v1",

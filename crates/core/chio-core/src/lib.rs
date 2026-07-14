@@ -384,5 +384,7 @@ pub use chio_core_types::{AgentId, CapabilityId, ServerId};
 pub use signed_artifact::{
     built_in_signed_artifact_registry, is_supported_signed_artifact_schema,
     validate_signed_artifact_schema, SignedArtifactSchemaEntry, CHIO_ANCHOR_BATCH_V1_SCHEMA,
+    CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_V1_SCHEMA, CHIO_FROST_AUTHORIZATION_V1_SCHEMA,
+    CHIO_FROST_EPOCH_CHECKPOINT_V1_SCHEMA, CHIO_FROST_ROSTER_V1_SCHEMA,
     KNOWN_SIGNED_ARTIFACT_SCHEMAS,
 };

@@ -20,6 +20,11 @@ pub const CHIO_ANCHOR_BATCH_V1_SCHEMA: &str = "chio.anchor_batch.v1";
 pub const CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA: &str = "chio.anchor-inclusion-proof.v1";
 pub const CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA: &str = "chio.anchor-proof-bundle.v1";
 pub const CHIO_BILATERAL_SIGNATURE_SLICE_V1_SCHEMA: &str = "chio.bilateral-signature-slice.v1";
+pub const CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_V1_SCHEMA: &str =
+    "chio.frost.authorization-slot-checkpoint.v1";
+pub const CHIO_FROST_AUTHORIZATION_V1_SCHEMA: &str = "chio.frost.authorization.v1";
+pub const CHIO_FROST_EPOCH_CHECKPOINT_V1_SCHEMA: &str = "chio.frost.epoch-checkpoint.v1";
+pub const CHIO_FROST_ROSTER_V1_SCHEMA: &str = "chio.frost.roster.v1";
 pub const CHIO_TRANSACTION_PASSPORT_V1_SCHEMA: &str = "chio.transaction-passport.v1";
 pub const CHIO_TRANSACTION_EVIDENCE_GRAPH_V1_SCHEMA: &str = "chio.transaction.evidence-graph.v1";
 pub const CHIO_TRANSACTION_CLAIM_SET_V1_SCHEMA: &str = "chio.transaction.claim-set.v1";
@@ -181,6 +186,25 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_BILATERAL_SIGNATURE_SLICE_V1_SCHEMA,
         Some(("bilateral_dsse_signature_slice", "federation-dsse-slice")),
+    ),
+    (
+        CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_V1_SCHEMA,
+        Some((
+            "frost_authorization_slot_checkpoint",
+            "frost-quorum-substrate-v1",
+        )),
+    ),
+    (
+        CHIO_FROST_AUTHORIZATION_V1_SCHEMA,
+        Some(("frost_authorization", "frost-quorum-substrate-v1")),
+    ),
+    (
+        CHIO_FROST_EPOCH_CHECKPOINT_V1_SCHEMA,
+        Some(("frost_epoch_checkpoint", "frost-quorum-substrate-v1")),
+    ),
+    (
+        CHIO_FROST_ROSTER_V1_SCHEMA,
+        Some(("frost_roster", "frost-quorum-substrate-v1")),
     ),
     (CHIO_SESSION_ANCHOR_SCHEMA, None),
     (CHIO_REQUEST_LINEAGE_RECORD_SCHEMA, None),

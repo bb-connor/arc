@@ -329,6 +329,31 @@ Verifier builds also expose the same IDs through
 `KNOWN_SIGNED_ARTIFACT_SCHEMAS`. Unknown signed-artifact schemas are rejected at
 load time and again at signature verification time.
 
+The FROST quorum substrate registers four signed artifact schemas:
+
+- `chio.frost.roster.v1`
+- `chio.frost.epoch-checkpoint.v1`
+- `chio.frost.authorization-slot-checkpoint.v1`
+- `chio.frost.authorization.v1`
+
+Roster, epoch-checkpoint, and authorization-slot signatures MUST verify against
+separately configured Ed25519 trust roots for their exact authority role and
+key id. Those artifacts carry key ids, never authority public keys. A verifier
+MUST reject an embedded-key field, an unknown key id, a key trusted for another
+role, or a signature that does not verify over the artifact's domain-separated
+RFC 8785 preimage. The corresponding prefixes are
+`CHIO-FROST-ROSTER-V1\0`, `CHIO-FROST-EPOCH-CHECKPOINT-V1\0`, and
+`CHIO-FROST-AUTHORIZATION-SLOT-CHECKPOINT-V1\0`.
+
+Checkpoint digests commit the signed checkpoint, including its authority
+signature. Sequence one has no predecessor; every later sequence names the
+previous checkpoint digest. An active authorization verifier MUST reread and
+authenticate the rollback-independent epoch checkpoint immediately before
+execution, even when it already holds a previously verified roster. It MUST
+also authenticate the exact permanently completed authorization-slot
+checkpoint and compare its canonical authorization blob byte-for-byte. Schema
+validity alone is never signature or trust-root validity.
+
 ### 5.1 Scope
 
 The shipped scope model includes:

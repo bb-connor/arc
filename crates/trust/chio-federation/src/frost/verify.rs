@@ -8,6 +8,7 @@ use super::roster::{
     FrostRosterError, FrostRosterResolutionError, FrostRosterV1, VerifiedActiveFrostRoster,
     FROST_ED25519_SHA512_SUITE_ID,
 };
+use super::trust::FrostArtifactTrustStore;
 use super::types::{
     validate_digest, validate_identifier, validate_nonzero, FrostAuthorizationBodyV1,
     FrostAuthorizationDomain, FrostAuthorizationError,
@@ -19,6 +20,10 @@ pub const CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA: &str =
 const CHIO_FROST_AUTHORIZATION_SLOT_ID_PREFIX: &[u8] = b"chio.frost.authorization.slot.id.v1\0";
 const CHIO_FROST_AUTHORIZATION_SESSION_ID_PREFIX: &[u8] =
     b"chio.frost.authorization.session.id.v1\0";
+const CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_DIGEST_PREFIX: &[u8] =
+    b"chio.frost.authorization-slot-checkpoint.digest.v1\0";
+const CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SIGNING_PREFIX: &[u8] =
+    b"CHIO-FROST-AUTHORIZATION-SLOT-CHECKPOINT-V1\0";
 
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
 pub enum FrostVerificationError {
@@ -30,6 +35,8 @@ pub enum FrostVerificationError {
     RosterResolution(String),
     #[error("FROST external anchor failed: {0}")]
     Anchor(String),
+    #[error("FROST artifact trust verification failed: {0}")]
+    ArtifactTrust(String),
     #[error("invalid FROST authorization proof: {0}")]
     InvalidProof(&'static str),
     #[error("FROST canonical JSON failed: {0}")]
@@ -116,6 +123,7 @@ pub enum FrostAuthorizationSlotState {
 pub struct FrostAuthorizationSlotCheckpointV1 {
     pub schema: String,
     pub anchor_id: String,
+    pub checkpoint_digest: String,
     pub scope_id: String,
     pub slot_id: String,
     pub slot_version: u64,
@@ -144,7 +152,64 @@ pub struct FrostAuthorizationSlotCheckpointV1 {
     pub anchor_signature: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FrostAuthorizationSlotCheckpointSigningPreimage<'a> {
+    schema: &'a str,
+    anchor_id: &'a str,
+    scope_id: &'a str,
+    slot_id: &'a str,
+    slot_version: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    predecessor_digest: Option<&'a str>,
+    domain: FrostAuthorizationDomain,
+    ladder_action_class: &'a str,
+    resource_id: &'a str,
+    resource_version: u64,
+    resource_fence: u64,
+    authorization_id: &'a str,
+    signing_message_digest: &'a str,
+    action_digest: &'a str,
+    roster_digest: &'a str,
+    key_epoch: u64,
+    session_id: &'a str,
+    state: FrostAuthorizationSlotState,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    aggregate_signature_digest: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    authorization_blob_digest: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    availability_receipt: Option<&'a str>,
+    clock_high_water: u64,
+    anchor_key_id: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FrostAuthorizationSlotCheckpointDigestPreimage<'a> {
+    #[serde(flatten)]
+    body: FrostAuthorizationSlotCheckpointSigningPreimage<'a>,
+    anchor_signature: &'a str,
+}
+
 impl FrostAuthorizationSlotCheckpointV1 {
+    pub fn signing_bytes(&self) -> Result<Vec<u8>, FrostVerificationError> {
+        canonical_prefixed_bytes(
+            CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SIGNING_PREFIX,
+            &self.signing_preimage(),
+        )
+    }
+
+    pub fn recompute_checkpoint_digest(&self) -> Result<String, FrostVerificationError> {
+        Ok(sha256_hex(&canonical_prefixed_bytes(
+            CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_DIGEST_PREFIX,
+            &FrostAuthorizationSlotCheckpointDigestPreimage {
+                body: self.signing_preimage(),
+                anchor_signature: &self.anchor_signature,
+            },
+        )?))
+    }
+
     pub fn validate(&self) -> Result<(), FrostVerificationError> {
         if self.schema != CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA {
             return Err(FrostVerificationError::SlotMismatch(
@@ -152,16 +217,23 @@ impl FrostAuthorizationSlotCheckpointV1 {
             ));
         }
         validate_identifier(&self.anchor_id, "anchor_id")?;
+        validate_digest(&self.checkpoint_digest, "checkpoint_digest")?;
         validate_identifier(&self.scope_id, "scope_id")?;
         validate_digest(&self.slot_id, "slot_id")?;
         validate_nonzero(self.slot_version, "slot_version")?;
-        if self.slot_version > 1 && self.predecessor_digest.is_none() {
-            return Err(FrostVerificationError::SlotMismatch(
-                "checkpoint predecessor is missing",
-            ));
-        }
-        if let Some(digest) = self.predecessor_digest.as_deref() {
-            validate_digest(digest, "predecessor_digest")?;
+        match (self.slot_version, self.predecessor_digest.as_deref()) {
+            (1, None) => {}
+            (1, Some(_)) => {
+                return Err(FrostVerificationError::SlotMismatch(
+                    "first checkpoint has a predecessor",
+                ));
+            }
+            (_, Some(digest)) => validate_digest(digest, "predecessor_digest")?,
+            (_, None) => {
+                return Err(FrostVerificationError::SlotMismatch(
+                    "checkpoint predecessor is missing",
+                ));
+            }
         }
         let registration = frost_action_registration(self.domain).ok_or(
             FrostVerificationError::SlotMismatch("checkpoint domain is disabled"),
@@ -243,7 +315,40 @@ impl FrostAuthorizationSlotCheckpointV1 {
                 )?;
             }
         }
+        if self.recompute_checkpoint_digest()? != self.checkpoint_digest {
+            return Err(FrostVerificationError::SlotMismatch(
+                "checkpoint digest does not match canonical signed artifact",
+            ));
+        }
         Ok(())
+    }
+
+    fn signing_preimage(&self) -> FrostAuthorizationSlotCheckpointSigningPreimage<'_> {
+        FrostAuthorizationSlotCheckpointSigningPreimage {
+            schema: &self.schema,
+            anchor_id: &self.anchor_id,
+            scope_id: &self.scope_id,
+            slot_id: &self.slot_id,
+            slot_version: self.slot_version,
+            predecessor_digest: self.predecessor_digest.as_deref(),
+            domain: self.domain,
+            ladder_action_class: &self.ladder_action_class,
+            resource_id: &self.resource_id,
+            resource_version: self.resource_version,
+            resource_fence: self.resource_fence,
+            authorization_id: &self.authorization_id,
+            signing_message_digest: &self.signing_message_digest,
+            action_digest: &self.action_digest,
+            roster_digest: &self.roster_digest,
+            key_epoch: self.key_epoch,
+            session_id: &self.session_id,
+            state: self.state,
+            aggregate_signature_digest: self.aggregate_signature_digest.as_deref(),
+            authorization_blob_digest: self.authorization_blob_digest.as_deref(),
+            availability_receipt: self.availability_receipt.as_deref(),
+            clock_high_water: self.clock_high_water,
+            anchor_key_id: &self.anchor_key_id,
+        }
     }
 }
 
@@ -254,7 +359,9 @@ pub struct FrostAnchoredAuthorizationSlot {
 }
 
 pub trait FrostAuthorizationSlotAnchor: Send + Sync {
-    /// Return an authenticated slot and its rollback-independent content.
+    /// Return the current slot and its rollback-independent content.
+    ///
+    /// The caller verifies its pinned anchor authority and canonical content.
     fn resolve_authorization_slot(
         &self,
         scope_id: &str,
@@ -322,6 +429,7 @@ pub fn resolve_active_roster_for_execution(
     scope_id: &str,
     resolver: &dyn ActiveFrostRosterResolver,
     epoch_anchor: &dyn FrostEpochAnchor,
+    artifact_trust: &FrostArtifactTrustStore,
     now: u64,
 ) -> Result<VerifiedActiveFrostRoster, FrostVerificationError> {
     validate_identifier(scope_id, "scope_id")?;
@@ -331,7 +439,9 @@ pub fn resolve_active_roster_for_execution(
             .ok_or(FrostVerificationError::EpochMismatch(
                 "active roster is absent",
             ))?;
-    roster.validate()?;
+    artifact_trust
+        .verify_roster(&roster)
+        .map_err(|error| FrostVerificationError::ArtifactTrust(error.to_string()))?;
     if roster.scope_id != scope_id {
         return Err(FrostVerificationError::EpochMismatch(
             "resolver returned another scope",
@@ -355,7 +465,9 @@ pub fn resolve_active_roster_for_execution(
     }
 
     let checkpoint = epoch_anchor.resolve_epoch_checkpoint(scope_id)?;
-    checkpoint.validate()?;
+    artifact_trust
+        .verify_epoch_checkpoint(&checkpoint)
+        .map_err(|error| FrostVerificationError::ArtifactTrust(error.to_string()))?;
     if checkpoint.scope_id != roster.scope_id
         || checkpoint.active_roster_id != roster.roster_id
         || checkpoint.active_roster_digest != roster.roster_digest
@@ -383,7 +495,9 @@ pub fn verify_for_execution(
     proof: &FrostAuthorizationV1,
     expected: &ExpectedFrostAuthorization<'_>,
     active_roster: &VerifiedActiveFrostRoster,
+    epoch_anchor: &dyn FrostEpochAnchor,
     slot_anchor: &dyn FrostAuthorizationSlotAnchor,
+    artifact_trust: &FrostArtifactTrustStore,
     now: u64,
 ) -> Result<VerifiedFrostAuthorization, FrostVerificationError> {
     proof.validate()?;
@@ -398,8 +512,9 @@ pub fn verify_for_execution(
             "active roster validity window",
         ));
     }
+    verify_current_epoch(active_roster, epoch_anchor, artifact_trust, now)?;
     verify_roster_binding(proof, &active_roster.roster)?;
-    verify_completed_slot(proof, slot_anchor, now)?;
+    verify_completed_slot(proof, slot_anchor, artifact_trust, now)?;
     verify_group_signature(proof, &active_roster.roster)?;
     let canonical = proof.canonical_bytes()?;
     Ok(VerifiedFrostAuthorization {
@@ -411,6 +526,7 @@ pub fn verify_for_execution(
 pub fn verify_historical_evidence(
     proof: &FrostAuthorizationV1,
     resolver: &dyn FrostHistoricalRosterResolver,
+    artifact_trust: &FrostArtifactTrustStore,
 ) -> Result<HistoricalFrostEvidence, FrostVerificationError> {
     proof.validate()?;
     let roster = resolver
@@ -422,7 +538,9 @@ pub fn verify_historical_evidence(
         .ok_or(FrostVerificationError::EpochMismatch(
             "historical roster is absent",
         ))?;
-    roster.validate()?;
+    artifact_trust
+        .verify_roster(&roster)
+        .map_err(|error| FrostVerificationError::ArtifactTrust(error.to_string()))?;
     if proof.body.issued_at < roster.valid_from || proof.body.issued_at >= roster.valid_until {
         return Err(FrostVerificationError::NotCurrent(
             "historical roster at authorization issuance",
@@ -529,11 +647,14 @@ fn verify_roster_binding(
 fn verify_completed_slot(
     proof: &FrostAuthorizationV1,
     slot_anchor: &dyn FrostAuthorizationSlotAnchor,
+    artifact_trust: &FrostArtifactTrustStore,
     now: u64,
 ) -> Result<(), FrostVerificationError> {
     let slot_id = frost_authorization_slot_id(&proof.body)?;
     let anchored = slot_anchor.resolve_authorization_slot(&proof.body.scope_id, &slot_id)?;
-    anchored.checkpoint.validate()?;
+    artifact_trust
+        .verify_authorization_slot_checkpoint(&anchored.checkpoint)
+        .map_err(|error| FrostVerificationError::ArtifactTrust(error.to_string()))?;
     let checkpoint = &anchored.checkpoint;
     if checkpoint.state != FrostAuthorizationSlotState::Completed {
         return Err(FrostVerificationError::SlotMismatch(
@@ -594,6 +715,33 @@ fn verify_completed_slot(
     if checkpoint.authorization_blob_digest.as_deref() != Some(blob_digest.as_str()) {
         return Err(FrostVerificationError::SlotMismatch(
             "authorization blob digest",
+        ));
+    }
+    Ok(())
+}
+
+fn verify_current_epoch(
+    active_roster: &VerifiedActiveFrostRoster,
+    epoch_anchor: &dyn FrostEpochAnchor,
+    artifact_trust: &FrostArtifactTrustStore,
+    now: u64,
+) -> Result<(), FrostVerificationError> {
+    let checkpoint = epoch_anchor.resolve_epoch_checkpoint(&active_roster.roster.scope_id)?;
+    artifact_trust
+        .verify_epoch_checkpoint(&checkpoint)
+        .map_err(|error| FrostVerificationError::ArtifactTrust(error.to_string()))?;
+    if checkpoint.scope_id != active_roster.roster.scope_id
+        || checkpoint.active_roster_id != active_roster.roster.roster_id
+        || checkpoint.active_roster_digest != active_roster.roster.roster_digest
+        || checkpoint.key_epoch != active_roster.roster.key_epoch
+    {
+        return Err(FrostVerificationError::EpochMismatch(
+            "active roster changed after resolution",
+        ));
+    }
+    if now < checkpoint.clock_high_water {
+        return Err(FrostVerificationError::NotCurrent(
+            "clock is behind external epoch high-water",
         ));
     }
     Ok(())
@@ -676,6 +824,18 @@ fn canonical_identifier<T: Serialize>(
     bytes.extend_from_slice(prefix);
     bytes.extend_from_slice(&canonical);
     Ok(sha256_hex(&bytes))
+}
+
+fn canonical_prefixed_bytes<T: Serialize>(
+    prefix: &[u8],
+    value: &T,
+) -> Result<Vec<u8>, FrostVerificationError> {
+    let canonical = canonical_json_bytes(value)
+        .map_err(|error| FrostVerificationError::Canonical(error.to_string()))?;
+    let mut bytes = Vec::with_capacity(prefix.len() + canonical.len());
+    bytes.extend_from_slice(prefix);
+    bytes.extend_from_slice(&canonical);
+    Ok(bytes)
 }
 
 fn decode_hex(value: &str, field: &'static str) -> Result<Vec<u8>, FrostVerificationError> {

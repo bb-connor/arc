@@ -3,6 +3,7 @@
 mod action;
 mod registry;
 mod roster;
+mod trust;
 mod types;
 mod verify;
 
@@ -22,6 +23,10 @@ pub use roster::{
     FrostHistoricalRosterResolver, FrostParticipantV1, FrostRosterError,
     FrostRosterResolutionError, FrostRosterV1, VerifiedActiveFrostRoster,
     CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA, CHIO_FROST_ROSTER_SCHEMA, FROST_ED25519_SHA512_SUITE_ID,
+};
+pub use trust::{
+    FrostArtifactAuthorityRole, FrostArtifactTrustError, FrostArtifactTrustRoot,
+    FrostArtifactTrustStore,
 };
 pub use types::{
     FrostAuthorizationBodyV1, FrostAuthorizationDomain, FrostAuthorizationError,
