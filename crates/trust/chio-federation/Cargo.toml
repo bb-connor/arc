@@ -22,6 +22,7 @@ chio-metrics-spec = { workspace = true }
 chio-open-market = { workspace = true }
 chio-pheromone = { workspace = true }
 chio-revocation-oracle = { workspace = true }
+frost-ed25519 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
