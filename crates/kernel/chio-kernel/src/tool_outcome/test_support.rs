@@ -36,8 +36,17 @@ pub fn returned_value(
         identifier("tool-outcome-test-tool"),
         provider_attempt,
         digest("transport-terminal"),
+        0,
+        7,
+        InvocationStreamLimitsV1 {
+            max_total_bytes: 1024,
+            max_chunks: 16,
+            max_duration_secs: 30,
+        },
         InvocationOutputV1::Value { value },
         reported_cost,
+        None,
+        Vec::new(),
     )?;
     let blob = raw.canonical_blob()?;
     let outcome = ToolOutcomeRecordV1::record_tool_returned(

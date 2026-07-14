@@ -27,7 +27,9 @@ pub use kernel_struct::{
     MIN_RECEIPT_APPEND_BUDGET_MS,
 };
 
-pub(crate) use admission_coordinator::{DurableAdmissionRuntime, DurableToolAdmission};
+pub(crate) use admission_coordinator::{
+    DurableAdmissionRuntime, DurableToolAdmission, DurableToolReturnInput,
+};
 pub(crate) use kernel_drop_guard::{PostAdmissionDropGuard, PostAdmissionReceiptContext};
 pub(crate) use kernel_scopes::{
     current_scoped_receipt_federation_admission, current_scoped_receipt_tenant_id,

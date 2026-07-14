@@ -48,9 +48,9 @@ impl ToolServerConnection for MutationServer {
     }
 }
 
-fn kernel_config() -> KernelConfig {
+fn kernel_config(keypair: Keypair) -> KernelConfig {
     KernelConfig {
-        keypair: Keypair::generate(),
+        keypair,
         ca_public_keys: Vec::new(),
         max_delegation_depth: 5,
         policy_hash: sha256_hex(b"sqlite-durable-admission-test-policy"),
@@ -110,53 +110,69 @@ fn sqlite_durable_admission_atomically_publishes_receipt_and_terminal_outcome(
     let lock_root = temp.path().join("locks");
     std::fs::create_dir(&lock_root)?;
     SqliteAuthorityStore::provision(&database, &lock_root)?;
+    let kernel_keypair = Keypair::generate();
+    let invocations = Arc::new(AtomicU64::new(0));
+    let (request, response, first_owner_epoch) = {
+        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let fence = authority.mutation_fence();
+        let first_owner_epoch = fence.owner_epoch;
+        let operations = Arc::new(authority.admission_operation_store());
+        let outcomes = Arc::new(authority.tool_outcome_store());
+        let mut kernel = ChioKernel::new(kernel_config(kernel_keypair.clone()));
+        kernel.set_durable_admission_store(operations.clone(), outcomes.clone(), fence)?;
+        kernel.register_tool_server(Box::new(MutationServer {
+            invocations: invocations.clone(),
+        }));
+        let agent = Keypair::generate();
+        let capability = kernel.issue_capability(&agent.public_key(), scope(), 300)?;
+        let request = request(&capability);
+        let response = kernel.evaluate_tool_call_blocking(&request)?;
+        let metadata: AdmissionReceiptMetadataV1 = serde_json::from_value(
+            response
+                .receipt
+                .metadata
+                .as_ref()
+                .and_then(serde_json::Value::as_object)
+                .and_then(|metadata| metadata.get(ADMISSION_RECEIPT_METADATA_KEY))
+                .cloned()
+                .ok_or_else(|| std::io::Error::other("admission receipt metadata is absent"))?,
+        )?;
+        let operation = operations
+            .load_by_operation_id(&metadata.operation_id)?
+            .ok_or_else(|| std::io::Error::other("completed admission operation is absent"))?;
+
+        assert_eq!(response.verdict, Verdict::Allow);
+        assert_eq!(operation.state(), AdmissionOperationState::Completed);
+        assert_eq!(invocations.load(Ordering::SeqCst), 1);
+        let stored_receipt = operations
+            .load_chio_receipt(&response.receipt.id)?
+            .ok_or_else(|| std::io::Error::other("projected receipt is absent"))?;
+        assert_eq!(
+            canonical_json_bytes(&stored_receipt)?,
+            canonical_json_bytes(&response.receipt)?
+        );
+        let resolved = outcomes
+            .load_resolved_output_by_operation(&metadata.operation_id)?
+            .ok_or_else(|| std::io::Error::other("resolved output blob is absent"))?;
+        assert_eq!(sha256_hex(resolved.bytes()), response.receipt.content_hash);
+        (request, response, first_owner_epoch)
+    };
+
     let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
     let fence = authority.mutation_fence();
+    assert!(fence.owner_epoch > first_owner_epoch);
     let operations = Arc::new(authority.admission_operation_store());
     let outcomes = Arc::new(authority.tool_outcome_store());
-
-    let mut kernel = ChioKernel::new(kernel_config());
-    kernel.set_durable_admission_store(operations.clone(), outcomes.clone(), fence)?;
-    let invocations = Arc::new(AtomicU64::new(0));
-    kernel.register_tool_server(Box::new(MutationServer {
+    let mut recovered_kernel = ChioKernel::new(kernel_config(kernel_keypair));
+    recovered_kernel.set_durable_admission_store(operations, outcomes, fence)?;
+    recovered_kernel.register_tool_server(Box::new(MutationServer {
         invocations: invocations.clone(),
     }));
-    let agent = Keypair::generate();
-    let capability = kernel.issue_capability(&agent.public_key(), scope(), 300)?;
-    let request = request(&capability);
 
-    let response = kernel.evaluate_tool_call_blocking(&request)?;
-    let metadata: AdmissionReceiptMetadataV1 = serde_json::from_value(
-        response
-            .receipt
-            .metadata
-            .as_ref()
-            .and_then(serde_json::Value::as_object)
-            .and_then(|metadata| metadata.get(ADMISSION_RECEIPT_METADATA_KEY))
-            .cloned()
-            .ok_or_else(|| std::io::Error::other("admission receipt metadata is absent"))?,
-    )?;
-    let operation = operations
-        .load_by_operation_id(&metadata.operation_id)?
-        .ok_or_else(|| std::io::Error::other("completed admission operation is absent"))?;
-
-    assert_eq!(response.verdict, Verdict::Allow);
-    assert_eq!(operation.state(), AdmissionOperationState::Completed);
-    assert_eq!(invocations.load(Ordering::SeqCst), 1);
-    let stored_receipt = operations
-        .load_chio_receipt(&response.receipt.id)?
-        .ok_or_else(|| std::io::Error::other("projected receipt is absent"))?;
-    assert_eq!(
-        canonical_json_bytes(&stored_receipt)?,
-        canonical_json_bytes(&response.receipt)?
-    );
-    let resolved = outcomes
-        .load_resolved_output_by_operation(&metadata.operation_id)?
-        .ok_or_else(|| std::io::Error::other("resolved output blob is absent"))?;
-    assert_eq!(sha256_hex(resolved.bytes()), response.receipt.content_hash);
-
-    let replay = kernel.evaluate_tool_call_blocking(&request)?;
-    assert_eq!(replay.verdict, Verdict::Deny);
+    let replay = recovered_kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(replay.verdict, Verdict::Allow, "{:?}", replay.reason);
+    assert_eq!(replay.receipt.id, response.receipt.id);
+    assert_eq!(replay.output, response.output);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     Ok(())
 }

@@ -60,8 +60,11 @@ struct TestAdmissionState {
 }
 
 struct TestAdmissionOperationStore {
-    fence: StoreMutationFence,
+    fence: std::sync::Mutex<StoreMutationFence>,
     fail_next_outcome_write: std::sync::atomic::AtomicBool,
+    fail_next_evaluation_begin: std::sync::atomic::AtomicBool,
+    fail_next_evaluation_stage: std::sync::atomic::AtomicBool,
+    fail_next_evaluation_finalization: std::sync::atomic::AtomicBool,
     fail_next_terminal_projection: std::sync::atomic::AtomicBool,
     state: std::sync::Mutex<TestAdmissionState>,
 }
@@ -69,8 +72,11 @@ struct TestAdmissionOperationStore {
 impl TestAdmissionOperationStore {
     fn new(fence: StoreMutationFence) -> Self {
         Self {
-            fence,
+            fence: std::sync::Mutex::new(fence),
             fail_next_outcome_write: std::sync::atomic::AtomicBool::new(false),
+            fail_next_evaluation_begin: std::sync::atomic::AtomicBool::new(false),
+            fail_next_evaluation_stage: std::sync::atomic::AtomicBool::new(false),
+            fail_next_evaluation_finalization: std::sync::atomic::AtomicBool::new(false),
             fail_next_terminal_projection: std::sync::atomic::AtomicBool::new(false),
             state: std::sync::Mutex::new(TestAdmissionState::default()),
         }
@@ -83,6 +89,34 @@ impl TestAdmissionOperationStore {
     fn fail_next_terminal_projection(&self) {
         self.fail_next_terminal_projection
             .store(true, Ordering::SeqCst);
+    }
+
+    fn fail_next_evaluation_begin(&self) {
+        self.fail_next_evaluation_begin.store(true, Ordering::SeqCst);
+    }
+
+    fn fail_next_evaluation_stage(&self) {
+        self.fail_next_evaluation_stage.store(true, Ordering::SeqCst);
+    }
+
+    fn fail_next_evaluation_finalization(&self) {
+        self.fail_next_evaluation_finalization
+            .store(true, Ordering::SeqCst);
+    }
+
+    fn outcome_versions(&self) -> (Option<u64>, Option<u64>) {
+        let state = self.state.lock().expect("test admission state lock");
+        (
+            state
+                .post_return_evaluation
+                .as_ref()
+                .map(PostReturnEvaluationRecordV1::version),
+            state.tool_outcome.as_ref().map(ToolOutcomeRecordV1::version),
+        )
+    }
+
+    fn rotate_fence(&self, fence: StoreMutationFence) {
+        *self.fence.lock().expect("test admission fence lock") = fence;
     }
 
     fn operation(&self) -> AdmissionOperationV1 {
@@ -106,7 +140,7 @@ impl TestAdmissionOperationStore {
         &self,
         fence: &StoreMutationFence,
     ) -> Result<(), AdmissionOperationStoreError> {
-        (fence == &self.fence)
+        (fence == &*self.fence.lock().expect("test admission fence lock"))
             .then_some(())
             .ok_or(AdmissionOperationStoreError::Fenced)
     }
@@ -349,6 +383,22 @@ impl ReceiptStore for TestAdmissionOperationStore {
         })
     }
 
+    fn load_chio_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<chio_core::receipt::body::ChioReceipt>, ReceiptStoreError> {
+        Ok(self
+            .state
+            .lock()
+            .map_err(|_| {
+                ReceiptStoreError::Conflict("test admission state lock poisoned".to_owned())
+            })?
+            .receipt
+            .as_ref()
+            .filter(|receipt| receipt.id == receipt_id)
+            .cloned())
+    }
+
     fn append_child_receipt(
         &self,
         _receipt: &chio_core::receipt::lineage::ChildRequestReceipt,
@@ -480,6 +530,14 @@ impl ToolOutcomeStore for TestAdmissionOperationStore {
             .validate_against(operation, outcome)
             .and_then(|_| record.validate_for_store_mutation(trusted_now_unix_ms))
             .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?;
+        if self
+            .fail_next_evaluation_begin
+            .swap(false, Ordering::SeqCst)
+        {
+            return Err(ToolOutcomeStoreError::Unavailable(
+                "injected evaluation begin failure".to_owned(),
+            ));
+        }
         match state.post_return_evaluation.as_ref() {
             Some(existing) if existing == record => Ok(existing.clone()),
             Some(_) => Err(ToolOutcomeStoreError::Conflict),
@@ -517,6 +575,14 @@ impl ToolOutcomeStore for TestAdmissionOperationStore {
         validate_evaluation_store_successor(&current, next)
             .and_then(|_| next.validate_for_store_mutation(trusted_now_unix_ms))
             .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?;
+        if self
+            .fail_next_evaluation_stage
+            .swap(false, Ordering::SeqCst)
+        {
+            return Err(ToolOutcomeStoreError::Unavailable(
+                "injected evaluation stage failure".to_owned(),
+            ));
+        }
         state.post_return_evaluation = Some(next.clone());
         Ok(next.clone())
     }
@@ -561,6 +627,14 @@ impl ToolOutcomeStore for TestAdmissionOperationStore {
         )
         .and_then(|_| terminal_evaluation.validate_for_store_mutation(trusted_now_unix_ms))
         .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?;
+        if self
+            .fail_next_evaluation_finalization
+            .swap(false, Ordering::SeqCst)
+        {
+            return Err(ToolOutcomeStoreError::Unavailable(
+                "injected evaluation finalization failure".to_owned(),
+            ));
+        }
         state.post_return_evaluation = Some(terminal_evaluation.clone());
         state.tool_outcome = Some(terminal_outcome.clone());
         state.resolved_output = resolved_output.cloned();
@@ -710,8 +784,10 @@ fn top_level_durable_admission_commits_before_dispatch_and_blocks_replay() {
 
     let replay = kernel
         .evaluate_tool_call_blocking(&request)
-        .expect("exact replay denial");
-    assert_eq!(replay.verdict, Verdict::Deny);
+        .expect("exact replay delivery");
+    assert_eq!(replay.verdict, Verdict::Allow);
+    assert_eq!(replay.receipt.id, response.receipt.id);
+    assert_eq!(replay.output, response.output);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 
     let mut conflict = request.clone();
@@ -773,12 +849,115 @@ fn failed_terminal_projection_retains_finalizing_operation_and_blocks_redispatch
 
     let replay = kernel
         .evaluate_tool_call_blocking(&request)
-        .expect("retained finalization must produce a denial");
-    assert_eq!(replay.verdict, Verdict::Deny);
-    assert!(replay
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("Finalizing")));
+        .expect("retained finalization must recover delivery");
+    assert_eq!(replay.verdict, Verdict::Allow);
+    assert_eq!(store.operation().state(), AdmissionOperationState::Completed);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+fn assert_finalization_crash_recovers(
+    request_id: &str,
+    inject: fn(&TestAdmissionOperationStore),
+    expected_error: &str,
+    expected_versions: (Option<u64>, Option<u64>),
+) {
+    let (kernel, request, store, invocations) = durable_admission_fixture(request_id);
+    inject(&store);
+
+    let error = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect_err("injected finalization crash must fail closed");
+    assert!(matches!(
+        error,
+        KernelError::DurableAdmission(ref reason) if reason.contains(expected_error)
+    ));
+    assert_eq!(store.operation().state(), AdmissionOperationState::Finalizing);
+    assert_eq!(store.outcome_versions(), expected_versions);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let recovered = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("finalization replay must recover delivery");
+    assert_eq!(recovered.verdict, Verdict::Allow);
+    assert_eq!(store.operation().state(), AdmissionOperationState::Completed);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let replay = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("completed replay must redeliver the recovered result");
+    assert_eq!(replay.verdict, Verdict::Allow);
+    assert_eq!(replay.receipt.id, recovered.receipt.id);
+    assert_eq!(replay.output, recovered.output);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn finalization_recovers_before_evaluation_creation() {
+    assert_finalization_crash_recovers(
+        "durable-evaluation-begin-failure",
+        TestAdmissionOperationStore::fail_next_evaluation_begin,
+        "injected evaluation begin failure",
+        (None, Some(1)),
+    );
+}
+
+#[test]
+fn finalization_recovers_after_frozen_evaluation_creation() {
+    assert_finalization_crash_recovers(
+        "durable-evaluation-stage-failure",
+        TestAdmissionOperationStore::fail_next_evaluation_stage,
+        "injected evaluation stage failure",
+        (Some(1), Some(1)),
+    );
+}
+
+#[test]
+fn finalization_recovers_after_pure_result_staging() {
+    assert_finalization_crash_recovers(
+        "durable-evaluation-finalization-failure",
+        TestAdmissionOperationStore::fail_next_evaluation_finalization,
+        "injected evaluation finalization failure",
+        (Some(2), Some(1)),
+    );
+}
+
+#[test]
+fn finalization_recovers_after_store_owner_rotation() {
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture("durable-owner-rotation-recovery");
+    store.fail_next_evaluation_begin();
+
+    kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect_err("injected finalization crash must fail closed");
+    assert_eq!(store.operation().state(), AdmissionOperationState::Finalizing);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let rotated_fence = StoreMutationFence {
+        store_uuid: admission_test_fence().store_uuid,
+        lease_id: "test-admission-lease-2".to_owned(),
+        owner_epoch: 2,
+    };
+    store.rotate_fence(rotated_fence.clone());
+    let mut recovered_config = make_config();
+    recovered_config.keypair = kernel.config.keypair.clone();
+    recovered_config.policy_hash = sha256_hex(b"durable-admission-test-policy");
+    let mut recovered_kernel = make_kernel(recovered_config);
+    recovered_kernel
+        .set_durable_admission_store(store.clone(), store.clone(), rotated_fence)
+        .expect("rotated qualified admission store");
+    recovered_kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
+        id: "durable-server".to_owned(),
+        tools: vec!["mutate".to_owned()],
+        invocations: invocations.clone(),
+        store: store.clone(),
+    }));
+
+    let recovered = recovered_kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("new serving owner must finish retained finalization");
+    assert_eq!(recovered.verdict, Verdict::Allow);
+    assert_eq!(store.operation().state(), AdmissionOperationState::Completed);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
 
@@ -906,7 +1085,9 @@ fn nested_durable_admission_commits_before_dispatch_and_blocks_replay() {
     assert_eq!(store.operation().state(), AdmissionOperationState::Completed);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 
-    let replay = evaluate(&request).expect("nested replay denial");
-    assert_eq!(replay.verdict, Verdict::Deny);
+    let replay = evaluate(&request).expect("nested replay delivery");
+    assert_eq!(replay.verdict, Verdict::Allow);
+    assert_eq!(replay.receipt.id, response.receipt.id);
+    assert_eq!(replay.output, response.output);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }

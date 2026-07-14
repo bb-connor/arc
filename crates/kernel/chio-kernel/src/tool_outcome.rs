@@ -3,6 +3,7 @@
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::capability::scope::MonetaryAmount;
 use chio_core::crypto::sha256_hex;
+use chio_core::receipt::metadata::GuardEvidence;
 use chio_core_types::{provider_attempt::ProviderAttemptBindingV1, StoreMutationFence};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -30,6 +31,7 @@ pub const MAX_EVIDENCE_ARTIFACT_BYTES: usize = 256 * 1024;
 pub const MAX_MONETARY_RELEASE_EVIDENCE_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_STREAM_CHUNKS: usize = 1_048_576;
 pub const MAX_EVALUATION_STEPS: usize = 128;
+pub const MAX_RECEIPT_GUARD_EVIDENCE: usize = 1_024;
 
 const MAX_REASON_BYTES: usize = 1024;
 const I_JSON_MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
@@ -263,6 +265,40 @@ impl InvocationOutputV1 {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InvocationStreamLimitsV1 {
+    pub max_total_bytes: u64,
+    pub max_chunks: u64,
+    pub max_duration_secs: u64,
+}
+
+impl InvocationStreamLimitsV1 {
+    pub(crate) fn new(
+        max_total_bytes: u64,
+        max_chunks: u64,
+        max_duration_secs: u64,
+    ) -> Result<Self, ToolOutcomeError> {
+        let limits = Self {
+            max_total_bytes,
+            max_chunks,
+            max_duration_secs,
+        };
+        limits.validate()?;
+        Ok(limits)
+    }
+
+    fn validate(&self) -> Result<(), ToolOutcomeError> {
+        if self.max_total_bytes > I_JSON_MAX_SAFE_INTEGER
+            || self.max_chunks > I_JSON_MAX_SAFE_INTEGER
+            || self.max_duration_secs > I_JSON_MAX_SAFE_INTEGER
+        {
+            return Err(ToolOutcomeError::Invalid("raw.stream_limits"));
+        }
+        Ok(())
+    }
+}
+
 /// The only canonical representation of a returned invocation.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct RawInvocationOutcomeV1 {
@@ -275,8 +311,13 @@ pub struct RawInvocationOutcomeV1 {
     tool_name: AdmissionIdentifier,
     provider_attempt: ProviderAttemptBindingV1,
     transport_terminal_evidence_digest: AdmissionDigest,
+    matched_grant_index: u64,
+    elapsed_millis: u64,
+    stream_limits: InvocationStreamLimitsV1,
     output: InvocationOutputV1,
     reported_cost: Option<MonetaryAmount>,
+    receipt_metadata_snapshot: Option<Value>,
+    pre_invocation_guard_evidence: Vec<GuardEvidence>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -291,8 +332,13 @@ pub struct PersistedRawInvocationOutcomeV1 {
     pub tool_name: AdmissionIdentifier,
     pub provider_attempt: ProviderAttemptBindingV1,
     pub transport_terminal_evidence_digest: AdmissionDigest,
+    pub matched_grant_index: u64,
+    pub elapsed_millis: u64,
+    pub stream_limits: InvocationStreamLimitsV1,
     pub output: InvocationOutputV1,
     pub reported_cost: Option<MonetaryAmount>,
+    pub receipt_metadata_snapshot: Option<Value>,
+    pub pre_invocation_guard_evidence: Vec<GuardEvidence>,
 }
 
 impl RawInvocationOutcomeV1 {
@@ -305,8 +351,13 @@ impl RawInvocationOutcomeV1 {
         tool_name: AdmissionIdentifier,
         provider_attempt: ProviderAttemptBindingV1,
         transport_terminal_evidence_digest: AdmissionDigest,
+        matched_grant_index: u64,
+        elapsed_millis: u64,
+        stream_limits: InvocationStreamLimitsV1,
         output: InvocationOutputV1,
         reported_cost: Option<MonetaryAmount>,
+        receipt_metadata_snapshot: Option<Value>,
+        pre_invocation_guard_evidence: Vec<GuardEvidence>,
     ) -> Result<Self, ToolOutcomeError> {
         validate_committed_operation(operation, commit)?;
         validate_registered_provider_attempt(operation, &provider_attempt)?;
@@ -320,8 +371,13 @@ impl RawInvocationOutcomeV1 {
             tool_name,
             provider_attempt,
             transport_terminal_evidence_digest,
+            matched_grant_index,
+            elapsed_millis,
+            stream_limits,
             output,
             reported_cost,
+            receipt_metadata_snapshot,
+            pre_invocation_guard_evidence,
         };
         raw.canonical_blob()?;
         Ok(raw)
@@ -342,8 +398,13 @@ impl RawInvocationOutcomeV1 {
             tool_name: self.tool_name.clone(),
             provider_attempt: self.provider_attempt.clone(),
             transport_terminal_evidence_digest: self.transport_terminal_evidence_digest.clone(),
+            matched_grant_index: self.matched_grant_index,
+            elapsed_millis: self.elapsed_millis,
+            stream_limits: self.stream_limits,
             output: self.output.clone(),
             reported_cost: self.reported_cost.clone(),
+            receipt_metadata_snapshot: self.receipt_metadata_snapshot.clone(),
+            pre_invocation_guard_evidence: self.pre_invocation_guard_evidence.clone(),
         }
     }
 
@@ -363,8 +424,13 @@ impl RawInvocationOutcomeV1 {
             tool_name: value.tool_name,
             provider_attempt: value.provider_attempt,
             transport_terminal_evidence_digest: value.transport_terminal_evidence_digest,
+            matched_grant_index: value.matched_grant_index,
+            elapsed_millis: value.elapsed_millis,
+            stream_limits: value.stream_limits,
             output: value.output,
             reported_cost: value.reported_cost,
+            receipt_metadata_snapshot: value.receipt_metadata_snapshot,
+            pre_invocation_guard_evidence: value.pre_invocation_guard_evidence,
         };
         raw.canonical_blob()?;
         Ok(raw)
@@ -396,11 +462,50 @@ impl RawInvocationOutcomeV1 {
             self.dispatch_operation_version,
         )?;
         positive("raw.dispatch_fence", self.dispatch_fence)?;
+        if self.matched_grant_index > I_JSON_MAX_SAFE_INTEGER {
+            return Err(ToolOutcomeError::Invalid("raw.matched_grant_index"));
+        }
+        if self.elapsed_millis > I_JSON_MAX_SAFE_INTEGER {
+            return Err(ToolOutcomeError::Invalid("raw.elapsed_millis"));
+        }
+        self.stream_limits.validate()?;
         self.output.validate()?;
         if let Some(cost) = &self.reported_cost {
             amount(cost)?;
         }
+        if self.pre_invocation_guard_evidence.len() > MAX_RECEIPT_GUARD_EVIDENCE {
+            return Err(ToolOutcomeError::TooLarge {
+                field: "raw.pre_invocation_guard_evidence",
+                actual: self.pre_invocation_guard_evidence.len(),
+                maximum: MAX_RECEIPT_GUARD_EVIDENCE,
+            });
+        }
         CanonicalInvocationBlobV1::new(bounded("raw_invocation_outcome", self, maximum)?)
+    }
+
+    pub(crate) fn output(&self) -> &InvocationOutputV1 {
+        &self.output
+    }
+
+    pub(crate) fn matched_grant_index(&self) -> Result<usize, ToolOutcomeError> {
+        usize::try_from(self.matched_grant_index)
+            .map_err(|_| ToolOutcomeError::Invalid("raw.matched_grant_index"))
+    }
+
+    pub(crate) fn elapsed_millis(&self) -> u64 {
+        self.elapsed_millis
+    }
+
+    pub(crate) fn stream_limits(&self) -> InvocationStreamLimitsV1 {
+        self.stream_limits
+    }
+
+    pub(crate) fn receipt_metadata_snapshot(&self) -> Option<&Value> {
+        self.receipt_metadata_snapshot.as_ref()
+    }
+
+    pub(crate) fn pre_invocation_guard_evidence(&self) -> &[GuardEvidence] {
+        &self.pre_invocation_guard_evidence
     }
 }
 

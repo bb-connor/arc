@@ -706,6 +706,30 @@ impl PostReturnEvaluationRecordV1 {
         &self.state
     }
 
+    pub(crate) fn trusted_time_unix_ms(&self) -> u64 {
+        self.trusted_time_unix_ms
+    }
+
+    pub(crate) fn step_result_digest(&self, index: usize) -> Option<&AdmissionDigest> {
+        self.step_results
+            .get(index)
+            .map(|result| &result.result_digest)
+    }
+
+    pub(crate) fn validate_replay_contract(
+        &self,
+        frozen_steps: &[FrozenEvaluationStepV1],
+        normalized_request_context: &PostReturnNormalizedRequestContextV1,
+    ) -> Result<(), ToolOutcomeError> {
+        self.validate()?;
+        if self.frozen_steps != frozen_steps
+            || &self.exact_inputs.normalized_request_context != normalized_request_context
+        {
+            return Err(ToolOutcomeError::Binding("evaluation.replay_contract"));
+        }
+        Ok(())
+    }
+
     #[allow(dead_code)]
     pub fn validate_against(
         &self,

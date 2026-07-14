@@ -245,34 +245,44 @@ impl ChioKernel {
         output: ToolServerOutput,
         elapsed: Duration,
     ) -> Result<ToolServerOutput, KernelError> {
+        let limits = crate::tool_outcome::InvocationStreamLimitsV1 {
+            max_total_bytes: self.config.max_stream_total_bytes,
+            max_chunks: self.config.memory_budget.max_stream_chunks,
+            max_duration_secs: self.config.max_stream_duration_secs,
+        };
+        self.apply_stream_limit_snapshot(output, elapsed, limits)
+    }
+
+    pub(crate) fn apply_stream_limit_snapshot(
+        &self,
+        output: ToolServerOutput,
+        elapsed: Duration,
+        limits: crate::tool_outcome::InvocationStreamLimitsV1,
+    ) -> Result<ToolServerOutput, KernelError> {
         let ToolServerOutput::Stream(stream_result) = output else {
             return Ok(output);
         };
 
-        let duration_limit = Duration::from_secs(self.config.max_stream_duration_secs);
-        let duration_exceeded =
-            self.config.max_stream_duration_secs > 0 && elapsed > duration_limit;
+        let duration_limit = Duration::from_secs(limits.max_duration_secs);
+        let duration_exceeded = limits.max_duration_secs > 0 && elapsed > duration_limit;
 
         let (stream, base_reason) = match stream_result {
             ToolServerStreamResult::Complete(stream) => (stream, None),
             ToolServerStreamResult::Incomplete { stream, reason } => (stream, Some(reason)),
         };
 
-        let (stream, total_bytes, truncation_cause) = truncate_stream_to_limits(
-            &stream,
-            self.config.max_stream_total_bytes,
-            self.config.memory_budget.max_stream_chunks,
-        )?;
+        let (stream, total_bytes, truncation_cause) =
+            truncate_stream_to_limits(&stream, limits.max_total_bytes, limits.max_chunks)?;
 
         let limit_reason = match truncation_cause {
             Some(cause) => Some(stream_limit_reason(
                 cause,
-                self.config.max_stream_total_bytes,
-                self.config.memory_budget.max_stream_chunks,
+                limits.max_total_bytes,
+                limits.max_chunks,
             )),
             None if duration_exceeded => Some(format!(
                 "CHIO_SERVER_STREAM_LIMIT: stream exceeded max duration of {}s",
-                self.config.max_stream_duration_secs
+                limits.max_duration_secs
             )),
             None => None,
         };

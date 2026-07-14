@@ -324,6 +324,12 @@ impl ChioKernel {
             }
         };
 
+        if let Some(admission) = durable_admission.as_mut() {
+            if let Some(response) = self.recover_durable_tool_admission(admission, request)? {
+                return Ok(response);
+            }
+        }
+
         // Persistence was confirmed healthy at the pre-dispatch gate above, so the
         // writer-backed lineage write can run without racing a dead writer.
         if let Err(error) = self.record_observed_capability_snapshot(cap) {
@@ -1026,14 +1032,21 @@ impl ChioKernel {
                 );
             }
         };
+        let tool_elapsed = tool_started_at.elapsed();
         let durable_outcome = if let Some(admission) = durable_admission.as_mut() {
             let recorded_at_unix_ms = current_unix_timestamp_ms().max(now_unix_ms);
             match self.record_durable_tool_return(
                 admission,
-                request,
-                &tool_output,
-                reported_cost.clone(),
-                recorded_at_unix_ms,
+                DurableToolReturnInput {
+                    request,
+                    output: &tool_output,
+                    reported_cost: reported_cost.clone(),
+                    matched_grant_index,
+                    elapsed: tool_elapsed,
+                    extra_receipt_metadata: extra_metadata.clone(),
+                    pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
+                    trusted_now_unix_ms: recorded_at_unix_ms,
+                },
             ) {
                 Ok(outcome) => Some(outcome),
                 Err(error) => {
@@ -1056,23 +1069,13 @@ impl ChioKernel {
                     "monetary dispatch reached an unsupported durable terminal path".to_owned(),
                 ));
             }
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.finalize_durable_tool_return(
-                    admission,
-                    request,
-                    outcome,
-                    tool_output,
-                    tool_started_at.elapsed(),
-                    matched_grant_index,
-                    extra_metadata,
-                )
-            });
+            return self.finalize_durable_tool_return(admission, request, outcome);
         }
         self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
             self.finalize_budgeted_tool_output_with_cost_and_metadata(
                 request,
                 tool_output,
-                tool_started_at.elapsed(),
+                tool_elapsed,
                 now,
                 matched_grant_index,
                 FinalizeToolOutputCostContext {

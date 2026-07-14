@@ -6,6 +6,7 @@ use chio_core::crypto::Keypair;
 use chio_core::receipt::{
     body::{ChioReceipt, ChioReceiptBody},
     decision::{Decision, ToolCallAction},
+    metadata::GuardEvidence,
 };
 use chio_core_types::{provider_attempt::ProviderAttemptBindingV1, StoreMutationFence};
 use serde_json::{json, Map};
@@ -194,6 +195,14 @@ fn raw_for(operation: &AdmissionOperationV1, output: Value) -> RawInvocationOutc
     raw_for_attempt(operation, "attempt-1", output).unwrap()
 }
 
+fn stream_limits() -> InvocationStreamLimitsV1 {
+    InvocationStreamLimitsV1 {
+        max_total_bytes: 1024,
+        max_chunks: 16,
+        max_duration_secs: 30,
+    }
+}
+
 fn raw_for_attempt(
     operation: &AdmissionOperationV1,
     attempt_id: &str,
@@ -206,11 +215,16 @@ fn raw_for_attempt(
         id("tool-1"),
         provider_attempt(operation, attempt_id),
         admission_digest("transport-terminal"),
+        0,
+        7,
+        stream_limits(),
         InvocationOutputV1::Value { value: output },
         Some(MonetaryAmount {
             units: 25,
             currency: "USD".to_owned(),
         }),
+        None,
+        Vec::new(),
     )
 }
 
@@ -405,14 +419,19 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
             "a".repeat(64),
         )
         .unwrap(),
+        matched_grant_index: 0,
+        elapsed_millis: 7,
+        stream_limits: stream_limits(),
         output: InvocationOutputV1::Value {
             value: Value::Object(reverse),
         },
         reported_cost: None,
+        receipt_metadata_snapshot: None,
+        pre_invocation_guard_evidence: Vec::new(),
     };
     let blob = raw.canonical_blob().unwrap();
     let expected = format!(
-        "{{\"dispatch_fence\":8,\"dispatch_operation_version\":7,\"operation_id\":\"{}\",\"output\":{{\"kind\":\"value\",\"value\":{{\"a\":1,\"z\":2}}}},\"provider_attempt\":{{\"attempt_id\":\"attempt\",\"operation_id\":\"{}\",\"transport_id\":\"transport\",\"transport_key_epoch\":1}},\"reported_cost\":null,\"request_id\":\"req\",\"schema\":\"{}\",\"tool_name\":\"tool\",\"tool_server\":\"server\",\"transport_terminal_evidence_digest\":\"{}\"}}",
+        "{{\"dispatch_fence\":8,\"dispatch_operation_version\":7,\"elapsed_millis\":7,\"matched_grant_index\":0,\"operation_id\":\"{}\",\"output\":{{\"kind\":\"value\",\"value\":{{\"a\":1,\"z\":2}}}},\"pre_invocation_guard_evidence\":[],\"provider_attempt\":{{\"attempt_id\":\"attempt\",\"operation_id\":\"{}\",\"transport_id\":\"transport\",\"transport_key_epoch\":1}},\"receipt_metadata_snapshot\":null,\"reported_cost\":null,\"request_id\":\"req\",\"schema\":\"{}\",\"stream_limits\":{{\"max_chunks\":16,\"max_duration_secs\":30,\"max_total_bytes\":1024}},\"tool_name\":\"tool\",\"tool_server\":\"server\",\"transport_terminal_evidence_digest\":\"{}\"}}",
         operation_id.as_str(),
         operation_id.as_str(),
         RAW_INVOCATION_OUTCOME_SCHEMA,
@@ -452,6 +471,102 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
 }
 
 #[test]
+fn raw_outcome_rejects_unsafe_recovery_fields() {
+    let operation = committed_operation("request-raw-bounds");
+    let raw = raw_for(&operation, json!({"ok": true}));
+
+    let mut persisted = raw.to_persisted();
+    persisted.matched_grant_index = I_JSON_MAX_SAFE_INTEGER + 1;
+    assert!(matches!(
+        RawInvocationOutcomeV1::from_persisted(persisted),
+        Err(ToolOutcomeError::Invalid("raw.matched_grant_index"))
+    ));
+
+    let mut persisted = raw.to_persisted();
+    persisted.elapsed_millis = I_JSON_MAX_SAFE_INTEGER + 1;
+    assert!(matches!(
+        RawInvocationOutcomeV1::from_persisted(persisted),
+        Err(ToolOutcomeError::Invalid("raw.elapsed_millis"))
+    ));
+
+    for mutate in [
+        |limits: &mut InvocationStreamLimitsV1| {
+            limits.max_total_bytes = I_JSON_MAX_SAFE_INTEGER + 1;
+        },
+        |limits: &mut InvocationStreamLimitsV1| {
+            limits.max_chunks = I_JSON_MAX_SAFE_INTEGER + 1;
+        },
+        |limits: &mut InvocationStreamLimitsV1| {
+            limits.max_duration_secs = I_JSON_MAX_SAFE_INTEGER + 1;
+        },
+    ] {
+        let mut persisted = raw.to_persisted();
+        mutate(&mut persisted.stream_limits);
+        assert!(matches!(
+            RawInvocationOutcomeV1::from_persisted(persisted),
+            Err(ToolOutcomeError::Invalid("raw.stream_limits"))
+        ));
+    }
+
+    let evidence = GuardEvidence {
+        guard_name: "input-guard".to_owned(),
+        verdict: true,
+        details: Some("bound to the returned invocation".to_owned()),
+    };
+    let mut persisted = raw.to_persisted();
+    persisted.pre_invocation_guard_evidence = vec![evidence; MAX_RECEIPT_GUARD_EVIDENCE + 1];
+    assert!(matches!(
+        RawInvocationOutcomeV1::from_persisted(persisted),
+        Err(ToolOutcomeError::TooLarge {
+            field: "raw.pre_invocation_guard_evidence",
+            actual,
+            maximum: MAX_RECEIPT_GUARD_EVIDENCE,
+        }) if actual == MAX_RECEIPT_GUARD_EVIDENCE + 1
+    ));
+}
+
+#[test]
+fn raw_outcome_round_trip_retains_finalization_inputs() {
+    let operation = committed_operation("request-raw-finalization-inputs");
+    let evidence = GuardEvidence {
+        guard_name: "input-policy".to_owned(),
+        verdict: true,
+        details: Some("verified before dispatch".to_owned()),
+    };
+    let metadata = json!({
+        "attribution": {"grant_index": 0},
+        "governed_transaction": {"runtime_assurance": "verified"}
+    });
+    let raw = RawInvocationOutcomeV1::from_committed_dispatch(
+        &operation,
+        operation.dispatch_commit().unwrap(),
+        id("server-1"),
+        id("tool-1"),
+        provider_attempt(&operation, "attempt-1"),
+        admission_digest("transport-terminal"),
+        0,
+        17,
+        stream_limits(),
+        InvocationOutputV1::Value {
+            value: json!({"ok": true}),
+        },
+        None,
+        Some(metadata.clone()),
+        vec![evidence.clone()],
+    )
+    .unwrap();
+
+    let restored =
+        RawInvocationOutcomeV1::from_canonical_bytes(raw.canonical_blob().unwrap().bytes())
+            .unwrap();
+    assert_eq!(restored.matched_grant_index().unwrap(), 0);
+    assert_eq!(restored.elapsed_millis(), 17);
+    assert_eq!(restored.stream_limits(), stream_limits());
+    assert_eq!(restored.receipt_metadata_snapshot(), Some(&metadata));
+    assert_eq!(restored.pre_invocation_guard_evidence(), &[evidence]);
+}
+
+#[test]
 fn canonical_blob_and_admission_bindings_reject_substitution() {
     let operation = committed_operation("request-1");
     let other = committed_operation("request-2");
@@ -464,8 +579,13 @@ fn canonical_blob_and_admission_bindings_reject_substitution() {
         id("tool"),
         operation.provider_attempt().unwrap().clone(),
         admission_digest("transport"),
+        0,
+        7,
+        stream_limits(),
         InvocationOutputV1::Value { value: json!(1) },
         None,
+        None,
+        Vec::new(),
     )
     .is_err());
 
@@ -538,8 +658,13 @@ fn broker_attempt_registration_binds_raw_outcome_creation_and_recording() {
                 id("tool-1"),
                 substituted,
                 admission_digest("transport-terminal"),
+                0,
+                7,
+                stream_limits(),
                 InvocationOutputV1::Value { value: json!(1) },
                 None,
+                None,
+                Vec::new(),
             )
             .unwrap_err(),
             ToolOutcomeError::Binding("provider_attempt.registered_attempt"),
@@ -894,11 +1019,16 @@ fn exact_replay_rejects_immutable_semantic_substitution() {
             tool,
             operation.provider_attempt().unwrap().clone(),
             admission_digest("transport-terminal"),
+            0,
+            7,
+            stream_limits(),
             InvocationOutputV1::Value { value: output },
             Some(MonetaryAmount {
                 units,
                 currency: "USD".to_owned(),
             }),
+            None,
+            Vec::new(),
         )
         .unwrap();
         let blob = raw.canonical_blob().unwrap();

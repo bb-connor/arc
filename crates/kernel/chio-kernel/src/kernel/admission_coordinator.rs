@@ -3,6 +3,10 @@ use std::sync::Arc;
 
 use serde::Serialize;
 
+#[path = "admission_coordinator/terminal.rs"]
+mod terminal;
+pub(crate) use terminal::DurableToolReturnInput;
+
 use super::*;
 use crate::admission_operation::{
     AdmissionAttachment, AdmissionBeginResult, AdmissionCompensationStatus,
@@ -11,17 +15,19 @@ use crate::admission_operation::{
     AdmissionOperationKind, AdmissionOperationState, AdmissionOperationV1,
     AdmissionParticipantRequirements, AdmissionProjectionContext, AdmissionReceiptMetadataV1,
     AdmissionReceiptSchema, AdmissionRequestBindingV1, AdmissionTerminalProjection,
-    AuthenticatedRequestNamespace, ObservationAttemptZero, ProviderAttemptBindingV1,
-    QualifiedAdmissionOperationStoreExt, SideEffectClass, StoreMutationFence,
-    VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
+    AdmissionTerminalReplay, AuthenticatedRequestNamespace, ObservationAttemptZero,
+    ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt, SideEffectClass,
+    StoreMutationFence, VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
+    LOCAL_SYSTEM_TENANT_ID,
 };
 use crate::budget_store::{BudgetAdmissionBinding, BudgetEventAuthority};
 use crate::receipt_store::QualifiedAdmissionProjectionStore;
 use crate::supplemental_quota::CanonicalRevocationSet;
 use crate::tool_outcome::{
     EvaluationModeV1, EvaluationPhaseV1, FrozenEvaluationStepV1, InvocationOutputV1,
-    PostReturnEvaluationRecordV1, PostReturnNormalizedRequestContextV1, QualifiedToolOutcomeStore,
-    RawInvocationOutcomeV1, SettlementDispositionV1, ToolOutcomeRecordV1, ToolOutcomeStoreError,
+    InvocationStreamLimitsV1, PostReturnEvaluationRecordV1, PostReturnEvaluationStateV1,
+    PostReturnNormalizedRequestContextV1, QualifiedToolOutcomeStore, RawInvocationOutcomeV1,
+    ResolvedToolOutcomeV1, SettlementDispositionV1, ToolOutcomeRecordV1, ToolOutcomeStoreError,
     ToolOutcomeTerminalEvidenceV1, ToolOutcomeTransitionV1,
 };
 
@@ -81,39 +87,6 @@ pub(crate) struct DurableToolAdmission {
     operation: AdmissionOperationV1,
 }
 
-#[derive(Serialize)]
-struct LocalToolReturnEvidence<'a> {
-    schema: &'static str,
-    operation_id: &'a str,
-    provider_attempt: &'a ProviderAttemptBindingV1,
-    output: &'a InvocationOutputV1,
-    reported_cost: &'a Option<ToolInvocationCost>,
-}
-
-#[derive(Serialize)]
-struct KernelPostReturnContext<'a> {
-    schema: &'static str,
-    request_binding_hash: &'a str,
-    matched_grant_index: usize,
-    elapsed_millis: u64,
-    max_stream_total_bytes: u64,
-    max_stream_chunks: u64,
-    max_stream_duration_secs: u64,
-}
-
-#[derive(Serialize)]
-struct KernelOutputGuardDecision<'a> {
-    schema: &'static str,
-    resolved_output_digest: &'a str,
-    complete: bool,
-}
-
-#[derive(Serialize)]
-struct KernelPricingVerdict {
-    schema: &'static str,
-    disposition: &'static str,
-}
-
 impl DurableToolAdmission {
     pub(crate) fn operation_id(&self) -> &str {
         self.operation.binding().operation_id().as_str()
@@ -135,6 +108,10 @@ impl DurableToolAdmission {
 
     pub(crate) fn can_resume_captured_hold(&self) -> bool {
         self.operation.state() == AdmissionOperationState::CapturePending
+    }
+
+    pub(crate) fn state(&self) -> AdmissionOperationState {
+        self.operation.state()
     }
 }
 
@@ -175,6 +152,7 @@ impl ChioKernel {
         if !self.durable_admission_mode.covers(effect_class) {
             return Ok(None);
         }
+        self.durable_stream_limits()?;
         let Some(runtime) = self.durable_admission_runtime.as_ref() else {
             if self.config.allow_ephemeral_receipt_log {
                 return Ok(None);
@@ -293,6 +271,8 @@ impl ChioKernel {
                         | AdmissionOperationState::BudgetAuthorized
                         | AdmissionOperationState::ReadyToDispatch
                         | AdmissionOperationState::CapturePending
+                        | AdmissionOperationState::Finalizing
+                        | AdmissionOperationState::Completed
                 ) =>
             {
                 operation
@@ -312,23 +292,38 @@ impl ChioKernel {
                 )));
             }
         };
-        let expected_attempt = ProviderAttemptBindingV1 {
-            operation_id: operation.binding().operation_id().as_str().to_string(),
-            attempt_id: format!("attempt:{}", operation.binding().operation_id().as_str()),
-            transport_id: format!("kernel-tool-server:{}", request.server_id),
-            transport_key_epoch: runtime.fence.owner_epoch,
-        };
-        expected_attempt.validate().map_err(|error| {
-            KernelError::DurableAdmission(format!("provider attempt binding is invalid: {error}"))
-        })?;
+        let expected_operation_id = operation.binding().operation_id().as_str();
+        let expected_attempt_id = format!("attempt:{expected_operation_id}");
+        let expected_transport_id = format!("kernel-tool-server:{}", request.server_id);
         let operation = match operation.state() {
-            AdmissionOperationState::Prepared => self.apply_admission_command(
-                operation,
-                vec![AdmissionAttachment::BrokerAttempt(expected_attempt)],
-                AdmissionOperationState::BrokerAttemptRegistered,
-                trusted_now_unix_ms,
-            )?,
-            _ if operation.provider_attempt() == Some(&expected_attempt) => operation,
+            AdmissionOperationState::Prepared => {
+                let expected_attempt = ProviderAttemptBindingV1 {
+                    operation_id: expected_operation_id.to_owned(),
+                    attempt_id: expected_attempt_id,
+                    transport_id: expected_transport_id,
+                    transport_key_epoch: runtime.fence.owner_epoch,
+                };
+                expected_attempt.validate().map_err(|error| {
+                    KernelError::DurableAdmission(format!(
+                        "provider attempt binding is invalid: {error}"
+                    ))
+                })?;
+                self.apply_admission_command(
+                    operation,
+                    vec![AdmissionAttachment::BrokerAttempt(expected_attempt)],
+                    AdmissionOperationState::BrokerAttemptRegistered,
+                    trusted_now_unix_ms,
+                )?
+            }
+            _ if operation.provider_attempt().is_some_and(|attempt| {
+                attempt.operation_id == expected_operation_id
+                    && attempt.attempt_id == expected_attempt_id
+                    && attempt.transport_id == expected_transport_id
+                    && attempt.transport_key_epoch <= operation.coordinator_lease_epoch()
+            }) =>
+            {
+                operation
+            }
             _ => {
                 return Err(KernelError::DurableAdmission(
                     "retained provider attempt does not match this dispatch".to_string(),
@@ -473,469 +468,6 @@ impl ChioKernel {
         Ok(())
     }
 
-    pub(crate) fn record_durable_tool_return(
-        &self,
-        admission: &mut DurableToolAdmission,
-        request: &ToolCallRequest,
-        output: &ToolServerOutput,
-        reported_cost: Option<ToolInvocationCost>,
-        trusted_now_unix_ms: u64,
-    ) -> Result<ToolOutcomeRecordV1, KernelError> {
-        let runtime = self.durable_runtime()?;
-        if admission.operation.state() != AdmissionOperationState::DispatchCommitted {
-            return Err(KernelError::DurableAdmission(format!(
-                "tool return cannot be recorded from state {:?}",
-                admission.operation.state()
-            )));
-        }
-        let provider_attempt =
-            admission
-                .operation
-                .provider_attempt()
-                .cloned()
-                .ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "durable tool return has no registered provider attempt".to_owned(),
-                    )
-                })?;
-        let invocation_output = match output {
-            ToolServerOutput::Value(value) => InvocationOutputV1::Value {
-                value: value.clone(),
-            },
-            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => {
-                InvocationOutputV1::CompleteStream {
-                    chunks: stream
-                        .chunks
-                        .iter()
-                        .map(|chunk| chunk.data.clone())
-                        .collect(),
-                }
-            }
-            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => {
-                InvocationOutputV1::IncompleteStream {
-                    chunks: stream
-                        .chunks
-                        .iter()
-                        .map(|chunk| chunk.data.clone())
-                        .collect(),
-                    reason: reason.clone(),
-                }
-            }
-        };
-        let transport_terminal_evidence_digest = admission_digest(
-            "transport_terminal_evidence_digest",
-            &LocalToolReturnEvidence {
-                schema: "chio.local-tool-return-evidence.v1",
-                operation_id: admission.operation_id(),
-                provider_attempt: &provider_attempt,
-                output: &invocation_output,
-                reported_cost: &reported_cost,
-            },
-        )?;
-        let monetary_cost =
-            reported_cost
-                .as_ref()
-                .map(|cost| chio_core::capability::scope::MonetaryAmount {
-                    units: cost.units,
-                    currency: cost.currency.clone(),
-                });
-        let commit = admission
-            .operation
-            .dispatch_commit()
-            .cloned()
-            .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "durable tool return lost its dispatch commit".to_owned(),
-                )
-            })?;
-        let raw = RawInvocationOutcomeV1::from_committed_dispatch(
-            &admission.operation,
-            &commit,
-            AdmissionIdentifier::try_new("tool_server", request.server_id.clone())?,
-            AdmissionIdentifier::try_new("tool_name", request.tool_name.clone())?,
-            provider_attempt,
-            transport_terminal_evidence_digest,
-            invocation_output,
-            monetary_cost,
-        )
-        .map_err(tool_outcome_error)?;
-        let blob = raw.canonical_blob().map_err(tool_outcome_error)?;
-        let record = ToolOutcomeRecordV1::record_tool_returned(
-            &admission.operation,
-            &raw,
-            &blob,
-            runtime.fence.clone(),
-            trusted_now_unix_ms,
-        )
-        .map_err(tool_outcome_error)?;
-        let expires_at_unix_ms = trusted_now_unix_ms
-            .checked_add(RECOVERY_LEASE_DURATION_MS)
-            .ok_or_else(|| {
-                KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
-            })?;
-        let lease = runtime
-            .store
-            .claim_recovery(
-                admission.operation.binding().operation_id(),
-                admission.operation.version(),
-                &runtime.claimant_id,
-                trusted_now_unix_ms,
-                expires_at_unix_ms,
-                &runtime.fence,
-            )
-            .map_err(durable_store_error)?;
-        let (stored, finalizing) = runtime
-            .outcome_store
-            .record_tool_returned(
-                &admission.operation,
-                &lease,
-                &blob,
-                &record,
-                &runtime.fence,
-                trusted_now_unix_ms,
-            )
-            .map_err(durable_outcome_store_error)?
-            .into_parts();
-        admission.operation = finalizing;
-        Ok(stored)
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn finalize_durable_tool_return(
-        &self,
-        admission: &mut DurableToolAdmission,
-        request: &ToolCallRequest,
-        returned_outcome: &ToolOutcomeRecordV1,
-        output: ToolServerOutput,
-        elapsed: Duration,
-        matched_grant_index: usize,
-        extra_metadata: Option<serde_json::Value>,
-    ) -> Result<ToolCallResponse, KernelError> {
-        let runtime = self.durable_runtime()?;
-        if admission.operation.state() != AdmissionOperationState::Finalizing {
-            return Err(KernelError::DurableAdmission(format!(
-                "terminal projection cannot start from state {:?}",
-                admission.operation.state()
-            )));
-        }
-        if !self.post_invocation_pipeline.is_empty() {
-            return Err(KernelError::DurableAdmission(
-                "post-invocation pipeline changed after durable admission".to_owned(),
-            ));
-        }
-
-        let limited = self.apply_stream_limits(output, elapsed)?;
-        let output = match limited {
-            ToolServerOutput::Value(value) => ToolCallOutput::Value(value),
-            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => {
-                ToolCallOutput::Stream(stream)
-            }
-            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => {
-                return Err(KernelError::DurableAdmission(format!(
-                    "incomplete durable output retained for recovery: {reason}"
-                )));
-            }
-        };
-        let expected_chunks = match &output {
-            ToolCallOutput::Stream(stream) => Some(stream.chunk_count()),
-            ToolCallOutput::Value(_) => None,
-        };
-        let receipt_content = receipt_content_for_output(Some(&output), expected_chunks)?;
-        let resolved_output_digest = AdmissionDigest::try_new(
-            "resolved_output_digest",
-            receipt_content.content_hash.clone(),
-        )?;
-        let trusted_now_unix_ms = current_unix_timestamp_ms()
-            .max(returned_outcome.recorded_at_unix_ms())
-            .max(1);
-        let lease = self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
-        let elapsed_millis = u64::try_from(elapsed.as_millis())
-            .unwrap_or(I_JSON_MAX_SAFE_INTEGER)
-            .min(I_JSON_MAX_SAFE_INTEGER);
-        let normalized_context = PostReturnNormalizedRequestContextV1::from_verified_normalization(
-            serde_json::to_value(KernelPostReturnContext {
-                schema: "chio.kernel-post-return-context.v1",
-                request_binding_hash: admission
-                    .operation
-                    .binding()
-                    .request_binding_hash()
-                    .as_str(),
-                matched_grant_index,
-                elapsed_millis,
-                max_stream_total_bytes: self.config.max_stream_total_bytes,
-                max_stream_chunks: self.config.memory_budget.max_stream_chunks,
-                max_stream_duration_secs: self.config.max_stream_duration_secs,
-            })
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
-        )
-        .map_err(tool_outcome_error)?;
-        let implementation_digest = AdmissionDigest::try_new(
-            "implementation_digest",
-            sha256_hex(b"chio.kernel-output-finalization.v1"),
-        )?;
-        let prepared = PostReturnEvaluationRecordV1::prepare(
-            &admission.operation,
-            returned_outcome,
-            vec![FrozenEvaluationStepV1 {
-                phase: EvaluationPhaseV1::OutputGuard,
-                position: 0,
-                component_id: AdmissionIdentifier::try_new(
-                    "component_id",
-                    "kernel-output-finalization",
-                )?,
-                component_version: AdmissionIdentifier::try_new("component_version", "v1")?,
-                implementation_digest,
-                mode: EvaluationModeV1::Pure,
-            }],
-            trusted_now_unix_ms,
-            normalized_context,
-        )
-        .map_err(tool_outcome_error)?;
-        let prepared = runtime
-            .outcome_store
-            .begin_post_return_evaluation(&lease, &prepared, &runtime.fence, trusted_now_unix_ms)
-            .map_err(durable_outcome_store_error)?;
-        let post_guard_decision_digest = admission_digest(
-            "post_guard_decision_digest",
-            &KernelOutputGuardDecision {
-                schema: "chio.kernel-output-guard-decision.v1",
-                resolved_output_digest: resolved_output_digest.as_str(),
-                complete: true,
-            },
-        )?;
-        let evaluated = prepared
-            .record_next_pure_result(post_guard_decision_digest.clone())
-            .map_err(tool_outcome_error)?;
-        let evaluated = runtime
-            .outcome_store
-            .stage_post_return_evaluation(
-                admission.operation.binding().operation_id(),
-                prepared.version(),
-                &lease,
-                &evaluated,
-                &runtime.fence,
-                trusted_now_unix_ms,
-            )
-            .map_err(durable_outcome_store_error)?;
-        let pricing_verdict_digest = admission_digest(
-            "pricing_verdict_digest",
-            &KernelPricingVerdict {
-                schema: "chio.kernel-pricing-verdict.v1",
-                disposition: "not_applicable",
-            },
-        )?;
-        let (terminal_evaluation, resolved_output) = evaluated
-            .resolve_with_signing_preimage(
-                receipt_content.canonical_content.clone(),
-                post_guard_decision_digest,
-                pricing_verdict_digest,
-                SettlementDispositionV1::NotApplicable,
-            )
-            .map_err(tool_outcome_error)?;
-        let terminal_outcome = returned_outcome
-            .transition(
-                returned_outcome.version(),
-                ToolOutcomeTransitionV1::Resolve(
-                    terminal_evaluation
-                        .terminal_evidence()
-                        .map_err(tool_outcome_error)?,
-                ),
-            )
-            .map_err(tool_outcome_error)?;
-        let (terminal_evaluation, terminal_outcome) = runtime
-            .outcome_store
-            .finalize_post_return(
-                admission.operation.binding().operation_id(),
-                evaluated.version(),
-                &lease,
-                &terminal_evaluation,
-                returned_outcome.version(),
-                &terminal_outcome,
-                Some(&resolved_output),
-                &runtime.fence,
-                trusted_now_unix_ms,
-            )
-            .map_err(durable_outcome_store_error)?;
-        let context = AdmissionProjectionContext {
-            operation_id: admission.operation.binding().operation_id().clone(),
-            request_id: admission.operation.binding().request_id().clone(),
-            expected_operation_version: admission.operation.version(),
-            trusted_time_unix_ms: trusted_now_unix_ms,
-            coordinator_lease_id: lease.coordinator_lease_id().clone(),
-            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
-            store_fence: runtime.fence.clone(),
-        };
-        let tool_outcome = ToolOutcomeTerminalEvidenceV1::from_records(
-            &admission.operation,
-            &context,
-            &terminal_outcome,
-            &terminal_evaluation,
-        )
-        .map_err(tool_outcome_error)?;
-        let projected_operation_version =
-            admission
-                .operation
-                .version()
-                .checked_add(1)
-                .ok_or_else(|| {
-                    KernelError::DurableAdmission("operation version overflowed".to_owned())
-                })?;
-        let admission_metadata = AdmissionReceiptMetadataV1 {
-            schema: AdmissionReceiptSchema::V1,
-            operation_id: context.operation_id.clone(),
-            request_id: context.request_id.clone(),
-            request_namespace_digest: admission
-                .operation
-                .binding()
-                .request_namespace_digest()
-                .clone(),
-            request_binding_hash: admission.operation.binding().request_binding_hash().clone(),
-            projected_operation_version,
-            projected_state: AdmissionOperationState::Completed,
-            projected_dispatch_state: AdmissionDispatchState::Terminal,
-            trusted_time_unix_ms: trusted_now_unix_ms,
-            coordinator_lease_id: context.coordinator_lease_id.clone(),
-            coordinator_lease_epoch: context.coordinator_lease_epoch,
-            store_fence: context.store_fence.clone(),
-            retained_dispatch_commit: admission.operation.dispatch_commit().cloned(),
-            compensation_status: AdmissionCompensationStatus::NotCompensated,
-            tool_outcome_id: Some(terminal_outcome.outcome_id().clone()),
-            tool_outcome_version: Some(terminal_outcome.version()),
-        };
-        let memory_action_kind = crate::memory_provenance::classify_memory_action(
-            &request.tool_name,
-            &request.arguments,
-        );
-        let memory_read_metadata = match memory_action_kind.as_ref() {
-            Some(crate::memory_provenance::MemoryActionKind::Read { store, key }) => {
-                self.resolve_memory_read_provenance_metadata(store, key)
-            }
-            _ => None,
-        };
-        let timestamp = trusted_now_unix_ms / 1_000;
-        let request_metadata = request_receipt_metadata(
-            request,
-            self.attestation_trust_policy.as_ref(),
-            timestamp,
-            extra_metadata.as_ref(),
-        )?;
-        let metadata = merge_metadata_objects(
-            merge_metadata_objects(
-                merge_metadata_objects(
-                    merge_metadata_objects(
-                        merge_metadata_objects(receipt_content.metadata, request_metadata),
-                        extra_metadata,
-                    ),
-                    receipt_attribution_metadata(&request.capability, Some(matched_grant_index)),
-                ),
-                memory_read_metadata,
-            ),
-            Some(serde_json::json!({
-                ADMISSION_RECEIPT_METADATA_KEY: admission_metadata
-            })),
-        );
-        let action =
-            ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
-                KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {error}"))
-            })?;
-        let receipt = self.build_and_sign_receipt(ReceiptParams {
-            request_id: Some(&request.request_id),
-            capability_id: &request.capability.id,
-            tool_name: &request.tool_name,
-            server_id: &request.server_id,
-            decision: Decision::Allow,
-            action,
-            content_hash: receipt_content.content_hash,
-            canonical_content: receipt_content.canonical_content,
-            metadata,
-            timestamp,
-            trust_level: chio_core::receipt::kinds::TrustLevel::default(),
-            tenant_id: None,
-        })?;
-        let receipt = VerifiedAdmissionReceipt::from_kernel_verified(
-            receipt,
-            &self.config.keypair.public_key(),
-            &admission.operation,
-            &context,
-            &tool_outcome,
-        )
-        .map_err(|error| {
-            KernelError::DurableAdmission(format!("terminal receipt qualification failed: {error}"))
-        })?;
-        let observer_work = if admission
-            .operation
-            .binding()
-            .participant_requirements()
-            .observation_attempt_zero
-        {
-            Some(ObservationAttemptZero::from_verified(
-                &admission.operation,
-                &context,
-                &receipt,
-                terminal_outcome.outcome_id().clone(),
-                terminal_outcome.version(),
-            )?)
-        } else {
-            None
-        };
-        let projected_receipt = receipt.receipt().clone();
-        let projection =
-            AdmissionTerminalProjection::Completed(Box::new(AdmissionCompletedProjection {
-                context,
-                receipt,
-                tool_outcome: Some(tool_outcome),
-                payment_evidence: None,
-                authorization: None,
-                eligibility: None,
-                observer_work,
-                obligation: None,
-            }));
-        let terminal = runtime
-            .store
-            .commit_admission_projection(&projection)
-            .map_err(|error| {
-                KernelError::DurableAdmission(format!("atomic terminal projection failed: {error}"))
-            })?;
-        if terminal.state != AdmissionOperationState::Completed {
-            return Err(KernelError::DurableAdmission(
-                "terminal projection did not complete the operation".to_owned(),
-            ));
-        }
-        admission.operation = runtime
-            .store
-            .load_by_operation_id(admission.operation.binding().operation_id())
-            .map_err(durable_store_error)?
-            .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "completed admission operation disappeared".to_owned(),
-                )
-            })?;
-        self.append_chio_receipt_to_local_log(projected_receipt.clone());
-        self.apply_federation_cosign_for_admitted_request(request, &projected_receipt)?;
-        if let Some(crate::memory_provenance::MemoryActionKind::Write { store, key }) =
-            memory_action_kind.as_ref()
-        {
-            self.append_memory_provenance_for_write(
-                store,
-                key,
-                &request.capability.id,
-                &projected_receipt.id,
-                projected_receipt.timestamp,
-            )?;
-        }
-        let execution_nonce =
-            self.mint_execution_nonce_for_allow(request, &request.capability, &projected_receipt)?;
-        Ok(ToolCallResponse {
-            request_id: request.request_id.clone(),
-            verdict: Verdict::Allow,
-            output: Some(output),
-            reason: None,
-            terminal_state: OperationTerminalState::Completed,
-            receipt: projected_receipt,
-            execution_nonce,
-        })
-    }
-
     fn claim_admission_recovery(
         &self,
         operation: &AdmissionOperationV1,
@@ -1007,6 +539,15 @@ impl ChioKernel {
             )
         })
     }
+
+    fn durable_stream_limits(&self) -> Result<InvocationStreamLimitsV1, KernelError> {
+        InvocationStreamLimitsV1::new(
+            self.config.max_stream_total_bytes,
+            self.config.memory_budget.max_stream_chunks,
+            self.config.max_stream_duration_secs,
+        )
+        .map_err(|error| KernelError::DurableAdmission(error.to_string()))
+    }
 }
 
 fn admission_digest(
@@ -1016,6 +557,28 @@ fn admission_digest(
     let canonical = canonical_json_bytes(value)
         .map_err(|error| KernelError::DurableAdmission(format!("{field}: {error}")))?;
     AdmissionDigest::try_new(field, sha256_hex(&canonical)).map_err(KernelError::from)
+}
+
+fn invocation_output_to_server_output(output: &InvocationOutputV1) -> ToolServerOutput {
+    let stream = |chunks: &[serde_json::Value]| ToolCallStream {
+        chunks: chunks
+            .iter()
+            .cloned()
+            .map(|data| ToolCallChunk { data })
+            .collect(),
+    };
+    match output {
+        InvocationOutputV1::Value { value } => ToolServerOutput::Value(value.clone()),
+        InvocationOutputV1::CompleteStream { chunks } => {
+            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream(chunks)))
+        }
+        InvocationOutputV1::IncompleteStream { chunks, reason } => {
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete {
+                stream: stream(chunks),
+                reason: reason.clone(),
+            })
+        }
+    }
 }
 
 fn durable_store_error(
