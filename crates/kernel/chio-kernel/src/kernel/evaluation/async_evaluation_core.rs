@@ -1026,22 +1026,47 @@ impl ChioKernel {
                 );
             }
         };
-        if let Some(admission) = durable_admission.as_mut() {
+        let durable_outcome = if let Some(admission) = durable_admission.as_mut() {
             let recorded_at_unix_ms = current_unix_timestamp_ms().max(now_unix_ms);
-            if let Err(error) = self.record_durable_tool_return(
+            match self.record_durable_tool_return(
                 admission,
                 request,
                 &tool_output,
                 reported_cost.clone(),
                 recorded_at_unix_ms,
             ) {
-                warn!(
-                    request_id = %request.request_id,
-                    reason = %redacted!(&error),
-                    "tool return could not be durably recorded"
-                );
-                return Err(error);
+                Ok(outcome) => Some(outcome),
+                Err(error) => {
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %redacted!(&error),
+                        "tool return could not be durably recorded"
+                    );
+                    return Err(error);
+                }
             }
+        } else {
+            None
+        };
+        if let (Some(admission), Some(outcome)) =
+            (durable_admission.as_mut(), durable_outcome.as_ref())
+        {
+            if budget_mutation.charge_result().is_some() {
+                return Err(KernelError::DurableAdmission(
+                    "monetary dispatch reached an unsupported durable terminal path".to_owned(),
+                ));
+            }
+            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
+                self.finalize_durable_tool_return(
+                    admission,
+                    request,
+                    outcome,
+                    tool_output,
+                    tool_started_at.elapsed(),
+                    matched_grant_index,
+                    extra_metadata,
+                )
+            });
         }
         self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
             self.finalize_budgeted_tool_output_with_cost_and_metadata(

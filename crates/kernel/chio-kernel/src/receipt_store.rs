@@ -847,6 +847,13 @@ pub trait ReceiptStore: Send + Sync {
     }
 }
 
+/// Store authority qualified to coordinate admission state and atomically
+/// publish every terminal receipt projection.
+pub trait QualifiedAdmissionProjectionStore:
+    ReceiptStore + crate::admission_operation::QualifiedAdmissionOperationStore
+{
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

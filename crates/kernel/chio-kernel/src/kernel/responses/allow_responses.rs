@@ -179,7 +179,7 @@ impl ChioKernel {
     /// entry OR the chain is tampered / unavailable. This is the
     /// fail-closed signal: the receipt explicitly records that the
     /// memory read was not backed by a provenance record.
-    fn resolve_memory_read_provenance_metadata(
+    pub(crate) fn resolve_memory_read_provenance_metadata(
         &self,
         store: &str,
         key: &str,
@@ -255,7 +255,7 @@ impl ChioKernel {
 
     /// Append a provenance entry for a governed memory write once the allow
     /// receipt is signed. Fails closed on chain-store errors.
-    fn append_memory_provenance_for_write(
+    pub(crate) fn append_memory_provenance_for_write(
         &self,
         store: &str,
         key: &str,

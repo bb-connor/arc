@@ -262,6 +262,7 @@ impl AdmissionParticipantRequirements {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct AdmissionRequestBindingV1 {
     pub(super) immutable_request_hash: AdmissionDigest,
+    pub(super) action_parameter_hash: AdmissionDigest,
     pub(super) participant_requirements: AdmissionParticipantRequirements,
     pub(super) request_binding_hash: AdmissionDigest,
 }
@@ -271,11 +272,27 @@ impl AdmissionRequestBindingV1 {
         immutable_request_hash: AdmissionDigest,
         participant_requirements: AdmissionParticipantRequirements,
     ) -> Result<Self, AdmissionOperationError> {
+        Self::new_with_action_parameter_hash(
+            immutable_request_hash.clone(),
+            immutable_request_hash,
+            participant_requirements,
+        )
+    }
+
+    pub fn new_with_action_parameter_hash(
+        immutable_request_hash: AdmissionDigest,
+        action_parameter_hash: AdmissionDigest,
+        participant_requirements: AdmissionParticipantRequirements,
+    ) -> Result<Self, AdmissionOperationError> {
         participant_requirements.validate()?;
-        let request_binding_hash =
-            derive_request_binding_hash(&immutable_request_hash, participant_requirements)?;
+        let request_binding_hash = derive_request_binding_hash(
+            &immutable_request_hash,
+            &action_parameter_hash,
+            participant_requirements,
+        )?;
         Ok(Self {
             immutable_request_hash,
+            action_parameter_hash,
             participant_requirements,
             request_binding_hash,
         })
@@ -283,8 +300,11 @@ impl AdmissionRequestBindingV1 {
 
     fn validate(&self) -> Result<(), AdmissionOperationError> {
         self.participant_requirements.validate()?;
-        if derive_request_binding_hash(&self.immutable_request_hash, self.participant_requirements)?
-            != self.request_binding_hash
+        if derive_request_binding_hash(
+            &self.immutable_request_hash,
+            &self.action_parameter_hash,
+            self.participant_requirements,
+        )? != self.request_binding_hash
         {
             return Err(AdmissionOperationError::RequestBindingMismatch);
         }
@@ -301,12 +321,14 @@ impl<'de> Deserialize<'de> for AdmissionRequestBindingV1 {
         #[serde(deny_unknown_fields)]
         struct Persisted {
             immutable_request_hash: AdmissionDigest,
+            action_parameter_hash: AdmissionDigest,
             participant_requirements: AdmissionParticipantRequirements,
             request_binding_hash: AdmissionDigest,
         }
         let value = Persisted::deserialize(deserializer)?;
         let binding = Self {
             immutable_request_hash: value.immutable_request_hash,
+            action_parameter_hash: value.action_parameter_hash,
             participant_requirements: value.participant_requirements,
             request_binding_hash: value.request_binding_hash,
         };
@@ -528,6 +550,11 @@ impl AdmissionOperationBindingV1 {
     }
 
     #[must_use]
+    pub fn action_parameter_hash(&self) -> &AdmissionDigest {
+        &self.request_binding.action_parameter_hash
+    }
+
+    #[must_use]
     pub fn participant_requirements(&self) -> AdmissionParticipantRequirements {
         self.request_binding.participant_requirements
     }
@@ -625,17 +652,20 @@ pub(super) fn derive_operation_id(
 
 fn derive_request_binding_hash(
     immutable_request_hash: &AdmissionDigest,
+    action_parameter_hash: &AdmissionDigest,
     participant_requirements: AdmissionParticipantRequirements,
 ) -> Result<AdmissionDigest, AdmissionOperationError> {
     #[derive(Serialize)]
     struct RequestBindingBody<'a> {
         immutable_request_hash: &'a str,
+        action_parameter_hash: &'a str,
         participant_requirements: AdmissionParticipantRequirements,
     }
     domain_separated_digest(
         ADMISSION_REQUEST_BINDING_DOMAIN,
         &RequestBindingBody {
             immutable_request_hash: immutable_request_hash.as_str(),
+            action_parameter_hash: action_parameter_hash.as_str(),
             participant_requirements,
         },
     )

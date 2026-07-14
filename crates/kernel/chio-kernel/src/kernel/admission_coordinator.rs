@@ -5,18 +5,24 @@ use serde::Serialize;
 
 use super::*;
 use crate::admission_operation::{
-    AdmissionAttachment, AdmissionBeginResult, AdmissionDigest, AdmissionIdentifier,
+    AdmissionAttachment, AdmissionBeginResult, AdmissionCompensationStatus,
+    AdmissionCompletedProjection, AdmissionDigest, AdmissionDispatchState, AdmissionIdentifier,
     AdmissionOperationBindingInputV1, AdmissionOperationBindingV1, AdmissionOperationCommand,
     AdmissionOperationKind, AdmissionOperationState, AdmissionOperationV1,
-    AdmissionParticipantRequirements, AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
-    ProviderAttemptBindingV1, QualifiedAdmissionOperationStore,
+    AdmissionParticipantRequirements, AdmissionProjectionContext, AdmissionReceiptMetadataV1,
+    AdmissionReceiptSchema, AdmissionRequestBindingV1, AdmissionTerminalProjection,
+    AuthenticatedRequestNamespace, ObservationAttemptZero, ProviderAttemptBindingV1,
     QualifiedAdmissionOperationStoreExt, SideEffectClass, StoreMutationFence,
+    VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
 };
 use crate::budget_store::{BudgetAdmissionBinding, BudgetEventAuthority};
+use crate::receipt_store::QualifiedAdmissionProjectionStore;
 use crate::supplemental_quota::CanonicalRevocationSet;
 use crate::tool_outcome::{
-    InvocationOutputV1, QualifiedToolOutcomeStore, RawInvocationOutcomeV1, ToolOutcomeRecordV1,
-    ToolOutcomeStoreError,
+    EvaluationModeV1, EvaluationPhaseV1, FrozenEvaluationStepV1, InvocationOutputV1,
+    PostReturnEvaluationRecordV1, PostReturnNormalizedRequestContextV1, QualifiedToolOutcomeStore,
+    RawInvocationOutcomeV1, SettlementDispositionV1, ToolOutcomeRecordV1, ToolOutcomeStoreError,
+    ToolOutcomeTerminalEvidenceV1, ToolOutcomeTransitionV1,
 };
 
 const RECOVERY_LEASE_DURATION_MS: u64 = 60_000;
@@ -24,7 +30,7 @@ const I_JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 
 #[derive(Clone)]
 pub(crate) struct DurableAdmissionRuntime {
-    store: Arc<dyn QualifiedAdmissionOperationStore>,
+    store: Arc<dyn QualifiedAdmissionProjectionStore>,
     outcome_store: Arc<dyn QualifiedToolOutcomeStore>,
     fence: StoreMutationFence,
     claimant_id: AdmissionIdentifier,
@@ -42,7 +48,7 @@ impl fmt::Debug for DurableAdmissionRuntime {
 
 impl DurableAdmissionRuntime {
     pub(crate) fn new(
-        store: Arc<dyn QualifiedAdmissionOperationStore>,
+        store: Arc<dyn QualifiedAdmissionProjectionStore>,
         outcome_store: Arc<dyn QualifiedToolOutcomeStore>,
         fence: StoreMutationFence,
         kernel_id: &str,
@@ -82,6 +88,30 @@ struct LocalToolReturnEvidence<'a> {
     provider_attempt: &'a ProviderAttemptBindingV1,
     output: &'a InvocationOutputV1,
     reported_cost: &'a Option<ToolInvocationCost>,
+}
+
+#[derive(Serialize)]
+struct KernelPostReturnContext<'a> {
+    schema: &'static str,
+    request_binding_hash: &'a str,
+    matched_grant_index: usize,
+    elapsed_millis: u64,
+    max_stream_total_bytes: u64,
+    max_stream_chunks: u64,
+    max_stream_duration_secs: u64,
+}
+
+#[derive(Serialize)]
+struct KernelOutputGuardDecision<'a> {
+    schema: &'static str,
+    resolved_output_digest: &'a str,
+    complete: bool,
+}
+
+#[derive(Serialize)]
+struct KernelPricingVerdict {
+    schema: &'static str,
+    disposition: &'static str,
 }
 
 impl DurableToolAdmission {
@@ -153,6 +183,31 @@ impl ChioKernel {
                 "no qualified admission operation store is configured".to_string(),
             ));
         };
+        if effect_class == SideEffectClass::Monetary {
+            return Err(KernelError::DurableAdmission(
+                "durable monetary finalization requires a qualified payment journal".to_owned(),
+            ));
+        }
+        if !self.post_invocation_pipeline.is_empty() {
+            return Err(KernelError::DurableAdmission(
+                "durable post-invocation hooks require frozen implementation identities".to_owned(),
+            ));
+        }
+        if self.execution_nonce_config.is_some() {
+            return Err(KernelError::DurableAdmission(
+                "durable execution nonces require an atomic admission participant".to_owned(),
+            ));
+        }
+        let projection_capabilities = runtime.store.admission_projection_capabilities();
+        let observer_required = self.settlement_observer.is_some();
+        if !projection_capabilities.operation_terminal
+            || !projection_capabilities.tool_outcome
+            || (observer_required && !projection_capabilities.observation_attempt_zero)
+        {
+            return Err(KernelError::DurableAdmission(
+                "admission store lacks atomic terminal tool-outcome projection support".to_owned(),
+            ));
+        }
 
         let immutable_request = ImmutableToolAdmissionRequest {
             schema: "chio.tool-admission-request.v1",
@@ -173,25 +228,39 @@ impl ChioKernel {
         };
         let immutable_request_hash =
             admission_digest("immutable_request_hash", &immutable_request)?;
+        let action =
+            ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
+                KernelError::DurableAdmission(format!(
+                    "tool action parameters are invalid: {error}"
+                ))
+            })?;
+        let action_parameter_hash =
+            AdmissionDigest::try_new("action_parameter_hash", action.parameter_hash.clone())?;
         let authorization_capability_hash =
             admission_digest("authorization_capability_hash", &request.capability)?;
         let policy_hash = AdmissionDigest::try_new("policy_hash", self.config.policy_hash.clone())
-            .or_else(|_| {
-                AdmissionDigest::try_new(
-                    "policy_hash",
-                    sha256_hex(self.config.policy_hash.as_bytes()),
+            .map_err(|_| {
+                KernelError::DurableAdmission(
+                    "durable admission requires a canonical SHA-256 policy hash".to_owned(),
                 )
             })?;
         let requirements = AdmissionParticipantRequirements {
             broker_attempt: true,
             budget_capture: true,
+            observation_attempt_zero: observer_required,
             ..AdmissionParticipantRequirements::NONE
         };
-        let namespace =
-            AuthenticatedRequestNamespace::for_local_system(AdmissionIdentifier::try_new(
-                "coordinator_authority_id",
-                runtime.fence.store_uuid.clone(),
-            )?)?;
+        let coordinator_authority_id = AdmissionIdentifier::try_new(
+            "coordinator_authority_id",
+            runtime.fence.store_uuid.clone(),
+        )?;
+        let namespace = match self.receipt_tenant_id_for_request(Some(&request.request_id)) {
+            Some(tenant_id) => AuthenticatedRequestNamespace::from_authentication_context(
+                coordinator_authority_id,
+                tenant_id,
+            )?,
+            None => AuthenticatedRequestNamespace::for_local_system(coordinator_authority_id)?,
+        };
         let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
             kind: AdmissionOperationKind::ToolDispatch,
             namespace,
@@ -201,7 +270,11 @@ impl ChioKernel {
                 request.capability.id.clone(),
             )?,
             authorization_capability_hash,
-            request_binding: AdmissionRequestBindingV1::new(immutable_request_hash, requirements)?,
+            request_binding: AdmissionRequestBindingV1::new_with_action_parameter_hash(
+                immutable_request_hash,
+                action_parameter_hash,
+                requirements,
+            )?,
             policy_hash,
             effect_class,
         })?;
@@ -525,6 +598,366 @@ impl ChioKernel {
             .into_parts();
         admission.operation = finalizing;
         Ok(stored)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn finalize_durable_tool_return(
+        &self,
+        admission: &mut DurableToolAdmission,
+        request: &ToolCallRequest,
+        returned_outcome: &ToolOutcomeRecordV1,
+        output: ToolServerOutput,
+        elapsed: Duration,
+        matched_grant_index: usize,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let runtime = self.durable_runtime()?;
+        if admission.operation.state() != AdmissionOperationState::Finalizing {
+            return Err(KernelError::DurableAdmission(format!(
+                "terminal projection cannot start from state {:?}",
+                admission.operation.state()
+            )));
+        }
+        if !self.post_invocation_pipeline.is_empty() {
+            return Err(KernelError::DurableAdmission(
+                "post-invocation pipeline changed after durable admission".to_owned(),
+            ));
+        }
+
+        let limited = self.apply_stream_limits(output, elapsed)?;
+        let output = match limited {
+            ToolServerOutput::Value(value) => ToolCallOutput::Value(value),
+            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => {
+                ToolCallOutput::Stream(stream)
+            }
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => {
+                return Err(KernelError::DurableAdmission(format!(
+                    "incomplete durable output retained for recovery: {reason}"
+                )));
+            }
+        };
+        let expected_chunks = match &output {
+            ToolCallOutput::Stream(stream) => Some(stream.chunk_count()),
+            ToolCallOutput::Value(_) => None,
+        };
+        let receipt_content = receipt_content_for_output(Some(&output), expected_chunks)?;
+        let resolved_output_digest = AdmissionDigest::try_new(
+            "resolved_output_digest",
+            receipt_content.content_hash.clone(),
+        )?;
+        let trusted_now_unix_ms = current_unix_timestamp_ms()
+            .max(returned_outcome.recorded_at_unix_ms())
+            .max(1);
+        let lease = self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
+        let elapsed_millis = u64::try_from(elapsed.as_millis())
+            .unwrap_or(I_JSON_MAX_SAFE_INTEGER)
+            .min(I_JSON_MAX_SAFE_INTEGER);
+        let normalized_context = PostReturnNormalizedRequestContextV1::from_verified_normalization(
+            serde_json::to_value(KernelPostReturnContext {
+                schema: "chio.kernel-post-return-context.v1",
+                request_binding_hash: admission
+                    .operation
+                    .binding()
+                    .request_binding_hash()
+                    .as_str(),
+                matched_grant_index,
+                elapsed_millis,
+                max_stream_total_bytes: self.config.max_stream_total_bytes,
+                max_stream_chunks: self.config.memory_budget.max_stream_chunks,
+                max_stream_duration_secs: self.config.max_stream_duration_secs,
+            })
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
+        )
+        .map_err(tool_outcome_error)?;
+        let implementation_digest = AdmissionDigest::try_new(
+            "implementation_digest",
+            sha256_hex(b"chio.kernel-output-finalization.v1"),
+        )?;
+        let prepared = PostReturnEvaluationRecordV1::prepare(
+            &admission.operation,
+            returned_outcome,
+            vec![FrozenEvaluationStepV1 {
+                phase: EvaluationPhaseV1::OutputGuard,
+                position: 0,
+                component_id: AdmissionIdentifier::try_new(
+                    "component_id",
+                    "kernel-output-finalization",
+                )?,
+                component_version: AdmissionIdentifier::try_new("component_version", "v1")?,
+                implementation_digest,
+                mode: EvaluationModeV1::Pure,
+            }],
+            trusted_now_unix_ms,
+            normalized_context,
+        )
+        .map_err(tool_outcome_error)?;
+        let prepared = runtime
+            .outcome_store
+            .begin_post_return_evaluation(&lease, &prepared, &runtime.fence, trusted_now_unix_ms)
+            .map_err(durable_outcome_store_error)?;
+        let post_guard_decision_digest = admission_digest(
+            "post_guard_decision_digest",
+            &KernelOutputGuardDecision {
+                schema: "chio.kernel-output-guard-decision.v1",
+                resolved_output_digest: resolved_output_digest.as_str(),
+                complete: true,
+            },
+        )?;
+        let evaluated = prepared
+            .record_next_pure_result(post_guard_decision_digest.clone())
+            .map_err(tool_outcome_error)?;
+        let evaluated = runtime
+            .outcome_store
+            .stage_post_return_evaluation(
+                admission.operation.binding().operation_id(),
+                prepared.version(),
+                &lease,
+                &evaluated,
+                &runtime.fence,
+                trusted_now_unix_ms,
+            )
+            .map_err(durable_outcome_store_error)?;
+        let pricing_verdict_digest = admission_digest(
+            "pricing_verdict_digest",
+            &KernelPricingVerdict {
+                schema: "chio.kernel-pricing-verdict.v1",
+                disposition: "not_applicable",
+            },
+        )?;
+        let (terminal_evaluation, resolved_output) = evaluated
+            .resolve_with_signing_preimage(
+                receipt_content.canonical_content.clone(),
+                post_guard_decision_digest,
+                pricing_verdict_digest,
+                SettlementDispositionV1::NotApplicable,
+            )
+            .map_err(tool_outcome_error)?;
+        let terminal_outcome = returned_outcome
+            .transition(
+                returned_outcome.version(),
+                ToolOutcomeTransitionV1::Resolve(
+                    terminal_evaluation
+                        .terminal_evidence()
+                        .map_err(tool_outcome_error)?,
+                ),
+            )
+            .map_err(tool_outcome_error)?;
+        let (terminal_evaluation, terminal_outcome) = runtime
+            .outcome_store
+            .finalize_post_return(
+                admission.operation.binding().operation_id(),
+                evaluated.version(),
+                &lease,
+                &terminal_evaluation,
+                returned_outcome.version(),
+                &terminal_outcome,
+                Some(&resolved_output),
+                &runtime.fence,
+                trusted_now_unix_ms,
+            )
+            .map_err(durable_outcome_store_error)?;
+        let context = AdmissionProjectionContext {
+            operation_id: admission.operation.binding().operation_id().clone(),
+            request_id: admission.operation.binding().request_id().clone(),
+            expected_operation_version: admission.operation.version(),
+            trusted_time_unix_ms: trusted_now_unix_ms,
+            coordinator_lease_id: lease.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+            store_fence: runtime.fence.clone(),
+        };
+        let tool_outcome = ToolOutcomeTerminalEvidenceV1::from_records(
+            &admission.operation,
+            &context,
+            &terminal_outcome,
+            &terminal_evaluation,
+        )
+        .map_err(tool_outcome_error)?;
+        let projected_operation_version =
+            admission
+                .operation
+                .version()
+                .checked_add(1)
+                .ok_or_else(|| {
+                    KernelError::DurableAdmission("operation version overflowed".to_owned())
+                })?;
+        let admission_metadata = AdmissionReceiptMetadataV1 {
+            schema: AdmissionReceiptSchema::V1,
+            operation_id: context.operation_id.clone(),
+            request_id: context.request_id.clone(),
+            request_namespace_digest: admission
+                .operation
+                .binding()
+                .request_namespace_digest()
+                .clone(),
+            request_binding_hash: admission.operation.binding().request_binding_hash().clone(),
+            projected_operation_version,
+            projected_state: AdmissionOperationState::Completed,
+            projected_dispatch_state: AdmissionDispatchState::Terminal,
+            trusted_time_unix_ms: trusted_now_unix_ms,
+            coordinator_lease_id: context.coordinator_lease_id.clone(),
+            coordinator_lease_epoch: context.coordinator_lease_epoch,
+            store_fence: context.store_fence.clone(),
+            retained_dispatch_commit: admission.operation.dispatch_commit().cloned(),
+            compensation_status: AdmissionCompensationStatus::NotCompensated,
+            tool_outcome_id: Some(terminal_outcome.outcome_id().clone()),
+            tool_outcome_version: Some(terminal_outcome.version()),
+        };
+        let memory_action_kind = crate::memory_provenance::classify_memory_action(
+            &request.tool_name,
+            &request.arguments,
+        );
+        let memory_read_metadata = match memory_action_kind.as_ref() {
+            Some(crate::memory_provenance::MemoryActionKind::Read { store, key }) => {
+                self.resolve_memory_read_provenance_metadata(store, key)
+            }
+            _ => None,
+        };
+        let timestamp = trusted_now_unix_ms / 1_000;
+        let request_metadata = request_receipt_metadata(
+            request,
+            self.attestation_trust_policy.as_ref(),
+            timestamp,
+            extra_metadata.as_ref(),
+        )?;
+        let metadata = merge_metadata_objects(
+            merge_metadata_objects(
+                merge_metadata_objects(
+                    merge_metadata_objects(
+                        merge_metadata_objects(receipt_content.metadata, request_metadata),
+                        extra_metadata,
+                    ),
+                    receipt_attribution_metadata(&request.capability, Some(matched_grant_index)),
+                ),
+                memory_read_metadata,
+            ),
+            Some(serde_json::json!({
+                ADMISSION_RECEIPT_METADATA_KEY: admission_metadata
+            })),
+        );
+        let action =
+            ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
+                KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {error}"))
+            })?;
+        let receipt = self.build_and_sign_receipt(ReceiptParams {
+            request_id: Some(&request.request_id),
+            capability_id: &request.capability.id,
+            tool_name: &request.tool_name,
+            server_id: &request.server_id,
+            decision: Decision::Allow,
+            action,
+            content_hash: receipt_content.content_hash,
+            canonical_content: receipt_content.canonical_content,
+            metadata,
+            timestamp,
+            trust_level: chio_core::receipt::kinds::TrustLevel::default(),
+            tenant_id: None,
+        })?;
+        let receipt = VerifiedAdmissionReceipt::from_kernel_verified(
+            receipt,
+            &self.config.keypair.public_key(),
+            &admission.operation,
+            &context,
+            &tool_outcome,
+        )
+        .map_err(|error| {
+            KernelError::DurableAdmission(format!("terminal receipt qualification failed: {error}"))
+        })?;
+        let observer_work = if admission
+            .operation
+            .binding()
+            .participant_requirements()
+            .observation_attempt_zero
+        {
+            Some(ObservationAttemptZero::from_verified(
+                &admission.operation,
+                &context,
+                &receipt,
+                terminal_outcome.outcome_id().clone(),
+                terminal_outcome.version(),
+            )?)
+        } else {
+            None
+        };
+        let projected_receipt = receipt.receipt().clone();
+        let projection =
+            AdmissionTerminalProjection::Completed(Box::new(AdmissionCompletedProjection {
+                context,
+                receipt,
+                tool_outcome: Some(tool_outcome),
+                payment_evidence: None,
+                authorization: None,
+                eligibility: None,
+                observer_work,
+                obligation: None,
+            }));
+        let terminal = runtime
+            .store
+            .commit_admission_projection(&projection)
+            .map_err(|error| {
+                KernelError::DurableAdmission(format!("atomic terminal projection failed: {error}"))
+            })?;
+        if terminal.state != AdmissionOperationState::Completed {
+            return Err(KernelError::DurableAdmission(
+                "terminal projection did not complete the operation".to_owned(),
+            ));
+        }
+        admission.operation = runtime
+            .store
+            .load_by_operation_id(admission.operation.binding().operation_id())
+            .map_err(durable_store_error)?
+            .ok_or_else(|| {
+                KernelError::DurableAdmission(
+                    "completed admission operation disappeared".to_owned(),
+                )
+            })?;
+        self.append_chio_receipt_to_local_log(projected_receipt.clone());
+        self.apply_federation_cosign_for_admitted_request(request, &projected_receipt)?;
+        if let Some(crate::memory_provenance::MemoryActionKind::Write { store, key }) =
+            memory_action_kind.as_ref()
+        {
+            self.append_memory_provenance_for_write(
+                store,
+                key,
+                &request.capability.id,
+                &projected_receipt.id,
+                projected_receipt.timestamp,
+            )?;
+        }
+        let execution_nonce =
+            self.mint_execution_nonce_for_allow(request, &request.capability, &projected_receipt)?;
+        Ok(ToolCallResponse {
+            request_id: request.request_id.clone(),
+            verdict: Verdict::Allow,
+            output: Some(output),
+            reason: None,
+            terminal_state: OperationTerminalState::Completed,
+            receipt: projected_receipt,
+            execution_nonce,
+        })
+    }
+
+    fn claim_admission_recovery(
+        &self,
+        operation: &AdmissionOperationV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<crate::admission_operation::AdmissionRecoveryLease, KernelError> {
+        let runtime = self.durable_runtime()?;
+        let expires_at_unix_ms = trusted_now_unix_ms
+            .checked_add(RECOVERY_LEASE_DURATION_MS)
+            .ok_or_else(|| {
+                KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
+            })?;
+        runtime
+            .store
+            .claim_recovery(
+                operation.binding().operation_id(),
+                operation.version(),
+                &runtime.claimant_id,
+                trusted_now_unix_ms,
+                expires_at_unix_ms,
+                &runtime.fence,
+            )
+            .map_err(durable_store_error)
     }
 
     fn apply_admission_command(

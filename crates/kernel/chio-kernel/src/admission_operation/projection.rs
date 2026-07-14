@@ -80,7 +80,7 @@ impl VerifiedAdmissionReceipt {
             &Decision::Allow,
             tool_outcome.tool_server().as_str(),
             tool_outcome.tool_name().as_str(),
-            operation.binding.immutable_request_hash(),
+            operation.binding.action_parameter_hash(),
             tool_outcome.resolved_output_digest(),
             operation,
             context,

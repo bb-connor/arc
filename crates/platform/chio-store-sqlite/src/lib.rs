@@ -199,6 +199,11 @@ pub use schema_version::{
     check_schema_version, stamp_schema_version, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID,
 };
 pub use serving_owner::{SqliteAuthorityStore, SqliteServingOwnerError};
+
+impl chio_kernel::QualifiedAdmissionProjectionStore
+    for admission_operation_store::SqliteAdmissionOperationStore
+{
+}
 pub use settle_attempts::{SqliteSettlementOutcomeStore, SETTLE_ATTEMPTS_MIGRATION};
 pub use tool_outcome_store::SqliteToolOutcomeStore;
 

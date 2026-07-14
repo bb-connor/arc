@@ -2,13 +2,16 @@ use crate::admission_operation::{
     AdmissionBeginResult, AdmissionCommandResult, AdmissionIdentifier, AdmissionOperationCommand,
     AdmissionOperationError, AdmissionOperationId, AdmissionOperationState,
     AdmissionOperationStore, AdmissionOperationStoreError, AdmissionOperationV1,
-    AdmissionReplayClassification, AdmissionReplayKey, AdmissionTerminalReplay,
+    AdmissionProjectionCapabilities, AdmissionReplayClassification, AdmissionReplayKey,
+    AdmissionTerminal, AdmissionTerminalProjection, AdmissionTerminalReplay,
     QualifiedAdmissionOperationStore, StoreMutationFence, UntrustedAdmissionRecoveryClaim,
 };
+use crate::receipt_store::{QualifiedAdmissionProjectionStore, ReceiptStore, ReceiptStoreError};
 use crate::tool_outcome::{
-    CanonicalInvocationBlobV1, PostReturnEvaluationRecordV1, QualifiedToolOutcomeStore,
-    RawInvocationOutcomeV1, ToolOutcomeInsertResultV1, ToolOutcomeRecordV1, ToolOutcomeStore,
-    ToolOutcomeStoreError,
+    validate_evaluation_store_successor, validate_terminal_store_pair,
+    CanonicalInvocationBlobV1, CanonicalResolvedOutputBlobV1, PostReturnEvaluationRecordV1,
+    QualifiedToolOutcomeStore, RawInvocationOutcomeV1, ToolOutcomeInsertResultV1,
+    ToolOutcomeRecordV1, ToolOutcomeStore, ToolOutcomeStoreError,
 };
 
 #[test]
@@ -51,11 +54,15 @@ struct TestAdmissionState {
     claim: Option<UntrustedAdmissionRecoveryClaim>,
     raw_outcome: Option<RawInvocationOutcomeV1>,
     tool_outcome: Option<ToolOutcomeRecordV1>,
+    post_return_evaluation: Option<PostReturnEvaluationRecordV1>,
+    resolved_output: Option<CanonicalResolvedOutputBlobV1>,
+    receipt: Option<chio_core::receipt::body::ChioReceipt>,
 }
 
 struct TestAdmissionOperationStore {
     fence: StoreMutationFence,
     fail_next_outcome_write: std::sync::atomic::AtomicBool,
+    fail_next_terminal_projection: std::sync::atomic::AtomicBool,
     state: std::sync::Mutex<TestAdmissionState>,
 }
 
@@ -64,12 +71,18 @@ impl TestAdmissionOperationStore {
         Self {
             fence,
             fail_next_outcome_write: std::sync::atomic::AtomicBool::new(false),
+            fail_next_terminal_projection: std::sync::atomic::AtomicBool::new(false),
             state: std::sync::Mutex::new(TestAdmissionState::default()),
         }
     }
 
     fn fail_next_outcome_write(&self) {
         self.fail_next_outcome_write.store(true, Ordering::SeqCst);
+    }
+
+    fn fail_next_terminal_projection(&self) {
+        self.fail_next_terminal_projection
+            .store(true, Ordering::SeqCst);
     }
 
     fn operation(&self) -> AdmissionOperationV1 {
@@ -79,6 +92,14 @@ impl TestAdmissionOperationStore {
             .operation
             .clone()
             .expect("retained operation")
+    }
+
+    fn has_operation(&self) -> bool {
+        self.state
+            .lock()
+            .expect("test admission state lock")
+            .operation
+            .is_some()
     }
 
     fn require_fence(
@@ -261,6 +282,85 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
 
 impl QualifiedAdmissionOperationStore for TestAdmissionOperationStore {}
 
+impl ReceiptStore for TestAdmissionOperationStore {
+    fn append_chio_receipt(
+        &self,
+        _receipt: &chio_core::receipt::body::ChioReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Unsupported(
+            "test admissions require a terminal projection".to_owned(),
+        ))
+    }
+
+    fn admission_projection_capabilities(&self) -> AdmissionProjectionCapabilities {
+        AdmissionProjectionCapabilities {
+            operation_terminal: true,
+            tool_outcome: true,
+            ..AdmissionProjectionCapabilities::default()
+        }
+    }
+
+    fn commit_admission_projection(
+        &self,
+        projection: &AdmissionTerminalProjection,
+    ) -> Result<AdmissionTerminal, ReceiptStoreError> {
+        if self
+            .fail_next_terminal_projection
+            .swap(false, Ordering::SeqCst)
+        {
+            return Err(ReceiptStoreError::Conflict(
+                "injected terminal projection failure".to_owned(),
+            ));
+        }
+        let mut state = self.state.lock().map_err(|_| {
+            ReceiptStoreError::Conflict("test admission state lock poisoned".to_owned())
+        })?;
+        let operation = state.operation.clone().ok_or_else(|| {
+            ReceiptStoreError::NotFound("test admission operation".to_owned())
+        })?;
+        let claim = state.claim.as_ref().ok_or_else(|| {
+            ReceiptStoreError::Conflict("terminal projection has no recovery claim".to_owned())
+        })?;
+        let context = projection.context();
+        if claim.operation_id() != &context.operation_id
+            || claim.coordinator_lease_id() != &context.coordinator_lease_id
+            || claim.coordinator_lease_epoch() != context.coordinator_lease_epoch
+            || claim.store_fence() != &context.store_fence
+        {
+            return Err(ReceiptStoreError::Conflict(
+                "terminal projection recovery claim mismatch".to_owned(),
+            ));
+        }
+        let updated = operation
+            .apply_terminal_projection(projection, &self.admission_projection_capabilities())
+            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        let replay = updated.terminal_replay().cloned().ok_or_else(|| {
+            ReceiptStoreError::Conflict("terminal replay is absent".to_owned())
+        })?;
+        if let AdmissionTerminalProjection::Completed(completed) = projection {
+            state.receipt = Some(completed.receipt.receipt().clone());
+        }
+        state.operation = Some(updated.clone());
+        state.claim = None;
+        Ok(AdmissionTerminal {
+            operation_id: updated.binding().operation_id().clone(),
+            state: updated.state(),
+            replay,
+        })
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &chio_core::receipt::lineage::ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Unsupported(
+            "test child receipt persistence".to_owned(),
+        ))
+    }
+}
+
+impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {}
+
 impl ToolOutcomeStore for TestAdmissionOperationStore {
     fn record_tool_returned(
         &self,
@@ -351,54 +451,132 @@ impl ToolOutcomeStore for TestAdmissionOperationStore {
 
     fn lookup_post_return_evaluation(
         &self,
-        _operation_id: &AdmissionOperationId,
+        operation_id: &AdmissionOperationId,
     ) -> Result<Option<PostReturnEvaluationRecordV1>, ToolOutcomeStoreError> {
-        Ok(None)
+        let state = self.state.lock().expect("test admission state lock");
+        Ok(state
+            .post_return_evaluation
+            .as_ref()
+            .filter(|evaluation| evaluation.operation_id() == operation_id)
+            .cloned())
     }
 
     fn begin_post_return_evaluation(
         &self,
-        _recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
-        _record: &PostReturnEvaluationRecordV1,
-        _active_fence: &StoreMutationFence,
-        _trusted_now_unix_ms: u64,
+        recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+        record: &PostReturnEvaluationRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
     ) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeStoreError> {
-        Err(ToolOutcomeStoreError::Unavailable("unused in test".to_owned()))
+        self.require_fence(active_fence)
+            .map_err(|_| ToolOutcomeStoreError::Fenced)?;
+        let mut state = self.state.lock().expect("test admission state lock");
+        let operation = state.operation.as_ref().ok_or(ToolOutcomeStoreError::NotFound)?;
+        let outcome = state.tool_outcome.as_ref().ok_or(ToolOutcomeStoreError::NotFound)?;
+        if state.claim.as_ref() != Some(recovery_lease.untrusted_claim()) {
+            return Err(ToolOutcomeStoreError::Fenced);
+        }
+        record
+            .validate_against(operation, outcome)
+            .and_then(|_| record.validate_for_store_mutation(trusted_now_unix_ms))
+            .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?;
+        match state.post_return_evaluation.as_ref() {
+            Some(existing) if existing == record => Ok(existing.clone()),
+            Some(_) => Err(ToolOutcomeStoreError::Conflict),
+            None => {
+                state.post_return_evaluation = Some(record.clone());
+                Ok(record.clone())
+            }
+        }
     }
 
     fn stage_post_return_evaluation(
         &self,
-        _operation_id: &AdmissionOperationId,
-        _expected_version: u64,
-        _recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
-        _next: &PostReturnEvaluationRecordV1,
-        _active_fence: &StoreMutationFence,
-        _trusted_now_unix_ms: u64,
+        operation_id: &AdmissionOperationId,
+        expected_version: u64,
+        recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+        next: &PostReturnEvaluationRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
     ) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeStoreError> {
-        Err(ToolOutcomeStoreError::Unavailable("unused in test".to_owned()))
+        self.require_fence(active_fence)
+            .map_err(|_| ToolOutcomeStoreError::Fenced)?;
+        let mut state = self.state.lock().expect("test admission state lock");
+        if state.claim.as_ref() != Some(recovery_lease.untrusted_claim()) {
+            return Err(ToolOutcomeStoreError::Fenced);
+        }
+        let current = state
+            .post_return_evaluation
+            .as_ref()
+            .filter(|evaluation| evaluation.operation_id() == operation_id)
+            .cloned()
+            .ok_or(ToolOutcomeStoreError::NotFound)?;
+        if current.version() != expected_version {
+            return Err(ToolOutcomeStoreError::CasConflict);
+        }
+        validate_evaluation_store_successor(&current, next)
+            .and_then(|_| next.validate_for_store_mutation(trusted_now_unix_ms))
+            .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?;
+        state.post_return_evaluation = Some(next.clone());
+        Ok(next.clone())
     }
 
     fn finalize_post_return(
         &self,
-        _operation_id: &AdmissionOperationId,
-        _expected_evaluation_version: u64,
-        _recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
-        _terminal_evaluation: &PostReturnEvaluationRecordV1,
-        _expected_outcome_version: u64,
-        _terminal_outcome: &ToolOutcomeRecordV1,
-        _resolved_output: Option<&crate::tool_outcome::CanonicalResolvedOutputBlobV1>,
-        _active_fence: &StoreMutationFence,
-        _trusted_now_unix_ms: u64,
+        operation_id: &AdmissionOperationId,
+        expected_evaluation_version: u64,
+        recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+        terminal_evaluation: &PostReturnEvaluationRecordV1,
+        expected_outcome_version: u64,
+        terminal_outcome: &ToolOutcomeRecordV1,
+        resolved_output: Option<&CanonicalResolvedOutputBlobV1>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
     ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
-        Err(ToolOutcomeStoreError::Unavailable("unused in test".to_owned()))
+        self.require_fence(active_fence)
+            .map_err(|_| ToolOutcomeStoreError::Fenced)?;
+        let mut state = self.state.lock().expect("test admission state lock");
+        if state.claim.as_ref() != Some(recovery_lease.untrusted_claim()) {
+            return Err(ToolOutcomeStoreError::Fenced);
+        }
+        let operation = state.operation.as_ref().ok_or(ToolOutcomeStoreError::NotFound)?;
+        let current_outcome = state.tool_outcome.as_ref().ok_or(ToolOutcomeStoreError::NotFound)?;
+        let current_evaluation = state
+            .post_return_evaluation
+            .as_ref()
+            .filter(|evaluation| evaluation.operation_id() == operation_id)
+            .ok_or(ToolOutcomeStoreError::NotFound)?;
+        if current_evaluation.version() != expected_evaluation_version
+            || current_outcome.version() != expected_outcome_version
+        {
+            return Err(ToolOutcomeStoreError::CasConflict);
+        }
+        validate_terminal_store_pair(
+            operation,
+            current_outcome,
+            current_evaluation,
+            terminal_evaluation,
+            terminal_outcome,
+            resolved_output,
+        )
+        .and_then(|_| terminal_evaluation.validate_for_store_mutation(trusted_now_unix_ms))
+        .map_err(|error| ToolOutcomeStoreError::Invariant(error.to_string()))?;
+        state.post_return_evaluation = Some(terminal_evaluation.clone());
+        state.tool_outcome = Some(terminal_outcome.clone());
+        state.resolved_output = resolved_output.cloned();
+        Ok((terminal_evaluation.clone(), terminal_outcome.clone()))
     }
 
     fn load_resolved_output_by_operation(
         &self,
-        _operation_id: &AdmissionOperationId,
-    ) -> Result<Option<crate::tool_outcome::CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError>
-    {
-        Ok(None)
+        operation_id: &AdmissionOperationId,
+    ) -> Result<Option<CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError> {
+        let state = self.state.lock().expect("test admission state lock");
+        Ok(state
+            .tool_outcome
+            .as_ref()
+            .filter(|outcome| outcome.operation_id() == operation_id)
+            .and(state.resolved_output.clone()))
     }
 }
 
@@ -456,7 +634,24 @@ fn durable_admission_fixture(
     std::sync::Arc<TestAdmissionOperationStore>,
     std::sync::Arc<AtomicU64>,
 ) {
-    let mut kernel = make_kernel(make_config());
+    durable_admission_fixture_with_grants(
+        request_id,
+        vec![make_grant("durable-server", "mutate")],
+    )
+}
+
+fn durable_admission_fixture_with_grants(
+    request_id: &str,
+    grants: Vec<ToolGrant>,
+) -> (
+    ChioKernel,
+    ToolCallRequest,
+    std::sync::Arc<TestAdmissionOperationStore>,
+    std::sync::Arc<AtomicU64>,
+) {
+    let mut config = make_config();
+    config.policy_hash = sha256_hex(b"durable-admission-test-policy");
+    let mut kernel = make_kernel(config);
     let fence = admission_test_fence();
     let store = std::sync::Arc::new(TestAdmissionOperationStore::new(fence.clone()));
     kernel
@@ -473,7 +668,7 @@ fn durable_admission_fixture(
     let capability = make_capability(
         &kernel,
         &agent,
-        make_scope(vec![make_grant("durable-server", "mutate")]),
+        make_scope(grants),
         300,
     );
     let request = make_request_with_arguments(
@@ -486,6 +681,22 @@ fn durable_admission_fixture(
     (kernel, request, store, invocations)
 }
 
+struct VersionlessPostInvocationHook;
+
+impl crate::post_invocation::PostInvocationHook for VersionlessPostInvocationHook {
+    fn name(&self) -> &str {
+        "versionless-post-hook"
+    }
+
+    fn inspect(
+        &self,
+        _context: &crate::post_invocation::PostInvocationContext<'_>,
+        _response: &serde_json::Value,
+    ) -> crate::post_invocation::PostInvocationVerdict {
+        crate::post_invocation::PostInvocationVerdict::Allow
+    }
+}
+
 #[test]
 fn top_level_durable_admission_commits_before_dispatch_and_blocks_replay() {
     let (kernel, request, store, invocations) = durable_admission_fixture("durable-top-level");
@@ -494,10 +705,7 @@ fn top_level_durable_admission_commits_before_dispatch_and_blocks_replay() {
         .evaluate_tool_call_blocking(&request)
         .expect("first durable dispatch");
     assert_eq!(response.verdict, Verdict::Allow);
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Finalizing
-    );
+    assert_eq!(store.operation().state(), AdmissionOperationState::Completed);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 
     let replay = kernel
@@ -547,8 +755,81 @@ fn failed_tool_return_persistence_retains_dispatch_and_blocks_redispatch() {
 }
 
 #[test]
+fn failed_terminal_projection_retains_finalizing_operation_and_blocks_redispatch() {
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture("durable-terminal-projection-failure");
+    store.fail_next_terminal_projection();
+
+    let error = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect_err("terminal projection failure must fail closed");
+    assert!(matches!(
+        error,
+        KernelError::DurableAdmission(ref reason)
+            if reason.contains("injected terminal projection failure")
+    ));
+    assert_eq!(store.operation().state(), AdmissionOperationState::Finalizing);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let replay = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("retained finalization must produce a denial");
+    assert_eq!(replay.verdict, Verdict::Deny);
+    assert!(replay
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("Finalizing")));
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn unsupported_durable_participants_fail_before_dispatch() {
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("durable-versionless-post-hook");
+    kernel.add_post_invocation_hook(Box::new(VersionlessPostInvocationHook));
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("versionless post hook denial");
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("frozen implementation identities")));
+    assert!(!store.has_operation());
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+
+    let mut monetary_grant = make_grant("durable-server", "mutate");
+    monetary_grant.max_cost_per_invocation = Some(MonetaryAmount {
+        units: 10,
+        currency: "USD".to_owned(),
+    });
+    monetary_grant.max_total_cost = Some(MonetaryAmount {
+        units: 100,
+        currency: "USD".to_owned(),
+    });
+    let (kernel, request, store, invocations) = durable_admission_fixture_with_grants(
+        "durable-unqualified-payment",
+        vec![monetary_grant],
+    );
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("unqualified payment denial");
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("qualified payment journal")));
+    assert!(!store.has_operation());
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}
+
+#[test]
 fn durable_admission_binds_the_first_budget_eligible_matching_grant() {
-    let mut kernel = make_kernel(make_config());
+    let mut config = make_config();
+    config.policy_hash = sha256_hex(b"durable-admission-grant-test-policy");
+    let mut kernel = make_kernel(config);
     let fence = admission_test_fence();
     let store = std::sync::Arc::new(TestAdmissionOperationStore::new(fence.clone()));
     kernel
@@ -622,10 +903,7 @@ fn nested_durable_admission_commits_before_dispatch_and_blocks_replay() {
 
     let response = evaluate(&request).expect("first nested durable dispatch");
     assert_eq!(response.verdict, Verdict::Allow);
-    assert_eq!(
-        store.operation().state(),
-        AdmissionOperationState::Finalizing
-    );
+    assert_eq!(store.operation().state(), AdmissionOperationState::Completed);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 
     let replay = evaluate(&request).expect("nested replay denial");

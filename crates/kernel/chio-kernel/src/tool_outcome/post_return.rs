@@ -729,6 +729,59 @@ impl PostReturnEvaluationRecordV1 {
         domain_digest("chio.post-return-step-results.v1", &self.step_results)
     }
 
+    pub(crate) fn record_next_pure_result(
+        &self,
+        result_digest: AdmissionDigest,
+    ) -> Result<Self, ToolOutcomeError> {
+        let index = self.step_results.len();
+        let step = self
+            .frozen_steps
+            .get(index)
+            .ok_or(ToolOutcomeError::Invalid(
+                "evaluation.no_step_result_expected",
+            ))?;
+        if step.mode != EvaluationModeV1::Pure {
+            return Err(ToolOutcomeError::Invalid(
+                "evaluation.next_step_is_not_pure",
+            ));
+        }
+        let step_index = u32::try_from(index)
+            .map_err(|_| ToolOutcomeError::Overflow("evaluation.step_index"))?;
+        let input_dependency_digest = self.step_results.last().map_or_else(
+            || self.exact_inputs_digest.clone(),
+            |prior| prior.result_digest.clone(),
+        );
+        self.transition(
+            self.version,
+            PostReturnEvaluationTransitionV1::RecordStepResult(EvaluationStepResultV1::pure(
+                step_index,
+                input_dependency_digest,
+                result_digest,
+            )),
+        )
+    }
+
+    pub(crate) fn resolve_with_signing_preimage(
+        &self,
+        signing_preimage: Vec<u8>,
+        post_guard_decision_digest: AdmissionDigest,
+        pricing_verdict_digest: AdmissionDigest,
+        settlement_disposition: SettlementDispositionV1,
+    ) -> Result<(Self, CanonicalResolvedOutputBlobV1), ToolOutcomeError> {
+        let (resolution, blob) = PostReturnResolutionV1::from_signing_preimage(
+            self,
+            signing_preimage,
+            post_guard_decision_digest,
+            pricing_verdict_digest,
+            settlement_disposition,
+        )?;
+        self.transition(
+            self.version,
+            PostReturnEvaluationTransitionV1::Resolve(resolution),
+        )
+        .map(|terminal| (terminal, blob))
+    }
+
     pub(super) fn validate(&self) -> Result<(), ToolOutcomeError> {
         positive("evaluation.tool_outcome_version", self.tool_outcome_version)?;
         positive("evaluation.trusted_time", self.trusted_time_unix_ms)?;

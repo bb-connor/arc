@@ -91,6 +91,7 @@ chio-test-support = { workspace = true }
 criterion = { workspace = true }
 dhat = { workspace = true }
 loom = { workspace = true }
+tempfile = { workspace = true }
 # proptest = "1.10" (via workspace.dependencies). Used by:
 # - tests/property_budget_store.rs
 # - tests/replay_proptest.rs (replay-invariance suite)

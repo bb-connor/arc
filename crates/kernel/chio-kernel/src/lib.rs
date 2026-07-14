@@ -422,10 +422,11 @@ pub use receipt_query::{
 };
 pub use receipt_store::{
     AtomicReceiptProjection, AuthorizationReceiptConsumption, FederatedEvidenceShareImport,
-    FederatedEvidenceShareSummary, PendingSettlementObservation, ReceiptCheckpointCreateReport,
-    ReceiptCheckpointRange, ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore,
-    ReceiptStoreError, ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
-    ReceiptWriterLiveness, RetentionConfig, StoredChildReceipt, StoredToolReceipt,
+    FederatedEvidenceShareSummary, PendingSettlementObservation, QualifiedAdmissionProjectionStore,
+    ReceiptCheckpointCreateReport, ReceiptCheckpointRange, ReceiptCheckpointStatusReport,
+    ReceiptFlushReport, ReceiptStore, ReceiptStoreError, ReceiptStoreHealthReport,
+    ReceiptWalCheckpointReport, ReceiptWriterCounters, ReceiptWriterLiveness, RetentionConfig,
+    StoredChildReceipt, StoredToolReceipt,
 };
 pub use revocation_runtime::{InMemoryRevocationStore, RevocationObservation, RevocationStore};
 pub use revocation_store::{RevocationRecord, RevocationStoreError};

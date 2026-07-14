@@ -122,14 +122,46 @@ impl ChioKernel {
         let thread_admission = thread_admission.as_ref().filter(|admission| {
             admission.remote_kernel_id.as_deref() == request.federated_origin_kernel_id.as_deref()
         });
-        let scoped_admission = request_admission.as_ref().or(thread_admission);
         self.record_chio_receipt(receipt)?;
+        self.apply_federation_cosign_for_admitted_request_with_snapshot(
+            request,
+            receipt,
+            request_admission.as_ref().or(thread_admission),
+        )?;
+        Ok(())
+    }
+
+    pub(crate) fn apply_federation_cosign_for_admitted_request(
+        &self,
+        request: &crate::runtime::ToolCallRequest,
+        receipt: &ChioReceipt,
+    ) -> Result<(), KernelError> {
+        let request_admission = self.receipt_federation_admission_for_request(
+            &request.request_id,
+            request.federated_origin_kernel_id.as_deref(),
+        );
+        let thread_admission = current_scoped_receipt_federation_admission();
+        let thread_admission = thread_admission.as_ref().filter(|admission| {
+            admission.remote_kernel_id.as_deref() == request.federated_origin_kernel_id.as_deref()
+        });
+        self.apply_federation_cosign_for_admitted_request_with_snapshot(
+            request,
+            receipt,
+            request_admission.as_ref().or(thread_admission),
+        )
+    }
+
+    fn apply_federation_cosign_for_admitted_request_with_snapshot(
+        &self,
+        request: &crate::runtime::ToolCallRequest,
+        receipt: &ChioReceipt,
+        admission: Option<&ReceiptFederationAdmission>,
+    ) -> Result<(), KernelError> {
         self.apply_federation_cosign(
             request,
             receipt,
-            scoped_admission.and_then(|admission| admission.peer.as_ref()),
-        )?;
-        Ok(())
+            admission.and_then(|admission| admission.peer.as_ref()),
+        )
     }
 
     pub(super) fn record_chio_receipt_with_mode(
