@@ -1,0 +1,485 @@
+use chio_core_types::crypto::sha256_hex;
+use chio_federation::frost::{
+    frost_action_registration, frost_authorization_session_id, frost_authorization_slot_id,
+    resolve_active_roster_for_execution, verify_for_execution, verify_historical_evidence,
+    ActiveFrostRosterResolver, ExpectedFrostAuthorization, FrostAnchorError,
+    FrostAnchoredAuthorizationSlot, FrostAuthorizationBodyV1, FrostAuthorizationDomain,
+    FrostAuthorizationSlotAnchor, FrostAuthorizationSlotCheckpointV1, FrostAuthorizationSlotState,
+    FrostAuthorizationV1, FrostEpochAnchor, FrostEpochCheckpointV1, FrostHistoricalRosterResolver,
+    FrostParticipantV1, FrostRosterResolutionError, FrostRosterV1,
+    CHIO_FROST_AUTHORIZATION_BODY_SCHEMA, CHIO_FROST_AUTHORIZATION_SCHEMA,
+    CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA, CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA,
+    CHIO_FROST_ROSTER_SCHEMA, FROST_ED25519_SHA512_SUITE_ID,
+};
+use frost_ed25519::keys::{SigningShare, VerifyingShare};
+use frost_ed25519::{Signature, SigningKey, VerifyingKey};
+use rand_chacha::ChaCha20Rng;
+use rand_core::SeedableRng;
+
+const OFFICIAL_SECRET_KEY: &str =
+    "7b1c33d3f5291d85de664833beb1ad469f7fb6025a0ec78b3a790c6e13a98304";
+const OFFICIAL_VERIFYING_KEY: &str =
+    "15d21ccd7ee42959562fc8aa63224c8851fb3ec85a3faf66040d380fb9738673";
+const OFFICIAL_TEST_SIGNATURE: &str = concat!(
+    "154fb694ee7fcb37bf2381d94488c2a84b03b3352ad085feca81ad26d45852b7",
+    "ecfe971ce4da95c4a95db93ac376b053897fca212ef85f99cf696bffeb178f07"
+);
+const OFFICIAL_SHARES: [&str; 3] = [
+    "929dcc590407aae7d388761cddb0c0db6f5627aea8e217f4a033f2ec83d93509",
+    "a91e66e012e4364ac9aaa405fcafd370402d9859f7b6685c07eed76bf409e80d",
+    "d3cb090a075eb154e82fdb4b3cb507f110040905468bb9c46da8bdea643a9a02",
+];
+
+#[derive(Clone)]
+struct TestActiveResolver {
+    roster: FrostRosterV1,
+    scope_classification: String,
+}
+
+impl ActiveFrostRosterResolver for TestActiveResolver {
+    fn resolve_active_roster(
+        &self,
+        scope_id: &str,
+    ) -> Result<Option<FrostRosterV1>, FrostRosterResolutionError> {
+        Ok((self.roster.scope_id == scope_id).then(|| self.roster.clone()))
+    }
+
+    fn classify_scope(&self, scope_id: &str) -> Result<Option<String>, FrostRosterResolutionError> {
+        Ok((self.roster.scope_id == scope_id).then(|| self.scope_classification.clone()))
+    }
+}
+
+#[derive(Clone)]
+struct TestHistoricalResolver {
+    roster: FrostRosterV1,
+}
+
+impl FrostHistoricalRosterResolver for TestHistoricalResolver {
+    fn resolve_historical_roster(
+        &self,
+        roster_digest: &str,
+        key_epoch: u64,
+        issued_at: u64,
+    ) -> Result<Option<FrostRosterV1>, FrostRosterResolutionError> {
+        Ok((self.roster.roster_digest == roster_digest
+            && self.roster.key_epoch == key_epoch
+            && self.roster.valid_from <= issued_at
+            && issued_at < self.roster.valid_until)
+            .then(|| self.roster.clone()))
+    }
+}
+
+#[derive(Clone)]
+struct TestEpochAnchor {
+    checkpoint: FrostEpochCheckpointV1,
+}
+
+impl FrostEpochAnchor for TestEpochAnchor {
+    fn resolve_epoch_checkpoint(
+        &self,
+        scope_id: &str,
+    ) -> Result<FrostEpochCheckpointV1, FrostAnchorError> {
+        if self.checkpoint.scope_id != scope_id {
+            return Err(FrostAnchorError::Unavailable(
+                "scope has no epoch checkpoint".to_string(),
+            ));
+        }
+        Ok(self.checkpoint.clone())
+    }
+}
+
+#[derive(Clone)]
+struct TestSlotAnchor {
+    slot: FrostAnchoredAuthorizationSlot,
+}
+
+impl FrostAuthorizationSlotAnchor for TestSlotAnchor {
+    fn resolve_authorization_slot(
+        &self,
+        scope_id: &str,
+        slot_id: &str,
+    ) -> Result<FrostAnchoredAuthorizationSlot, FrostAnchorError> {
+        if self.slot.checkpoint.scope_id != scope_id || self.slot.checkpoint.slot_id != slot_id {
+            return Err(FrostAnchorError::Unavailable(
+                "authorization slot is absent".to_string(),
+            ));
+        }
+        Ok(self.slot.clone())
+    }
+}
+
+#[derive(Clone)]
+struct Fixture {
+    proof: FrostAuthorizationV1,
+    roster: FrostRosterV1,
+    epoch_checkpoint: FrostEpochCheckpointV1,
+    slot: FrostAnchoredAuthorizationSlot,
+}
+
+impl Fixture {
+    fn expected(&self) -> ExpectedFrostAuthorization<'_> {
+        ExpectedFrostAuthorization {
+            domain: self.proof.body.domain,
+            ladder_action_class: &self.proof.body.ladder_action_class,
+            ladder_contract_digest: &self.proof.body.ladder_contract_digest,
+            scope_id: &self.proof.body.scope_id,
+            resource_id: &self.proof.body.resource_id,
+            resource_version: self.proof.body.resource_version,
+            resource_fence: self.proof.body.resource_fence,
+            action_digest: &self.proof.body.action_digest,
+        }
+    }
+
+    fn active_roster(&self, now: u64) -> chio_federation::frost::VerifiedActiveFrostRoster {
+        let resolver = TestActiveResolver {
+            roster: self.roster.clone(),
+            scope_classification: "treaty".to_string(),
+        };
+        resolve_active_roster_for_execution(
+            &self.proof.body.scope_id,
+            &resolver,
+            &TestEpochAnchor {
+                checkpoint: self.epoch_checkpoint.clone(),
+            },
+            now,
+        )
+        .unwrap_or_else(|error| panic!("fixture active roster must resolve: {error}"))
+    }
+}
+
+fn decode_hex(value: &str) -> Vec<u8> {
+    hex::decode(value).unwrap_or_else(|error| panic!("fixture hex must decode: {error}"))
+}
+
+fn official_verifying_share(share: &str) -> String {
+    let signing_share = SigningShare::deserialize(&decode_hex(share))
+        .unwrap_or_else(|error| panic!("official signing share must decode: {error}"));
+    let verifying_share = VerifyingShare::from(signing_share);
+    hex::encode(
+        verifying_share
+            .serialize()
+            .unwrap_or_else(|error| panic!("verifying share must serialize: {error}")),
+    )
+}
+
+fn roster(group_public_key: &str, key_epoch: u64) -> FrostRosterV1 {
+    let mut roster = FrostRosterV1 {
+        schema: CHIO_FROST_ROSTER_SCHEMA.to_string(),
+        roster_id: String::new(),
+        roster_digest: String::new(),
+        authority_scope: "treaty".to_string(),
+        scope_id: "treaty.atlantic.v1".to_string(),
+        allowed_domains: vec![FrostAuthorizationDomain::SettleCommitment],
+        key_epoch,
+        threshold: 2,
+        participant_count: 3,
+        participants: OFFICIAL_SHARES
+            .iter()
+            .enumerate()
+            .map(|(index, share)| FrostParticipantV1 {
+                participant_id: format!("operator-{}", index + 1),
+                verification_share: official_verifying_share(share),
+            })
+            .collect(),
+        group_public_key: group_public_key.to_string(),
+        suite_id: FROST_ED25519_SHA512_SUITE_ID.to_string(),
+        ceremony_transcript_digest: "44".repeat(32),
+        predecessor_roster_digest: (key_epoch > 1).then(|| "55".repeat(32)),
+        valid_from: 100,
+        valid_until: 1_000,
+        roster_authority_key_id: "authority.treaty.v1".to_string(),
+        roster_authority_signature: "66".repeat(64),
+    };
+    roster.roster_id = roster
+        .recompute_roster_id()
+        .unwrap_or_else(|error| panic!("fixture roster id must compute: {error}"));
+    roster.roster_digest = roster
+        .recompute_roster_digest()
+        .unwrap_or_else(|error| panic!("fixture roster digest must compute: {error}"));
+    roster
+}
+
+fn epoch_checkpoint(roster: &FrostRosterV1) -> FrostEpochCheckpointV1 {
+    FrostEpochCheckpointV1 {
+        schema: CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA.to_string(),
+        anchor_id: "epoch-anchor.primary".to_string(),
+        scope_id: roster.scope_id.clone(),
+        checkpoint_sequence: roster.key_epoch,
+        predecessor_digest: Some("77".repeat(32)),
+        active_roster_id: roster.roster_id.clone(),
+        active_roster_digest: roster.roster_digest.clone(),
+        key_epoch: roster.key_epoch,
+        group_public_key_digest: sha256_hex(&decode_hex(&roster.group_public_key)),
+        rotation_authorization_digest: Some("88".repeat(32)),
+        activation_fence: 19,
+        clock_high_water: 200,
+        anchor_key_id: "epoch-anchor-key.v1".to_string(),
+        anchor_signature: "99".repeat(64),
+    }
+}
+
+fn fixture_with_keys(roster_key: &str, signing_key: &str) -> Fixture {
+    let roster = roster(roster_key, 4);
+    let registration = frost_action_registration(FrostAuthorizationDomain::SettleCommitment)
+        .unwrap_or_else(|| panic!("settlement authorization domain must be registered"));
+    let mut body = FrostAuthorizationBodyV1 {
+        schema: CHIO_FROST_AUTHORIZATION_BODY_SCHEMA.to_string(),
+        authorization_id: String::new(),
+        domain: registration.domain,
+        ladder_action_class: registration.ladder_action_class.to_string(),
+        ladder_contract_digest: registration
+            .ladder_contract_digest()
+            .unwrap_or_else(|error| panic!("ladder digest must compute: {error}")),
+        quorum_n: registration.quorum_n,
+        quorum_m: registration.quorum_m,
+        quorum_scope: registration.quorum_scope.to_string(),
+        scope_id: roster.scope_id.clone(),
+        resource_id: "settlement.set-974".to_string(),
+        resource_version: 7,
+        resource_fence: 11,
+        action_digest: "aa".repeat(32),
+        roster_digest: roster.roster_digest.clone(),
+        key_epoch: roster.key_epoch,
+        issued_at: 200,
+        expires_at: 400,
+    };
+    body.authorization_id = body
+        .recompute_authorization_id()
+        .unwrap_or_else(|error| panic!("fixture authorization id must compute: {error}"));
+    let signing_bytes = body
+        .signing_bytes()
+        .unwrap_or_else(|error| panic!("fixture body must produce signing bytes: {error}"));
+    let secret = SigningKey::deserialize(&decode_hex(signing_key))
+        .unwrap_or_else(|error| panic!("official group secret must decode: {error}"));
+    let signature = secret.sign(ChaCha20Rng::from_seed([7; 32]), &signing_bytes);
+    let signature_bytes = signature
+        .serialize()
+        .unwrap_or_else(|error| panic!("fixture signature must serialize: {error}"));
+    let proof = FrostAuthorizationV1 {
+        schema: CHIO_FROST_AUTHORIZATION_SCHEMA.to_string(),
+        body,
+        suite_id: FROST_ED25519_SHA512_SUITE_ID.to_string(),
+        group_signature: hex::encode(&signature_bytes),
+    };
+    let signing_message_digest = sha256_hex(&signing_bytes);
+    let signature_digest = sha256_hex(&signature_bytes);
+    let canonical_proof = proof
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("fixture proof must canonicalize: {error}"));
+    let checkpoint = FrostAuthorizationSlotCheckpointV1 {
+        schema: CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA.to_string(),
+        anchor_id: "slot-anchor.primary".to_string(),
+        scope_id: proof.body.scope_id.clone(),
+        slot_id: frost_authorization_slot_id(&proof.body)
+            .unwrap_or_else(|error| panic!("slot id must compute: {error}")),
+        slot_version: 2,
+        predecessor_digest: Some("bb".repeat(32)),
+        domain: proof.body.domain,
+        ladder_action_class: proof.body.ladder_action_class.clone(),
+        resource_id: proof.body.resource_id.clone(),
+        resource_version: proof.body.resource_version,
+        resource_fence: proof.body.resource_fence,
+        authorization_id: proof.body.authorization_id.clone(),
+        signing_message_digest,
+        action_digest: proof.body.action_digest.clone(),
+        roster_digest: proof.body.roster_digest.clone(),
+        key_epoch: proof.body.key_epoch,
+        session_id: frost_authorization_session_id(&proof.body)
+            .unwrap_or_else(|error| panic!("session id must compute: {error}")),
+        state: FrostAuthorizationSlotState::Completed,
+        aggregate_signature_digest: Some(signature_digest),
+        authorization_blob_digest: Some(sha256_hex(&canonical_proof)),
+        availability_receipt: Some("availability.slot-anchor.primary.v1".to_string()),
+        clock_high_water: 200,
+        anchor_key_id: "slot-anchor-key.v1".to_string(),
+        anchor_signature: "cc".repeat(64),
+    };
+    Fixture {
+        proof,
+        epoch_checkpoint: epoch_checkpoint(&roster),
+        roster,
+        slot: FrostAnchoredAuthorizationSlot {
+            checkpoint,
+            authorization_blob: Some(canonical_proof),
+        },
+    }
+}
+
+fn fixture() -> Fixture {
+    fixture_with_keys(OFFICIAL_VERIFYING_KEY, OFFICIAL_SECRET_KEY)
+}
+
+#[test]
+fn upstream_official_vector_and_active_execution_authorization_verify() {
+    let verifying_key = VerifyingKey::deserialize(&decode_hex(OFFICIAL_VERIFYING_KEY))
+        .unwrap_or_else(|error| panic!("official verifying key must decode: {error}"));
+    let signature = Signature::deserialize(&decode_hex(OFFICIAL_TEST_SIGNATURE))
+        .unwrap_or_else(|error| panic!("official signature must decode: {error}"));
+    verifying_key
+        .verify(b"test", &signature)
+        .unwrap_or_else(|error| panic!("upstream official vector must verify: {error}"));
+
+    let fixture = fixture();
+    let active_roster = fixture.active_roster(250);
+    let verified = verify_for_execution(
+        &fixture.proof,
+        &fixture.expected(),
+        &active_roster,
+        &TestSlotAnchor {
+            slot: fixture.slot.clone(),
+        },
+        250,
+    )
+    .unwrap_or_else(|error| panic!("active FROST authorization must verify: {error}"));
+    assert_eq!(
+        verified.authorization_id(),
+        fixture.proof.body.authorization_id
+    );
+}
+
+#[test]
+fn active_verification_rejects_wrong_group_key_and_altered_body() {
+    let wrong_key = SigningKey::deserialize(&[
+        2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0,
+    ])
+    .unwrap_or_else(|error| panic!("alternate signing key must decode: {error}"));
+    let wrong_verifying_key = VerifyingKey::from(&wrong_key)
+        .serialize()
+        .unwrap_or_else(|error| panic!("alternate verifying key must serialize: {error}"));
+    let wrong_key_fixture =
+        fixture_with_keys(&hex::encode(wrong_verifying_key), OFFICIAL_SECRET_KEY);
+    assert!(
+        verify_for_execution(
+            &wrong_key_fixture.proof,
+            &wrong_key_fixture.expected(),
+            &wrong_key_fixture.active_roster(250),
+            &TestSlotAnchor {
+                slot: wrong_key_fixture.slot.clone(),
+            },
+            250,
+        )
+        .is_err(),
+        "a signature from another group key must reject"
+    );
+
+    let mut altered = fixture();
+    altered.proof.body.resource_fence += 1;
+    assert!(
+        verify_for_execution(
+            &altered.proof,
+            &altered.expected(),
+            &altered.active_roster(250),
+            &TestSlotAnchor {
+                slot: altered.slot.clone(),
+            },
+            250,
+        )
+        .is_err(),
+        "a body changed after signing must reject"
+    );
+}
+
+#[test]
+fn active_verification_rejects_wrong_domain_stale_epoch_and_expiry() {
+    let fixture = fixture();
+    let active_roster = fixture.active_roster(250);
+    let mut wrong_expected = fixture.expected();
+    wrong_expected.domain = FrostAuthorizationDomain::ChannelClose;
+    assert!(verify_for_execution(
+        &fixture.proof,
+        &wrong_expected,
+        &active_roster,
+        &TestSlotAnchor {
+            slot: fixture.slot.clone(),
+        },
+        250,
+    )
+    .is_err());
+
+    let mut stale_checkpoint = fixture.epoch_checkpoint.clone();
+    stale_checkpoint.key_epoch += 1;
+    let resolver = TestActiveResolver {
+        roster: fixture.roster.clone(),
+        scope_classification: "treaty".to_string(),
+    };
+    assert!(
+        resolve_active_roster_for_execution(
+            &fixture.proof.body.scope_id,
+            &resolver,
+            &TestEpochAnchor {
+                checkpoint: stale_checkpoint,
+            },
+            250,
+        )
+        .is_err(),
+        "local roster state behind the external epoch must reject"
+    );
+
+    assert!(
+        verify_for_execution(
+            &fixture.proof,
+            &fixture.expected(),
+            &active_roster,
+            &TestSlotAnchor {
+                slot: fixture.slot.clone(),
+            },
+            400,
+        )
+        .is_err(),
+        "authorization expiry is exclusive"
+    );
+}
+
+#[test]
+fn retired_epoch_is_historical_evidence_but_not_execution_authority() {
+    let retired = fixture();
+    let mut current_roster = retired.roster.clone();
+    current_roster.key_epoch += 1;
+    current_roster.predecessor_roster_digest = Some(retired.roster.roster_digest.clone());
+    current_roster.roster_id = current_roster
+        .recompute_roster_id()
+        .unwrap_or_else(|error| panic!("current roster id must compute: {error}"));
+    current_roster.roster_digest = current_roster
+        .recompute_roster_digest()
+        .unwrap_or_else(|error| panic!("current roster digest must compute: {error}"));
+    let current_checkpoint = epoch_checkpoint(&current_roster);
+    let current_scope_id = current_roster.scope_id.clone();
+    let current = resolve_active_roster_for_execution(
+        &current_scope_id,
+        &TestActiveResolver {
+            roster: current_roster,
+            scope_classification: "treaty".to_string(),
+        },
+        &TestEpochAnchor {
+            checkpoint: current_checkpoint,
+        },
+        250,
+    )
+    .unwrap_or_else(|error| panic!("current roster must resolve: {error}"));
+
+    assert!(
+        verify_for_execution(
+            &retired.proof,
+            &retired.expected(),
+            &current,
+            &TestSlotAnchor {
+                slot: retired.slot.clone(),
+            },
+            250,
+        )
+        .is_err(),
+        "retired roster signatures cannot authorize current execution"
+    );
+    let historical = verify_historical_evidence(
+        &retired.proof,
+        &TestHistoricalResolver {
+            roster: retired.roster.clone(),
+        },
+    )
+    .unwrap_or_else(|error| panic!("retired proof must remain valid historical evidence: {error}"));
+    assert_eq!(
+        historical.authorization_id(),
+        retired.proof.body.authorization_id
+    );
+}

@@ -43,6 +43,8 @@ hex = { workspace = true }
 # the verifier-side surface so that crate is pulled in here as a dev
 # dependency only.
 chio-kernel-core = { workspace = true }
+rand_chacha = { workspace = true }
+rand_core = { workspace = true }
 
 [lints]
 workspace = true

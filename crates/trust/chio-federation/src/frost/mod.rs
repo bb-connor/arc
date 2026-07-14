@@ -2,7 +2,9 @@
 
 mod action;
 mod registry;
+mod roster;
 mod types;
+mod verify;
 
 pub use action::{
     FrostActionPreimageV1, FrostChannelCloseActionV1, FrostClearingRoundFinalizeActionV1,
@@ -15,7 +17,21 @@ pub use action::{
     CHIO_FROST_SETTLE_COMMITMENT_ACTION_SCHEMA,
 };
 pub use registry::{frost_action_registration, registered_frost_actions, FrostActionRegistration};
+pub use roster::{
+    ActiveFrostRosterResolver, FrostAnchorError, FrostEpochAnchor, FrostEpochCheckpointV1,
+    FrostHistoricalRosterResolver, FrostParticipantV1, FrostRosterError,
+    FrostRosterResolutionError, FrostRosterV1, VerifiedActiveFrostRoster,
+    CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA, CHIO_FROST_ROSTER_SCHEMA, FROST_ED25519_SHA512_SUITE_ID,
+};
 pub use types::{
     FrostAuthorizationBodyV1, FrostAuthorizationDomain, FrostAuthorizationError,
     CHIO_FROST_AUTHORIZATION_BODY_SCHEMA, CHIO_FROST_AUTHORIZATION_SIGNING_PREFIX,
+};
+pub use verify::{
+    frost_authorization_session_id, frost_authorization_slot_id,
+    resolve_active_roster_for_execution, verify_for_execution, verify_historical_evidence,
+    ExpectedFrostAuthorization, FrostAnchoredAuthorizationSlot, FrostAuthorizationSlotAnchor,
+    FrostAuthorizationSlotCheckpointV1, FrostAuthorizationSlotState, FrostAuthorizationV1,
+    FrostVerificationError, HistoricalFrostEvidence, VerifiedFrostAuthorization,
+    CHIO_FROST_AUTHORIZATION_SCHEMA, CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
 };

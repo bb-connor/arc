@@ -1,0 +1,456 @@
+use std::collections::HashSet;
+
+use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
+use frost_ed25519::keys::VerifyingShare;
+use frost_ed25519::VerifyingKey;
+use serde::{Deserialize, Serialize};
+
+use super::registry::frost_action_registration;
+use super::types::{
+    validate_digest, validate_identifier, validate_nonzero, FrostAuthorizationDomain,
+};
+
+pub const CHIO_FROST_ROSTER_SCHEMA: &str = "chio.frost.roster.v1";
+pub const CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA: &str = "chio.frost.epoch-checkpoint.v1";
+pub const FROST_ED25519_SHA512_SUITE_ID: &str = "FROST-ED25519-SHA512-v1";
+const CHIO_FROST_ROSTER_ID_PREFIX: &[u8] = b"chio.frost.roster.id.v1\0";
+const CHIO_FROST_ROSTER_DIGEST_PREFIX: &[u8] = b"chio.frost.roster.digest.v1\0";
+
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum FrostRosterError {
+    #[error("unsupported FROST roster schema {0:?}")]
+    UnsupportedSchema(String),
+    #[error("invalid FROST roster field {field}: {detail}")]
+    InvalidField {
+        field: &'static str,
+        detail: &'static str,
+    },
+    #[error("FROST roster contract mismatch: {0}")]
+    ContractMismatch(&'static str),
+    #[error("FROST roster id does not match its canonical body")]
+    RosterIdMismatch,
+    #[error("FROST roster digest does not match its canonical signed artifact")]
+    RosterDigestMismatch,
+    #[error("FROST roster canonical JSON failed: {0}")]
+    Canonical(String),
+}
+
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum FrostRosterResolutionError {
+    #[error("FROST roster resolver unavailable: {0}")]
+    Unavailable(String),
+    #[error("FROST roster resolver returned invalid data: {0}")]
+    InvalidResponse(String),
+}
+
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum FrostAnchorError {
+    #[error("FROST external anchor unavailable: {0}")]
+    Unavailable(String),
+    #[error("FROST external anchor returned invalid data: {0}")]
+    InvalidResponse(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FrostParticipantV1 {
+    pub participant_id: String,
+    pub verification_share: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FrostRosterV1 {
+    pub schema: String,
+    pub roster_id: String,
+    pub roster_digest: String,
+    pub authority_scope: String,
+    pub scope_id: String,
+    pub allowed_domains: Vec<FrostAuthorizationDomain>,
+    pub key_epoch: u64,
+    pub threshold: u16,
+    pub participant_count: u16,
+    pub participants: Vec<FrostParticipantV1>,
+    pub group_public_key: String,
+    pub suite_id: String,
+    pub ceremony_transcript_digest: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub predecessor_roster_digest: Option<String>,
+    pub valid_from: u64,
+    pub valid_until: u64,
+    pub roster_authority_key_id: String,
+    pub roster_authority_signature: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FrostRosterIdPreimage<'a> {
+    schema: &'a str,
+    authority_scope: &'a str,
+    scope_id: &'a str,
+    allowed_domains: &'a [FrostAuthorizationDomain],
+    key_epoch: u64,
+    threshold: u16,
+    participant_count: u16,
+    participants: &'a [FrostParticipantV1],
+    group_public_key: &'a str,
+    suite_id: &'a str,
+    ceremony_transcript_digest: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    predecessor_roster_digest: Option<&'a str>,
+    valid_from: u64,
+    valid_until: u64,
+    roster_authority_key_id: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FrostRosterDigestPreimage<'a> {
+    roster_id: &'a str,
+    #[serde(flatten)]
+    body: FrostRosterIdPreimage<'a>,
+    roster_authority_signature: &'a str,
+}
+
+impl FrostRosterV1 {
+    pub fn recompute_roster_id(&self) -> Result<String, FrostRosterError> {
+        canonical_digest(CHIO_FROST_ROSTER_ID_PREFIX, &self.id_preimage())
+    }
+
+    pub fn recompute_roster_digest(&self) -> Result<String, FrostRosterError> {
+        canonical_digest(
+            CHIO_FROST_ROSTER_DIGEST_PREFIX,
+            &FrostRosterDigestPreimage {
+                roster_id: &self.roster_id,
+                body: self.id_preimage(),
+                roster_authority_signature: &self.roster_authority_signature,
+            },
+        )
+    }
+
+    pub fn validate(&self) -> Result<(), FrostRosterError> {
+        if self.schema != CHIO_FROST_ROSTER_SCHEMA {
+            return Err(FrostRosterError::UnsupportedSchema(self.schema.clone()));
+        }
+        roster_digest(&self.roster_id, "roster_id")?;
+        roster_digest(&self.roster_digest, "roster_digest")?;
+        roster_identifier(&self.authority_scope, "authority_scope")?;
+        roster_identifier(&self.scope_id, "scope_id")?;
+        roster_nonzero(self.key_epoch, "key_epoch")?;
+        if self.threshold == 0 || self.threshold > self.participant_count {
+            return Err(FrostRosterError::InvalidField {
+                field: "threshold",
+                detail: "must be between one and participant_count",
+            });
+        }
+        if usize::from(self.participant_count) != self.participants.len() {
+            return Err(FrostRosterError::InvalidField {
+                field: "participant_count",
+                detail: "must equal participants length",
+            });
+        }
+        self.validate_domains()?;
+        self.validate_participants()?;
+        validate_fixed_hex(&self.group_public_key, 64, "group_public_key")?;
+        VerifyingKey::deserialize(&decode_hex(&self.group_public_key, "group_public_key")?)
+            .map_err(|_| FrostRosterError::InvalidField {
+                field: "group_public_key",
+                detail: "must encode a valid FROST Ed25519 verifying key",
+            })?;
+        if self.suite_id != FROST_ED25519_SHA512_SUITE_ID {
+            return Err(FrostRosterError::InvalidField {
+                field: "suite_id",
+                detail: "must be the production FROST Ed25519 SHA-512 suite",
+            });
+        }
+        roster_digest(
+            &self.ceremony_transcript_digest,
+            "ceremony_transcript_digest",
+        )?;
+        match (self.key_epoch, self.predecessor_roster_digest.as_deref()) {
+            (1, None) => {}
+            (1, Some(_)) => {
+                return Err(FrostRosterError::InvalidField {
+                    field: "predecessor_roster_digest",
+                    detail: "must be absent for the first key epoch",
+                });
+            }
+            (_, Some(digest)) => roster_digest(digest, "predecessor_roster_digest")?,
+            (_, None) => {
+                return Err(FrostRosterError::InvalidField {
+                    field: "predecessor_roster_digest",
+                    detail: "is required after the first key epoch",
+                });
+            }
+        }
+        if self.valid_from >= self.valid_until {
+            return Err(FrostRosterError::InvalidField {
+                field: "valid_until",
+                detail: "must be greater than valid_from",
+            });
+        }
+        roster_identifier(&self.roster_authority_key_id, "roster_authority_key_id")?;
+        validate_fixed_hex(
+            &self.roster_authority_signature,
+            128,
+            "roster_authority_signature",
+        )?;
+        if self.recompute_roster_id()? != self.roster_id {
+            return Err(FrostRosterError::RosterIdMismatch);
+        }
+        if self.recompute_roster_digest()? != self.roster_digest {
+            return Err(FrostRosterError::RosterDigestMismatch);
+        }
+        Ok(())
+    }
+
+    fn validate_domains(&self) -> Result<(), FrostRosterError> {
+        if self.allowed_domains.is_empty() {
+            return Err(FrostRosterError::InvalidField {
+                field: "allowed_domains",
+                detail: "must not be empty",
+            });
+        }
+        if !self
+            .allowed_domains
+            .windows(2)
+            .all(|pair| pair[0].as_str() < pair[1].as_str())
+        {
+            return Err(FrostRosterError::InvalidField {
+                field: "allowed_domains",
+                detail: "must be sorted and unique by canonical domain",
+            });
+        }
+        for domain in &self.allowed_domains {
+            let registration =
+                frost_action_registration(*domain).ok_or(FrostRosterError::InvalidField {
+                    field: "allowed_domains",
+                    detail: "contains a reserved or unregistered domain",
+                })?;
+            if registration.quorum_n != self.threshold
+                || registration.quorum_m != self.participant_count
+                || registration.quorum_scope != self.authority_scope
+            {
+                return Err(FrostRosterError::ContractMismatch(
+                    "allowed domain quorum and authority scope",
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_participants(&self) -> Result<(), FrostRosterError> {
+        let mut shares = HashSet::with_capacity(self.participants.len());
+        for (index, participant) in self.participants.iter().enumerate() {
+            roster_identifier(&participant.participant_id, "participant_id")?;
+            if index > 0
+                && self.participants[index - 1].participant_id >= participant.participant_id
+            {
+                return Err(FrostRosterError::InvalidField {
+                    field: "participants",
+                    detail: "must be sorted by unique participant_id",
+                });
+            }
+            validate_fixed_hex(&participant.verification_share, 64, "verification_share")?;
+            if !shares.insert(&participant.verification_share) {
+                return Err(FrostRosterError::InvalidField {
+                    field: "verification_share",
+                    detail: "must be unique",
+                });
+            }
+            VerifyingShare::deserialize(&decode_hex(
+                &participant.verification_share,
+                "verification_share",
+            )?)
+            .map_err(|_| FrostRosterError::InvalidField {
+                field: "verification_share",
+                detail: "must encode a valid FROST Ed25519 verification share",
+            })?;
+        }
+        Ok(())
+    }
+
+    fn id_preimage(&self) -> FrostRosterIdPreimage<'_> {
+        FrostRosterIdPreimage {
+            schema: &self.schema,
+            authority_scope: &self.authority_scope,
+            scope_id: &self.scope_id,
+            allowed_domains: &self.allowed_domains,
+            key_epoch: self.key_epoch,
+            threshold: self.threshold,
+            participant_count: self.participant_count,
+            participants: &self.participants,
+            group_public_key: &self.group_public_key,
+            suite_id: &self.suite_id,
+            ceremony_transcript_digest: &self.ceremony_transcript_digest,
+            predecessor_roster_digest: self.predecessor_roster_digest.as_deref(),
+            valid_from: self.valid_from,
+            valid_until: self.valid_until,
+            roster_authority_key_id: &self.roster_authority_key_id,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FrostEpochCheckpointV1 {
+    pub schema: String,
+    pub anchor_id: String,
+    pub scope_id: String,
+    pub checkpoint_sequence: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub predecessor_digest: Option<String>,
+    pub active_roster_id: String,
+    pub active_roster_digest: String,
+    pub key_epoch: u64,
+    pub group_public_key_digest: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rotation_authorization_digest: Option<String>,
+    pub activation_fence: u64,
+    pub clock_high_water: u64,
+    pub anchor_key_id: String,
+    pub anchor_signature: String,
+}
+
+impl FrostEpochCheckpointV1 {
+    pub fn validate(&self) -> Result<(), FrostRosterError> {
+        if self.schema != CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA {
+            return Err(FrostRosterError::UnsupportedSchema(self.schema.clone()));
+        }
+        roster_identifier(&self.anchor_id, "anchor_id")?;
+        roster_identifier(&self.scope_id, "scope_id")?;
+        roster_nonzero(self.checkpoint_sequence, "checkpoint_sequence")?;
+        if self.checkpoint_sequence > 1 && self.predecessor_digest.is_none() {
+            return Err(FrostRosterError::InvalidField {
+                field: "predecessor_digest",
+                detail: "is required after the first checkpoint",
+            });
+        }
+        if let Some(digest) = self.predecessor_digest.as_deref() {
+            roster_digest(digest, "predecessor_digest")?;
+        }
+        roster_digest(&self.active_roster_id, "active_roster_id")?;
+        roster_digest(&self.active_roster_digest, "active_roster_digest")?;
+        roster_nonzero(self.key_epoch, "key_epoch")?;
+        roster_digest(&self.group_public_key_digest, "group_public_key_digest")?;
+        if self.key_epoch > 1 && self.rotation_authorization_digest.is_none() {
+            return Err(FrostRosterError::InvalidField {
+                field: "rotation_authorization_digest",
+                detail: "is required after the first key epoch",
+            });
+        }
+        if let Some(digest) = self.rotation_authorization_digest.as_deref() {
+            roster_digest(digest, "rotation_authorization_digest")?;
+        }
+        roster_nonzero(self.activation_fence, "activation_fence")?;
+        roster_nonzero(self.clock_high_water, "clock_high_water")?;
+        roster_identifier(&self.anchor_key_id, "anchor_key_id")?;
+        validate_fixed_hex(&self.anchor_signature, 128, "anchor_signature")
+    }
+}
+
+pub trait ActiveFrostRosterResolver: Send + Sync {
+    /// The implementation authenticates roster-authority signatures before return.
+    fn resolve_active_roster(
+        &self,
+        scope_id: &str,
+    ) -> Result<Option<FrostRosterV1>, FrostRosterResolutionError>;
+
+    /// Classify a concrete scope using trusted configuration.
+    fn classify_scope(&self, scope_id: &str) -> Result<Option<String>, FrostRosterResolutionError>;
+}
+
+pub trait FrostHistoricalRosterResolver: Send + Sync {
+    /// The implementation authenticates historical roster-authority signatures.
+    fn resolve_historical_roster(
+        &self,
+        roster_digest: &str,
+        key_epoch: u64,
+        issued_at: u64,
+    ) -> Result<Option<FrostRosterV1>, FrostRosterResolutionError>;
+}
+
+pub trait FrostEpochAnchor: Send + Sync {
+    /// Return an authenticated checkpoint from rollback-independent storage.
+    fn resolve_epoch_checkpoint(
+        &self,
+        scope_id: &str,
+    ) -> Result<FrostEpochCheckpointV1, FrostAnchorError>;
+}
+
+#[derive(Debug, Clone)]
+pub struct VerifiedActiveFrostRoster {
+    pub(super) roster: FrostRosterV1,
+}
+
+impl VerifiedActiveFrostRoster {
+    #[must_use]
+    pub fn scope_id(&self) -> &str {
+        &self.roster.scope_id
+    }
+
+    #[must_use]
+    pub const fn key_epoch(&self) -> u64 {
+        self.roster.key_epoch
+    }
+
+    #[must_use]
+    pub fn roster_digest(&self) -> &str {
+        &self.roster.roster_digest
+    }
+}
+
+fn canonical_digest<T: Serialize>(prefix: &[u8], value: &T) -> Result<String, FrostRosterError> {
+    let canonical = canonical_json_bytes(value)
+        .map_err(|error| FrostRosterError::Canonical(error.to_string()))?;
+    let mut bytes = Vec::with_capacity(prefix.len() + canonical.len());
+    bytes.extend_from_slice(prefix);
+    bytes.extend_from_slice(&canonical);
+    Ok(sha256_hex(&bytes))
+}
+
+fn decode_hex(value: &str, field: &'static str) -> Result<Vec<u8>, FrostRosterError> {
+    hex::decode(value).map_err(|_| FrostRosterError::InvalidField {
+        field,
+        detail: "must be lowercase hexadecimal",
+    })
+}
+
+fn validate_fixed_hex(
+    value: &str,
+    length: usize,
+    field: &'static str,
+) -> Result<(), FrostRosterError> {
+    if value.len() != length
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(FrostRosterError::InvalidField {
+            field,
+            detail: "must have the required lowercase hexadecimal encoding",
+        });
+    }
+    Ok(())
+}
+
+fn roster_identifier(value: &str, field: &'static str) -> Result<(), FrostRosterError> {
+    validate_identifier(value, field).map_err(|_| FrostRosterError::InvalidField {
+        field,
+        detail: "must contain only unpadded printable ASCII",
+    })
+}
+
+fn roster_digest(value: &str, field: &'static str) -> Result<(), FrostRosterError> {
+    validate_digest(value, field).map_err(|_| FrostRosterError::InvalidField {
+        field,
+        detail: "must be 64 lowercase hexadecimal characters",
+    })
+}
+
+fn roster_nonzero(value: u64, field: &'static str) -> Result<(), FrostRosterError> {
+    validate_nonzero(value, field).map_err(|_| FrostRosterError::InvalidField {
+        field,
+        detail: "must be non-zero",
+    })
+}
