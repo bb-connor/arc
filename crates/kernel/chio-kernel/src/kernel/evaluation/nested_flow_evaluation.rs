@@ -286,7 +286,8 @@ impl ChioKernel {
             cap,
             &matching_grants,
             self.execution_nonce_preflight_required(request),
-            durable_admission.as_ref(),
+            durable_admission.as_mut(),
+            now_unix_ms,
         ) {
             Ok(result) => result,
             Err(e) => {
@@ -302,25 +303,6 @@ impl ChioKernel {
                 );
             }
         };
-
-        if let Some(admission) = durable_admission.as_mut() {
-            if let Err(error) =
-                self.record_durable_budget_authorized(admission, &budget_mutation, now_unix_ms)
-            {
-                let reason = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable budget binding could not be confirmed (nested flow)");
-                return self.build_deny_response_with_metadata(
-                    request,
-                    &reason,
-                    now,
-                    Some(matched_grant_index),
-                    self.retained_admission_receipt_metadata(
-                        &budget_mutation,
-                        extra_metadata.clone(),
-                    ),
-                );
-            }
-        }
 
         let matched_grant = matching_grants
             .iter()
@@ -721,9 +703,12 @@ impl ChioKernel {
             }
         }
 
-        let payment_authorization = match self
-            .authorize_payment_if_needed(request, budget_mutation.charge_result())
-        {
+        let payment_authorization = match self.authorize_payment_if_needed(
+            request,
+            budget_mutation.charge_result(),
+            durable_admission.as_ref(),
+            now_unix_ms,
+        ) {
             Ok(authorization) => authorization,
             Err(error) => {
                 let internal_reason = error.to_string();
@@ -1098,11 +1083,6 @@ impl ChioKernel {
         if let (Some(admission), Some(outcome)) =
             (durable_admission.as_mut(), durable_outcome.as_ref())
         {
-            if budget_mutation.charge_result().is_some() {
-                return Err(KernelError::DurableAdmission(
-                    "monetary dispatch reached an unsupported durable terminal path".to_owned(),
-                ));
-            }
             return self.finalize_durable_tool_return(admission, request, outcome);
         }
         self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {

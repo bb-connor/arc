@@ -4,11 +4,17 @@ use chio_kernel::admission_operation::{
     PersistedAdmissionOperationV1, SignedAdmissionTerminalProjectionV1, StoreMutationFence,
     UntrustedAdmissionRecoveryClaim,
 };
+use chio_kernel::payment::{PaymentJournalRecord, PaymentJournalTransition};
 use chio_kernel::tool_outcome::{
-    PersistedPostReturnEvaluationRecordV1, PersistedRawInvocationOutcomeV1,
-    PersistedToolOutcomeRecordV1,
+    PersistedMonetaryReleaseEvidenceV1, PersistedPostReturnEvaluationRecordV1,
+    PersistedRawInvocationOutcomeV1, PersistedToolOutcomeRecordV1,
 };
 use serde::{Deserialize, Serialize};
+
+use super::structured_budget::{
+    StructuredBudgetAuthorizeRequest, StructuredBudgetAuthorizeResponse,
+    StructuredBudgetMutationResponse, StructuredBudgetReconcileRequest,
+};
 
 const ADMISSION_AUTHORITY_REQUEST_SCHEMA: &str = "chio.admission-authority-request.v1";
 const ADMISSION_AUTHORITY_RESPONSE_SCHEMA: &str = "chio.admission-authority-response.v1";
@@ -33,6 +39,10 @@ pub(crate) enum AdmissionAuthorityAction {
     StagePostReturnEvaluation,
     FinalizePostReturn,
     LoadResolvedOutput,
+    LoadPaymentJournal,
+    AdvancePaymentJournal,
+    BeginPaymentSettlement,
+    AuthorizeBudgetAndCommitAdmission,
     CaptureInvocationAndCommitDispatch,
     CommitTerminalProjection,
     LoadAdmissionReceipt,
@@ -135,18 +145,18 @@ mod response_tests {
     use super::*;
 
     #[test]
-    fn admission_authority_success_preserves_null_result() {
-        let response = AdmissionAuthorityResponse::success(&Option::<String>::None)
-            .expect("encode null admission authority result");
-        let encoded = serde_json::to_vec(&response).expect("serialize response");
-        let decoded: AdmissionAuthorityResponse =
-            serde_json::from_slice(&encoded).expect("deserialize response");
+    fn admission_authority_success_preserves_null_result() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let response = AdmissionAuthorityResponse::success(&Option::<String>::None)?;
+        let encoded = serde_json::to_vec(&response)?;
+        let decoded: AdmissionAuthorityResponse = serde_json::from_slice(&encoded)?;
+        let result = decoded
+            .result
+            .ok_or_else(|| std::io::Error::other("success result wrapper is absent"))?;
 
-        assert_eq!(
-            decoded.result.expect("success result wrapper").value,
-            serde_json::Value::Null
-        );
+        assert_eq!(result.value, serde_json::Value::Null);
         assert!(decoded.error.is_none());
+        Ok(())
     }
 }
 
@@ -261,6 +271,73 @@ pub(crate) struct AdmissionDispatchCaptureWire {
     pub(crate) authority_lease_epoch: u64,
     pub(crate) active_fence: StoreMutationFence,
     pub(crate) trusted_now_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AdmissionBudgetAuthorizeWire {
+    pub(crate) operation: PersistedAdmissionOperationV1,
+    pub(crate) recovery_claim: RecoveryClaimWire,
+    pub(crate) budget: StructuredBudgetAuthorizeRequest,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) payment_journal: Option<PaymentJournalRecord>,
+    pub(crate) authority_id: String,
+    pub(crate) authority_lease_id: String,
+    pub(crate) authority_lease_epoch: u64,
+    pub(crate) active_fence: StoreMutationFence,
+    pub(crate) trusted_now_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AdmissionPaymentAdvanceWire {
+    pub(crate) operation: PersistedAdmissionOperationV1,
+    pub(crate) recovery_claim: RecoveryClaimWire,
+    pub(crate) expected: PaymentJournalRecord,
+    pub(crate) transition: PaymentJournalTransition,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) release_evidence: Option<PersistedMonetaryReleaseEvidenceV1>,
+    pub(crate) active_fence: StoreMutationFence,
+    pub(crate) trusted_now_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AdmissionPaymentSettlementBeginWire {
+    pub(crate) operation: PersistedAdmissionOperationV1,
+    pub(crate) recovery_claim: RecoveryClaimWire,
+    pub(crate) expected: PaymentJournalRecord,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) transition: Option<PaymentJournalTransition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) release_evidence: Option<PersistedMonetaryReleaseEvidenceV1>,
+    pub(crate) budget_reconcile: StructuredBudgetReconcileRequest,
+    pub(crate) authority_id: String,
+    pub(crate) authority_lease_id: String,
+    pub(crate) authority_lease_epoch: u64,
+    pub(crate) active_fence: StoreMutationFence,
+    pub(crate) trusted_now_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AdmissionBudgetAuthorizeResultWire {
+    pub(crate) budget: StructuredBudgetAuthorizeResponse,
+    pub(crate) operation: PersistedAdmissionOperationV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AdmissionDispatchCaptureResultWire {
+    pub(crate) budget: StructuredBudgetMutationResponse,
+    pub(crate) operation: PersistedAdmissionOperationV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AdmissionPaymentSettlementResultWire {
+    pub(crate) journal: PaymentJournalRecord,
+    pub(crate) budget: StructuredBudgetMutationResponse,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -1002,8 +1002,7 @@ pub struct VerifiedContractualZeroCharge {
 }
 
 impl VerifiedContractualZeroCharge {
-    #[cfg(test)]
-    fn from_records(
+    pub(crate) fn from_records(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
         outcome: &ToolOutcomeRecordV1,

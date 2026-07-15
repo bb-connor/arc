@@ -16,7 +16,6 @@ struct VerifiedTerminalParticipantSourceV1 {
 }
 
 impl VerifiedTerminalParticipantSourceV1 {
-    #[cfg(test)]
     #[allow(clippy::too_many_arguments)]
     fn from_source_verified(
         operation: &AdmissionOperationV1,
@@ -94,7 +93,6 @@ macro_rules! attached_terminal_participant {
         }
 
         impl $name {
-            #[cfg(test)]
             #[allow(clippy::too_many_arguments, dead_code)]
             pub(crate) fn from_source_verified(
                 operation: &AdmissionOperationV1,

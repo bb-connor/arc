@@ -1025,13 +1025,27 @@ impl ChioKernel {
         cap: &CapabilityToken,
         matching_grants: &[MatchingGrant<'_>],
         nonce_preflight: bool,
-        durable_admission: Option<&DurableToolAdmission>,
+        mut durable_admission: Option<&mut DurableToolAdmission>,
+        trusted_now_unix_ms: u64,
     ) -> Result<(usize, PreExecutionBudgetMutation), KernelError> {
         let mut saw_exhausted_budget = false;
         let mut eligible_grant_seen = false;
 
         for matching in matching_grants {
-            if durable_admission.is_some_and(|admission| !admission.permits_grant(matching.index)) {
+            if durable_admission
+                .as_deref()
+                .is_some_and(|admission| !admission.permits_grant(matching.index))
+            {
+                continue;
+            }
+            if durable_admission.as_deref().is_some_and(|admission| {
+                admission.requires_payment()
+                    && matching
+                        .grant
+                        .max_cost_per_invocation
+                        .as_ref()
+                        .is_none_or(|amount| amount.units == 0)
+            }) {
                 continue;
             }
             eligible_grant_seen = true;
@@ -1059,7 +1073,7 @@ impl ChioKernel {
                 let max_per = grant.max_cost_per_invocation.as_ref().map(|m| m.units);
                 let budget_total = max_total.unwrap_or(u64::MAX);
                 let (budget_hold_id, authorize_event_id, admission_binding, authority) =
-                    if let Some(admission) = durable_admission {
+                    if let Some(admission) = durable_admission.as_deref() {
                         let (binding, authority) = self.durable_budget_binding(admission, cap)?;
                         (
                             admission.budget_hold_id(matching.index),
@@ -1084,22 +1098,87 @@ impl ChioKernel {
                         )
                     };
 
-                let decision = self.with_budget_store(|store| {
-                    Ok(store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
-                        capability_id: cap.id.clone(),
-                        grant_index: matching.index,
-                        max_invocations: grant.max_invocations,
-                        invocation_quotas: Vec::new(),
-                        cumulative_approval: None,
-                        admission_binding,
-                        requested_exposure_units: cost_units,
-                        max_cost_per_invocation: max_per,
-                        max_total_cost_units: max_total,
-                        hold_id: Some(budget_hold_id.clone()),
-                        event_id: Some(authorize_event_id),
-                        authority: Some(authority.clone()),
-                    })?)
-                })?;
+                let authorization_request = BudgetAuthorizeHoldRequest {
+                    capability_id: cap.id.clone(),
+                    grant_index: matching.index,
+                    max_invocations: grant.max_invocations,
+                    invocation_quotas: Vec::new(),
+                    cumulative_approval: None,
+                    admission_binding,
+                    requested_exposure_units: cost_units,
+                    max_cost_per_invocation: max_per,
+                    max_total_cost_units: max_total,
+                    hold_id: Some(budget_hold_id.clone()),
+                    event_id: Some(authorize_event_id),
+                    authority: Some(authority.clone()),
+                };
+                let decision = if let Some(admission) = durable_admission.as_deref_mut() {
+                    let payment_journal = if admission.requires_payment() {
+                        let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
+                            KernelError::DurableAdmission(
+                                "durable monetary authorization lost its payment adapter"
+                                    .to_owned(),
+                            )
+                        })?;
+                        let rail_mode = adapter.rail_mode().ok_or_else(|| {
+                            KernelError::DurableAdmission(
+                                "durable monetary authorization lost its payment rail mode"
+                                    .to_owned(),
+                            )
+                        })?;
+                        let journal = crate::payment::PaymentJournalRecord {
+                            operation_id: admission.operation_id().to_owned(),
+                            journal_version: 1,
+                            request_namespace_digest: admission
+                                .operation()
+                                .binding()
+                                .request_namespace_digest()
+                                .as_str()
+                                .to_owned(),
+                            request_id: admission
+                                .operation()
+                                .binding()
+                                .request_id()
+                                .as_str()
+                                .to_owned(),
+                            capability_id: cap.id.clone(),
+                            grant_index: u32::try_from(matching.index).map_err(|_| {
+                                KernelError::DurableAdmission(
+                                    "payment grant index exceeds the durable journal range"
+                                        .to_owned(),
+                                )
+                            })?,
+                            hold_id: Some(budget_hold_id.clone()),
+                            rail: adapter.rail_id().to_owned(),
+                            rail_mode,
+                            authorization_id: None,
+                            transaction_id: None,
+                            amount_units: cost_units,
+                            settle_action: None,
+                            settle_amount_units: None,
+                            release_authority: None,
+                            currency: currency.clone(),
+                            state: crate::payment::PaymentJournalState::HoldPlaced,
+                            created_at_unix_ms: trusted_now_unix_ms.max(1),
+                        };
+                        journal
+                            .validate()
+                            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+                        Some(journal)
+                    } else {
+                        None
+                    };
+                    self.authorize_durable_budget_hold(
+                        admission,
+                        authorization_request,
+                        payment_journal,
+                        trusted_now_unix_ms,
+                    )?
+                } else {
+                    self.with_budget_store(|store| {
+                        Ok(store.authorize_budget_hold(authorization_request)?)
+                    })?
+                };
                 match decision {
                     BudgetAuthorizeHoldDecision::Authorized(authorized) => {
                         let charge = BudgetChargeResult {
@@ -1132,6 +1211,7 @@ impl ChioKernel {
                     }
                     BudgetAuthorizeHoldDecision::AlreadyCaptured(captured) => {
                         if !durable_admission
+                            .as_deref()
                             .is_some_and(DurableToolAdmission::can_resume_captured_hold)
                         {
                             return Err(KernelError::BudgetExhausted(cap.id.clone()));
@@ -1386,7 +1466,7 @@ impl ChioKernel {
 
         let payment_already_settled = payment_authorization
             .as_ref()
-            .is_some_and(|authorization| authorization.settled);
+            .is_some_and(|authorization| authorization.state.is_final());
         let cost_overrun =
             !cross_currency_failed && actual_cost > charge.cost_charged && charge.cost_charged > 0;
 
@@ -1409,7 +1489,7 @@ impl ChioKernel {
         let running_committed_cost_units = reconcile.committed_cost_units_after;
 
         let payment_result = if let Some(authorization) = payment_authorization.as_ref() {
-            if authorization.settled || cross_currency_failed || cost_overrun {
+            if authorization.state.is_final() || cross_currency_failed || cost_overrun {
                 None
             } else {
                 let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
@@ -1440,7 +1520,7 @@ impl ChioKernel {
                 settlement_status: SettlementStatus::Failed,
             }
         } else if let Some(authorization) = payment_authorization.as_ref() {
-            if authorization.settled {
+            if authorization.state.is_final() {
                 ReceiptSettlement::from_authorization(authorization)
             } else if let Some(payment_result) = payment_result.as_ref() {
                 match payment_result {
@@ -1643,6 +1723,8 @@ impl ChioKernel {
         &self,
         request: &ToolCallRequest,
         charge_result: Option<&BudgetChargeResult>,
+        durable_admission: Option<&DurableToolAdmission>,
+        trusted_now_unix_ms: u64,
     ) -> Result<Option<PaymentAuthorization>, PaymentError> {
         let Some(charge) = charge_result else {
             return Ok(None);
@@ -1650,6 +1732,59 @@ impl ChioKernel {
         let Some(adapter) = self.payment_adapter.as_ref() else {
             return Ok(None);
         };
+        let durable_journal = durable_admission
+            .map(|admission| {
+                self.load_durable_payment_journal(admission)
+                    .map_err(|error| PaymentError::RailError(error.to_string()))
+            })
+            .transpose()?;
+        if let Some(journal) = durable_journal.as_ref() {
+            let rail_mode = adapter.rail_mode().ok_or_else(|| {
+                PaymentError::RailError("durable payment adapter omitted its rail mode".to_owned())
+            })?;
+            if adapter.rail_id() != journal.rail || rail_mode != journal.rail_mode {
+                return Err(PaymentError::RailError(
+                    "durable payment adapter does not match the persisted rail profile".to_owned(),
+                ));
+            }
+            match (journal.state, journal.rail_mode) {
+                (
+                    crate::payment::PaymentJournalState::Authorized,
+                    crate::payment::PaymentRailMode::ReversibleHold,
+                ) => {
+                    return Ok(Some(PaymentAuthorization {
+                        authorization_id: journal.authorization_id.clone().ok_or_else(|| {
+                            PaymentError::RailError(
+                                "authorized payment journal omitted authorization_id".to_owned(),
+                            )
+                        })?,
+                        state: crate::payment::PaymentAuthorizationState::Held,
+                        metadata: serde_json::json!({ "durable_replay": true }),
+                    }));
+                }
+                (
+                    crate::payment::PaymentJournalState::Settled,
+                    crate::payment::PaymentRailMode::PrepaidFinal,
+                ) => {
+                    return Ok(Some(PaymentAuthorization {
+                        authorization_id: journal.authorization_id.clone().ok_or_else(|| {
+                            PaymentError::RailError(
+                                "settled prepayment journal omitted authorization_id".to_owned(),
+                            )
+                        })?,
+                        state: crate::payment::PaymentAuthorizationState::PrepaidFinal,
+                        metadata: serde_json::json!({ "durable_replay": true }),
+                    }));
+                }
+                (crate::payment::PaymentJournalState::HoldPlaced, _) => {}
+                _ => {
+                    return Err(PaymentError::RailError(format!(
+                        "payment journal cannot authorize from state {:?}",
+                        journal.state
+                    )));
+                }
+            }
+        }
 
         let governed = request
             .governed_intent
@@ -1686,16 +1821,50 @@ impl ChioKernel {
                 })
         });
 
-        adapter
-            .authorize(&PaymentAuthorizeRequest {
-                amount_units: charge.cost_charged,
-                currency: charge.currency.clone(),
-                payer: request.agent_id.clone(),
-                payee: request.server_id.clone(),
-                reference: request.request_id.clone(),
-                governed,
-                commerce,
-            })
-            .map(Some)
+        let authorization = adapter.authorize(&PaymentAuthorizeRequest {
+            amount_units: charge.cost_charged,
+            currency: charge.currency.clone(),
+            payer: request.agent_id.clone(),
+            payee: request.server_id.clone(),
+            reference: durable_journal.as_ref().map_or_else(
+                || request.request_id.clone(),
+                |journal| journal.operation_id.clone(),
+            ),
+            governed,
+            commerce,
+        })?;
+        if let (Some(admission), Some(journal)) = (durable_admission, durable_journal.as_ref()) {
+            if !journal.rail_mode.accepts(authorization.state) {
+                return Err(PaymentError::RailError(
+                    "payment authorization state does not match the persisted rail mode".to_owned(),
+                ));
+            }
+            let transition = match authorization.state {
+                crate::payment::PaymentAuthorizationState::Held => {
+                    crate::payment::PaymentJournalTransition::AuthorizationHeld {
+                        authorization_id: authorization.authorization_id.clone(),
+                    }
+                }
+                crate::payment::PaymentAuthorizationState::PrepaidFinal => {
+                    crate::payment::PaymentJournalTransition::PrepaymentSettled {
+                        authorization_id: authorization.authorization_id.clone(),
+                    }
+                }
+            };
+            let advanced = self
+                .advance_durable_payment_journal(
+                    admission,
+                    journal,
+                    &transition,
+                    trusted_now_unix_ms,
+                )
+                .map_err(|error| PaymentError::RailError(error.to_string()))?;
+            if advanced.authorization_id.as_deref() != Some(&authorization.authorization_id) {
+                return Err(PaymentError::RailError(
+                    "durable payment journal changed authorization identity".to_owned(),
+                ));
+            }
+        }
+        Ok(Some(authorization))
     }
 }

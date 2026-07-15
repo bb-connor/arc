@@ -1441,7 +1441,7 @@ impl PaymentAdapter for StubPaymentAdapter {
     ) -> Result<PaymentAuthorization, PaymentError> {
         Ok(PaymentAuthorization {
             authorization_id: "auth_stub".to_string(),
-            settled: false,
+            state: PaymentAuthorizationState::Held,
             metadata: serde_json::json!({ "adapter": "stub" }),
         })
     }
@@ -1535,7 +1535,7 @@ impl PaymentAdapter for PrepaidSettledPaymentAdapter {
     ) -> Result<PaymentAuthorization, PaymentError> {
         Ok(PaymentAuthorization {
             authorization_id: "x402_txn_paid".to_string(),
-            settled: true,
+            state: PaymentAuthorizationState::PrepaidFinal,
             metadata: serde_json::json!({ "adapter": "x402" }),
         })
     }

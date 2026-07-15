@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS authority_global_commits (
     commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     projection_kind TEXT NOT NULL CHECK (
-        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost')
+        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment')
     ),
     projection_key TEXT NOT NULL,
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence >= 0),
@@ -177,9 +177,16 @@ pub(crate) fn initialize_global_commit_schema(
         if actual == expected_global_schema_catalog(GLOBAL_COMMIT_SCHEMA)? {
             return Ok(());
         }
-        let legacy_schema = legacy_global_commit_schema();
-        let expected_legacy = expected_global_schema_catalog(&legacy_schema)?;
-        if actual != expected_legacy {
+        let supported_legacy = [
+            pre_payment_global_commit_schema(),
+            legacy_global_commit_schema(),
+        ];
+        if !supported_legacy
+            .iter()
+            .map(|schema| expected_global_schema_catalog(schema))
+            .collect::<Result<Vec<_>, _>>()?
+            .contains(&actual)
+        {
             return Err(invalid(
                 "global authority commit schema is neither current nor a supported legacy definition",
             ));
@@ -204,8 +211,15 @@ pub(crate) fn verify_global_commit_schema(
 
 fn legacy_global_commit_schema() -> String {
     GLOBAL_COMMIT_SCHEMA.replace(
-        "'baseline', 'admission', 'budget', 'revocation', 'frost'",
+        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment'",
         "'baseline', 'admission', 'budget', 'revocation'",
+    )
+}
+
+fn pre_payment_global_commit_schema() -> String {
+    GLOBAL_COMMIT_SCHEMA.replace(
+        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment'",
+        "'baseline', 'admission', 'budget', 'revocation', 'frost'",
     )
 }
 
@@ -758,6 +772,7 @@ fn projection_reference_digest(
             .optional()?
             .ok_or_else(|| invalid("admission projection reference is absent")),
         "budget" => budget_event_reference_digest(connection, key, sequence),
+        "payment" => payment_journal_reference_digest(connection, key, sequence),
         "revocation" => revocation_reference_digest(connection, key, sequence),
         "frost" => connection
             .query_row(
@@ -778,6 +793,45 @@ fn verify_projection_reference(
     connection: &Connection,
     commit: &CommitRow,
 ) -> Result<(), SqliteServingOwnerError> {
+    if commit.projection_kind == "payment" {
+        let stored_version = connection
+            .query_row(
+                "SELECT journal_version FROM payment_journal WHERE operation_id = ?1",
+                [&commit.projection_key],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?
+            .ok_or_else(|| invalid("payment journal projection reference is absent"))?;
+        if read_u64(stored_version, "payment journal version")? < commit.projection_sequence {
+            return Err(invalid("payment journal projection history was truncated"));
+        }
+        let superseded = connection.query_row(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM authority_global_commits
+                WHERE projection_kind = 'payment' AND projection_key = ?1
+                  AND projection_sequence > ?2
+            )
+            "#,
+            params![
+                &commit.projection_key,
+                sqlite_u64(commit.projection_sequence, "payment journal version")?,
+            ],
+            |row| row.get::<_, bool>(0),
+        )?;
+        if !superseded
+            && payment_journal_reference_digest(
+                connection,
+                &commit.projection_key,
+                commit.projection_sequence,
+            )? != commit.projection_reference_digest
+        {
+            return Err(invalid(
+                "global authority commit lost its exact payment projection",
+            ));
+        }
+        return Ok(());
+    }
     if commit.projection_kind == "revocation" {
         let committed = connection.query_row(
             r#"
@@ -897,16 +951,41 @@ fn budget_event_reference_digest(
     })
 }
 
-fn baseline_projection_digest(connection: &Connection) -> Result<String, SqliteServingOwnerError> {
-    let tables = table_names(connection, false)?;
+fn payment_journal_reference_digest(
+    connection: &Connection,
+    operation_id: &str,
+    journal_version: u64,
+) -> Result<String, SqliteServingOwnerError> {
+    let stored_version = connection
+        .query_row(
+            "SELECT journal_version FROM payment_journal WHERE operation_id = ?1",
+            [operation_id],
+            |row| row.get::<_, i64>(0),
+        )
+        .optional()?
+        .ok_or_else(|| invalid("payment journal projection reference is absent"))?;
+    if read_u64(stored_version, "payment journal version")? != journal_version {
+        return Err(invalid(
+            "payment journal projection sequence does not match its record",
+        ));
+    }
+    let tables = ["payment_journal", "payment_release_evidence"];
     let mut snapshots = Vec::with_capacity(tables.len());
     for table in tables {
-        snapshots.push(table_snapshot(connection, &table, None)?);
+        snapshots.push(table_snapshot(
+            connection,
+            table,
+            Some(("operation_id", operation_id)),
+        )?);
     }
     digest(&AuthoritySnapshot {
-        format: "chio.sqlite-authority-projection.v1",
+        format: "chio.sqlite-authority-payment-journal-reference.v1",
         tables: snapshots,
     })
+}
+
+fn baseline_projection_digest(connection: &Connection) -> Result<String, SqliteServingOwnerError> {
+    baseline_projection_digest_for_tables(connection, table_names(connection, false)?)
 }
 
 fn verify_pristine_baseline(connection: &Connection) -> Result<(), SqliteServingOwnerError> {
@@ -995,7 +1074,13 @@ fn verify_live_baseline_projection(connection: &Connection) -> Result<(), Sqlite
     if committed == baseline_projection_digest(connection)? {
         return Ok(());
     }
-    if frost_projection_is_empty(connection)?
+    if payment_projection_is_empty(connection)?
+        && committed == pre_payment_baseline_projection_digest(connection)?
+    {
+        return Ok(());
+    }
+    if payment_projection_is_empty(connection)?
+        && frost_projection_is_empty(connection)?
         && committed == legacy_baseline_projection_digest(connection)?
     {
         return Ok(());
@@ -1003,6 +1088,15 @@ fn verify_live_baseline_projection(connection: &Connection) -> Result<(), Sqlite
     Err(invalid(
         "global authority baseline does not match its live projection",
     ))
+}
+
+fn pre_payment_baseline_projection_digest(
+    connection: &Connection,
+) -> Result<String, SqliteServingOwnerError> {
+    baseline_projection_digest_for_tables(
+        connection,
+        authority_table_names(connection, true, false)?,
+    )
 }
 
 fn legacy_baseline_projection_digest(
@@ -1038,8 +1132,19 @@ fn legacy_baseline_projection_digest(
 }
 
 fn frost_projection_is_empty(connection: &Connection) -> Result<bool, SqliteServingOwnerError> {
+    projection_is_empty(connection, "frost_")
+}
+
+fn payment_projection_is_empty(connection: &Connection) -> Result<bool, SqliteServingOwnerError> {
+    projection_is_empty(connection, "payment_")
+}
+
+fn projection_is_empty(
+    connection: &Connection,
+    table_prefix: &str,
+) -> Result<bool, SqliteServingOwnerError> {
     for table in table_names(connection, false)? {
-        if !table.starts_with("frost_") {
+        if !table.starts_with(table_prefix) {
             continue;
         }
         let count = connection.query_row(
@@ -1097,6 +1202,24 @@ fn verify_global_projection_coverage(
                       AND global.projection_sequence = local.projection_sequence
                 ) <> 1
             )
+            OR EXISTS(
+                SELECT 1 FROM payment_journal AS local
+                WHERE (
+                    SELECT COUNT(*) FROM authority_global_commits AS global
+                    WHERE global.projection_kind = 'payment'
+                      AND global.projection_key = local.operation_id
+                      AND global.projection_sequence = local.journal_version
+                ) <> 1
+            )
+            OR EXISTS(
+                SELECT 1 FROM authority_global_commits AS global
+                WHERE global.projection_kind = 'payment'
+                  AND NOT EXISTS(
+                      SELECT 1 FROM payment_journal AS local
+                      WHERE local.operation_id = global.projection_key
+                        AND local.journal_version >= global.projection_sequence
+                  )
+            )
         "#,
         [],
         |row| row.get::<_, bool>(0),
@@ -1111,14 +1234,29 @@ fn table_names(
     connection: &Connection,
     budget_event_only: bool,
 ) -> Result<Vec<String>, SqliteServingOwnerError> {
-    let sql = if budget_event_only {
-        r#"
+    if budget_event_only {
+        let mut statement = connection.prepare(
+            r#"
         SELECT name FROM sqlite_schema
         WHERE type = 'table'
           AND (name = 'budget_mutation_events' OR name GLOB 'budget_event_*')
         ORDER BY name
-        "#
-    } else {
+        "#,
+        )?;
+        return statement
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into);
+    }
+    authority_table_names(connection, true, true)
+}
+
+fn authority_table_names(
+    connection: &Connection,
+    include_frost: bool,
+    include_payment: bool,
+) -> Result<Vec<String>, SqliteServingOwnerError> {
+    let mut statement = connection.prepare(
         r#"
         SELECT name FROM sqlite_schema
         WHERE type = 'table'
@@ -1129,17 +1267,33 @@ fn table_names(
               OR name GLOB 'admission_operation*'
               OR name GLOB 'admission_authority_*'
               OR name GLOB 'budget_*'
-              OR name GLOB 'frost_*'
+              OR (?1 AND name GLOB 'frost_*')
+              OR (?2 AND name GLOB 'payment_*')
           )
           AND name NOT IN ('budget_ack_head_watermark', 'budget_origin_ack_heads')
         ORDER BY name
-        "#
-    };
-    let mut statement = connection.prepare(sql)?;
+        "#,
+    )?;
     let names = statement
-        .query_map([], |row| row.get::<_, String>(0))?
+        .query_map(params![include_frost, include_payment], |row| {
+            row.get::<_, String>(0)
+        })?
         .collect::<Result<Vec<_>, _>>()?;
     Ok(names)
+}
+
+fn baseline_projection_digest_for_tables(
+    connection: &Connection,
+    tables: Vec<String>,
+) -> Result<String, SqliteServingOwnerError> {
+    let mut snapshots = Vec::with_capacity(tables.len());
+    for table in tables {
+        snapshots.push(table_snapshot(connection, &table, None)?);
+    }
+    digest(&AuthoritySnapshot {
+        format: "chio.sqlite-authority-projection.v1",
+        tables: snapshots,
+    })
 }
 
 fn table_snapshot(
@@ -1277,4 +1431,57 @@ fn is_digest(value: &str) -> bool {
 
 fn invalid(detail: impl Into<String>) -> SqliteServingOwnerError {
     SqliteServingOwnerError::Invalid(detail.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn projection_fixture() -> Result<Connection, rusqlite::Error> {
+        let connection = Connection::open_in_memory()?;
+        connection.execute_batch(
+            r#"
+                CREATE TABLE budget_mutation_events (event_id TEXT PRIMARY KEY);
+                CREATE TABLE frost_nonce_commitments (nonce_id TEXT PRIMARY KEY);
+                CREATE TABLE payment_journal (operation_id TEXT PRIMARY KEY);
+                CREATE TABLE payment_release_evidence (evidence_id TEXT PRIMARY KEY);
+                "#,
+        )?;
+        Ok(connection)
+    }
+
+    #[test]
+    fn authority_snapshot_includes_payment_projection() -> Result<(), Box<dyn std::error::Error>> {
+        let connection = projection_fixture()?;
+
+        assert_eq!(
+            table_names(&connection, false)?,
+            vec![
+                "budget_mutation_events",
+                "frost_nonce_commitments",
+                "payment_journal",
+                "payment_release_evidence",
+            ]
+        );
+        assert_ne!(
+            baseline_projection_digest(&connection)?,
+            pre_payment_baseline_projection_digest(&connection)?
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn pre_payment_compatibility_requires_empty_payment_projection(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let connection = projection_fixture()?;
+        assert!(payment_projection_is_empty(&connection)?);
+
+        connection.execute(
+            "INSERT INTO payment_journal (operation_id) VALUES ('operation-1')",
+            [],
+        )?;
+
+        assert!(!payment_projection_is_empty(&connection)?);
+        Ok(())
+    }
 }

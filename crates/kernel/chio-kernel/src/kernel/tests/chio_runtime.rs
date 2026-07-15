@@ -2021,7 +2021,7 @@ fn drop_pre_dispatch_monetary_unwinds_without_receipt() -> Result<(), Box<dyn st
     let mutation = PreExecutionBudgetMutation::Charge(make_fabricated_drop_charge());
     let authorization = PaymentAuthorization {
         authorization_id: "auth-monetary-pre-dispatch-drop".to_string(),
-        settled: false,
+        state: PaymentAuthorizationState::Held,
         metadata: serde_json::json!({ "adapter": "tracking" }),
     };
 

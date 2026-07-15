@@ -309,7 +309,7 @@ impl ChioKernel {
                         "payment authorization present without configured adapter".to_string(),
                     )
                 })?;
-                let (release, expected_status) = if authorization.settled {
+                let (release, expected_status) = if authorization.state.is_final() {
                     (
                         adapter.refund(
                             &authorization.authorization_id,

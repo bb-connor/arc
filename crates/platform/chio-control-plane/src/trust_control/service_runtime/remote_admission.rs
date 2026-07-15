@@ -11,9 +11,14 @@ use chio_kernel::admission_operation::{
     QualifiedAdmissionOperationStore, SignedAdmissionTerminalProjectionV1, StoreMutationFence,
     UntrustedAdmissionRecoveryClaim,
 };
-use chio_kernel::budget_store::BudgetCaptureInvocationRequest;
+use chio_kernel::budget_store::{
+    BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest, BudgetGuaranteeLevel,
+};
 use chio_kernel::receipt_store::{
-    QualifiedAdmissionProjectionStore, ReceiptStore, ReceiptStoreError,
+    AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError, AdmissionBudgetCapture,
+    AdmissionPaymentJournalAdvance, AdmissionPaymentJournalError, AdmissionPaymentSettlement,
+    AdmissionPaymentSettlementBegin, QualifiedAdmissionProjectionStore, ReceiptStore,
+    ReceiptStoreError,
 };
 use chio_kernel::tool_outcome::{
     CanonicalInvocationBlobV1, CanonicalResolvedOutputBlobV1, PostReturnEvaluationRecordV1,
@@ -31,6 +36,7 @@ const ADMISSION_AUTHORITY_RESPONSE_LIMIT: u64 = 384 * 1024 * 1024;
 pub(crate) struct RemoteAdmissionStores {
     pub(crate) operations: Arc<dyn QualifiedAdmissionProjectionStore>,
     pub(crate) outcomes: Arc<dyn QualifiedToolOutcomeStore>,
+    pub(crate) budget: Arc<dyn chio_kernel::BudgetStore>,
     pub(crate) fence: StoreMutationFence,
 }
 
@@ -38,6 +44,7 @@ struct RemoteAdmissionAuthority {
     client: TrustControlClient,
     fence: StoreMutationFence,
     signer: Keypair,
+    budget: Arc<RemoteBudgetStore>,
 }
 
 #[derive(Debug)]
@@ -66,14 +73,17 @@ pub(crate) fn build_remote_admission_stores(
     let status: AdmissionAuthorityStatusWire = decode_response(response).map_err(|error| {
         CliError::cli_other_error(format!("failed to connect to admission authority: {error}"))
     })?;
+    let budget = super::budget::build_shared_remote_budget_store(control_url, control_token)?;
     let authority = Arc::new(RemoteAdmissionAuthority {
         client,
         fence: status.fence.clone(),
         signer,
+        budget: budget.clone(),
     });
     Ok(RemoteAdmissionStores {
         operations: authority.clone(),
         outcomes: authority,
+        budget,
         fence: status.fence,
     })
 }
@@ -388,6 +398,296 @@ impl ReceiptStore for RemoteAdmissionAuthority {
 }
 
 impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
+    fn load_payment_journal(
+        &self,
+        operation_id: &str,
+        active_fence: &StoreMutationFence,
+    ) -> Result<Option<chio_kernel::payment::PaymentJournalRecord>, AdmissionPaymentJournalError>
+    {
+        if active_fence != &self.fence {
+            return Err(AdmissionPaymentJournalError::Fenced);
+        }
+        let operation_id =
+            chio_kernel::admission_operation::AdmissionOperationId::from_persisted(operation_id)
+                .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+        let journal: Option<chio_kernel::payment::PaymentJournalRecord> = self
+            .call(
+                AdmissionAuthorityAction::LoadPaymentJournal,
+                &OperationIdWire {
+                    operation_id: operation_id.clone(),
+                },
+            )
+            .map_err(payment_journal_error)?;
+        if let Some(journal) = &journal {
+            journal
+                .validate()
+                .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+            if journal.operation_id != operation_id.as_str() {
+                return Err(AdmissionPaymentJournalError::Invariant(
+                    "remote payment journal changed operation identity".to_owned(),
+                ));
+            }
+        }
+        Ok(journal)
+    }
+
+    fn advance_payment_journal(
+        &self,
+        advance: AdmissionPaymentJournalAdvance<'_>,
+    ) -> Result<chio_kernel::payment::PaymentJournalRecord, AdmissionPaymentJournalError> {
+        let AdmissionPaymentJournalAdvance {
+            operation,
+            recovery_lease,
+            expected,
+            transition,
+            release_evidence,
+            active_fence,
+            trusted_now_unix_ms,
+        } = advance;
+        if active_fence != &self.fence
+            || recovery_lease.store_fence() != active_fence
+            || expected.operation_id != operation.binding().operation_id().as_str()
+        {
+            return Err(AdmissionPaymentJournalError::Fenced);
+        }
+        expected
+            .validate()
+            .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+        let desired = expected
+            .apply_transition(transition)
+            .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+        let journal: chio_kernel::payment::PaymentJournalRecord = self
+            .call(
+                AdmissionAuthorityAction::AdvancePaymentJournal,
+                &AdmissionPaymentAdvanceWire {
+                    operation: operation.to_persisted(),
+                    recovery_claim: Self::recovery_claim(recovery_lease),
+                    expected: expected.clone(),
+                    transition: transition.clone(),
+                    release_evidence: release_evidence.map(|evidence| evidence.to_persisted()),
+                    active_fence: active_fence.clone(),
+                    trusted_now_unix_ms,
+                },
+            )
+            .map_err(payment_journal_error)?;
+        journal
+            .validate()
+            .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+        if journal != desired {
+            return Err(AdmissionPaymentJournalError::Invariant(
+                "remote payment journal returned a non-canonical successor".to_owned(),
+            ));
+        }
+        Ok(journal)
+    }
+
+    fn begin_payment_settlement(
+        &self,
+        begin: AdmissionPaymentSettlementBegin<'_>,
+    ) -> Result<AdmissionPaymentSettlement, AdmissionPaymentJournalError> {
+        let AdmissionPaymentSettlementBegin {
+            operation,
+            recovery_lease,
+            expected,
+            transition,
+            release_evidence,
+            budget_reconcile,
+            active_fence,
+            trusted_now_unix_ms,
+        } = begin;
+        if active_fence != &self.fence
+            || recovery_lease.store_fence() != active_fence
+            || expected.operation_id != operation.binding().operation_id().as_str()
+        {
+            return Err(AdmissionPaymentJournalError::Fenced);
+        }
+        expected
+            .validate()
+            .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+        budget_reconcile
+            .validate()
+            .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+        let authority = budget_reconcile.authority.as_ref().ok_or_else(|| {
+            AdmissionPaymentJournalError::Invariant(
+                "remote payment settlement requires budget authority".to_owned(),
+            )
+        })?;
+        let hold_id = budget_reconcile.hold_id.clone().ok_or_else(|| {
+            AdmissionPaymentJournalError::Invariant(
+                "remote payment settlement requires hold_id".to_owned(),
+            )
+        })?;
+        let event_id = budget_reconcile.event_id.clone().ok_or_else(|| {
+            AdmissionPaymentJournalError::Invariant(
+                "remote payment settlement requires event_id".to_owned(),
+            )
+        })?;
+        let grant_index = u32::try_from(budget_reconcile.grant_index).map_err(|_| {
+            AdmissionPaymentJournalError::Invariant(
+                "remote payment settlement grant index overflowed".to_owned(),
+            )
+        })?;
+        let expected_successor = transition
+            .map(|transition| expected.apply_transition(transition))
+            .transpose()
+            .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?
+            .unwrap_or_else(|| expected.clone());
+        let response: AdmissionPaymentSettlementResultWire = self
+            .call(
+                AdmissionAuthorityAction::BeginPaymentSettlement,
+                &AdmissionPaymentSettlementBeginWire {
+                    operation: operation.to_persisted(),
+                    recovery_claim: Self::recovery_claim(recovery_lease),
+                    expected: expected.clone(),
+                    transition: transition.cloned(),
+                    release_evidence: release_evidence.map(|evidence| evidence.to_persisted()),
+                    budget_reconcile: StructuredBudgetReconcileRequest {
+                        schema: STRUCTURED_BUDGET_REQUEST_SCHEMA.to_owned(),
+                        capability_id: budget_reconcile.capability_id.clone(),
+                        grant_index,
+                        hold_id,
+                        event_id,
+                        exposed_cost_units: budget_reconcile.exposed_cost_units,
+                        realized_spend_units: budget_reconcile.realized_spend_units,
+                    },
+                    authority_id: authority.authority_id.clone(),
+                    authority_lease_id: authority.lease_id.clone(),
+                    authority_lease_epoch: authority.lease_epoch,
+                    active_fence: active_fence.clone(),
+                    trusted_now_unix_ms,
+                },
+            )
+            .map_err(payment_journal_error)?;
+        response
+            .journal
+            .validate()
+            .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+        if response.journal != expected_successor {
+            return Err(AdmissionPaymentJournalError::Invariant(
+                "remote payment settlement returned a non-canonical journal".to_owned(),
+            ));
+        }
+        let (budget, budget_already_reconciled) = self
+            .budget
+            .qualify_reconcile_response(&budget_reconcile, response.budget, true)
+            .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+        Ok(AdmissionPaymentSettlement {
+            journal: response.journal,
+            budget,
+            budget_already_reconciled,
+        })
+    }
+
+    fn authorize_budget_and_commit_admission(
+        &self,
+        operation: &AdmissionOperationV1,
+        recovery_lease: &AdmissionRecoveryLease,
+        request: BudgetAuthorizeHoldRequest,
+        payment_journal: Option<chio_kernel::payment::PaymentJournalRecord>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError> {
+        let authority = request.authority.as_ref().ok_or_else(|| {
+            AdmissionBudgetAuthorizationError::Invariant(
+                "remote combined authorization omitted its authority".to_owned(),
+            )
+        })?;
+        let hold_id = request.hold_id.clone().ok_or_else(|| {
+            AdmissionBudgetAuthorizationError::Invariant(
+                "remote combined authorization omitted hold_id".to_owned(),
+            )
+        })?;
+        if request.admission_binding.as_ref().is_none_or(|binding| {
+            binding.operation_id != operation.binding().operation_id().as_str()
+        }) {
+            return Err(AdmissionBudgetAuthorizationError::Invariant(
+                "remote combined authorization changed operation identity".to_owned(),
+            ));
+        }
+        let wire = StructuredBudgetAuthorizeRequest::from_core(&request)
+            .map_err(AdmissionBudgetAuthorizationError::Invariant)?;
+        let response: AdmissionBudgetAuthorizeResultWire = self
+            .call(
+                AdmissionAuthorityAction::AuthorizeBudgetAndCommitAdmission,
+                &AdmissionBudgetAuthorizeWire {
+                    operation: operation.to_persisted(),
+                    recovery_claim: Self::recovery_claim(recovery_lease),
+                    budget: wire.clone(),
+                    payment_journal: payment_journal.clone(),
+                    authority_id: authority.authority_id.clone(),
+                    authority_lease_id: authority.lease_id.clone(),
+                    authority_lease_epoch: authority.lease_epoch,
+                    active_fence: active_fence.clone(),
+                    trusted_now_unix_ms,
+                },
+            )
+            .map_err(authorization_error)?;
+        let decision = self
+            .budget
+            .decode_structured_budget_authorization(
+                request,
+                wire,
+                response.budget,
+                BudgetGuaranteeLevel::SingleNodeAtomic,
+            )
+            .map_err(|error| AdmissionBudgetAuthorizationError::Invariant(error.to_string()))?;
+        let updated = AdmissionOperationV1::from_persisted(response.operation)
+            .map_err(AdmissionBudgetAuthorizationError::Operation)?;
+        let expected = if matches!(
+            decision,
+            chio_kernel::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)
+        ) {
+            let requirements = operation.binding().participant_requirements();
+            if requirements.payment != payment_journal.is_some() {
+                return Err(AdmissionBudgetAuthorizationError::Invariant(
+                    "remote payment participant does not match operation requirements".to_owned(),
+                ));
+            }
+            let mut attachments = vec![
+                chio_kernel::admission_operation::AdmissionAttachment::BudgetHoldId(
+                    chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                        "budget_hold_id",
+                        hold_id,
+                    )?,
+                ),
+            ];
+            if requirements.payment {
+                attachments.push(
+                    chio_kernel::admission_operation::AdmissionAttachment::PaymentParticipantId(
+                        chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                            "payment_participant_id",
+                            operation.binding().operation_id().as_str(),
+                        )?,
+                    ),
+                );
+            }
+            let command = AdmissionOperationCommand::new(
+                operation.binding().operation_id().clone(),
+                operation.version(),
+                recovery_lease.clone(),
+                attachments,
+                Some(AdmissionOperationState::BudgetAuthorized),
+                None,
+                None,
+            )?;
+            operation
+                .apply_command(&command, trusted_now_unix_ms)?
+                .into_operation()
+        } else {
+            operation.clone()
+        };
+        if updated != expected {
+            return Err(AdmissionBudgetAuthorizationError::Invariant(
+                "remote combined authorization returned a non-canonical operation successor"
+                    .to_owned(),
+            ));
+        }
+        Ok(AdmissionBudgetAuthorization {
+            decision,
+            operation: updated,
+        })
+    }
+
     fn capture_invocation_and_commit_dispatch(
         &self,
         operation: &AdmissionOperationV1,
@@ -395,7 +695,7 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
         request: BudgetCaptureInvocationRequest,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
-    ) -> Result<AdmissionOperationV1, AdmissionCaptureError> {
+    ) -> Result<AdmissionBudgetCapture, AdmissionCaptureError> {
         let authority = request.authority.as_ref().ok_or_else(|| {
             AdmissionCaptureError::Invariant(
                 "remote combined capture omitted its authority".to_owned(),
@@ -412,16 +712,16 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
                 "remote combined capture grant index overflowed".to_owned(),
             )
         })?;
-        let updated: chio_kernel::admission_operation::PersistedAdmissionOperationV1 = self
+        let response: AdmissionDispatchCaptureResultWire = self
             .call(
                 AdmissionAuthorityAction::CaptureInvocationAndCommitDispatch,
                 &AdmissionDispatchCaptureWire {
                     operation: operation.to_persisted(),
                     recovery_claim: Self::recovery_claim(recovery_lease),
-                    capability_id: request.capability_id,
+                    capability_id: request.capability_id.clone(),
                     grant_index,
-                    hold_id: request.hold_id,
-                    event_id: request.event_id,
+                    hold_id: request.hold_id.clone(),
+                    event_id: request.event_id.clone(),
                     authority_id: authority.authority_id.clone(),
                     authority_lease_id: authority.lease_id.clone(),
                     authority_lease_epoch: authority.lease_epoch,
@@ -430,7 +730,7 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
                 },
             )
             .map_err(capture_error)?;
-        let updated = AdmissionOperationV1::from_persisted(updated)
+        let updated = AdmissionOperationV1::from_persisted(response.operation)
             .map_err(AdmissionCaptureError::Operation)?;
         let command = AdmissionOperationCommand::new(
             operation.binding().operation_id().clone(),
@@ -451,7 +751,14 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
                 "remote combined capture returned a non-canonical admission successor".to_owned(),
             ));
         }
-        Ok(updated)
+        let decision = self
+            .budget
+            .qualify_invocation_capture_response(&request, response.budget)
+            .map_err(|error| AdmissionCaptureError::Invariant(error.to_string()))?;
+        Ok(AdmissionBudgetCapture {
+            decision,
+            operation: updated,
+        })
     }
 
     fn list_admission_receipts_after(
@@ -706,6 +1013,49 @@ fn capture_error(error: RemoteAdmissionError) -> AdmissionCaptureError {
         },
         RemoteAdmissionError::Transport(message) => AdmissionCaptureError::Unavailable(message),
         RemoteAdmissionError::Protocol(message) => AdmissionCaptureError::Invariant(message),
+    }
+}
+
+fn authorization_error(error: RemoteAdmissionError) -> AdmissionBudgetAuthorizationError {
+    match error {
+        RemoteAdmissionError::Authority(error) => match error.code {
+            AdmissionAuthorityErrorCode::Fenced => AdmissionBudgetAuthorizationError::Fenced,
+            AdmissionAuthorityErrorCode::OutcomeUnknown => {
+                AdmissionBudgetAuthorizationError::OutcomeUnknown(error.message)
+            }
+            AdmissionAuthorityErrorCode::Unavailable | AdmissionAuthorityErrorCode::Timeout => {
+                AdmissionBudgetAuthorizationError::Unavailable(error.message)
+            }
+            _ => AdmissionBudgetAuthorizationError::Invariant(error.message),
+        },
+        RemoteAdmissionError::Transport(message) => {
+            AdmissionBudgetAuthorizationError::Unavailable(message)
+        }
+        RemoteAdmissionError::Protocol(message) => {
+            AdmissionBudgetAuthorizationError::Invariant(message)
+        }
+    }
+}
+
+fn payment_journal_error(error: RemoteAdmissionError) -> AdmissionPaymentJournalError {
+    match error {
+        RemoteAdmissionError::Authority(error) => match error.code {
+            AdmissionAuthorityErrorCode::Fenced => AdmissionPaymentJournalError::Fenced,
+            AdmissionAuthorityErrorCode::CasConflict | AdmissionAuthorityErrorCode::Conflict => {
+                AdmissionPaymentJournalError::Conflict(error.message)
+            }
+            AdmissionAuthorityErrorCode::OutcomeUnknown => {
+                AdmissionPaymentJournalError::OutcomeUnknown(error.message)
+            }
+            AdmissionAuthorityErrorCode::Unavailable | AdmissionAuthorityErrorCode::Timeout => {
+                AdmissionPaymentJournalError::Unavailable(error.message)
+            }
+            _ => AdmissionPaymentJournalError::Invariant(error.message),
+        },
+        RemoteAdmissionError::Transport(message) => {
+            AdmissionPaymentJournalError::Unavailable(message)
+        }
+        RemoteAdmissionError::Protocol(message) => AdmissionPaymentJournalError::Invariant(message),
     }
 }
 

@@ -21,17 +21,26 @@ use chio_kernel::budget_store::{
     BudgetReverseHoldDecision, BudgetReverseHoldRequest, DeniedBudgetHold,
     RevocationCommitMetadata,
 };
+use chio_kernel::payment::{
+    PaymentJournalRecord, PaymentJournalState, PaymentJournalTransition, PaymentRailMode,
+    PaymentReleaseAuthorityBinding, PaymentReleaseAuthorityKind, PaymentSettleAction,
+};
+use chio_kernel::tool_outcome::{MonetaryReleaseEvidenceKindV1, MonetaryReleaseEvidenceV1};
 use chio_kernel::{BudgetStore, BudgetStoreError, BudgetUsageRecord, CanonicalRevocationSet};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 mod authorization;
 mod composite;
-pub(crate) use composite::AdmissionCaptureBinding;
+pub(crate) use composite::{AdmissionAuthorizationBinding, AdmissionCaptureBinding};
 pub(crate) mod composite_schema;
 mod import_hold_state;
 mod import_validation;
 mod joint_guard;
 mod model;
+mod payment_journal;
+pub(crate) use payment_journal::{
+    advance_payment_journal, insert_payment_journal, load_payment_journal,
+};
 mod replication;
 mod rows;
 mod schema;

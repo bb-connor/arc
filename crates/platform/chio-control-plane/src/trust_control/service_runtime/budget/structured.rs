@@ -140,6 +140,25 @@ impl RemoteBudgetStore {
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
         let wire = StructuredBudgetAuthorizeRequest::from_core(&request)
             .map_err(structured_budget_error)?;
+        let response = self
+            .client
+            .authorize_structured_budget_hold(&wire)
+            .map_err(into_budget_store_error)?;
+        self.decode_structured_budget_authorization(
+            request,
+            wire,
+            response,
+            BudgetGuaranteeLevel::AdvisoryPosthoc,
+        )
+    }
+
+    pub(crate) fn decode_structured_budget_authorization(
+        &self,
+        request: BudgetAuthorizeHoldRequest,
+        wire: StructuredBudgetAuthorizeRequest,
+        response: StructuredBudgetAuthorizeResponse,
+        guarantee_level: BudgetGuaranteeLevel,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
         let expected_quotas = wire
             .invocation_quotas
             .clone()
@@ -147,10 +166,6 @@ impl RemoteBudgetStore {
             .map(TryInto::try_into)
             .collect::<Result<Vec<BudgetInvocationQuota>, String>>()
             .map_err(structured_budget_error)?;
-        let response = self
-            .client
-            .authorize_structured_budget_hold(&wire)
-            .map_err(into_budget_store_error)?;
         require_structured_response_schema(&response.schema).map_err(structured_budget_error)?;
         if response.capability_id != wire.capability_id
             || response.grant_index != wire.grant_index
@@ -212,7 +227,7 @@ impl RemoteBudgetStore {
             &response.projection_contract,
             usage_sequence_relation,
         )?;
-        mutation.metadata.guarantee_level = BudgetGuaranteeLevel::AdvisoryPosthoc;
+        mutation.metadata.guarantee_level = guarantee_level;
         let returned_quotas = mutation
             .invocation_quota_usages
             .iter()

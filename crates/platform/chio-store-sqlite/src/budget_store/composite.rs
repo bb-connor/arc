@@ -14,6 +14,14 @@ use model::*;
 use transitions::*;
 use validation::*;
 
+#[derive(Clone, Copy)]
+pub(crate) struct AdmissionAuthorizationBinding<'a> {
+    pub(crate) operation: &'a chio_kernel::admission_operation::AdmissionOperationV1,
+    pub(crate) recovery_lease: &'a chio_kernel::admission_operation::AdmissionRecoveryLease,
+    pub(crate) payment_journal: Option<&'a PaymentJournalRecord>,
+    pub(crate) trusted_now_unix_ms: u64,
+}
+
 impl SqliteBudgetStore {
     pub(crate) fn composite_quota_usage(
         &self,
@@ -93,6 +101,41 @@ impl SqliteBudgetStore {
         &self,
         request: BudgetAuthorizeHoldRequest,
     ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        self.authorize_composite_hold_inner(request, None)
+            .map(|(decision, _)| decision)
+    }
+
+    pub(crate) fn authorize_composite_hold_and_commit_admission(
+        &self,
+        request: BudgetAuthorizeHoldRequest,
+        binding: AdmissionAuthorizationBinding<'_>,
+    ) -> Result<
+        (
+            BudgetAuthorizeHoldDecision,
+            chio_kernel::admission_operation::AdmissionOperationV1,
+        ),
+        BudgetStoreError,
+    > {
+        let (decision, operation) = self.authorize_composite_hold_inner(request, Some(binding))?;
+        let operation = operation.ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "combined budget authorization omitted its admission operation".to_owned(),
+            )
+        })?;
+        Ok((decision, operation))
+    }
+
+    fn authorize_composite_hold_inner(
+        &self,
+        request: BudgetAuthorizeHoldRequest,
+        binding: Option<AdmissionAuthorizationBinding<'_>>,
+    ) -> Result<
+        (
+            BudgetAuthorizeHoldDecision,
+            Option<chio_kernel::admission_operation::AdmissionOperationV1>,
+        ),
+        BudgetStoreError,
+    > {
         request.validate()?;
         let quotas = normalized_quotas(&request)?;
         validate_composite_sqlite_range(&request, &quotas)?;
@@ -139,8 +182,20 @@ impl SqliteBudgetStore {
                 )));
             }
             let decision = self.authorization_decision_from_event(&transaction, &existing)?;
-            transaction.rollback()?;
-            return Ok(decision);
+            let operation = self.bind_authorization_to_admission(
+                &transaction,
+                &request,
+                &decision,
+                binding,
+                false,
+            )?;
+            if binding.is_some() {
+                self.commit_joint_transaction(transaction)?;
+                self.sync_joint_anchor(&connection)?;
+            } else {
+                transaction.rollback()?;
+            }
+            return Ok((decision, operation));
         }
         let grant_quota_index = i64::try_from(request.grant_index).map_err(|_| {
             BudgetStoreError::Invariant("grant_index does not fit sqlite range".to_string())
@@ -446,7 +501,7 @@ impl SqliteBudgetStore {
         self.append_joint_commit(&transaction, authorization_kind, event_id, event_seq)?;
         let decision = authorization_decision(
             self,
-            request,
+            request.clone(),
             outcome,
             event_seq,
             usage_after,
@@ -454,9 +509,164 @@ impl SqliteBudgetStore {
             cumulative_state,
             cumulative_after,
         )?;
+        let operation =
+            self.bind_authorization_to_admission(&transaction, &request, &decision, binding, true)?;
         self.commit_joint_transaction(transaction)?;
         self.sync_joint_anchor(&connection)?;
-        Ok(decision)
+        Ok((decision, operation))
+    }
+
+    fn bind_authorization_to_admission(
+        &self,
+        transaction: &Transaction<'_>,
+        request: &BudgetAuthorizeHoldRequest,
+        decision: &BudgetAuthorizeHoldDecision,
+        binding: Option<AdmissionAuthorizationBinding<'_>>,
+        insert_journal: bool,
+    ) -> Result<Option<chio_kernel::admission_operation::AdmissionOperationV1>, BudgetStoreError>
+    {
+        let Some(binding) = binding else {
+            return Ok(None);
+        };
+        if !matches!(decision, BudgetAuthorizeHoldDecision::Authorized(_)) {
+            return Ok(Some(binding.operation.clone()));
+        }
+        let admission = request.admission_binding.as_ref().ok_or_else(|| {
+            BudgetStoreError::Invariant("combined authorization omitted admission binding".into())
+        })?;
+        let hold_id = request.hold_id.as_deref().ok_or_else(|| {
+            BudgetStoreError::Invariant("combined authorization omitted hold_id".into())
+        })?;
+        let event_id = request.event_id.as_deref().ok_or_else(|| {
+            BudgetStoreError::Invariant("combined authorization omitted event_id".into())
+        })?;
+        let operation_id = binding.operation.binding().operation_id().as_str();
+        if admission.operation_id != operation_id
+            || binding.operation.binding().capability_id().as_str() != request.capability_id
+        {
+            return Err(BudgetStoreError::Invariant(
+                "combined authorization does not match its admission operation".to_owned(),
+            ));
+        }
+        let requires_payment = binding
+            .operation
+            .binding()
+            .participant_requirements()
+            .payment;
+        let owner = self.serving_owner.as_deref().ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "combined authorization requires a serving owner".to_owned(),
+            )
+        })?;
+        if requires_payment != binding.payment_journal.is_some() {
+            return Err(BudgetStoreError::Invariant(
+                "combined authorization payment participant does not match operation requirements"
+                    .to_owned(),
+            ));
+        }
+        if let Some(journal) = binding.payment_journal {
+            let grant_index = u32::try_from(request.grant_index).map_err(|_| {
+                BudgetStoreError::Invariant(
+                    "combined authorization grant index exceeds payment journal range".to_owned(),
+                )
+            })?;
+            if journal.operation_id != operation_id
+                || journal.request_namespace_digest
+                    != binding
+                        .operation
+                        .binding()
+                        .request_namespace_digest()
+                        .as_str()
+                || journal.request_id != binding.operation.binding().request_id().as_str()
+                || journal.capability_id != request.capability_id
+                || journal.grant_index != grant_index
+                || journal.hold_id.as_deref() != Some(hold_id)
+                || journal.amount_units != request.requested_exposure_units
+                || journal.created_at_unix_ms > binding.trusted_now_unix_ms
+            {
+                return Err(BudgetStoreError::Invariant(
+                    "payment journal does not match the combined authorization".to_owned(),
+                ));
+            }
+            if insert_journal {
+                insert_payment_journal(transaction, journal)?;
+                owner
+                    .append_global_commit(
+                        transaction,
+                        "payment_hold_placed",
+                        "payment",
+                        operation_id,
+                        journal.journal_version,
+                    )
+                    .map_err(super::store::map_serving_owner_error)?;
+            } else {
+                let stored = load_payment_journal(transaction, operation_id)?.ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "combined authorization replay lost its payment journal".to_owned(),
+                    )
+                })?;
+                if !stored.matches_hold_replay(journal) {
+                    return Err(BudgetStoreError::Invariant(
+                        "combined authorization replay does not match its payment journal"
+                            .to_owned(),
+                    ));
+                }
+            }
+        }
+        let commit_index = authorization_commit_index(decision)?;
+        let participant_digest = transaction.query_row(
+            r#"
+            SELECT projection_reference_digest
+            FROM authority_global_commits
+            WHERE projection_kind = 'budget' AND projection_key = ?1
+              AND projection_sequence = ?2
+            "#,
+            params![
+                event_id,
+                budget_u64_to_sqlite(commit_index, "budget authorization sequence")?
+            ],
+            |row| row.get::<_, String>(0),
+        )?;
+        let requirements = binding.operation.binding().participant_requirements();
+        let authorization_source = if requirements.broker_attempt {
+            chio_kernel::admission_operation::AdmissionOperationState::BrokerAttemptRegistered
+        } else {
+            chio_kernel::admission_operation::AdmissionOperationState::Prepared
+        };
+        let operation = if binding.operation.state() == authorization_source {
+            crate::admission_operation_store::advance_budget_authorization_tx(
+                transaction,
+                owner,
+                crate::admission_operation_store::BudgetAuthorizationAdvance {
+                    expected: binding.operation,
+                    recovery_lease: binding.recovery_lease,
+                    hold_id,
+                    payment_required: requires_payment,
+                    participant_digest: &participant_digest,
+                    trusted_now_unix_ms: binding.trusted_now_unix_ms,
+                },
+            )
+        } else {
+            crate::admission_operation_store::verify_budget_authorization_replay_tx(
+                transaction,
+                binding.operation,
+                hold_id,
+                requires_payment,
+                &participant_digest,
+            )
+        };
+        operation.map(Some).map_err(|error| match error {
+            chio_kernel::admission_operation::AdmissionOperationStoreError::Fenced => {
+                BudgetStoreError::Fenced {
+                    expected_epoch: owner.fence.owner_epoch,
+                    actual_epoch: None,
+                }
+            }
+            chio_kernel::admission_operation::AdmissionOperationStoreError::OutcomeUnknown(
+                detail,
+            ) => BudgetStoreError::OutcomeUnknown(detail),
+            error => BudgetStoreError::Invariant(error.to_string()),
+        })
     }
 
     fn authorization_decision_from_event(
@@ -575,4 +785,24 @@ impl SqliteBudgetStore {
         )?;
         Ok(())
     }
+}
+
+fn authorization_commit_index(
+    decision: &BudgetAuthorizeHoldDecision,
+) -> Result<u64, BudgetStoreError> {
+    let metadata = match decision {
+        BudgetAuthorizeHoldDecision::Authorized(value) => &value.metadata,
+        BudgetAuthorizeHoldDecision::ApprovalRequired(value) => &value.metadata,
+        BudgetAuthorizeHoldDecision::Denied(value) => &value.metadata,
+        BudgetAuthorizeHoldDecision::AlreadyCaptured(_) => {
+            return Err(BudgetStoreError::Invariant(
+                "combined admission authorization was already captured".to_owned(),
+            ));
+        }
+    };
+    metadata.budget_commit_index.ok_or_else(|| {
+        BudgetStoreError::Invariant(
+            "combined admission authorization omitted its durable sequence".to_owned(),
+        )
+    })
 }

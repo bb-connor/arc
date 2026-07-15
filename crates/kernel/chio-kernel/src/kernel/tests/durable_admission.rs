@@ -1,6 +1,6 @@
 use crate::admission_operation::{
-    AdmissionBeginResult, AdmissionCaptureError, AdmissionCommandResult, AdmissionIdentifier,
-    AdmissionOperationCommand, AdmissionOperationError, AdmissionOperationId,
+    AdmissionAttachment, AdmissionBeginResult, AdmissionCaptureError, AdmissionCommandResult,
+    AdmissionIdentifier, AdmissionOperationCommand, AdmissionOperationError, AdmissionOperationId,
     AdmissionOperationState,
     AdmissionOperationStore, AdmissionOperationStoreError, AdmissionOperationV1,
     AdmissionProjectionCapabilities, AdmissionReplayClassification, AdmissionReplayKey,
@@ -58,6 +58,10 @@ struct TestAdmissionState {
     post_return_evaluation: Option<PostReturnEvaluationRecordV1>,
     resolved_output: Option<CanonicalResolvedOutputBlobV1>,
     receipt: Option<chio_core::receipt::body::ChioReceipt>,
+    budget_authorization: Option<crate::budget_store::BudgetAuthorizeHoldRequest>,
+    payment_journal: Option<crate::payment::PaymentJournalRecord>,
+    payment_release_evidence:
+        Option<crate::tool_outcome::PersistedMonetaryReleaseEvidenceV1>,
 }
 
 struct TestAdmissionOperationStore {
@@ -67,6 +71,8 @@ struct TestAdmissionOperationStore {
     fail_next_evaluation_stage: std::sync::atomic::AtomicBool,
     fail_next_evaluation_finalization: std::sync::atomic::AtomicBool,
     fail_next_terminal_projection: std::sync::atomic::AtomicBool,
+    fail_next_payment_settlement_intent: std::sync::atomic::AtomicBool,
+    budget: std::sync::Arc<crate::budget_store::InMemoryBudgetStore>,
     state: std::sync::Mutex<TestAdmissionState>,
 }
 
@@ -79,6 +85,8 @@ impl TestAdmissionOperationStore {
             fail_next_evaluation_stage: std::sync::atomic::AtomicBool::new(false),
             fail_next_evaluation_finalization: std::sync::atomic::AtomicBool::new(false),
             fail_next_terminal_projection: std::sync::atomic::AtomicBool::new(false),
+            fail_next_payment_settlement_intent: std::sync::atomic::AtomicBool::new(false),
+            budget: std::sync::Arc::new(crate::budget_store::InMemoryBudgetStore::new()),
             state: std::sync::Mutex::new(TestAdmissionState::default()),
         }
     }
@@ -135,6 +143,33 @@ impl TestAdmissionOperationStore {
             .expect("test admission state lock")
             .operation
             .is_some()
+    }
+
+    fn payment_journal(&self) -> Option<crate::payment::PaymentJournalRecord> {
+        self.state
+            .lock()
+            .expect("test admission state lock")
+            .payment_journal
+            .clone()
+    }
+
+    fn payment_release_evidence(
+        &self,
+    ) -> Option<crate::tool_outcome::PersistedMonetaryReleaseEvidenceV1> {
+        self.state
+            .lock()
+            .expect("test admission state lock")
+            .payment_release_evidence
+            .clone()
+    }
+
+    fn fail_next_payment_settlement_intent(&self) {
+        self.fail_next_payment_settlement_intent
+            .store(true, Ordering::SeqCst);
+    }
+
+    fn budget_store(&self) -> std::sync::Arc<crate::budget_store::InMemoryBudgetStore> {
+        self.budget.clone()
     }
 
     fn require_fence(
@@ -331,6 +366,7 @@ impl ReceiptStore for TestAdmissionOperationStore {
         AdmissionProjectionCapabilities {
             operation_terminal: true,
             tool_outcome: true,
+            payment_terminal: true,
             ..AdmissionProjectionCapabilities::default()
         }
     }
@@ -410,7 +446,376 @@ impl ReceiptStore for TestAdmissionOperationStore {
     }
 }
 
+struct QualifiedDurablePaymentAdapter {
+    authorization_references: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+    settlement_actions: std::sync::Arc<std::sync::Mutex<Vec<&'static str>>>,
+}
+
+impl PaymentAdapter for QualifiedDurablePaymentAdapter {
+    fn rail_id(&self) -> &'static str {
+        "test-reversible"
+    }
+
+    fn rail_mode(&self) -> Option<PaymentRailMode> {
+        Some(PaymentRailMode::ReversibleHold)
+    }
+
+    fn authorize(
+        &self,
+        request: &PaymentAuthorizeRequest,
+    ) -> Result<PaymentAuthorization, PaymentError> {
+        self.authorization_references
+            .lock()
+            .map_err(|_| PaymentError::RailError("test payment lock poisoned".to_owned()))?
+            .push(request.reference.clone());
+        Ok(PaymentAuthorization {
+            authorization_id: "authorization-durable".to_owned(),
+            state: PaymentAuthorizationState::Held,
+            metadata: serde_json::json!({}),
+        })
+    }
+
+    fn capture(
+        &self,
+        authorization_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.settlement_actions
+            .lock()
+            .map_err(|_| PaymentError::RailError("test payment lock poisoned".to_owned()))?
+            .push("capture");
+        Ok(PaymentResult {
+            transaction_id: authorization_id.to_owned(),
+            settlement_status: RailSettlementStatus::Settled,
+            metadata: serde_json::json!({}),
+        })
+    }
+
+    fn release(
+        &self,
+        authorization_id: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        self.settlement_actions
+            .lock()
+            .map_err(|_| PaymentError::RailError("test payment lock poisoned".to_owned()))?
+            .push("release");
+        Ok(PaymentResult {
+            transaction_id: authorization_id.to_owned(),
+            settlement_status: RailSettlementStatus::Released,
+            metadata: serde_json::json!({}),
+        })
+    }
+
+    fn refund(
+        &self,
+        transaction_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
+    ) -> Result<PaymentResult, PaymentError> {
+        Ok(PaymentResult {
+            transaction_id: transaction_id.to_owned(),
+            settlement_status: RailSettlementStatus::Refunded,
+            metadata: serde_json::json!({}),
+        })
+    }
+}
+
 impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
+    fn load_payment_journal(
+        &self,
+        operation_id: &str,
+        active_fence: &StoreMutationFence,
+    ) -> Result<
+        Option<crate::payment::PaymentJournalRecord>,
+        crate::receipt_store::AdmissionPaymentJournalError,
+    > {
+        self.require_fence(active_fence).map_err(|_| {
+            crate::receipt_store::AdmissionPaymentJournalError::Fenced
+        })?;
+        Ok(self
+            .state
+            .lock()
+            .map_err(|_| {
+                crate::receipt_store::AdmissionPaymentJournalError::Invariant(
+                    "test admission state lock poisoned".to_owned(),
+                )
+            })?
+            .payment_journal
+            .as_ref()
+            .filter(|journal| journal.operation_id == operation_id)
+            .cloned())
+    }
+
+    fn advance_payment_journal(
+        &self,
+        advance: crate::receipt_store::AdmissionPaymentJournalAdvance<'_>,
+    ) -> Result<
+        crate::payment::PaymentJournalRecord,
+        crate::receipt_store::AdmissionPaymentJournalError,
+    > {
+        let crate::receipt_store::AdmissionPaymentJournalAdvance {
+            operation,
+            recovery_lease,
+            expected,
+            transition,
+            release_evidence,
+            active_fence,
+            trusted_now_unix_ms: _,
+        } = advance;
+        self.require_fence(active_fence).map_err(|_| {
+            crate::receipt_store::AdmissionPaymentJournalError::Fenced
+        })?;
+        let desired = expected.apply_transition(transition).map_err(|error| {
+            crate::receipt_store::AdmissionPaymentJournalError::Invariant(error.to_string())
+        })?;
+        let mut state = self.state.lock().map_err(|_| {
+            crate::receipt_store::AdmissionPaymentJournalError::Invariant(
+                "test admission state lock poisoned".to_owned(),
+            )
+        })?;
+        if state.operation.as_ref() != Some(operation)
+            || state.claim.as_ref() != Some(recovery_lease.untrusted_claim())
+        {
+            return Err(crate::receipt_store::AdmissionPaymentJournalError::Fenced);
+        }
+        match (transition, release_evidence) {
+            (
+                crate::payment::PaymentJournalTransition::BeginRelease { authority },
+                Some(evidence),
+            ) => {
+                let persisted = evidence.to_persisted();
+                if persisted.operation_id.as_str() != authority.operation_id
+                    || persisted.operation_version != authority.operation_version
+                    || persisted.evidence_id.as_str() != authority.evidence_id
+                    || persisted.bundle_digest.as_str() != authority.evidence_digest
+                {
+                    return Err(crate::receipt_store::AdmissionPaymentJournalError::Invariant(
+                        "test release evidence binding mismatch".to_owned(),
+                    ));
+                }
+                if state
+                    .payment_release_evidence
+                    .as_ref()
+                    .is_some_and(|stored| stored != &persisted)
+                {
+                    return Err(crate::receipt_store::AdmissionPaymentJournalError::Conflict(
+                        "test release evidence replay mismatch".to_owned(),
+                    ));
+                }
+                state.payment_release_evidence = Some(persisted);
+            }
+            (crate::payment::PaymentJournalTransition::BeginRelease { .. }, None)
+            | (_, Some(_)) => {
+                return Err(crate::receipt_store::AdmissionPaymentJournalError::Invariant(
+                    "test release transition evidence mismatch".to_owned(),
+                ));
+            }
+            (_, None) => {}
+        }
+        if state.payment_journal.as_ref() == Some(&desired) {
+            return Ok(desired);
+        }
+        if state.payment_journal.as_ref() != Some(expected) {
+            return Err(
+                crate::receipt_store::AdmissionPaymentJournalError::Conflict(
+                    "test payment journal compare-and-set conflicted".to_owned(),
+                ),
+            );
+        }
+        state.payment_journal = Some(desired.clone());
+        Ok(desired)
+    }
+
+    fn begin_payment_settlement(
+        &self,
+        begin: crate::receipt_store::AdmissionPaymentSettlementBegin<'_>,
+    ) -> Result<
+        crate::receipt_store::AdmissionPaymentSettlement,
+        crate::receipt_store::AdmissionPaymentJournalError,
+    > {
+        if self
+            .fail_next_payment_settlement_intent
+            .swap(false, Ordering::SeqCst)
+        {
+            return Err(
+                crate::receipt_store::AdmissionPaymentJournalError::OutcomeUnknown(
+                    "injected payment settlement intent failure".to_owned(),
+                ),
+            );
+        }
+        let journal = match begin.transition {
+            Some(transition) => self.advance_payment_journal(
+                crate::receipt_store::AdmissionPaymentJournalAdvance {
+                    operation: begin.operation,
+                    recovery_lease: begin.recovery_lease,
+                    expected: begin.expected,
+                    transition,
+                    release_evidence: begin.release_evidence,
+                    active_fence: begin.active_fence,
+                    trusted_now_unix_ms: begin.trusted_now_unix_ms,
+                },
+            )?,
+            None => {
+                if begin.release_evidence.is_some() {
+                    return Err(
+                        crate::receipt_store::AdmissionPaymentJournalError::Invariant(
+                            "test payment settlement evidence requires a transition".to_owned(),
+                        ),
+                    );
+                }
+                self.load_payment_journal(
+                    begin.operation.binding().operation_id().as_str(),
+                    begin.active_fence,
+                )?
+                .filter(|journal| journal == begin.expected)
+                .ok_or_else(|| {
+                    crate::receipt_store::AdmissionPaymentJournalError::Conflict(
+                        "test payment settlement journal changed".to_owned(),
+                    )
+                })?
+            }
+        };
+        let budget = crate::budget_store::BudgetStore::reconcile_budget_hold(
+            self.budget.as_ref(),
+            begin.budget_reconcile,
+        )
+        .map_err(|error| {
+            crate::receipt_store::AdmissionPaymentJournalError::Invariant(error.to_string())
+        })?;
+        Ok(crate::receipt_store::AdmissionPaymentSettlement {
+            journal,
+            budget,
+            budget_already_reconciled: false,
+        })
+    }
+
+    fn authorize_budget_and_commit_admission(
+        &self,
+        operation: &AdmissionOperationV1,
+        recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+        request: crate::budget_store::BudgetAuthorizeHoldRequest,
+        payment_journal: Option<crate::payment::PaymentJournalRecord>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        crate::receipt_store::AdmissionBudgetAuthorization,
+        crate::receipt_store::AdmissionBudgetAuthorizationError,
+    > {
+        self.require_fence(active_fence).map_err(|_| {
+            crate::receipt_store::AdmissionBudgetAuthorizationError::Fenced
+        })?;
+        request.validate().map_err(|error| {
+            crate::receipt_store::AdmissionBudgetAuthorizationError::Invariant(error.to_string())
+        })?;
+        if operation.binding().participant_requirements().payment != payment_journal.is_some() {
+            return Err(
+                crate::receipt_store::AdmissionBudgetAuthorizationError::Invariant(
+                    "test payment participant mismatch".to_owned(),
+                ),
+            );
+        }
+        if let Some(journal) = payment_journal.as_ref() {
+            journal.validate().map_err(|error| {
+                crate::receipt_store::AdmissionBudgetAuthorizationError::Invariant(
+                    error.to_string(),
+                )
+            })?;
+        }
+        let request_for_replay = request.clone();
+        let decision = crate::budget_store::BudgetStore::authorize_budget_hold(
+            self.budget.as_ref(),
+            request,
+        )
+        .map_err(|error| {
+            crate::receipt_store::AdmissionBudgetAuthorizationError::Invariant(error.to_string())
+        })?;
+        let mut state = self.state.lock().map_err(|_| {
+            crate::receipt_store::AdmissionBudgetAuthorizationError::Invariant(
+                "test admission state lock poisoned".to_owned(),
+            )
+        })?;
+        let stored = state.operation.clone().ok_or_else(|| {
+            crate::receipt_store::AdmissionBudgetAuthorizationError::Invariant(
+                "test admission operation is absent".to_owned(),
+            )
+        })?;
+        if &stored != operation {
+            return Err(crate::receipt_store::AdmissionBudgetAuthorizationError::Fenced);
+        }
+        if stored.state() == AdmissionOperationState::BudgetAuthorized {
+            let journal_matches = match (&state.payment_journal, &payment_journal) {
+                (None, None) => true,
+                (Some(stored), Some(proposed)) => stored.matches_hold_replay(proposed),
+                _ => false,
+            };
+            if state.budget_authorization.as_ref() != Some(&request_for_replay)
+                || !journal_matches
+            {
+                return Err(
+                    crate::receipt_store::AdmissionBudgetAuthorizationError::Invariant(
+                        "test combined authorization replay mismatch".to_owned(),
+                    ),
+                );
+            }
+            return Ok(crate::receipt_store::AdmissionBudgetAuthorization {
+                decision,
+                operation: stored,
+            });
+        }
+        if !matches!(
+            decision,
+            crate::budget_store::BudgetAuthorizeHoldDecision::Authorized(_)
+        ) {
+            return Ok(crate::receipt_store::AdmissionBudgetAuthorization {
+                decision,
+                operation: stored,
+            });
+        }
+        if state.claim.as_ref() != Some(recovery_lease.untrusted_claim()) {
+            return Err(crate::receipt_store::AdmissionBudgetAuthorizationError::Fenced);
+        }
+        let hold_id = request_for_replay.hold_id.as_deref().ok_or_else(|| {
+            crate::receipt_store::AdmissionBudgetAuthorizationError::Invariant(
+                "test combined authorization omitted hold_id".to_owned(),
+            )
+        })?;
+        let mut attachments = vec![AdmissionAttachment::BudgetHoldId(
+            AdmissionIdentifier::try_new("budget_hold_id", hold_id.to_owned())?,
+        )];
+        if stored.binding().participant_requirements().payment {
+            attachments.push(AdmissionAttachment::PaymentParticipantId(
+                AdmissionIdentifier::try_new(
+                    "payment_participant_id",
+                    stored.binding().operation_id().as_str().to_owned(),
+                )?,
+            ));
+        }
+        let command = AdmissionOperationCommand::new(
+            stored.binding().operation_id().clone(),
+            stored.version(),
+            recovery_lease.clone(),
+            attachments,
+            Some(AdmissionOperationState::BudgetAuthorized),
+            None,
+            None,
+        )?;
+        let updated = stored
+            .apply_command(&command, trusted_now_unix_ms)?
+            .into_operation();
+        state.operation = Some(updated.clone());
+        state.claim = None;
+        state.budget_authorization = Some(request_for_replay);
+        state.payment_journal = payment_journal;
+        Ok(crate::receipt_store::AdmissionBudgetAuthorization {
+            decision,
+            operation: updated,
+        })
+    }
+
     fn capture_invocation_and_commit_dispatch(
         &self,
         operation: &AdmissionOperationV1,
@@ -418,7 +823,7 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
         request: crate::budget_store::BudgetCaptureInvocationRequest,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
-    ) -> Result<AdmissionOperationV1, AdmissionCaptureError> {
+    ) -> Result<crate::receipt_store::AdmissionBudgetCapture, AdmissionCaptureError> {
         self.require_fence(active_fence)
             .map_err(|_| AdmissionCaptureError::Fenced)?;
         request
@@ -434,6 +839,11 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
                 "test combined capture binding mismatch".to_owned(),
             ));
         }
+        let decision = crate::budget_store::BudgetStore::capture_invocation_reservations(
+            self.budget.as_ref(),
+            request,
+        )
+        .map_err(|error| AdmissionCaptureError::Invariant(error.to_string()))?;
         let command = AdmissionOperationCommand::new(
             operation.binding().operation_id().clone(),
             operation.version(),
@@ -444,9 +854,14 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
             None,
         )
         .map_err(AdmissionCaptureError::Operation)?;
-        self.compare_and_swap(&command, trusted_now_unix_ms)
+        let operation = self
+            .compare_and_swap(&command, trusted_now_unix_ms)
             .map(AdmissionCommandResult::into_operation)
-            .map_err(|error| AdmissionCaptureError::Invariant(error.to_string()))
+            .map_err(|error| AdmissionCaptureError::Invariant(error.to_string()))?;
+        Ok(crate::receipt_store::AdmissionBudgetCapture {
+            decision,
+            operation,
+        })
     }
 
     fn list_admission_receipts_after(
@@ -918,6 +1333,7 @@ fn durable_admission_fixture_with_grants(
     kernel
         .set_durable_admission_store(store.clone(), store.clone(), fence)
         .expect("qualified admission store");
+    kernel.set_budget_store_handle(store.budget_store());
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
         id: "durable-server".to_string(),
@@ -1520,9 +1936,325 @@ fn unsupported_durable_participants_fail_before_dispatch() {
     assert!(response
         .reason
         .as_deref()
-        .is_some_and(|reason| reason.contains("qualified payment journal")));
+        .is_some_and(|reason| reason.contains("qualified payment adapter")));
     assert!(!store.has_operation());
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn durable_monetary_lifecycle_uses_the_qualified_projection_store() {
+    let mut config = make_config();
+    config.policy_hash = sha256_hex(b"durable-monetary-authorization-policy");
+    let mut kernel = make_kernel(config);
+    let fence = admission_test_fence();
+    let store = std::sync::Arc::new(TestAdmissionOperationStore::new(fence.clone()));
+    kernel
+        .set_durable_admission_store(store.clone(), store.clone(), fence)
+        .expect("qualified admission store");
+    // Durable monetary state is owned by the qualified projection store. A
+    // detached legacy store must never be consulted by this lifecycle.
+    kernel.set_budget_store_handle(std::sync::Arc::new(
+        crate::budget_store::InMemoryBudgetStore::new(),
+    ));
+    let authorization_references = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let settlement_actions = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    kernel.set_payment_adapter(Box::new(QualifiedDurablePaymentAdapter {
+        authorization_references: authorization_references.clone(),
+        settlement_actions,
+    }));
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
+        id: "durable-server".to_owned(),
+        tools: vec!["mutate".to_owned()],
+        invocations: invocations.clone(),
+        store: store.clone(),
+    }));
+    let mut grant = make_grant("durable-server", "mutate");
+    grant.max_cost_per_invocation = Some(MonetaryAmount {
+        units: 10,
+        currency: "USD".to_owned(),
+    });
+    grant.max_total_cost = Some(MonetaryAmount {
+        units: 100,
+        currency: "USD".to_owned(),
+    });
+    let agent = make_keypair();
+    let capability = make_capability(&kernel, &agent, make_scope(vec![grant]), 300);
+    let request = make_request(
+        "durable-monetary-authorization",
+        &capability,
+        "mutate",
+        "durable-server",
+    );
+    let matching = resolve_required_matching_grants(
+        &capability,
+        &request.tool_name,
+        &request.server_id,
+        &request.arguments,
+        request.model_metadata.as_ref(),
+    )
+    .expect("matching grants");
+    let now = current_unix_timestamp_ms();
+    let mut admission = kernel
+        .begin_durable_tool_admission(&request, &matching, now)
+        .expect("durable monetary admission")
+        .expect("covered durable admission");
+
+    let (_, mutation) = kernel
+        .check_and_increment_budget(
+            &request.request_id,
+            &capability,
+            &matching,
+            false,
+            Some(&mut admission),
+            now,
+        )
+        .expect("combined budget authorization");
+
+    assert!(mutation.durable_hold_result().is_some());
+    assert_eq!(
+        admission.state(),
+        AdmissionOperationState::BudgetAuthorized
+    );
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::BudgetAuthorized
+    );
+    let journal = store.payment_journal().expect("durable payment journal");
+    assert_eq!(journal.state, PaymentJournalState::HoldPlaced);
+    assert_eq!(journal.amount_units, 10);
+    assert_eq!(journal.rail, "test-reversible");
+
+    let authorization = kernel
+        .authorize_payment_if_needed(
+            &request,
+            mutation.charge_result(),
+            Some(&admission),
+            now + 1,
+        )
+        .expect("durable payment authorization")
+        .expect("payment authorization");
+    assert_eq!(authorization.authorization_id, "authorization-durable");
+    let authorized_journal = store.payment_journal().expect("authorized payment journal");
+    assert_eq!(authorized_journal.state, PaymentJournalState::Authorized);
+    assert_eq!(authorized_journal.journal_version, 2);
+    assert_eq!(
+        authorization_references
+            .lock()
+            .expect("authorization references")
+            .as_slice(),
+        [admission.operation_id()]
+    );
+
+    let replayed_authorization = kernel
+        .authorize_payment_if_needed(
+            &request,
+            mutation.charge_result(),
+            Some(&admission),
+            now + 2,
+        )
+        .expect("replay durable payment authorization")
+        .expect("replayed payment authorization");
+    assert_eq!(replayed_authorization.authorization_id, authorization.authorization_id);
+    assert_eq!(store.payment_journal(), Some(authorized_journal.clone()));
+    assert_eq!(
+        authorization_references
+            .lock()
+            .expect("authorization references")
+            .len(),
+        1
+    );
+
+    let mut resumed = kernel
+        .begin_durable_tool_admission(&request, &matching, now + 3)
+        .expect("resume durable monetary admission")
+        .expect("covered resumed admission");
+    let (_, replayed_mutation) = kernel
+        .check_and_increment_budget(
+            &request.request_id,
+            &capability,
+            &matching,
+            false,
+            Some(&mut resumed),
+            now + 3,
+        )
+        .expect("replay combined budget authorization");
+
+    assert!(replayed_mutation.durable_hold_result().is_some());
+    assert_eq!(resumed.operation(), admission.operation());
+    assert_eq!(store.payment_journal(), Some(authorized_journal));
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("complete durable monetary dispatch");
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(store.operation().state(), AdmissionOperationState::Completed);
+    let settled = store.payment_journal().expect("settled payment journal");
+    assert_eq!(settled.state, PaymentJournalState::Settled);
+    assert_eq!(settled.settle_action, Some(PaymentSettleAction::Capture));
+    assert_eq!(settled.settle_amount_units, Some(10));
+    assert_eq!(settled.transaction_id.as_deref(), Some("authorization-durable"));
+    assert!(response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("financial"))
+        .is_some());
+}
+
+#[test]
+fn durable_recovery_captures_after_tool_return_and_never_releases_from_authorized() {
+    let mut config = make_config();
+    config.policy_hash = sha256_hex(b"durable-payment-crash-window-policy");
+    let mut kernel = make_kernel(config);
+    let fence = admission_test_fence();
+    let store = std::sync::Arc::new(TestAdmissionOperationStore::new(fence.clone()));
+    kernel
+        .set_durable_admission_store(store.clone(), store.clone(), fence)
+        .expect("qualified admission store");
+    kernel.set_budget_store_handle(store.budget_store());
+    let settlement_actions = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    kernel.set_payment_adapter(Box::new(QualifiedDurablePaymentAdapter {
+        authorization_references: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+        settlement_actions: settlement_actions.clone(),
+    }));
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
+        id: "durable-server".to_owned(),
+        tools: vec!["mutate".to_owned()],
+        invocations: invocations.clone(),
+        store: store.clone(),
+    }));
+    let mut grant = make_grant("durable-server", "mutate");
+    grant.max_cost_per_invocation = Some(MonetaryAmount {
+        units: 10,
+        currency: "USD".to_owned(),
+    });
+    grant.max_total_cost = Some(MonetaryAmount {
+        units: 100,
+        currency: "USD".to_owned(),
+    });
+    let agent = make_keypair();
+    let capability = make_capability(&kernel, &agent, make_scope(vec![grant]), 300);
+    let request = make_request(
+        "durable-payment-crash-window",
+        &capability,
+        "mutate",
+        "durable-server",
+    );
+    store.fail_next_payment_settlement_intent();
+
+    let error = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect_err("settlement intent crash must fail closed");
+    assert!(matches!(
+        error,
+        KernelError::DurableAdmission(ref reason)
+            if reason.contains("injected payment settlement intent failure")
+    ));
+    assert_eq!(store.operation().state(), AdmissionOperationState::Finalizing);
+    assert_eq!(
+        store.payment_journal().map(|journal| journal.state),
+        Some(PaymentJournalState::Authorized)
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert!(settlement_actions
+        .lock()
+        .expect("settlement actions")
+        .is_empty());
+
+    let replay = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("recover captured payment from durable outcome");
+    assert_eq!(replay.verdict, Verdict::Allow);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        settlement_actions
+            .lock()
+            .expect("settlement actions")
+            .as_slice(),
+        ["capture"]
+    );
+    let journal = store.payment_journal().expect("settled recovery journal");
+    assert_eq!(journal.state, PaymentJournalState::Settled);
+    assert_eq!(journal.settle_action, Some(PaymentSettleAction::Capture));
+}
+
+#[test]
+fn durable_zero_charge_commits_release_evidence_before_releasing_payment() {
+    let mut config = make_config();
+    config.policy_hash = sha256_hex(b"durable-zero-charge-policy");
+    let mut kernel = make_kernel(config);
+    let fence = admission_test_fence();
+    let store = std::sync::Arc::new(TestAdmissionOperationStore::new(fence.clone()));
+    kernel
+        .set_durable_admission_store(store.clone(), store.clone(), fence)
+        .expect("qualified admission store");
+    kernel.set_budget_store_handle(store.budget_store());
+    let authorization_references = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    kernel.set_payment_adapter(Box::new(QualifiedDurablePaymentAdapter {
+        authorization_references,
+        settlement_actions: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+    }));
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new(
+        "durable-zero-server",
+        0,
+        "USD",
+    )));
+    let mut grant = make_grant("durable-zero-server", "compute");
+    grant.max_cost_per_invocation = Some(MonetaryAmount {
+        units: 10,
+        currency: "USD".to_owned(),
+    });
+    grant.max_total_cost = Some(MonetaryAmount {
+        units: 100,
+        currency: "USD".to_owned(),
+    });
+    let agent = make_keypair();
+    let capability = make_capability(&kernel, &agent, make_scope(vec![grant]), 300);
+    let request = make_request(
+        "durable-zero-charge",
+        &capability,
+        "compute",
+        "durable-zero-server",
+    );
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("complete zero-charge durable dispatch");
+
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(store.operation().state(), AdmissionOperationState::Completed);
+    let journal = store.payment_journal().expect("released payment journal");
+    assert_eq!(journal.state, PaymentJournalState::Settled);
+    assert_eq!(journal.settle_action, Some(PaymentSettleAction::Release));
+    assert_eq!(journal.settle_amount_units, None);
+    assert_eq!(
+        journal
+            .release_authority
+            .as_ref()
+            .map(|authority| authority.kind),
+        Some(PaymentReleaseAuthorityKind::ContractualZeroCharge)
+    );
+    let evidence = store
+        .payment_release_evidence()
+        .expect("canonical payment release evidence");
+    assert_eq!(
+        evidence.evidence_kind,
+        crate::tool_outcome::MonetaryReleaseEvidenceKindV1::ContractualZeroCharge
+    );
+    assert_eq!(evidence.operation_id.as_str(), journal.operation_id);
+    assert_eq!(
+        response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get("financial"))
+            .and_then(|financial| financial.get("cost_charged"))
+            .and_then(serde_json::Value::as_u64),
+        Some(0)
+    );
 }
 
 #[test]
@@ -1535,6 +2267,7 @@ fn durable_admission_binds_the_first_budget_eligible_matching_grant() {
     kernel
         .set_durable_admission_store(store.clone(), store.clone(), fence)
         .expect("qualified admission store");
+    kernel.set_budget_store_handle(store.budget_store());
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
         id: "durable-server".to_string(),
@@ -1561,7 +2294,7 @@ fn durable_admission_binds_the_first_budget_eligible_matching_grant() {
         .evaluate_tool_call_blocking(&request)
         .expect("fallback grant dispatch");
 
-    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     assert!(store
         .operation()

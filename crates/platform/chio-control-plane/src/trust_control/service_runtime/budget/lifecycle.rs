@@ -23,6 +23,14 @@ impl RemoteBudgetStore {
             .client
             .capture_structured_invocation(&wire)
             .map_err(into_budget_store_error)?;
+        self.qualify_invocation_capture_response(&request, response)
+    }
+
+    pub(crate) fn qualify_invocation_capture_response(
+        &self,
+        request: &BudgetCaptureInvocationRequest,
+        response: StructuredBudgetMutationResponse,
+    ) -> Result<BudgetInvocationCaptureDecision, BudgetStoreError> {
         let (decision, mutation, usage) = self.validate_structured_mutation_response(
             &request.capability_id,
             request.grant_index,
@@ -226,6 +234,27 @@ impl RemoteBudgetStore {
             .client
             .reconcile_structured_budget_hold(&wire)
             .map_err(into_budget_store_error)?;
+        self.qualify_reconcile_response(&request, response, false)
+            .map(|(mutation, _)| mutation)
+    }
+
+    pub(crate) fn qualify_reconcile_response(
+        &self,
+        request: &BudgetReconcileHoldRequest,
+        response: StructuredBudgetMutationResponse,
+        require_exact_replay_status: bool,
+    ) -> Result<(BudgetHoldMutationDecision, bool), BudgetStoreError> {
+        request.validate()?;
+        if request.exposed_cost_units == 0 {
+            return Err(structured_budget_error(
+                "zero-unit remote budget reconciliation is not a state transition",
+            ));
+        }
+        let (hold_id, event_id) = required_remote_hold_event(
+            request.hold_id.as_deref(),
+            request.event_id.as_deref(),
+            "reconciliation",
+        )?;
         let (decision, mutation, usage) = self.validate_structured_mutation_response(
             &request.capability_id,
             request.grant_index,
@@ -234,8 +263,17 @@ impl RemoteBudgetStore {
             response,
             StructuredUsageSequenceRelation::AdvancesAtCommit,
         )?;
-        if decision != StructuredBudgetMutationDecisionView::AppliedOrAlreadyApplied
-            || mutation.invocation_state != BudgetInvocationState::Captured
+        let replayed = match (require_exact_replay_status, decision) {
+            (false, StructuredBudgetMutationDecisionView::AppliedOrAlreadyApplied) => false,
+            (true, StructuredBudgetMutationDecisionView::Applied) => false,
+            (true, StructuredBudgetMutationDecisionView::AlreadyApplied) => true,
+            _ => {
+                return Err(structured_budget_error(
+                    "remote reconciliation returned an invalid replay status",
+                ));
+            }
+        };
+        if mutation.invocation_state != BudgetInvocationState::Captured
             || mutation.exposure_units != request.exposed_cost_units
             || mutation.realized_spend_units != request.realized_spend_units
             || mutation.monetary_state != BudgetMonetaryState::Reconciled
@@ -251,7 +289,7 @@ impl RemoteBudgetStore {
             ));
         }
         self.cache_structured_usage(&request.capability_id, request.grant_index, usage)?;
-        Ok(mutation)
+        Ok((mutation, replayed))
     }
 
     pub(super) fn capture_budget_hold_remote(

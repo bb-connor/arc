@@ -334,7 +334,7 @@ impl PaymentAdapter for BlockingAuthorizationPaymentAdapter {
         }
         Ok(PaymentAuthorization {
             authorization_id: "auth_concurrent_same_request".to_string(),
-            settled: false,
+            state: PaymentAuthorizationState::Held,
             metadata: serde_json::json!({ "adapter": "blocking" }),
         })
     }
@@ -398,7 +398,7 @@ impl PaymentAdapter for NonceCleanupPaymentAdapter {
     ) -> Result<PaymentAuthorization, PaymentError> {
         Ok(PaymentAuthorization {
             authorization_id: "auth_nonce_cleanup".to_string(),
-            settled: false,
+            state: PaymentAuthorizationState::Held,
             metadata: serde_json::json!({ "adapter": "nonce-cleanup" }),
         })
     }
@@ -1225,10 +1225,11 @@ fn predispatch_unwind_requires_confirmed_payment_release_status(
             &matching,
             false,
             None,
+            current_unix_timestamp_ms(),
         )?;
     let authorization = PaymentAuthorization {
         authorization_id: "auth-predispatch-unwind-pending".to_string(),
-        settled: false,
+        state: PaymentAuthorizationState::Held,
         metadata: serde_json::json!({}),
     };
 

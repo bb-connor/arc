@@ -425,18 +425,53 @@ impl SqliteBudgetStore {
         kind: BudgetMutationKind,
         monetary_after: BudgetMonetaryState,
     ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_write(&mut connection)?;
+        let (decision, changed) = self.settle_composite_hold_in_transaction(
+            &transaction,
+            capability_id,
+            grant_index,
+            exposed_units,
+            realized_units,
+            hold_id,
+            event_id,
+            authority,
+            kind,
+            monetary_after,
+        )?;
+        if changed {
+            self.commit_joint_transaction(transaction)?;
+            self.sync_joint_anchor(&connection)?;
+        } else {
+            transaction.rollback()?;
+        }
+        Ok(decision)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn settle_composite_hold_in_transaction(
+        &self,
+        transaction: &rusqlite::Transaction<'_>,
+        capability_id: &str,
+        grant_index: usize,
+        exposed_units: u64,
+        realized_units: u64,
+        hold_id: &str,
+        event_id: &str,
+        authority: Option<&BudgetEventAuthority>,
+        kind: BudgetMutationKind,
+        monetary_after: BudgetMonetaryState,
+    ) -> Result<(BudgetHoldMutationDecision, bool), BudgetStoreError> {
         if exposed_units == 0 || realized_units > exposed_units {
             return Err(BudgetStoreError::Invariant(
                 "monetary settlement requires positive exposure and spend not above exposure"
                     .to_string(),
             ));
         }
-        let mut connection = self.connection()?;
-        let transaction = self.begin_write(&mut connection)?;
         self.validate_joint_authority(authority)?;
         if let Some(decision) = replay_transition(
             self,
-            &transaction,
+            transaction,
             event_id,
             kind,
             hold_id,
@@ -448,15 +483,14 @@ impl SqliteBudgetStore {
             None,
             None,
         )? {
-            transaction.rollback()?;
-            return Ok(decision);
+            return Ok((decision, false));
         }
-        let hold = load_structured_hold(&transaction, hold_id)?.ok_or_else(|| {
+        let hold = load_structured_hold(transaction, hold_id)?.ok_or_else(|| {
             BudgetStoreError::Invariant(format!("unknown composite budget hold `{hold_id}`"))
         })?;
         validate_transition_identity(
             self,
-            &transaction,
+            transaction,
             &hold,
             capability_id,
             grant_index,
@@ -470,15 +504,15 @@ impl SqliteBudgetStore {
                 "budget hold `{hold_id}` is not dispatch-captured and settleable"
             )));
         }
-        let quota_states = load_quota_states(&transaction, &hold)?;
-        let cumulative = load_cumulative_snapshot(&transaction, &hold)?;
-        let mut usage = load_usage_or_default(&transaction, capability_id, grant_index)?;
+        let quota_states = load_quota_states(transaction, &hold)?;
+        let cumulative = load_cumulative_snapshot(transaction, &hold)?;
+        let mut usage = load_usage_or_default(transaction, capability_id, grant_index)?;
         if usage.total_cost_exposed < exposed_units {
             return Err(BudgetStoreError::Invariant(
                 "settlement exceeds total budget exposure".to_string(),
             ));
         }
-        let event_seq = allocate_budget_replication_seq(&transaction)?;
+        let event_seq = allocate_budget_replication_seq(transaction)?;
         usage.total_cost_exposed -= exposed_units;
         usage.total_cost_realized_spend = usage
             .total_cost_realized_spend
@@ -488,7 +522,7 @@ impl SqliteBudgetStore {
             })?;
         usage.seq = event_seq;
         usage.updated_at = unix_now();
-        write_usage(&transaction, &usage)?;
+        write_usage(transaction, &usage)?;
         let next_authority = authority.or(hold.authority.as_ref());
         let changed = transaction.execute(
             r#"
@@ -516,7 +550,7 @@ impl SqliteBudgetStore {
             ));
         }
         let event = SqliteBudgetStore::append_mutation_event(
-            &transaction,
+            transaction,
             Some(event_id),
             Some(hold_id),
             authority,
@@ -536,7 +570,7 @@ impl SqliteBudgetStore {
             usage.total_cost_realized_spend,
         )?;
         write_transition_projection(
-            &transaction,
+            transaction,
             &event.event_id,
             &hold,
             None,
@@ -566,11 +600,35 @@ impl SqliteBudgetStore {
             None,
             None,
         )?;
-        let decision = transition_decision_from_event(self, &transaction, event)?;
-        self.append_joint_commit(&transaction, kind, event_id, event_seq)?;
-        self.commit_joint_transaction(transaction)?;
-        self.sync_joint_anchor(&connection)?;
-        Ok(decision)
+        let decision = transition_decision_from_event(self, transaction, event)?;
+        self.append_joint_commit(transaction, kind, event_id, event_seq)?;
+        Ok((decision, true))
+    }
+
+    pub(crate) fn reconcile_composite_hold_in_transaction(
+        &self,
+        transaction: &rusqlite::Transaction<'_>,
+        request: &BudgetReconcileHoldRequest,
+    ) -> Result<(BudgetReconcileHoldDecision, bool), BudgetStoreError> {
+        request.validate()?;
+        self.settle_composite_hold_in_transaction(
+            transaction,
+            &request.capability_id,
+            request.grant_index,
+            request.exposed_cost_units,
+            request.realized_spend_units,
+            request.hold_id.as_deref().ok_or_else(|| {
+                BudgetStoreError::Invariant("composite reconciliation requires hold_id".to_string())
+            })?,
+            request.event_id.as_deref().ok_or_else(|| {
+                BudgetStoreError::Invariant(
+                    "composite reconciliation requires event_id".to_string(),
+                )
+            })?,
+            request.authority.as_ref(),
+            BudgetMutationKind::ReconcileSpend,
+            BudgetMonetaryState::Reconciled,
+        )
     }
 
     pub(crate) fn reconcile_composite_hold(

@@ -402,8 +402,11 @@ pub use operator_report::{
 };
 pub use payment::{
     AcpPaymentAdapter, CommercePaymentContext, GovernedPaymentContext, PaymentAdapter,
-    PaymentAuthorization, PaymentAuthorizeRequest, PaymentError, PaymentResult,
-    RailSettlementStatus, ReceiptSettlement, X402PaymentAdapter,
+    PaymentAuthorization, PaymentAuthorizationState, PaymentAuthorizeRequest, PaymentError,
+    PaymentJournalError, PaymentJournalRecord, PaymentJournalState, PaymentJournalTransition,
+    PaymentRailMode, PaymentReleaseAuthorityBinding, PaymentReleaseAuthorityKind, PaymentResult,
+    PaymentSettleAction, RailSettlementState, RailSettlementStatus, ReceiptSettlement,
+    X402PaymentAdapter,
 };
 pub use post_invocation::{
     PipelineOutcome, PostInvocationContext, PostInvocationHook, PostInvocationHookIdentity,
@@ -422,12 +425,14 @@ pub use receipt_query::{
     ReceiptReadContext, ReceiptReadContextSource, MAX_QUERY_LIMIT,
 };
 pub use receipt_store::{
-    AtomicReceiptProjection, AuthorizationReceiptConsumption, FederatedEvidenceShareImport,
-    FederatedEvidenceShareSummary, PendingSettlementObservation, QualifiedAdmissionProjectionStore,
-    ReceiptCheckpointCreateReport, ReceiptCheckpointRange, ReceiptCheckpointStatusReport,
-    ReceiptFlushReport, ReceiptStore, ReceiptStoreError, ReceiptStoreHealthReport,
-    ReceiptWalCheckpointReport, ReceiptWriterCounters, ReceiptWriterLiveness, RetentionConfig,
-    StoredChildReceipt, StoredToolReceipt,
+    AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError, AdmissionBudgetCapture,
+    AdmissionPaymentJournalAdvance, AdmissionPaymentJournalError, AdmissionPaymentSettlement,
+    AdmissionPaymentSettlementBegin, AtomicReceiptProjection, AuthorizationReceiptConsumption,
+    FederatedEvidenceShareImport, FederatedEvidenceShareSummary, PendingSettlementObservation,
+    QualifiedAdmissionProjectionStore, ReceiptCheckpointCreateReport, ReceiptCheckpointRange,
+    ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore, ReceiptStoreError,
+    ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
+    ReceiptWriterLiveness, RetentionConfig, StoredChildReceipt, StoredToolReceipt,
 };
 pub use revocation_runtime::{InMemoryRevocationStore, RevocationObservation, RevocationStore};
 pub use revocation_store::{RevocationRecord, RevocationStoreError};

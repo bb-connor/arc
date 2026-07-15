@@ -18,10 +18,24 @@ pub fn build_remote_budget_store(
     control_url: &str,
     control_token: &str,
 ) -> Result<Box<dyn BudgetStore>, CliError> {
-    Ok(Box::new(RemoteBudgetStore {
+    Ok(Box::new(remote_budget_store(control_url, control_token)?))
+}
+
+pub(crate) fn build_shared_remote_budget_store(
+    control_url: &str,
+    control_token: &str,
+) -> Result<Arc<RemoteBudgetStore>, CliError> {
+    remote_budget_store(control_url, control_token).map(Arc::new)
+}
+
+fn remote_budget_store(
+    control_url: &str,
+    control_token: &str,
+) -> Result<RemoteBudgetStore, CliError> {
+    Ok(RemoteBudgetStore {
         client: build_client(control_url, control_token)?,
         cached_usage: Mutex::new(HashMap::new()),
-    }))
+    })
 }
 
 fn remote_budget_grant_index(grant_index: usize) -> Result<u32, BudgetStoreError> {

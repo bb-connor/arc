@@ -217,6 +217,85 @@ pub use serving_owner::{
 impl chio_kernel::QualifiedAdmissionProjectionStore
     for admission_operation_store::SqliteAdmissionOperationStore
 {
+    fn load_payment_journal(
+        &self,
+        operation_id: &str,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+    ) -> Result<
+        Option<chio_kernel::payment::PaymentJournalRecord>,
+        chio_kernel::AdmissionPaymentJournalError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::load_payment_journal(
+            self,
+            operation_id,
+            active_fence,
+        )
+    }
+
+    fn advance_payment_journal(
+        &self,
+        advance: chio_kernel::AdmissionPaymentJournalAdvance<'_>,
+    ) -> Result<chio_kernel::payment::PaymentJournalRecord, chio_kernel::AdmissionPaymentJournalError>
+    {
+        admission_operation_store::SqliteAdmissionOperationStore::advance_payment_journal(
+            self, advance,
+        )
+    }
+
+    fn begin_payment_settlement(
+        &self,
+        begin: chio_kernel::AdmissionPaymentSettlementBegin<'_>,
+    ) -> Result<chio_kernel::AdmissionPaymentSettlement, chio_kernel::AdmissionPaymentJournalError>
+    {
+        admission_operation_store::SqliteAdmissionOperationStore::begin_payment_settlement(
+            self, begin,
+        )
+    }
+
+    fn authorize_budget_and_commit_admission(
+        &self,
+        operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+        recovery_lease: &chio_kernel::admission_operation::AdmissionRecoveryLease,
+        request: chio_kernel::budget_store::BudgetAuthorizeHoldRequest,
+        payment_journal: Option<chio_kernel::payment::PaymentJournalRecord>,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::AdmissionBudgetAuthorization,
+        chio_kernel::AdmissionBudgetAuthorizationError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::authorize_budget_and_commit_admission(
+            self,
+            operation,
+            recovery_lease,
+            request,
+            payment_journal,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map(|(decision, operation)| chio_kernel::AdmissionBudgetAuthorization {
+            decision,
+            operation,
+        })
+        .map_err(|error| match error {
+            chio_kernel::admission_operation::AdmissionCaptureError::Unavailable(detail) => {
+                chio_kernel::AdmissionBudgetAuthorizationError::Unavailable(detail)
+            }
+            chio_kernel::admission_operation::AdmissionCaptureError::Fenced => {
+                chio_kernel::AdmissionBudgetAuthorizationError::Fenced
+            }
+            chio_kernel::admission_operation::AdmissionCaptureError::OutcomeUnknown(detail) => {
+                chio_kernel::AdmissionBudgetAuthorizationError::OutcomeUnknown(detail)
+            }
+            chio_kernel::admission_operation::AdmissionCaptureError::Invariant(detail) => {
+                chio_kernel::AdmissionBudgetAuthorizationError::Invariant(detail)
+            }
+            chio_kernel::admission_operation::AdmissionCaptureError::Operation(error) => {
+                chio_kernel::AdmissionBudgetAuthorizationError::Operation(error)
+            }
+        })
+    }
+
     fn capture_invocation_and_commit_dispatch(
         &self,
         operation: &chio_kernel::admission_operation::AdmissionOperationV1,
@@ -225,7 +304,7 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
         active_fence: &chio_kernel::admission_operation::StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<
-        chio_kernel::admission_operation::AdmissionOperationV1,
+        chio_kernel::AdmissionBudgetCapture,
         chio_kernel::admission_operation::AdmissionCaptureError,
     > {
         admission_operation_store::SqliteAdmissionOperationStore::capture_invocation_and_commit_dispatch(
@@ -236,6 +315,10 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
             active_fence,
             trusted_now_unix_ms,
         )
+        .map(|(decision, operation)| chio_kernel::AdmissionBudgetCapture {
+            decision,
+            operation,
+        })
     }
 
     fn list_admission_receipts_after(

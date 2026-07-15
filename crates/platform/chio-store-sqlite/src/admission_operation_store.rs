@@ -17,9 +17,15 @@ use chio_kernel::admission_operation::{
     UntrustedAdmissionRecoveryClaim, VerifiedAdmissionTerminalProjectionRecordV1,
     VerifiedAdmissionTerminalProjectionV1,
 };
-use chio_kernel::budget_store::{BudgetCaptureInvocationRequest, BudgetStoreError};
+use chio_kernel::budget_store::{
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCaptureInvocationRequest,
+    BudgetReconcileHoldRequest, BudgetStoreError,
+};
+use chio_kernel::payment::{PaymentJournalRecord, PaymentJournalTransition};
 use chio_kernel::receipt_store::{
-    AuthorizationReceiptConsumption, PendingSettlementObservation, ReceiptStore, ReceiptStoreError,
+    AdmissionPaymentJournalAdvance, AdmissionPaymentJournalError, AdmissionPaymentSettlement,
+    AdmissionPaymentSettlementBegin, AuthorizationReceiptConsumption, PendingSettlementObservation,
+    ReceiptStore, ReceiptStoreError,
 };
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction, TransactionBehavior};
 use serde::Serialize;
@@ -142,7 +148,13 @@ impl SqliteAdmissionOperationStore {
         request: BudgetCaptureInvocationRequest,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
-    ) -> Result<AdmissionOperationV1, AdmissionCaptureError> {
+    ) -> Result<
+        (
+            chio_kernel::budget_store::BudgetInvocationCaptureDecision,
+            AdmissionOperationV1,
+        ),
+        AdmissionCaptureError,
+    > {
         if active_fence != &self.serving_owner.fence
             || recovery_lease.store_fence() != active_fence
             || operation.state() != AdmissionOperationState::CapturePending
@@ -166,8 +178,213 @@ impl SqliteAdmissionOperationStore {
                     trusted_now_unix_ms,
                 },
             )
-            .map(|(_, operation)| operation)
             .map_err(map_budget_capture_error)
+    }
+
+    pub fn authorize_budget_and_commit_admission(
+        &self,
+        operation: &AdmissionOperationV1,
+        recovery_lease: &AdmissionRecoveryLease,
+        request: BudgetAuthorizeHoldRequest,
+        payment_journal: Option<PaymentJournalRecord>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(BudgetAuthorizeHoldDecision, AdmissionOperationV1), AdmissionCaptureError> {
+        if active_fence != &self.serving_owner.fence || recovery_lease.store_fence() != active_fence
+        {
+            return Err(AdmissionCaptureError::Fenced);
+        }
+        let budget = crate::budget_store::SqliteBudgetStore::open_alongside(
+            self.connection.clone(),
+            self.serving_owner.clone(),
+        );
+        budget
+            .authorize_composite_hold_and_commit_admission(
+                request,
+                crate::budget_store::AdmissionAuthorizationBinding {
+                    operation,
+                    recovery_lease,
+                    payment_journal: payment_journal.as_ref(),
+                    trusted_now_unix_ms,
+                },
+            )
+            .map_err(map_budget_capture_error)
+    }
+
+    pub fn load_payment_journal(
+        &self,
+        operation_id: &str,
+        active_fence: &StoreMutationFence,
+    ) -> Result<Option<PaymentJournalRecord>, AdmissionPaymentJournalError> {
+        if active_fence != &self.serving_owner.fence {
+            return Err(AdmissionPaymentJournalError::Fenced);
+        }
+        let mut connection = self.connection().map_err(map_payment_operation_error)?;
+        let transaction = self
+            .begin_read(&mut connection)
+            .map_err(map_payment_operation_error)?;
+        let journal = crate::budget_store::load_payment_journal(&transaction, operation_id)
+            .map_err(map_payment_budget_error)?;
+        transaction
+            .commit()
+            .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+        Ok(journal)
+    }
+
+    pub fn advance_payment_journal(
+        &self,
+        advance: AdmissionPaymentJournalAdvance<'_>,
+    ) -> Result<PaymentJournalRecord, AdmissionPaymentJournalError> {
+        let AdmissionPaymentJournalAdvance {
+            operation,
+            recovery_lease,
+            expected,
+            transition,
+            release_evidence,
+            active_fence,
+            trusted_now_unix_ms,
+        } = advance;
+        if active_fence != &self.serving_owner.fence
+            || recovery_lease.store_fence() != active_fence
+            || expected.operation_id != operation.binding().operation_id().as_str()
+        {
+            return Err(AdmissionPaymentJournalError::Fenced);
+        }
+        let mut connection = self.connection().map_err(map_payment_operation_error)?;
+        let transaction = self
+            .begin_write(&mut connection, Some(active_fence))
+            .map_err(map_payment_operation_error)?;
+        verify_payment_write_context(
+            &transaction,
+            &self.serving_owner,
+            operation,
+            recovery_lease,
+            active_fence,
+            trusted_now_unix_ms,
+        )?;
+        let (updated, changed) = crate::budget_store::advance_payment_journal(
+            &transaction,
+            expected,
+            transition,
+            release_evidence,
+            trusted_now_unix_ms,
+        )
+        .map_err(map_payment_budget_error)?;
+        if changed {
+            self.serving_owner
+                .append_global_commit(
+                    &transaction,
+                    "payment_journal_transition",
+                    "payment",
+                    &updated.operation_id,
+                    updated.journal_version,
+                )
+                .map_err(map_payment_owner_error)?;
+        }
+        self.commit_write(transaction)
+            .map_err(map_payment_operation_error)?;
+        if changed {
+            self.sync_after_write(&connection)
+                .map_err(map_payment_operation_error)?;
+        }
+        Ok(updated)
+    }
+
+    pub fn begin_payment_settlement(
+        &self,
+        begin: AdmissionPaymentSettlementBegin<'_>,
+    ) -> Result<AdmissionPaymentSettlement, AdmissionPaymentJournalError> {
+        let AdmissionPaymentSettlementBegin {
+            operation,
+            recovery_lease,
+            expected,
+            transition,
+            release_evidence,
+            budget_reconcile,
+            active_fence,
+            trusted_now_unix_ms,
+        } = begin;
+        if active_fence != &self.serving_owner.fence
+            || recovery_lease.store_fence() != active_fence
+            || expected.operation_id != operation.binding().operation_id().as_str()
+        {
+            return Err(AdmissionPaymentJournalError::Fenced);
+        }
+        validate_payment_reconcile_binding(expected, transition, &budget_reconcile)?;
+        let mut connection = self.connection().map_err(map_payment_operation_error)?;
+        let transaction = self
+            .begin_write(&mut connection, Some(active_fence))
+            .map_err(map_payment_operation_error)?;
+        verify_payment_write_context(
+            &transaction,
+            &self.serving_owner,
+            operation,
+            recovery_lease,
+            active_fence,
+            trusted_now_unix_ms,
+        )?;
+        let budget = crate::budget_store::SqliteBudgetStore::open_alongside(
+            self.connection.clone(),
+            self.serving_owner.clone(),
+        );
+        let (budget, budget_changed) = budget
+            .reconcile_composite_hold_in_transaction(&transaction, &budget_reconcile)
+            .map_err(map_payment_budget_error)?;
+        let (journal, payment_changed) = match transition {
+            Some(transition) => crate::budget_store::advance_payment_journal(
+                &transaction,
+                expected,
+                transition,
+                release_evidence,
+                trusted_now_unix_ms,
+            )
+            .map_err(map_payment_budget_error)?,
+            None => {
+                if release_evidence.is_some() {
+                    return Err(AdmissionPaymentJournalError::Invariant(
+                        "payment release evidence requires a journal transition".to_owned(),
+                    ));
+                }
+                let stored = crate::budget_store::load_payment_journal(
+                    &transaction,
+                    operation.binding().operation_id().as_str(),
+                )
+                .map_err(map_payment_budget_error)?
+                .ok_or_else(|| {
+                    AdmissionPaymentJournalError::Invariant(
+                        "payment settlement journal is absent".to_owned(),
+                    )
+                })?;
+                if stored != *expected {
+                    return Err(AdmissionPaymentJournalError::Conflict(
+                        "payment settlement journal changed".to_owned(),
+                    ));
+                }
+                (stored, false)
+            }
+        };
+        if payment_changed {
+            self.serving_owner
+                .append_global_commit(
+                    &transaction,
+                    "payment_settlement_intent",
+                    "payment",
+                    &journal.operation_id,
+                    journal.journal_version,
+                )
+                .map_err(map_payment_owner_error)?;
+        }
+        self.commit_write(transaction)
+            .map_err(map_payment_operation_error)?;
+        if budget_changed || payment_changed {
+            self.sync_after_write(&connection)
+                .map_err(map_payment_operation_error)?;
+        }
+        Ok(AdmissionPaymentSettlement {
+            journal,
+            budget,
+            budget_already_reconciled: !budget_changed,
+        })
     }
 
     pub fn commit_terminal_projection(
@@ -184,6 +401,15 @@ impl SqliteAdmissionOperationStore {
         verify_trusted_time(&transaction, context.trusted_time_unix_ms)?;
         let stored = load_by_operation_id_tx(&transaction, &context.operation_id)?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
+        verify_payment_terminal_source(
+            &transaction,
+            &stored.operation,
+            context,
+            canonical.records().iter().filter_map(|record| {
+                (record.commitment().kind() == AdmissionProjectionRecordKind::PaymentTerminal)
+                    .then_some(record.canonical_bytes())
+            }),
+        )?;
 
         if stored.operation.state().is_terminal() {
             let terminal = verify_exact_terminal_replay(
@@ -284,6 +510,15 @@ impl SqliteAdmissionOperationStore {
         verify_trusted_time(&transaction, context.trusted_time_unix_ms)?;
         let stored = load_by_operation_id_tx(&transaction, &context.operation_id)?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
+        verify_payment_terminal_source(
+            &transaction,
+            &stored.operation,
+            context,
+            verified.records().iter().filter_map(|record| {
+                (record.kind() == AdmissionProjectionRecordKind::PaymentTerminal)
+                    .then_some(record.canonical_json())
+            }),
+        )?;
 
         if stored.operation.state().is_terminal() {
             let terminal = verify_exact_signed_terminal_replay(&transaction, &stored, &verified)?;
@@ -358,11 +593,228 @@ impl SqliteAdmissionOperationStore {
     }
 }
 
+fn verify_payment_write_context(
+    transaction: &Transaction<'_>,
+    serving_owner: &SqliteServingOwner,
+    operation: &AdmissionOperationV1,
+    recovery_lease: &AdmissionRecoveryLease,
+    active_fence: &StoreMutationFence,
+    trusted_now_unix_ms: u64,
+) -> Result<(), AdmissionPaymentJournalError> {
+    let stored = load_by_operation_id_tx(transaction, operation.binding().operation_id())
+        .map_err(map_payment_operation_error)?
+        .ok_or_else(|| {
+            AdmissionPaymentJournalError::Invariant(
+                "payment journal admission operation is absent".to_owned(),
+            )
+        })?;
+    if stored.operation != *operation {
+        return Err(AdmissionPaymentJournalError::Fenced);
+    }
+    verify_stored_recovery_claim(
+        transaction,
+        serving_owner,
+        &stored,
+        recovery_lease.untrusted_claim(),
+        trusted_now_unix_ms,
+        active_fence,
+    )
+    .map_err(map_payment_operation_error)
+}
+
+fn validate_payment_reconcile_binding(
+    journal: &PaymentJournalRecord,
+    transition: Option<&PaymentJournalTransition>,
+    budget: &BudgetReconcileHoldRequest,
+) -> Result<(), AdmissionPaymentJournalError> {
+    journal
+        .validate()
+        .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+    budget
+        .validate()
+        .map_err(|error| AdmissionPaymentJournalError::Invariant(error.to_string()))?;
+    let grant_index = usize::try_from(journal.grant_index).map_err(|_| {
+        AdmissionPaymentJournalError::Invariant(
+            "payment journal grant index exceeds the budget range".to_owned(),
+        )
+    })?;
+    let hold_id = journal.hold_id.as_deref().ok_or_else(|| {
+        AdmissionPaymentJournalError::Invariant("payment journal omitted hold_id".to_owned())
+    })?;
+    if budget.capability_id != journal.capability_id
+        || budget.grant_index != grant_index
+        || budget.exposed_cost_units != journal.amount_units
+        || budget.hold_id.as_deref() != Some(hold_id)
+        || budget.event_id.as_deref() != Some(format!("{hold_id}:reconcile").as_str())
+    {
+        return Err(AdmissionPaymentJournalError::Invariant(
+            "budget reconciliation does not match the payment journal".to_owned(),
+        ));
+    }
+    let realized_units = match transition {
+        Some(PaymentJournalTransition::BeginCapture { amount_units }) => *amount_units,
+        Some(PaymentJournalTransition::BeginRelease { .. }) => 0,
+        Some(_) => {
+            return Err(AdmissionPaymentJournalError::Invariant(
+                "payment settlement can only begin with capture or release intent".to_owned(),
+            ));
+        }
+        None => match (journal.rail_mode, journal.state, journal.settle_action) {
+            (
+                chio_kernel::payment::PaymentRailMode::PrepaidFinal,
+                chio_kernel::payment::PaymentJournalState::Settled,
+                None,
+            ) => journal.amount_units,
+            (
+                chio_kernel::payment::PaymentRailMode::ReversibleHold,
+                chio_kernel::payment::PaymentJournalState::Settling
+                | chio_kernel::payment::PaymentJournalState::Settled,
+                Some(chio_kernel::payment::PaymentSettleAction::Capture),
+            ) => journal.settle_amount_units.ok_or_else(|| {
+                AdmissionPaymentJournalError::Invariant(
+                    "capturing payment journal omitted settlement amount".to_owned(),
+                )
+            })?,
+            (
+                chio_kernel::payment::PaymentRailMode::ReversibleHold,
+                chio_kernel::payment::PaymentJournalState::Settling
+                | chio_kernel::payment::PaymentJournalState::Settled,
+                Some(chio_kernel::payment::PaymentSettleAction::Release),
+            ) => 0,
+            _ => {
+                return Err(AdmissionPaymentJournalError::Invariant(
+                    "payment journal has no replayable settlement intent".to_owned(),
+                ));
+            }
+        },
+    };
+    if budget.realized_spend_units != realized_units {
+        return Err(AdmissionPaymentJournalError::Invariant(
+            "budget reconciliation spend does not match the payment intent".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn verify_payment_terminal_source<'a>(
+    transaction: &Transaction<'_>,
+    operation: &AdmissionOperationV1,
+    context: &chio_kernel::admission_operation::AdmissionProjectionContext,
+    records: impl Iterator<Item = &'a [u8]>,
+) -> Result<(), AdmissionOperationStoreError> {
+    let records = records.collect::<Vec<_>>();
+    let requires_payment = operation.binding().participant_requirements().payment;
+    if records.len() != usize::from(requires_payment) {
+        return Err(AdmissionOperationError::TerminalProjectionBindingMismatch.into());
+    }
+    let Some(bytes) = records.first() else {
+        return Ok(());
+    };
+    let journal = crate::budget_store::load_payment_journal(
+        transaction,
+        operation.binding().operation_id().as_str(),
+    )
+    .map_err(|error| AdmissionOperationStoreError::Invariant(error.to_string()))?
+    .ok_or_else(|| {
+        AdmissionOperationStoreError::Invariant(
+            "terminal payment source journal is absent".to_owned(),
+        )
+    })?;
+    journal
+        .validate()
+        .map_err(|error| AdmissionOperationStoreError::Invariant(error.to_string()))?;
+    if !matches!(
+        journal.state,
+        chio_kernel::payment::PaymentJournalState::Settled
+            | chio_kernel::payment::PaymentJournalState::Closed
+    ) {
+        return Err(AdmissionOperationStoreError::Invariant(
+            "terminal payment source journal is not settled".to_owned(),
+        ));
+    }
+    let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|error| {
+        AdmissionOperationStoreError::Invariant(format!(
+            "terminal payment evidence is invalid JSON: {error}"
+        ))
+    })?;
+    let source = value.get("source").and_then(serde_json::Value::as_object);
+    let expected_source_record_id = format!("payment:{}", journal.operation_id);
+    let journal_digest = sha256_hex(
+        &canonical_json_bytes(&journal)
+            .map_err(|error| AdmissionOperationStoreError::Invariant(error.to_string()))?,
+    );
+    let authority_digest = sha256_hex(
+        &canonical_json_bytes(&context.store_fence)
+            .map_err(|error| AdmissionOperationStoreError::Invariant(error.to_string()))?,
+    );
+    let source_recorded_at = source
+        .and_then(|source| source.get("source_recorded_at_unix_ms"))
+        .and_then(serde_json::Value::as_u64);
+    if value
+        .get("payment_participant_id")
+        .and_then(serde_json::Value::as_str)
+        != Some(operation.binding().operation_id().as_str())
+        || source
+            .and_then(|source| source.get("source_record_id"))
+            .and_then(serde_json::Value::as_str)
+            != Some(expected_source_record_id.as_str())
+        || source
+            .and_then(|source| source.get("source_record_digest"))
+            .and_then(serde_json::Value::as_str)
+            != Some(journal_digest.as_str())
+        || source
+            .and_then(|source| source.get("source_authority_digest"))
+            .and_then(serde_json::Value::as_str)
+            != Some(authority_digest.as_str())
+        || source_recorded_at.is_none_or(|recorded_at| {
+            recorded_at < journal.created_at_unix_ms || recorded_at > context.trusted_time_unix_ms
+        })
+    {
+        return Err(AdmissionOperationError::TerminalProjectionBindingMismatch.into());
+    }
+    Ok(())
+}
+
 fn map_budget_capture_error(error: BudgetStoreError) -> AdmissionCaptureError {
     match error {
         BudgetStoreError::Fenced { .. } => AdmissionCaptureError::Fenced,
         BudgetStoreError::OutcomeUnknown(detail) => AdmissionCaptureError::OutcomeUnknown(detail),
         error => AdmissionCaptureError::Invariant(error.to_string()),
+    }
+}
+
+fn map_payment_operation_error(
+    error: AdmissionOperationStoreError,
+) -> AdmissionPaymentJournalError {
+    match error {
+        AdmissionOperationStoreError::Fenced => AdmissionPaymentJournalError::Fenced,
+        AdmissionOperationStoreError::OutcomeUnknown(detail) => {
+            AdmissionPaymentJournalError::OutcomeUnknown(detail)
+        }
+        AdmissionOperationStoreError::Unavailable(detail) => {
+            AdmissionPaymentJournalError::Unavailable(detail)
+        }
+        error => AdmissionPaymentJournalError::Invariant(error.to_string()),
+    }
+}
+
+fn map_payment_budget_error(error: BudgetStoreError) -> AdmissionPaymentJournalError {
+    match error {
+        BudgetStoreError::Fenced { .. } => AdmissionPaymentJournalError::Fenced,
+        BudgetStoreError::OutcomeUnknown(detail) => {
+            AdmissionPaymentJournalError::OutcomeUnknown(detail)
+        }
+        BudgetStoreError::Invariant(detail) => AdmissionPaymentJournalError::Conflict(detail),
+        error => AdmissionPaymentJournalError::Invariant(error.to_string()),
+    }
+}
+
+fn map_payment_owner_error(error: SqliteServingOwnerError) -> AdmissionPaymentJournalError {
+    match error {
+        SqliteServingOwnerError::OutcomeUnknown(detail) => {
+            AdmissionPaymentJournalError::OutcomeUnknown(detail)
+        }
+        error => AdmissionPaymentJournalError::Invariant(error.to_string()),
     }
 }
 
@@ -470,10 +922,150 @@ pub(crate) fn advance_budget_capture_tx(
     let updated = expected
         .apply_command(&command, trusted_now_unix_ms)?
         .into_operation();
+    advance_participant_bound_operation_tx(
+        transaction,
+        owner,
+        expected,
+        recovery_lease,
+        &updated,
+        participant_digest,
+        trusted_now_unix_ms,
+    )
+}
+
+pub(crate) struct BudgetAuthorizationAdvance<'a> {
+    pub(crate) expected: &'a AdmissionOperationV1,
+    pub(crate) recovery_lease: &'a AdmissionRecoveryLease,
+    pub(crate) hold_id: &'a str,
+    pub(crate) payment_required: bool,
+    pub(crate) participant_digest: &'a str,
+    pub(crate) trusted_now_unix_ms: u64,
+}
+
+pub(crate) fn advance_budget_authorization_tx(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    advance: BudgetAuthorizationAdvance<'_>,
+) -> Result<AdmissionOperationV1, AdmissionOperationStoreError> {
+    let BudgetAuthorizationAdvance {
+        expected,
+        recovery_lease,
+        hold_id,
+        payment_required,
+        participant_digest,
+        trusted_now_unix_ms,
+    } = advance;
+    let requirements = expected.binding().participant_requirements();
+    let required_state = if requirements.broker_attempt {
+        AdmissionOperationState::BrokerAttemptRegistered
+    } else {
+        AdmissionOperationState::Prepared
+    };
+    if expected.state() != required_state
+        || !requirements.budget_capture
+        || requirements.payment != payment_required
+    {
+        return Err(invariant(
+            "combined budget authorization does not match operation requirements",
+        ));
+    }
+    let mut attachments = vec![AdmissionAttachment::BudgetHoldId(
+        AdmissionIdentifier::try_new("budget_hold_id", hold_id)?,
+    )];
+    if payment_required {
+        attachments.push(AdmissionAttachment::PaymentParticipantId(
+            AdmissionIdentifier::try_new(
+                "payment_participant_id",
+                expected.binding().operation_id().as_str(),
+            )?,
+        ));
+    }
+    let command = AdmissionOperationCommand::new(
+        expected.binding().operation_id().clone(),
+        expected.version(),
+        recovery_lease.clone(),
+        attachments,
+        Some(AdmissionOperationState::BudgetAuthorized),
+        None,
+        None,
+    )?;
+    let updated = expected
+        .apply_command(&command, trusted_now_unix_ms)?
+        .into_operation();
+    advance_participant_bound_operation_tx(
+        transaction,
+        owner,
+        expected,
+        recovery_lease,
+        &updated,
+        participant_digest,
+        trusted_now_unix_ms,
+    )
+}
+
+pub(crate) fn verify_budget_authorization_replay_tx(
+    transaction: &Transaction<'_>,
+    operation: &AdmissionOperationV1,
+    hold_id: &str,
+    payment_required: bool,
+    participant_digest: &str,
+) -> Result<AdmissionOperationV1, AdmissionOperationStoreError> {
+    let requirements = operation.binding().participant_requirements();
+    if !matches!(
+        operation.state(),
+        AdmissionOperationState::BudgetAuthorized
+            | AdmissionOperationState::ReadyToDispatch
+            | AdmissionOperationState::CapturePending
+            | AdmissionOperationState::DispatchCommitted
+            | AdmissionOperationState::Finalizing
+            | AdmissionOperationState::Completed
+    ) || !requirements.budget_capture
+        || requirements.payment != payment_required
+        || operation
+            .budget_hold_id()
+            .is_none_or(|bound| bound.as_str() != hold_id)
+    {
+        return Err(invariant(
+            "combined budget authorization replay does not match operation requirements",
+        ));
+    }
+    let exact_commit = transaction
+        .query_row(
+            r#"
+            SELECT COUNT(*) = 1
+            FROM admission_operation_commits
+            WHERE operation_id = ?1 AND mutation_kind = ?2
+              AND participant_digest = ?3
+            "#,
+            params![
+                operation.binding().operation_id().as_str(),
+                COMBINED_CAPTURE_OPERATION_MUTATION_KIND,
+                participant_digest,
+            ],
+            |row| row.get::<_, bool>(0),
+        )
+        .map_err(sqlite_error)?;
+    if !exact_commit {
+        return Err(invariant(
+            "combined budget authorization replay lost its exact participant commit",
+        ));
+    }
+    Ok(operation.clone())
+}
+
+fn advance_participant_bound_operation_tx(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    expected: &AdmissionOperationV1,
+    recovery_lease: &AdmissionRecoveryLease,
+    updated: &AdmissionOperationV1,
+    participant_digest: &str,
+    trusted_now_unix_ms: u64,
+) -> Result<AdmissionOperationV1, AdmissionOperationStoreError> {
     let stored = load_by_operation_id_tx(transaction, expected.binding().operation_id())?
         .ok_or(AdmissionOperationStoreError::NotFound)?;
 
-    if stored.operation == updated {
+    if stored.operation == *updated {
         let exact_commit = transaction
             .query_row(
                 r#"
@@ -493,10 +1085,10 @@ pub(crate) fn advance_budget_capture_tx(
             .map_err(sqlite_error)?;
         if !exact_commit {
             return Err(invariant(
-                "dispatch-committed operation is not bound to the exact budget capture",
+                "participant-bound operation lost its exact projection commit",
             ));
         }
-        return Ok(updated);
+        return Ok(updated.clone());
     }
     if stored.operation != *expected || trusted_now_unix_ms < stored.updated_at_unix_ms {
         return Err(AdmissionOperationStoreError::Fenced);
@@ -509,7 +1101,7 @@ pub(crate) fn advance_budget_capture_tx(
         trusted_now_unix_ms,
         recovery_lease.store_fence(),
     )?;
-    let encoded = encode_operation(&updated)?;
+    let encoded = encode_operation(updated)?;
     let changed = transaction
         .execute(
             r#"
@@ -535,7 +1127,7 @@ pub(crate) fn advance_budget_capture_tx(
     }
     commit_chain::append_operation_commit_with_participant(
         transaction,
-        &updated,
+        updated,
         &encoded,
         stored.recovery_claim.as_ref(),
         COMBINED_CAPTURE_OPERATION_MUTATION_KIND,
@@ -543,7 +1135,7 @@ pub(crate) fn advance_budget_capture_tx(
         owner,
         trusted_now_unix_ms,
     )?;
-    Ok(updated)
+    Ok(updated.clone())
 }
 
 pub(crate) fn append_participant_update_tx(

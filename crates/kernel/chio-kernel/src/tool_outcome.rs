@@ -504,6 +504,10 @@ impl RawInvocationOutcomeV1 {
         self.receipt_metadata_snapshot.as_ref()
     }
 
+    pub(crate) fn reported_cost(&self) -> Option<&MonetaryAmount> {
+        self.reported_cost.as_ref()
+    }
+
     pub(crate) fn pre_invocation_guard_evidence(&self) -> &[GuardEvidence] {
         &self.pre_invocation_guard_evidence
     }

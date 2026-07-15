@@ -18,12 +18,13 @@ use crate::admission_operation::{
     AdmissionParticipantRequirements, AdmissionProjectionContext, AdmissionReceiptMetadataV1,
     AdmissionReceiptSchema, AdmissionRequestBindingV1, AdmissionTerminalProjection,
     AdmissionTerminalReplay, AuthenticatedRequestNamespace, ObservationAttemptZero,
-    ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt, SideEffectClass,
-    StoreMutationFence, VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
+    PaymentTerminalEvidence, ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt,
+    SideEffectClass, StoreMutationFence, VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
     LOCAL_SYSTEM_TENANT_ID,
 };
 use crate::budget_store::{
     BudgetAdmissionBinding, BudgetCaptureInvocationRequest, BudgetEventAuthority,
+    BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
 };
 use crate::receipt_store::QualifiedAdmissionProjectionStore;
 use crate::supplemental_quota::CanonicalRevocationSet;
@@ -129,6 +130,10 @@ pub(crate) struct DurableToolAdmission {
 }
 
 impl DurableToolAdmission {
+    pub(crate) fn operation(&self) -> &AdmissionOperationV1 {
+        &self.operation
+    }
+
     pub(crate) fn operation_id(&self) -> &str {
         self.operation.binding().operation_id().as_str()
     }
@@ -149,6 +154,10 @@ impl DurableToolAdmission {
 
     pub(crate) fn can_resume_captured_hold(&self) -> bool {
         self.operation.state() == AdmissionOperationState::CapturePending
+    }
+
+    pub(crate) fn requires_payment(&self) -> bool {
+        self.operation.binding().participant_requirements().payment
     }
 
     pub(crate) fn state(&self) -> AdmissionOperationState {
@@ -262,10 +271,22 @@ impl ChioKernel {
                 "no qualified admission operation store is configured".to_string(),
             ));
         };
-        if effect_class == SideEffectClass::Monetary {
-            return Err(KernelError::DurableAdmission(
-                "durable monetary finalization requires a qualified payment journal".to_owned(),
-            ));
+        let payment_required = effect_class == SideEffectClass::Monetary;
+        if payment_required {
+            let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
+                KernelError::DurableAdmission(
+                    "durable monetary admission requires a qualified payment adapter".to_owned(),
+                )
+            })?;
+            if adapter.rail_id().is_empty()
+                || adapter.rail_id() == "unspecified"
+                || adapter.rail_mode().is_none()
+            {
+                return Err(KernelError::DurableAdmission(
+                    "durable monetary admission requires a recoverable payment rail identity"
+                        .to_owned(),
+                ));
+            }
         }
         if self.execution_nonce_config.is_some() {
             return Err(KernelError::DurableAdmission(
@@ -276,6 +297,7 @@ impl ChioKernel {
         let observer_required = self.settlement_observer.is_some();
         if !projection_capabilities.operation_terminal
             || !projection_capabilities.tool_outcome
+            || (payment_required && !projection_capabilities.payment_terminal)
             || (observer_required && !projection_capabilities.observation_attempt_zero)
         {
             return Err(KernelError::DurableAdmission(
@@ -323,6 +345,7 @@ impl ChioKernel {
         let requirements = AdmissionParticipantRequirements {
             broker_attempt: true,
             budget_capture: true,
+            payment: payment_required,
             observation_attempt_zero: observer_required,
             ..AdmissionParticipantRequirements::NONE
         };
@@ -518,60 +541,140 @@ impl ChioKernel {
         ))
     }
 
-    pub(crate) fn record_durable_budget_authorized(
+    pub(crate) fn authorize_durable_budget_hold(
         &self,
         admission: &mut DurableToolAdmission,
-        budget_mutation: &PreExecutionBudgetMutation,
+        request: crate::budget_store::BudgetAuthorizeHoldRequest,
+        payment_journal: Option<crate::payment::PaymentJournalRecord>,
         trusted_now_unix_ms: u64,
-    ) -> Result<(), KernelError> {
+    ) -> Result<crate::budget_store::BudgetAuthorizeHoldDecision, KernelError> {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let hold = budget_mutation.durable_hold_result().ok_or_else(|| {
+        let expected = admission.operation.clone();
+        let hold_id = request.hold_id.clone().ok_or_else(|| {
             KernelError::DurableAdmission(
-                "durable admission did not produce an authoritative budget hold".to_string(),
+                "combined durable authorization omitted its budget hold identity".to_owned(),
             )
         })?;
-        let expected_authority = runtime.authority();
-        if hold.authorize_metadata.authority.as_ref() != Some(&expected_authority) {
+        if request.authority.as_ref() != Some(&runtime.authority()) {
             return Err(KernelError::DurableAdmission(
-                format!(
-                    "budget hold authority does not match the admission store fence: expected {expected_authority:?}, observed {:?}",
-                    hold.authorize_metadata.authority
-                ),
+                "combined durable authorization authority does not match the admission fence"
+                    .to_owned(),
             ));
         }
-        let expected_hold_id = admission.budget_hold_id(hold.grant_index);
-        if hold.budget_hold_id != expected_hold_id {
+        let recovery_lease =
+            self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
+        let authorization = runtime
+            .store
+            .authorize_budget_and_commit_admission(
+                &admission.operation,
+                &recovery_lease,
+                request,
+                payment_journal,
+                &runtime.fence,
+                trusted_now_unix_ms,
+            )
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        if authorization.operation.binding() != expected.binding() {
             return Err(KernelError::DurableAdmission(
-                "budget hold does not match the admission operation".to_string(),
+                "combined durable authorization changed the immutable operation binding".to_owned(),
             ));
         }
-        match admission.operation.state() {
-            AdmissionOperationState::BrokerAttemptRegistered => {
-                admission.operation = self.apply_admission_command(
-                    admission.operation.clone(),
-                    vec![AdmissionAttachment::BudgetHoldId(
-                        AdmissionIdentifier::try_new("budget_hold_id", expected_hold_id)?,
-                    )],
-                    AdmissionOperationState::BudgetAuthorized,
-                    trusted_now_unix_ms,
-                )?;
-            }
-            AdmissionOperationState::BudgetAuthorized
-            | AdmissionOperationState::ReadyToDispatch
-            | AdmissionOperationState::CapturePending
-                if admission
+        match &authorization.decision {
+            crate::budget_store::BudgetAuthorizeHoldDecision::Authorized(_) => {
+                if !matches!(
+                    authorization.operation.state(),
+                    AdmissionOperationState::BudgetAuthorized
+                        | AdmissionOperationState::ReadyToDispatch
+                        | AdmissionOperationState::CapturePending
+                        | AdmissionOperationState::DispatchCommitted
+                        | AdmissionOperationState::Finalizing
+                        | AdmissionOperationState::Completed
+                ) || authorization
                     .operation
                     .budget_hold_id()
-                    .is_some_and(|hold_id| hold_id.as_str() == expected_hold_id) => {}
-            state => {
+                    .is_none_or(|bound| bound.as_str() != hold_id)
+                {
+                    return Err(KernelError::DurableAdmission(
+                        "combined durable authorization returned an unbound operation".to_owned(),
+                    ));
+                }
+            }
+            crate::budget_store::BudgetAuthorizeHoldDecision::Denied(_)
+            | crate::budget_store::BudgetAuthorizeHoldDecision::ApprovalRequired(_)
+                if authorization.operation == expected => {}
+            crate::budget_store::BudgetAuthorizeHoldDecision::AlreadyCaptured(_)
+                if authorization.operation.state() == AdmissionOperationState::CapturePending
+                    && authorization
+                        .operation
+                        .budget_hold_id()
+                        .is_some_and(|bound| bound.as_str() == hold_id) => {}
+            _ => {
                 return Err(KernelError::DurableAdmission(format!(
-                    "budget authorization cannot resume from state {state:?}"
+                    "combined durable authorization returned incompatible operation state {:?}",
+                    authorization.operation.state()
                 )));
             }
         }
-        Ok(())
+        admission.operation = authorization.operation;
+        Ok(authorization.decision)
+    }
+
+    pub(crate) fn load_durable_payment_journal(
+        &self,
+        admission: &DurableToolAdmission,
+    ) -> Result<crate::payment::PaymentJournalRecord, KernelError> {
+        let runtime = self.durable_runtime()?;
+        let _mutation_guard = runtime.lock_mutations()?;
+        let journal = runtime
+            .store
+            .load_payment_journal(admission.operation_id(), &runtime.fence)
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
+            .ok_or_else(|| {
+                KernelError::DurableAdmission(
+                    "durable payment participant is absent for the admission operation".to_owned(),
+                )
+            })?;
+        journal
+            .validate()
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        if journal.operation_id != admission.operation_id() {
+            return Err(KernelError::DurableAdmission(
+                "durable payment participant changed operation identity".to_owned(),
+            ));
+        }
+        Ok(journal)
+    }
+
+    pub(crate) fn advance_durable_payment_journal(
+        &self,
+        admission: &DurableToolAdmission,
+        expected: &crate::payment::PaymentJournalRecord,
+        transition: &crate::payment::PaymentJournalTransition,
+        trusted_now_unix_ms: u64,
+    ) -> Result<crate::payment::PaymentJournalRecord, KernelError> {
+        let runtime = self.durable_runtime()?;
+        let _mutation_guard = runtime.lock_mutations()?;
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let recovery_lease =
+            self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
+        let journal = runtime
+            .store
+            .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
+                operation: &admission.operation,
+                recovery_lease: &recovery_lease,
+                expected,
+                transition,
+                release_evidence: None,
+                active_fence: &runtime.fence,
+                trusted_now_unix_ms,
+            })
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        journal
+            .validate()
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        Ok(journal)
     }
 
     pub(crate) fn mark_durable_capture_pending(
@@ -643,7 +746,7 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        let charge = budget_mutation.durable_hold_result().ok_or_else(|| {
+        let charge = budget_mutation.durable_hold_result_mut().ok_or_else(|| {
             KernelError::DurableAdmission(
                 "combined dispatch commit requires an authorized budget hold".to_owned(),
             )
@@ -660,7 +763,7 @@ impl ChioKernel {
             AdmissionOperationState::CapturePending => {
                 let recovery_lease =
                     self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
-                admission.operation = runtime
+                let capture = runtime
                     .store
                     .capture_invocation_and_commit_dispatch(
                         &admission.operation,
@@ -670,6 +773,14 @@ impl ChioKernel {
                         trusted_now_unix_ms,
                     )
                     .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+                admission.operation = capture.operation;
+                let mutation = match capture.decision {
+                    crate::budget_store::BudgetInvocationCaptureDecision::Captured(mutation)
+                    | crate::budget_store::BudgetInvocationCaptureDecision::AlreadyCaptured(
+                        mutation,
+                    ) => mutation,
+                };
+                charge.invocation_capture = Some(Box::new(mutation));
             }
             AdmissionOperationState::DispatchCommitted => {}
             state => {
@@ -678,7 +789,6 @@ impl ChioKernel {
                 )));
             }
         }
-        self.capture_invocation(capability, budget_mutation)?;
         Ok(())
     }
 

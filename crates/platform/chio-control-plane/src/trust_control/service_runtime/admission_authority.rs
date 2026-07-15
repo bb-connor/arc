@@ -4,15 +4,19 @@ use chio_kernel::admission_operation::{
     AdmissionOperationStore, AdmissionOperationStoreError, AdmissionOperationV1,
     QualifiedAdmissionOperationStoreExt, StoreMutationFence,
 };
-use chio_kernel::budget_store::{BudgetCaptureInvocationRequest, BudgetEventAuthority};
+use chio_kernel::budget_store::{
+    BudgetAuthorizeHoldDecision, BudgetCaptureInvocationRequest, BudgetEventAuthority,
+    BudgetInvocationCaptureDecision, BudgetReconcileHoldRequest,
+};
 use chio_kernel::receipt_store::{
+    AdmissionPaymentJournalAdvance, AdmissionPaymentJournalError, AdmissionPaymentSettlementBegin,
     QualifiedAdmissionProjectionStore, ReceiptStore, ReceiptStoreError,
 };
 use chio_kernel::tool_outcome::{
     CanonicalResolvedOutputBlobV1, PostReturnEvaluationRecordV1, RawInvocationOutcomeV1,
     ToolOutcomeInsertResultV1, ToolOutcomeRecordV1, ToolOutcomeStore, ToolOutcomeStoreError,
 };
-use chio_store_sqlite::{SqliteAdmissionOperationStore, SqliteToolOutcomeStore};
+use chio_store_sqlite::{SqliteAdmissionOperationStore, SqliteBudgetStore, SqliteToolOutcomeStore};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -64,12 +68,14 @@ fn handle_request(
     }
     let operations = authority.admission_operation_store();
     let outcomes = authority.tool_outcome_store();
+    let budget = authority.budget_store();
     match handle_action(
         request.action,
         request.payload,
         &fence,
         &operations,
         &outcomes,
+        &budget,
     ) {
         Ok(value) => AdmissionAuthorityResponse::success(&value).unwrap_or_else(|error| {
             AdmissionAuthorityResponse::failure(
@@ -91,6 +97,7 @@ fn handle_action(
     fence: &StoreMutationFence,
     operations: &SqliteAdmissionOperationStore,
     outcomes: &SqliteToolOutcomeStore,
+    budget: &SqliteBudgetStore,
 ) -> Result<serde_json::Value, AdmissionAuthorityWireError> {
     match action {
         AdmissionAuthorityAction::Status => encode(&AdmissionAuthorityStatusWire {
@@ -370,6 +377,181 @@ fn handle_action(
                 .map(|blob| STANDARD.encode(blob.bytes()));
             encode(&value)
         }
+        AdmissionAuthorityAction::LoadPaymentJournal => {
+            let request: OperationIdWire = decode(payload)?;
+            let journal = operations
+                .load_payment_journal(request.operation_id.as_str(), fence)
+                .map_err(payment_journal_store_error)?;
+            encode(&journal)
+        }
+        AdmissionAuthorityAction::AdvancePaymentJournal => {
+            let request: AdmissionPaymentAdvanceWire = decode(payload)?;
+            if request.active_fence != *fence {
+                return Err(wire_error(
+                    AdmissionAuthorityErrorCode::Fenced,
+                    "payment journal serving owner changed",
+                ));
+            }
+            let operation = AdmissionOperationV1::from_persisted(request.operation)
+                .map_err(invalid_operation)?;
+            let release_evidence = request
+                .release_evidence
+                .map(chio_kernel::tool_outcome::MonetaryReleaseEvidenceV1::from_persisted)
+                .transpose()
+                .map_err(invalid_outcome)?;
+            let lease = qualify_lease(
+                operations,
+                request.recovery_claim,
+                request.trusted_now_unix_ms,
+                fence,
+            )?;
+            let journal = operations
+                .advance_payment_journal(AdmissionPaymentJournalAdvance {
+                    operation: &operation,
+                    recovery_lease: &lease,
+                    expected: &request.expected,
+                    transition: &request.transition,
+                    release_evidence: release_evidence.as_ref(),
+                    active_fence: &request.active_fence,
+                    trusted_now_unix_ms: request.trusted_now_unix_ms,
+                })
+                .map_err(payment_journal_store_error)?;
+            encode(&journal)
+        }
+        AdmissionAuthorityAction::BeginPaymentSettlement => {
+            let request: AdmissionPaymentSettlementBeginWire = decode(payload)?;
+            if request.active_fence != *fence {
+                return Err(wire_error(
+                    AdmissionAuthorityErrorCode::Fenced,
+                    "payment settlement serving owner changed",
+                ));
+            }
+            if request.budget_reconcile.schema != STRUCTURED_BUDGET_REQUEST_SCHEMA {
+                return Err(invalid_request(
+                    "payment settlement budget schema is invalid".to_owned(),
+                ));
+            }
+            let operation = AdmissionOperationV1::from_persisted(request.operation)
+                .map_err(invalid_operation)?;
+            let release_evidence = request
+                .release_evidence
+                .map(chio_kernel::tool_outcome::MonetaryReleaseEvidenceV1::from_persisted)
+                .transpose()
+                .map_err(invalid_outcome)?;
+            let lease = qualify_lease(
+                operations,
+                request.recovery_claim,
+                request.trusted_now_unix_ms,
+                fence,
+            )?;
+            let grant_index = request.budget_reconcile.grant_index;
+            let capability_id = request.budget_reconcile.capability_id.clone();
+            let hold_id = request.budget_reconcile.hold_id.clone();
+            let event_id = request.budget_reconcile.event_id.clone();
+            let settlement = operations
+                .begin_payment_settlement(AdmissionPaymentSettlementBegin {
+                    operation: &operation,
+                    recovery_lease: &lease,
+                    expected: &request.expected,
+                    transition: request.transition.as_ref(),
+                    release_evidence: release_evidence.as_ref(),
+                    budget_reconcile: BudgetReconcileHoldRequest {
+                        capability_id: capability_id.clone(),
+                        grant_index: usize::try_from(grant_index).map_err(|_| {
+                            invalid_request(
+                                "payment settlement budget grant index overflowed".to_owned(),
+                            )
+                        })?,
+                        exposed_cost_units: request.budget_reconcile.exposed_cost_units,
+                        realized_spend_units: request.budget_reconcile.realized_spend_units,
+                        hold_id: Some(hold_id.clone()),
+                        event_id: Some(event_id.clone()),
+                        authority: Some(BudgetEventAuthority {
+                            authority_id: request.authority_id,
+                            lease_id: request.authority_lease_id,
+                            lease_epoch: request.authority_lease_epoch,
+                        }),
+                    },
+                    active_fence: &request.active_fence,
+                    trusted_now_unix_ms: request.trusted_now_unix_ms,
+                })
+                .map_err(payment_journal_store_error)?;
+            let decision = if settlement.budget_already_reconciled {
+                StructuredBudgetMutationDecisionView::AlreadyApplied
+            } else {
+                StructuredBudgetMutationDecisionView::Applied
+            };
+            let budget = super::super::budget_handlers::exact_structured_mutation_projection(
+                budget,
+                Some(&capability_id),
+                Some(grant_index),
+                hold_id,
+                event_id,
+                decision,
+                settlement.budget,
+            )
+            .map_err(|_| {
+                wire_error(
+                    AdmissionAuthorityErrorCode::Invariant,
+                    "payment settlement budget projection is inconsistent",
+                )
+            })?;
+            encode(&AdmissionPaymentSettlementResultWire {
+                journal: settlement.journal,
+                budget,
+            })
+        }
+        AdmissionAuthorityAction::AuthorizeBudgetAndCommitAdmission => {
+            let request: AdmissionBudgetAuthorizeWire = decode(payload)?;
+            if request.active_fence != *fence {
+                return Err(AdmissionAuthorityWireError {
+                    code: AdmissionAuthorityErrorCode::Fenced,
+                    message: "combined budget authorization serving owner changed".to_owned(),
+                });
+            }
+            let operation = AdmissionOperationV1::from_persisted(request.operation)
+                .map_err(invalid_operation)?;
+            let lease = qualify_lease(
+                operations,
+                request.recovery_claim,
+                request.trusted_now_unix_ms,
+                fence,
+            )?;
+            let capability_id = request.budget.capability_id.clone();
+            let grant_index = request.budget.grant_index;
+            let hold_id = request.budget.hold_id.clone();
+            let event_id = request.budget.event_id.clone();
+            let budget_request = request
+                .budget
+                .into_core(Some(BudgetEventAuthority {
+                    authority_id: request.authority_id,
+                    lease_id: request.authority_lease_id,
+                    lease_epoch: request.authority_lease_epoch,
+                }))
+                .map_err(invalid_request)?;
+            let (decision, updated) = operations
+                .authorize_budget_and_commit_admission(
+                    &operation,
+                    &lease,
+                    budget_request,
+                    request.payment_journal,
+                    &request.active_fence,
+                    request.trusted_now_unix_ms,
+                )
+                .map_err(admission_capture_error)?;
+            let budget = structured_authorization_response(
+                budget,
+                capability_id,
+                grant_index,
+                hold_id,
+                event_id,
+                decision,
+            )?;
+            encode(&AdmissionBudgetAuthorizeResultWire {
+                budget,
+                operation: updated.to_persisted(),
+            })
+        }
         AdmissionAuthorityAction::CaptureInvocationAndCommitDispatch => {
             let request: AdmissionDispatchCaptureWire = decode(payload)?;
             if request.active_fence != *fence {
@@ -386,12 +568,12 @@ fn handle_action(
                 request.trusted_now_unix_ms,
                 fence,
             )?;
-            let updated = operations
+            let (decision, updated) = operations
                 .capture_invocation_and_commit_dispatch(
                     &operation,
                     &lease,
                     BudgetCaptureInvocationRequest {
-                        capability_id: request.capability_id,
+                        capability_id: request.capability_id.clone(),
                         grant_index: usize::try_from(request.grant_index).map_err(|_| {
                             AdmissionAuthorityWireError {
                                 code: AdmissionAuthorityErrorCode::InvalidRequest,
@@ -399,8 +581,8 @@ fn handle_action(
                                     .to_owned(),
                             }
                         })?,
-                        hold_id: request.hold_id,
-                        event_id: request.event_id,
+                        hold_id: request.hold_id.clone(),
+                        event_id: request.event_id.clone(),
                         trusted_time: None,
                         authority: Some(BudgetEventAuthority {
                             authority_id: request.authority_id,
@@ -412,7 +594,34 @@ fn handle_action(
                     request.trusted_now_unix_ms,
                 )
                 .map_err(admission_capture_error)?;
-            encode(&updated.to_persisted())
+            let (decision, mutation) = match decision {
+                BudgetInvocationCaptureDecision::Captured(mutation) => {
+                    (StructuredBudgetMutationDecisionView::Applied, mutation)
+                }
+                BudgetInvocationCaptureDecision::AlreadyCaptured(mutation) => (
+                    StructuredBudgetMutationDecisionView::AlreadyApplied,
+                    mutation,
+                ),
+            };
+            let budget = super::super::budget_handlers::exact_structured_mutation_projection(
+                budget,
+                Some(&request.capability_id),
+                Some(request.grant_index),
+                request.hold_id,
+                request.event_id,
+                decision,
+                mutation,
+            )
+            .map_err(|_| {
+                wire_error(
+                    AdmissionAuthorityErrorCode::Invariant,
+                    "combined admission capture projection is inconsistent",
+                )
+            })?;
+            encode(&AdmissionDispatchCaptureResultWire {
+                budget,
+                operation: updated.to_persisted(),
+            })
         }
         AdmissionAuthorityAction::CommitTerminalProjection => {
             let request: CommitTerminalProjectionWire = decode(payload)?;
@@ -483,6 +692,73 @@ fn encode<T: Serialize>(value: &T) -> Result<serde_json::Value, AdmissionAuthori
     })
 }
 
+fn structured_authorization_response(
+    store: &SqliteBudgetStore,
+    capability_id: String,
+    grant_index: u32,
+    hold_id: String,
+    event_id: String,
+    decision: BudgetAuthorizeHoldDecision,
+) -> Result<StructuredBudgetAuthorizeResponse, AdmissionAuthorityWireError> {
+    let mutation_event_id = match &decision {
+        BudgetAuthorizeHoldDecision::Authorized(value) => value.metadata.event_id.as_deref(),
+        BudgetAuthorizeHoldDecision::ApprovalRequired(value) => value.metadata.event_id.as_deref(),
+        BudgetAuthorizeHoldDecision::Denied(value) => value.metadata.event_id.as_deref(),
+        BudgetAuthorizeHoldDecision::AlreadyCaptured(value) => value.metadata.event_id.as_deref(),
+    }
+    .ok_or_else(|| invalid_request("combined budget authorization omitted its mutation event"))?;
+    let event = store
+        .mutation_event_for_event_id(mutation_event_id)
+        .map_err(|error| invalid_request(error.to_string()))?
+        .ok_or_else(|| invalid_request("combined budget authorization event is not durable"))?;
+    if event.capability_id != capability_id
+        || event.grant_index != grant_index
+        || event.hold_id.as_deref() != Some(hold_id.as_str())
+    {
+        return Err(invalid_request(
+            "combined budget authorization event changed request identity",
+        ));
+    }
+    let usage = store
+        .usage_projection_for_event_id(mutation_event_id)
+        .map_err(|error| invalid_request(error.to_string()))?;
+    let usage = match (event.usage_seq, usage) {
+        (Some(expected_seq), Some(usage))
+            if usage.seq == expected_seq
+                && usage.capability_id == event.capability_id
+                && usage.grant_index == event.grant_index
+                && usage.invocation_count == event.invocation_count_after
+                && usage.total_cost_exposed == event.total_cost_exposed_after
+                && usage.total_cost_realized_spend == event.total_cost_realized_spend_after =>
+        {
+            usage.into()
+        }
+        (None, None) => StructuredBudgetUsageView {
+            capability_id: event.capability_id.clone(),
+            grant_index: event.grant_index,
+            invocation_count: event.invocation_count_after,
+            updated_at: event.recorded_at,
+            seq: None,
+            total_cost_exposed: event.total_cost_exposed_after,
+            total_cost_realized_spend: event.total_cost_realized_spend_after,
+        },
+        _ => {
+            return Err(invalid_request(
+                "combined budget authorization usage does not match its mutation event",
+            ))
+        }
+    };
+    StructuredBudgetAuthorizeResponse::from_core(
+        capability_id,
+        grant_index,
+        hold_id,
+        event_id,
+        decision,
+        usage,
+    )
+    .map_err(invalid_request)
+}
+
 fn invalid_request(message: impl Into<String>) -> AdmissionAuthorityWireError {
     wire_error(AdmissionAuthorityErrorCode::InvalidRequest, message)
 }
@@ -526,6 +802,19 @@ fn admission_capture_error(
         AdmissionCaptureError::Invariant(_) | AdmissionCaptureError::Operation(_) => {
             AdmissionAuthorityErrorCode::Invariant
         }
+    };
+    wire_error(code, error.to_string())
+}
+
+fn payment_journal_store_error(error: AdmissionPaymentJournalError) -> AdmissionAuthorityWireError {
+    let code = match error {
+        AdmissionPaymentJournalError::Unavailable(_) => AdmissionAuthorityErrorCode::Unavailable,
+        AdmissionPaymentJournalError::Fenced => AdmissionAuthorityErrorCode::Fenced,
+        AdmissionPaymentJournalError::Conflict(_) => AdmissionAuthorityErrorCode::CasConflict,
+        AdmissionPaymentJournalError::OutcomeUnknown(_) => {
+            AdmissionAuthorityErrorCode::OutcomeUnknown
+        }
+        AdmissionPaymentJournalError::Invariant(_) => AdmissionAuthorityErrorCode::Invariant,
     };
     wire_error(code, error.to_string())
 }

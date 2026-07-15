@@ -8,10 +8,520 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub struct PaymentAuthorization {
     /// Payment rail's authorization or hold identifier.
     pub authorization_id: String,
-    /// Whether the rail already considers the funds fully settled.
-    pub settled: bool,
+    /// Whether authorization created a reversible hold or completed final prepayment.
+    pub state: PaymentAuthorizationState,
     /// Rail-specific metadata such as idempotency keys, quote IDs, or expiry.
     pub metadata: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PaymentAuthorizationState {
+    Held,
+    PrepaidFinal,
+}
+
+impl PaymentAuthorizationState {
+    #[must_use]
+    pub const fn is_final(self) -> bool {
+        matches!(self, Self::PrepaidFinal)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PaymentRailMode {
+    ReversibleHold,
+    PrepaidFinal,
+}
+
+impl PaymentRailMode {
+    #[must_use]
+    pub const fn accepts(self, state: PaymentAuthorizationState) -> bool {
+        matches!(
+            (self, state),
+            (Self::ReversibleHold, PaymentAuthorizationState::Held)
+                | (Self::PrepaidFinal, PaymentAuthorizationState::PrepaidFinal)
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PaymentJournalState {
+    HoldPlaced,
+    Authorized,
+    Settling,
+    Settled,
+    Closed,
+    ReconcileFailed,
+}
+
+impl PaymentJournalState {
+    #[must_use]
+    pub const fn can_advance_to(self, next: Self, rail_mode: PaymentRailMode) -> bool {
+        matches!(
+            (rail_mode, self, next),
+            (
+                PaymentRailMode::ReversibleHold,
+                Self::HoldPlaced,
+                Self::Authorized | Self::ReconcileFailed
+            ) | (
+                PaymentRailMode::ReversibleHold,
+                Self::Authorized,
+                Self::Settling | Self::ReconcileFailed
+            ) | (
+                PaymentRailMode::ReversibleHold,
+                Self::Settling,
+                Self::Settled | Self::ReconcileFailed
+            ) | (_, Self::Settled, Self::Closed)
+                | (
+                    PaymentRailMode::PrepaidFinal,
+                    Self::HoldPlaced,
+                    Self::Settled | Self::ReconcileFailed
+                )
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PaymentSettleAction {
+    Capture,
+    Release,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PaymentJournalTransition {
+    AuthorizationHeld {
+        authorization_id: String,
+    },
+    PrepaymentSettled {
+        authorization_id: String,
+    },
+    BeginCapture {
+        amount_units: u64,
+    },
+    BeginRelease {
+        authority: PaymentReleaseAuthorityBinding,
+    },
+    SettlementCompleted {
+        transaction_id: String,
+    },
+    ReconcileFailed,
+    Close,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PaymentReleaseAuthorityKind {
+    PreDispatchNoEffect,
+    TransportNotAccepted,
+    ContractualZeroCharge,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaymentReleaseAuthorityBinding {
+    pub kind: PaymentReleaseAuthorityKind,
+    pub operation_id: String,
+    pub operation_version: u64,
+    pub evidence_id: String,
+    pub evidence_digest: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaymentJournalRecord {
+    pub operation_id: String,
+    pub journal_version: u64,
+    pub request_namespace_digest: String,
+    pub request_id: String,
+    pub capability_id: String,
+    pub grant_index: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hold_id: Option<String>,
+    pub rail: String,
+    pub rail_mode: PaymentRailMode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transaction_id: Option<String>,
+    pub amount_units: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settle_action: Option<PaymentSettleAction>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settle_amount_units: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub release_authority: Option<PaymentReleaseAuthorityBinding>,
+    pub currency: String,
+    pub state: PaymentJournalState,
+    pub created_at_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("invalid payment journal record: {0}")]
+pub struct PaymentJournalError(String);
+
+impl PaymentJournalRecord {
+    #[must_use]
+    pub fn matches_hold_replay(&self, proposed: &Self) -> bool {
+        if proposed.state != PaymentJournalState::HoldPlaced
+            || proposed.journal_version != 1
+            || self.validate().is_err()
+            || proposed.validate().is_err()
+        {
+            return false;
+        }
+        self.operation_id == proposed.operation_id
+            && self.request_namespace_digest == proposed.request_namespace_digest
+            && self.request_id == proposed.request_id
+            && self.capability_id == proposed.capability_id
+            && self.grant_index == proposed.grant_index
+            && self.hold_id == proposed.hold_id
+            && self.rail == proposed.rail
+            && self.rail_mode == proposed.rail_mode
+            && self.amount_units == proposed.amount_units
+            && self.currency == proposed.currency
+    }
+
+    pub fn validate(&self) -> Result<(), PaymentJournalError> {
+        validate_payment_text("operation_id", &self.operation_id)?;
+        if self.journal_version == 0 || self.journal_version > ((1_u64 << 53) - 1) {
+            return Err(PaymentJournalError(
+                "journal_version must be a positive I-JSON safe integer".to_owned(),
+            ));
+        }
+        validate_payment_digest("request_namespace_digest", &self.request_namespace_digest)?;
+        validate_payment_text("request_id", &self.request_id)?;
+        validate_payment_text("capability_id", &self.capability_id)?;
+        let hold_id = self
+            .hold_id
+            .as_deref()
+            .ok_or_else(|| PaymentJournalError("hold_id is required".to_owned()))?;
+        validate_payment_text("hold_id", hold_id)?;
+        validate_payment_text("rail", &self.rail)?;
+        if self.rail == "unspecified" {
+            return Err(PaymentJournalError(
+                "rail must identify a recoverable payment adapter".to_owned(),
+            ));
+        }
+        if self.amount_units == 0 || self.amount_units > ((1_u64 << 53) - 1) {
+            return Err(PaymentJournalError(
+                "amount_units must be a positive I-JSON safe integer".to_owned(),
+            ));
+        }
+        if self.currency.len() != 3 || !self.currency.bytes().all(|byte| byte.is_ascii_uppercase())
+        {
+            return Err(PaymentJournalError(
+                "currency must be a three-letter uppercase code".to_owned(),
+            ));
+        }
+        if self.created_at_unix_ms == 0 || self.created_at_unix_ms > ((1_u64 << 53) - 1) {
+            return Err(PaymentJournalError(
+                "created_at_unix_ms must be a positive I-JSON safe integer".to_owned(),
+            ));
+        }
+        self.authorization_id
+            .as_deref()
+            .map(|value| validate_payment_text("authorization_id", value))
+            .transpose()?;
+        self.transaction_id
+            .as_deref()
+            .map(|value| validate_payment_text("transaction_id", value))
+            .transpose()?;
+        match self.state {
+            PaymentJournalState::HoldPlaced => {
+                if self.journal_version != 1 {
+                    return Err(PaymentJournalError(
+                        "hold_placed must be journal version 1".to_owned(),
+                    ));
+                }
+                self.validate_empty_settlement("hold_placed")?;
+            }
+            PaymentJournalState::Authorized => {
+                if self.rail_mode != PaymentRailMode::ReversibleHold {
+                    return Err(PaymentJournalError(
+                        "only a reversible rail can retain an authorized hold".to_owned(),
+                    ));
+                }
+                self.require_authorization_id("authorized")?;
+                if self.transaction_id.is_some()
+                    || self.settle_action.is_some()
+                    || self.settle_amount_units.is_some()
+                    || self.release_authority.is_some()
+                {
+                    return Err(PaymentJournalError(
+                        "authorized state cannot contain a terminal settle result".to_owned(),
+                    ));
+                }
+            }
+            PaymentJournalState::Settling => {
+                if self.rail_mode != PaymentRailMode::ReversibleHold {
+                    return Err(PaymentJournalError(
+                        "only a reversible rail can enter settling".to_owned(),
+                    ));
+                }
+                self.require_authorization_id("settling")?;
+                if self.transaction_id.is_some() {
+                    return Err(PaymentJournalError(
+                        "settling cannot contain a terminal transaction_id".to_owned(),
+                    ));
+                }
+                self.validate_settle_intent()?;
+            }
+            PaymentJournalState::Settled | PaymentJournalState::Closed => {
+                self.require_authorization_id("terminal")?;
+                match self.rail_mode {
+                    PaymentRailMode::PrepaidFinal => {
+                        if self.transaction_id.is_some()
+                            || self.settle_action.is_some()
+                            || self.settle_amount_units.is_some()
+                            || self.release_authority.is_some()
+                        {
+                            return Err(PaymentJournalError(
+                                "final prepayment cannot contain synthetic settlement fields"
+                                    .to_owned(),
+                            ));
+                        }
+                    }
+                    PaymentRailMode::ReversibleHold => {
+                        if self.transaction_id.is_none() {
+                            return Err(PaymentJournalError(
+                                "a terminal reversible hold requires transaction_id".to_owned(),
+                            ));
+                        }
+                        self.validate_settle_intent()?;
+                    }
+                }
+            }
+            PaymentJournalState::ReconcileFailed => self.validate_reconcile_shape()?,
+        }
+        Ok(())
+    }
+
+    pub fn apply_transition(
+        &self,
+        transition: &PaymentJournalTransition,
+    ) -> Result<Self, PaymentJournalError> {
+        self.validate()?;
+        let mut next = self.clone();
+        next.journal_version = self
+            .journal_version
+            .checked_add(1)
+            .ok_or_else(|| PaymentJournalError("journal_version overflowed".to_owned()))?;
+        let next_state = match transition {
+            PaymentJournalTransition::AuthorizationHeld { authorization_id } => {
+                if self.state != PaymentJournalState::HoldPlaced
+                    || self.rail_mode != PaymentRailMode::ReversibleHold
+                {
+                    return Err(PaymentJournalError(
+                        "held authorization requires a reversible hold_placed journal".to_owned(),
+                    ));
+                }
+                next.authorization_id = Some(authorization_id.clone());
+                PaymentJournalState::Authorized
+            }
+            PaymentJournalTransition::PrepaymentSettled { authorization_id } => {
+                if self.state != PaymentJournalState::HoldPlaced
+                    || self.rail_mode != PaymentRailMode::PrepaidFinal
+                {
+                    return Err(PaymentJournalError(
+                        "final prepayment requires a prepaid hold_placed journal".to_owned(),
+                    ));
+                }
+                next.authorization_id = Some(authorization_id.clone());
+                PaymentJournalState::Settled
+            }
+            PaymentJournalTransition::BeginCapture { amount_units } => {
+                if self.state != PaymentJournalState::Authorized {
+                    return Err(PaymentJournalError(
+                        "capture intent requires an authorized journal".to_owned(),
+                    ));
+                }
+                next.settle_action = Some(PaymentSettleAction::Capture);
+                next.settle_amount_units = Some(*amount_units);
+                PaymentJournalState::Settling
+            }
+            PaymentJournalTransition::BeginRelease { authority } => {
+                if self.state != PaymentJournalState::Authorized {
+                    return Err(PaymentJournalError(
+                        "release intent requires an authorized journal".to_owned(),
+                    ));
+                }
+                next.settle_action = Some(PaymentSettleAction::Release);
+                next.release_authority = Some(authority.clone());
+                PaymentJournalState::Settling
+            }
+            PaymentJournalTransition::SettlementCompleted { transaction_id } => {
+                if self.state != PaymentJournalState::Settling {
+                    return Err(PaymentJournalError(
+                        "settlement completion requires a settling journal".to_owned(),
+                    ));
+                }
+                next.transaction_id = Some(transaction_id.clone());
+                PaymentJournalState::Settled
+            }
+            PaymentJournalTransition::ReconcileFailed => {
+                if matches!(
+                    self.state,
+                    PaymentJournalState::Settled
+                        | PaymentJournalState::Closed
+                        | PaymentJournalState::ReconcileFailed
+                ) {
+                    return Err(PaymentJournalError(
+                        "terminal payment journal cannot enter reconciliation failure".to_owned(),
+                    ));
+                }
+                PaymentJournalState::ReconcileFailed
+            }
+            PaymentJournalTransition::Close => {
+                if self.state != PaymentJournalState::Settled {
+                    return Err(PaymentJournalError(
+                        "only a settled payment journal can close".to_owned(),
+                    ));
+                }
+                PaymentJournalState::Closed
+            }
+        };
+        if !self.state.can_advance_to(next_state, self.rail_mode) {
+            return Err(PaymentJournalError(
+                "payment journal transition is not permitted".to_owned(),
+            ));
+        }
+        next.state = next_state;
+        next.validate()?;
+        Ok(next)
+    }
+
+    fn require_authorization_id(&self, state: &str) -> Result<(), PaymentJournalError> {
+        if self.authorization_id.is_none() {
+            return Err(PaymentJournalError(format!(
+                "{state} state requires authorization_id"
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_empty_settlement(&self, state: &str) -> Result<(), PaymentJournalError> {
+        if self.authorization_id.is_some()
+            || self.transaction_id.is_some()
+            || self.settle_action.is_some()
+            || self.settle_amount_units.is_some()
+            || self.release_authority.is_some()
+        {
+            return Err(PaymentJournalError(format!(
+                "{state} cannot contain rail results or a settle intent"
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_settle_intent(&self) -> Result<(), PaymentJournalError> {
+        match self.settle_action {
+            Some(PaymentSettleAction::Capture) => {
+                let amount = self.settle_amount_units.ok_or_else(|| {
+                    PaymentJournalError("capture requires settle_amount_units".to_owned())
+                })?;
+                if amount == 0 || amount > self.amount_units {
+                    return Err(PaymentJournalError(
+                        "settle_amount_units must be within the authorized amount".to_owned(),
+                    ));
+                }
+                if self.release_authority.is_some() {
+                    return Err(PaymentJournalError(
+                        "capture cannot contain release authority".to_owned(),
+                    ));
+                }
+            }
+            Some(PaymentSettleAction::Release) => {
+                if self.settle_amount_units.is_some() {
+                    return Err(PaymentJournalError(
+                        "release cannot contain settle_amount_units".to_owned(),
+                    ));
+                }
+                self.release_authority
+                    .as_ref()
+                    .ok_or_else(|| {
+                        PaymentJournalError("release requires verified authority".to_owned())
+                    })?
+                    .validate_for(&self.operation_id)?;
+            }
+            None => {
+                return Err(PaymentJournalError(
+                    "settling requires a committed action".to_owned(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_reconcile_shape(&self) -> Result<(), PaymentJournalError> {
+        if self.transaction_id.is_some() && self.authorization_id.is_none() {
+            return Err(PaymentJournalError(
+                "reconcile_failed transaction requires authorization_id".to_owned(),
+            ));
+        }
+        match self.settle_action {
+            Some(_) => {
+                if self.rail_mode != PaymentRailMode::ReversibleHold {
+                    return Err(PaymentJournalError(
+                        "final prepayment cannot contain a settle intent".to_owned(),
+                    ));
+                }
+                self.require_authorization_id("reconcile_failed")?;
+                self.validate_settle_intent()
+            }
+            None => {
+                if self.settle_amount_units.is_some() || self.release_authority.is_some() {
+                    return Err(PaymentJournalError(
+                        "reconcile_failed contains an incomplete settle intent".to_owned(),
+                    ));
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl PaymentReleaseAuthorityBinding {
+    fn validate_for(&self, operation_id: &str) -> Result<(), PaymentJournalError> {
+        if self.operation_id != operation_id {
+            return Err(PaymentJournalError(
+                "release authority is bound to another operation".to_owned(),
+            ));
+        }
+        if self.operation_version == 0 || self.operation_version > ((1_u64 << 53) - 1) {
+            return Err(PaymentJournalError(
+                "release authority version must be a positive I-JSON safe integer".to_owned(),
+            ));
+        }
+        validate_payment_text("release evidence_id", &self.evidence_id)?;
+        validate_payment_digest("release evidence_digest", &self.evidence_digest)
+    }
+}
+
+fn validate_payment_text(field: &str, value: &str) -> Result<(), PaymentJournalError> {
+    if value.is_empty() || value.len() > 512 || value.chars().any(char::is_control) {
+        return Err(PaymentJournalError(format!(
+            "{field} must contain 1 to 512 non-control bytes"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_payment_digest(field: &str, value: &str) -> Result<(), PaymentJournalError> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(PaymentJournalError(format!(
+            "{field} must be a lowercase SHA-256 digest"
+        )));
+    }
+    Ok(())
 }
 
 /// Result of a capture, settlement, release, or refund operation.
@@ -36,6 +546,18 @@ pub enum RailSettlementStatus {
     Failed,
     Released,
     Refunded,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RailSettlementState {
+    NoAuthorization,
+    Held {
+        authorization_id: String,
+    },
+    Settled {
+        authorization_id: String,
+        result: PaymentResult,
+    },
 }
 
 impl RailSettlementStatus {
@@ -124,7 +646,7 @@ impl ReceiptSettlement {
     pub fn from_authorization(authorization: &PaymentAuthorization) -> Self {
         Self {
             payment_reference: Some(authorization.authorization_id.clone()),
-            settlement_status: if authorization.settled {
+            settlement_status: if authorization.state.is_final() {
                 SettlementStatus::Settled
             } else {
                 SettlementStatus::Pending
@@ -148,13 +670,27 @@ impl ReceiptSettlement {
 
 /// Trait for executing payments against an external rail.
 pub trait PaymentAdapter: Send + Sync {
+    fn rail_id(&self) -> &'static str {
+        "unspecified"
+    }
+
+    fn rail_mode(&self) -> Option<PaymentRailMode> {
+        None
+    }
+
     /// Authorize or prepay up to `amount_units` before the tool executes.
+    ///
+    /// Implementations must be idempotent by `request.reference`: repeating the
+    /// same request returns the same authorization and creates at most one
+    /// rail-side hold or prepayment.
     fn authorize(
         &self,
         request: &PaymentAuthorizeRequest,
     ) -> Result<PaymentAuthorization, PaymentError>;
 
     /// Finalize payment for the actual cost after tool execution.
+    ///
+    /// Implementations must be idempotent by `(authorization_id, reference)`.
     fn capture(
         &self,
         authorization_id: &str,
@@ -164,6 +700,8 @@ pub trait PaymentAdapter: Send + Sync {
     ) -> Result<PaymentResult, PaymentError>;
 
     /// Release an unused authorization hold.
+    ///
+    /// Implementations must be idempotent by `(authorization_id, reference)`.
     fn release(
         &self,
         authorization_id: &str,
@@ -178,6 +716,22 @@ pub trait PaymentAdapter: Send + Sync {
         currency: &str,
         reference: &str,
     ) -> Result<PaymentResult, PaymentError>;
+
+    /// Return the side-effect-free rail state for a durable reference.
+    ///
+    /// This query must remain answerable when `authorization_id` is absent so
+    /// recovery can close the crash window after authorization but before the
+    /// rail-assigned identifier reaches the local journal.
+    fn settlement_state(
+        &self,
+        reference: &str,
+        authorization_id: Option<&str>,
+    ) -> Result<RailSettlementState, PaymentError> {
+        let _ = (reference, authorization_id);
+        Err(PaymentError::Unavailable(
+            "settlement_state query is not implemented by this payment adapter".to_owned(),
+        ))
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -284,6 +838,14 @@ impl AcpPaymentAdapter {
 }
 
 impl PaymentAdapter for X402PaymentAdapter {
+    fn rail_id(&self) -> &'static str {
+        "x402"
+    }
+
+    fn rail_mode(&self) -> Option<PaymentRailMode> {
+        Some(PaymentRailMode::PrepaidFinal)
+    }
+
     fn authorize(
         &self,
         request: &PaymentAuthorizeRequest,
@@ -295,9 +857,19 @@ impl PaymentAdapter for X402PaymentAdapter {
             &self.authorize_path,
             request,
         )?;
+        let state = if response.settled {
+            PaymentAuthorizationState::PrepaidFinal
+        } else {
+            PaymentAuthorizationState::Held
+        };
+        if !PaymentRailMode::PrepaidFinal.accepts(state) {
+            return Err(PaymentError::RailError(
+                "x402 authorization did not complete final prepayment".to_owned(),
+            ));
+        }
         Ok(PaymentAuthorization {
             authorization_id: response.authorization_id,
-            settled: response.settled,
+            state,
             metadata: merge_json_values(
                 Some(response.metadata),
                 Some(serde_json::json!({
@@ -368,6 +940,14 @@ impl PaymentAdapter for X402PaymentAdapter {
 }
 
 impl PaymentAdapter for AcpPaymentAdapter {
+    fn rail_id(&self) -> &'static str {
+        "acp"
+    }
+
+    fn rail_mode(&self) -> Option<PaymentRailMode> {
+        Some(PaymentRailMode::ReversibleHold)
+    }
+
     fn authorize(
         &self,
         request: &PaymentAuthorizeRequest,
@@ -379,9 +959,19 @@ impl PaymentAdapter for AcpPaymentAdapter {
             &self.authorize_path,
             request,
         )?;
+        let state = if response.settled {
+            PaymentAuthorizationState::PrepaidFinal
+        } else {
+            PaymentAuthorizationState::Held
+        };
+        if !PaymentRailMode::ReversibleHold.accepts(state) {
+            return Err(PaymentError::RailError(
+                "ACP authorization did not create a reversible hold".to_owned(),
+            ));
+        }
         Ok(PaymentAuthorization {
             authorization_id: response.authorization_id,
-            settled: response.settled,
+            state,
             metadata: merge_json_values(
                 Some(response.metadata),
                 Some(serde_json::json!({
@@ -597,6 +1187,148 @@ mod tests {
     use std::sync::mpsc;
     use std::thread;
 
+    fn hold_placed_payment_journal() -> PaymentJournalRecord {
+        PaymentJournalRecord {
+            operation_id: "op-1".to_owned(),
+            journal_version: 1,
+            request_namespace_digest:
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned(),
+            request_id: "request-1".to_owned(),
+            capability_id: "capability-1".to_owned(),
+            grant_index: 0,
+            hold_id: Some("hold-1".to_owned()),
+            rail: "acp".to_owned(),
+            rail_mode: PaymentRailMode::ReversibleHold,
+            authorization_id: None,
+            transaction_id: None,
+            amount_units: 125,
+            settle_action: None,
+            settle_amount_units: None,
+            release_authority: None,
+            currency: "USD".to_owned(),
+            state: PaymentJournalState::HoldPlaced,
+            created_at_unix_ms: 1_700_000_000_000,
+        }
+    }
+
+    #[test]
+    fn payment_journal_accepts_durable_hold_placed_record() {
+        let record = hold_placed_payment_journal();
+
+        assert_eq!(record.validate(), Ok(()));
+    }
+
+    #[test]
+    fn payment_journal_requires_reversible_mode_for_authorized_hold() {
+        let mut record = hold_placed_payment_journal();
+        record.state = PaymentJournalState::Authorized;
+        record.rail_mode = PaymentRailMode::PrepaidFinal;
+        record.authorization_id = Some("authorization-1".to_owned());
+
+        assert!(record.validate().is_err());
+    }
+
+    #[test]
+    fn payment_journal_requires_committed_action_while_settling() {
+        let mut record = hold_placed_payment_journal();
+        record.state = PaymentJournalState::Settling;
+        record.authorization_id = Some("authorization-1".to_owned());
+
+        assert!(record.validate().is_err());
+    }
+
+    #[test]
+    fn payment_journal_rejects_cross_operation_release_authority() {
+        let mut record = hold_placed_payment_journal();
+        record.state = PaymentJournalState::Settling;
+        record.authorization_id = Some("authorization-1".to_owned());
+        record.settle_action = Some(PaymentSettleAction::Release);
+        record.release_authority = Some(PaymentReleaseAuthorityBinding {
+            kind: PaymentReleaseAuthorityKind::PreDispatchNoEffect,
+            operation_id: "another-operation".to_owned(),
+            operation_version: 2,
+            evidence_id: "release-evidence-1".to_owned(),
+            evidence_digest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                .to_owned(),
+        });
+
+        assert!(record.validate().is_err());
+    }
+
+    #[test]
+    fn payment_journal_rejects_synthetic_capture_for_final_prepayment() {
+        let mut record = hold_placed_payment_journal();
+        record.state = PaymentJournalState::Settled;
+        record.rail = "x402".to_owned();
+        record.rail_mode = PaymentRailMode::PrepaidFinal;
+        record.authorization_id = Some("authorization-1".to_owned());
+        record.transaction_id = Some("transaction-1".to_owned());
+        record.settle_action = Some(PaymentSettleAction::Capture);
+        record.settle_amount_units = Some(125);
+
+        assert!(record.validate().is_err());
+    }
+
+    #[test]
+    fn payment_journal_generic_advancement_cannot_skip_terminal_evidence() {
+        assert!(PaymentJournalState::HoldPlaced.can_advance_to(
+            PaymentJournalState::Authorized,
+            PaymentRailMode::ReversibleHold
+        ));
+        assert!(PaymentJournalState::HoldPlaced
+            .can_advance_to(PaymentJournalState::Settled, PaymentRailMode::PrepaidFinal));
+        assert!(!PaymentJournalState::HoldPlaced
+            .can_advance_to(PaymentJournalState::Closed, PaymentRailMode::ReversibleHold));
+        assert!(!PaymentJournalState::Authorized
+            .can_advance_to(PaymentJournalState::Closed, PaymentRailMode::ReversibleHold));
+    }
+
+    #[test]
+    fn payment_journal_capture_transition_is_monotonic_and_replayable() {
+        let authorized = hold_placed_payment_journal()
+            .apply_transition(&PaymentJournalTransition::AuthorizationHeld {
+                authorization_id: "authorization-1".to_owned(),
+            })
+            .expect("record held authorization");
+        let settling = authorized
+            .apply_transition(&PaymentJournalTransition::BeginCapture { amount_units: 75 })
+            .expect("record capture intent");
+        let settled = settling
+            .apply_transition(&PaymentJournalTransition::SettlementCompleted {
+                transaction_id: "transaction-1".to_owned(),
+            })
+            .expect("record settlement result");
+
+        assert_eq!(authorized.journal_version, 2);
+        assert_eq!(authorized.state, PaymentJournalState::Authorized);
+        assert_eq!(settling.journal_version, 3);
+        assert_eq!(settling.settle_action, Some(PaymentSettleAction::Capture));
+        assert_eq!(settling.settle_amount_units, Some(75));
+        assert_eq!(settled.journal_version, 4);
+        assert_eq!(settled.state, PaymentJournalState::Settled);
+        assert_eq!(settled.transaction_id.as_deref(), Some("transaction-1"));
+    }
+
+    #[test]
+    fn payment_journal_final_prepayment_skips_releasable_states() {
+        let mut record = hold_placed_payment_journal();
+        record.rail = "x402".to_owned();
+        record.rail_mode = PaymentRailMode::PrepaidFinal;
+
+        let settled = record
+            .apply_transition(&PaymentJournalTransition::PrepaymentSettled {
+                authorization_id: "prepayment-1".to_owned(),
+            })
+            .expect("record final prepayment");
+
+        assert_eq!(settled.state, PaymentJournalState::Settled);
+        assert_eq!(settled.journal_version, 2);
+        assert!(settled.transaction_id.is_none());
+        assert!(settled
+            .apply_transition(&PaymentJournalTransition::BeginCapture { amount_units: 125 })
+            .is_err());
+    }
+
     #[test]
     fn rail_settlement_status_maps_to_canonical_receipt_states() {
         assert_eq!(
@@ -633,12 +1365,12 @@ mod tests {
     fn authorization_maps_to_receipt_reference_and_state() {
         let pending = PaymentAuthorization {
             authorization_id: "auth_123".to_string(),
-            settled: false,
+            state: PaymentAuthorizationState::Held,
             metadata: serde_json::json!({ "provider": "stripe" }),
         };
         let settled = PaymentAuthorization {
             authorization_id: "auth_456".to_string(),
-            settled: true,
+            state: PaymentAuthorizationState::PrepaidFinal,
             metadata: serde_json::json!({ "provider": "x402" }),
         };
 
@@ -706,7 +1438,7 @@ mod tests {
         assert!(request.contains("\"reference\":\"req-1\""));
 
         assert_eq!(authorization.authorization_id, "x402_txn_123");
-        assert!(authorization.settled);
+        assert_eq!(authorization.state, PaymentAuthorizationState::PrepaidFinal);
         assert_eq!(authorization.metadata["adapter"], "x402");
         assert_eq!(authorization.metadata["network"], "base");
 
@@ -844,7 +1576,7 @@ mod tests {
         assert!(request.contains("\"units\":5000"));
 
         assert_eq!(authorization.authorization_id, "acp_hold_123");
-        assert!(!authorization.settled);
+        assert_eq!(authorization.state, PaymentAuthorizationState::Held);
         assert_eq!(authorization.metadata["adapter"], "acp");
         assert_eq!(authorization.metadata["mode"], "shared_payment_token_hold");
         assert_eq!(authorization.metadata["provider"], "stripe");

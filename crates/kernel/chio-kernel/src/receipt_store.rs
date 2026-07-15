@@ -849,9 +849,105 @@ pub trait ReceiptStore: Send + Sync {
 
 /// Store authority qualified to coordinate admission state and atomically
 /// publish every terminal receipt projection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdmissionBudgetAuthorization {
+    pub decision: crate::budget_store::BudgetAuthorizeHoldDecision,
+    pub operation: crate::admission_operation::AdmissionOperationV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdmissionBudgetCapture {
+    pub decision: crate::budget_store::BudgetInvocationCaptureDecision,
+    pub operation: crate::admission_operation::AdmissionOperationV1,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct AdmissionPaymentJournalAdvance<'a> {
+    pub operation: &'a crate::admission_operation::AdmissionOperationV1,
+    pub recovery_lease: &'a crate::admission_operation::AdmissionRecoveryLease,
+    pub expected: &'a crate::payment::PaymentJournalRecord,
+    pub transition: &'a crate::payment::PaymentJournalTransition,
+    pub release_evidence: Option<&'a crate::tool_outcome::MonetaryReleaseEvidenceV1>,
+    pub active_fence: &'a crate::admission_operation::StoreMutationFence,
+    pub trusted_now_unix_ms: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct AdmissionPaymentSettlementBegin<'a> {
+    pub operation: &'a crate::admission_operation::AdmissionOperationV1,
+    pub recovery_lease: &'a crate::admission_operation::AdmissionRecoveryLease,
+    pub expected: &'a crate::payment::PaymentJournalRecord,
+    pub transition: Option<&'a crate::payment::PaymentJournalTransition>,
+    pub release_evidence: Option<&'a crate::tool_outcome::MonetaryReleaseEvidenceV1>,
+    pub budget_reconcile: crate::budget_store::BudgetReconcileHoldRequest,
+    pub active_fence: &'a crate::admission_operation::StoreMutationFence,
+    pub trusted_now_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdmissionPaymentSettlement {
+    pub journal: crate::payment::PaymentJournalRecord,
+    pub budget: crate::budget_store::BudgetReconcileHoldDecision,
+    pub budget_already_reconciled: bool,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum AdmissionBudgetAuthorizationError {
+    #[error("combined admission budget authorization is unavailable: {0}")]
+    Unavailable(String),
+    #[error("combined admission budget authorization was fenced")]
+    Fenced,
+    #[error("combined admission budget authorization durable outcome is unknown: {0}")]
+    OutcomeUnknown(String),
+    #[error("combined admission budget authorization invariant failed: {0}")]
+    Invariant(String),
+    #[error(transparent)]
+    Operation(#[from] crate::admission_operation::AdmissionOperationError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum AdmissionPaymentJournalError {
+    #[error("qualified payment journal is unavailable: {0}")]
+    Unavailable(String),
+    #[error("qualified payment journal mutation was fenced")]
+    Fenced,
+    #[error("qualified payment journal compare-and-set conflicted: {0}")]
+    Conflict(String),
+    #[error("qualified payment journal durable outcome is unknown: {0}")]
+    OutcomeUnknown(String),
+    #[error("qualified payment journal invariant failed: {0}")]
+    Invariant(String),
+}
+
 pub trait QualifiedAdmissionProjectionStore:
     ReceiptStore + crate::admission_operation::QualifiedAdmissionOperationStore
 {
+    fn load_payment_journal(
+        &self,
+        operation_id: &str,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+    ) -> Result<Option<crate::payment::PaymentJournalRecord>, AdmissionPaymentJournalError>;
+
+    fn advance_payment_journal(
+        &self,
+        advance: AdmissionPaymentJournalAdvance<'_>,
+    ) -> Result<crate::payment::PaymentJournalRecord, AdmissionPaymentJournalError>;
+
+    fn begin_payment_settlement(
+        &self,
+        begin: AdmissionPaymentSettlementBegin<'_>,
+    ) -> Result<AdmissionPaymentSettlement, AdmissionPaymentJournalError>;
+
+    fn authorize_budget_and_commit_admission(
+        &self,
+        operation: &crate::admission_operation::AdmissionOperationV1,
+        recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+        request: crate::budget_store::BudgetAuthorizeHoldRequest,
+        payment_journal: Option<crate::payment::PaymentJournalRecord>,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError>;
+
     fn capture_invocation_and_commit_dispatch(
         &self,
         operation: &crate::admission_operation::AdmissionOperationV1,
@@ -859,10 +955,7 @@ pub trait QualifiedAdmissionProjectionStore:
         request: crate::budget_store::BudgetCaptureInvocationRequest,
         active_fence: &crate::admission_operation::StoreMutationFence,
         trusted_now_unix_ms: u64,
-    ) -> Result<
-        crate::admission_operation::AdmissionOperationV1,
-        crate::admission_operation::AdmissionCaptureError,
-    >;
+    ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError>;
 
     fn list_admission_receipts_after(
         &self,

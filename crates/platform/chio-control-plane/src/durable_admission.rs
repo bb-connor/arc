@@ -73,12 +73,6 @@ impl DurableAdmissionRuntime {
                 control_token,
                 kernel_keypair.clone(),
             )?;
-        let budget = Arc::from(
-            crate::trust_control::service_runtime::budget::build_remote_budget_store(
-                control_url,
-                control_token,
-            )?,
-        );
         let revocations = Arc::from(
             crate::trust_control::service_runtime::remote_stores::build_remote_revocation_store(
                 control_url,
@@ -88,7 +82,7 @@ impl DurableAdmissionRuntime {
         Ok(Self {
             operations: stores.operations,
             outcomes: stores.outcomes,
-            budget,
+            budget: stores.budget,
             revocations,
             fence: stores.fence,
             kernel_keypair,
@@ -362,7 +356,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn durable_admission_rejects_split_local_participant_databases() {
+    fn durable_admission_rejects_split_local_participant_databases() -> Result<(), CliError> {
         let revocations = Path::new("revocations.sqlite3");
         let budget = Path::new("budget.sqlite3");
 
@@ -371,99 +365,120 @@ mod tests {
             (None, Some(budget)),
             (Some(revocations), Some(budget)),
         ] {
-            let error = validate_durable_admission_participant_paths(
+            let Err(error) = validate_durable_admission_participant_paths(
                 DurableAdmissionMode::SideEffecting,
                 None,
                 revocation_database,
                 budget_database,
-            )
-            .expect_err("split local participant databases must be rejected");
+            ) else {
+                return Err(CliError::cli_other_error(
+                    "split local participant databases were accepted",
+                ));
+            };
             assert!(error
                 .to_string()
                 .contains("durable admission authority owns revocation and budget state"));
         }
+        Ok(())
     }
 
     #[test]
-    fn durable_admission_rejects_local_participants_with_remote_authority() {
-        let error = validate_durable_admission_participant_paths(
+    fn durable_admission_rejects_local_participants_with_remote_authority() -> Result<(), CliError>
+    {
+        let Err(error) = validate_durable_admission_participant_paths(
             DurableAdmissionMode::Monetary,
             Some("http://127.0.0.1:8080"),
             Some(Path::new("revocations.sqlite3")),
             None,
-        )
-        .expect_err("remote authority must reject a local participant database");
+        ) else {
+            return Err(CliError::cli_other_error(
+                "remote authority accepted a local participant database",
+            ));
+        };
         assert!(error
             .to_string()
             .contains("--control-url cannot be combined with --revocation-db or --budget-db"));
+        Ok(())
     }
 
     #[test]
-    fn participant_path_validation_is_inactive_when_durable_admission_is_off() {
+    fn participant_path_validation_is_inactive_when_durable_admission_is_off(
+    ) -> Result<(), CliError> {
         validate_durable_admission_participant_paths(
             DurableAdmissionMode::Off,
             None,
             Some(Path::new("revocations.sqlite3")),
             Some(Path::new("budget.sqlite3")),
         )
-        .expect("legacy independent stores remain valid when durable admission is disabled");
     }
 
     #[test]
-    fn database_path_validation_rejects_hard_link_aliases() {
-        let directory = tempfile::tempdir().expect("create database alias directory");
+    fn database_path_validation_rejects_hard_link_aliases() -> Result<(), CliError> {
+        let directory = tempfile::tempdir()?;
         let first = directory.path().join("first.sqlite3");
         let second = directory.path().join("second.sqlite3");
-        fs::write(&first, []).expect("create first database path");
-        fs::hard_link(&first, &second).expect("create database hard link");
+        fs::write(&first, [])?;
+        fs::hard_link(&first, &second)?;
 
-        let error = validate_distinct_database_paths(&[
+        let Err(error) = validate_distinct_database_paths(&[
             ("first database", first.as_path()),
             ("second database", second.as_path()),
-        ])
-        .expect_err("hard-linked databases must alias");
+        ]) else {
+            return Err(CliError::cli_other_error(
+                "hard-linked databases were treated as distinct",
+            ));
+        };
         assert!(error
             .to_string()
             .contains("first database must not alias second database"));
+        Ok(())
     }
 
     #[test]
-    fn database_path_validation_rejects_dangling_symlink_aliases() {
+    fn database_path_validation_rejects_dangling_symlink_aliases() -> Result<(), CliError> {
         use std::os::unix::fs::symlink;
 
-        let directory = tempfile::tempdir().expect("create database alias directory");
+        let directory = tempfile::tempdir()?;
         let target = directory.path().join("target.sqlite3");
         let alias = directory.path().join("alias.sqlite3");
-        symlink(&target, &alias).expect("create dangling database symlink");
+        symlink(&target, &alias)?;
 
-        let error = validate_distinct_database_paths(&[
+        let Err(error) = validate_distinct_database_paths(&[
             ("target database", target.as_path()),
             ("alias database", alias.as_path()),
-        ])
-        .expect_err("dangling symlink databases must alias");
+        ]) else {
+            return Err(CliError::cli_other_error(
+                "dangling database symlink was treated as distinct",
+            ));
+        };
         assert!(error
             .to_string()
             .contains("target database must not alias alias database"));
+        Ok(())
     }
 
     #[test]
-    fn database_path_validation_rejects_dangling_parent_symlink_aliases() {
+    fn database_path_validation_rejects_dangling_parent_symlink_aliases() -> Result<(), CliError> {
         use std::os::unix::fs::symlink;
 
-        let directory = tempfile::tempdir().expect("create database alias directory");
+        let directory = tempfile::tempdir()?;
         let target_directory = directory.path().join("target");
         let alias_directory = directory.path().join("alias");
-        symlink(&target_directory, &alias_directory).expect("create dangling directory symlink");
+        symlink(&target_directory, &alias_directory)?;
         let target = target_directory.join("state.sqlite3");
         let alias = alias_directory.join("state.sqlite3");
 
-        let error = validate_distinct_database_paths(&[
+        let Err(error) = validate_distinct_database_paths(&[
             ("target database", target.as_path()),
             ("alias database", alias.as_path()),
-        ])
-        .expect_err("databases below a dangling symlink must alias");
+        ]) else {
+            return Err(CliError::cli_other_error(
+                "databases below a dangling symlink were treated as distinct",
+            ));
+        };
         assert!(error
             .to_string()
             .contains("target database must not alias alias database"));
+        Ok(())
     }
 }

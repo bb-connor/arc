@@ -973,7 +973,7 @@ fn structured_mutation_projection(
     .map(Some)
 }
 
-fn exact_structured_mutation_projection(
+pub(crate) fn exact_structured_mutation_projection(
     store: &SqliteBudgetStore,
     expected_capability_id: Option<&str>,
     expected_grant_index: Option<u32>,

@@ -1060,7 +1060,7 @@ impl PaymentAdapter for TrackingPaymentAdapter {
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(PaymentAuthorization {
             authorization_id: "auth_tracking".to_string(),
-            settled: false,
+            state: PaymentAuthorizationState::Held,
             metadata: serde_json::json!({ "adapter": "tracking" }),
         })
     }
