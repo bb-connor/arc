@@ -345,7 +345,7 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
+        dispatch_intent_journal: kernel_policy.dispatch_intent_journal,
     };
 
     let mut kernel = ChioKernel::new(config);

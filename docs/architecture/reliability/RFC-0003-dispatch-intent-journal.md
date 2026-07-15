@@ -596,6 +596,15 @@ impl Default for DispatchIntentJournalMode {
 }
 ```
 
+Every `KernelConfig` construction site pins this field explicitly (Rust has no
+struct-literal defaulting), so the file-config lowering layers are what let an
+operator change it without a code change: the `receipts.dispatch_intent_journal`
+key in a `chio.yaml`-configured deployment, and the `kernel.dispatch_intent_journal`
+key in a policy-file-configured `chio-cli` deployment. Both lowerings default the
+absent key to `Off`, not the enum's own compiled default, so upgrading a binary
+never silently starts journaling for a deployment that has not opted in; a
+present but unrecognized value rejects at config load time.
+
 ### Error taxonomy (typed, fail-closed)
 
 `ReceiptStoreError` (`crates/kernel/chio-kernel/src/receipt_store.rs:151`) already
@@ -668,6 +677,14 @@ effect has run.
   data is in hand, and make `SideEffecting` the compiled default in the third. The
   money path (F70) can be gated independently: enable intents for `Monetary` first,
   since that is the highest-consequence class.
+- Operators enable the mode without a code change through the `dispatch_intent_journal`
+  key: `receipts.dispatch_intent_journal` in a `chio.yaml`-configured deployment
+  (`crates/platform/chio-config/src/schema.rs`), or `kernel.dispatch_intent_journal`
+  in a policy-file-configured `chio-cli` deployment
+  (`crates/platform/chio-control-plane/src/policy/types.rs`). Both accept `"off"`,
+  `"side_effecting"`, or `"all"`; an absent key keeps `Off` regardless of the
+  enum's own compiled default, and an unrecognized value rejects at config load
+  time rather than silently falling back to a default.
 - Health `healthy` tightening (dead-letter rows flip unhealthy) is behavior-visible
   to operators; document it in the release notes so a newly surfaced orphan is read
   as "recovery working", not "new fault".
@@ -748,7 +765,10 @@ effect has run.
    nonzero `dead_letter_dispatch_intents` count rides the RFC-0009 observability and
    alerting wiring.
 2. This RFC (RFC-0003) lands next: schema, actor `Intent` variant, same-transaction
-   consume, kernel wiring, health fields, config defaulting to `Off`.
+   consume, kernel wiring, health fields, config defaulting to `Off`, and the
+   operator-facing `dispatch_intent_journal` config key (`receipts.dispatch_intent_journal`
+   in `chio.yaml`, `kernel.dispatch_intent_journal` in a `chio-cli` policy file) so a
+   file-configured deployment can flip the mode without a code change.
 3. Enable `Monetary` then `SideEffecting` via config after nightly kill-injection soak
    is green; promote `SideEffecting` to compiled default.
 4. RFC-0013 extends the money path: it upgrades `rail_authorization_id` handling into
