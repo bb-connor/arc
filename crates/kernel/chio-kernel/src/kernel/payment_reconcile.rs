@@ -3,7 +3,8 @@ use super::*;
 use chio_log_redact::redacted;
 
 use crate::payment::{
-    PaymentError, PaymentJournalRecord, PaymentJournalState, PaymentSettleAction,
+    PaymentAdapter, PaymentJournalRecord, PaymentJournalState, PaymentSettleAction,
+    RailSettlementState,
 };
 use crate::receipt_store::{
     DispatchIntentReconciler, DispatchIntentRecord, DispatchIntentResolution, ReceiptStoreError,
@@ -122,7 +123,7 @@ fn resolve_incomplete_payment_journal_row(
     kernel: &ChioKernel,
     record: &PaymentJournalRecord,
 ) -> Result<PaymentReconcileOutcome, KernelError> {
-    let Some(adapter) = kernel.payment_adapter.as_ref() else {
+    let Some(adapter) = kernel.payment_adapter.as_deref() else {
         return Ok(PaymentReconcileOutcome::ReconcileFailed {
             detail: "no payment adapter configured for reconcile".to_string(),
         });
@@ -131,31 +132,50 @@ fn resolve_incomplete_payment_journal_row(
         PaymentJournalState::HoldPlaced => {
             // Authorize may or may not have fired; no authorization id is
             // durable. The side-effect-free state query keyed by the durable
-            // reference answers which.
+            // reference answers which, and the returned state distinguishes
+            // a live hold from funds that already moved: only a proven
+            // hold-only state is ever released.
             match adapter.settlement_state(&record.request_id, record.authorization_id.as_deref()) {
-                Ok(result) => {
-                    // The rail knows the reference: release the hold (no
-                    // price was ever chosen, so release is the only sound,
-                    // price-free completion).
-                    match adapter.release(&result.transaction_id, &record.request_id) {
-                        Ok(_) => {
-                            reverse_hold_best_effort(kernel, record);
-                            Ok(PaymentReconcileOutcome::Released)
-                        }
-                        Err(error) => Ok(PaymentReconcileOutcome::ReconcileFailed {
-                            detail: format!("release during reconcile failed: {error}"),
-                        }),
-                    }
-                }
-                Err(PaymentError::Unavailable(detail)) => {
-                    // The adapter cannot answer: never silently close.
-                    Ok(PaymentReconcileOutcome::ReconcileFailed { detail })
-                }
-                Err(_) => {
-                    // The rail has no record of the reference: authorize
-                    // never took effect and funds never moved.
+                Ok(RailSettlementState::NoAuthorization) => {
+                    // Authorize never took effect: nothing to release on the
+                    // rail, and funds never moved.
                     reverse_hold_best_effort(kernel, record);
                     Ok(PaymentReconcileOutcome::Released)
+                }
+                Ok(RailSettlementState::Held { authorization_id }) => {
+                    // A live hold with no settlement: no price was ever
+                    // chosen, so release is the only sound, price-free
+                    // completion.
+                    Ok(release_hold_and_report(
+                        kernel,
+                        adapter,
+                        record,
+                        &authorization_id,
+                    ))
+                }
+                Ok(RailSettlementState::Settled {
+                    authorization_id,
+                    result,
+                }) => {
+                    // Funds already moved: releasing here would reverse the
+                    // local hold and erase the only record of the charge.
+                    // Record the rail reference and emit a reconciliation
+                    // receipt for the already-moved amount instead.
+                    let mut settled_record = record.clone();
+                    settled_record.authorization_id = Some(authorization_id.clone());
+                    settled_record.transaction_id = Some(result.transaction_id.clone());
+                    emit_reconciliation_receipt(kernel, &settled_record)?;
+                    Ok(PaymentReconcileOutcome::ClosedReconciled {
+                        rail_reference: format!("{}:{authorization_id}", record.rail),
+                    })
+                }
+                Err(error) => {
+                    // The adapter cannot say whether funds moved: never
+                    // guess. A silent release here could erase the only
+                    // record of a charge that already happened.
+                    Ok(PaymentReconcileOutcome::ReconcileFailed {
+                        detail: format!("settlement state during reconcile is unknown: {error}"),
+                    })
                 }
             }
         }
@@ -168,15 +188,12 @@ fn resolve_incomplete_payment_journal_row(
                     detail: "authorized row missing authorization_id".to_string(),
                 });
             };
-            match adapter.release(authorization_id, &record.request_id) {
-                Ok(_) => {
-                    reverse_hold_best_effort(kernel, record);
-                    Ok(PaymentReconcileOutcome::Released)
-                }
-                Err(error) => Ok(PaymentReconcileOutcome::ReconcileFailed {
-                    detail: format!("release during reconcile failed: {error}"),
-                }),
-            }
+            Ok(release_hold_and_report(
+                kernel,
+                adapter,
+                record,
+                authorization_id,
+            ))
         }
         PaymentJournalState::Settling => {
             // A terminal action IS durable; replay it exactly. The adapter
@@ -246,6 +263,27 @@ fn resolve_incomplete_payment_journal_row(
         PaymentJournalState::Closed | PaymentJournalState::ReconcileFailed => {
             Ok(PaymentReconcileOutcome::ClosedAttested)
         }
+    }
+}
+
+/// Release a hold proven to carry no settlement and report the outcome.
+/// Releasing is idempotent and price-free, so success always reverses the
+/// local exposure and closes the row; a release failure is an operator
+/// incident, never a silent retry loop.
+fn release_hold_and_report(
+    kernel: &ChioKernel,
+    adapter: &dyn PaymentAdapter,
+    record: &PaymentJournalRecord,
+    authorization_id: &str,
+) -> PaymentReconcileOutcome {
+    match adapter.release(authorization_id, &record.request_id) {
+        Ok(_) => {
+            reverse_hold_best_effort(kernel, record);
+            PaymentReconcileOutcome::Released
+        }
+        Err(error) => PaymentReconcileOutcome::ReconcileFailed {
+            detail: format!("release during reconcile failed: {error}"),
+        },
     }
 }
 

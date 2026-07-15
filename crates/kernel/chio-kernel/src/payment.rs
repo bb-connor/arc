@@ -146,6 +146,38 @@ impl ReceiptSettlement {
     }
 }
 
+/// Side-effect-free snapshot of a rail's view of a prior authorization,
+/// returned by [`PaymentAdapter::settlement_state`]. Distinct from
+/// [`PaymentResult`] because the crash window this query answers spans a
+/// case `PaymentResult` cannot express on its own: a hold that exists but
+/// has not settled. Carrying that distinction explicitly lets
+/// reconciliation release a proven hold-only authorization while never
+/// releasing, and thereby erasing the only record of, funds the rail
+/// already moved.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RailSettlementState {
+    /// The rail has no hold or settlement for this reference: `authorize`
+    /// never took effect. Reconciliation reverses the local budget hold and
+    /// closes the journal; funds never moved.
+    NoAuthorization,
+    /// A hold exists but no funds have moved. Carries the rail-assigned
+    /// `authorization_id` so reconciliation can release it.
+    Held {
+        /// Rail-assigned identifier for the open, unsettled hold.
+        authorization_id: String,
+    },
+    /// Funds already moved on the rail. Carries the rail-assigned
+    /// `authorization_id` and the settled result so reconciliation records
+    /// the id and emits a durable receipt for the already-moved amount
+    /// instead of releasing it.
+    Settled {
+        /// Rail-assigned identifier for the settled authorization.
+        authorization_id: String,
+        /// The rail's settlement result for the moved funds.
+        result: PaymentResult,
+    },
+}
+
 /// Trait for executing payments against an external rail.
 pub trait PaymentAdapter: Send + Sync {
     /// Stable identifier of the rail this adapter drives, recorded on
@@ -208,14 +240,17 @@ pub trait PaymentAdapter: Send + Sync {
     /// Keyed on `reference` (the durable request id recorded before
     /// authorize) so it stays answerable in the crash window where no
     /// authorization id is durable yet; `authorization_id` is an optional
-    /// refinement passed once known. Defaulted to `Unavailable` so an
+    /// refinement passed once known. The returned `RailSettlementState`
+    /// distinguishes a live, unsettled hold from funds that already moved,
+    /// so reconciliation releases only a proven hold and never mistakes an
+    /// already-settled charge for one. Defaulted to `Unavailable` so an
     /// adapter that cannot answer forces a fail-closed operator incident
     /// during reconciliation rather than a silent close.
     fn settlement_state(
         &self,
         reference: &str,
         authorization_id: Option<&str>,
-    ) -> Result<PaymentResult, PaymentError> {
+    ) -> Result<RailSettlementState, PaymentError> {
         let _ = (reference, authorization_id);
         Err(PaymentError::Unavailable(
             "settlement_state query not implemented by this adapter".to_string(),
@@ -403,19 +438,24 @@ impl PaymentAdapter for X402PaymentAdapter {
         &self,
         reference: &str,
         authorization_id: Option<&str>,
-    ) -> Result<PaymentResult, PaymentError> {
+    ) -> Result<RailSettlementState, PaymentError> {
         // Prepaid rail: funds move at authorize and capture is a local
         // no-op, so the state query is a pure read reporting Settled for
-        // the known reference.
-        Ok(PaymentResult {
-            transaction_id: authorization_id.unwrap_or(reference).to_string(),
-            settlement_status: RailSettlementStatus::Settled,
-            metadata: serde_json::json!({
-                "adapter": "x402",
-                "mode": "prepaid",
-                "action": "settlement_state",
-                "reference": reference
-            }),
+        // the known reference. Reconciliation must never release a hold
+        // here; the funds already moved.
+        let authorization_id = authorization_id.unwrap_or(reference).to_string();
+        Ok(RailSettlementState::Settled {
+            authorization_id: authorization_id.clone(),
+            result: PaymentResult {
+                transaction_id: authorization_id,
+                settlement_status: RailSettlementStatus::Settled,
+                metadata: serde_json::json!({
+                    "adapter": "x402",
+                    "mode": "prepaid",
+                    "action": "settlement_state",
+                    "reference": reference
+                }),
+            },
         })
     }
 
@@ -511,19 +551,24 @@ impl PaymentAdapter for AcpPaymentAdapter {
         &self,
         reference: &str,
         authorization_id: Option<&str>,
-    ) -> Result<PaymentResult, PaymentError> {
+    ) -> Result<RailSettlementState, PaymentError> {
         // The shared-payment-token hold settles at authorize time and the
         // local capture/release are no-ops, so the state query is a pure
-        // read reporting Settled for the known reference.
-        Ok(PaymentResult {
-            transaction_id: authorization_id.unwrap_or(reference).to_string(),
-            settlement_status: RailSettlementStatus::Settled,
-            metadata: serde_json::json!({
-                "adapter": "acp",
-                "mode": "shared_payment_token_hold",
-                "action": "settlement_state",
-                "reference": reference
-            }),
+        // read reporting Settled for the known reference. Reconciliation
+        // must never release a hold here; the funds already moved.
+        let authorization_id = authorization_id.unwrap_or(reference).to_string();
+        Ok(RailSettlementState::Settled {
+            authorization_id: authorization_id.clone(),
+            result: PaymentResult {
+                transaction_id: authorization_id,
+                settlement_status: RailSettlementStatus::Settled,
+                metadata: serde_json::json!({
+                    "adapter": "acp",
+                    "mode": "shared_payment_token_hold",
+                    "action": "settlement_state",
+                    "reference": reference
+                }),
+            },
         })
     }
 
@@ -805,32 +850,53 @@ mod tests {
     #[test]
     fn prepaid_adapters_answer_settlement_state_without_moving_funds() {
         // The base URLs are never contacted: the prepaid state query is a
-        // pure read.
+        // pure read. Both adapters report Settled, never Held, because
+        // their funds move at authorize: reconciliation must never release
+        // a hold discovered through this query.
         let x402 = X402PaymentAdapter::new("http://127.0.0.1:1");
-        let state = x402
+        match x402
             .settlement_state("req-x", Some("auth-x"))
-            .expect("prepaid settlement state answers");
-        assert_eq!(state.transaction_id, "auth-x");
-        assert!(matches!(
-            state.settlement_status,
-            RailSettlementStatus::Settled
-        ));
+            .expect("prepaid settlement state answers")
+        {
+            RailSettlementState::Settled {
+                authorization_id,
+                result,
+            } => {
+                assert_eq!(authorization_id, "auth-x");
+                assert_eq!(result.transaction_id, "auth-x");
+                assert!(matches!(
+                    result.settlement_status,
+                    RailSettlementStatus::Settled
+                ));
+            }
+            other => panic!("expected Settled, got {other:?}"),
+        }
         // Answerable by the durable reference alone, for the crash window
         // where no authorization id is durable yet.
-        let by_reference = x402
+        match x402
             .settlement_state("req-x", None)
-            .expect("keyed by reference");
-        assert_eq!(by_reference.transaction_id, "req-x");
+            .expect("keyed by reference")
+        {
+            RailSettlementState::Settled {
+                authorization_id, ..
+            } => assert_eq!(authorization_id, "req-x"),
+            other => panic!("expected Settled, got {other:?}"),
+        }
 
         let acp = AcpPaymentAdapter::new("http://127.0.0.1:1");
         assert_eq!(acp.rail_id(), "acp");
-        let acp_state = acp
+        match acp
             .settlement_state("req-a", Some("auth-a"))
-            .expect("acp settlement state answers");
-        assert!(matches!(
-            acp_state.settlement_status,
-            RailSettlementStatus::Settled
-        ));
+            .expect("acp settlement state answers")
+        {
+            RailSettlementState::Settled { result, .. } => {
+                assert!(matches!(
+                    result.settlement_status,
+                    RailSettlementStatus::Settled
+                ));
+            }
+            other => panic!("expected Settled, got {other:?}"),
+        }
     }
 
     #[test]

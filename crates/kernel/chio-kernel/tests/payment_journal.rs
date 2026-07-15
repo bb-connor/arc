@@ -7,6 +7,7 @@
 mod support {
     #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+    use std::collections::HashMap;
     use std::sync::atomic::AtomicUsize;
     use std::sync::{Arc, Mutex};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -33,10 +34,14 @@ mod support {
 
     /// Payment rail that settles locally and counts every capture/release so
     /// tests can prove money moved at most once. `settlement_state` answers
-    /// like the in-tree prepaid rails.
+    /// like the in-tree prepaid rails (funds move at authorize) unless a
+    /// test scripts a different answer for a specific reference, so crash-
+    /// window scenarios other than "already settled" stay reachable.
     pub struct CountingRail {
         pub captures: AtomicUsize,
         pub releases: AtomicUsize,
+        settlement_state_script:
+            Mutex<HashMap<String, Result<chio_kernel::RailSettlementState, String>>>,
     }
 
     impl CountingRail {
@@ -44,7 +49,30 @@ mod support {
             Self {
                 captures: AtomicUsize::new(0),
                 releases: AtomicUsize::new(0),
+                settlement_state_script: Mutex::new(HashMap::new()),
             }
+        }
+
+        /// Script a specific `settlement_state` answer for one reference,
+        /// overriding the default "prepaid rail always settled" response.
+        pub fn script_settlement_state(
+            &self,
+            reference: &str,
+            state: chio_kernel::RailSettlementState,
+        ) {
+            self.settlement_state_script
+                .lock()
+                .expect("script lock")
+                .insert(reference.to_string(), Ok(state));
+        }
+
+        /// Script `settlement_state` to fail for one reference, simulating a
+        /// rail that cannot say whether funds moved.
+        pub fn script_settlement_state_error(&self, reference: &str, detail: &str) {
+            self.settlement_state_script
+                .lock()
+                .expect("script lock")
+                .insert(reference.to_string(), Err(detail.to_string()));
         }
     }
 
@@ -112,13 +140,27 @@ mod support {
             &self,
             reference: &str,
             authorization_id: Option<&str>,
-        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
-            Ok(chio_kernel::PaymentResult {
-                transaction_id: authorization_id
-                    .map(str::to_string)
-                    .unwrap_or_else(|| format!("auth-{reference}")),
-                settlement_status: chio_kernel::RailSettlementStatus::Settled,
-                metadata: serde_json::json!({}),
+        ) -> Result<chio_kernel::RailSettlementState, chio_kernel::PaymentError> {
+            if let Some(scripted) = self
+                .settlement_state_script
+                .lock()
+                .expect("script lock")
+                .get(reference)
+            {
+                return scripted
+                    .clone()
+                    .map_err(chio_kernel::PaymentError::Unavailable);
+            }
+            let authorization_id = authorization_id
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("auth-{reference}"));
+            Ok(chio_kernel::RailSettlementState::Settled {
+                authorization_id: authorization_id.clone(),
+                result: chio_kernel::PaymentResult {
+                    transaction_id: authorization_id,
+                    settlement_status: chio_kernel::RailSettlementStatus::Settled,
+                    metadata: serde_json::json!({}),
+                },
             })
         }
     }
@@ -227,6 +269,7 @@ mod support {
     pub struct MoneyJournalHarness {
         pub kernel: ChioKernel,
         pub budget_store: Arc<SqliteBudgetStore>,
+        pub receipt_store: Arc<SqliteReceiptStore>,
         pub rail: Arc<CountingRail>,
         pub capability: CapabilityToken,
         pub journal_rows_seen_at_invoke:
@@ -285,7 +328,7 @@ mod support {
             &self,
             reference: &str,
             authorization_id: Option<&str>,
-        ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+        ) -> Result<chio_kernel::RailSettlementState, chio_kernel::PaymentError> {
             self.0.settlement_state(reference, authorization_id)
         }
     }
@@ -319,6 +362,7 @@ mod support {
         Ok(MoneyJournalHarness {
             kernel,
             budget_store,
+            receipt_store,
             rail,
             capability,
             journal_rows_seen_at_invoke,
@@ -494,7 +538,9 @@ fn boot_reconcile_resolves_every_incomplete_row() -> Result<(), Box<dyn std::err
     corrupt.settle_action = None;
     store.record_payment_journal(&corrupt)?;
 
+    let receipts_before = harness.receipt_store.max_tool_receipt_seq()?;
     let report = harness.kernel.reconcile_payment_journal(0)?;
+    let receipts_after = harness.receipt_store.max_tool_receipt_seq()?;
     assert_eq!(
         report.resolved, 4,
         "four rows resolve terminally: {report:?}"
@@ -511,8 +557,12 @@ fn boot_reconcile_resolves_every_incomplete_row() -> Result<(), Box<dyn std::err
         "unresolved rows after reconcile: {remaining:?}"
     );
 
-    // The committed capture replayed exactly once; the price-free rows
-    // released instead.
+    // The committed capture replayed exactly once; req-auth is the only
+    // genuine price-free hold and releases. req-hold's rail query reports
+    // the prepaid rail's real answer (already settled at authorize), so
+    // reconciliation must record it with a receipt rather than release it:
+    // releasing here would reverse the local hold and erase the only
+    // record of a charge that already happened.
     assert_eq!(
         harness
             .rail
@@ -526,8 +576,14 @@ fn boot_reconcile_resolves_every_incomplete_row() -> Result<(), Box<dyn std::err
             .rail
             .releases
             .load(std::sync::atomic::Ordering::SeqCst),
-        2,
-        "req-hold and req-auth release; the already-settled row does not touch the rail"
+        1,
+        "only req-auth releases; req-hold reports settled funds and is reconciled with a receipt instead"
+    );
+    assert_eq!(
+        receipts_after - receipts_before,
+        3,
+        "req-hold, req-settling, and req-settled each emit a reconciliation receipt; \
+         req-auth releases and req-corrupt incidents without one"
     );
 
     // Idempotent: a second pass finds nothing and moves no money.
@@ -542,6 +598,118 @@ fn boot_reconcile_resolves_every_incomplete_row() -> Result<(), Box<dyn std::err
         1,
         "no double capture on a second pass"
     );
+
+    harness.cleanup();
+    Ok(())
+}
+
+#[test]
+fn hold_placed_reconcile_only_releases_a_proven_hold_never_a_settlement(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::payment::PaymentJournalRecord;
+    use chio_kernel::{PaymentResult, RailSettlementState, RailSettlementStatus};
+
+    let harness = support::money_journal_harness("chio-holdplaced-branch", 75)?;
+    let store = &harness.budget_store;
+
+    // Every row crashed in the same window (HoldPlaced, no durable
+    // authorization id): authorize may or may not have fired. Only the
+    // rail's answer distinguishes them.
+    let base = |request_id: &str| PaymentJournalRecord {
+        request_id: request_id.to_string(),
+        capability_id: "cap".to_string(),
+        grant_index: 0,
+        hold_id: Some(format!("hold-{request_id}")),
+        rail: "x402".to_string(),
+        authorization_id: None,
+        transaction_id: None,
+        amount_units: 100,
+        settle_action: None,
+        settle_amount_units: None,
+        currency: "USD".to_string(),
+        state: PaymentJournalState::HoldPlaced,
+        created_at_unix_ms: 1,
+    };
+
+    // A prepaid adapter crashed in the HoldPlaced window after authorize
+    // already moved the funds. Releasing here would erase the only record
+    // of the charge, so reconciliation must record it instead.
+    store.record_payment_journal(&base("req-funds-moved"))?;
+    harness.rail.script_settlement_state(
+        "req-funds-moved",
+        RailSettlementState::Settled {
+            authorization_id: "auth-funds-moved".to_string(),
+            result: PaymentResult {
+                transaction_id: "txn-funds-moved".to_string(),
+                settlement_status: RailSettlementStatus::Settled,
+                metadata: serde_json::json!({}),
+            },
+        },
+    );
+
+    // A genuine hold-only crash: authorize placed a hold but no funds ever
+    // moved. Reconciliation still releases it cleanly.
+    store.record_payment_journal(&base("req-hold-only"))?;
+    harness.rail.script_settlement_state(
+        "req-hold-only",
+        RailSettlementState::Held {
+            authorization_id: "auth-hold-only".to_string(),
+        },
+    );
+
+    // The rail cannot say whether funds moved. Never guess: this is an
+    // operator incident, not a release.
+    store.record_payment_journal(&base("req-unknown"))?;
+    harness
+        .rail
+        .script_settlement_state_error("req-unknown", "rail unreachable during reconcile");
+
+    let receipts_before = harness.receipt_store.max_tool_receipt_seq()?;
+    let report = harness.kernel.reconcile_payment_journal(0)?;
+    let receipts_after = harness.receipt_store.max_tool_receipt_seq()?;
+
+    assert_eq!(
+        report.resolved, 2,
+        "req-funds-moved and req-hold-only resolve terminally: {report:?}"
+    );
+    assert_eq!(
+        report.reconcile_failed, 1,
+        "req-unknown raises an incident rather than a guess: {report:?}"
+    );
+
+    assert_eq!(
+        receipts_after - receipts_before,
+        1,
+        "exactly one reconciliation receipt: req-funds-moved, never req-hold-only or req-unknown"
+    );
+    assert_eq!(
+        harness
+            .rail
+            .releases
+            .load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "only the genuine hold-only row releases; a settled or unknown row never does"
+    );
+    assert_eq!(
+        harness
+            .rail
+            .captures
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "the HoldPlaced arm never captures: a settled row is recorded, not replayed"
+    );
+
+    // Every row reached a terminal state, including the incident.
+    let remaining = store.list_incomplete_payment_journal(u64::MAX)?;
+    assert!(
+        remaining.is_empty(),
+        "unresolved rows after reconcile: {remaining:?}"
+    );
+
+    // Idempotent: a second pass finds nothing left to resolve.
+    let again = harness.kernel.reconcile_payment_journal(0)?;
+    assert_eq!(again.resolved, 0);
+    assert_eq!(again.reconcile_failed, 0);
 
     harness.cleanup();
     Ok(())
