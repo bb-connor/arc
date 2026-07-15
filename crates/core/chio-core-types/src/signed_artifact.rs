@@ -5,6 +5,10 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use crate::capability::{features::CHIO_CAPABILITIES_SCHEMA, token::CHIO_CAPABILITY_SCHEMA};
+use crate::economic_continuity::{
+    CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
+    CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
+};
 use crate::error::{Error, Result};
 use crate::oracle::CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA;
 use crate::receipt::{body::CHIO_RECEIPT_SCHEMA, lineage::CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA};
@@ -205,6 +209,18 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_FROST_ROSTER_V1_SCHEMA,
         Some(("frost_roster", "frost-quorum-substrate-v1")),
+    ),
+    (
+        CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
+        Some(("economic_resource_head", "economic-state-continuity-v1")),
+    ),
+    (
+        CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
+        Some(("economic_state_batch", "economic-state-continuity-v1")),
+    ),
+    (
+        CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
+        Some(("economic_effect_slot", "economic-state-continuity-v1")),
     ),
     (CHIO_SESSION_ANCHOR_SCHEMA, None),
     (CHIO_REQUEST_LINEAGE_RECORD_SCHEMA, None),

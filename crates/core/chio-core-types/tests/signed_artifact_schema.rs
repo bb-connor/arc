@@ -33,6 +33,22 @@ fn known_signed_artifact_schemas_are_supported() {
 }
 
 #[test]
+fn economic_continuity_schemas_are_registered() {
+    for (schema, artifact_kind) in [
+        ("chio.economy.resource-head.v1", "economic_resource_head"),
+        ("chio.economy.state-batch.v1", "economic_state_batch"),
+        ("chio.economy.effect-slot.v1", "economic_effect_slot"),
+    ] {
+        assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
+        assert!(chio_core_types::built_in_signed_artifact_registry()
+            .iter()
+            .any(|entry| entry.schema == schema
+                && entry.artifact_kind == artifact_kind
+                && entry.introduced_by == "economic-state-continuity-v1"));
+    }
+}
+
+#[test]
 fn known_signed_artifact_schemas_match_public_registry_or_internal_exemption() {
     let registry: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),

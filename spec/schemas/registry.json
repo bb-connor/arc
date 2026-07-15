@@ -1528,6 +1528,24 @@
       "artifactKind": "risk_adjudication_jurisdiction_receipt",
       "introducedBy": "trust-market-v1",
       "schemaFile": "spec/schemas/chio-risk/v1/adjudication-jurisdiction-receipt.schema.json"
+    },
+    {
+      "schema": "chio.economy.resource-head.v1",
+      "artifactKind": "economic_resource_head",
+      "introducedBy": "economic-state-continuity-v1",
+      "schemaFile": "spec/schemas/chio-economy/resource-head.v1.json"
+    },
+    {
+      "schema": "chio.economy.state-batch.v1",
+      "artifactKind": "economic_state_batch",
+      "introducedBy": "economic-state-continuity-v1",
+      "schemaFile": "spec/schemas/chio-economy/state-batch.v1.json"
+    },
+    {
+      "schema": "chio.economy.effect-slot.v1",
+      "artifactKind": "economic_effect_slot",
+      "introducedBy": "economic-state-continuity-v1",
+      "schemaFile": "spec/schemas/chio-economy/effect-slot.v1.json"
     }
   ]
 }

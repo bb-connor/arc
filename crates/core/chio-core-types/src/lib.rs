@@ -26,6 +26,7 @@ pub mod canonical;
 pub mod capability;
 pub mod crypto;
 pub mod delegation_receipt;
+pub mod economic_continuity;
 pub mod error;
 pub mod hashing;
 pub mod loaded_weights;
@@ -45,6 +46,10 @@ pub mod signed_artifact;
 mod signer_binding;
 mod store_fence;
 
+#[cfg(test)]
+#[path = "economic_continuity_tests.rs"]
+mod economic_continuity_tests;
+
 pub use canonical::{
     canonical_json_bytes, canonical_json_bytes_from_str, canonical_json_string,
     canonical_json_string_from_str, canonicalize, CanonicalBytes, CanonicalJsonWitness,
@@ -57,6 +62,10 @@ pub use crypto::{HybridBackend, MlDsa65Backend};
 #[cfg(feature = "fips")]
 pub use crypto::{P256Backend, P384Backend};
 pub use delegation_receipt::{DelegationReceipt, ScopeAttenuation};
+pub use economic_continuity::{
+    CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
+    CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
+};
 pub use error::{Error, Result};
 pub use hashing::{sha256, Hash};
 pub use loaded_weights::{
