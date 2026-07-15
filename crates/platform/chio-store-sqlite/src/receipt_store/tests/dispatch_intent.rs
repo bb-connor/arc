@@ -562,6 +562,84 @@ fn reconcile_dead_letters_orphans_and_reports_counts() -> Result<(), Box<dyn std
 }
 
 #[test]
+fn reconcile_resolution_batch_times_out_cleanly_on_a_wedged_writer(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // The resolution batch (dead-letter / monetary-reconciled / replay-release)
+    // used to go through an unbounded write while holding the reconcile probe
+    // mutex. A wedged-but-alive writer therefore hung the whole pass, and
+    // because `DispatchIntentRecoveryHandle::drop` joins the background
+    // recovery worker thread that calls this method on its cadence, a wedged
+    // writer could hang kernel shutdown along with it. The write must now
+    // return within its budget, releasing the probe mutex and downgrading any
+    // exclusive mark exactly as a successful pass does, and must leave the
+    // claimed row untouched so a later pass (once the writer recovers) can
+    // still resolve it.
+    let path = unique_db_path("chio-intents-reconcile-wedged-writer");
+
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.record_dispatch_intent(&sample_intent("orphan-wedged"))?;
+    }
+
+    // The restarted instance holds the file exclusively, so the row above is
+    // a true orphan and reconciliation has real resolution work to do.
+    let store = SqliteReceiptStore::open(&path)?;
+
+    // Occupy the single writer with a job that parks until released, so the
+    // reconciliation resolution batch below queues up behind it and never
+    // drains on its own.
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    let blocker_handle = store.writer_handle();
+    let blocker = std::thread::spawn(move || {
+        blocker_handle.run_write(move |_connection| {
+            let _ = started_tx.send(());
+            let _ = release_rx.recv_timeout(std::time::Duration::from_secs(30));
+            Ok(())
+        })
+    });
+    started_rx.recv_timeout(std::time::Duration::from_secs(5))?;
+
+    let started = std::time::Instant::now();
+    let result = store.reconcile_dispatch_intents(&RecordingReconciler);
+    let elapsed = started.elapsed();
+    assert!(
+        elapsed < std::time::Duration::from_secs(10),
+        "a wedged writer must not hang the reconciliation pass; elapsed {elapsed:?}"
+    );
+    assert!(
+        matches!(
+            result,
+            Err(chio_kernel::receipt_store::ReceiptStoreError::Timeout { .. })
+        ),
+        "a timed-out resolution batch must surface a timeout, not hang or silently \
+         succeed: {result:?}"
+    );
+
+    // Release the blocker and drain the queue behind it. The abandoned
+    // resolution write must not have landed: the row stays open for the next
+    // pass rather than being resolved twice or resolving the wrong epoch of
+    // the row.
+    release_tx.send(())?;
+    blocker.join().map_err(|_| "blocker thread panicked")??;
+    store.writer_handle().run_write(|_connection| Ok(()))?;
+    assert_eq!(
+        open_intent_row_count(&store)?,
+        1,
+        "a timed-out resolution write must leave the claimed row open for a later pass"
+    );
+
+    // The next cadence tick retries against a writer that has since
+    // recovered and resolves the orphan normally.
+    let report = store.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(report.dead_lettered, 1);
+    assert_eq!(open_intent_row_count(&store)?, 0);
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
 fn attach_defers_reconciliation_while_a_sibling_writer_is_live(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // The store supports sibling writer instances on one database file. An

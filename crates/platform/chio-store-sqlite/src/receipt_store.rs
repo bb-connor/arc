@@ -283,6 +283,19 @@ const RECEIPT_GROUP_COMMIT_MAX_BATCH: usize = 64;
 const RECEIPT_GROUP_COMMIT_FLUSH_DELAY: Duration = Duration::from_micros(500);
 const RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY: usize = RECEIPT_GROUP_COMMIT_MAX_BATCH * 16;
 
+/// Bound on the dispatch-intent reconciliation resolution write: applying
+/// dead-letter, monetary-reconciled, and replay-release outcomes to the rows
+/// this pass claimed. This runs off the request path (boot attach, or the
+/// background recovery worker's cadence), so it can afford the same order of
+/// magnitude as the hot-path receipt append budget without a request ever
+/// observing it; the bound exists so a wedged-but-alive writer cannot hang
+/// the pass indefinitely while it holds the sidecar reconcile probe mutex
+/// (and, when the batch includes unattributed rows, the writer-lifetime mark
+/// converted to exclusive), which would otherwise block sibling `open()`s and
+/// make `DispatchIntentRecoveryHandle::drop` (which joins the worker thread)
+/// hang kernel shutdown with it.
+const DISPATCH_INTENT_RECONCILE_RESOLUTION_BUDGET: Duration = Duration::from_secs(5);
+
 struct ReceiptCommitActor {
     sender: mpsc::SyncSender<ReceiptCommitCommand>,
     health: Arc<ReceiptCommitWriterHealth>,
@@ -3692,22 +3705,26 @@ impl SqliteReceiptStore {
             }
             // Every resolution write is keyed on the claimed row's (tenant,
             // request id) identity so a live tenant's intent sharing the
-            // request id is never resolved alongside the orphan.
-            self.writer_handle().run_write(move |connection| {
-                let tx = connection
-                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-                for (request_id, tenant_id, detail) in &dead_letters {
-                    dead_letter_dispatch_intent_tx(&tx, request_id, tenant_id.as_deref(), detail)?;
-                }
-                for (request_id, tenant_id, detail) in &reconciled {
-                    reconcile_dispatch_intent_tx(&tx, request_id, tenant_id.as_deref(), detail)?;
-                }
-                for (request_id, tenant_id) in &replayable {
-                    release_dispatch_intent_for_replay_tx(&tx, request_id, tenant_id.as_deref())?;
-                }
-                tx.commit()?;
-                Ok(())
-            })
+            // request id is never resolved alongside the orphan. Bounded and
+            // abandon-checked (see `dispatch_intent_resolution_batch_job`):
+            // a wedged-but-alive writer must not hang this pass indefinitely
+            // while it holds the reconcile probe mutex (and, when the batch
+            // claimed unattributed rows, the exclusive writer-lifetime mark).
+            // A timeout here releases cleanly through the same cleanup below
+            // and leaves every claimed row untouched for the next recovery
+            // pass to re-claim.
+            let abandoned = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let job = dispatch_intent_resolution_batch_job(
+                dead_letters,
+                reconciled,
+                replayable,
+                Arc::clone(&abandoned),
+            );
+            self.writer_handle().run_write_abandoning_on_timeout(
+                job,
+                DISPATCH_INTENT_RECONCILE_RESOLUTION_BUDGET,
+                abandoned,
+            )
         })();
         // Return to the shared mark even when the claim failed: holding the
         // exclusive lock past this pass would block sibling opens for the

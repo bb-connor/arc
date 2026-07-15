@@ -425,6 +425,58 @@ pub(crate) fn release_dispatch_intent_for_replay_tx(
     Ok(())
 }
 
+/// Bounded-path job for a reconciliation pass's resolution batch: applies
+/// every claimed row's outcome (dead-letter, monetary-reconciled, or
+/// release-for-replay) in one immediate transaction. The caller marks
+/// `abandoned` when its response wait times out, and the job refuses to
+/// commit once marked, checked both before the transaction (cheap skip) and
+/// again immediately before commit, mirroring
+/// [`dispatch_intent_insert_job_unless_abandoned`]. The check matters more
+/// here than a plain bounded wait would suggest: each resolution write is
+/// guarded on `state = 'open'` alone (see [`dead_letter_dispatch_intent_tx`],
+/// [`reconcile_dispatch_intent_tx`], [`release_dispatch_intent_for_replay_tx`]),
+/// which cannot distinguish the orphan this pass claimed from a fresh intent
+/// a replay has since journaled under the same (tenant, request id) identity;
+/// a commit that lands after the caller gave up could resolve the wrong row.
+/// A row this job leaves untouched stays open for the next recovery pass to
+/// re-claim.
+pub(crate) fn dispatch_intent_resolution_batch_job(
+    dead_letters: Vec<(String, Option<String>, String)>,
+    reconciled: Vec<(String, Option<String>, String)>,
+    replayable: Vec<(String, Option<String>)>,
+    abandoned: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> impl FnOnce(&mut SqliteStoreConnection) -> Result<(), ReceiptStoreError> + Send + 'static {
+    move |connection| {
+        let abandoned_error = || {
+            ReceiptStoreError::Conflict(
+                "dispatch intent reconciliation resolution was abandoned by its timed-out \
+                 caller; the next recovery pass will re-claim any row still open"
+                    .to_string(),
+            )
+        };
+        if abandoned.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(abandoned_error());
+        }
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        for (request_id, tenant_id, detail) in &dead_letters {
+            dead_letter_dispatch_intent_tx(&tx, request_id, tenant_id.as_deref(), detail)?;
+        }
+        for (request_id, tenant_id, detail) in &reconciled {
+            reconcile_dispatch_intent_tx(&tx, request_id, tenant_id.as_deref(), detail)?;
+        }
+        for (request_id, tenant_id) in &replayable {
+            release_dispatch_intent_for_replay_tx(&tx, request_id, tenant_id.as_deref())?;
+        }
+        if abandoned.load(std::sync::atomic::Ordering::SeqCst) {
+            // Dropping the transaction rolls every resolution in this batch
+            // back; none of the claimed rows change state.
+            return Err(abandoned_error());
+        }
+        tx.commit()?;
+        Ok(())
+    }
+}
+
 /// Count of open (in-flight or unreconciled) dispatch intents, tolerant of a
 /// missing table on a pre-journal database.
 pub(crate) fn open_dispatch_intent_count_query(
