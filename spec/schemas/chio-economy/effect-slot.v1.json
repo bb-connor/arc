@@ -130,11 +130,22 @@
     "admissionHandoff": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["state", "operationVersion", "lifecycleFence"],
+      "required": ["state", "operationVersion", "lifecycleFence", "storeFence"],
       "properties": {
         "state": { "enum": ["dispatch_committed", "mutation_submitted"] },
         "operationVersion": { "$ref": "#/$defs/positiveInteger" },
-        "lifecycleFence": { "$ref": "#/$defs/positiveInteger" }
+        "lifecycleFence": { "$ref": "#/$defs/positiveInteger" },
+        "storeFence": { "$ref": "#/$defs/storeFence" }
+      }
+    },
+    "storeFence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["store_uuid", "lease_id", "owner_epoch"],
+      "properties": {
+        "store_uuid": { "$ref": "#/$defs/identifier" },
+        "lease_id": { "$ref": "#/$defs/identifier" },
+        "owner_epoch": { "$ref": "#/$defs/positiveInteger" }
       }
     },
     "target": {

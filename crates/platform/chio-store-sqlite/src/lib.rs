@@ -33,6 +33,7 @@ pub mod batch_approval_store;
 pub mod budget_store;
 pub mod capability_lineage;
 pub mod dead_letters;
+pub mod economic_state_cache;
 pub mod encrypted_blob;
 pub mod evidence_export;
 pub mod execution_nonce_store;
@@ -187,6 +188,10 @@ pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use batch_approval_store::SqliteBatchApprovalStore;
 pub use budget_store::{BudgetStoreSnapshot, SqliteBudgetStore};
+pub use economic_state_cache::{
+    EconomicOperationStageBinding, EconomicOperationStageContext, EconomicStateCacheError,
+    EconomicStateStageRecord, EconomicStateStageStatus, SqliteEconomicStateCache,
+};
 pub use encrypted_blob::{
     decrypt_blob, encrypt_blob, BlobHandle, BlobStoreError, DecryptError, EncryptError,
     EncryptedBlob, SqliteEncryptedBlobStore, TenantId, TenantKey,

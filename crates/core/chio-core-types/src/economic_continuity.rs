@@ -8,6 +8,7 @@ use serde_json::Value;
 
 use crate::canonical::canonical_json_bytes;
 use crate::crypto::{sha256_hex, Keypair, PublicKey, Signature};
+use crate::StoreMutationFence;
 
 mod anchor;
 pub use anchor::*;
@@ -403,12 +404,24 @@ pub struct EconomicAdmissionHandoffV1 {
     pub state: EconomicAdmissionHandoffStateV1,
     pub operation_version: u64,
     pub lifecycle_fence: u64,
+    pub store_fence: StoreMutationFence,
 }
 
 impl EconomicAdmissionHandoffV1 {
     pub fn validate(&self) -> Result<(), EconomicContinuityError> {
         validate_positive("admission_operation_version", self.operation_version)?;
-        validate_positive("admission_lifecycle_fence", self.lifecycle_fence)
+        validate_positive("admission_lifecycle_fence", self.lifecycle_fence)?;
+        validate_text(
+            "admission_store_uuid",
+            &self.store_fence.store_uuid,
+            MAX_IDENTIFIER_BYTES,
+        )?;
+        validate_text(
+            "admission_store_lease_id",
+            &self.store_fence.lease_id,
+            MAX_IDENTIFIER_BYTES,
+        )?;
+        validate_positive("admission_store_owner_epoch", self.store_fence.owner_epoch)
     }
 }
 
@@ -1037,6 +1050,11 @@ impl EconomicStateBatchV1 {
         }
         for slot in &self.effect_slots {
             slot.validate()?;
+            if slot.state != EconomicEffectStateV1::Ready || slot.terminal.is_some() {
+                return Err(EconomicContinuityError::BindingMismatch(
+                    "prepared_effect_slot_state",
+                ));
+            }
             if slot.anchor_id != self.anchor_id || slot.namespace != self.namespace {
                 return Err(EconomicContinuityError::BindingMismatch(
                     "effect_slot_anchor",

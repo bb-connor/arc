@@ -189,6 +189,11 @@ pub(crate) fn ready_effect_slot() -> Result<EconomicEffectSlotV1, EconomicContin
             state: EconomicAdmissionHandoffStateV1::MutationSubmitted,
             operation_version: 4,
             lifecycle_fence: 9,
+            store_fence: crate::StoreMutationFence {
+                store_uuid: "store-1".to_string(),
+                lease_id: "lease-1".to_string(),
+                owner_epoch: 3,
+            },
         },
         target: EconomicEffectTargetV1 {
             target_id: "settlement-rail".to_string(),
@@ -335,6 +340,24 @@ fn batch_binds_prepared_effect_slot_and_request_replay() -> Result<(), Box<dyn c
     let keypair = Keypair::from_seed(&[9; 32]);
     batch.seal(&keypair)?;
     batch.verify_signature(&keypair.public_key())?;
+
+    let mut already_dispatched = batch.clone();
+    already_dispatched.effect_slots[0].state = EconomicEffectStateV1::DispatchCommitted;
+    let dispatched_slot = already_dispatched.effect_slots[0].clone();
+    already_dispatched.transitions[0]
+        .prepared_effect
+        .as_mut()
+        .ok_or("prepared effect is missing")?
+        .effect_slot_digest = dispatched_slot.digest()?;
+    let slot_transition = already_dispatched
+        .transitions
+        .iter_mut()
+        .find(|transition| transition.resource_key == dispatched_slot.resource_head_key())
+        .ok_or("effect slot transition is missing")?;
+    let slot_content = inline_content(serde_json::to_value(&dispatched_slot)?);
+    slot_transition.next_head.state_digest = slot_content.digest()?;
+    slot_transition.next_head.state = slot_content;
+    assert!(already_dispatched.seal(&keypair).is_err());
 
     let mut duplicate_prepared = batch.clone();
     let mut unowned_slot = slot.clone();

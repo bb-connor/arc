@@ -1,4 +1,4 @@
-b7aecebd50a7edeeb9e99f9168735a1b3b4d1796dec98fe376d1a3f8ea164819  spec/schemas/MANIFEST.sha256
+b472f141d1ba46507a15a8c71b71fa44c4bb157d890caffcbc020a186e7d1a09  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -36,7 +36,7 @@ ffdc4c19cea5d3a471c0645deb4b6aec170a3f32045f16788a40e3438e884a3b  spec/schemas/c
 86244a1732a1bf3091a816f19c9fb4e3ce518f467028c089ae66b7b725647684  spec/schemas/chio-disclosure/v1/verifier-privacy-profile.schema.json
 ee4bb4d7d95da7232a7bbcee225eaa504046c4b563f3c3f77e6abdf777d231e6  spec/schemas/chio-economy/anchor-view.v1.json
 7b46ec4afb9b7ee3afc707a57df8551a2a044990578aa5bb79cfc98fce284b49  spec/schemas/chio-economy/effect-dispatch-commit.v1.json
-dcf69be220062fa30ccb610359a2466794a61a113470a803070d620a430522ef  spec/schemas/chio-economy/effect-slot.v1.json
+0502f8d89fe2226d791f26f65446d510fb0fe9e483a850331f404f2febf6ec0f  spec/schemas/chio-economy/effect-slot.v1.json
 d6cea9045b9ec7ce1b7d68081fd5159e1bce8b318e35236e47e6a60b6a7d8c73  spec/schemas/chio-economy/resource-head.v1.json
 fb10036259cce9ba1abd18a6b516d78d0c9f0460bcd5e042bbe0db6fdf892fed  spec/schemas/chio-economy/state-batch.v1.json
 fb931201ed0380c0eece1e1563a6e593c30df0ac5330105b76c5db5875bb048a  spec/schemas/chio-enterprise/v1/approval-case.schema.json

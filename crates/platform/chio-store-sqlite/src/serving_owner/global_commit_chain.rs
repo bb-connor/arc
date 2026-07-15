@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS authority_global_commits (
     commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     projection_kind TEXT NOT NULL CHECK (
-        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment')
+        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic')
     ),
     projection_key TEXT NOT NULL,
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence >= 0),
@@ -178,6 +178,7 @@ pub(crate) fn initialize_global_commit_schema(
             return Ok(());
         }
         let supported_legacy = [
+            pre_economic_global_commit_schema(),
             pre_payment_global_commit_schema(),
             legacy_global_commit_schema(),
         ];
@@ -211,15 +212,22 @@ pub(crate) fn verify_global_commit_schema(
 
 fn legacy_global_commit_schema() -> String {
     GLOBAL_COMMIT_SCHEMA.replace(
-        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment'",
+        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic'",
         "'baseline', 'admission', 'budget', 'revocation'",
     )
 }
 
 fn pre_payment_global_commit_schema() -> String {
     GLOBAL_COMMIT_SCHEMA.replace(
-        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment'",
+        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic'",
         "'baseline', 'admission', 'budget', 'revocation', 'frost'",
+    )
+}
+
+fn pre_economic_global_commit_schema() -> String {
+    GLOBAL_COMMIT_SCHEMA.replace(
+        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic'",
+        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment'",
     )
 }
 
@@ -785,6 +793,17 @@ fn projection_reference_digest(
             )
             .optional()?
             .ok_or_else(|| invalid("FROST projection reference is absent")),
+        "economic" => connection
+            .query_row(
+                r#"
+                SELECT commit_digest FROM economic_state_stage_commits
+                WHERE batch_id = ?1 AND stage_version = ?2
+                "#,
+                params![key, sqlite_u64(sequence, "economic stage version")?],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or_else(|| invalid("economic projection reference is absent")),
         _ => Err(invalid("unknown global authority projection kind")),
     }
 }
@@ -1209,6 +1228,15 @@ fn verify_global_projection_coverage(
                     WHERE global.projection_kind = 'payment'
                       AND global.projection_key = local.operation_id
                       AND global.projection_sequence = local.journal_version
+                ) <> 1
+            )
+            OR EXISTS(
+                SELECT 1 FROM economic_state_stage_commits AS local
+                WHERE (
+                    SELECT COUNT(*) FROM authority_global_commits AS global
+                    WHERE global.projection_kind = 'economic'
+                      AND global.projection_key = local.batch_id
+                      AND global.projection_sequence = local.stage_version
                 ) <> 1
             )
             OR EXISTS(

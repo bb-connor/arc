@@ -1,5 +1,8 @@
 use super::*;
 
+mod query;
+pub use query::*;
+
 pub const CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA: &str = "chio.economy.anchor-view.v1";
 pub const CHIO_ECONOMIC_EFFECT_DISPATCH_COMMIT_SCHEMA: &str =
     "chio.economy.effect-dispatch-commit.v1";
@@ -455,39 +458,6 @@ pub fn verify_economic_state_view(
 ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
     view.verify(pins)?;
     Ok(VerifiedEconomicStateView { view })
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct EconomicStateReadQuery {
-    pub resource_keys: Vec<EconomicResourceKeyV1>,
-    pub request_keys: Vec<EconomicRequestKeyV1>,
-}
-
-impl EconomicStateReadQuery {
-    pub fn validate(&self) -> Result<(), EconomicStateAnchorError> {
-        if self.resource_keys.len() > MAX_ECONOMIC_TRANSITIONS
-            || self.request_keys.len() > MAX_ECONOMIC_TRANSITIONS
-        {
-            return Err(EconomicStateAnchorError::InvalidView(
-                "read query exceeds the bound",
-            ));
-        }
-        if !self.resource_keys.windows(2).all(|pair| pair[0] < pair[1])
-            || !self.request_keys.windows(2).all(|pair| pair[0] < pair[1])
-        {
-            return Err(EconomicStateAnchorError::InvalidView(
-                "read query keys must be sorted and unique",
-            ));
-        }
-        for key in &self.resource_keys {
-            key.validate()?;
-        }
-        for key in &self.request_keys {
-            key.validate()?;
-        }
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1183,6 +1153,11 @@ pub trait EconomicStateAnchor: Send + Sync {
     fn read_state(
         &self,
         query: &EconomicStateReadQuery,
+    ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError>;
+
+    fn read_checkpoint_state(
+        &self,
+        query: &EconomicCheckpointReadQuery,
     ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError>;
 
     fn compare_and_swap_batch(

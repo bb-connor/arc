@@ -7,18 +7,20 @@ use chio_core::economic_continuity::{
     assess_economic_state_readiness, reverify_economic_effect_dispatch_advance,
     reverify_economic_state_batch_advance, verify_economic_effect_dispatch_commit,
     verify_economic_state_batch_commit, verify_economic_state_view,
-    EconomicAdmissionHandoffVerifier, EconomicEffectDispatchCommitV1, EconomicStateAnchor,
-    EconomicStateAnchorError, EconomicStateAnchorPins, EconomicStateAnchorViewV1,
-    EconomicStateReadQuery, EconomicStateReadiness, EconomicStateReadinessExpectation,
-    EconomicTransitionProofVerifier, VerifiedEconomicEffectDispatch,
-    VerifiedEconomicEffectDispatchAdvance, VerifiedEconomicStateBatchAdvance,
-    VerifiedEconomicStateView, MAX_ECONOMIC_BATCH_BYTES, MAX_ECONOMIC_INLINE_CONTENT_BYTES,
-    MAX_ECONOMIC_TERMINAL_CONTENT_BYTES, MAX_ECONOMIC_TRANSITIONS,
+    EconomicAdmissionHandoffVerifier, EconomicCheckpointReadQuery, EconomicEffectDispatchCommitV1,
+    EconomicStateAnchor, EconomicStateAnchorError, EconomicStateAnchorPins,
+    EconomicStateAnchorViewV1, EconomicStateReadQuery, EconomicStateReadiness,
+    EconomicStateReadinessExpectation, EconomicTransitionProofVerifier,
+    VerifiedEconomicEffectDispatch, VerifiedEconomicEffectDispatchAdvance,
+    VerifiedEconomicStateBatchAdvance, VerifiedEconomicStateView, MAX_ECONOMIC_BATCH_BYTES,
+    MAX_ECONOMIC_INLINE_CONTENT_BYTES, MAX_ECONOMIC_TERMINAL_CONTENT_BYTES,
+    MAX_ECONOMIC_TRANSITIONS,
 };
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 pub const ECONOMIC_STATE_READ_PATH: &str = "/v1/economic-state/read";
+pub const ECONOMIC_STATE_CHECKPOINT_READ_PATH: &str = "/v1/economic-state/checkpoints/read";
 pub const ECONOMIC_STATE_CAS_PATH: &str = "/v1/economic-state/compare-and-swap";
 pub const ECONOMIC_EFFECT_DISPATCH_PATH: &str = "/v1/economic-state/effects/dispatch";
 const ECONOMIC_STATE_REQUEST_LIMIT: usize = MAX_ECONOMIC_BATCH_BYTES;
@@ -266,6 +268,26 @@ impl EconomicStateAnchor for RemoteEconomicStateAnchor {
         let view =
             verify_economic_state_view(self.post(ECONOMIC_STATE_READ_PATH, query)?, &self.pins)?;
         verify_query_coverage(query, &view)?;
+        Ok(view)
+    }
+
+    fn read_checkpoint_state(
+        &self,
+        query: &EconomicCheckpointReadQuery,
+    ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
+        query.validate()?;
+        let view = verify_economic_state_view(
+            self.post(ECONOMIC_STATE_CHECKPOINT_READ_PATH, query)?,
+            &self.pins,
+        )?;
+        if view.view().checkpoint_sequence != query.checkpoint_sequence
+            || view.view().checkpoint_digest != query.checkpoint_digest
+        {
+            return Err(EconomicStateAnchorError::InvalidView(
+                "retained checkpoint does not match the requested identity",
+            ));
+        }
+        verify_query_coverage(&query.query, &view)?;
         Ok(view)
     }
 
@@ -550,6 +572,11 @@ mod tests {
                 state: EconomicAdmissionHandoffStateV1::MutationSubmitted,
                 operation_version: 4,
                 lifecycle_fence: 9,
+                store_fence: chio_kernel::admission_operation::StoreMutationFence {
+                    store_uuid: "store-1".to_owned(),
+                    lease_id: "lease-1".to_owned(),
+                    owner_epoch: 3,
+                },
             },
             target: EconomicEffectTargetV1 {
                 target_id: "settlement-rail".to_owned(),
@@ -783,6 +810,55 @@ mod tests {
         assert_eq!(requests[0].0, ECONOMIC_STATE_READ_PATH);
         assert_eq!(
             serde_json::from_slice::<EconomicStateReadQuery>(&requests[0].1)?,
+            query
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn remote_checkpoint_read_requires_the_exact_retained_checkpoint() -> TestResult {
+        let key = resource_key("round-1");
+        let checkpoint_digest = digest("checkpoint-7");
+        let query = chio_core::economic_continuity::EconomicCheckpointReadQuery {
+            checkpoint_sequence: 7,
+            checkpoint_digest: checkpoint_digest.clone(),
+            query: EconomicStateReadQuery {
+                resource_keys: vec![key.clone()],
+                request_keys: Vec::new(),
+            },
+        };
+        let transport = Arc::new(FixtureTransport::default());
+        transport.respond_with(&signed_view_at(
+            7,
+            checkpoint_digest,
+            vec![resource_head(key.clone())?],
+            Vec::new(),
+        )?)?;
+        transport.respond_with(&signed_view_at(
+            8,
+            digest("checkpoint-8"),
+            vec![resource_head(key)?],
+            Vec::new(),
+        )?)?;
+        let anchor = RemoteEconomicStateAnchor::with_fixture_transport(
+            config(
+                "https://anchor.example",
+                "anchor-token",
+                Duration::from_secs(5),
+            ),
+            Arc::new(DirectTransitionVerifier),
+            Arc::new(AdmissionVerifier),
+            transport.clone(),
+        )?;
+
+        anchor.read_checkpoint_state(&query)?;
+        assert!(anchor.read_checkpoint_state(&query).is_err());
+        let requests = lock_unpoisoned(&transport.requests);
+        assert_eq!(requests[0].0, ECONOMIC_STATE_CHECKPOINT_READ_PATH);
+        assert_eq!(
+            serde_json::from_slice::<chio_core::economic_continuity::EconomicCheckpointReadQuery>(
+                &requests[0].1
+            )?,
             query
         );
         Ok(())

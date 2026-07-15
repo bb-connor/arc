@@ -185,7 +185,7 @@ fn legacy_global_projection_constraint_migrates_without_rewriting_history() {
         )
         .expect("global commit table SQL");
     let legacy_table_sql = table_sql.replace(
-        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment'",
+        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic'",
         "'baseline', 'admission', 'budget', 'revocation'",
     );
     let transaction = connection

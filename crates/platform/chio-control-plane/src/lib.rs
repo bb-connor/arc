@@ -27,6 +27,7 @@ pub use durable_admission::{
     DurableAdmissionRuntime,
 };
 pub mod economic_state_anchor;
+pub mod economic_state_recovery;
 pub mod enterprise_federation;
 pub mod evidence_export;
 pub mod federation_policy;

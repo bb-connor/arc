@@ -321,6 +321,10 @@ impl SqliteAuthorityStore {
                 "frost",
                 crate::frost_store::FROST_STORE_SUPPORTED_SCHEMA_VERSION,
             ),
+            (
+                "economic_state_cache",
+                crate::economic_state_cache::ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION,
+            ),
         ] {
             crate::check_schema_version(
                 &connection,
@@ -475,6 +479,10 @@ impl SqliteAuthorityStore {
             (
                 "frost",
                 crate::frost_store::FROST_STORE_SUPPORTED_SCHEMA_VERSION,
+            ),
+            (
+                "economic_state_cache",
+                crate::economic_state_cache::ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION,
             ),
         ] {
             crate::check_schema_version(
@@ -660,6 +668,14 @@ impl SqliteAuthorityStore {
             self.owner.clone(),
         )
     }
+
+    #[must_use]
+    pub fn economic_state_cache(&self) -> crate::economic_state_cache::SqliteEconomicStateCache {
+        crate::economic_state_cache::SqliteEconomicStateCache::open_alongside(
+            self.connection.clone(),
+            self.owner.clone(),
+        )
+    }
 }
 
 fn initialize_offline_authority_schemas(
@@ -697,6 +713,8 @@ fn initialize_offline_authority_schemas(
     )
     .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     crate::frost_store::initialize_frost_schema(connection)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::economic_state_cache::initialize_economic_state_cache_schema(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     Ok(())
 }
@@ -1336,6 +1354,8 @@ fn verify_authority_store_invariants(
     crate::tool_outcome_store::verify_tool_outcome_invariants(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     crate::frost_store::verify_frost_store_invariants(connection)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::economic_state_cache::verify_cache_sql_invariants(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     Ok(())
 }
