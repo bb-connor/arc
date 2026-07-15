@@ -83,7 +83,10 @@ fn record_dispatch_intent_rejects_an_empty_string_tenant_id(
         .err()
         .ok_or("an empty-string tenant id must be rejected")?;
     assert!(
-        matches!(error, chio_kernel::receipt_store::ReceiptStoreError::Conflict(_)),
+        matches!(
+            error,
+            chio_kernel::receipt_store::ReceiptStoreError::Conflict(_)
+        ),
         "expected Conflict, got {error:?}"
     );
     assert_eq!(
@@ -1416,7 +1419,10 @@ fn resolve_dead_letter_intent_refuses_a_missing_request() -> Result<(), Box<dyn 
         .err()
         .ok_or("resolving a nonexistent request must refuse, not no-op")?;
     assert!(
-        matches!(error, chio_kernel::receipt_store::ReceiptStoreError::NotFound(_)),
+        matches!(
+            error,
+            chio_kernel::receipt_store::ReceiptStoreError::NotFound(_)
+        ),
         "expected NotFound, got {error:?}"
     );
 
@@ -1425,8 +1431,7 @@ fn resolve_dead_letter_intent_refuses_a_missing_request() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn resolve_dead_letter_intent_refuses_a_still_open_row() -> Result<(), Box<dyn std::error::Error>>
-{
+fn resolve_dead_letter_intent_refuses_a_still_open_row() -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-intents-resolve-still-open");
     let store = SqliteReceiptStore::open(&path)?;
     // The intent is open (in flight, still owned by this live instance),
@@ -1438,7 +1443,10 @@ fn resolve_dead_letter_intent_refuses_a_still_open_row() -> Result<(), Box<dyn s
         .err()
         .ok_or("resolving a non-dead-letter row must refuse")?;
     assert!(
-        matches!(error, chio_kernel::receipt_store::ReceiptStoreError::Conflict(_)),
+        matches!(
+            error,
+            chio_kernel::receipt_store::ReceiptStoreError::Conflict(_)
+        ),
         "expected Conflict, got {error:?}"
     );
     assert_eq!(
