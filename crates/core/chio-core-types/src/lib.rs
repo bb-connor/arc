@@ -47,6 +47,9 @@ mod signer_binding;
 mod store_fence;
 
 #[cfg(test)]
+#[path = "economic_continuity_anchor_tests.rs"]
+mod economic_continuity_anchor_tests;
+#[cfg(test)]
 #[path = "economic_continuity_tests.rs"]
 mod economic_continuity_tests;
 

@@ -6,7 +6,8 @@ use alloc::vec::Vec;
 
 use crate::capability::{features::CHIO_CAPABILITIES_SCHEMA, token::CHIO_CAPABILITY_SCHEMA};
 use crate::economic_continuity::{
-    CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
+    CHIO_ECONOMIC_EFFECT_DISPATCH_COMMIT_SCHEMA, CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
+    CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA, CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
     CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
 };
 use crate::error::{Error, Result};
@@ -221,6 +222,17 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
         Some(("economic_effect_slot", "economic-state-continuity-v1")),
+    ),
+    (
+        CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
+        Some(("economic_state_anchor_view", "economic-state-continuity-v1")),
+    ),
+    (
+        CHIO_ECONOMIC_EFFECT_DISPATCH_COMMIT_SCHEMA,
+        Some((
+            "economic_effect_dispatch_commit",
+            "economic-state-continuity-v1",
+        )),
     ),
     (CHIO_SESSION_ANCHOR_SCHEMA, None),
     (CHIO_REQUEST_LINEAGE_RECORD_SCHEMA, None),

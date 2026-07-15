@@ -6,11 +6,11 @@ use serde_json::json;
 use crate::economic_continuity::*;
 use crate::{sha256_hex, Keypair};
 
-fn digest(label: &str) -> String {
+pub(crate) fn digest(label: &str) -> String {
     sha256_hex(label.as_bytes())
 }
 
-fn resource_key(resource_id: &str) -> EconomicResourceKeyV1 {
+pub(crate) fn resource_key(resource_id: &str) -> EconomicResourceKeyV1 {
     EconomicResourceKeyV1 {
         resource_family: "clearing_round".to_string(),
         scope_id: "tenant-1".to_string(),
@@ -18,11 +18,11 @@ fn resource_key(resource_id: &str) -> EconomicResourceKeyV1 {
     }
 }
 
-fn inline_content(value: serde_json::Value) -> EconomicContentV1 {
+pub(crate) fn inline_content(value: serde_json::Value) -> EconomicContentV1 {
     EconomicContentV1::Inline { value }
 }
 
-fn head(
+pub(crate) fn head(
     key: EconomicResourceKeyV1,
     head_version: u64,
     resource_version: u64,
@@ -52,7 +52,7 @@ fn head(
     })
 }
 
-fn transition(
+pub(crate) fn transition(
     next_head: EconomicResourceHeadV1,
     expected_head_digest: Option<String>,
 ) -> EconomicStateTransitionV1 {
@@ -65,7 +65,7 @@ fn transition(
     }
 }
 
-fn unsigned_batch(transitions: Vec<EconomicStateTransitionV1>) -> EconomicStateBatchV1 {
+pub(crate) fn unsigned_batch(transitions: Vec<EconomicStateTransitionV1>) -> EconomicStateBatchV1 {
     EconomicStateBatchV1 {
         schema: CHIO_ECONOMIC_STATE_BATCH_SCHEMA.to_string(),
         batch_id: String::new(),
@@ -171,7 +171,7 @@ fn resource_heads_reject_regression_and_wrong_predecessor(
     Ok(())
 }
 
-fn ready_effect_slot() -> Result<EconomicEffectSlotV1, EconomicContinuityError> {
+pub(crate) fn ready_effect_slot() -> Result<EconomicEffectSlotV1, EconomicContinuityError> {
     let mut slot = EconomicEffectSlotV1 {
         schema: CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA.to_string(),
         slot_id: String::new(),
@@ -430,7 +430,7 @@ fn wire_schemas_accept_canonical_values_and_reject_one_field_tampering(
     Ok(())
 }
 
-fn schema_validator(
+pub(crate) fn schema_validator(
     root: &std::path::Path,
     name: &str,
 ) -> Result<jsonschema::Validator, Box<dyn core::error::Error>> {
@@ -439,6 +439,8 @@ fn schema_validator(
         "resource-head.v1.json",
         "effect-slot.v1.json",
         "state-batch.v1.json",
+        "anchor-view.v1.json",
+        "effect-dispatch-commit.v1.json",
     ] {
         let schema: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(root.join(schema_name))?)?;
@@ -454,6 +456,10 @@ fn schema_validator(
         }
         "effect-slot.v1.json" => "https://chio-protocol.dev/schemas/chio-economy/effect-slot/v1",
         "state-batch.v1.json" => "https://chio-protocol.dev/schemas/chio-economy/state-batch/v1",
+        "anchor-view.v1.json" => "https://chio-protocol.dev/schemas/chio-economy/anchor-view/v1",
+        "effect-dispatch-commit.v1.json" => {
+            "https://chio-protocol.dev/schemas/chio-economy/effect-dispatch-commit/v1"
+        }
         _ => return Err(format!("unsupported economic schema {name}").into()),
     };
     let schema = schemas

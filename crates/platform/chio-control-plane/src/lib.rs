@@ -26,6 +26,7 @@ pub use durable_admission::{
     validate_distinct_database_paths, validate_durable_admission_participant_paths,
     DurableAdmissionRuntime,
 };
+pub mod economic_state_anchor;
 pub mod enterprise_federation;
 pub mod evidence_export;
 pub mod federation_policy;

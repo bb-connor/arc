@@ -1546,6 +1546,18 @@
       "artifactKind": "economic_effect_slot",
       "introducedBy": "economic-state-continuity-v1",
       "schemaFile": "spec/schemas/chio-economy/effect-slot.v1.json"
+    },
+    {
+      "schema": "chio.economy.anchor-view.v1",
+      "artifactKind": "economic_state_anchor_view",
+      "introducedBy": "economic-state-continuity-v1",
+      "schemaFile": "spec/schemas/chio-economy/anchor-view.v1.json"
+    },
+    {
+      "schema": "chio.economy.effect-dispatch-commit.v1",
+      "artifactKind": "economic_effect_dispatch_commit",
+      "introducedBy": "economic-state-continuity-v1",
+      "schemaFile": "spec/schemas/chio-economy/effect-dispatch-commit.v1.json"
     }
   ]
 }

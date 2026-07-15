@@ -38,6 +38,11 @@ fn economic_continuity_schemas_are_registered() {
         ("chio.economy.resource-head.v1", "economic_resource_head"),
         ("chio.economy.state-batch.v1", "economic_state_batch"),
         ("chio.economy.effect-slot.v1", "economic_effect_slot"),
+        ("chio.economy.anchor-view.v1", "economic_state_anchor_view"),
+        (
+            "chio.economy.effect-dispatch-commit.v1",
+            "economic_effect_dispatch_commit",
+        ),
     ] {
         assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
         assert!(chio_core_types::built_in_signed_artifact_registry()
