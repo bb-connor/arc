@@ -3164,11 +3164,11 @@ version = "0.1.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.spin]]
-version = "0.9.9"
+version = "0.9.8"
 criteria = "safe-to-deploy"
 
 [[exemptions.spin]]
-version = "0.10.1"
+version = "0.10.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.spki]]
