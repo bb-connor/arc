@@ -376,6 +376,17 @@ pub enum BudgetDenyReason {
         /// The draft's currency, if any.
         draft_currency: Option<String>,
     },
+    /// The current spend plus the draft cannot be represented in `u64` for
+    /// a checked dimension. A cap can never be soundly compared against an
+    /// overflowed projection, so this denies rather than silently
+    /// saturating to a value the cap would wrongly appear to permit.
+    ProjectionOverflow {
+        /// The node whose projection overflowed.
+        node: BudgetNodeId,
+        /// Dimension whose projection overflowed. Stable identifier:
+        /// `"spend"`.
+        dimension: String,
+    },
 }
 
 /// Outcome of an evaluation.
@@ -634,20 +645,38 @@ impl BudgetTree {
                     (Some(node_currency), Some(draft_currency))
                         if node_currency == draft_currency =>
                     {
-                        if projected.spend_units > cap {
-                            let cap_str = format!("{cap} {node_currency}");
-                            let reach_str = format!(
-                                "{} {}",
-                                projected.spend_units,
-                                projected.currency.clone().unwrap_or_default()
-                            );
-                            let candidate = BudgetDenyReason::DimensionExceeded {
-                                node: node_id.clone(),
-                                dimension: "spend".to_string(),
-                                cap: cap_str,
-                                would_reach: reach_str,
-                            };
-                            offender = Some((idx, candidate));
+                        match current_spend
+                            .current
+                            .spend_units
+                            .checked_add(draft.spend_units)
+                        {
+                            Some(projected_spend_units) => {
+                                if projected_spend_units > cap {
+                                    let cap_str = format!("{cap} {node_currency}");
+                                    let reach_str = format!(
+                                        "{projected_spend_units} {}",
+                                        projected.currency.clone().unwrap_or_default()
+                                    );
+                                    let candidate = BudgetDenyReason::DimensionExceeded {
+                                        node: node_id.clone(),
+                                        dimension: "spend".to_string(),
+                                        cap: cap_str,
+                                        would_reach: reach_str,
+                                    };
+                                    offender = Some((idx, candidate));
+                                }
+                            }
+                            None => {
+                                // The checked add overflowed u64: saturating
+                                // here would compare the cap against a value
+                                // that understates the true projected spend,
+                                // so this denies instead.
+                                let candidate = BudgetDenyReason::ProjectionOverflow {
+                                    node: node_id.clone(),
+                                    dimension: "spend".to_string(),
+                                };
+                                offender = Some((idx, candidate));
+                            }
                         }
                     }
                     _ if draft.spend_units > 0 => {

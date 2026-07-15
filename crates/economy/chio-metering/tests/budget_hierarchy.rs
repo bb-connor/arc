@@ -561,3 +561,24 @@ fn spend_dimension_denies_on_currency_mismatch() {
     let dec = tree.evaluate(&id, AggregateSpend::with_tokens(10), &snap);
     assert!(matches!(dec, BudgetDecision::Allow));
 }
+
+#[test]
+fn spend_dimension_denies_on_projection_overflow() {
+    // The recorded spend already sits at u64::MAX; adding any further draft
+    // cannot be represented in u64. Checked arithmetic denies rather than
+    // saturating to a value that would compare incorrectly against the cap.
+    let mut tree = BudgetTree::new();
+    tree.insert(org("org/usd", usd(1_000), BudgetWindow::Daily))
+        .expect("org");
+
+    let id = BudgetNodeId::from("org/usd");
+    let snap = snapshot_for("org/usd", AggregateSpend::with_spend(u64::MAX, "USD"));
+
+    let dec = tree.evaluate(&id, AggregateSpend::with_spend(1, "USD"), &snap);
+    assert!(matches!(
+        dec,
+        BudgetDecision::Deny {
+            reason: BudgetDenyReason::ProjectionOverflow { .. }
+        }
+    ));
+}
