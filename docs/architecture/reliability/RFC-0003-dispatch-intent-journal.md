@@ -583,6 +583,18 @@ opened via `open_existing` (which runs no DDL), the counting queries treat a mis
 `chio_dispatch_intents` table as zero rows (see migration notes). Live writer-liveness polling
 is out of scope here and tracked separately in the wave-3 program.
 
+The sanctioned remediation for a dead-letter incident is `chio receipt
+resolve-dead-letter --request-id <id> [--tenant <tenant>] --note <note>`, backed by
+`ReceiptStore::resolve_dead_letter_dispatch_intent`. It transitions the row to a
+terminal `resolved` state that stops counting against `dead_letter_dispatch_intents`
+(and therefore `healthy`) while appending the operator's note to the existing
+resolution detail rather than overwriting it, so the row stays on disk as a complete,
+auditable history. It refuses (fail-closed) when the request id does not name an
+intent, or names one that is not currently `dead_letter` (still open, already
+reconciled, or already resolved), so an operator cannot silently resolve the wrong
+incident or resolve one twice. `chio receipt health`'s human output names this command
+whenever `dead_letter_dispatch_intents` is nonzero.
+
 ### Config
 
 Add to `KernelConfig`

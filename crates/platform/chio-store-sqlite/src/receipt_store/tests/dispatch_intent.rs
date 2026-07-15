@@ -66,6 +66,41 @@ fn record_dispatch_intent_inserts_and_rejects_duplicate() -> Result<(), Box<dyn 
 }
 
 #[test]
+fn record_dispatch_intent_rejects_an_empty_string_tenant_id(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // The unique index folds a NULL tenant to '' so tenantless rows still
+    // conflict with each other. An explicit "" tenant would fold to the same
+    // value and collide with tenantless rows it does not belong to; this
+    // must be an explicit, named rejection rather than a bare unique-index
+    // conflict the caller has to puzzle out.
+    let path = unique_db_path("chio-intents-empty-tenant");
+    let store = SqliteReceiptStore::open(&path)?;
+
+    let mut intent = sample_intent("req-empty-tenant");
+    intent.tenant_id = Some(String::new());
+    let result = store.record_dispatch_intent(&intent);
+    let error = result
+        .err()
+        .ok_or("an empty-string tenant id must be rejected")?;
+    assert!(
+        matches!(error, chio_kernel::receipt_store::ReceiptStoreError::Conflict(_)),
+        "expected Conflict, got {error:?}"
+    );
+    assert_eq!(
+        open_intent_row_count(&store)?,
+        0,
+        "a rejected insert must not leave a row behind"
+    );
+
+    // A genuinely tenantless intent (None) still journals normally.
+    store.record_dispatch_intent(&sample_intent("req-empty-tenant"))?;
+    assert_eq!(open_intent_row_count(&store)?, 1);
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
 fn attach_rail_ref_updates_open_intent_and_notfound_when_absent(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let path = unique_db_path("chio-intents-attach");
@@ -1376,9 +1411,10 @@ fn resolve_dead_letter_intent_refuses_a_missing_request() -> Result<(), Box<dyn 
 {
     let path = unique_db_path("chio-intents-resolve-missing");
     let store = SqliteReceiptStore::open(&path)?;
-    let error = store
-        .resolve_dead_letter_dispatch_intent("no-such-request", None, "note")
-        .expect_err("resolving a nonexistent request must refuse, not no-op");
+    let result = store.resolve_dead_letter_dispatch_intent("no-such-request", None, "note");
+    let error = result
+        .err()
+        .ok_or("resolving a nonexistent request must refuse, not no-op")?;
     assert!(
         matches!(error, chio_kernel::receipt_store::ReceiptStoreError::NotFound(_)),
         "expected NotFound, got {error:?}"
@@ -1397,9 +1433,10 @@ fn resolve_dead_letter_intent_refuses_a_still_open_row() -> Result<(), Box<dyn s
     // never dead-lettered.
     store.record_dispatch_intent(&sample_intent("req-still-open"))?;
 
-    let error = store
-        .resolve_dead_letter_dispatch_intent("req-still-open", None, "note")
-        .expect_err("resolving a non-dead-letter row must refuse");
+    let result = store.resolve_dead_letter_dispatch_intent("req-still-open", None, "note");
+    let error = result
+        .err()
+        .ok_or("resolving a non-dead-letter row must refuse")?;
     assert!(
         matches!(error, chio_kernel::receipt_store::ReceiptStoreError::Conflict(_)),
         "expected Conflict, got {error:?}"

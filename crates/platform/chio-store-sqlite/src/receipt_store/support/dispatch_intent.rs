@@ -25,6 +25,19 @@ pub(crate) fn insert_dispatch_intent_tx(
     intent: &DispatchIntentRecord,
     owner_token: &str,
 ) -> Result<(), ReceiptStoreError> {
+    // The unique index folds a NULL tenant to '' (`COALESCE(tenant_id, '')`)
+    // so tenantless rows still conflict with each other. An explicit
+    // empty-string tenant would fold to that same value and collide with
+    // tenantless rows it does not belong to; reject it here so the
+    // NULL-means-no-tenant invariant is explicit rather than surfacing as an
+    // unexplained unique-constraint conflict.
+    if intent.tenant_id.as_deref() == Some("") {
+        return Err(ReceiptStoreError::Conflict(
+            "dispatch intent tenant_id must not be an empty string; use no tenant (None) \
+             instead of \"\""
+                .to_string(),
+        ));
+    }
     let changed = tx.execute(
         "INSERT INTO chio_dispatch_intents (
             request_id, capability_id, tool_server, tool_name, parameter_hash,
