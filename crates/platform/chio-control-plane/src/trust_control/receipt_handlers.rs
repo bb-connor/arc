@@ -871,8 +871,8 @@ pub(crate) async fn handle_get_delegation_chain(
         Err(response) => return response,
     };
     match store.get_combined_delegation_chain(&capability_id) {
-        Ok(chain) => Json(chain).into_response(),
-        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+        Ok(chain) => Json(project_combined_delegation_chain(chain)).into_response(),
+        Err(error) => trust_http_error_from_receipt_store(error).into_response(),
     }
 }
 

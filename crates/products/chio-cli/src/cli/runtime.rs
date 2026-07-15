@@ -1,4 +1,46 @@
 use super::*;
+
+fn open_cli_durable_admission_runtime(
+    mode: chio_kernel::admission_operation::DurableAdmissionMode,
+    admission_db_path: Option<&Path>,
+    receipt_db_path: Option<&Path>,
+    revocation_db_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<Option<DurableAdmissionRuntime>, CliError> {
+    validate_durable_admission_participant_paths(
+        mode,
+        control_url,
+        revocation_db_path,
+        budget_db_path,
+    )?;
+    if mode != chio_kernel::admission_operation::DurableAdmissionMode::Off {
+        if let Some(admission_db_path) = admission_db_path {
+            let mut paths = vec![("durable admission database", admission_db_path)];
+            for (label, path) in [
+                ("receipt database", receipt_db_path),
+                ("revocation database", revocation_db_path),
+                ("capability authority database", authority_db_path),
+                ("budget database", budget_db_path),
+            ] {
+                if let Some(path) = path {
+                    paths.push((label, path));
+                }
+            }
+            validate_distinct_database_paths(&paths)?;
+        }
+    }
+    match (mode, admission_db_path, control_url) {
+        (chio_kernel::admission_operation::DurableAdmissionMode::Off, _, _) => Ok(None),
+        (_, Some(identity_path), Some(url)) => {
+            let token = require_control_token(control_token)?;
+            DurableAdmissionRuntime::open_remote(identity_path, url, token).map(Some)
+        }
+        _ => open_durable_admission_runtime(mode, admission_db_path),
+    }
+}
 use chio_api_protect::DEFAULT_UPSTREAM_REQUEST_TIMEOUT;
 use std::time::Duration;
 
@@ -11,7 +53,7 @@ pub(crate) fn cmd_run(
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
-    _session_db_path: Option<&Path>,
+    session_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
@@ -20,6 +62,16 @@ pub(crate) fn cmd_run(
     let default_capabilities = loaded_policy.default_capabilities.clone();
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
+    let durable_admission = open_cli_durable_admission_runtime(
+        loaded_policy.kernel.durable_admission_mode,
+        session_db_path,
+        receipt_db_path,
+        revocation_db_path,
+        authority_db_path,
+        budget_db_path,
+        control_url,
+        control_token,
+    )?;
 
     info!(
         policy_path = %policy_path.display(),
@@ -29,11 +81,21 @@ pub(crate) fn cmd_run(
         "loaded policy"
     );
 
-    let kernel_kp = Keypair::generate();
+    let kernel_kp = durable_admission
+        .as_ref()
+        .map(DurableAdmissionRuntime::kernel_keypair)
+        .unwrap_or_else(Keypair::generate);
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
     configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
-    configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
-    opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
+    if durable_admission.is_none() {
+        configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
+        opt_in_ephemeral_revocation_for_local_session(
+            &mut kernel,
+            revocation_db_path,
+            control_url,
+        );
+    }
+    attach_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
     configure_capability_authority(
         &mut kernel,
         &kernel_kp,
@@ -46,7 +108,9 @@ pub(crate) fn cmd_run(
         issuance_policy,
         runtime_assurance_policy,
     )?;
-    configure_budget_store(&mut kernel, budget_db_path, control_url, control_token)?;
+    if durable_admission.is_none() {
+        configure_budget_store(&mut kernel, budget_db_path, control_url, control_token)?;
+    }
 
     let agent_kp = Keypair::generate();
     let agent_pk = agent_kp.public_key();
@@ -229,8 +293,27 @@ pub(crate) struct McpEdgeStores<'a> {
     pub authority_seed_path: Option<&'a Path>,
     pub authority_db_path: Option<&'a Path>,
     pub budget_db_path: Option<&'a Path>,
+    pub durable_admission: Option<&'a DurableAdmissionRuntime>,
     pub control_url: Option<&'a str>,
     pub control_token: Option<&'a str>,
+}
+
+fn attach_durable_admission_runtime(
+    kernel: &mut ChioKernel,
+    runtime: Option<&DurableAdmissionRuntime>,
+) -> Result<(), CliError> {
+    if kernel.durable_admission_mode()
+        == chio_kernel::admission_operation::DurableAdmissionMode::Off
+    {
+        return Ok(());
+    }
+    runtime
+        .ok_or_else(|| {
+            CliError::cli_other_error(
+                "durable admission runtime is unavailable for an enabled policy".to_string(),
+            )
+        })?
+        .attach(kernel)
 }
 
 /// Build the kernel that backs the long-running `chio mcp serve` edge.
@@ -258,12 +341,15 @@ pub(crate) fn build_mcp_edge_kernel(
         stores.control_url,
         stores.control_token,
     )?;
-    configure_revocation_store(
-        &mut kernel,
-        stores.revocation_db_path,
-        stores.control_url,
-        stores.control_token,
-    )?;
+    if stores.durable_admission.is_none() {
+        configure_revocation_store(
+            &mut kernel,
+            stores.revocation_db_path,
+            stores.control_url,
+            stores.control_token,
+        )?;
+    }
+    attach_durable_admission_runtime(&mut kernel, stores.durable_admission)?;
     configure_capability_authority(
         &mut kernel,
         kernel_kp,
@@ -276,12 +362,14 @@ pub(crate) fn build_mcp_edge_kernel(
         issuance_policy,
         runtime_assurance_policy,
     )?;
-    configure_budget_store(
-        &mut kernel,
-        stores.budget_db_path,
-        stores.control_url,
-        stores.control_token,
-    )?;
+    if stores.durable_admission.is_none() {
+        configure_budget_store(
+            &mut kernel,
+            stores.budget_db_path,
+            stores.control_url,
+            stores.control_token,
+        )?;
+    }
     Ok(kernel)
 }
 
@@ -486,7 +574,7 @@ pub(crate) fn cmd_check(
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
-    _session_db_path: Option<&Path>,
+    session_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
@@ -496,12 +584,32 @@ pub(crate) fn cmd_check(
     let default_capabilities = loaded_policy.default_capabilities.clone();
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
+    let durable_admission = open_cli_durable_admission_runtime(
+        loaded_policy.kernel.durable_admission_mode,
+        session_db_path,
+        receipt_db_path,
+        revocation_db_path,
+        authority_db_path,
+        budget_db_path,
+        control_url,
+        control_token,
+    )?;
 
-    let kernel_kp = Keypair::generate();
+    let kernel_kp = durable_admission
+        .as_ref()
+        .map(DurableAdmissionRuntime::kernel_keypair)
+        .unwrap_or_else(Keypair::generate);
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
     configure_receipt_store(&mut kernel, receipt_db_path, control_url, control_token)?;
-    configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
-    opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
+    if durable_admission.is_none() {
+        configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
+        opt_in_ephemeral_revocation_for_local_session(
+            &mut kernel,
+            revocation_db_path,
+            control_url,
+        );
+    }
+    attach_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
     configure_capability_authority(
         &mut kernel,
         &kernel_kp,
@@ -514,7 +622,9 @@ pub(crate) fn cmd_check(
         issuance_policy,
         runtime_assurance_policy,
     )?;
-    configure_budget_store(&mut kernel, budget_db_path, control_url, control_token)?;
+    if durable_admission.is_none() {
+        configure_budget_store(&mut kernel, budget_db_path, control_url, control_token)?;
+    }
 
     kernel.register_tool_server(Box::new(CheckToolServer {
         id: server.to_string(),
@@ -722,7 +832,7 @@ pub(crate) fn cmd_mcp_serve(
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
-    _session_db_path: Option<&Path>,
+    session_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
@@ -761,6 +871,16 @@ pub(crate) fn cmd_mcp_serve(
     let loaded_policy = load_policy(resolved_policy_path)?;
     let policy_identity = loaded_policy.identity.clone();
     let default_capabilities = loaded_policy.default_capabilities.clone();
+    let durable_admission = open_cli_durable_admission_runtime(
+        loaded_policy.kernel.durable_admission_mode,
+        session_db_path,
+        receipt_db_path,
+        revocation_db_path,
+        authority_db_path,
+        budget_db_path,
+        control_url,
+        control_token,
+    )?;
 
     info!(
         policy_path = %resolved_policy_path.display(),
@@ -772,7 +892,10 @@ pub(crate) fn cmd_mcp_serve(
         "loaded policy for MCP edge"
     );
 
-    let kernel_kp = Keypair::generate();
+    let kernel_kp = durable_admission
+        .as_ref()
+        .map(DurableAdmissionRuntime::kernel_keypair)
+        .unwrap_or_else(Keypair::generate);
     let mut kernel = build_mcp_edge_kernel(
         loaded_policy,
         &kernel_kp,
@@ -782,6 +905,7 @@ pub(crate) fn cmd_mcp_serve(
             authority_seed_path,
             authority_db_path,
             budget_db_path,
+            durable_admission: durable_admission.as_ref(),
             control_url,
             control_token,
         },
@@ -1139,7 +1263,7 @@ pub(crate) fn cmd_trust_serve(
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
-    _session_db_path: Option<&Path>,
+    session_db_path: Option<&Path>,
     advertise_url: Option<&str>,
     allow_local_peer_urls: bool,
     certification_public_metadata_ttl_seconds: u64,
@@ -1174,6 +1298,7 @@ pub(crate) fn cmd_trust_serve(
         authority_seed_path: authority_seed_path.map(Path::to_path_buf),
         authority_db_path: authority_db_path.map(Path::to_path_buf),
         budget_db_path: budget_db_path.map(Path::to_path_buf),
+        joint_authority_db_path: session_db_path.map(Path::to_path_buf),
         enterprise_providers_file: enterprise_providers_file.map(Path::to_path_buf),
         federation_policies_file: federation_policies_file.map(Path::to_path_buf),
         scim_lifecycle_file: scim_lifecycle_file.map(Path::to_path_buf),

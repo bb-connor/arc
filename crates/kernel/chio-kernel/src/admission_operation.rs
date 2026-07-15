@@ -7,6 +7,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 mod capture;
 mod identity;
 mod projection;
+mod remote_projection;
 mod state;
 mod store;
 
@@ -15,6 +16,7 @@ use state::*;
 pub use capture::*;
 pub use identity::*;
 pub use projection::*;
+pub use remote_projection::*;
 pub use store::*;
 
 pub const ADMISSION_OPERATION_SCHEMA: &str = "chio.admission-operation.v1";
@@ -608,7 +610,8 @@ impl AdmissionOperationV1 {
         }
     }
 
-    pub(crate) fn budget_hold_id(&self) -> Option<&AdmissionIdentifier> {
+    #[must_use]
+    pub fn budget_hold_id(&self) -> Option<&AdmissionIdentifier> {
         match self.attachment(AdmissionAttachmentKind::BudgetHold) {
             Some(AdmissionAttachment::BudgetHoldId(hold_id)) => Some(hold_id),
             _ => None,
@@ -857,6 +860,26 @@ impl AdmissionOperationCommand {
     #[must_use]
     pub fn recovery_lease(&self) -> &AdmissionRecoveryLease {
         &self.recovery_lease
+    }
+
+    #[must_use]
+    pub fn attachments(&self) -> &[AdmissionAttachment] {
+        &self.attachments
+    }
+
+    #[must_use]
+    pub fn next_state(&self) -> Option<AdmissionOperationState> {
+        self.next_state
+    }
+
+    #[must_use]
+    pub fn terminal_replay(&self) -> Option<&AdmissionTerminalReplay> {
+        self.terminal_replay.as_ref()
+    }
+
+    #[must_use]
+    pub fn last_error(&self) -> Option<&AdmissionErrorDetail> {
+        self.last_error.as_ref()
     }
 }
 

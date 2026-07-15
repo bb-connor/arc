@@ -3,6 +3,7 @@ use rusqlite::{params, OptionalExtension, Transaction};
 
 mod approval;
 mod capture;
+pub(crate) use capture::AdmissionCaptureBinding;
 mod terminal;
 
 struct CumulativeSnapshot<'a> {

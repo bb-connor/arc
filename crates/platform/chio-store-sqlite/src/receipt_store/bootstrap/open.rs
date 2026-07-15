@@ -140,6 +140,24 @@ impl SqliteReceiptStore {
         Self::open_with_pool_config(path, crate::SqlitePoolConfig::default())
     }
 
+    /// Wait until the commit actor has seeded its durable head before a host
+    /// advertises readiness. The flush barrier is processed only after actor
+    /// initialization, and the serving check preserves a poisoned-head failure.
+    pub fn wait_for_writer_ready(&self, timeout: Duration) -> Result<(), ReceiptStoreError> {
+        self.receipt_commit_actor.flush_with_timeout(timeout)?;
+        if !self.writer_serving_closed() {
+            return Ok(());
+        }
+        let detail = self
+            .receipt_commit_actor
+            .writer_counters()
+            .last_error
+            .unwrap_or_else(|| "durable receipt head is unavailable".to_string());
+        Err(ReceiptStoreError::Conflict(format!(
+            "receipt commit writer failed startup readiness: {detail}"
+        )))
+    }
+
     pub fn open_existing(path: impl AsRef<Path>) -> Result<Self, ReceiptStoreError> {
         Self::open_existing_with_pool_config(path, crate::SqlitePoolConfig::default())
     }

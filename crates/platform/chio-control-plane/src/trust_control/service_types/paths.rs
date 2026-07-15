@@ -114,6 +114,7 @@ pub(crate) const INTERNAL_CLUSTER_STATUS_PATH: &str = "/v1/internal/cluster/stat
 pub(crate) const INTERNAL_CLUSTER_SNAPSHOT_PATH: &str = "/v1/internal/cluster/snapshot";
 pub(crate) const INTERNAL_CLUSTER_PARTITION_PATH: &str = "/v1/internal/cluster/partition";
 pub(crate) const INTERNAL_AUTHORITY_SNAPSHOT_PATH: &str = "/v1/internal/authority/snapshot";
+pub(crate) const INTERNAL_ADMISSION_AUTHORITY_PATH: &str = "/v1/internal/admission-authority";
 pub(crate) const INTERNAL_REVOCATIONS_DELTA_PATH: &str = "/v1/internal/revocations/delta";
 pub(crate) const INTERNAL_TOOL_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/tools/delta";
 pub(crate) const INTERNAL_CHILD_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/children/delta";

@@ -68,6 +68,7 @@ rsa = { version = "0.9", features = ["sha2"] }
 p384 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
 x509-cert = "0.2"
 url = "2"
+uuid = { workspace = true }
 
 [dev-dependencies]
 chio-anchor = { workspace = true }

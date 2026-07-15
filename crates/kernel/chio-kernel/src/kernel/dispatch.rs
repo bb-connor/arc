@@ -278,6 +278,9 @@ impl ChioKernel {
     }
 
     pub(crate) fn has_local_receipt_id(&self, receipt_id: &str) -> Result<bool, KernelError> {
+        if self.load_durable_admission_receipt(receipt_id)?.is_some() {
+            return Ok(true);
+        }
         // Store-authoritative: a durable store is a point lookup by id, not an
         // O(n) mirror scan. On a store MISS fall back to the local mirror below: a
         // store may implement append without point loads (for example an
@@ -335,6 +338,9 @@ impl ChioKernel {
         &self,
         receipt_id: &str,
     ) -> Result<Option<LocalReceiptArtifact>, KernelError> {
+        if let Some(receipt) = self.load_durable_admission_receipt(receipt_id)? {
+            return Ok(Some(LocalReceiptArtifact::Tool(Box::new(receipt))));
+        }
         // Consult the durable store first; on a MISS fall back to the local
         // mirror (append-only / remote stores may not implement point loads, so
         // a receipt appended and mirrored locally must still resolve). A store

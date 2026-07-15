@@ -71,13 +71,32 @@ impl VerifiedAdmissionReceipt {
         context: &AdmissionProjectionContext,
         tool_outcome: &ToolOutcomeTerminalEvidenceV1,
     ) -> Result<Self, AdmissionOperationError> {
+        Self::from_kernel_verified_terminal(
+            receipt,
+            expected_kernel_public_key,
+            &Decision::Allow,
+            operation,
+            context,
+            tool_outcome,
+        )
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn from_kernel_verified_terminal(
+        receipt: ChioReceipt,
+        expected_kernel_public_key: &PublicKey,
+        expected_decision: &Decision,
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+        tool_outcome: &ToolOutcomeTerminalEvidenceV1,
+    ) -> Result<Self, AdmissionOperationError> {
         tool_outcome
             .validate_against(operation, context)
             .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)?;
         Self::qualify(
             receipt,
             expected_kernel_public_key,
-            &Decision::Allow,
+            expected_decision,
             tool_outcome.tool_server().as_str(),
             tool_outcome.tool_name().as_str(),
             operation.binding.action_parameter_hash(),
@@ -142,7 +161,10 @@ impl VerifiedAdmissionReceipt {
             || !receipt.verify_signature().map_err(|_| mismatch())?
             || receipt.decision.as_ref() != Some(expected_decision)
             || (projected_state == AdmissionOperationState::Completed
-                && !matches!(expected_decision, Decision::Allow))
+                && !matches!(
+                    expected_decision,
+                    Decision::Allow | Decision::Incomplete { .. }
+                ))
             || receipt.tool_server != expected_tool_server
             || receipt.tool_name != expected_tool_name
             || receipt.action.parameter_hash != expected_parameter_hash.as_str()
@@ -453,7 +475,8 @@ impl CanonicalAdmissionTerminalProjection {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AdmissionProjectionContext {
     pub operation_id: AdmissionOperationId,
     pub request_id: AdmissionIdentifier,
@@ -1088,7 +1111,7 @@ impl AdmissionReceiptOrIncident {
     }
 }
 
-fn validate_receipt_projection(
+pub(super) fn validate_receipt_projection(
     receipt: &ChioReceipt,
     operation: &AdmissionOperationV1,
     context: &AdmissionProjectionContext,

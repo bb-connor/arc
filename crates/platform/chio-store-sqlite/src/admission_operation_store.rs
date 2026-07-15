@@ -5,16 +5,19 @@ use chio_core::canonical::canonical_json_bytes;
 use chio_core::receipt::{body::ChioReceipt, lineage::ChildRequestReceipt};
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_kernel::admission_operation::{
-    AdmissionAttachment, AdmissionBeginResult, AdmissionCommandResult, AdmissionDigest,
-    AdmissionIdentifier, AdmissionOperationCommand, AdmissionOperationError, AdmissionOperationId,
-    AdmissionOperationState, AdmissionOperationStore, AdmissionOperationStoreError,
-    AdmissionOperationV1, AdmissionProjectionCapabilities, AdmissionProjectionManifestV1,
-    AdmissionProjectionRecordKind, AdmissionRecoveryLease, AdmissionReplayClassification,
-    AdmissionReplayKey, AdmissionTerminal, AdmissionTerminalProjection, AdmissionTerminalReplay,
-    CanonicalAdmissionProjectionRecord, CanonicalAdmissionTerminalProjection,
-    PersistedAdmissionOperationV1, QualifiedAdmissionOperationStore,
-    UntrustedAdmissionRecoveryClaim,
+    AdmissionAttachment, AdmissionBeginResult, AdmissionCaptureError, AdmissionCommandResult,
+    AdmissionDigest, AdmissionIdentifier, AdmissionOperationCommand, AdmissionOperationError,
+    AdmissionOperationId, AdmissionOperationState, AdmissionOperationStore,
+    AdmissionOperationStoreError, AdmissionOperationV1, AdmissionProjectionCapabilities,
+    AdmissionProjectionManifestV1, AdmissionProjectionRecordKind, AdmissionRecoveryLease,
+    AdmissionReplayClassification, AdmissionReplayKey, AdmissionTerminal,
+    AdmissionTerminalProjection, AdmissionTerminalReplay, CanonicalAdmissionProjectionRecord,
+    CanonicalAdmissionTerminalProjection, PersistedAdmissionOperationV1,
+    QualifiedAdmissionOperationStore, SignedAdmissionTerminalProjectionV1,
+    UntrustedAdmissionRecoveryClaim, VerifiedAdmissionTerminalProjectionRecordV1,
+    VerifiedAdmissionTerminalProjectionV1,
 };
+use chio_kernel::budget_store::{BudgetCaptureInvocationRequest, BudgetStoreError};
 use chio_kernel::receipt_store::{
     AuthorizationReceiptConsumption, PendingSettlementObservation, ReceiptStore, ReceiptStoreError,
 };
@@ -33,8 +36,9 @@ pub(crate) use commit_chain::{
 };
 use projection::{
     ensure_projection_absent, full_projection_capabilities, insert_terminal_projection,
-    terminal_from_operation, validate_canonical_projection_size, verify_exact_terminal_replay,
-    verify_stored_terminal_projection,
+    insert_verified_terminal_projection, terminal_from_operation,
+    validate_canonical_projection_size, verify_exact_signed_terminal_replay,
+    verify_exact_terminal_replay, verify_stored_terminal_projection,
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
@@ -53,6 +57,7 @@ const MAX_RECOVERY_BATCH: usize = 256;
 const MAX_TRUSTED_UNIX_MS: u64 = (1_u64 << 53) - 1;
 const MAX_TRUSTED_CLOCK_SKEW_MS: u64 = 5 * 60 * 1_000;
 const MAX_RECOVERY_LEASE_DURATION_MS: u64 = 5 * 60 * 1_000;
+const COMBINED_CAPTURE_OPERATION_MUTATION_KIND: &str = "compare_and_swap";
 
 const ADMISSION_OPERATION_SCHEMA: &str = include_str!("admission_operation_store.sql");
 
@@ -128,6 +133,41 @@ impl SqliteAdmissionOperationStore {
                 "sqlite admission operation commit outcome is unknown: {error}"
             )))
         })
+    }
+
+    pub fn capture_invocation_and_commit_dispatch(
+        &self,
+        operation: &AdmissionOperationV1,
+        recovery_lease: &AdmissionRecoveryLease,
+        request: BudgetCaptureInvocationRequest,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionOperationV1, AdmissionCaptureError> {
+        if active_fence != &self.serving_owner.fence
+            || recovery_lease.store_fence() != active_fence
+            || operation.state() != AdmissionOperationState::CapturePending
+            || operation.binding().capability_id().as_str() != request.capability_id
+            || operation
+                .budget_hold_id()
+                .is_none_or(|hold_id| hold_id.as_str() != request.hold_id)
+        {
+            return Err(AdmissionCaptureError::Fenced);
+        }
+        let budget = crate::budget_store::SqliteBudgetStore::open_alongside(
+            self.connection.clone(),
+            self.serving_owner.clone(),
+        );
+        budget
+            .capture_composite_invocation_and_commit_dispatch(
+                request,
+                crate::budget_store::AdmissionCaptureBinding {
+                    operation,
+                    recovery_lease,
+                    trusted_now_unix_ms,
+                },
+            )
+            .map(|(_, operation)| operation)
+            .map_err(map_budget_capture_error)
     }
 
     pub fn commit_terminal_projection(
@@ -232,6 +272,98 @@ impl SqliteAdmissionOperationStore {
         self.sync_after_write(&connection)?;
         terminal_from_operation(&updated)
     }
+
+    pub fn commit_signed_terminal_projection(
+        &self,
+        envelope: &SignedAdmissionTerminalProjectionV1,
+    ) -> Result<AdmissionTerminal, AdmissionOperationStoreError> {
+        let verified = envelope.verify()?;
+        let context = verified.context();
+        let mut connection = self.connection()?;
+        let transaction = self.begin_write(&mut connection, Some(&context.store_fence))?;
+        verify_trusted_time(&transaction, context.trusted_time_unix_ms)?;
+        let stored = load_by_operation_id_tx(&transaction, &context.operation_id)?
+            .ok_or(AdmissionOperationStoreError::NotFound)?;
+
+        if stored.operation.state().is_terminal() {
+            let terminal = verify_exact_signed_terminal_replay(&transaction, &stored, &verified)?;
+            transaction.commit().map_err(sqlite_error)?;
+            return Ok(terminal);
+        }
+        if stored.operation != *verified.source_operation()
+            || context.trusted_time_unix_ms < stored.updated_at_unix_ms
+        {
+            return Err(AdmissionOperationError::TerminalProjectionBindingMismatch.into());
+        }
+        let recovery_claim = stored
+            .recovery_claim
+            .as_ref()
+            .ok_or(AdmissionOperationStoreError::Fenced)?;
+        let expected_claimant = format!("kernel:{}", verified.signer_key().to_hex());
+        if recovery_claim.claimant_id().as_str() != expected_claimant
+            || recovery_claim.coordinator_lease_id() != &context.coordinator_lease_id
+            || recovery_claim.coordinator_lease_epoch() != context.coordinator_lease_epoch
+            || recovery_claim.store_fence() != &context.store_fence
+        {
+            return Err(AdmissionOperationStoreError::Fenced);
+        }
+        verify_stored_recovery_claim(
+            &transaction,
+            &self.serving_owner,
+            &stored,
+            recovery_claim,
+            context.trusted_time_unix_ms,
+            &context.store_fence,
+        )?;
+        ensure_projection_absent(&transaction, &context.operation_id)?;
+
+        let updated = verified.terminal_operation();
+        let encoded = encode_operation(updated)?;
+        let changed = transaction
+            .execute(
+                r#"
+                UPDATE admission_operations
+                SET operation_json = ?1, state = ?2, terminal = 1,
+                    coordinator_lease_epoch = ?3, version = ?4,
+                    updated_at_unix_ms = ?5
+                WHERE operation_id = ?6 AND version = ?7 AND terminal = 0
+                "#,
+                params![
+                    &encoded,
+                    state_name(updated.state()),
+                    sqlite_i64(updated.coordinator_lease_epoch(), "coordinator_lease_epoch")?,
+                    sqlite_i64(updated.version(), "terminal_operation_version")?,
+                    sqlite_i64(context.trusted_time_unix_ms, "trusted_now_unix_ms")?,
+                    context.operation_id.as_str(),
+                    sqlite_i64(stored.operation.version(), "expected_operation_version")?,
+                ],
+            )
+            .map_err(sqlite_error)?;
+        if changed != 1 {
+            return Err(AdmissionOperationStoreError::Fenced);
+        }
+        insert_verified_terminal_projection(&transaction, &verified)?;
+        append_operation_commit(
+            &transaction,
+            updated,
+            &encoded,
+            Some(recovery_claim),
+            "compare_and_swap",
+            &self.serving_owner,
+            context.trusted_time_unix_ms,
+        )?;
+        self.commit_write(transaction)?;
+        self.sync_after_write(&connection)?;
+        terminal_from_operation(updated)
+    }
+}
+
+fn map_budget_capture_error(error: BudgetStoreError) -> AdmissionCaptureError {
+    match error {
+        BudgetStoreError::Fenced { .. } => AdmissionCaptureError::Fenced,
+        BudgetStoreError::OutcomeUnknown(detail) => AdmissionCaptureError::OutcomeUnknown(detail),
+        error => AdmissionCaptureError::Invariant(error.to_string()),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -306,6 +438,107 @@ pub(crate) fn advance_tool_outcome_tx(
         &encoded,
         stored.recovery_claim.as_ref(),
         "compare_and_swap",
+        Some(participant_digest),
+        owner,
+        trusted_now_unix_ms,
+    )?;
+    Ok(updated)
+}
+
+pub(crate) fn advance_budget_capture_tx(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    expected: &AdmissionOperationV1,
+    recovery_lease: &AdmissionRecoveryLease,
+    participant_digest: &str,
+    trusted_now_unix_ms: u64,
+) -> Result<AdmissionOperationV1, AdmissionOperationStoreError> {
+    if expected.state() != AdmissionOperationState::CapturePending {
+        return Err(invariant(
+            "combined budget capture requires a CapturePending operation",
+        ));
+    }
+    let command = AdmissionOperationCommand::new(
+        expected.binding().operation_id().clone(),
+        expected.version(),
+        recovery_lease.clone(),
+        Vec::new(),
+        Some(AdmissionOperationState::DispatchCommitted),
+        None,
+        None,
+    )?;
+    let updated = expected
+        .apply_command(&command, trusted_now_unix_ms)?
+        .into_operation();
+    let stored = load_by_operation_id_tx(transaction, expected.binding().operation_id())?
+        .ok_or(AdmissionOperationStoreError::NotFound)?;
+
+    if stored.operation == updated {
+        let exact_commit = transaction
+            .query_row(
+                r#"
+                SELECT COUNT(*) = 1
+                FROM admission_operation_commits
+                WHERE operation_id = ?1 AND operation_version = ?2
+                  AND mutation_kind = ?3 AND participant_digest = ?4
+                "#,
+                params![
+                    updated.binding().operation_id().as_str(),
+                    sqlite_i64(updated.version(), "operation_version")?,
+                    COMBINED_CAPTURE_OPERATION_MUTATION_KIND,
+                    participant_digest,
+                ],
+                |row| row.get::<_, bool>(0),
+            )
+            .map_err(sqlite_error)?;
+        if !exact_commit {
+            return Err(invariant(
+                "dispatch-committed operation is not bound to the exact budget capture",
+            ));
+        }
+        return Ok(updated);
+    }
+    if stored.operation != *expected || trusted_now_unix_ms < stored.updated_at_unix_ms {
+        return Err(AdmissionOperationStoreError::Fenced);
+    }
+    verify_stored_recovery_claim(
+        transaction,
+        owner,
+        &stored,
+        recovery_lease.untrusted_claim(),
+        trusted_now_unix_ms,
+        recovery_lease.store_fence(),
+    )?;
+    let encoded = encode_operation(&updated)?;
+    let changed = transaction
+        .execute(
+            r#"
+            UPDATE admission_operations
+            SET operation_json = ?1, state = ?2, terminal = 0,
+                coordinator_lease_epoch = ?3, version = ?4,
+                updated_at_unix_ms = ?5
+            WHERE operation_id = ?6 AND version = ?7 AND terminal = 0
+            "#,
+            params![
+                &encoded,
+                state_name(updated.state()),
+                sqlite_i64(updated.coordinator_lease_epoch(), "coordinator_lease_epoch")?,
+                sqlite_i64(updated.version(), "operation_version")?,
+                sqlite_i64(trusted_now_unix_ms, "trusted_now_unix_ms")?,
+                updated.binding().operation_id().as_str(),
+                sqlite_i64(expected.version(), "expected_version")?,
+            ],
+        )
+        .map_err(sqlite_error)?;
+    if changed != 1 {
+        return Err(AdmissionOperationStoreError::Fenced);
+    }
+    commit_chain::append_operation_commit_with_participant(
+        transaction,
+        &updated,
+        &encoded,
+        stored.recovery_claim.as_ref(),
+        COMBINED_CAPTURE_OPERATION_MUTATION_KIND,
         Some(participant_digest),
         owner,
         trusted_now_unix_ms,

@@ -6,6 +6,8 @@
 
 use super::*;
 
+#[path = "service_types/admission_authority.rs"]
+mod admission_authority;
 #[path = "service_types/budget_lifecycle.rs"]
 mod budget_lifecycle;
 #[path = "service_types/cluster_budget.rs"]
@@ -23,6 +25,7 @@ mod state;
 #[path = "service_types/structured_budget.rs"]
 mod structured_budget;
 
+pub(crate) use self::admission_authority::*;
 pub(crate) use self::budget_lifecycle::BudgetMutationLifecycleView;
 pub(crate) use self::cluster_budget::{
     AbandonedSeqRange, AuthoritySnapshotView, AuthorityTrustedKeyView, BudgetAuthorityMetadataView,
@@ -69,10 +72,11 @@ pub(crate) use self::paths::{
     FEDERATION_PROVIDER_PATH, GENERIC_GOVERNANCE_CASE_EVALUATE_PATH,
     GENERIC_GOVERNANCE_CASE_ISSUE_PATH, GENERIC_GOVERNANCE_CHARTER_ISSUE_PATH,
     GENERIC_TRUST_ACTIVATION_EVALUATE_PATH, GENERIC_TRUST_ACTIVATION_ISSUE_PATH, HEALTH_PATH,
-    INTERNAL_AUTHORITY_SNAPSHOT_PATH, INTERNAL_BUDGETS_DELTA_PATH,
-    INTERNAL_CHILD_RECEIPTS_DELTA_PATH, INTERNAL_CLUSTER_PARTITION_PATH,
-    INTERNAL_CLUSTER_SNAPSHOT_PATH, INTERNAL_CLUSTER_STATUS_PATH, INTERNAL_LINEAGE_DELTA_PATH,
-    INTERNAL_REVOCATIONS_DELTA_PATH, INTERNAL_TOOL_RECEIPTS_DELTA_PATH, ISSUE_CAPABILITY_PATH,
+    INTERNAL_ADMISSION_AUTHORITY_PATH, INTERNAL_AUTHORITY_SNAPSHOT_PATH,
+    INTERNAL_BUDGETS_DELTA_PATH, INTERNAL_CHILD_RECEIPTS_DELTA_PATH,
+    INTERNAL_CLUSTER_PARTITION_PATH, INTERNAL_CLUSTER_SNAPSHOT_PATH, INTERNAL_CLUSTER_STATUS_PATH,
+    INTERNAL_LINEAGE_DELTA_PATH, INTERNAL_REVOCATIONS_DELTA_PATH,
+    INTERNAL_TOOL_RECEIPTS_DELTA_PATH, ISSUE_CAPABILITY_PATH,
     LIABILITY_AUTO_BIND_DECISION_ISSUE_PATH, LIABILITY_BOUND_COVERAGE_ISSUE_PATH,
     LIABILITY_CLAIM_ADJUDICATION_ISSUE_PATH, LIABILITY_CLAIM_DISPUTE_ISSUE_PATH,
     LIABILITY_CLAIM_PACKAGE_ISSUE_PATH, LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ISSUE_PATH,
@@ -145,7 +149,8 @@ pub use self::requests::{
     VerifyPassportChallengeRequest, WalletExchangeStatusResponse,
 };
 pub(crate) use self::responses::{
-    liability_market_http_error, TrustHttpError, UnderwritingQuotedExposure,
+    liability_market_http_error, project_combined_delegation_chain, TrustHttpError,
+    UnderwritingQuotedExposure,
 };
 pub use self::responses::{
     BudgetListResponse, BudgetQuery, BudgetUsageView, ChildReceiptQuery, ReceiptListResponse,

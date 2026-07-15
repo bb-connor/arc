@@ -370,6 +370,8 @@ pub enum AdmissionCaptureError {
     Unavailable(String),
     #[error("combined admission capture was fenced")]
     Fenced,
+    #[error("combined admission capture durable outcome is unknown: {0}")]
+    OutcomeUnknown(String),
     #[error("combined admission capture invariant failed: {0}")]
     Invariant(String),
     #[error(transparent)]

@@ -547,6 +547,111 @@ fn terminal_projection_accepts_new_owner_fence_only_on_the_same_store() {
 }
 
 #[test]
+fn signed_terminal_projection_envelope_rejects_canonical_body_tampering() {
+    let operation = finalizing_active_operation();
+    let context = projection_context(&operation);
+    let kernel = Keypair::generate();
+    let metadata = receipt_metadata(
+        &operation,
+        &context,
+        AdmissionOperationState::Completed,
+        AdmissionCompensationStatus::NotCompensated,
+    );
+    let receipt = verify_completed_receipt(
+        &operation,
+        &context,
+        signed_projection_receipt(&operation, Some(metadata), &kernel),
+        &kernel,
+        None,
+    )
+    .expect("completed receipt must qualify");
+    let projection =
+        AdmissionTerminalProjection::Completed(Box::new(AdmissionCompletedProjection {
+            context,
+            receipt,
+            tool_outcome: None,
+            payment_evidence: None,
+            authorization: None,
+            eligibility: None,
+            observer_work: None,
+            obligation: None,
+        }));
+    let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
+        &operation,
+        &projection,
+        &full_projection_capabilities(),
+        &kernel,
+    )
+    .expect("verified projection must produce a signed envelope");
+    let verified = envelope
+        .verify()
+        .expect("untampered terminal envelope must verify");
+    assert_eq!(verified.source_operation(), &operation);
+    assert_eq!(
+        verified.terminal_operation().state(),
+        AdmissionOperationState::Completed
+    );
+
+    let mut encoded = serde_json::to_value(&envelope).expect("envelope must encode");
+    encoded["body"]["projection_json"] = serde_json::Value::String("e30=".to_string());
+    let tampered: SignedAdmissionTerminalProjectionV1 =
+        serde_json::from_value(encoded).expect("tampered wire value must decode structurally");
+    assert!(matches!(
+        tampered.verify(),
+        Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+    ));
+}
+
+#[test]
+fn signed_terminal_projection_envelope_rejects_signer_substitution() {
+    let operation = finalizing_active_operation();
+    let context = projection_context(&operation);
+    let kernel = Keypair::generate();
+    let metadata = receipt_metadata(
+        &operation,
+        &context,
+        AdmissionOperationState::Completed,
+        AdmissionCompensationStatus::NotCompensated,
+    );
+    let receipt = verify_completed_receipt(
+        &operation,
+        &context,
+        signed_projection_receipt(&operation, Some(metadata), &kernel),
+        &kernel,
+        None,
+    )
+    .expect("completed receipt must qualify");
+    let projection =
+        AdmissionTerminalProjection::Completed(Box::new(AdmissionCompletedProjection {
+            context,
+            receipt,
+            tool_outcome: None,
+            payment_evidence: None,
+            authorization: None,
+            eligibility: None,
+            observer_work: None,
+            obligation: None,
+        }));
+    let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
+        &operation,
+        &projection,
+        &full_projection_capabilities(),
+        &kernel,
+    )
+    .expect("verified projection must produce a signed envelope");
+
+    let mut encoded = serde_json::to_value(&envelope).expect("envelope must encode");
+    encoded["body"]["signer_key"] =
+        serde_json::to_value(Keypair::generate().public_key()).expect("key must encode");
+    let tampered: SignedAdmissionTerminalProjectionV1 =
+        serde_json::from_value(encoded).expect("tampered wire value must decode structurally");
+    assert!(matches!(
+        tampered.verify(),
+        Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+    ));
+}
+
+#[test]
 fn tool_outcome_attachment_is_required_and_exact_before_finalizing() {
     assert!(
         serde_json::from_value::<AdmissionAttachment>(serde_json::json!({

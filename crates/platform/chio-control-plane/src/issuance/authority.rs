@@ -24,12 +24,48 @@ pub fn wrap_capability_authority(
     receipt_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
 ) -> Box<dyn CapabilityAuthority> {
+    wrap_capability_authority_with_lineage_mode(
+        inner,
+        issuance_policy,
+        runtime_assurance_policy,
+        receipt_db_path,
+        budget_db_path,
+        true,
+    )
+}
+
+pub(crate) fn wrap_capability_authority_with_deferred_lineage(
+    inner: Box<dyn CapabilityAuthority>,
+    issuance_policy: Option<ReputationIssuancePolicy>,
+    runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
+    receipt_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+) -> Box<dyn CapabilityAuthority> {
+    wrap_capability_authority_with_lineage_mode(
+        inner,
+        issuance_policy,
+        runtime_assurance_policy,
+        receipt_db_path,
+        budget_db_path,
+        false,
+    )
+}
+
+fn wrap_capability_authority_with_lineage_mode(
+    inner: Box<dyn CapabilityAuthority>,
+    issuance_policy: Option<ReputationIssuancePolicy>,
+    runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
+    receipt_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+    persist_lineage_immediately: bool,
+) -> Box<dyn CapabilityAuthority> {
     Box::new(PolicyBackedCapabilityAuthority {
         inner,
         issuance_policy,
         runtime_assurance_policy,
         receipt_db_path: receipt_db_path.map(Path::to_path_buf),
         budget_db_path: budget_db_path.map(Path::to_path_buf),
+        persist_lineage_immediately,
     })
 }
 
@@ -39,6 +75,7 @@ struct PolicyBackedCapabilityAuthority {
     runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
     receipt_db_path: Option<PathBuf>,
     budget_db_path: Option<PathBuf>,
+    persist_lineage_immediately: bool,
 }
 
 impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
@@ -121,7 +158,10 @@ impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
             &self.inner.authority_public_key(),
         )?;
 
-        if let Some(path) = self.receipt_db_path.as_deref() {
+        if self.persist_lineage_immediately {
+            let Some(path) = self.receipt_db_path.as_deref() else {
+                return Ok(capability);
+            };
             let store = SqliteReceiptStore::open(path)
                 .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
             store

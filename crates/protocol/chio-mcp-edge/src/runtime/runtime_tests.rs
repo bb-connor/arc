@@ -4160,10 +4160,7 @@ fn create_message_roundtrips_through_client_with_child_lineage() {
         .inflight()
         .get(&RequestId::new("tool-parent"))
         .is_some());
-    assert!(session
-        .inflight()
-        .get(&RequestId::new("mcp-edge-req-1"))
-        .is_none());
+    assert_eq!(session.inflight().len(), 1);
 }
 
 #[test]
@@ -4245,13 +4242,69 @@ fn create_message_denies_tool_use_when_not_negotiated() {
         other => panic!("unexpected error: {other}"),
     }
     assert!(output.is_empty());
-    assert!(edge
-        .kernel
-        .session(&session_id)
-        .unwrap()
-        .inflight()
-        .get(&RequestId::new("mcp-edge-req-1"))
-        .is_none());
+    assert_eq!(
+        edge.kernel.session(&session_id).unwrap().inflight().len(),
+        1
+    );
+}
+
+#[test]
+fn external_request_identity_is_stable_and_session_scoped() {
+    let first = build_operation_context(
+        &json!(41),
+        SessionId::new("stable-session-a"),
+        "agent",
+        &json!({}),
+    )
+    .unwrap();
+    let replay = build_operation_context(
+        &json!(41),
+        SessionId::new("stable-session-a"),
+        "agent",
+        &json!({}),
+    )
+    .unwrap();
+    let other_session = build_operation_context(
+        &json!(41),
+        SessionId::new("stable-session-b"),
+        "agent",
+        &json!({}),
+    )
+    .unwrap();
+    let other_request = build_operation_context(
+        &json!(42),
+        SessionId::new("stable-session-a"),
+        "agent",
+        &json!({}),
+    )
+    .unwrap();
+
+    assert_eq!(first.request_id, replay.request_id);
+    assert_ne!(first.request_id, other_session.request_id);
+    assert_ne!(first.request_id, other_request.request_id);
+    assert!(first.request_id.as_str().starts_with("mcp-edge-req-"));
+}
+
+#[test]
+fn configured_session_identity_is_used_during_initialization() {
+    let mut edge = make_edge(10);
+    let expected = SessionId::new("stable-hosted-session");
+    edge.set_initial_session_id(expected.clone()).unwrap();
+
+    let response = edge.handle_jsonrpc(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    }));
+
+    assert!(response
+        .and_then(|value| value.get("result").cloned())
+        .is_some());
+    assert!(matches!(
+        edge.state,
+        EdgeState::WaitingForInitialized { ref session_id } if session_id == &expected
+    ));
 }
 
 #[test]

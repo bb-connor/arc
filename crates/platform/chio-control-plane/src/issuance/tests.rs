@@ -394,6 +394,49 @@ fn probationary_subject_requires_constrained_read_scope_and_persists_snapshot() 
 }
 
 #[test]
+fn deferred_lineage_wrapper_leaves_atomic_federated_projection_to_its_caller() {
+    let receipt_db_path = unique_path("issuance-policy-deferred-lineage", ".sqlite3");
+    let authority = wrap_capability_authority_with_deferred_lineage(
+        Box::new(chio_kernel::LocalCapabilityAuthority::new(
+            Keypair::generate(),
+        )),
+        None,
+        None,
+        Some(&receipt_db_path),
+        None,
+    );
+    let subject_kp = Keypair::generate();
+    let capability = authority
+        .issue_capability(
+            &subject_kp.public_key(),
+            ChioScope {
+                grants: vec![ToolGrant {
+                    server_id: "filesystem".to_owned(),
+                    tool_name: "read_file".to_owned(),
+                    operations: vec![Operation::Read],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                resource_grants: Vec::new(),
+                prompt_grants: Vec::new(),
+            },
+            30,
+        )
+        .test_expect("deferred capability issuance");
+
+    let store = SqliteReceiptStore::open(&receipt_db_path).test_expect("open receipt store");
+    assert!(store
+        .get_lineage(&capability.id)
+        .test_expect("lineage query")
+        .is_none());
+
+    let _ = fs::remove_file(receipt_db_path);
+}
+
+#[test]
 fn probationary_subject_denied_broad_issue_request() {
     let receipt_db_path = unique_path("issuance-policy-deny", ".sqlite3");
     let authority = wrap_capability_authority(

@@ -83,7 +83,7 @@ pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) budget_db: Option<PathBuf>,
 
-    /// Optional SQLite database path for durable remote MCP session tombstones.
+    /// Optional SQLite database path for durable admission, trust authority, and remote MCP session state.
     #[arg(long, global = true)]
     pub(crate) session_db: Option<PathBuf>,
 

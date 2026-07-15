@@ -10,6 +10,7 @@ pub struct TrustServiceConfig {
     pub authority_seed_path: Option<PathBuf>,
     pub authority_db_path: Option<PathBuf>,
     pub budget_db_path: Option<PathBuf>,
+    pub joint_authority_db_path: Option<PathBuf>,
     pub enterprise_providers_file: Option<PathBuf>,
     pub federation_policies_file: Option<PathBuf>,
     pub scim_lifecycle_file: Option<PathBuf>,
@@ -70,6 +71,43 @@ impl TrustServiceConfig {
                 "certification public metadata TTL must be non-zero".to_string(),
             ));
         }
+        if self.joint_authority_db_path.is_some()
+            && (self.budget_db_path.is_some() || self.revocation_db_path.is_some())
+        {
+            return Err(CliError::cli_other_error(
+                "a joint authority database replaces separate budget and revocation databases"
+                    .to_string(),
+            ));
+        }
+        if self.joint_authority_db_path.is_some() && !self.peer_urls.is_empty() {
+            return Err(CliError::cli_other_error(
+                "a local joint authority database cannot run with the legacy cluster coordinator"
+                    .to_string(),
+            ));
+        }
+        let mut database_paths = Vec::new();
+        for (label, path) in [
+            (
+                "joint authority database",
+                self.joint_authority_db_path.as_deref(),
+            ),
+            ("receipt database", self.receipt_db_path.as_deref()),
+            ("revocation database", self.revocation_db_path.as_deref()),
+            (
+                "capability authority database",
+                self.authority_db_path.as_deref(),
+            ),
+            ("budget database", self.budget_db_path.as_deref()),
+            (
+                "verifier challenge database",
+                self.verifier_challenge_db_path.as_deref(),
+            ),
+        ] {
+            if let Some(path) = path {
+                database_paths.push((label, path));
+            }
+        }
+        crate::validate_distinct_database_paths(&database_paths)?;
         Ok(())
     }
 }
@@ -112,6 +150,7 @@ mod service_config_tests {
             authority_seed_path: None,
             authority_db_path: None,
             budget_db_path: None,
+            joint_authority_db_path: None,
             enterprise_providers_file: None,
             federation_policies_file: None,
             scim_lifecycle_file: None,
@@ -150,6 +189,51 @@ mod service_config_tests {
                 "unexpected error for token `{token:?}`: {error}",
             );
         }
+    }
+
+    #[test]
+    fn trust_service_config_rejects_split_stores_with_joint_authority() {
+        let mut config = base_config();
+        config.joint_authority_db_path = Some(PathBuf::from("joint.sqlite3"));
+        config.budget_db_path = Some(PathBuf::from("budget.sqlite3"));
+
+        let error = config
+            .validate()
+            .test_expect_err("split budget store must conflict with joint authority");
+
+        assert!(error
+            .to_string()
+            .contains("joint authority database replaces separate budget and revocation"));
+    }
+
+    #[test]
+    fn trust_service_config_rejects_joint_authority_with_legacy_cluster() {
+        let mut config = base_config();
+        config.joint_authority_db_path = Some(PathBuf::from("joint.sqlite3"));
+        config.peer_urls = vec!["https://peer.example".to_string()];
+
+        let error = config
+            .validate()
+            .test_expect_err("joint authority must not use the legacy cluster coordinator");
+
+        assert!(error
+            .to_string()
+            .contains("joint authority database cannot run with the legacy cluster"));
+    }
+
+    #[test]
+    fn trust_service_config_rejects_joint_authority_path_aliases() {
+        let mut config = base_config();
+        config.joint_authority_db_path = Some(PathBuf::from("authority.sqlite3"));
+        config.receipt_db_path = Some(PathBuf::from("./authority.sqlite3"));
+
+        let error = config
+            .validate()
+            .test_expect_err("joint authority must not alias the receipt store");
+
+        assert!(error
+            .to_string()
+            .contains("joint authority database must not alias receipt database"));
     }
 
     #[test]

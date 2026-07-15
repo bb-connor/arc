@@ -187,6 +187,7 @@ fn write_safe_output_fixture() -> tempfile::NamedTempFile {
 fn preset_denies_dotenv_write_via_chio_check() {
     let preset = write_preset_to_temp();
     let receipt_db = tempfile::NamedTempFile::new().expect("receipt-db tempfile");
+    let session_db = tempfile::NamedTempFile::new().expect("session-db tempfile");
     let output_fixture = write_safe_output_fixture();
     let output = Command::new(chio_cli_binary())
         .args(["--format", "json", "check", "--policy"])
@@ -195,6 +196,8 @@ fn preset_denies_dotenv_write_via_chio_check() {
         .arg(output_fixture.path())
         .arg("--receipt-db")
         .arg(receipt_db.path())
+        .arg("--session-db")
+        .arg(session_db.path())
         .args([
             "--server",
             "fs",
@@ -230,6 +233,7 @@ fn preset_denies_dotenv_write_via_chio_check() {
 fn preset_allows_safe_file_read_via_chio_check() {
     let preset = write_preset_to_temp();
     let receipt_db = tempfile::NamedTempFile::new().expect("receipt-db tempfile");
+    let session_db = tempfile::NamedTempFile::new().expect("session-db tempfile");
     let output_fixture = write_safe_output_fixture();
     let output = Command::new(chio_cli_binary())
         .args(["--format", "json", "check", "--policy"])
@@ -238,6 +242,8 @@ fn preset_allows_safe_file_read_via_chio_check() {
         .arg(output_fixture.path())
         .arg("--receipt-db")
         .arg(receipt_db.path())
+        .arg("--session-db")
+        .arg(session_db.path())
         .args([
             "--server",
             "fs",
@@ -350,12 +356,15 @@ fn check_full_mode_uses_output_fixture_for_output_sensitive_policy() {
     let policy = write_output_sensitive_policy();
     let output_fixture = write_safe_output_fixture();
     let receipt_db = tempfile::NamedTempFile::new().expect("receipt-db tempfile");
+    let session_db = tempfile::NamedTempFile::new().expect("session-db tempfile");
 
     let output = Command::new(chio_cli_binary())
         .args(["--format", "json", "check", "--policy"])
         .arg(policy.path())
         .arg("--receipt-db")
         .arg(receipt_db.path())
+        .arg("--session-db")
+        .arg(session_db.path())
         .args(["--mode", "full", "--output-fixture"])
         .arg(output_fixture.path())
         .args([

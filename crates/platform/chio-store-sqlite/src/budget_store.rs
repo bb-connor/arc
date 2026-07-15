@@ -26,6 +26,7 @@ use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 mod authorization;
 mod composite;
+pub(crate) use composite::AdmissionCaptureBinding;
 pub(crate) mod composite_schema;
 mod import_hold_state;
 mod import_validation;

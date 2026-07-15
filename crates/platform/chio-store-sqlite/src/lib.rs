@@ -217,6 +217,34 @@ pub use serving_owner::{
 impl chio_kernel::QualifiedAdmissionProjectionStore
     for admission_operation_store::SqliteAdmissionOperationStore
 {
+    fn capture_invocation_and_commit_dispatch(
+        &self,
+        operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+        recovery_lease: &chio_kernel::admission_operation::AdmissionRecoveryLease,
+        request: chio_kernel::budget_store::BudgetCaptureInvocationRequest,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::admission_operation::AdmissionOperationV1,
+        chio_kernel::admission_operation::AdmissionCaptureError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::capture_invocation_and_commit_dispatch(
+            self,
+            operation,
+            recovery_lease,
+            request,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn list_admission_receipts_after(
+        &self,
+        after_receipt_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<chio_core::receipt::body::ChioReceipt>, chio_kernel::ReceiptStoreError> {
+        self.list_terminal_receipts_after(after_receipt_id, limit)
+    }
 }
 pub use settle_attempts::{SqliteSettlementOutcomeStore, SETTLE_ATTEMPTS_MIGRATION};
 pub use tool_outcome_store::SqliteToolOutcomeStore;

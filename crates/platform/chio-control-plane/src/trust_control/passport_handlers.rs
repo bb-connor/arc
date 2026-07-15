@@ -4,7 +4,8 @@
 
 use super::report_rendering::forward_post_to_leader;
 use super::report_validation::{
-    bearer_token_from_headers, load_capability_authority, validate_service_auth,
+    bearer_token_from_headers, load_capability_authority,
+    load_capability_authority_with_deferred_lineage, validate_service_auth,
 };
 use super::*;
 
@@ -1304,7 +1305,12 @@ pub(crate) async fn handle_federated_issue(
     } else {
         None
     };
-    match load_capability_authority(&state.config) {
+    let authority = if payload.delegation_policy.is_some() {
+        load_capability_authority_with_deferred_lineage(&state.config)
+    } else {
+        load_capability_authority(&state.config)
+    };
+    match authority {
         Ok(authority) => {
             if let Some(policy) = payload.delegation_policy.as_ref() {
                 if !authority

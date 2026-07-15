@@ -353,6 +353,13 @@ pub(crate) fn execute_runtime_loopback_step(
                 "Chio runtime loopback admission store install: {error}"
             ))
         })?;
+    kernel
+        .reconcile_durable_admission_receipt_projections()
+        .map_err(|error| {
+            RuntimeLoopbackError::message(format!(
+                "Chio runtime loopback admission receipt reconciliation: {error}"
+            ))
+        })?;
     kernel.set_revocation_store(Box::new(authority.revocation_store()));
     let peer_pin_now_unix_ms = now_unix_ms;
     if let Some(origin_kernel_id) = step.request.origin_kernel_id.as_deref() {

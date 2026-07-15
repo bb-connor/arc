@@ -18,6 +18,17 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
     )?;
     let verifier_policy_registry =
         load_verifier_policy_registry(config.verifier_policies_file.as_deref(), "trust_control")?;
+    let joint_authority_store = match config.joint_authority_db_path.as_deref() {
+        Some(path) => {
+            let lock_root = crate::durable_admission_lock_root(path)?;
+            std::fs::create_dir_all(&lock_root)?;
+            SqliteAuthorityStore::provision(path, &lock_root)?;
+            Some(Arc::new(SqliteAuthorityStore::open_serving(
+                path, &lock_root,
+            )?))
+        }
+        None => None,
+    };
     let budget_store = config
         .budget_db_path
         .as_deref()
@@ -50,7 +61,7 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
     let cluster_progress = cluster.as_ref().map(|_| Arc::new(ClusterProgress::new()));
     let state = TrustServiceState {
         config,
-        joint_authority_store: None,
+        joint_authority_store,
         budget_store,
         revocation_store,
         enterprise_provider_registry,

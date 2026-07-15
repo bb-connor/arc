@@ -33,6 +33,10 @@ fn unique_test_dir() -> PathBuf {
     ))
 }
 
+fn default_session_db_path(dir: &Path, listen: SocketAddr) -> PathBuf {
+    dir.join(format!("remote-session-{}.sqlite3", listen.port()))
+}
+
 macro_rules! skip_when_loopback_denied {
     ($test_name:ident) => {
         if skip_when_loopback_bind_denied(stringify!($test_name)) {
@@ -616,6 +620,8 @@ fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
     let authority_seed_path = dir.join("remote-authority.seed");
+    let default_session_db_path = default_session_db_path(dir, listen);
+    let session_db_path = session_db_path.unwrap_or(&default_session_db_path);
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
     command.args([
@@ -626,9 +632,10 @@ fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
         "--authority-seed-file",
         authority_seed_path.to_str().expect("authority seed path"),
     ]);
-    if let Some(path) = session_db_path {
-        command.args(["--session-db", path.to_str().expect("session db path")]);
-    }
+    command.args([
+        "--session-db",
+        session_db_path.to_str().expect("session db path"),
+    ]);
     command.args([
         "mcp",
         "serve-http",
@@ -688,6 +695,8 @@ fn spawn_http_server_with_policy_path_and_jwt_auth(
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
     let authority_seed_path = dir.join("remote-authority.seed");
+    let default_session_db_path = default_session_db_path(dir, listen);
+    let session_db_path = session_db_path.unwrap_or(&default_session_db_path);
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
     command.args([
@@ -698,9 +707,10 @@ fn spawn_http_server_with_policy_path_and_jwt_auth(
         "--authority-seed-file",
         authority_seed_path.to_str().expect("authority seed path"),
     ]);
-    if let Some(path) = session_db_path {
-        command.args(["--session-db", path.to_str().expect("session db path")]);
-    }
+    command.args([
+        "--session-db",
+        session_db_path.to_str().expect("session db path"),
+    ]);
     let child = command
         .args([
             "mcp",
@@ -747,6 +757,7 @@ fn spawn_http_server_with_shared_owner(
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
     let authority_seed_path = dir.join("remote-authority.seed");
+    let session_db_path = default_session_db_path(dir, listen);
 
     let child = Command::new(env!("CARGO_BIN_EXE_chio"))
         .env(
@@ -760,6 +771,8 @@ fn spawn_http_server_with_shared_owner(
             revocation_db_path.to_str().expect("revocation db path"),
             "--authority-seed-file",
             authority_seed_path.to_str().expect("authority seed path"),
+            "--session-db",
+            session_db_path.to_str().expect("session db path"),
             "mcp",
             "serve-http",
             "--policy",
@@ -796,6 +809,7 @@ fn spawn_http_server_with_authority_db(
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
+    let session_db_path = default_session_db_path(dir, listen);
 
     let child = Command::new(env!("CARGO_BIN_EXE_chio"))
         .args([
@@ -805,6 +819,8 @@ fn spawn_http_server_with_authority_db(
             revocation_db_path.to_str().expect("revocation db path"),
             "--authority-db",
             authority_db_path.to_str().expect("authority db path"),
+            "--session-db",
+            session_db_path.to_str().expect("session db path"),
             "mcp",
             "serve-http",
             "--policy",
@@ -862,6 +878,7 @@ fn spawn_http_server_with_shared_owner_and_jwt_auth(
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
     let authority_seed_path = dir.join("remote-authority.seed");
+    let session_db_path = default_session_db_path(dir, listen);
 
     let child = Command::new(env!("CARGO_BIN_EXE_chio"))
         .args([
@@ -871,6 +888,8 @@ fn spawn_http_server_with_shared_owner_and_jwt_auth(
             revocation_db_path.to_str().expect("revocation db path"),
             "--authority-seed-file",
             authority_seed_path.to_str().expect("authority seed path"),
+            "--session-db",
+            session_db_path.to_str().expect("session db path"),
             "mcp",
             "serve-http",
             "--policy",
@@ -919,6 +938,7 @@ fn spawn_http_server_with_jwt_auth_and_identity_federation(
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
     let authority_seed_path = dir.join("remote-authority.seed");
+    let session_db_path = default_session_db_path(dir, listen);
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
     command.args([
@@ -928,6 +948,8 @@ fn spawn_http_server_with_jwt_auth_and_identity_federation(
         revocation_db_path.to_str().expect("revocation db path"),
         "--authority-seed-file",
         authority_seed_path.to_str().expect("authority seed path"),
+        "--session-db",
+        session_db_path.to_str().expect("session db path"),
         "mcp",
         "serve-http",
         "--policy",
@@ -982,6 +1004,7 @@ fn spawn_http_server_with_jwt_auth_and_local_discovery(
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
     let authority_seed_path = dir.join("remote-authority.seed");
     let public_base_url = format!("http://{listen}");
+    let session_db_path = default_session_db_path(dir, listen);
 
     let child = Command::new(env!("CARGO_BIN_EXE_chio"))
         .args([
@@ -991,6 +1014,8 @@ fn spawn_http_server_with_jwt_auth_and_local_discovery(
             revocation_db_path.to_str().expect("revocation db path"),
             "--authority-seed-file",
             authority_seed_path.to_str().expect("authority seed path"),
+            "--session-db",
+            session_db_path.to_str().expect("session db path"),
             "mcp",
             "serve-http",
             "--policy",
@@ -1225,6 +1250,7 @@ fn spawn_http_server_with_oidc_discovery_and_identity_federation(
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
     let authority_seed_path = dir.join("remote-authority.seed");
+    let session_db_path = default_session_db_path(dir, listen);
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
     command.args([
@@ -1234,6 +1260,8 @@ fn spawn_http_server_with_oidc_discovery_and_identity_federation(
         revocation_db_path.to_str().expect("revocation db path"),
         "--authority-seed-file",
         authority_seed_path.to_str().expect("authority seed path"),
+        "--session-db",
+        session_db_path.to_str().expect("session db path"),
         "mcp",
         "serve-http",
         "--policy",
@@ -1289,6 +1317,7 @@ fn spawn_http_server_with_token_introspection_and_identity_federation(
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
     let authority_seed_path = dir.join("remote-authority.seed");
+    let session_db_path = default_session_db_path(dir, listen);
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
     command.args([
@@ -1298,6 +1327,8 @@ fn spawn_http_server_with_token_introspection_and_identity_federation(
         revocation_db_path.to_str().expect("revocation db path"),
         "--authority-seed-file",
         authority_seed_path.to_str().expect("authority seed path"),
+        "--session-db",
+        session_db_path.to_str().expect("session db path"),
         "mcp",
         "serve-http",
         "--policy",
@@ -1344,20 +1375,19 @@ fn spawn_trust_control_service(
     listen: SocketAddr,
     service_token: &str,
     receipt_db_path: &Path,
-    revocation_db_path: &Path,
     authority_db_path: &Path,
-    budget_db_path: &Path,
+    joint_authority_db_path: &Path,
 ) -> ServerGuard {
     let child = Command::new(env!("CARGO_BIN_EXE_chio"))
         .args([
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
-            "--revocation-db",
-            revocation_db_path.to_str().expect("revocation db path"),
             "--authority-db",
             authority_db_path.to_str().expect("authority db path"),
-            "--budget-db",
-            budget_db_path.to_str().expect("budget db path"),
+            "--session-db",
+            joint_authority_db_path
+                .to_str()
+                .expect("joint authority db path"),
             "trust",
             "serve",
             "--listen",
@@ -1383,6 +1413,7 @@ fn spawn_http_server_with_control_plane(
 ) -> ServerGuard {
     let policy_path = write_policy(dir);
     let script_path = write_mock_server_script(dir);
+    let session_db_path = default_session_db_path(dir, listen);
 
     let child = Command::new(env!("CARGO_BIN_EXE_chio"))
         .args([
@@ -1390,6 +1421,8 @@ fn spawn_http_server_with_control_plane(
             control_url,
             "--control-token",
             control_token,
+            "--session-db",
+            session_db_path.to_str().expect("session db path"),
             "mcp",
             "serve-http",
             "--policy",
@@ -3783,8 +3816,14 @@ fn mcp_serve_http_shared_hosted_owner_reuses_one_upstream_subprocess_and_keeps_s
     let (slow_b_result, slow_b_events) = slow_b.join().expect("shared owner slow call B");
     assert!(slow_a_events.is_empty());
     assert!(slow_b_events.is_empty());
-    assert_eq!(slow_a_result["result"]["isError"], false);
-    assert_eq!(slow_b_result["result"]["isError"], false);
+    assert_eq!(
+        slow_a_result["result"]["isError"], false,
+        "session A response: {slow_a_result:#}"
+    );
+    assert_eq!(
+        slow_b_result["result"]["isError"], false,
+        "session B response: {slow_b_result:#}"
+    );
 
     let create_task = post_json(
         &client,
@@ -4603,9 +4642,8 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     fs::create_dir_all(&node_b_dir).expect("create node B dir");
 
     let receipt_db_path = dir.join("control-receipts.sqlite3");
-    let revocation_db_path = dir.join("control-revocations.sqlite3");
     let authority_db_path = dir.join("control-authority.sqlite3");
-    let budget_db_path = dir.join("control-budgets.sqlite3");
+    let joint_authority_db_path = dir.join("control-joint-authority.sqlite3");
     let auth_token = "edge-token";
     let control_token = "control-token";
     let client = Client::builder()
@@ -4621,9 +4659,8 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
                 listen,
                 control_token,
                 &receipt_db_path,
-                &revocation_db_path,
                 &authority_db_path,
-                &budget_db_path,
+                &joint_authority_db_path,
             )
         },
         wait_for_control_service_result,
@@ -4707,8 +4744,8 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     let (tool_call, notifications) = read_sse_until_response(tool_call, json!(41), |_| {});
     assert!(notifications.is_empty());
     assert_eq!(
-        tool_call["result"]["structuredContent"]["echo"],
-        "distributed hello"
+        tool_call["result"]["structuredContent"]["echo"], "distributed hello",
+        "control-backed tool response: {tool_call:#}"
     );
 
     let control_receipts = get_control_tool_receipts(

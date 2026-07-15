@@ -25,6 +25,7 @@ const EVIDENCE_IMPORT_MAX_BODY_BYTES: usize = 64 * 1024 * 1024;
 /// room for the surrounding receipt envelope, while still bounding the buffered
 /// `Json` decode so an oversized body cannot grow without limit.
 const RECEIPT_APPEND_MAX_BODY_BYTES: usize = 128 * 1024 * 1024;
+const ADMISSION_AUTHORITY_MAX_BODY_BYTES: usize = 384 * 1024 * 1024;
 
 pub(crate) fn build_router(state: TrustServiceState) -> Router {
     // Seed the fixed alert-pack label sets at zero before this serve process can
@@ -37,6 +38,11 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
     chio_metrics_spec::runtime::preregister_known_label_sets();
 
     let router = trust_control_health::install_health_routes(Router::new())
+        .route(
+            INTERNAL_ADMISSION_AUTHORITY_PATH,
+            post(super::admission_authority::handle_admission_authority)
+                .layer(DefaultBodyLimit::max(ADMISSION_AUTHORITY_MAX_BODY_BYTES)),
+        )
         .route(
             AUTHORITY_PATH,
             get(handle_authority_status).post(handle_rotate_authority),

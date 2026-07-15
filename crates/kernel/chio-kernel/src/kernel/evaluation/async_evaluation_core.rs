@@ -718,7 +718,7 @@ impl ChioKernel {
                 );
             }
         }
-        if budget_mutation.durable_hold_result().is_some() {
+        if budget_mutation.durable_hold_result().is_some() && durable_admission.is_none() {
             let capture = self.capture_invocation(cap, &mut budget_mutation);
             match capture {
                 Ok(BudgetInvocationCaptureDecision::Captured(_)) => {}
@@ -855,7 +855,17 @@ impl ChioKernel {
         }
 
         if let Some(admission) = durable_admission.as_mut() {
-            if let Err(error) = self.commit_durable_dispatch(admission, now_unix_ms) {
+            let commit = if budget_mutation.durable_hold_result().is_some() {
+                self.capture_and_commit_durable_dispatch(
+                    admission,
+                    cap,
+                    &mut budget_mutation,
+                    now_unix_ms,
+                )
+            } else {
+                self.commit_durable_dispatch(admission, now_unix_ms)
+            };
+            if let Err(error) = commit {
                 let reason = error.to_string();
                 warn!(request_id = %request.request_id, reason = %redacted!(&reason), "durable dispatch commit could not be confirmed");
                 return self.with_pre_invocation_guard_evidence(

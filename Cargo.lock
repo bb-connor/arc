@@ -3111,6 +3111,7 @@ dependencies = [
  "tracing",
  "ureq 2.12.1",
  "url",
+ "uuid",
  "x509-cert",
 ]
 

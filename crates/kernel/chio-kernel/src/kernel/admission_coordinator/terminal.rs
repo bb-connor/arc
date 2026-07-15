@@ -44,10 +44,25 @@ struct KernelPostReturnContext<'a> {
 }
 
 #[derive(Serialize)]
+struct KernelOutputMaterialization<'a> {
+    schema: &'static str,
+    content_hash: &'a str,
+    incomplete_reason: Option<&'a str>,
+}
+
+struct DurableEvaluatedOutput {
+    output: ToolCallOutput,
+    incomplete_reason: Option<String>,
+    post_invocation_metadata: Option<serde_json::Value>,
+    post_invocation_evidence: Vec<chio_core::receipt::metadata::GuardEvidence>,
+    step_result_digests: Vec<AdmissionDigest>,
+}
+
+#[derive(Serialize)]
 struct KernelOutputGuardDecision<'a> {
     schema: &'static str,
     resolved_output_digest: &'a str,
-    complete: bool,
+    decision: &'a Decision,
 }
 
 #[derive(Serialize)]
@@ -73,6 +88,8 @@ impl ChioKernel {
             trusted_now_unix_ms,
         } = input;
         let runtime = self.durable_runtime()?;
+        let _mutation_guard = runtime.lock_mutations()?;
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
         if admission.operation.state() != AdmissionOperationState::DispatchCommitted {
             return Err(KernelError::DurableAdmission(format!(
                 "tool return cannot be recorded from state {:?}",
@@ -297,26 +314,84 @@ impl ChioKernel {
         Ok(DurableToolReturn { raw, outcome })
     }
 
-    fn materialize_durable_output(
-        &self,
-        raw: &RawInvocationOutcomeV1,
-    ) -> Result<ToolCallOutput, KernelError> {
-        let output = invocation_output_to_server_output(raw.output());
-        match self.apply_stream_limit_snapshot(
-            output,
-            Duration::from_millis(raw.elapsed_millis()),
-            raw.stream_limits(),
-        )? {
-            ToolServerOutput::Value(value) => Ok(ToolCallOutput::Value(value)),
+    fn terminal_tool_call_output(output: ToolServerOutput) -> (ToolCallOutput, Option<String>) {
+        match output {
+            ToolServerOutput::Value(value) => (ToolCallOutput::Value(value), None),
             ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => {
-                Ok(ToolCallOutput::Stream(stream))
+                (ToolCallOutput::Stream(stream), None)
             }
-            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => {
-                Err(KernelError::DurableAdmission(format!(
-                    "incomplete durable output retained for recovery: {reason}"
-                )))
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => {
+                (ToolCallOutput::Stream(stream), Some(reason))
             }
         }
+    }
+
+    fn evaluate_durable_post_return_output(
+        &self,
+        request: &ToolCallRequest,
+        raw: &RawInvocationOutcomeV1,
+        matched_grant_index: usize,
+        plan: &DurablePostReturnPlan,
+    ) -> Result<DurableEvaluatedOutput, KernelError> {
+        let materialized = self.apply_stream_limit_snapshot(
+            invocation_output_to_server_output(raw.output()),
+            Duration::from_millis(raw.elapsed_millis()),
+            raw.stream_limits(),
+        )?;
+        let (materialized_output, materialized_incomplete_reason) =
+            Self::terminal_tool_call_output(materialized.clone());
+        let materialized_chunks = match (&materialized_output, &materialized_incomplete_reason) {
+            (ToolCallOutput::Stream(stream), None) => Some(stream.chunk_count()),
+            (ToolCallOutput::Value(_), _) => None,
+            (ToolCallOutput::Stream(_), Some(_)) => None,
+        };
+        let materialized_content =
+            receipt_content_for_output(Some(&materialized_output), materialized_chunks)?;
+        let materialization_digest = admission_digest(
+            "output_materialization_digest",
+            &KernelOutputMaterialization {
+                schema: "chio.kernel-output-materialization.v1",
+                content_hash: &materialized_content.content_hash,
+                incomplete_reason: materialized_incomplete_reason.as_deref(),
+            },
+        )?;
+        let (handling, hook_results) = self.apply_durable_post_invocation_pipeline(
+            request,
+            materialized,
+            matched_grant_index,
+            None,
+            &plan.hook_identities,
+            raw.stream_limits(),
+        )?;
+        if handling.blocked_reason.is_some() {
+            return Err(KernelError::DurableAdmission(
+                "durable post-invocation pipeline returned an unsupported blocking verdict"
+                    .to_owned(),
+            ));
+        }
+        let (output, transformed_incomplete_reason) =
+            Self::terminal_tool_call_output(handling.output);
+        let incomplete_reason = materialized_incomplete_reason.or(transformed_incomplete_reason);
+        let mut step_result_digests = Vec::with_capacity(hook_results.len() + 1);
+        step_result_digests.push(materialization_digest);
+        for result in hook_results {
+            step_result_digests.push(admission_digest(
+                "post_invocation_step_result_digest",
+                &result,
+            )?);
+        }
+        if step_result_digests.len() != plan.frozen_steps.len() {
+            return Err(KernelError::DurableAdmission(
+                "durable post-invocation result count changed after admission".to_owned(),
+            ));
+        }
+        Ok(DurableEvaluatedOutput {
+            output,
+            incomplete_reason,
+            post_invocation_metadata: handling.extra_metadata,
+            post_invocation_evidence: handling.evidence,
+            step_result_digests,
+        })
     }
 
     fn durable_evaluation_contract(
@@ -326,7 +401,7 @@ impl ChioKernel {
     ) -> Result<
         (
             usize,
-            Vec<FrozenEvaluationStepV1>,
+            DurablePostReturnPlan,
             PostReturnNormalizedRequestContextV1,
         ),
         KernelError,
@@ -355,22 +430,11 @@ impl ChioKernel {
             .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
         )
         .map_err(tool_outcome_error)?;
-        let implementation_digest = AdmissionDigest::try_new(
-            "implementation_digest",
-            sha256_hex(b"chio.kernel-output-finalization.v1"),
-        )?;
-        let frozen_steps = vec![FrozenEvaluationStepV1 {
-            phase: EvaluationPhaseV1::OutputGuard,
-            position: 0,
-            component_id: AdmissionIdentifier::try_new(
-                "component_id",
-                "kernel-output-finalization",
-            )?,
-            component_version: AdmissionIdentifier::try_new("component_version", "v1")?,
-            implementation_digest,
-            mode: EvaluationModeV1::Pure,
-        }];
-        Ok((matched_grant_index, frozen_steps, normalized_context))
+        Ok((
+            matched_grant_index,
+            self.durable_post_return_plan()?,
+            normalized_context,
+        ))
     }
 
     fn completed_durable_tool_response(
@@ -380,15 +444,36 @@ impl ChioKernel {
     ) -> Result<ToolCallResponse, KernelError> {
         let runtime = self.durable_runtime()?;
         let tool_return = self.load_durable_tool_return(admission)?;
-        let output = self.materialize_durable_output(&tool_return.raw)?;
-        let expected_chunks = match &output {
-            ToolCallOutput::Stream(stream) => Some(stream.chunk_count()),
-            ToolCallOutput::Value(_) => None,
+        let (matched_grant_index, plan, normalized_context) =
+            self.durable_evaluation_contract(admission, &tool_return.raw)?;
+        let DurableEvaluatedOutput {
+            output,
+            incomplete_reason,
+            post_invocation_metadata,
+            post_invocation_evidence,
+            step_result_digests,
+        } = self.evaluate_durable_post_return_output(
+            request,
+            &tool_return.raw,
+            matched_grant_index,
+            &plan,
+        )?;
+        let expected_chunks = match (&output, &incomplete_reason) {
+            (ToolCallOutput::Stream(stream), None) => Some(stream.chunk_count()),
+            _ => None,
         };
         let receipt_content = receipt_content_for_output(Some(&output), expected_chunks)?;
+        let expected_decision = incomplete_reason
+            .as_ref()
+            .map_or(Decision::Allow, |reason| Decision::Incomplete {
+                reason: reason.clone(),
+            });
         let expected_non_admission_metadata = merge_metadata_objects(
-            receipt_content.metadata.clone(),
-            tool_return.raw.receipt_metadata_snapshot().cloned(),
+            merge_metadata_objects(
+                receipt_content.metadata.clone(),
+                tool_return.raw.receipt_metadata_snapshot().cloned(),
+            ),
+            post_invocation_metadata,
         );
         let evaluation = runtime
             .outcome_store
@@ -397,11 +482,11 @@ impl ChioKernel {
             .ok_or_else(|| {
                 KernelError::DurableAdmission("terminal evaluation disappeared".to_owned())
             })?;
-        let (_, frozen_steps, normalized_context) =
-            self.durable_evaluation_contract(admission, &tool_return.raw)?;
         evaluation
             .validate_against(&admission.operation, &tool_return.outcome)
-            .and_then(|_| evaluation.validate_replay_contract(&frozen_steps, &normalized_context))
+            .and_then(|_| {
+                evaluation.validate_replay_contract(&plan.frozen_steps, &normalized_context)
+            })
             .map_err(tool_outcome_error)?;
         if !matches!(
             evaluation.state(),
@@ -409,6 +494,21 @@ impl ChioKernel {
         ) {
             return Err(KernelError::DurableAdmission(
                 "completed admission retains a nonterminal evaluation".to_owned(),
+            ));
+        }
+        for (index, expected) in step_result_digests.iter().enumerate() {
+            if evaluation.step_result_digest(index) != Some(expected) {
+                return Err(KernelError::DurableAdmission(
+                    "completed post-invocation result conflicts with replay".to_owned(),
+                ));
+            }
+        }
+        if evaluation
+            .step_result_digest(step_result_digests.len())
+            .is_some()
+        {
+            return Err(KernelError::DurableAdmission(
+                "completed post-invocation result count conflicts with replay".to_owned(),
             ));
         }
         let resolved_output = runtime
@@ -458,14 +558,28 @@ impl ChioKernel {
             &tool_return,
             &receipt_content.content_hash,
             expected_non_admission_metadata,
+            &expected_decision,
+            &post_invocation_evidence,
             &receipt,
         )?;
+        self.materialize_durable_admission_receipt(&receipt)?;
+        self.mirror_durable_admission_receipt(&receipt)?;
+        let (verdict, reason, terminal_state) = incomplete_reason.map_or(
+            (Verdict::Allow, None, OperationTerminalState::Completed),
+            |reason| {
+                (
+                    Verdict::Deny,
+                    Some(reason.clone()),
+                    OperationTerminalState::Incomplete { reason },
+                )
+            },
+        );
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
-            verdict: Verdict::Allow,
+            verdict,
             output: Some(output),
-            reason: None,
-            terminal_state: OperationTerminalState::Completed,
+            reason,
+            terminal_state,
             receipt,
             execution_nonce: None,
         })
@@ -478,6 +592,8 @@ impl ChioKernel {
         tool_return: &DurableToolReturn,
         expected_content_hash: &str,
         expected_non_admission_metadata: Option<serde_json::Value>,
+        expected_decision: &Decision,
+        expected_post_invocation_evidence: &[chio_core::receipt::metadata::GuardEvidence],
         receipt: &chio_core::receipt::body::ChioReceipt,
     ) -> Result<(), KernelError> {
         let runtime = self.durable_runtime()?;
@@ -556,7 +672,7 @@ impl ChioKernel {
         if !signature_valid
             || receipt.id != replay_receipt_id
             || receipt.kernel_key != self.config.keypair.public_key()
-            || receipt.decision.as_ref() != Some(&Decision::Allow)
+            || receipt.decision.as_ref() != Some(expected_decision)
             || receipt.capability_id != request.capability.id
             || receipt.tool_server != request.server_id
             || receipt.tool_name != request.tool_name
@@ -565,7 +681,14 @@ impl ChioKernel {
             || receipt.content_hash != expected_content_hash
             || receipt.policy_hash != operation.binding().policy_hash().as_str()
             || receipt.tenant_id.as_deref() != expected_tenant
-            || receipt.evidence != tool_return.raw.pre_invocation_guard_evidence()
+            || receipt.evidence
+                != tool_return
+                    .raw
+                    .pre_invocation_guard_evidence()
+                    .iter()
+                    .chain(expected_post_invocation_evidence)
+                    .cloned()
+                    .collect::<Vec<_>>()
             || metadata.schema != AdmissionReceiptSchema::V1
             || metadata.operation_id != *operation.binding().operation_id()
             || metadata.request_id != *operation.binding().request_id()
@@ -602,11 +725,6 @@ impl ChioKernel {
                 admission.operation.state()
             )));
         }
-        if !self.post_invocation_pipeline.is_empty() {
-            return Err(KernelError::DurableAdmission(
-                "post-invocation pipeline changed after durable admission".to_owned(),
-            ));
-        }
         let raw_blob = tool_return
             .raw
             .canonical_blob()
@@ -618,14 +736,32 @@ impl ChioKernel {
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             tool_return.raw.pre_invocation_guard_evidence().to_vec(),
         );
-        let (_, frozen_steps, normalized_context) =
+        let (matched_grant_index, plan, normalized_context) =
             self.durable_evaluation_contract(admission, &tool_return.raw)?;
-        let output = self.materialize_durable_output(&tool_return.raw)?;
-        let expected_chunks = match &output {
-            ToolCallOutput::Stream(stream) => Some(stream.chunk_count()),
-            ToolCallOutput::Value(_) => None,
+        let DurableEvaluatedOutput {
+            output,
+            incomplete_reason,
+            post_invocation_metadata,
+            post_invocation_evidence,
+            step_result_digests,
+        } = self.evaluate_durable_post_return_output(
+            request,
+            &tool_return.raw,
+            matched_grant_index,
+            &plan,
+        )?;
+        let _post_invocation_evidence_scope =
+            scope_post_invocation_guard_evidence(post_invocation_evidence);
+        let expected_chunks = match (&output, &incomplete_reason) {
+            (ToolCallOutput::Stream(stream), None) => Some(stream.chunk_count()),
+            _ => None,
         };
         let receipt_content = receipt_content_for_output(Some(&output), expected_chunks)?;
+        let terminal_decision = incomplete_reason
+            .as_ref()
+            .map_or(Decision::Allow, |reason| Decision::Incomplete {
+                reason: reason.clone(),
+            });
         let resolved_output_digest = AdmissionDigest::try_new(
             "resolved_output_digest",
             receipt_content.content_hash.clone(),
@@ -649,6 +785,7 @@ impl ChioKernel {
             .outcome_store
             .lookup_post_return_evaluation(admission.operation.binding().operation_id())
             .map_err(durable_outcome_store_error)?;
+        let mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = current_unix_timestamp_ms()
             .max(stored_outcome.recorded_at_unix_ms())
             .max(
@@ -657,6 +794,7 @@ impl ChioKernel {
                     .map_or(0, PostReturnEvaluationRecordV1::trusted_time_unix_ms),
             )
             .max(1);
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
         let lease = self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
         let mut evaluation = match existing_evaluation {
             Some(existing) => existing,
@@ -672,7 +810,7 @@ impl ChioKernel {
                 let prepared = PostReturnEvaluationRecordV1::prepare(
                     &admission.operation,
                     &stored_outcome,
-                    frozen_steps.clone(),
+                    plan.frozen_steps.clone(),
                     trusted_now_unix_ms,
                     normalized_context.clone(),
                 )
@@ -690,14 +828,16 @@ impl ChioKernel {
         };
         evaluation
             .validate_against(&admission.operation, &stored_outcome)
-            .and_then(|_| evaluation.validate_replay_contract(&frozen_steps, &normalized_context))
+            .and_then(|_| {
+                evaluation.validate_replay_contract(&plan.frozen_steps, &normalized_context)
+            })
             .map_err(tool_outcome_error)?;
         let post_guard_decision_digest = admission_digest(
             "post_guard_decision_digest",
             &KernelOutputGuardDecision {
-                schema: "chio.kernel-output-guard-decision.v1",
+                schema: "chio.kernel-output-guard-decision.v2",
                 resolved_output_digest: resolved_output_digest.as_str(),
-                complete: true,
+                decision: &terminal_decision,
             },
         )?;
         let pricing_verdict_digest = admission_digest(
@@ -709,29 +849,39 @@ impl ChioKernel {
         )?;
         let (terminal_evaluation, terminal_outcome) = match evaluation.state() {
             PostReturnEvaluationStateV1::Evaluating => {
-                match evaluation.step_result_digest(0) {
-                    Some(recorded) if recorded != &post_guard_decision_digest => {
-                        return Err(KernelError::DurableAdmission(
-                            "retained output-guard result conflicts with replay".to_owned(),
-                        ));
+                for (index, expected_digest) in step_result_digests.iter().enumerate() {
+                    match evaluation.step_result_digest(index) {
+                        Some(recorded) if recorded != expected_digest => {
+                            return Err(KernelError::DurableAdmission(
+                                "retained post-invocation result conflicts with replay".to_owned(),
+                            ));
+                        }
+                        Some(_) => {}
+                        None => {
+                            let next = evaluation
+                                .record_next_pure_result(expected_digest.clone())
+                                .map_err(tool_outcome_error)?;
+                            evaluation = runtime
+                                .outcome_store
+                                .stage_post_return_evaluation(
+                                    admission.operation.binding().operation_id(),
+                                    evaluation.version(),
+                                    &lease,
+                                    &next,
+                                    &runtime.fence,
+                                    trusted_now_unix_ms,
+                                )
+                                .map_err(durable_outcome_store_error)?;
+                        }
                     }
-                    Some(_) => {}
-                    None => {
-                        let next = evaluation
-                            .record_next_pure_result(post_guard_decision_digest.clone())
-                            .map_err(tool_outcome_error)?;
-                        evaluation = runtime
-                            .outcome_store
-                            .stage_post_return_evaluation(
-                                admission.operation.binding().operation_id(),
-                                evaluation.version(),
-                                &lease,
-                                &next,
-                                &runtime.fence,
-                                trusted_now_unix_ms,
-                            )
-                            .map_err(durable_outcome_store_error)?;
-                    }
+                }
+                if evaluation
+                    .step_result_digest(step_result_digests.len())
+                    .is_some()
+                {
+                    return Err(KernelError::DurableAdmission(
+                        "retained post-invocation result count conflicts with replay".to_owned(),
+                    ));
                 }
                 if !matches!(
                     stored_outcome.disposition(),
@@ -798,8 +948,13 @@ impl ChioKernel {
                             "resolved output preimage disappeared".to_owned(),
                         )
                     })?;
-                if evaluation.step_result_digest(0) != Some(&post_guard_decision_digest)
-                    || evaluation.step_result_digest(1).is_some()
+                if step_result_digests
+                    .iter()
+                    .enumerate()
+                    .any(|(index, expected)| evaluation.step_result_digest(index) != Some(expected))
+                    || evaluation
+                        .step_result_digest(step_result_digests.len())
+                        .is_some()
                     || resolved_output.blob_ref() != expected_output
                     || u64::try_from(resolved_output.bytes().len()).ok()
                         != Some(*resolved_output_size_bytes)
@@ -873,8 +1028,11 @@ impl ChioKernel {
         let timestamp = trusted_now_unix_ms / 1_000;
         let metadata = merge_metadata_objects(
             merge_metadata_objects(
-                receipt_content.metadata,
-                tool_return.raw.receipt_metadata_snapshot().cloned(),
+                merge_metadata_objects(
+                    receipt_content.metadata,
+                    tool_return.raw.receipt_metadata_snapshot().cloned(),
+                ),
+                post_invocation_metadata,
             ),
             Some(serde_json::json!({
                 ADMISSION_RECEIPT_METADATA_KEY: admission_metadata
@@ -889,7 +1047,7 @@ impl ChioKernel {
             capability_id: &request.capability.id,
             tool_name: &request.tool_name,
             server_id: &request.server_id,
-            decision: Decision::Allow,
+            decision: terminal_decision.clone(),
             action,
             content_hash: receipt_content.content_hash,
             canonical_content: receipt_content.canonical_content,
@@ -898,9 +1056,10 @@ impl ChioKernel {
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
             tenant_id: None,
         })?;
-        let receipt = VerifiedAdmissionReceipt::from_kernel_verified(
+        let receipt = VerifiedAdmissionReceipt::from_kernel_verified_terminal(
             receipt,
             &self.config.keypair.public_key(),
+            &terminal_decision,
             &admission.operation,
             &context,
             &tool_outcome,
@@ -956,7 +1115,9 @@ impl ChioKernel {
                     "completed admission operation disappeared".to_owned(),
                 )
             })?;
-        self.append_chio_receipt_to_local_log(projected_receipt.clone());
+        drop(mutation_guard);
+        self.materialize_durable_admission_receipt(&projected_receipt)?;
+        self.mirror_durable_admission_receipt(&projected_receipt)?;
         self.apply_federation_cosign_for_admitted_request(request, &projected_receipt)?;
         if let Some(crate::memory_provenance::MemoryActionKind::Write { store, key }) =
             memory_action_kind.as_ref()
@@ -969,14 +1130,30 @@ impl ChioKernel {
                 projected_receipt.timestamp,
             )?;
         }
-        let execution_nonce =
-            self.mint_execution_nonce_for_allow(request, &request.capability, &projected_receipt)?;
+        let (verdict, reason, terminal_state, execution_nonce) = match incomplete_reason {
+            Some(reason) => (
+                Verdict::Deny,
+                Some(reason.clone()),
+                OperationTerminalState::Incomplete { reason },
+                None,
+            ),
+            None => (
+                Verdict::Allow,
+                None,
+                OperationTerminalState::Completed,
+                self.mint_execution_nonce_for_allow(
+                    request,
+                    &request.capability,
+                    &projected_receipt,
+                )?,
+            ),
+        };
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
-            verdict: Verdict::Allow,
+            verdict,
             output: Some(output),
-            reason: None,
-            terminal_state: OperationTerminalState::Completed,
+            reason,
+            terminal_state,
             receipt: projected_receipt,
             execution_nonce,
         })

@@ -1,5 +1,6 @@
     use super::*;
-    use std::{fs, path::PathBuf};
+    use chio_core::capability::scope::{Operation, ToolGrant};
+    use std::{fs, path::{Path, PathBuf}};
     use std::time::{SystemTime, UNIX_EPOCH};
     use wiremock::matchers::{header, method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -10,8 +11,8 @@
         policy::LoadedPolicy {
             format: policy::PolicyFormat::ChioYaml,
             identity: policy::PolicyIdentity {
-                source_hash: "test-source-hash".to_string(),
-                runtime_hash: "test-runtime-hash".to_string(),
+                source_hash: chio_core::crypto::sha256_hex(b"test-source-policy"),
+                runtime_hash: chio_core::crypto::sha256_hex(b"test-runtime-policy"),
             },
             kernel: policy.kernel.clone(),
             default_capabilities,
@@ -49,20 +50,33 @@
         std::net::TcpListener::bind(("127.0.0.1", 0)).is_ok()
     }
 
-    // Mirror production (cli/runtime.rs): pair build_kernel with a receipt
-    // store so the kernel's fail-closed receipt-persistence check passes, and
-    // opt the in-memory revocation store into the ephemeral case exactly as a
-    // local `chio run` without `--revocation-db` does, so dispatch clears the
-    // revocation-durability gate for the same reason production does.
+    // Mirror production (cli/runtime.rs): install durable receipt and admission
+    // stores from one authority owner.
     fn build_kernel_with_receipt_store(
         loaded_policy: policy::LoadedPolicy,
-        kernel_kp: &Keypair,
+        _kernel_kp: &Keypair,
     ) -> ChioKernel {
-        let mut kernel = build_kernel(loaded_policy, kernel_kp);
+        let session_db_path = unique_db_path("chio-cli-session-admission");
+        build_kernel_with_admission_db(loaded_policy, &session_db_path)
+    }
+
+    fn build_kernel_with_admission_db(
+        loaded_policy: policy::LoadedPolicy,
+        session_db_path: &Path,
+    ) -> ChioKernel {
+        let durable_admission = open_durable_admission_runtime(
+            loaded_policy.kernel.durable_admission_mode,
+            Some(session_db_path),
+        )
+        .expect("open durable admission runtime")
+        .expect("enabled durable admission runtime");
+        let mut kernel = build_kernel(loaded_policy, &durable_admission.kernel_keypair());
         let receipt_db_path = unique_db_path("chio-cli-session-receipts");
         configure_receipt_store(&mut kernel, Some(&receipt_db_path), None, None)
             .expect("configure receipt store for session test");
-        crate::runtime_cli::opt_in_ephemeral_revocation_for_local_session(&mut kernel, None, None);
+        durable_admission
+            .attach(&mut kernel)
+            .expect("attach durable admission runtime");
         kernel
     }
 
@@ -136,12 +150,14 @@ capabilities:
 "#;
         let policy = policy::parse_policy(yaml).unwrap();
         let revocation_db_path = unique_db_path("chio-cli-revocations");
-        let kp = Keypair::generate();
+        let admission_db_path = unique_db_path("chio-cli-revocation-admission");
 
         let agent_kp = Keypair::generate();
         let cap = {
-            let mut kernel =
-                build_kernel_with_receipt_store(load_test_policy_runtime(&policy), &kp);
+            let mut kernel = build_kernel_with_admission_db(
+                load_test_policy_runtime(&policy),
+                &admission_db_path,
+            );
             configure_revocation_store(&mut kernel, Some(&revocation_db_path), None, None).unwrap();
             kernel.register_tool_server(Box::new(StubToolServer {
                 id: "*".to_string(),
@@ -152,8 +168,10 @@ capabilities:
             cap
         };
 
-        let mut restarted =
-            build_kernel_with_receipt_store(load_test_policy_runtime(&policy), &kp);
+        let mut restarted = build_kernel_with_admission_db(
+            load_test_policy_runtime(&policy),
+            &admission_db_path,
+        );
         configure_revocation_store(&mut restarted, Some(&revocation_db_path), None, None).unwrap();
         restarted.register_tool_server(Box::new(StubToolServer {
             id: "*".to_string(),
@@ -176,7 +194,11 @@ capabilities:
 
         let response = restarted.evaluate_tool_call(&request).await.unwrap();
         assert_eq!(response.verdict, chio_kernel::Verdict::Deny);
-        assert!(response.reason.as_deref().unwrap_or("").contains("revoked"));
+        assert!(
+            response.reason.as_deref().unwrap_or("").contains("revoked"),
+            "unexpected denial reason: {:?}",
+            response.reason
+        );
 
         let _ = std::fs::remove_file(revocation_db_path);
     }
@@ -424,20 +446,31 @@ capabilities:
         assert_eq!(response.verdict, chio_kernel::Verdict::Deny);
     }
 
-    fn mcp_edge_kernel(policy: &policy::ChioPolicy, kernel_kp: &Keypair) -> (ChioKernel, PathBuf) {
-        // Mirror `chio mcp serve`: durable receipts on a filesystem path and an
-        // in-memory revocation store, wired through the production helper so the
-        // edge's fail-closed revocation stance is exercised, not re-implemented.
+    fn mcp_edge_kernel(
+        policy: &policy::ChioPolicy,
+        _kernel_kp: &Keypair,
+    ) -> (ChioKernel, PathBuf) {
+        // Mirror `chio mcp serve`: durable receipts plus one fenced admission
+        // authority for operation, outcome, budget, and revocation state.
         let receipt_db_path = unique_db_path("chio-cli-mcp-edge-receipts");
+        let loaded_policy = load_test_policy_runtime(policy);
+        let admission_db_path = unique_db_path("chio-cli-mcp-edge-admission");
+        let durable_admission = open_durable_admission_runtime(
+            loaded_policy.kernel.durable_admission_mode,
+            Some(&admission_db_path),
+        )
+        .expect("open mcp edge admission runtime")
+        .expect("enabled mcp edge admission runtime");
         let kernel = crate::runtime_cli::build_mcp_edge_kernel(
-            load_test_policy_runtime(policy),
-            kernel_kp,
+            loaded_policy,
+            &durable_admission.kernel_keypair(),
             &crate::runtime_cli::McpEdgeStores {
                 receipt_db_path: Some(&receipt_db_path),
                 revocation_db_path: None,
                 authority_seed_path: None,
                 authority_db_path: None,
                 budget_db_path: None,
+                durable_admission: Some(&durable_admission),
                 control_url: None,
                 control_token: None,
             },
@@ -477,10 +510,7 @@ capabilities:
 "#;
 
     #[tokio::test]
-    async fn mcp_edge_denies_dispatch_without_durable_or_opted_in_revocation() {
-        // Policy does NOT opt into ephemeral revocation, and no durable revocation
-        // backend is wired. A long-running edge that keeps durable receipts must
-        // fail closed rather than silently forgetting a revoked token on restart.
+    async fn mcp_edge_uses_the_durable_admission_revocation_authority() {
         let yaml = format!(
             "kernel:\n  max_capability_ttl: 3600\n  allow_ephemeral_revocation_store: false\n{MCP_EDGE_TOOL_POLICY}"
         );
@@ -493,25 +523,34 @@ capabilities:
 
         let agent_kp = Keypair::generate();
         let cap = first_default_capability(&kernel, &policy, &agent_kp);
-        let response = kernel
-            .evaluate_tool_call(&mcp_edge_tool_call(&agent_kp, cap))
+        let mut first_request = mcp_edge_tool_call(&agent_kp, cap.clone());
+        first_request.request_id = "mcp-edge-before-revocation".to_owned();
+        let first = kernel
+            .evaluate_tool_call(&first_request)
             .await
             .unwrap();
-        assert_eq!(
-            response.verdict,
-            chio_kernel::Verdict::Deny,
-            "MCP edge must fail closed without durable or opted-in revocation"
-        );
+        assert_eq!(first.verdict, chio_kernel::Verdict::Allow);
+
+        kernel
+            .revoke_capability(&cap.id)
+            .expect("revoke through durable admission authority");
+        assert!(kernel
+            .is_capability_revoked(&cap.id.to_string())
+            .expect("query durable revocation authority"));
+        let mut revoked_request = mcp_edge_tool_call(&agent_kp, cap);
+        revoked_request.request_id = "mcp-edge-after-revocation".to_owned();
+        let revoked = kernel
+            .evaluate_tool_call(&revoked_request)
+            .await
+            .unwrap();
+        assert_eq!(revoked.verdict, chio_kernel::Verdict::Deny);
         let _ = std::fs::remove_file(receipt_db_path);
     }
 
     #[tokio::test]
-    async fn mcp_edge_allows_dispatch_with_policy_opted_in_ephemeral_revocation() {
-        // Explicit `allow_ephemeral_revocation_store` in policy is the sanctioned
-        // opt-in for running the edge without a durable revocation backend, so
-        // dispatch clears the revocation-durability gate.
+    async fn mcp_edge_durable_admission_authority_enforces_invocation_budget() {
         let yaml = format!(
-            "kernel:\n  max_capability_ttl: 3600\n  allow_ephemeral_revocation_store: true\n{MCP_EDGE_TOOL_POLICY}"
+            "kernel:\n  max_capability_ttl: 3600\n  allow_ephemeral_revocation_store: false\n{MCP_EDGE_TOOL_POLICY}"
         );
         let policy = policy::parse_policy(&yaml).unwrap();
         let kp = Keypair::generate();
@@ -521,16 +560,40 @@ capabilities:
         }));
 
         let agent_kp = Keypair::generate();
-        let cap = first_default_capability(&kernel, &policy, &agent_kp);
-        let response = kernel
-            .evaluate_tool_call(&mcp_edge_tool_call(&agent_kp, cap))
+        let cap = kernel
+            .issue_capability(
+                &agent_kp.public_key(),
+                ChioScope {
+                    grants: vec![ToolGrant {
+                        server_id: "*".to_owned(),
+                        tool_name: "read_file".to_owned(),
+                        operations: vec![Operation::Invoke],
+                        constraints: Vec::new(),
+                        max_invocations: Some(1),
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    ..ChioScope::default()
+                },
+                300,
+            )
+            .expect("issue invocation-limited capability");
+        let mut first_request = mcp_edge_tool_call(&agent_kp, cap.clone());
+        first_request.request_id = "mcp-edge-budget-first".to_owned();
+        let first = kernel
+            .evaluate_tool_call(&first_request)
             .await
             .unwrap();
-        assert_eq!(
-            response.verdict,
-            chio_kernel::Verdict::Allow,
-            "policy ephemeral-revocation opt-in must clear the gate"
-        );
+        assert_eq!(first.verdict, chio_kernel::Verdict::Allow);
+
+        let mut second_request = mcp_edge_tool_call(&agent_kp, cap);
+        second_request.request_id = "mcp-edge-budget-second".to_owned();
+        let second = kernel
+            .evaluate_tool_call(&second_request)
+            .await
+            .unwrap();
+        assert_eq!(second.verdict, chio_kernel::Verdict::Deny);
         let _ = std::fs::remove_file(receipt_db_path);
     }
 

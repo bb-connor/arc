@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use chio_core::crypto::Keypair;
 use chio_kernel::admission_operation::{
     AdmissionAttachment, AdmissionBeginResult, AdmissionDigest, AdmissionIdentifier,
     AdmissionIncident, AdmissionOperationBindingInputV1, AdmissionOperationBindingV1,
@@ -10,9 +11,14 @@ use chio_kernel::admission_operation::{
     AdmissionParticipantRequirements, AdmissionProjectionContext, AdmissionRecoveryLease,
     AdmissionRequestBindingV1, AdmissionTerminalProjection, AdmissionTerminalReplay,
     AuthenticatedRequestNamespace, ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt,
-    SideEffectClass, UntrustedAdmissionRecoveryClaim,
+    SideEffectClass, SignedAdmissionTerminalProjectionV1, UntrustedAdmissionRecoveryClaim,
+};
+use chio_kernel::budget_store::{
+    BudgetAdmissionBinding, BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
+    BudgetCaptureInvocationRequest, BudgetEventAuthority,
 };
 use chio_kernel::receipt_store::{ReceiptStore, ReceiptStoreError};
+use chio_kernel::{BudgetStore, CanonicalRevocationSet};
 use rusqlite::{params, Connection};
 use tempfile::TempDir;
 
@@ -243,6 +249,250 @@ fn unknown_projection(
         context,
         incident: Box::new(incident),
     }
+}
+
+fn unknown_projection_for_claimant(
+    fixture: &Fixture,
+    operation: &AdmissionOperationV1,
+    incident_id: &str,
+    incident_digest: char,
+    at: u64,
+    claimant: &str,
+) -> AdmissionTerminalProjection {
+    let recovery = claim(fixture, operation, claimant, at);
+    let context = AdmissionProjectionContext {
+        operation_id: operation.binding().operation_id().clone(),
+        request_id: operation.replay_key().request_id,
+        expected_operation_version: operation.version(),
+        trusted_time_unix_ms: at + 1,
+        coordinator_lease_id: recovery.coordinator_lease_id().clone(),
+        coordinator_lease_epoch: recovery.coordinator_lease_epoch(),
+        store_fence: recovery.store_fence().clone(),
+    };
+    let incident = AdmissionIncident::from_verified(
+        operation,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        identifier("incident_id", incident_id),
+        digest("incident_digest", incident_digest),
+    )
+    .expect("bind durable incident");
+    AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
+        context,
+        incident: Box::new(incident),
+    }
+}
+
+#[test]
+fn combined_budget_capture_and_dispatch_commit_is_atomic_and_exactly_replayable() {
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let mut operation = prepared_operation(
+        &fixture.fence,
+        AdmissionOperationKind::ToolDispatch,
+        "request-combined-capture",
+        "capability-combined-capture",
+    );
+    fixture
+        .store
+        .begin(&operation, &fixture.fence, begun_at)
+        .expect("begin combined capture operation");
+    let hold_id = "hold-combined-capture";
+    let transitions = [
+        (
+            AdmissionOperationState::BrokerAttemptRegistered,
+            vec![AdmissionAttachment::BrokerAttempt(provider_attempt(
+                &operation,
+                "attempt-combined-capture",
+            ))],
+        ),
+        (
+            AdmissionOperationState::BudgetAuthorized,
+            vec![AdmissionAttachment::BudgetHoldId(identifier(
+                "budget_hold_id",
+                hold_id,
+            ))],
+        ),
+        (AdmissionOperationState::ReadyToDispatch, Vec::new()),
+        (AdmissionOperationState::CapturePending, Vec::new()),
+    ];
+    for (index, (state, attachments)) in transitions.into_iter().enumerate() {
+        let at = begun_at + 1 + u64::try_from(index).expect("transition index") * 2;
+        let lease = claim(&fixture, &operation, "combined-capture-worker", at);
+        operation = fixture
+            .store
+            .compare_and_swap(
+                &command(&operation, lease, attachments, state, None),
+                at + 1,
+            )
+            .expect("advance combined capture operation")
+            .into_operation();
+    }
+    assert_eq!(operation.state(), AdmissionOperationState::CapturePending);
+
+    let authority = BudgetEventAuthority {
+        authority_id: fixture.fence.store_uuid.clone(),
+        lease_id: fixture.fence.lease_id.clone(),
+        lease_epoch: fixture.fence.owner_epoch,
+    };
+    let budget = fixture.authority.budget_store();
+    assert!(matches!(
+        budget
+            .authorize_budget_hold(BudgetAuthorizeHoldRequest {
+                capability_id: "capability-combined-capture".to_owned(),
+                grant_index: 0,
+                max_invocations: Some(1),
+                invocation_quotas: Vec::new(),
+                cumulative_approval: None,
+                admission_binding: Some(BudgetAdmissionBinding {
+                    operation_id: operation.binding().operation_id().as_str().to_owned(),
+                    revocation_set: CanonicalRevocationSet::canonicalize(vec![
+                        "capability-combined-capture".to_owned(),
+                    ])
+                    .expect("canonical revocation set"),
+                    authorization_artifact_digests: vec!["a".repeat(64)],
+                    last_observed_revocation: None,
+                    supplemental_verifier_id: None,
+                    supplemental_verifier_config_digest: None,
+                    supplemental_authorization_artifact_digest: None,
+                    supplemental_authorization_expires_at: None,
+                }),
+                requested_exposure_units: 10,
+                max_cost_per_invocation: Some(10),
+                max_total_cost_units: Some(10),
+                hold_id: Some(hold_id.to_owned()),
+                event_id: Some("authorize-combined-capture".to_owned()),
+                authority: Some(authority.clone()),
+            })
+            .expect("authorize combined capture hold"),
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+    let capture = BudgetCaptureInvocationRequest {
+        capability_id: "capability-combined-capture".to_owned(),
+        grant_index: 0,
+        hold_id: hold_id.to_owned(),
+        event_id: "capture-combined-capture".to_owned(),
+        trusted_time: None,
+        authority: Some(authority),
+    };
+    let capture_at = begun_at + 20;
+    let lease = claim(&fixture, &operation, "combined-capture-worker", capture_at);
+    let head_before = {
+        let connection = fixture.store.connection().expect("connection");
+        connection
+            .query_row(
+                "SELECT head_sequence FROM authority_global_commit_meta WHERE singleton = 1",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .expect("global head before capture")
+    };
+    {
+        let connection = fixture.store.connection().expect("connection");
+        connection
+            .execute_batch(
+                r#"
+                CREATE TEMP TRIGGER fail_combined_capture_admission_commit
+                BEFORE INSERT ON admission_operation_commits
+                WHEN NEW.mutation_kind = 'compare_and_swap'
+                 AND NEW.participant_digest IS NOT NULL
+                BEGIN
+                    SELECT RAISE(ROLLBACK, 'injected combined capture rollback');
+                END;
+                "#,
+            )
+            .expect("install combined capture failure");
+    }
+    assert!(fixture
+        .store
+        .capture_invocation_and_commit_dispatch(
+            &operation,
+            &lease,
+            capture.clone(),
+            &fixture.fence,
+            capture_at + 1,
+        )
+        .is_err());
+    {
+        let connection = fixture.store.connection().expect("connection");
+        connection
+            .execute_batch("DROP TRIGGER fail_combined_capture_admission_commit")
+            .expect("remove combined capture failure");
+        let (state, capture_events, global_head): (String, i64, i64) = connection
+            .query_row(
+                r#"
+                SELECT
+                    (SELECT invocation_state FROM budget_authorization_holds
+                     WHERE hold_id = ?1),
+                    (SELECT COUNT(*) FROM budget_mutation_events
+                     WHERE event_id = ?2),
+                    (SELECT head_sequence FROM authority_global_commit_meta
+                     WHERE singleton = 1)
+                "#,
+                params![hold_id, &capture.event_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("state after rolled-back combined capture");
+        assert_eq!(state, "authorized");
+        assert_eq!(capture_events, 0);
+        assert_eq!(global_head, head_before);
+    }
+    assert_eq!(
+        fixture
+            .store
+            .load_by_operation_id(operation.binding().operation_id())
+            .expect("load rolled-back operation")
+            .expect("rolled-back operation exists")
+            .state(),
+        AdmissionOperationState::CapturePending
+    );
+
+    let dispatched = fixture
+        .store
+        .capture_invocation_and_commit_dispatch(
+            &operation,
+            &lease,
+            capture.clone(),
+            &fixture.fence,
+            capture_at + 1,
+        )
+        .expect("commit combined capture");
+    assert_eq!(
+        dispatched.state(),
+        AdmissionOperationState::DispatchCommitted
+    );
+    let replayed = fixture
+        .store
+        .capture_invocation_and_commit_dispatch(
+            &operation,
+            &lease,
+            capture.clone(),
+            &fixture.fence,
+            capture_at + 1,
+        )
+        .expect("replay exact combined capture");
+    assert_eq!(replayed, dispatched);
+    let connection = fixture.store.connection().expect("connection");
+    let (capture_events, participant_commits, global_head): (i64, i64, i64) = connection
+        .query_row(
+            r#"
+            SELECT
+                (SELECT COUNT(*) FROM budget_mutation_events WHERE event_id = ?1),
+                (SELECT COUNT(*) FROM admission_operation_commits
+                 WHERE operation_id = ?2 AND participant_digest IS NOT NULL),
+                (SELECT head_sequence FROM authority_global_commit_meta
+                 WHERE singleton = 1)
+            "#,
+            params![
+                &capture.event_id,
+                operation.binding().operation_id().as_str()
+            ],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .expect("combined capture commit counts");
+    assert_eq!(capture_events, 1);
+    assert_eq!(participant_commits, 1);
+    assert_eq!(global_head, head_before + 2);
 }
 
 #[test]
@@ -857,6 +1107,88 @@ fn terminal_projection_is_atomic_replayable_and_retained() {
         .is_some());
     drop(reopened);
     drop(_temp);
+}
+
+#[test]
+fn signed_terminal_projection_is_bound_to_the_durable_kernel_claimant() {
+    let fixture = fixture();
+    let begun_at = now_ms();
+    let operation = finalizing_tool_operation(
+        &fixture,
+        "request-signed-projection",
+        "capability-signed-projection",
+        begun_at,
+    );
+    let signer = Keypair::generate();
+    let claimant = format!("kernel:{}", signer.public_key().to_hex());
+    let projection = unknown_projection_for_claimant(
+        &fixture,
+        &operation,
+        "signed-projection-incident",
+        'e',
+        begun_at + 20_000,
+        &claimant,
+    );
+    let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
+        &operation,
+        &projection,
+        &fixture.store.admission_projection_capabilities(),
+        &signer,
+    )
+    .expect("projection envelope");
+    let committed = fixture
+        .store
+        .commit_signed_terminal_projection(&envelope)
+        .expect("commit signed terminal projection");
+    assert_eq!(
+        committed.state,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch
+    );
+    assert_eq!(
+        fixture
+            .store
+            .commit_signed_terminal_projection(&envelope)
+            .expect("exact signed replay"),
+        committed
+    );
+
+    let second_begun_at = begun_at + 30_000;
+    let second = finalizing_tool_operation(
+        &fixture,
+        "request-signer-substitution",
+        "capability-signer-substitution",
+        second_begun_at,
+    );
+    let authorized = Keypair::generate();
+    let authorized_claimant = format!("kernel:{}", authorized.public_key().to_hex());
+    let second_projection = unknown_projection_for_claimant(
+        &fixture,
+        &second,
+        "signer-substitution-incident",
+        'd',
+        second_begun_at + 20_000,
+        &authorized_claimant,
+    );
+    let substituted = SignedAdmissionTerminalProjectionV1::from_verified(
+        &second,
+        &second_projection,
+        &fixture.store.admission_projection_capabilities(),
+        &Keypair::generate(),
+    )
+    .expect("structurally valid substituted envelope");
+    assert!(matches!(
+        fixture
+            .store
+            .commit_signed_terminal_projection(&substituted),
+        Err(AdmissionOperationStoreError::Fenced)
+    ));
+    assert_eq!(
+        fixture
+            .store
+            .load_by_operation_id(second.binding().operation_id())
+            .expect("load after signer rejection"),
+        Some(second)
+    );
 }
 
 #[test]

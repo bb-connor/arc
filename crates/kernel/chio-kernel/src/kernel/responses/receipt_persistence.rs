@@ -1,5 +1,13 @@
 use super::*;
 
+fn receipts_match(left: &ChioReceipt, right: &ChioReceipt) -> Result<bool, KernelError> {
+    let left = chio_core::canonical::canonical_json_bytes(left)
+        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+    let right = chio_core::canonical::canonical_json_bytes(right)
+        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+    Ok(left == right)
+}
+
 impl ChioKernel {
     /// Build and sign a receipt from a `ReceiptParams` descriptor.
     pub(crate) fn build_and_sign_receipt(
@@ -248,6 +256,69 @@ impl ChioKernel {
             current_unix_timestamp_ms().max(claim_now_ms),
         );
         Ok(())
+    }
+
+    pub(crate) fn materialize_durable_admission_receipt(
+        &self,
+        receipt: &ChioReceipt,
+    ) -> Result<(), KernelError> {
+        if self.receipt_store.is_none() {
+            return Ok(());
+        }
+        let _receipt_store_write = self
+            .receipt_store_write_lock
+            .lock()
+            .map_err(|_| KernelError::Internal("receipt store write lock poisoned".to_string()))?;
+        self.with_receipt_store(|store| match store.load_chio_receipt(&receipt.id)? {
+            Some(existing) => {
+                if receipts_match(&existing, receipt)? {
+                    Ok(())
+                } else {
+                    Err(KernelError::DurableAdmission(format!(
+                        "receipt projection {} conflicts with the canonical admission receipt",
+                        receipt.id
+                    )))
+                }
+            }
+            None => {
+                store.append_chio_receipt_with_timeout(
+                    receipt,
+                    self.config.deadlines.receipt_append_budget(),
+                )?;
+                Ok(())
+            }
+        })?;
+        Ok(())
+    }
+
+    pub(crate) fn mirror_durable_admission_receipt(
+        &self,
+        receipt: &ChioReceipt,
+    ) -> Result<(), KernelError> {
+        let mut log = match self.receipt_log.lock() {
+            Ok(log) => log,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let existing = log
+            .iter()
+            .find(|existing| existing.id == receipt.id)
+            .cloned();
+        match existing {
+            Some(existing) => {
+                if receipts_match(&existing, receipt)? {
+                    Ok(())
+                } else {
+                    Err(KernelError::DurableAdmission(format!(
+                        "local receipt mirror {} conflicts with the canonical admission receipt",
+                        receipt.id
+                    )))
+                }
+            }
+            None => {
+                log.append(receipt.clone());
+                Ok(())
+            }
+        }
     }
 
     /// Whether a durable receipt store is configured but no longer serving (its

@@ -31,7 +31,7 @@ Options:
       --budget-db <BUDGET_DB>
           Optional SQLite database path for durable shared capability budget state
       --session-db <SESSION_DB>
-          Optional SQLite database path for durable remote MCP session tombstones
+          Optional SQLite database path for durable admission, trust authority, and remote MCP session state
       --control-url <CONTROL_URL>
           Optional shared trust-control service base URL
       --control-token <CONTROL_TOKEN>

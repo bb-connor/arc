@@ -106,12 +106,30 @@ pub(in crate::runtime) fn parse_cursor(id: &Value, params: &Value) -> Result<usi
 pub(in crate::runtime) fn build_operation_context(
     id: &Value,
     session_id: SessionId,
-    request_id: String,
     agent_id: &str,
     params: &Value,
 ) -> Result<OperationContext, Value> {
-    let mut context =
-        OperationContext::new(session_id, RequestId::new(request_id), agent_id.to_string());
+    #[derive(Serialize)]
+    struct ExternalRequestIdentity<'a> {
+        domain: &'static str,
+        session_id: &'a str,
+        jsonrpc_id: &'a Value,
+    }
+
+    let identity = ExternalRequestIdentity {
+        domain: "CHIO-MCP-EXTERNAL-REQUEST-ID-V1",
+        session_id: session_id.as_str(),
+        jsonrpc_id: id,
+    };
+    let canonical = canonical_json_bytes(&identity).map_err(|error| {
+        jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_REQUEST,
+            &format!("failed to canonicalize MCP request identity: {error}"),
+        )
+    })?;
+    let request_id = RequestId::new(format!("mcp-edge-req-{}", sha256_hex(&canonical)));
+    let mut context = OperationContext::new(session_id, request_id, agent_id.to_string());
     context.progress_token = parse_progress_token(id, params)?;
     Ok(context)
 }

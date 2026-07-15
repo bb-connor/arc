@@ -41,10 +41,11 @@ mod settle;
 pub use chio_control_plane::{
     authority_public_key_from_seed_file, build_kernel, certify, configure_budget_store,
     configure_capability_authority, configure_receipt_store, configure_revocation_store,
-    enterprise_federation, evidence_export, federation_policy, issuance,
-    issue_default_capabilities, load_or_create_authority_keypair, passport_verifier, policy,
-    reputation, require_control_token, rotate_authority_keypair, scim_lifecycle, trust_control,
-    CliError,
+    durable_admission_sidecar_path, enterprise_federation, evidence_export, federation_policy,
+    issuance, issue_default_capabilities, load_or_create_authority_keypair,
+    open_durable_admission_runtime, passport_verifier, policy, reputation, require_control_token,
+    rotate_authority_keypair, scim_lifecycle, trust_control, validate_distinct_database_paths,
+    validate_durable_admission_participant_paths, CliError, DurableAdmissionRuntime,
 };
 pub use chio_mcp_remote as remote_mcp;
 

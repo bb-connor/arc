@@ -1,6 +1,7 @@
 use crate::admission_operation::{
-    AdmissionBeginResult, AdmissionCommandResult, AdmissionIdentifier, AdmissionOperationCommand,
-    AdmissionOperationError, AdmissionOperationId, AdmissionOperationState,
+    AdmissionBeginResult, AdmissionCaptureError, AdmissionCommandResult, AdmissionIdentifier,
+    AdmissionOperationCommand, AdmissionOperationError, AdmissionOperationId,
+    AdmissionOperationState,
     AdmissionOperationStore, AdmissionOperationStoreError, AdmissionOperationV1,
     AdmissionProjectionCapabilities, AdmissionReplayClassification, AdmissionReplayKey,
     AdmissionTerminal, AdmissionTerminalProjection, AdmissionTerminalReplay,
@@ -409,7 +410,65 @@ impl ReceiptStore for TestAdmissionOperationStore {
     }
 }
 
-impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {}
+impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
+    fn capture_invocation_and_commit_dispatch(
+        &self,
+        operation: &AdmissionOperationV1,
+        recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+        request: crate::budget_store::BudgetCaptureInvocationRequest,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionOperationV1, AdmissionCaptureError> {
+        self.require_fence(active_fence)
+            .map_err(|_| AdmissionCaptureError::Fenced)?;
+        request
+            .validate()
+            .map_err(|error| AdmissionCaptureError::Invariant(error.to_string()))?;
+        if operation.state() != AdmissionOperationState::CapturePending
+            || operation.binding().capability_id().as_str() != request.capability_id
+            || operation
+                .budget_hold_id()
+                .is_none_or(|hold_id| hold_id.as_str() != request.hold_id)
+        {
+            return Err(AdmissionCaptureError::Invariant(
+                "test combined capture binding mismatch".to_owned(),
+            ));
+        }
+        let command = AdmissionOperationCommand::new(
+            operation.binding().operation_id().clone(),
+            operation.version(),
+            recovery_lease.clone(),
+            Vec::new(),
+            Some(AdmissionOperationState::DispatchCommitted),
+            None,
+            None,
+        )
+        .map_err(AdmissionCaptureError::Operation)?;
+        self.compare_and_swap(&command, trusted_now_unix_ms)
+            .map(AdmissionCommandResult::into_operation)
+            .map_err(|error| AdmissionCaptureError::Invariant(error.to_string()))
+    }
+
+    fn list_admission_receipts_after(
+        &self,
+        after_receipt_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<chio_core::receipt::body::ChioReceipt>, ReceiptStoreError> {
+        let receipt = self
+            .state
+            .lock()
+            .map_err(|_| {
+                ReceiptStoreError::Conflict("test admission state lock poisoned".to_owned())
+            })?
+            .receipt
+            .clone();
+        Ok(receipt
+            .into_iter()
+            .filter(|receipt| after_receipt_id.is_none_or(|after| receipt.id.as_str() > after))
+            .take(limit)
+            .collect())
+    }
+}
 
 impl ToolOutcomeStore for TestAdmissionOperationStore {
     fn record_tool_returned(
@@ -656,6 +715,85 @@ impl ToolOutcomeStore for TestAdmissionOperationStore {
 
 impl QualifiedToolOutcomeStore for TestAdmissionOperationStore {}
 
+#[derive(Clone, Default)]
+struct AdmissionReceiptProjectionStore {
+    receipt: std::sync::Arc<std::sync::Mutex<Option<ChioReceipt>>>,
+    successful_appends: std::sync::Arc<AtomicU64>,
+    fail_next_append: std::sync::Arc<AtomicBool>,
+}
+
+impl AdmissionReceiptProjectionStore {
+    fn fail_next_append(&self) {
+        self.fail_next_append.store(true, Ordering::SeqCst);
+    }
+
+    fn receipt(&self) -> Option<ChioReceipt> {
+        self.receipt
+            .lock()
+            .expect("admission receipt projection lock")
+            .clone()
+    }
+
+    fn successful_appends(&self) -> u64 {
+        self.successful_appends.load(Ordering::SeqCst)
+    }
+}
+
+impl ReceiptStore for AdmissionReceiptProjectionStore {
+    fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        if self.fail_next_append.swap(false, Ordering::SeqCst) {
+            return Err(ReceiptStoreError::Conflict(
+                "injected admission receipt projection failure".to_owned(),
+            ));
+        }
+        let mut stored = self.receipt.lock().map_err(|_| {
+            ReceiptStoreError::Conflict("admission receipt projection lock poisoned".to_owned())
+        })?;
+        if let Some(existing) = stored.as_ref() {
+            let existing = chio_core::canonical::canonical_json_bytes(existing)
+                .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;
+            let projected = chio_core::canonical::canonical_json_bytes(receipt)
+                .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;
+            return (existing == projected).then_some(()).ok_or_else(|| {
+                ReceiptStoreError::Conflict(
+                    "admission receipt projection id conflicts".to_owned(),
+                )
+            });
+        }
+        *stored = Some(receipt.clone());
+        self.successful_appends.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+
+    fn load_chio_receipt(&self, receipt_id: &str) -> Result<Option<ChioReceipt>, ReceiptStoreError> {
+        Ok(self
+            .receipt
+            .lock()
+            .map_err(|_| {
+                ReceiptStoreError::Conflict("admission receipt projection lock poisoned".to_owned())
+            })?
+            .as_ref()
+            .filter(|receipt| receipt.id == receipt_id)
+            .cloned())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &chio_core::receipt::lineage::ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Unsupported(
+            "test child receipt persistence".to_owned(),
+        ))
+    }
+}
+
+fn assert_same_receipt(left: &ChioReceipt, right: &ChioReceipt) {
+    assert_eq!(
+        chio_core::canonical::canonical_json_bytes(left).expect("canonical left receipt"),
+        chio_core::canonical::canonical_json_bytes(right).expect("canonical right receipt")
+    );
+}
+
 fn admission_test_fence() -> StoreMutationFence {
     StoreMutationFence {
         store_uuid: "test-admission-authority".to_string(),
@@ -697,6 +835,55 @@ impl ToolServerConnection for DurableAdmissionCheckingServer {
             "tool": tool_name,
             "echo": arguments,
         }))
+    }
+}
+
+struct DurableIncompleteStreamServer {
+    invocations: std::sync::Arc<AtomicU64>,
+    store: std::sync::Arc<TestAdmissionOperationStore>,
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for DurableIncompleteStreamServer {
+    fn server_id(&self) -> &str {
+        "durable-server"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["mutate".to_owned()]
+    }
+
+    async fn invoke_stream(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<Option<ToolServerStreamResult>, KernelError> {
+        assert_eq!(
+            self.store.operation().state(),
+            AdmissionOperationState::DispatchCommitted,
+            "dispatch must be durably committed before tool invocation"
+        );
+        self.invocations.fetch_add(1, Ordering::SeqCst);
+        Ok(Some(ToolServerStreamResult::Incomplete {
+            stream: ToolCallStream {
+                chunks: vec![ToolCallChunk {
+                    data: serde_json::json!({"partial": "ledger-7"}),
+                }],
+            },
+            reason: "transport ended after the side effect".to_owned(),
+        }))
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        Err(KernelError::Internal(
+            "streaming durable server unexpectedly used value invocation".to_owned(),
+        ))
     }
 }
 
@@ -771,6 +958,73 @@ impl crate::post_invocation::PostInvocationHook for VersionlessPostInvocationHoo
     }
 }
 
+struct StableRedactingPostInvocationHook {
+    replacement: &'static str,
+}
+
+impl crate::post_invocation::PostInvocationHook for StableRedactingPostInvocationHook {
+    fn name(&self) -> &str {
+        "stable-redacting-post-hook"
+    }
+
+    fn inspect(
+        &self,
+        _context: &crate::post_invocation::PostInvocationContext<'_>,
+        _response: &serde_json::Value,
+    ) -> crate::post_invocation::PostInvocationVerdict {
+        crate::post_invocation::PostInvocationVerdict::Redact(serde_json::json!({
+            "kind": "value",
+            "value": {"replacement": self.replacement}
+        }))
+    }
+
+    fn durable_identity(
+        &self,
+    ) -> Result<Option<crate::post_invocation::PostInvocationHookIdentity>, String> {
+        crate::post_invocation::PostInvocationHookIdentity::from_canonical_config(
+            "stable-redacting-post-hook",
+            "1",
+            "chio-kernel.tests.stable-redacting-post-hook.v1",
+            &self.replacement,
+        )
+        .map(Some)
+    }
+}
+
+struct StableStreamRedactingPostInvocationHook;
+
+impl crate::post_invocation::PostInvocationHook for StableStreamRedactingPostInvocationHook {
+    fn name(&self) -> &str {
+        "stable-stream-redacting-post-hook"
+    }
+
+    fn inspect(
+        &self,
+        _context: &crate::post_invocation::PostInvocationContext<'_>,
+        _response: &serde_json::Value,
+    ) -> crate::post_invocation::PostInvocationVerdict {
+        crate::post_invocation::PostInvocationVerdict::Redact(serde_json::json!({
+            "kind": "stream",
+            "stream": {
+                "complete": true,
+                "chunks": [{"part": 1}, {"part": 2}]
+            }
+        }))
+    }
+
+    fn durable_identity(
+        &self,
+    ) -> Result<Option<crate::post_invocation::PostInvocationHookIdentity>, String> {
+        crate::post_invocation::PostInvocationHookIdentity::from_canonical_config(
+            "stable-stream-redacting-post-hook",
+            "1",
+            "chio-kernel.tests.stable-stream-redacting-post-hook.v1",
+            &(),
+        )
+        .map(Some)
+    }
+}
+
 #[test]
 fn top_level_durable_admission_commits_before_dispatch_and_blocks_replay() {
     let (kernel, request, store, invocations) = durable_admission_fixture("durable-top-level");
@@ -796,6 +1050,103 @@ fn top_level_durable_admission_commits_before_dispatch_and_blocks_replay() {
         .evaluate_tool_call_blocking(&conflict)
         .expect("conflicting replay denial");
     assert_eq!(conflict.verdict, Verdict::Deny);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn durable_completion_projects_the_canonical_receipt_idempotently() {
+    let (mut kernel, request, _store, invocations) =
+        durable_admission_fixture("durable-receipt-projection");
+    let projection = AdmissionReceiptProjectionStore::default();
+    kernel
+        .set_receipt_store(Box::new(projection.clone()))
+        .expect("receipt projection store");
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("durable receipt projection");
+    assert_same_receipt(
+        projection.receipt().as_ref().expect("projected receipt"),
+        &response.receipt,
+    );
+    assert_eq!(projection.successful_appends(), 1);
+
+    let replay = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("idempotent durable receipt projection replay");
+    assert_same_receipt(&replay.receipt, &response.receipt);
+    assert_eq!(projection.successful_appends(), 1);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn completed_replay_heals_a_failed_receipt_projection_without_redispatch() {
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("durable-receipt-projection-recovery");
+    let projection = AdmissionReceiptProjectionStore::default();
+    projection.fail_next_append();
+    kernel
+        .set_receipt_store(Box::new(projection.clone()))
+        .expect("receipt projection store");
+
+    let error = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect_err("receipt projection failure must fail closed");
+    assert!(error
+        .to_string()
+        .contains("injected admission receipt projection failure"));
+    assert_eq!(store.operation().state(), AdmissionOperationState::Completed);
+    assert!(projection.receipt().is_none());
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let replay = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("completed replay must heal receipt projection");
+    assert_same_receipt(
+        projection.receipt().as_ref().expect("healed receipt"),
+        &replay.receipt,
+    );
+    assert_eq!(projection.successful_appends(), 1);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn admission_receipt_reconciliation_heals_a_crash_gap_before_serving() {
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture("durable-receipt-startup-recovery");
+    let completed = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("canonical admission completion");
+
+    let mut recovered_config = make_config();
+    recovered_config.keypair = kernel.config.keypair.clone();
+    recovered_config.policy_hash = sha256_hex(b"durable-admission-test-policy");
+    let mut recovered_kernel = make_kernel(recovered_config);
+    let projection = AdmissionReceiptProjectionStore::default();
+    recovered_kernel
+        .set_receipt_store(Box::new(projection.clone()))
+        .expect("receipt projection store");
+    recovered_kernel
+        .set_durable_admission_store(
+            store.clone(),
+            store.clone(),
+            admission_test_fence(),
+        )
+        .expect("qualified admission store");
+
+    assert_eq!(
+        recovered_kernel
+            .reconcile_durable_admission_receipt_projections()
+            .expect("startup receipt reconciliation"),
+        1
+    );
+    assert_same_receipt(
+        projection
+            .receipt()
+            .as_ref()
+            .expect("reconciled receipt"),
+        &completed.receipt,
+    );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
 
@@ -962,6 +1313,176 @@ fn finalization_recovers_after_store_owner_rotation() {
 }
 
 #[test]
+fn durable_post_invocation_identity_binds_transformed_output_and_replay() {
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("durable-versioned-post-hook");
+    kernel.add_post_invocation_hook(Box::new(StableRedactingPostInvocationHook {
+        replacement: "filtered",
+    }));
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("versioned post hook dispatch");
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(
+        response.output,
+        Some(ToolCallOutput::Value(
+            serde_json::json!({"replacement": "filtered"})
+        ))
+    );
+    assert_eq!(store.operation().state(), AdmissionOperationState::Completed);
+    assert_eq!(store.outcome_versions(), (Some(4), Some(2)));
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let replay = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("versioned post hook replay");
+    assert_eq!(replay.output, response.output);
+    assert_eq!(replay.receipt.id, response.receipt.id);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn durable_redaction_cannot_upgrade_incomplete_transport_and_replay_is_exactly_once() {
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("durable-incomplete-redacted-stream");
+    kernel.register_tool_server(Box::new(DurableIncompleteStreamServer {
+        invocations: invocations.clone(),
+        store: store.clone(),
+    }));
+    kernel.add_post_invocation_hook(Box::new(StableRedactingPostInvocationHook {
+        replacement: "filtered-partial",
+    }));
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("durable incomplete stream finalization");
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        response.output,
+        Some(ToolCallOutput::Value(
+            serde_json::json!({"replacement": "filtered-partial"})
+        ))
+    );
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("transport ended after the side effect")
+    );
+    assert_eq!(
+        response.receipt.decision,
+        Some(chio_core::receipt::decision::Decision::Incomplete {
+            reason: "transport ended after the side effect".to_owned(),
+        })
+    );
+    assert_eq!(store.operation().state(), AdmissionOperationState::Completed);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let replay = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("durable incomplete stream replay");
+    assert_eq!(replay.output, response.output);
+    assert_eq!(replay.receipt.id, response.receipt.id);
+    assert_eq!(replay.terminal_state, response.terminal_state);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn durable_redaction_recovery_uses_the_recorded_stream_limits() {
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("durable-redaction-stream-limit-snapshot");
+    kernel.config.memory_budget.max_stream_chunks = 1;
+    kernel.add_post_invocation_hook(Box::new(StableStreamRedactingPostInvocationHook));
+    store.fail_next_evaluation_begin();
+
+    kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect_err("injected finalization crash");
+    assert_eq!(store.operation().state(), AdmissionOperationState::Finalizing);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let mut recovered_config = make_config();
+    recovered_config.keypair = kernel.config.keypair.clone();
+    recovered_config.policy_hash = sha256_hex(b"durable-admission-test-policy");
+    recovered_config.memory_budget.max_stream_chunks = 2;
+    let mut recovered_kernel = make_kernel(recovered_config);
+    recovered_kernel
+        .set_durable_admission_store(
+            store.clone(),
+            store.clone(),
+            admission_test_fence(),
+        )
+        .expect("qualified admission store");
+    recovered_kernel.add_post_invocation_hook(Box::new(StableStreamRedactingPostInvocationHook));
+    recovered_kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
+        id: "durable-server".to_owned(),
+        tools: vec!["mutate".to_owned()],
+        invocations: invocations.clone(),
+        store: store.clone(),
+    }));
+
+    let recovered = recovered_kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("recover redacted stream with recorded limits");
+    assert_eq!(recovered.verdict, Verdict::Deny);
+    assert!(recovered
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("max chunk count of 1")));
+    let Some(ToolCallOutput::Stream(stream)) = recovered.output else {
+        panic!("expected retained redacted stream");
+    };
+    assert_eq!(stream.chunk_count(), 1);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn durable_post_invocation_identity_change_cannot_resume_finalization() {
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("durable-post-hook-identity-change");
+    kernel.add_post_invocation_hook(Box::new(StableRedactingPostInvocationHook {
+        replacement: "first",
+    }));
+    store.fail_next_evaluation_begin();
+    kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect_err("injected finalization crash");
+    assert_eq!(store.operation().state(), AdmissionOperationState::Finalizing);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let mut recovered_config = make_config();
+    recovered_config.keypair = kernel.config.keypair.clone();
+    recovered_config.policy_hash = sha256_hex(b"durable-admission-test-policy");
+    let mut recovered_kernel = make_kernel(recovered_config);
+    recovered_kernel
+        .set_durable_admission_store(
+            store.clone(),
+            store.clone(),
+            admission_test_fence(),
+        )
+        .expect("qualified admission store");
+    recovered_kernel.add_post_invocation_hook(Box::new(StableRedactingPostInvocationHook {
+        replacement: "second",
+    }));
+    recovered_kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
+        id: "durable-server".to_owned(),
+        tools: vec!["mutate".to_owned()],
+        invocations: invocations.clone(),
+        store: store.clone(),
+    }));
+
+    let response = recovered_kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("identity substitution denial");
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("request id conflicts")));
+    assert_eq!(store.operation().state(), AdmissionOperationState::Finalizing);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+}
+
+#[test]
 fn unsupported_durable_participants_fail_before_dispatch() {
     let (mut kernel, request, store, invocations) =
         durable_admission_fixture("durable-versionless-post-hook");
@@ -974,7 +1495,7 @@ fn unsupported_durable_participants_fail_before_dispatch() {
     assert!(response
         .reason
         .as_deref()
-        .is_some_and(|reason| reason.contains("frozen implementation identities")));
+        .is_some_and(|reason| reason.contains("has no durable implementation identity")));
     assert!(!store.has_operation());
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
 

@@ -503,7 +503,7 @@ mod tests {
                 action_class_id: "workflow.destructive.vendor_call".to_string(),
                 mode: "receipt_backed".to_string(),
                 destructive: false,
-                consistency_model: "totally_ordered".to_string(),
+                consistency_model: "totally-ordered".to_string(),
                 co_sign: "bilateral_required".to_string(),
                 co_sign_quorum: None,
                 evidence_required: vec!["receipt_lineage".to_string()],

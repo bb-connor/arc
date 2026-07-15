@@ -852,6 +852,23 @@ pub trait ReceiptStore: Send + Sync {
 pub trait QualifiedAdmissionProjectionStore:
     ReceiptStore + crate::admission_operation::QualifiedAdmissionOperationStore
 {
+    fn capture_invocation_and_commit_dispatch(
+        &self,
+        operation: &crate::admission_operation::AdmissionOperationV1,
+        recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+        request: crate::budget_store::BudgetCaptureInvocationRequest,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        crate::admission_operation::AdmissionOperationV1,
+        crate::admission_operation::AdmissionCaptureError,
+    >;
+
+    fn list_admission_receipts_after(
+        &self,
+        after_receipt_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ChioReceipt>, ReceiptStoreError>;
 }
 
 #[cfg(test)]

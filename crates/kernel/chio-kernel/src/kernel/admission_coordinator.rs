@@ -2,6 +2,8 @@ use std::fmt;
 use std::sync::Arc;
 
 use serde::Serialize;
+use std::collections::HashMap;
+use std::sync::{Mutex, MutexGuard, OnceLock, Weak};
 
 #[path = "admission_coordinator/terminal.rs"]
 mod terminal;
@@ -20,7 +22,9 @@ use crate::admission_operation::{
     StoreMutationFence, VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
     LOCAL_SYSTEM_TENANT_ID,
 };
-use crate::budget_store::{BudgetAdmissionBinding, BudgetEventAuthority};
+use crate::budget_store::{
+    BudgetAdmissionBinding, BudgetCaptureInvocationRequest, BudgetEventAuthority,
+};
 use crate::receipt_store::QualifiedAdmissionProjectionStore;
 use crate::supplemental_quota::CanonicalRevocationSet;
 use crate::tool_outcome::{
@@ -40,6 +44,30 @@ pub(crate) struct DurableAdmissionRuntime {
     outcome_store: Arc<dyn QualifiedToolOutcomeStore>,
     fence: StoreMutationFence,
     claimant_id: AdmissionIdentifier,
+    mutation_sequencer: Arc<Mutex<()>>,
+}
+
+type AdmissionMutationSequencers = HashMap<String, Weak<Mutex<()>>>;
+
+fn mutation_sequencer_for_fence(fence: &StoreMutationFence) -> Arc<Mutex<()>> {
+    static SEQUENCERS: OnceLock<Mutex<AdmissionMutationSequencers>> = OnceLock::new();
+
+    let key = format!(
+        "{}\0{}\0{}",
+        fence.store_uuid, fence.lease_id, fence.owner_epoch
+    );
+    let registry = SEQUENCERS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut sequencers = match registry.lock() {
+        Ok(sequencers) => sequencers,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    sequencers.retain(|_, sequencer| sequencer.strong_count() > 0);
+    if let Some(sequencer) = sequencers.get(&key).and_then(Weak::upgrade) {
+        return sequencer;
+    }
+    let sequencer = Arc::new(Mutex::new(()));
+    sequencers.insert(key, Arc::downgrade(&sequencer));
+    sequencer
 }
 
 impl fmt::Debug for DurableAdmissionRuntime {
@@ -69,9 +97,22 @@ impl DurableAdmissionRuntime {
         Ok(Self {
             store,
             outcome_store,
+            mutation_sequencer: mutation_sequencer_for_fence(&fence),
             fence,
             claimant_id,
         })
+    }
+
+    fn lock_mutations(&self) -> Result<MutexGuard<'_, ()>, KernelError> {
+        self.mutation_sequencer.lock().map_err(|_| {
+            KernelError::DurableAdmission(
+                "durable admission mutation sequencer is poisoned".to_owned(),
+            )
+        })
+    }
+
+    fn refresh_trusted_time(&self, requested_unix_ms: u64) -> u64 {
+        requested_unix_ms.max(current_unix_timestamp_ms()).max(1)
     }
 
     fn authority(&self) -> BudgetEventAuthority {
@@ -126,6 +167,7 @@ struct ImmutableToolAdmissionRequest<'a> {
     model_metadata: &'a Option<chio_core::capability::scope::ModelMetadata>,
     federated_origin_kernel_id: &'a Option<String>,
     matching_grants: Vec<ImmutableMatchingGrant<'a>>,
+    post_return_steps: &'a [FrozenEvaluationStepV1],
 }
 
 #[derive(Serialize)]
@@ -134,7 +176,66 @@ struct ImmutableMatchingGrant<'a> {
     grant: &'a ToolGrant,
 }
 
+struct DurablePostReturnPlan {
+    hook_identities: Vec<crate::post_invocation::PostInvocationHookIdentity>,
+    frozen_steps: Vec<FrozenEvaluationStepV1>,
+}
+
 impl ChioKernel {
+    pub(crate) fn load_durable_admission_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<chio_core::receipt::body::ChioReceipt>, KernelError> {
+        let Some(runtime) = self.durable_admission_runtime.as_ref() else {
+            return Ok(None);
+        };
+        runtime
+            .store
+            .load_chio_receipt(receipt_id)
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))
+    }
+
+    pub fn reconcile_durable_admission_receipt_projections(&self) -> Result<usize, KernelError> {
+        const PAGE_LIMIT: usize = 256;
+
+        if self.receipt_store.is_none() {
+            return Ok(0);
+        }
+        let Some(runtime) = self.durable_admission_runtime.as_ref() else {
+            return Ok(0);
+        };
+        let mut after_receipt_id = None;
+        let mut reconciled = 0_usize;
+        loop {
+            let page = runtime
+                .store
+                .list_admission_receipts_after(after_receipt_id.as_deref(), PAGE_LIMIT)
+                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            if page.is_empty() {
+                return Ok(reconciled);
+            }
+            if page.len() > PAGE_LIMIT {
+                return Err(KernelError::DurableAdmission(
+                    "admission receipt store exceeded the requested page limit".to_owned(),
+                ));
+            }
+            let mut previous = after_receipt_id.as_deref();
+            for receipt in &page {
+                if previous.is_some_and(|cursor| receipt.id.as_str() <= cursor) {
+                    return Err(KernelError::DurableAdmission(
+                        "admission receipt store returned a non-advancing page".to_owned(),
+                    ));
+                }
+                self.materialize_durable_admission_receipt(receipt)?;
+                previous = Some(receipt.id.as_str());
+            }
+            reconciled = reconciled.checked_add(page.len()).ok_or_else(|| {
+                KernelError::DurableAdmission("admission receipt count overflow".to_owned())
+            })?;
+            after_receipt_id = page.last().map(|receipt| receipt.id.clone());
+        }
+    }
+
     pub(crate) fn begin_durable_tool_admission(
         &self,
         request: &ToolCallRequest,
@@ -166,11 +267,6 @@ impl ChioKernel {
                 "durable monetary finalization requires a qualified payment journal".to_owned(),
             ));
         }
-        if !self.post_invocation_pipeline.is_empty() {
-            return Err(KernelError::DurableAdmission(
-                "durable post-invocation hooks require frozen implementation identities".to_owned(),
-            ));
-        }
         if self.execution_nonce_config.is_some() {
             return Err(KernelError::DurableAdmission(
                 "durable execution nonces require an atomic admission participant".to_owned(),
@@ -186,6 +282,7 @@ impl ChioKernel {
                 "admission store lacks atomic terminal tool-outcome projection support".to_owned(),
             ));
         }
+        let post_return_plan = self.durable_post_return_plan()?;
 
         let immutable_request = ImmutableToolAdmissionRequest {
             schema: "chio.tool-admission-request.v1",
@@ -203,6 +300,7 @@ impl ChioKernel {
                     grant: matching.grant,
                 })
                 .collect(),
+            post_return_steps: &post_return_plan.frozen_steps,
         };
         let immutable_request_hash =
             admission_digest("immutable_request_hash", &immutable_request)?;
@@ -257,6 +355,8 @@ impl ChioKernel {
             effect_class,
         })?;
         let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
+        let _mutation_guard = runtime.lock_mutations()?;
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
         let operation = match runtime
             .store
             .begin(&prepared, &runtime.fence, trusted_now_unix_ms)
@@ -333,6 +433,56 @@ impl ChioKernel {
         Ok(Some(DurableToolAdmission { operation }))
     }
 
+    fn durable_post_return_plan(&self) -> Result<DurablePostReturnPlan, KernelError> {
+        let hook_identities = self
+            .post_invocation_pipeline
+            .durable_identities()
+            .map_err(KernelError::DurableAdmission)?;
+        let mut frozen_steps = Vec::with_capacity(hook_identities.len() + 1);
+        frozen_steps.push(FrozenEvaluationStepV1 {
+            phase: EvaluationPhaseV1::OutputGuard,
+            position: 0,
+            component_id: AdmissionIdentifier::try_new(
+                "component_id",
+                "kernel-output-materialization",
+            )?,
+            component_version: AdmissionIdentifier::try_new("component_version", "v1")?,
+            implementation_digest: AdmissionDigest::try_new(
+                "implementation_digest",
+                sha256_hex(b"chio.kernel-output-materialization.v1"),
+            )?,
+            mode: EvaluationModeV1::Pure,
+        });
+        for (index, identity) in hook_identities.iter().enumerate() {
+            let position = u32::try_from(index + 1).map_err(|_| {
+                KernelError::DurableAdmission(
+                    "post-invocation pipeline has too many durable steps".to_owned(),
+                )
+            })?;
+            frozen_steps.push(FrozenEvaluationStepV1 {
+                phase: EvaluationPhaseV1::OutputGuard,
+                position,
+                component_id: AdmissionIdentifier::try_new(
+                    "component_id",
+                    identity.component_id(),
+                )?,
+                component_version: AdmissionIdentifier::try_new(
+                    "component_version",
+                    identity.component_version(),
+                )?,
+                implementation_digest: AdmissionDigest::try_new(
+                    "implementation_digest",
+                    identity.implementation_digest(),
+                )?,
+                mode: EvaluationModeV1::Pure,
+            });
+        }
+        Ok(DurablePostReturnPlan {
+            hook_identities,
+            frozen_steps,
+        })
+    }
+
     pub(crate) fn durable_budget_binding(
         &self,
         admission: &DurableToolAdmission,
@@ -374,15 +524,21 @@ impl ChioKernel {
         budget_mutation: &PreExecutionBudgetMutation,
         trusted_now_unix_ms: u64,
     ) -> Result<(), KernelError> {
+        let runtime = self.durable_runtime()?;
+        let _mutation_guard = runtime.lock_mutations()?;
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
         let hold = budget_mutation.durable_hold_result().ok_or_else(|| {
             KernelError::DurableAdmission(
                 "durable admission did not produce an authoritative budget hold".to_string(),
             )
         })?;
-        let expected_authority = self.durable_runtime()?.authority();
+        let expected_authority = runtime.authority();
         if hold.authorize_metadata.authority.as_ref() != Some(&expected_authority) {
             return Err(KernelError::DurableAdmission(
-                "budget hold authority does not match the admission store fence".to_string(),
+                format!(
+                    "budget hold authority does not match the admission store fence: expected {expected_authority:?}, observed {:?}",
+                    hold.authorize_metadata.authority
+                ),
             ));
         }
         let expected_hold_id = admission.budget_hold_id(hold.grant_index);
@@ -423,6 +579,9 @@ impl ChioKernel {
         admission: &mut DurableToolAdmission,
         trusted_now_unix_ms: u64,
     ) -> Result<(), KernelError> {
+        let runtime = self.durable_runtime()?;
+        let _mutation_guard = runtime.lock_mutations()?;
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
         if admission.operation.state() == AdmissionOperationState::BudgetAuthorized {
             admission.operation = self.apply_admission_command(
                 admission.operation.clone(),
@@ -453,6 +612,12 @@ impl ChioKernel {
         admission: &mut DurableToolAdmission,
         trusted_now_unix_ms: u64,
     ) -> Result<(), KernelError> {
+        let runtime = self.durable_runtime()?;
+        let _mutation_guard = runtime.lock_mutations()?;
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        if admission.operation.state() == AdmissionOperationState::DispatchCommitted {
+            return Ok(());
+        }
         if admission.operation.state() != AdmissionOperationState::CapturePending {
             return Err(KernelError::DurableAdmission(format!(
                 "dispatch cannot commit from state {:?}",
@@ -465,6 +630,55 @@ impl ChioKernel {
             AdmissionOperationState::DispatchCommitted,
             trusted_now_unix_ms,
         )?;
+        Ok(())
+    }
+
+    pub(crate) fn capture_and_commit_durable_dispatch(
+        &self,
+        admission: &mut DurableToolAdmission,
+        capability: &CapabilityToken,
+        budget_mutation: &mut PreExecutionBudgetMutation,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), KernelError> {
+        let runtime = self.durable_runtime()?;
+        let _mutation_guard = runtime.lock_mutations()?;
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let charge = budget_mutation.durable_hold_result().ok_or_else(|| {
+            KernelError::DurableAdmission(
+                "combined dispatch commit requires an authorized budget hold".to_owned(),
+            )
+        })?;
+        let request = BudgetCaptureInvocationRequest {
+            capability_id: capability.id.clone(),
+            grant_index: charge.grant_index,
+            hold_id: charge.budget_hold_id.clone(),
+            event_id: charge.capture_invocation_event_id(),
+            trusted_time: None,
+            authority: charge.authorize_metadata.authority.clone(),
+        };
+        match admission.operation.state() {
+            AdmissionOperationState::CapturePending => {
+                let recovery_lease =
+                    self.claim_admission_recovery(&admission.operation, trusted_now_unix_ms)?;
+                admission.operation = runtime
+                    .store
+                    .capture_invocation_and_commit_dispatch(
+                        &admission.operation,
+                        &recovery_lease,
+                        request,
+                        &runtime.fence,
+                        trusted_now_unix_ms,
+                    )
+                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            }
+            AdmissionOperationState::DispatchCommitted => {}
+            state => {
+                return Err(KernelError::DurableAdmission(format!(
+                    "combined dispatch capture cannot resume from state {state:?}"
+                )));
+            }
+        }
+        self.capture_invocation(capability, budget_mutation)?;
         Ok(())
     }
 

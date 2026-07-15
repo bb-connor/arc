@@ -128,6 +128,40 @@ fn federation_bridge_is_immutable_and_preserves_signed_parent() {
 }
 
 #[test]
+fn combined_delegation_chain_rejects_partial_and_cyclic_federated_lineage() {
+    let path = unique_db_path("federated-chain-integrity");
+    let mut store = SqliteReceiptStore::open(&path).test_unwrap();
+    let issuer = Keypair::generate();
+    let missing_parent = signed_snapshot(
+        &signed_token("missing-parent-child", &Keypair::generate(), &issuer),
+        Some("missing-parent".to_string()),
+    );
+    store
+        .import_federated_evidence_share(&share_import("missing-parent", missing_parent.clone()))
+        .test_unwrap();
+    assert!(matches!(
+        store.get_combined_delegation_chain(&missing_parent.capability_id),
+        Err(ReceiptStoreError::Conflict(message))
+            if message.contains("missing parent")
+    ));
+
+    let first = synthetic_anchor("cycle-first", None);
+    let second = synthetic_anchor("cycle-second", Some(first.capability_id.clone()));
+    let mut first = first;
+    first.federated_parent_capability_id = Some(second.capability_id.clone());
+    let mut import = share_import("cycle", first.clone());
+    import.capability_lineage.push(second);
+    store.import_federated_evidence_share(&import).test_unwrap();
+    assert!(matches!(
+        store.get_combined_delegation_chain(&first.capability_id),
+        Err(ReceiptStoreError::Conflict(message)) if message.contains("cycle")
+    ));
+
+    drop(store);
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn federated_import_rejects_legacy_and_cross_share_divergence() {
     let path = unique_db_path("federated-cross-share-conflict");
     let mut store = SqliteReceiptStore::open(&path).test_unwrap();

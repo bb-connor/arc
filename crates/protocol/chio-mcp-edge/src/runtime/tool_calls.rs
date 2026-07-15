@@ -334,9 +334,7 @@ impl ChioMcpEdge {
             }
         };
 
-        let request_id = self.next_request_id();
-        let context =
-            build_operation_context(id, session_id.clone(), request_id, &self.agent_id, params)?;
+        let context = build_operation_context(id, session_id.clone(), &self.agent_id, params)?;
 
         Ok((
             session_id,

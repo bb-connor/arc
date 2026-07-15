@@ -739,16 +739,30 @@ impl SqliteReceiptStore {
         &self,
         capability_id: &str,
     ) -> Result<Vec<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
+        const MAX_CHAIN_LENGTH: usize = 32;
+
         let mut chain = Vec::new();
         let mut current = Some(capability_id.to_string());
         let mut seen = BTreeSet::new();
 
         while let Some(current_capability_id) = current.take() {
-            if !seen.insert(current_capability_id.clone()) || chain.len() >= 32 {
-                break;
+            if !seen.insert(current_capability_id.clone()) {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "combined delegation chain for {capability_id} contains a cycle at {current_capability_id}"
+                )));
+            }
+            if chain.len() >= MAX_CHAIN_LENGTH {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "combined delegation chain for {capability_id} exceeds {MAX_CHAIN_LENGTH} capabilities"
+                )));
             }
             let Some(snapshot) = self.get_combined_lineage(&current_capability_id)? else {
-                break;
+                if chain.is_empty() {
+                    return Ok(Vec::new());
+                }
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "combined delegation chain for {capability_id} references missing parent {current_capability_id}"
+                )));
             };
             current = snapshot
                 .parent_capability_id

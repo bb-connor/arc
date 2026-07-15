@@ -5,6 +5,8 @@ mod cumulative_model;
 mod event_projection;
 mod model;
 mod transitions;
+
+pub(crate) use transitions::AdmissionCaptureBinding;
 mod validation;
 
 use cumulative_model::*;

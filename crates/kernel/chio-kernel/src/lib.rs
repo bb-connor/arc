@@ -406,8 +406,8 @@ pub use payment::{
     RailSettlementStatus, ReceiptSettlement, X402PaymentAdapter,
 };
 pub use post_invocation::{
-    PipelineOutcome, PostInvocationContext, PostInvocationHook, PostInvocationPipeline,
-    PostInvocationVerdict,
+    PipelineOutcome, PostInvocationContext, PostInvocationHook, PostInvocationHookIdentity,
+    PostInvocationPipeline, PostInvocationVerdict,
 };
 pub use provider_verdict::{
     build_tool_call_request, canonical_invocation_bytes, verdict_result_from_response,
