@@ -445,6 +445,23 @@ before ever returning `SafeToReplay`. Given a class, the method:
   authorize and admission abort arms use, so no hold leaks), and denies before
   dispatch.
 
+Trust posture of the read-only signal: for a tool reached through the MCP adapter
+(`crates/protocol/chio-mcp-adapter/src/server.rs`, `AdaptedMcpServer::tool_is_read_only`),
+the read-only exemption bottoms out in the upstream MCP server's own
+`readOnlyHint` tool annotation, captured into the manifest once at adapt time
+(`crates/protocol/chio-mcp-adapter/src/manifest.rs`, `infer_has_side_effects`), not
+re-verified per call. The MCP spec treats tool annotations as untrusted hints from
+the server describing itself, so a lying or compromised upstream server can mark
+its own side-effecting tools `readOnlyHint: true` and exempt them from the journal's
+crash-window audit net; policy evaluation, guards, and receipt issuance are
+unaffected; only the pre-dispatch durable intent write is skipped. The parsing is
+conservative in the operator's favor, not the server's: a malformed hint or an
+explicit `destructiveHint: true` overrides a `readOnlyHint: true` and the tool
+still journals (`McpToolSafetyHints::has_side_effects`); only a clean, present
+`readOnlyHint: true` with no destructive hint earns the exemption.
+`DispatchIntentJournalMode::All` is the operator override for a deployment that
+does not trust its upstream servers' self-reported hints.
+
 Money path (F70, extended by RFC-0013): after `authorize_payment_if_needed`
 (line 469) returns a `PaymentAuthorization`, attach its `authorization_id` to the
 open intent via `store.attach_dispatch_intent_rail_ref(request_id, authorization_id)`
