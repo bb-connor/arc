@@ -381,6 +381,52 @@ pub(crate) fn dead_letter_dispatch_intent_tx(
     Ok(())
 }
 
+/// Resolve a specific dead-letter dispatch intent: the sanctioned operator
+/// remediation for the incident a nonzero `dead_letter_dispatch_intents`
+/// count flags in health. The row's current state is read first rather than
+/// inferred from an update's affected-row count, so a refusal names the
+/// actual state: missing entirely, or present but not `dead_letter` (still
+/// open, already reconciled, or already resolved). A resolved row is never
+/// deleted and never loses its original incident detail: the operator's
+/// note is appended to the existing `resolution_detail` rather than
+/// overwriting it, so the row reads as a complete history and remains
+/// auditable after it stops counting against health.
+pub(crate) fn resolve_dead_letter_dispatch_intent_tx(
+    tx: &rusqlite::Transaction<'_>,
+    request_id: &str,
+    tenant_id: Option<&str>,
+    note: &str,
+) -> Result<(), ReceiptStoreError> {
+    let current_state: Option<String> = tx
+        .query_row(
+            "SELECT state FROM chio_dispatch_intents \
+             WHERE request_id = ?1 AND ((tenant_id IS NULL AND ?2 IS NULL) OR tenant_id = ?2)",
+            rusqlite::params![request_id, tenant_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    match current_state.as_deref() {
+        None => Err(ReceiptStoreError::NotFound(format!(
+            "no dispatch intent found for request `{request_id}`"
+        ))),
+        Some("dead_letter") => {
+            tx.execute(
+                "UPDATE chio_dispatch_intents SET state = 'resolved', resolution_detail = \
+                 COALESCE(resolution_detail || '; ', '') || 'operator resolution: ' || ?3 \
+                 WHERE request_id = ?1 \
+                   AND ((tenant_id IS NULL AND ?2 IS NULL) OR tenant_id = ?2) \
+                   AND state = 'dead_letter'",
+                rusqlite::params![request_id, tenant_id, note],
+            )?;
+            Ok(())
+        }
+        Some(other) => Err(ReceiptStoreError::Conflict(format!(
+            "dispatch intent for request `{request_id}` is in state `{other}`, not \
+             `dead_letter`; refusing to resolve"
+        ))),
+    }
+}
+
 /// Mark an orphaned monetary intent whose outcome the reconciler PROVED
 /// against the rail as terminally reconciled. Distinct from a dead letter:
 /// the outcome is known, so the row must not count as an outcome-unknown

@@ -823,6 +823,26 @@ pub trait ReceiptStore: Send + Sync {
     fn dead_letter_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
         Ok(0)
     }
+    /// Resolve a specific dead-letter dispatch intent: the sanctioned
+    /// operator remediation for the incident a nonzero
+    /// `dead_letter_dispatch_intents` count flags in health. Transitions the
+    /// row to a terminal `resolved` state that stops counting against
+    /// health, appending the operator's note to the existing resolution
+    /// detail rather than overwriting it, so the row stays auditable end to
+    /// end. Refuses (fail-closed) when no intent matches `request_id` and
+    /// `tenant_id`, or when it exists but is not currently in `dead_letter`
+    /// state, so an operator cannot silently resolve the wrong incident or
+    /// resolve one twice.
+    fn resolve_dead_letter_dispatch_intent(
+        &self,
+        _request_id: &str,
+        _tenant_id: Option<&str>,
+        _note: &str,
+    ) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Conflict(
+            "dead-letter resolution is not supported by this receipt store".to_string(),
+        ))
+    }
     fn append_child_receipt(&self, receipt: &ChildRequestReceipt) -> Result<(), ReceiptStoreError>;
     fn append_child_receipt_returning_seq(
         &self,

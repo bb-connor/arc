@@ -1319,6 +1319,139 @@ fn dead_letter_intent_flips_store_unhealthy() -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
+#[test]
+fn resolve_dead_letter_intent_clears_health_and_preserves_audit_trail(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-intents-resolve");
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.record_dispatch_intent(&sample_intent("req-resolve"))?;
+    }
+    let store = SqliteReceiptStore::open(&path)?;
+    store.flush_receipt_writes()?;
+    store.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert!(
+        !store.receipt_store_health()?.healthy,
+        "the dead-lettered orphan must flip health unhealthy before resolution"
+    );
+
+    store.resolve_dead_letter_dispatch_intent(
+        "req-resolve",
+        None,
+        "confirmed via rail statement, no funds moved",
+    )?;
+
+    let after = store.receipt_store_health()?;
+    assert!(
+        after.healthy,
+        "a resolved dead letter must stop counting against health"
+    );
+    assert_eq!(after.open_dispatch_intents, 0);
+    assert_eq!(after.dead_letter_dispatch_intents, 0);
+
+    // The row survives (auditable), carrying both the original incident
+    // detail and the operator's note, rather than being deleted.
+    let connection = store.reader_connection_for_test()?;
+    let (state, detail): (String, String) = connection.query_row(
+        "SELECT state, resolution_detail FROM chio_dispatch_intents WHERE request_id = 'req-resolve'",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    assert_eq!(state, "resolved");
+    assert!(
+        detail.contains("outcome unknown"),
+        "the original incident detail must survive: {detail}"
+    );
+    assert!(
+        detail.contains("confirmed via rail statement, no funds moved"),
+        "the operator's note must be appended: {detail}"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn resolve_dead_letter_intent_refuses_a_missing_request() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("chio-intents-resolve-missing");
+    let store = SqliteReceiptStore::open(&path)?;
+    let error = store
+        .resolve_dead_letter_dispatch_intent("no-such-request", None, "note")
+        .expect_err("resolving a nonexistent request must refuse, not no-op");
+    assert!(
+        matches!(error, chio_kernel::receipt_store::ReceiptStoreError::NotFound(_)),
+        "expected NotFound, got {error:?}"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn resolve_dead_letter_intent_refuses_a_still_open_row() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("chio-intents-resolve-still-open");
+    let store = SqliteReceiptStore::open(&path)?;
+    // The intent is open (in flight, still owned by this live instance),
+    // never dead-lettered.
+    store.record_dispatch_intent(&sample_intent("req-still-open"))?;
+
+    let error = store
+        .resolve_dead_letter_dispatch_intent("req-still-open", None, "note")
+        .expect_err("resolving a non-dead-letter row must refuse");
+    assert!(
+        matches!(error, chio_kernel::receipt_store::ReceiptStoreError::Conflict(_)),
+        "expected Conflict, got {error:?}"
+    );
+    assert_eq!(
+        open_intent_row_count(&store)?,
+        1,
+        "a refused resolution must not disturb the still-open row"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
+#[test]
+fn resolve_dead_letter_intent_refuses_a_row_already_resolved(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-intents-resolve-twice");
+    {
+        let store = SqliteReceiptStore::open(&path)?;
+        store.record_dispatch_intent(&sample_intent("req-resolve-twice"))?;
+    }
+    // Reopen so the row is foreign to this instance and reconciliation can
+    // actually dead-letter it (a store never claims its own live intents).
+    let store = SqliteReceiptStore::open(&path)?;
+    store.flush_receipt_writes()?;
+    store.reconcile_dispatch_intents(&RecordingReconciler)?;
+    assert_eq!(store.dead_letter_dispatch_intent_count()?, 1);
+
+    store.resolve_dead_letter_dispatch_intent("req-resolve-twice", None, "first resolution")?;
+
+    // Resolving it a second time (already resolved, not dead_letter) must
+    // refuse, not silently succeed: the state check re-runs against the
+    // CURRENT row rather than trusting the caller's belief that it is still
+    // a dead letter.
+    let second = store.resolve_dead_letter_dispatch_intent(
+        "req-resolve-twice",
+        None,
+        "second resolution attempt",
+    );
+    assert!(
+        matches!(
+            second,
+            Err(chio_kernel::receipt_store::ReceiptStoreError::Conflict(_))
+        ),
+        "resolving an already-resolved row must refuse, got {second:?}"
+    );
+
+    let _ = std::fs::remove_file(&path);
+    Ok(())
+}
+
 fn stamped_receipt_schema_version(
     connection: &rusqlite::Connection,
 ) -> Result<i32, Box<dyn std::error::Error>> {

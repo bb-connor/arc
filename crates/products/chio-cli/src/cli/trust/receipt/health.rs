@@ -72,6 +72,33 @@ pub(crate) fn cmd_receipt_health(backend: QueryBackend<'_>) -> Result<(), CliErr
     }
 }
 
+/// `chio receipt resolve-dead-letter`: the sanctioned operator remediation
+/// for a dead-letter dispatch-intent incident (see RFC-0003). The store
+/// method itself is fail-closed: it refuses when the request id is missing
+/// or the row is not currently in `dead_letter` state, so a resolved
+/// incident (or one that was never dead-lettered) cannot be silently
+/// resolved again.
+pub(crate) fn cmd_receipt_resolve_dead_letter(
+    request_id: &str,
+    tenant: Option<&str>,
+    note: &str,
+    backend: QueryBackend<'_>,
+) -> Result<(), CliError> {
+    let store = local_receipt_store(&backend, "receipt resolve-dead-letter")?;
+    store.resolve_dead_letter_dispatch_intent(request_id, tenant, note)?;
+    let report = DeadLetterResolutionReport {
+        request_id: request_id.to_string(),
+        tenant_id: tenant.map(str::to_string),
+        resolved: true,
+    };
+    if backend.json_output {
+        print_receipt_operator_json(CHIO_CLI_RECEIPT_RESOLVE_DEAD_LETTER_SCHEMA, &report)?;
+    } else {
+        print!("{}", render_receipt_resolve_dead_letter_human(&report));
+    }
+    Ok(())
+}
+
 pub(crate) fn cmd_receipt_flush(
     timeout_ms: u64,
     backend: QueryBackend<'_>,
@@ -848,5 +875,153 @@ mod receipt_operator_tests {
             notice.contains("NOT reseeded") && notice.contains("cannot reach"),
             "repair notice must be explicit that a live writer was not reseeded: {notice}"
         );
+    }
+
+    struct AlwaysDeadLetterReconciler;
+
+    impl chio_kernel::receipt_store::DispatchIntentReconciler for AlwaysDeadLetterReconciler {
+        fn resolve(
+            &self,
+            _intent: &chio_kernel::receipt_store::DispatchIntentRecord,
+        ) -> Result<chio_kernel::receipt_store::DispatchIntentResolution, chio_kernel::ReceiptStoreError>
+        {
+            Ok(chio_kernel::receipt_store::DispatchIntentResolution::DeadLetter {
+                detail: "outcome unknown; test orphan".to_string(),
+            })
+        }
+    }
+
+    fn sample_dispatch_intent(request_id: &str) -> chio_kernel::receipt_store::DispatchIntentRecord {
+        chio_kernel::receipt_store::DispatchIntentRecord {
+            request_id: request_id.to_string(),
+            capability_id: "cap-abc".to_string(),
+            tool_server: "srv".to_string(),
+            tool_name: "write_file".to_string(),
+            parameter_hash: "ph-123".to_string(),
+            side_effect_class: chio_kernel::receipt_store::SideEffectClass::SideEffecting,
+            monetary: false,
+            rail: None,
+            rail_authorization_id: None,
+            tenant_id: None,
+            created_at_unix_ms: 42,
+        }
+    }
+
+    /// `chio receipt resolve-dead-letter` is the sanctioned CLI path onto the
+    /// store API: it must clear a dead-letter incident's grip on `receipt
+    /// health` and its JSON/human output must name the request id it
+    /// resolved.
+    #[test]
+    fn resolve_dead_letter_entrypoint_clears_health_and_reports_the_request(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let db_path = unique_temp_path("receipt-resolve-dead-letter", "sqlite3");
+        {
+            let store = chio_store_sqlite::SqliteReceiptStore::open(&db_path)?;
+            store.record_dispatch_intent(&sample_dispatch_intent("cli-resolve-req"))?;
+        }
+        // Reopen so the row is foreign to this instance and reconciliation
+        // dead-letters it, exactly as a restart after a crash would. Flush
+        // before checking health: each open spawns a writer thread whose
+        // verified-head seed clears asynchronously, so an immediate health
+        // read on a fresh instance can otherwise race thread startup (see
+        // `dead_letter_intent_flips_store_unhealthy` in the store crate).
+        let store = chio_store_sqlite::SqliteReceiptStore::open_existing(&db_path)?;
+        store.reconcile_dispatch_intents(&AlwaysDeadLetterReconciler)?;
+        store.flush_receipt_writes()?;
+        let dead_letters = store.dead_letter_dispatch_intent_count()?;
+        drop(store);
+        assert_eq!(dead_letters, 1, "the orphan must be dead-lettered before resolution");
+
+        assert!(
+            !matches!(
+                cmd_receipt_health(backend(Some(&db_path), None)),
+                Ok(())
+            ),
+            "a dead-letter incident must fail `receipt health` before resolution"
+        );
+
+        cmd_receipt_resolve_dead_letter(
+            "cli-resolve-req",
+            None,
+            "confirmed via rail statement",
+            backend(Some(&db_path), None),
+        )?;
+
+        // Each CLI invocation opens a fresh store (a fresh writer thread
+        // whose verified-head seed clears asynchronously), so poll briefly
+        // rather than asserting on the very next open: the incident itself
+        // is already resolved above, this loop only waits out that startup
+        // race before the health check can observe a settled store.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            match cmd_receipt_health(backend(Some(&db_path), None)) {
+                Ok(()) => break,
+                Err(_) if std::time::Instant::now() < deadline => {
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                }
+                Err(error) => return Err(Box::new(error)),
+            }
+        }
+
+        let human = render_receipt_resolve_dead_letter_human(&DeadLetterResolutionReport {
+            request_id: "cli-resolve-req".to_string(),
+            tenant_id: None,
+            resolved: true,
+        });
+        assert!(human.contains("cli-resolve-req"));
+
+        let json_value = receipt_operator_json_value(
+            CHIO_CLI_RECEIPT_RESOLVE_DEAD_LETTER_SCHEMA,
+            &DeadLetterResolutionReport {
+                request_id: "cli-resolve-req".to_string(),
+                tenant_id: Some("tenant-a".to_string()),
+                resolved: true,
+            },
+        )?;
+        assert_eq!(
+            json_value["report"]["requestId"].as_str(),
+            Some("cli-resolve-req")
+        );
+        assert_eq!(json_value["report"]["tenantId"].as_str(), Some("tenant-a"));
+        assert_eq!(json_value["report"]["resolved"].as_bool(), Some(true));
+
+        let _ = std::fs::remove_file(db_path);
+        Ok(())
+    }
+
+    /// The store method is fail-closed on a missing or non-dead-letter row;
+    /// the CLI entrypoint must propagate that refusal rather than reporting
+    /// success.
+    #[test]
+    fn resolve_dead_letter_entrypoint_fails_closed_on_a_missing_request(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let db_path = unique_temp_path("receipt-resolve-dead-letter-missing", "sqlite3");
+        let store = chio_store_sqlite::SqliteReceiptStore::open(&db_path)?;
+        store.append_chio_receipt(&operator_sample_receipt()?)?;
+        drop(store);
+
+        let result = cmd_receipt_resolve_dead_letter(
+            "no-such-request",
+            None,
+            "note",
+            backend(Some(&db_path), None),
+        );
+        assert!(
+            result.is_err(),
+            "resolving a nonexistent request must fail closed, not report success"
+        );
+
+        let _ = std::fs::remove_file(db_path);
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_dead_letter_entrypoint_rejects_remote_control_backend() {
+        assert_remote_unsupported(cmd_receipt_resolve_dead_letter(
+            "req",
+            None,
+            "note",
+            backend(None, Some("http://127.0.0.1:9977")),
+        ));
     }
 }

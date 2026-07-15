@@ -4000,6 +4000,29 @@ impl SqliteReceiptStore {
         dead_letter_dispatch_intent_count_query(&connection)
     }
 
+    /// Resolve a specific dead-letter dispatch intent: the sanctioned
+    /// operator remediation for the incident a nonzero
+    /// `dead_letter_dispatch_intents` count flags in health. See
+    /// [`resolve_dead_letter_dispatch_intent_tx`] for the fail-closed
+    /// state check and the auditable append-only note.
+    pub fn resolve_dead_letter_dispatch_intent(
+        &self,
+        request_id: &str,
+        tenant_id: Option<&str>,
+        note: &str,
+    ) -> Result<(), ReceiptStoreError> {
+        let request_id = request_id.to_string();
+        let tenant_id = tenant_id.map(str::to_string);
+        let note = note.to_string();
+        self.writer_handle().run_write(move |connection| {
+            let tx =
+                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            resolve_dead_letter_dispatch_intent_tx(&tx, &request_id, tenant_id.as_deref(), &note)?;
+            tx.commit()?;
+            Ok(())
+        })
+    }
+
     /// Whether the commit writer can no longer be trusted to persist receipts, so
     /// the kernel pre-dispatch gate must deny before a tool executes. True when the
     /// supervised writer thread has left the healthy state, and also when the

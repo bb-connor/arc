@@ -466,6 +466,15 @@ impl ReceiptStore for SqliteReceiptStore {
         SqliteReceiptStore::dead_letter_dispatch_intent_count(self)
     }
 
+    fn resolve_dead_letter_dispatch_intent(
+        &self,
+        request_id: &str,
+        tenant_id: Option<&str>,
+        note: &str,
+    ) -> Result<(), ReceiptStoreError> {
+        SqliteReceiptStore::resolve_dead_letter_dispatch_intent(self, request_id, tenant_id, note)
+    }
+
     fn receipts_canonical_bytes_range(
         &self,
         start_seq: u64,
