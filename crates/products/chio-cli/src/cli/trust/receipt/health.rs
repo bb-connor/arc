@@ -22,10 +22,14 @@ pub(crate) fn receipt_health_report_error(report: &chio_kernel::ReceiptStoreHeal
     )
 }
 
-pub(crate) fn local_receipt_store(
-    backend: &QueryBackend<'_>,
+/// Resolve and validate `--receipt-db` without opening the store: rejects a
+/// remote control backend, a missing flag, and a nonexistent path. Shared by
+/// `local_receipt_store` and the read-only health sampler, which must not
+/// open a read-write store just to validate the path.
+pub(crate) fn local_receipt_db_path<'a>(
+    backend: &QueryBackend<'a>,
     command_name: &str,
-) -> Result<chio_store_sqlite::SqliteReceiptStore, CliError> {
+) -> Result<&'a Path, CliError> {
     if backend.control_url.is_some() {
         return Err(CliError::cli_other_error(format!(
             "{command_name} requires local --receipt-db; remote receipt operator operations are not supported in this release"
@@ -40,6 +44,14 @@ pub(crate) fn local_receipt_store(
             path.display()
         )));
     }
+    Ok(path)
+}
+
+pub(crate) fn local_receipt_store(
+    backend: &QueryBackend<'_>,
+    command_name: &str,
+) -> Result<chio_store_sqlite::SqliteReceiptStore, CliError> {
+    let path = local_receipt_db_path(backend, command_name)?;
     chio_store_sqlite::SqliteReceiptStore::open_existing(path).map_err(CliError::from)
 }
 
@@ -57,9 +69,16 @@ pub(crate) fn load_existing_kernel_checkpoint_keypair(path: &Path) -> Result<chi
     chio_core::Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
 }
 
+/// Reads health through the store's read-only sampler rather than
+/// `local_receipt_store` / `open_existing`: `open_existing` acquires a writer
+/// lifetime lock, registers a live-writer mark, and (on a pre-journal
+/// database) runs the additive migration DDL, none of which a health read
+/// should do. The sampler cannot see a live serving kernel's in-memory writer
+/// counters either way (this CLI process never shares that memory), so
+/// switching loses no real observability and works against a read-only mount.
 pub(crate) fn cmd_receipt_health(backend: QueryBackend<'_>) -> Result<(), CliError> {
-    let store = local_receipt_store(&backend, "receipt health")?;
-    let report = store.receipt_store_health()?;
+    let path = local_receipt_db_path(&backend, "receipt health")?;
+    let report = chio_store_sqlite::SqliteReceiptStore::receipt_store_health_read_only(path)?;
     if backend.json_output {
         print_receipt_operator_json(CHIO_CLI_RECEIPT_HEALTH_SCHEMA, &report)?;
     } else {
