@@ -361,23 +361,8 @@ impl BudgetStore for SqliteBudgetStore {
              ORDER BY created_at ASC",
         )?;
         let cutoff = older_than_unix_ms.min(i64::MAX as u64) as i64;
-        type JournalRow = (
-            String,
-            String,
-            i64,
-            Option<String>,
-            String,
-            Option<String>,
-            Option<String>,
-            i64,
-            Option<String>,
-            Option<i64>,
-            String,
-            String,
-            i64,
-        );
         let rows = statement.query_map(params![cutoff], |row| {
-            Ok::<JournalRow, rusqlite::Error>((
+            Ok::<PaymentJournalRow, rusqlite::Error>((
                 row.get(0)?,
                 row.get(1)?,
                 row.get(2)?,
@@ -395,41 +380,44 @@ impl BudgetStore for SqliteBudgetStore {
         })?;
         let mut out = Vec::new();
         for row in rows {
-            let (
-                request_id,
-                capability_id,
-                grant_index,
-                hold_id,
-                rail,
-                authorization_id,
-                transaction_id,
-                amount_units,
-                settle_action,
-                settle_amount_units,
-                currency,
-                state,
-                created_at,
-            ) = row?;
-            out.push(chio_kernel::payment::PaymentJournalRecord {
-                request_id,
-                capability_id,
-                grant_index: grant_index.clamp(0, i64::from(u32::MAX)) as u32,
-                hold_id,
-                rail,
-                authorization_id,
-                transaction_id,
-                amount_units: amount_units.max(0) as u64,
-                settle_action: settle_action
-                    .as_deref()
-                    .map(parse_settle_action)
-                    .transpose()?,
-                settle_amount_units: settle_amount_units.map(|units| units.max(0) as u64),
-                currency,
-                state: parse_journal_state(&state)?,
-                created_at_unix_ms: created_at.max(0) as u64,
-            });
+            out.push(payment_journal_row_to_record(row?)?);
         }
         Ok(out)
+    }
+
+    fn get_payment_journal(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<chio_kernel::payment::PaymentJournalRecord>, BudgetStoreError> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            "SELECT request_id, capability_id, grant_index, hold_id, rail, authorization_id, \
+                    transaction_id, amount_units, settle_action, settle_amount_units, currency, \
+                    state, created_at \
+             FROM payment_journal \
+             WHERE request_id = ?1 AND state NOT IN ('closed', 'reconcile_failed')",
+        )?;
+        let mut rows = statement.query_map(params![request_id], |row| {
+            Ok::<PaymentJournalRow, rusqlite::Error>((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+                row.get(5)?,
+                row.get(6)?,
+                row.get(7)?,
+                row.get(8)?,
+                row.get(9)?,
+                row.get(10)?,
+                row.get(11)?,
+                row.get(12)?,
+            ))
+        })?;
+        let Some(row) = rows.next() else {
+            return Ok(None);
+        };
+        Ok(Some(payment_journal_row_to_record(row?)?))
     }
 
     fn reverse_charge_cost(
@@ -1576,6 +1564,63 @@ fn parse_settle_action(
             "unknown payment settle action `{other}`"
         ))),
     }
+}
+
+/// Column shape shared by every `payment_journal` point and range query,
+/// in the fixed order every `SELECT` below projects.
+type PaymentJournalRow = (
+    String,
+    String,
+    i64,
+    Option<String>,
+    String,
+    Option<String>,
+    Option<String>,
+    i64,
+    Option<String>,
+    Option<i64>,
+    String,
+    String,
+    i64,
+);
+
+/// Decode one `payment_journal` row into the kernel-owned record type.
+fn payment_journal_row_to_record(
+    row: PaymentJournalRow,
+) -> Result<chio_kernel::payment::PaymentJournalRecord, BudgetStoreError> {
+    let (
+        request_id,
+        capability_id,
+        grant_index,
+        hold_id,
+        rail,
+        authorization_id,
+        transaction_id,
+        amount_units,
+        settle_action,
+        settle_amount_units,
+        currency,
+        state,
+        created_at,
+    ) = row;
+    Ok(chio_kernel::payment::PaymentJournalRecord {
+        request_id,
+        capability_id,
+        grant_index: grant_index.clamp(0, i64::from(u32::MAX)) as u32,
+        hold_id,
+        rail,
+        authorization_id,
+        transaction_id,
+        amount_units: amount_units.max(0) as u64,
+        settle_action: settle_action
+            .as_deref()
+            .map(parse_settle_action)
+            .transpose()?,
+        settle_amount_units: settle_amount_units.map(|units| units.max(0) as u64),
+        currency,
+        state: parse_journal_state(&state)?,
+        created_at_unix_ms: created_at.max(0) as u64,
+    })
 }
 
 fn journal_now_unix_ms() -> i64 {

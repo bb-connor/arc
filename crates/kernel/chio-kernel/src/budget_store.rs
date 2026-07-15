@@ -598,6 +598,23 @@ pub trait BudgetStore: Send + Sync {
         Ok(Vec::new())
     }
 
+    /// Look up one incomplete payment-journal row by request id. Scoped
+    /// identically to [`Self::list_incomplete_payment_journal`]: a closed,
+    /// reconcile-failed, or absent row returns `Ok(None)`, never a stale
+    /// terminal record. Default: a linear scan over
+    /// `list_incomplete_payment_journal`, correct for any store but O(n) in
+    /// the number of open rows; a store expecting many concurrent monetary
+    /// orphans should override this with a keyed lookup.
+    fn get_payment_journal(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<crate::payment::PaymentJournalRecord>, BudgetStoreError> {
+        Ok(self
+            .list_incomplete_payment_journal(u64::MAX)?
+            .into_iter()
+            .find(|row| row.request_id == request_id))
+    }
+
     fn authorize_budget_hold(
         &self,
         request: BudgetAuthorizeHoldRequest,

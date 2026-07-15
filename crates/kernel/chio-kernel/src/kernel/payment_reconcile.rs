@@ -388,12 +388,10 @@ impl DispatchIntentReconciler for MonetaryDispatchIntentReconciler<'_> {
             .kernel
             .with_budget_store(|store| {
                 store
-                    .list_incomplete_payment_journal(u64::MAX)
+                    .get_payment_journal(&intent.request_id)
                     .map_err(KernelError::from)
             })
-            .map_err(|error| ReceiptStoreError::Pool(error.to_string()))?
-            .into_iter()
-            .find(|row| row.request_id == intent.request_id);
+            .map_err(|error| ReceiptStoreError::Pool(error.to_string()))?;
         let Some(record) = row else {
             // No incomplete journal row: the money path already terminated
             // (closed against a receipt, or an incident already stands).

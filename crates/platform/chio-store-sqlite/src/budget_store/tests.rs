@@ -2789,6 +2789,56 @@ fn payment_journal_insert_advance_close_and_conflict() {
 }
 
 #[test]
+fn get_payment_journal_is_scoped_identically_to_the_incomplete_listing() {
+    use chio_kernel::budget_store::BudgetStore;
+    use chio_kernel::payment::{PaymentJournalRecord, PaymentJournalState};
+
+    let path = unique_db_path("payment-journal-keyed-lookup");
+    let store = SqliteBudgetStore::open(&path).expect("open budget store");
+
+    // Absent request id: no row, no error.
+    assert!(store
+        .get_payment_journal("req-missing")
+        .expect("lookup an absent row")
+        .is_none());
+
+    let record = PaymentJournalRecord {
+        request_id: "req-K".to_string(),
+        capability_id: "cap".to_string(),
+        grant_index: 0,
+        hold_id: Some("hold-1".to_string()),
+        rail: "x402".to_string(),
+        authorization_id: Some("auth-K".to_string()),
+        transaction_id: None,
+        amount_units: 100,
+        settle_action: None,
+        settle_amount_units: None,
+        currency: "USD".to_string(),
+        state: PaymentJournalState::HoldPlaced,
+        created_at_unix_ms: 1_000,
+    };
+    store.record_payment_journal(&record).expect("insert");
+
+    // A one-row keyed lookup finds exactly the record just inserted.
+    let found = store
+        .get_payment_journal("req-K")
+        .expect("lookup a present row")
+        .expect("row present");
+    assert_eq!(found, record);
+
+    // Closed: the keyed lookup returns None, matching
+    // list_incomplete_payment_journal's scope so a monetary reconciler
+    // never mistakes a terminal row for an open one.
+    assert!(store.close_payment_journal("req-K").expect("close"));
+    assert!(store
+        .get_payment_journal("req-K")
+        .expect("lookup a closed row")
+        .is_none());
+
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
 fn authorize_budget_hold_writes_journal_atomically() {
     use chio_kernel::budget_store::{BudgetAuthorizeHoldRequest, BudgetStore};
     use chio_kernel::payment::{PaymentJournalRecord, PaymentJournalState};
