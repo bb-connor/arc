@@ -45,11 +45,11 @@ flowchart TD
     upstream["Upstream API"]
 
     client -->|"data plane"| proxy
-    client -->|"control routes"| auth
-    auth --> evaluate
+    client -->|"unauthenticated"| evaluate
+    client -->|"unauthenticated"| verifyrec
+    client -->|"bearer or loopback"| auth
     auth --> mint
     auth --> validate
-    auth --> verifyrec
     auth --> approvals
 
     proxy -->|"revocation preflight"| revocation
