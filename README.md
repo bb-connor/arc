@@ -180,11 +180,8 @@ claude plugin marketplace add backbay-labs/chio-claude-code-plugin
 claude plugin install chio@chio
 ```
 
-**Hermes** ([chio-hermes](docs/integrations/HERMES.md)) installs from PyPI:
-
-```sh
-pip install chio-hermes
-```
+**Hermes** ([chio-hermes](docs/integrations/HERMES.md)) is not yet published to PyPI;
+until it ships, follow the source install in the integration guide.
 
 Enable the plugin and select its toolset in `~/.hermes/config.yaml` (the `toolsets` entry is
 required, otherwise the `chio_*` tools never surface):

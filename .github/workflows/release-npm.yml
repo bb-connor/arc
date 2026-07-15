@@ -71,6 +71,7 @@ jobs:
             "sdks/typescript/packages/node-http"
             "sdks/typescript/packages/wasm-core"
             "sdks/typescript/packages/browser"
+            "sdks/typescript/packages/wasm-core"
             "sdks/typescript/packages/workers"
             "sdks/typescript/packages/edge"
             "sdks/typescript/packages/deno"
