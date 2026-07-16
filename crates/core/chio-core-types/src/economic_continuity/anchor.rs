@@ -691,11 +691,34 @@ fn verify_transition_authorization(
 pub trait EconomicAdmissionHandoffVerifier: Send + Sync {
     fn verify_operation_active(&self, operation_id: &str) -> Result<(), EconomicStateAnchorError>;
 
+    fn verify_prepared_effect(
+        &self,
+        _slot: &EconomicEffectSlotV1,
+    ) -> Result<(), EconomicStateAnchorError> {
+        Err(EconomicStateAnchorError::AdmissionHandoffRejected)
+    }
+
     fn verify_handoff(
         &self,
         operation_id: &str,
         handoff: &EconomicAdmissionHandoffV1,
     ) -> Result<(), EconomicStateAnchorError>;
+}
+
+pub fn verify_economic_admission_batch(
+    advance: &VerifiedEconomicStateBatchAdvance,
+    admission: &dyn EconomicAdmissionHandoffVerifier,
+) -> Result<(), EconomicStateAnchorError> {
+    if advance.batch.effect_slots.is_empty() {
+        if let Some(operation_id) = advance.batch.operation_id.as_deref() {
+            admission.verify_operation_active(operation_id)?;
+        }
+    } else {
+        for slot in &advance.batch.effect_slots {
+            admission.verify_prepared_effect(slot)?;
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug)]

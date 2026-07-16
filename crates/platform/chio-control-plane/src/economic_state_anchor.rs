@@ -6,9 +6,9 @@ use std::time::Duration;
 use chio_core::economic_continuity::{
     assess_economic_state_readiness, reverify_economic_effect_cancellation_advance,
     reverify_economic_effect_dispatch_advance, reverify_economic_state_batch_advance,
-    verify_economic_effect_cancellation_commit, verify_economic_effect_dispatch_commit,
-    verify_economic_state_batch_commit, verify_economic_state_view,
-    EconomicAdmissionHandoffVerifier, EconomicCheckpointReadQuery,
+    verify_economic_admission_batch, verify_economic_effect_cancellation_commit,
+    verify_economic_effect_dispatch_commit, verify_economic_state_batch_commit,
+    verify_economic_state_view, EconomicAdmissionHandoffVerifier, EconomicCheckpointReadQuery,
     EconomicEffectCancellationProofVerifier, EconomicEffectDispatchCommitV1, EconomicStateAnchor,
     EconomicStateAnchorError, EconomicStateAnchorPins, EconomicStateAnchorViewV1,
     EconomicStateReadQuery, EconomicStateReadiness, EconomicStateReadinessExpectation,
@@ -310,10 +310,7 @@ impl EconomicStateAnchor for RemoteEconomicStateAnchor {
             &self.pins,
             self.transition_verifier.as_ref(),
         )?;
-        if let Some(operation_id) = advance.batch().operation_id.as_deref() {
-            self.admission_verifier
-                .verify_operation_active(operation_id)?;
-        }
+        verify_economic_admission_batch(advance, self.admission_verifier.as_ref())?;
         let committed = verify_economic_state_view(
             self.post(ECONOMIC_STATE_CAS_PATH, advance.batch())?,
             &self.pins,
@@ -565,6 +562,13 @@ mod tests {
             Ok(())
         }
 
+        fn verify_prepared_effect(
+            &self,
+            _slot: &EconomicEffectSlotV1,
+        ) -> Result<(), EconomicStateAnchorError> {
+            Ok(())
+        }
+
         fn verify_handoff(
             &self,
             _operation_id: &str,
@@ -623,6 +627,14 @@ mod tests {
         fn verify_operation_active(
             &self,
             _operation_id: &str,
+        ) -> Result<(), EconomicStateAnchorError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+
+        fn verify_prepared_effect(
+            &self,
+            _slot: &EconomicEffectSlotV1,
         ) -> Result<(), EconomicStateAnchorError> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             Ok(())

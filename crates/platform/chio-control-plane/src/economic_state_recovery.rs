@@ -606,6 +606,54 @@ impl EconomicAdmissionHandoffVerifier for QualifiedEconomicAdmissionHandoffVerif
         Ok(())
     }
 
+    fn verify_prepared_effect(
+        &self,
+        slot: &EconomicEffectSlotV1,
+    ) -> Result<(), EconomicStateAnchorError> {
+        slot.validate()?;
+        if slot.admission_handoff.store_fence != self.active_fence {
+            return Err(EconomicStateAnchorError::AdmissionHandoffRejected);
+        }
+        let operation_id = AdmissionOperationId::from_persisted(slot.operation_id.clone())
+            .map_err(|_| EconomicStateAnchorError::AdmissionHandoffRejected)?;
+        let operation = self
+            .operations
+            .load_by_operation_id(&operation_id)
+            .map_err(|_| EconomicStateAnchorError::AdmissionHandoffRejected)?
+            .ok_or(EconomicStateAnchorError::AdmissionHandoffRejected)?;
+        let (handoff_state, remaining_versions) = match operation.binding().kind() {
+            AdmissionOperationKind::ToolDispatch => (
+                EconomicAdmissionHandoffStateV1::DispatchCommitted,
+                5 + u64::from(operation.binding().participant_requirements().approval),
+            ),
+            AdmissionOperationKind::GovernedActiveResponse => {
+                (EconomicAdmissionHandoffStateV1::DispatchCommitted, 3)
+            }
+            AdmissionOperationKind::GovernedEconomicMutation => {
+                (EconomicAdmissionHandoffStateV1::MutationSubmitted, 2)
+            }
+        };
+        let expected_handoff_version = operation
+            .version()
+            .checked_add(remaining_versions)
+            .ok_or(EconomicStateAnchorError::AdmissionHandoffRejected)?;
+        let binding = operation.binding();
+        if operation.state() != AdmissionOperationState::Prepared
+            || operation.version() != 1
+            || slot.operation_id != binding.operation_id().as_str()
+            || slot.request.request_namespace_digest != binding.request_namespace_digest().as_str()
+            || slot.request.request_id != binding.request_id().as_str()
+            || slot.request.request_binding_digest != binding.request_binding_hash().as_str()
+            || slot.parameters_digest != binding.action_parameter_hash().as_str()
+            || slot.admission_handoff.state != handoff_state
+            || slot.admission_handoff.operation_version != expected_handoff_version
+            || slot.admission_handoff.lifecycle_fence != operation.coordinator_lease_epoch()
+        {
+            return Err(EconomicStateAnchorError::AdmissionHandoffRejected);
+        }
+        Ok(())
+    }
+
     fn verify_handoff(
         &self,
         operation_id: &str,
@@ -972,6 +1020,50 @@ mod tests {
         })
         .expect("operation binding");
         AdmissionOperationV1::prepare(binding, fence.owner_epoch).expect("prepared operation")
+    }
+
+    fn prepared_effect_slot(
+        operation: &AdmissionOperationV1,
+        fence: &StoreMutationFence,
+        handoff_state: EconomicAdmissionHandoffStateV1,
+        handoff_version: u64,
+    ) -> TestResult<EconomicEffectSlotV1> {
+        let binding = operation.binding();
+        let mut slot = EconomicEffectSlotV1 {
+            schema: CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA.to_owned(),
+            slot_id: String::new(),
+            anchor_id: "anchor-1".to_owned(),
+            namespace: "economy-prod".to_owned(),
+            resource_key: key(),
+            operation_id: binding.operation_id().as_str().to_owned(),
+            effect_kind: "settlement_dispatch".to_owned(),
+            request: EconomicRequestBindingV1 {
+                request_namespace_digest: binding.request_namespace_digest().as_str().to_owned(),
+                request_id: binding.request_id().as_str().to_owned(),
+                request_binding_digest: binding.request_binding_hash().as_str().to_owned(),
+            },
+            admission_handoff: EconomicAdmissionHandoffV1 {
+                state: handoff_state,
+                operation_version: handoff_version,
+                lifecycle_fence: operation.coordinator_lease_epoch(),
+                store_fence: fence.clone(),
+            },
+            target: EconomicEffectTargetV1 {
+                target_id: "settlement-rail".to_owned(),
+                target_key_epoch: 1,
+                qualification_digest: digest("target-qualification"),
+            },
+            action_digest: digest("effect-action"),
+            parameters_digest: binding.action_parameter_hash().as_str().to_owned(),
+            resource_head_digest: digest("resource-head"),
+            frost: None,
+            idempotency_key: digest("idempotency-key"),
+            state: EconomicEffectStateV1::Ready,
+            terminal: None,
+        };
+        slot.slot_id = slot.recompute_slot_id()?;
+        slot.validate()?;
+        Ok(slot)
     }
 
     fn advance_operation(
@@ -1526,6 +1618,60 @@ mod tests {
         assert!(verifier
             .verify_handoff(operation.binding().operation_id().as_str(), &wrong_lease)
             .is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_effect_verifier_binds_operation_request_handoff_and_fences() -> TestResult {
+        let fixture = fixture();
+        let operations = fixture._authority.admission_operation_store();
+        let mut mutation = prepared_economic_operation(&fixture.fence, "prepared-mutation");
+        let dispatch = prepared_dispatch_operation(&fixture.fence, "prepared-dispatch");
+        let now = now_ms();
+        operations.begin(&mutation, &fixture.fence, now)?;
+        operations.begin(&dispatch, &fixture.fence, now + 1)?;
+        let verifier = QualifiedEconomicAdmissionHandoffVerifier::new(
+            fixture.operations.clone(),
+            fixture.fence.clone(),
+        );
+        let mutation_slot = prepared_effect_slot(
+            &mutation,
+            &fixture.fence,
+            EconomicAdmissionHandoffStateV1::MutationSubmitted,
+            3,
+        )?;
+        verifier.verify_prepared_effect(&mutation_slot)?;
+        let dispatch_slot = prepared_effect_slot(
+            &dispatch,
+            &fixture.fence,
+            EconomicAdmissionHandoffStateV1::DispatchCommitted,
+            6,
+        )?;
+        verifier.verify_prepared_effect(&dispatch_slot)?;
+
+        let mut wrong_request = mutation_slot.clone();
+        wrong_request.request.request_binding_digest = digest("different-request");
+        assert!(verifier.verify_prepared_effect(&wrong_request).is_err());
+        let mut wrong_parameters = mutation_slot.clone();
+        wrong_parameters.parameters_digest = digest("different-parameters");
+        assert!(verifier.verify_prepared_effect(&wrong_parameters).is_err());
+        let mut wrong_version = mutation_slot.clone();
+        wrong_version.admission_handoff.operation_version += 1;
+        assert!(verifier.verify_prepared_effect(&wrong_version).is_err());
+        let mut wrong_fence = mutation_slot.clone();
+        wrong_fence.admission_handoff.lifecycle_fence += 1;
+        assert!(verifier.verify_prepared_effect(&wrong_fence).is_err());
+
+        mutation = advance_operation(
+            &operations,
+            &mutation,
+            &identifier("claimant_id", "prepared-effect-owner"),
+            &fixture.fence,
+            AdmissionOperationState::MutationReady,
+            now + 2,
+        )?;
+        assert_eq!(mutation.state(), AdmissionOperationState::MutationReady);
+        assert!(verifier.verify_prepared_effect(&mutation_slot).is_err());
         Ok(())
     }
 

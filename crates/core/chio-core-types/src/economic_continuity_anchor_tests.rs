@@ -6,7 +6,7 @@ use serde_json::json;
 use crate::economic_continuity::*;
 use crate::economic_continuity_tests::{
     digest, head, inline_content, ready_effect_slot, resource_key, schema_validator, transition,
-    unsigned_batch,
+    unsigned_batch, unsigned_prepared_effect_batch,
 };
 use crate::Keypair;
 
@@ -411,6 +411,18 @@ impl EconomicAdmissionHandoffVerifier for MatchingAdmissionHandoff {
         }
     }
 
+    fn verify_prepared_effect(
+        &self,
+        slot: &EconomicEffectSlotV1,
+    ) -> Result<(), EconomicStateAnchorError> {
+        if slot.operation_id == digest("operation-1") && slot.state == EconomicEffectStateV1::Ready
+        {
+            Ok(())
+        } else {
+            Err(EconomicStateAnchorError::AdmissionHandoffRejected)
+        }
+    }
+
     fn verify_handoff(
         &self,
         operation_id: &str,
@@ -426,6 +438,37 @@ impl EconomicAdmissionHandoffVerifier for MatchingAdmissionHandoff {
             Err(EconomicStateAnchorError::AdmissionHandoffRejected)
         }
     }
+}
+
+#[test]
+fn prepared_effect_batches_require_explicit_admission_verification(
+) -> Result<(), Box<dyn core::error::Error>> {
+    let (mut batch, slot) = unsigned_prepared_effect_batch()?;
+    let absent_resource_keys = batch
+        .transitions
+        .iter()
+        .map(|transition| transition.resource_key.clone())
+        .collect::<Vec<_>>();
+    let current = verify_economic_state_view(
+        signed_view(
+            1,
+            digest("checkpoint-1"),
+            Vec::new(),
+            absent_resource_keys,
+            Vec::new(),
+            vec![slot.request.key()],
+        )?,
+        &pins(),
+    )?;
+    batch.checkpoint_sequence = 2;
+    batch.previous_checkpoint_digest = Some(current.view().checkpoint_digest.clone());
+    batch.seal(&anchor_keypair())?;
+    let advance =
+        verify_economic_state_batch_advance(&current, batch, &pins(), &DirectTransitionVerifier)?;
+
+    verify_economic_admission_batch(&advance, &MatchingAdmissionHandoff)?;
+    assert!(verify_economic_admission_batch(&advance, &RejectingAdmissionHandoff).is_err());
+    Ok(())
 }
 
 fn dispatch_advance() -> Result<

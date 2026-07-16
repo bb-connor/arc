@@ -294,49 +294,7 @@ fn permanent_request_replay_mapping_rejects_conflicting_truth(
 #[test]
 fn batch_binds_prepared_effect_slot_and_request_replay() -> Result<(), Box<dyn core::error::Error>>
 {
-    let slot = ready_effect_slot()?;
-    let operation_id = slot.operation_id.clone();
-    let idempotency_key = slot.idempotency_key.clone();
-    let slot_content = inline_content(serde_json::to_value(&slot)?);
-    let slot_key = slot.resource_head_key();
-    let slot_head = EconomicResourceHeadV1 {
-        schema: CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA.to_string(),
-        anchor_id: slot.anchor_id.clone(),
-        namespace: slot.namespace.clone(),
-        resource_key: slot_key,
-        head_version: 1,
-        resource_version: 1,
-        lifecycle_fence: 1,
-        lifecycle_state: "ready".to_string(),
-        state_digest: slot_content.digest()?,
-        state: slot_content,
-        operation_id: Some(operation_id.clone()),
-        effect_idempotency_key: Some(idempotency_key),
-        frost: None,
-        terminal_result: None,
-        trusted_clock_high_water: 110,
-        predecessor_digest: None,
-    };
-    let mut resource_head = head(resource_key("round-1"), 1, 1, None)?;
-    resource_head.operation_id = Some(operation_id.clone());
-    resource_head.effect_idempotency_key = Some(slot.idempotency_key.clone());
-    let prepared = EconomicPreparedEffectV1 {
-        operation_id: operation_id.clone(),
-        action_digest: slot.action_digest.clone(),
-        effect_slot_id: slot.slot_id.clone(),
-        effect_slot_digest: slot.digest()?,
-        authorization: EconomicActionAuthorizationV1::Direct,
-    };
-    let mut resource_transition = transition(resource_head, None);
-    resource_transition.prepared_effect = Some(prepared);
-    let mut batch = unsigned_batch(vec![resource_transition, transition(slot_head, None)]);
-    batch.operation_id = Some(operation_id.clone());
-    batch.effect_slots = vec![slot.clone()];
-    batch.request_replays = vec![EconomicRequestReplayV1 {
-        request: slot.request.clone(),
-        operation_id,
-        effect_slot_ids: vec![slot.slot_id.clone()],
-    }];
+    let (mut batch, slot) = unsigned_prepared_effect_batch()?;
     let keypair = Keypair::from_seed(&[9; 32]);
     batch.seal(&keypair)?;
     batch.verify_signature(&keypair.public_key())?;
@@ -404,6 +362,54 @@ fn batch_binds_prepared_effect_slot_and_request_replay() -> Result<(), Box<dyn c
     conflicting.request_replays[0].request.request_id = "request-2".to_string();
     assert!(conflicting.seal(&keypair).is_err());
     Ok(())
+}
+
+pub(crate) fn unsigned_prepared_effect_batch(
+) -> Result<(EconomicStateBatchV1, EconomicEffectSlotV1), Box<dyn core::error::Error>> {
+    let slot = ready_effect_slot()?;
+    let operation_id = slot.operation_id.clone();
+    let idempotency_key = slot.idempotency_key.clone();
+    let slot_content = inline_content(serde_json::to_value(&slot)?);
+    let slot_key = slot.resource_head_key();
+    let slot_head = EconomicResourceHeadV1 {
+        schema: CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA.to_string(),
+        anchor_id: slot.anchor_id.clone(),
+        namespace: slot.namespace.clone(),
+        resource_key: slot_key,
+        head_version: 1,
+        resource_version: 1,
+        lifecycle_fence: 1,
+        lifecycle_state: "ready".to_string(),
+        state_digest: slot_content.digest()?,
+        state: slot_content,
+        operation_id: Some(operation_id.clone()),
+        effect_idempotency_key: Some(idempotency_key),
+        frost: None,
+        terminal_result: None,
+        trusted_clock_high_water: 110,
+        predecessor_digest: None,
+    };
+    let mut resource_head = head(resource_key("round-1"), 1, 1, None)?;
+    resource_head.operation_id = Some(operation_id.clone());
+    resource_head.effect_idempotency_key = Some(slot.idempotency_key.clone());
+    let prepared = EconomicPreparedEffectV1 {
+        operation_id: operation_id.clone(),
+        action_digest: slot.action_digest.clone(),
+        effect_slot_id: slot.slot_id.clone(),
+        effect_slot_digest: slot.digest()?,
+        authorization: EconomicActionAuthorizationV1::Direct,
+    };
+    let mut resource_transition = transition(resource_head, None);
+    resource_transition.prepared_effect = Some(prepared);
+    let mut batch = unsigned_batch(vec![resource_transition, transition(slot_head, None)]);
+    batch.operation_id = Some(operation_id.clone());
+    batch.effect_slots = vec![slot.clone()];
+    batch.request_replays = vec![EconomicRequestReplayV1 {
+        request: slot.request.clone(),
+        operation_id,
+        effect_slot_ids: vec![slot.slot_id.clone()],
+    }];
+    Ok((batch, slot))
 }
 
 #[test]
