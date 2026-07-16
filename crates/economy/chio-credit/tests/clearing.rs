@@ -330,7 +330,7 @@ fn balanced_cycle_emits_no_settlement_intent() -> TestResult {
 fn aggregate_that_cannot_fit_the_wire_amount_rejects() -> TestResult {
     let participant_authority = Keypair::from_seed(&[9; 32]);
     let obligation_authority = Keypair::from_seed(&[14; 32]);
-    let obligations = (1..=2_051)
+    let obligations = (1..=2)
         .map(|sequence| reserved_obligation(sequence, "A", "B", "USD", (1_u64 << 53) - 1))
         .collect::<Result<Vec<_>, _>>()?;
     let request = signed_request(obligations, &participant_authority, &obligation_authority)?;

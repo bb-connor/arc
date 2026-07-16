@@ -8,10 +8,12 @@ use crate::obligation::{
 };
 
 mod engine;
+mod lifecycle;
 
 pub use engine::{
     compute_netting_round, sign_netting_round, verify_netting_round, verify_signed_netting_round,
 };
+pub use lifecycle::*;
 
 pub const CLEARING_ALGORITHM_V1: &str = "balance_match.v1";
 pub const CLEARING_PARTICIPANT_SNAPSHOT_SCHEMA: &str = "chio.clearing.participant-snapshot.v1";
@@ -24,7 +26,8 @@ pub const CLEARING_SETTLEMENT_INTENT_SCHEMA: &str = "chio.clearing.settlement-in
 pub const CLEARING_TRANSFORMATION_SCHEMA: &str = "chio.clearing.atom-transformation.v1";
 pub const CLEARING_OUTPUT_MANIFEST_SCHEMA: &str = "chio.clearing.output-manifest.v1";
 
-pub(super) const MAX_CLEARING_INPUTS: usize = 4_096;
+pub(super) const MAX_CLEARING_INPUTS: usize =
+    chio_core_types::economic_continuity::MAX_ECONOMIC_TRANSITIONS - 1;
 pub(super) const MAX_CLEARING_PARTICIPANTS: usize = 1_024;
 pub(super) const MAX_CLEARING_IDENTITIES_PER_PARTICIPANT: usize = 64;
 pub(super) const MAX_TEXT_BYTES: usize = 2_048;
@@ -90,6 +93,10 @@ pub enum ClearingError {
     ParticipantIdentity(String),
     #[error("clearing arithmetic overflow")]
     ArithmeticOverflow,
+    #[error("illegal clearing lifecycle transition")]
+    IllegalLifecycleTransition,
+    #[error("clearing lifecycle projection is incomplete")]
+    IncompleteLifecycleProjection,
     #[error("clearing obligation invalid: {0}")]
     Obligation(#[from] ObligationError),
     #[error("clearing canonicalization failed: {0}")]
@@ -434,7 +441,12 @@ pub(super) fn validate_currency(value: &str) -> Result<(), ClearingError> {
 }
 
 pub(super) fn checked_u64(value: u128) -> Result<u64, ClearingError> {
-    u64::try_from(value).map_err(|_| ClearingError::ArithmeticOverflow)
+    let value = u64::try_from(value).map_err(|_| ClearingError::ArithmeticOverflow)?;
+    if value > I_JSON_MAX_SAFE_INTEGER {
+        Err(ClearingError::ArithmeticOverflow)
+    } else {
+        Ok(value)
+    }
 }
 
 pub(super) fn checked_count(value: usize) -> Result<u64, ClearingError> {

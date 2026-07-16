@@ -37,7 +37,7 @@
         "entries": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 4096,
+          "maxItems": 127,
           "items": { "$ref": "#/$defs/entry" }
         },
         "hasMore": { "const": false },

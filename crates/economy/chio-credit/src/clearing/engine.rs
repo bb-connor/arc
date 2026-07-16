@@ -38,14 +38,7 @@ pub fn compute_netting_round(
         domain_digest(SNAPSHOT_DIGEST_DOMAIN, &request.participant_snapshot.body)?;
     let input_manifest_digest =
         domain_digest(INPUT_MANIFEST_DIGEST_DOMAIN, &request.input_manifest.body)?;
-    let reservation_digests = request
-        .input_manifest
-        .body
-        .entries
-        .iter()
-        .map(|entry| entry.disposition_digest.clone())
-        .collect::<Vec<_>>();
-    let reservation_root = domain_digest(RESERVATION_ROOT_DOMAIN, &reservation_digests)?;
+    let reservation_root = clearing_reservation_root(&request.obligations)?;
     let core = NettingRoundCoreV1 {
         schema: CLEARING_ROUND_CORE_SCHEMA.to_owned(),
         round_id: request.round_id.clone(),
