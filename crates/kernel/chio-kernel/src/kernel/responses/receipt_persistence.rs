@@ -274,7 +274,10 @@ impl ChioKernel {
         }
         // The terminal receipt is durable: the money path's journal row (if
         // any) has served its purpose and closes. A crash before this close
-        // leaves a row boot reconciliation closes against this receipt.
+        // leaves a row boot reconciliation closes against this receipt. The
+        // close is state-aware: a row still in Settling belongs to a failed
+        // or unconfirmed rail call and survives for boot reconciliation to
+        // replay (see close_payment_journal_best_effort).
         if let Some(request_id) = request_id {
             self.close_payment_journal_best_effort(request_id);
         }

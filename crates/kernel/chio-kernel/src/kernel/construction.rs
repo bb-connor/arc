@@ -1065,9 +1065,46 @@ impl ChioKernel {
     /// the close leaves a Settled row that boot reconciliation closes
     /// against the attested receipt, so a close failure here is warned, not
     /// fatal.
+    ///
+    /// State-aware: a row still in `Settling` is never closed from here. On
+    /// the success path the settle advance to `Settled` precedes the
+    /// receipt, so a `Settling` row at receipt time means the rail call
+    /// failed or never confirmed AFTER its terminal action was durably
+    /// committed - money may have moved. The failure receipt records
+    /// `settlement_status: failed`, and the row must stay open so boot
+    /// reconciliation can replay the committed action (idempotent by the
+    /// adapter contract) instead of losing its only recovery handle.
     pub(crate) fn close_payment_journal_best_effort(&self, request_id: &str) {
         if !self.payment_journal_active() {
             return;
+        }
+        match self.with_budget_store(|store| {
+            store
+                .get_payment_journal(request_id)
+                .map_err(KernelError::from)
+        }) {
+            Ok(Some(row)) if row.state == crate::payment::PaymentJournalState::Settling => {
+                tracing::warn!(
+                    request_id = %request_id,
+                    rail = %row.rail,
+                    "payment journal row is still Settling at receipt commit; leaving it open \
+                     for boot reconciliation to replay the committed settle action"
+                );
+                return;
+            }
+            Ok(_) => {}
+            Err(error) => {
+                // Unknown state: never destroy a possible recovery handle.
+                // A stray open Settled row at the next boot re-emits an
+                // advisory reconciliation receipt, never a second charge.
+                tracing::warn!(
+                    request_id = %request_id,
+                    reason = %redacted!(&error.to_string()),
+                    "payment journal lookup failed at receipt commit; leaving the row for boot \
+                     reconciliation"
+                );
+                return;
+            }
         }
         let closed = self.with_budget_store(|store| {
             store

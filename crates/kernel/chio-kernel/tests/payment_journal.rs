@@ -42,6 +42,7 @@ mod support {
         pub releases: AtomicUsize,
         settlement_state_script:
             Mutex<HashMap<String, Result<chio_kernel::RailSettlementState, String>>>,
+        capture_error_script: Mutex<HashMap<String, String>>,
     }
 
     impl CountingRail {
@@ -50,7 +51,18 @@ mod support {
                 captures: AtomicUsize::new(0),
                 releases: AtomicUsize::new(0),
                 settlement_state_script: Mutex::new(HashMap::new()),
+                capture_error_script: Mutex::new(HashMap::new()),
             }
+        }
+
+        /// Script the next capture for `reference` to fail once, simulating
+        /// a transient rail failure after the settle intent was committed.
+        /// The scripted failure moves no money and does not count a capture.
+        pub fn script_capture_error_once(&self, reference: &str, detail: &str) {
+            self.capture_error_script
+                .lock()
+                .expect("script lock")
+                .insert(reference.to_string(), detail.to_string());
         }
 
         /// Script a specific `settlement_state` answer for one reference,
@@ -97,8 +109,16 @@ mod support {
             authorization_id: &str,
             _amount_units: u64,
             _currency: &str,
-            _reference: &str,
+            reference: &str,
         ) -> Result<chio_kernel::PaymentResult, chio_kernel::PaymentError> {
+            if let Some(detail) = self
+                .capture_error_script
+                .lock()
+                .expect("script lock")
+                .remove(reference)
+            {
+                return Err(chio_kernel::PaymentError::Unavailable(detail));
+            }
             self.captures
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             Ok(chio_kernel::PaymentResult {
@@ -443,6 +463,74 @@ fn priced_call_walks_journal_to_closed() -> Result<(), Box<dyn std::error::Error
             .load(std::sync::atomic::Ordering::SeqCst),
         1
     );
+
+    harness.cleanup();
+    Ok(())
+}
+
+#[test]
+fn failed_settle_leaves_the_journal_open_for_boot_reconciliation(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::payment::PaymentSettleAction;
+
+    let harness = support::money_journal_harness("chio-failed-settle", 75)?;
+    // The rail fails the capture once, transiently, AFTER the settle intent
+    // was durably committed (journal in Settling). The rail-side outcome is
+    // unknown: the HTTP request may have landed before the failure.
+    harness
+        .rail
+        .script_capture_error_once("req-F", "rail unreachable during capture");
+
+    let response = harness
+        .kernel
+        .evaluate_tool_call_blocking(&harness.request("req-F"))?;
+    assert!(matches!(response.verdict, Verdict::Allow));
+
+    // The failure receipt must NOT close the Settling row: it is boot
+    // reconciliation's only handle on the committed rail action.
+    let incomplete = harness
+        .budget_store
+        .list_incomplete_payment_journal(u64::MAX)?;
+    let row = incomplete
+        .iter()
+        .find(|row| row.request_id == "req-F")
+        .expect("the Settling row must survive the failure receipt");
+    assert_eq!(row.state, PaymentJournalState::Settling);
+    assert_eq!(row.settle_action, Some(PaymentSettleAction::Capture));
+    assert_eq!(row.settle_amount_units, Some(75));
+    assert_eq!(
+        harness
+            .rail
+            .captures
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "the failed capture moved no money"
+    );
+
+    // Boot reconciliation replays the committed capture exactly once and
+    // records the outcome with a reconciliation receipt.
+    let receipts_before = harness.receipt_store.max_tool_receipt_seq()?;
+    let report = harness.kernel.reconcile_payment_journal(0)?;
+    let receipts_after = harness.receipt_store.max_tool_receipt_seq()?;
+    assert_eq!(report.resolved, 1, "the Settling row replays: {report:?}");
+    assert_eq!(report.reconcile_failed, 0);
+    assert_eq!(
+        harness
+            .rail
+            .captures
+            .load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "the replay captures exactly once"
+    );
+    assert_eq!(
+        receipts_after - receipts_before,
+        1,
+        "the replayed capture is recorded with a reconciliation receipt"
+    );
+    assert!(harness
+        .budget_store
+        .list_incomplete_payment_journal(u64::MAX)?
+        .is_empty());
 
     harness.cleanup();
     Ok(())
