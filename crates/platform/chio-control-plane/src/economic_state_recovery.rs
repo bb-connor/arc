@@ -13,10 +13,12 @@ use chio_core::economic_continuity::{
     VerifiedEconomicTargetStatus,
 };
 use chio_kernel::admission_operation::{
-    AdmissionIdentifier, AdmissionOperationId, AdmissionOperationKind, AdmissionOperationState,
-    AdmissionOperationStoreError, QualifiedAdmissionOperationStore,
-    QualifiedAdmissionOperationStoreExt, StoreMutationFence,
+    verified_pre_dispatch_compensation_projection, AdmissionIdentifier, AdmissionMutationSequencer,
+    AdmissionOperationError, AdmissionOperationId, AdmissionOperationKind, AdmissionOperationState,
+    AdmissionOperationStoreError, AdmissionProjectionContext, AdmissionTerminal,
+    QualifiedAdmissionOperationStore, QualifiedAdmissionOperationStoreExt, StoreMutationFence,
 };
+use chio_kernel::{QualifiedAdmissionProjectionStore, ReceiptStoreError};
 use chio_store_sqlite::{
     EconomicOperationStageBinding, EconomicStateCacheError, EconomicStateStageRecord,
     EconomicStateStageStatus, SqliteEconomicStateCache,
@@ -33,6 +35,12 @@ pub enum EconomicStateRecoveryError {
     Anchor(#[from] EconomicStateAnchorError),
     #[error(transparent)]
     Admission(#[from] AdmissionOperationStoreError),
+    #[error(transparent)]
+    Projection(#[from] AdmissionOperationError),
+    #[error(transparent)]
+    Receipt(#[from] ReceiptStoreError),
+    #[error("economic pre-dispatch compensation was rejected: {0}")]
+    CompensationRejected(String),
     #[error("economic recovery configuration is invalid: {0}")]
     InvalidConfiguration(String),
 }
@@ -45,19 +53,43 @@ pub enum EconomicRecoveryOutcome {
     Pending(EconomicStateStageRecord),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EconomicPreDispatchCompensation {
+    terminal: AdmissionTerminal,
+    stage: EconomicStateStageRecord,
+}
+
+impl EconomicPreDispatchCompensation {
+    #[must_use]
+    pub const fn terminal(&self) -> &AdmissionTerminal {
+        &self.terminal
+    }
+
+    #[must_use]
+    pub const fn stage(&self) -> &EconomicStateStageRecord {
+        &self.stage
+    }
+}
+
 #[derive(Debug)]
 pub enum EconomicEffectRecoveryDecision {
     TargetStatus(VerifiedEconomicTargetStatus),
     IdempotentRetry(VerifiedEconomicIdempotentRecovery),
-    LockedUnknown(EconomicEffectRecoveryLock),
+    LockedUnknown(Box<EconomicEffectRecoveryLock>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EconomicEffectRecoveryLock {
+    current_slot: EconomicEffectSlotV1,
     next_slot: EconomicEffectSlotV1,
 }
 
 impl EconomicEffectRecoveryLock {
+    #[must_use]
+    pub fn current_slot(&self) -> &EconomicEffectSlotV1 {
+        &self.current_slot
+    }
+
     #[must_use]
     pub fn next_slot(&self) -> &EconomicEffectSlotV1 {
         &self.next_slot
@@ -81,19 +113,21 @@ pub fn qualify_committed_effect_recovery(
         return Ok(
             match verify_economic_target_status(slot, evidence_digest, verifier) {
                 Ok(status) => EconomicEffectRecoveryDecision::TargetStatus(status),
-                Err(_) => EconomicEffectRecoveryDecision::LockedUnknown(unknown_lock(slot)?),
+                Err(_) => {
+                    EconomicEffectRecoveryDecision::LockedUnknown(Box::new(unknown_lock(slot)?))
+                }
             },
         );
     }
     if let Some(verifier) = idempotent_target {
         return Ok(match verify_economic_idempotent_recovery(slot, verifier) {
             Ok(retry) => EconomicEffectRecoveryDecision::IdempotentRetry(retry),
-            Err(_) => EconomicEffectRecoveryDecision::LockedUnknown(unknown_lock(slot)?),
+            Err(_) => EconomicEffectRecoveryDecision::LockedUnknown(Box::new(unknown_lock(slot)?)),
         });
     }
-    Ok(EconomicEffectRecoveryDecision::LockedUnknown(unknown_lock(
-        slot,
-    )?))
+    Ok(EconomicEffectRecoveryDecision::LockedUnknown(Box::new(
+        unknown_lock(slot)?,
+    )))
 }
 
 fn unknown_lock(
@@ -104,18 +138,22 @@ fn unknown_lock(
         next_slot.state = EconomicEffectStateV1::Unknown;
         slot.validate_successor(&next_slot)?;
     }
-    Ok(EconomicEffectRecoveryLock { next_slot })
+    Ok(EconomicEffectRecoveryLock {
+        current_slot: slot.clone(),
+        next_slot,
+    })
 }
 
 pub struct EconomicStateRecovery {
     cache: SqliteEconomicStateCache,
     anchor: Arc<dyn EconomicStateAnchor>,
-    operations: Arc<dyn QualifiedAdmissionOperationStore>,
+    operations: Arc<dyn QualifiedAdmissionProjectionStore>,
     transition_verifier: Arc<dyn EconomicTransitionProofVerifier>,
     pins: EconomicStateAnchorPins,
     active_fence: StoreMutationFence,
     claimant_id: AdmissionIdentifier,
     recovery_lease_duration: Duration,
+    mutation_sequencer: AdmissionMutationSequencer,
 }
 
 impl EconomicStateRecovery {
@@ -123,7 +161,7 @@ impl EconomicStateRecovery {
     pub fn new(
         cache: SqliteEconomicStateCache,
         anchor: Arc<dyn EconomicStateAnchor>,
-        operations: Arc<dyn QualifiedAdmissionOperationStore>,
+        operations: Arc<dyn QualifiedAdmissionProjectionStore>,
         transition_verifier: Arc<dyn EconomicTransitionProofVerifier>,
         pins: EconomicStateAnchorPins,
         active_fence: StoreMutationFence,
@@ -141,6 +179,8 @@ impl EconomicStateRecovery {
                 "pins, serving fence, and lease duration must be bounded and nonzero".to_owned(),
             ));
         }
+        let mutation_sequencer = AdmissionMutationSequencer::for_fence(&active_fence)
+            .map_err(|error| EconomicStateRecoveryError::InvalidConfiguration(error.to_string()))?;
         Ok(Self {
             cache,
             anchor,
@@ -150,6 +190,7 @@ impl EconomicStateRecovery {
             active_fence,
             claimant_id,
             recovery_lease_duration,
+            mutation_sequencer,
         })
     }
 
@@ -158,6 +199,10 @@ impl EconomicStateRecovery {
         batch_id: &str,
         trusted_now_unix_ms: u64,
     ) -> Result<EconomicRecoveryOutcome, EconomicStateRecoveryError> {
+        let _mutation_guard = self
+            .mutation_sequencer
+            .lock()
+            .map_err(|error| EconomicStateRecoveryError::InvalidConfiguration(error.to_string()))?;
         validate_trusted_time(trusted_now_unix_ms)?;
         let stage = self
             .cache
@@ -261,6 +306,135 @@ impl EconomicStateRecovery {
             .collect()
     }
 
+    pub fn compensate_unanchored_stage_before_dispatch(
+        &self,
+        batch_id: &str,
+        trusted_now_unix_ms: u64,
+    ) -> Result<EconomicPreDispatchCompensation, EconomicStateRecoveryError> {
+        let _mutation_guard = self
+            .mutation_sequencer
+            .lock()
+            .map_err(|error| EconomicStateRecoveryError::InvalidConfiguration(error.to_string()))?;
+        validate_trusted_time(trusted_now_unix_ms)?;
+        let stage = self
+            .cache
+            .load_stage(batch_id)?
+            .ok_or(EconomicStateCacheError::NotFound)?;
+        if stage.status() != EconomicStateStageStatus::DbStaged {
+            return Err(EconomicStateRecoveryError::CompensationRejected(
+                "the staged batch is no longer unanchored".to_owned(),
+            ));
+        }
+        let binding = stage.operation_binding().ok_or_else(|| {
+            EconomicStateRecoveryError::CompensationRejected(
+                "the staged batch is not bound to an admission operation".to_owned(),
+            )
+        })?;
+        let current = verify_economic_state_view(stage.base_view().clone(), &self.pins)?;
+        let advance = verify_economic_state_batch_advance(
+            &current,
+            stage.batch().clone(),
+            &self.pins,
+            self.transition_verifier.as_ref(),
+        )?;
+        let observed = self.anchor.read_state(&state_query(advance.batch()))?;
+        if observed.view().checkpoint_sequence != current.view().checkpoint_sequence
+            || observed.view().checkpoint_digest != current.view().checkpoint_digest
+        {
+            return Err(EconomicStateRecoveryError::CompensationRejected(
+                "the external anchor no longer retains the staged predecessor".to_owned(),
+            ));
+        }
+
+        let operation_id = AdmissionOperationId::from_persisted(binding.operation_id().to_owned())
+            .map_err(|error| EconomicStateRecoveryError::InvalidConfiguration(error.to_string()))?;
+        let operation = self
+            .operations
+            .load_by_operation_id(&operation_id)?
+            .ok_or(AdmissionOperationStoreError::NotFound)?;
+        if operation.state().is_terminal() {
+            let expected_version = binding.operation_version().checked_add(1).ok_or_else(|| {
+                EconomicStateRecoveryError::CompensationRejected(
+                    "the staged operation version overflowed".to_owned(),
+                )
+            })?;
+            if operation.state() != AdmissionOperationState::CompensatedBeforeDispatch
+                || operation.version() != expected_version
+                || operation.coordinator_lease_epoch() != binding.coordinator_lease_epoch()
+            {
+                return Err(EconomicStateRecoveryError::CompensationRejected(
+                    "the terminal operation is not the staged compensation successor".to_owned(),
+                ));
+            }
+            let replay = operation.terminal_replay().cloned().ok_or_else(|| {
+                EconomicStateRecoveryError::CompensationRejected(
+                    "the compensated operation omitted terminal replay evidence".to_owned(),
+                )
+            })?;
+            let discarded = self.cache.discard_unanchored_stage(
+                batch_id,
+                "admission operation was compensated before economic dispatch",
+                &self.active_fence,
+                trusted_now_unix_ms,
+            )?;
+            return Ok(EconomicPreDispatchCompensation {
+                terminal: AdmissionTerminal {
+                    operation_id,
+                    state: operation.state(),
+                    replay,
+                },
+                stage: discarded,
+            });
+        }
+        if operation.state() != binding.operation_state()
+            || operation.version() != binding.operation_version()
+            || operation.coordinator_lease_epoch() != binding.coordinator_lease_epoch()
+            || binding.store_fence() != &self.active_fence
+        {
+            return Err(EconomicStateRecoveryError::CompensationRejected(
+                "the admission operation changed after the batch was staged".to_owned(),
+            ));
+        }
+        let (claimant_id, expires_at_unix_ms) =
+            self.stage_recovery_claim(binding, trusted_now_unix_ms)?;
+        let lease = self.operations.claim_recovery(
+            &operation_id,
+            operation.version(),
+            &claimant_id,
+            trusted_now_unix_ms,
+            expires_at_unix_ms,
+            &self.active_fence,
+        )?;
+        let context = AdmissionProjectionContext {
+            operation_id: operation_id.clone(),
+            request_id: operation.replay_key().request_id,
+            expected_operation_version: operation.version(),
+            trusted_time_unix_ms: trusted_now_unix_ms,
+            coordinator_lease_id: lease.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: operation.coordinator_lease_epoch(),
+            store_fence: self.active_fence.clone(),
+        };
+        let projection = verified_pre_dispatch_compensation_projection(&operation, context)?;
+        let terminal = self.operations.commit_admission_projection(&projection)?;
+        if terminal.operation_id != operation_id
+            || terminal.state != AdmissionOperationState::CompensatedBeforeDispatch
+        {
+            return Err(EconomicStateRecoveryError::CompensationRejected(
+                "the admission store returned a different terminal operation".to_owned(),
+            ));
+        }
+        let discarded = self.cache.discard_unanchored_stage(
+            batch_id,
+            "admission operation was compensated before economic dispatch",
+            &self.active_fence,
+            trusted_now_unix_ms,
+        )?;
+        Ok(EconomicPreDispatchCompensation {
+            terminal,
+            stage: discarded,
+        })
+    }
+
     fn operation_authorizes_retry(
         &self,
         binding: &EconomicOperationStageBinding,
@@ -275,8 +449,38 @@ impl EconomicStateRecovery {
             || operation.state() != binding.operation_state()
             || operation.version() != binding.operation_version()
             || operation.coordinator_lease_epoch() != binding.coordinator_lease_epoch()
+            || binding.store_fence() != &self.active_fence
         {
             return Ok(false);
+        }
+        let (claimant_id, expires_at) = self.stage_recovery_claim(binding, trusted_now_unix_ms)?;
+        self.operations.claim_recovery(
+            &operation_id,
+            operation.version(),
+            &claimant_id,
+            trusted_now_unix_ms,
+            expires_at,
+            &self.active_fence,
+        )?;
+        let Some(revalidated) = self.operations.load_by_operation_id(&operation_id)? else {
+            return Ok(false);
+        };
+        Ok(revalidated == operation)
+    }
+
+    fn stage_recovery_claim(
+        &self,
+        binding: &EconomicOperationStageBinding,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(AdmissionIdentifier, u64), EconomicStateRecoveryError> {
+        if binding.recovery_expires_at_unix_ms() > trusted_now_unix_ms {
+            return Ok((
+                AdmissionIdentifier::try_new(
+                    "recovery_claimant_id",
+                    binding.recovery_claimant_id().to_owned(),
+                )?,
+                binding.recovery_expires_at_unix_ms(),
+            ));
         }
         let duration_ms =
             u64::try_from(self.recovery_lease_duration.as_millis()).map_err(|_| {
@@ -292,18 +496,7 @@ impl EconomicStateRecovery {
                     "recovery lease expiry overflowed I-JSON".to_owned(),
                 )
             })?;
-        self.operations.claim_recovery(
-            &operation_id,
-            operation.version(),
-            &self.claimant_id,
-            trusted_now_unix_ms,
-            expires_at,
-            &self.active_fence,
-        )?;
-        let Some(revalidated) = self.operations.load_by_operation_id(&operation_id)? else {
-            return Ok(false);
-        };
-        Ok(revalidated == operation)
+        Ok((self.claimant_id.clone(), expires_at))
     }
 
     fn resolve_uncertain_cas(
@@ -399,6 +592,20 @@ impl QualifiedEconomicAdmissionHandoffVerifier {
 }
 
 impl EconomicAdmissionHandoffVerifier for QualifiedEconomicAdmissionHandoffVerifier {
+    fn verify_operation_active(&self, operation_id: &str) -> Result<(), EconomicStateAnchorError> {
+        let operation_id = AdmissionOperationId::from_persisted(operation_id.to_owned())
+            .map_err(|_| EconomicStateAnchorError::AdmissionHandoffRejected)?;
+        let operation = self
+            .operations
+            .load_by_operation_id(&operation_id)
+            .map_err(|_| EconomicStateAnchorError::AdmissionHandoffRejected)?
+            .ok_or(EconomicStateAnchorError::AdmissionHandoffRejected)?;
+        if operation.state().is_terminal() {
+            return Err(EconomicStateAnchorError::AdmissionHandoffRejected);
+        }
+        Ok(())
+    }
+
     fn verify_handoff(
         &self,
         operation_id: &str,
@@ -479,9 +686,10 @@ fn validate_trusted_time(value: u64) -> Result<(), EconomicStateRecoveryError> {
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use std::collections::VecDeque;
-    use std::fs;
+    use std::fs::{self, File, OpenOptions};
+    use std::io;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{Arc, Mutex, MutexGuard};
+    use std::sync::{Arc, Barrier, Mutex, MutexGuard};
     use std::time::Duration;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -504,9 +712,10 @@ mod tests {
         AdmissionDigest, AdmissionIdentifier, AdmissionOperationBindingInputV1,
         AdmissionOperationBindingV1, AdmissionOperationCommand, AdmissionOperationKind,
         AdmissionOperationStore, AdmissionOperationV1, AdmissionParticipantRequirements,
-        AdmissionRequestBindingV1, AuthenticatedRequestNamespace, QualifiedAdmissionOperationStore,
+        AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
         QualifiedAdmissionOperationStoreExt, SideEffectClass,
     };
+    use chio_kernel::ReceiptStore;
     use chio_store_sqlite::{SqliteAuthorityStore, SqliteEconomicStateCache};
     use serde_json::json;
     use tempfile::TempDir;
@@ -519,7 +728,7 @@ mod tests {
         _temp: TempDir,
         _authority: SqliteAuthorityStore,
         cache: SqliteEconomicStateCache,
-        operations: Arc<dyn QualifiedAdmissionOperationStore>,
+        operations: Arc<dyn QualifiedAdmissionProjectionStore>,
         fence: StoreMutationFence,
     }
 
@@ -734,8 +943,39 @@ mod tests {
         AdmissionOperationV1::prepare(binding, fence.owner_epoch).expect("prepared operation")
     }
 
+    fn prepared_dispatch_operation(
+        fence: &StoreMutationFence,
+        request_id: &str,
+    ) -> AdmissionOperationV1 {
+        let namespace = AuthenticatedRequestNamespace::for_local_system(identifier(
+            "coordinator_authority_id",
+            "economic-recovery-test",
+        ))
+        .expect("namespace");
+        let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
+            kind: AdmissionOperationKind::ToolDispatch,
+            namespace,
+            request_id: identifier("request_id", request_id),
+            capability_id: identifier("capability_id", "economic-recovery-capability"),
+            authorization_capability_hash: admission_digest("authorization_capability_hash", 'a'),
+            request_binding: AdmissionRequestBindingV1::new(
+                admission_digest("immutable_request_hash", 'b'),
+                AdmissionParticipantRequirements {
+                    broker_attempt: true,
+                    budget_capture: true,
+                    ..AdmissionParticipantRequirements::NONE
+                },
+            )
+            .expect("request binding"),
+            policy_hash: admission_digest("policy_hash", 'c'),
+            effect_class: SideEffectClass::Monetary,
+        })
+        .expect("operation binding");
+        AdmissionOperationV1::prepare(binding, fence.owner_epoch).expect("prepared operation")
+    }
+
     fn advance_operation(
-        operations: &dyn QualifiedAdmissionOperationStore,
+        operations: &dyn QualifiedAdmissionProjectionStore,
         operation: &AdmissionOperationV1,
         claimant: &AdmissionIdentifier,
         fence: &StoreMutationFence,
@@ -849,6 +1089,87 @@ mod tests {
     }
 
     #[test]
+    fn lost_anchor_cas_acknowledgement_recovers_the_exact_committed_batch() -> TestResult {
+        let fixture = fixture();
+        let (advance, committed) = verified_advance()?;
+        fixture
+            .cache
+            .stage_batch(&advance, None, &fixture.fence, 1_000)?;
+        let anchor = Arc::new(FixtureAnchor::default());
+        lock(&anchor.reads).push_back(Ok(advance.current().clone()));
+        lock(&anchor.commits).push_back(Err(EconomicStateAnchorError::Unavailable(
+            "commit acknowledgement was lost".to_owned(),
+        )));
+        lock(&anchor.reads).push_back(Ok(committed));
+        let recovery = recovery(&fixture, anchor.clone());
+
+        let outcome = recovery.recover_stage(&advance.batch().batch_id, 1_001)?;
+        assert!(matches!(outcome, EconomicRecoveryOutcome::Finalized(_)));
+        assert_eq!(anchor.cas_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(fixture.cache.load_finalized_head(&key())?, Some(head()?));
+        Ok(())
+    }
+
+    #[test]
+    fn anchor_advanced_marker_resumes_only_local_finalization() -> TestResult {
+        let fixture = fixture();
+        let (advance, committed) = verified_advance()?;
+        fixture
+            .cache
+            .stage_batch(&advance, None, &fixture.fence, 1_000)?;
+        let advanced = fixture.cache.record_anchor_advanced(
+            &advance,
+            &committed,
+            &pins(),
+            &fixture.fence,
+            1_001,
+        )?;
+        assert_eq!(
+            advanced.status(),
+            chio_store_sqlite::EconomicStateStageStatus::EconomicAnchorAdvanced
+        );
+        let anchor = Arc::new(FixtureAnchor::default());
+        let recovery = recovery(&fixture, anchor.clone());
+
+        let outcome = recovery.recover_stage(&advance.batch().batch_id, 1_002)?;
+        assert!(matches!(outcome, EconomicRecoveryOutcome::Finalized(_)));
+        assert_eq!(anchor.cas_calls.load(Ordering::SeqCst), 0);
+        assert_eq!(fixture.cache.load_finalized_head(&key())?, Some(head()?));
+        Ok(())
+    }
+
+    #[test]
+    fn old_same_epoch_snapshot_cannot_erase_an_economic_stage() -> TestResult {
+        let temp = tempfile::tempdir()?;
+        let database = temp.path().join("authority.db");
+        let snapshot = temp.path().join("before-economic-stage.db");
+        let lock_root = temp.path().join("locks");
+        fs::create_dir(&lock_root)?;
+        SqliteAuthorityStore::provision(&database, &lock_root)?;
+        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        fs::copy(&database, &snapshot)?;
+        let fence = authority.mutation_fence();
+        let cache = authority.economic_state_cache();
+        let (advance, _) = verified_advance()?;
+        cache.stage_batch(&advance, None, &fence, now_ms())?;
+        drop(cache);
+        drop(authority);
+
+        let mut input = File::open(&snapshot)?;
+        let mut output = OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(&database)?;
+        io::copy(&mut input, &mut output)?;
+        output.sync_all()?;
+        for suffix in ["-wal", "-shm"] {
+            let _ = fs::remove_file(format!("{}{suffix}", database.display()));
+        }
+        assert!(SqliteAuthorityStore::open_serving(&database, &lock_root).is_err());
+        Ok(())
+    }
+
+    #[test]
     fn anchored_ahead_recovery_uses_retained_checkpoint_without_replaying_cas() -> TestResult {
         let fixture = fixture();
         let (advance, committed) = verified_advance()?;
@@ -915,6 +1236,247 @@ mod tests {
         assert!(matches!(outcome, EconomicRecoveryOutcome::Discarded(_)));
         assert_eq!(anchor.cas_calls.load(Ordering::SeqCst), 0);
         assert!(fixture.cache.load_finalized_head(&key())?.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn compensation_winner_discards_the_unanchored_stage_before_anchor_cas() -> TestResult {
+        let fixture = fixture();
+        let operations = fixture._authority.admission_operation_store();
+        let operation = prepared_dispatch_operation(&fixture.fence, "compensation-wins");
+        let now = now_ms();
+        operations.begin(&operation, &fixture.fence, now)?;
+        let stage_claimant = identifier("claimant_id", "stage-owner");
+        let stage_lease = operations.claim_recovery(
+            operation.binding().operation_id(),
+            operation.version(),
+            &stage_claimant,
+            now + 1,
+            now + 1_001,
+            &fixture.fence,
+        )?;
+        let (advance, _) = verified_advance_for_operation(Some(
+            operation.binding().operation_id().as_str().to_owned(),
+        ))?;
+        fixture.cache.stage_batch(
+            &advance,
+            Some(chio_store_sqlite::EconomicOperationStageContext::new(
+                &operation,
+                &stage_lease,
+            )),
+            &fixture.fence,
+            now + 2,
+        )?;
+        let anchor = Arc::new(FixtureAnchor::default());
+        lock(&anchor.reads).push_back(Ok(advance.current().clone()));
+        let recovery = recovery(&fixture, anchor.clone());
+
+        let compensated = recovery
+            .compensate_unanchored_stage_before_dispatch(&advance.batch().batch_id, now + 3)?;
+
+        assert_eq!(
+            compensated.terminal().state,
+            AdmissionOperationState::CompensatedBeforeDispatch
+        );
+        assert_eq!(
+            compensated.stage().status(),
+            EconomicStateStageStatus::Discarded
+        );
+        assert_eq!(anchor.cas_calls.load(Ordering::SeqCst), 0);
+        assert!(matches!(
+            recovery.recover_stage(&advance.batch().batch_id, now + 4)?,
+            EconomicRecoveryOutcome::Discarded(_)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn recovery_winner_rejects_late_pre_dispatch_compensation() -> TestResult {
+        let fixture = fixture();
+        let operations = fixture._authority.admission_operation_store();
+        let operation = prepared_dispatch_operation(&fixture.fence, "recovery-wins");
+        let now = now_ms();
+        operations.begin(&operation, &fixture.fence, now)?;
+        let stage_claimant = identifier("claimant_id", "stage-owner");
+        let stage_lease = operations.claim_recovery(
+            operation.binding().operation_id(),
+            operation.version(),
+            &stage_claimant,
+            now + 1,
+            now + 1_001,
+            &fixture.fence,
+        )?;
+        let (advance, committed) = verified_advance_for_operation(Some(
+            operation.binding().operation_id().as_str().to_owned(),
+        ))?;
+        fixture.cache.stage_batch(
+            &advance,
+            Some(chio_store_sqlite::EconomicOperationStageContext::new(
+                &operation,
+                &stage_lease,
+            )),
+            &fixture.fence,
+            now + 2,
+        )?;
+        let anchor = Arc::new(FixtureAnchor::default());
+        lock(&anchor.reads).push_back(Ok(advance.current().clone()));
+        lock(&anchor.commits).push_back(Ok(committed));
+        let recovery = recovery(&fixture, anchor.clone());
+
+        assert!(matches!(
+            recovery.recover_stage(&advance.batch().batch_id, now + 3)?,
+            EconomicRecoveryOutcome::Finalized(_)
+        ));
+        assert!(recovery
+            .compensate_unanchored_stage_before_dispatch(&advance.batch().batch_id, now + 4)
+            .is_err());
+        let retained = operations
+            .load_by_operation_id(operation.binding().operation_id())?
+            .ok_or("operation disappeared")?;
+        assert!(!retained.state().is_terminal());
+        assert_eq!(anchor.cas_calls.load(Ordering::SeqCst), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn compensation_and_unanchored_recovery_have_exactly_one_lifecycle_winner() -> TestResult {
+        let fixture = fixture();
+        let operations = fixture._authority.admission_operation_store();
+        let operation = prepared_dispatch_operation(&fixture.fence, "concurrent-race");
+        let now = now_ms();
+        operations.begin(&operation, &fixture.fence, now)?;
+        let stage_claimant = identifier("claimant_id", "stage-owner");
+        let stage_lease = operations.claim_recovery(
+            operation.binding().operation_id(),
+            operation.version(),
+            &stage_claimant,
+            now + 1,
+            now + 1_001,
+            &fixture.fence,
+        )?;
+        let (advance, committed) = verified_advance_for_operation(Some(
+            operation.binding().operation_id().as_str().to_owned(),
+        ))?;
+        fixture.cache.stage_batch(
+            &advance,
+            Some(chio_store_sqlite::EconomicOperationStageContext::new(
+                &operation,
+                &stage_lease,
+            )),
+            &fixture.fence,
+            now + 2,
+        )?;
+        let anchor = Arc::new(FixtureAnchor::default());
+        lock(&anchor.reads).push_back(Ok(advance.current().clone()));
+        lock(&anchor.reads).push_back(Ok(advance.current().clone()));
+        lock(&anchor.commits).push_back(Ok(committed));
+        let recovery = Arc::new(recovery(&fixture, anchor.clone()));
+        let barrier = Arc::new(Barrier::new(3));
+        let batch_id = advance.batch().batch_id.clone();
+
+        let compensation = {
+            let recovery = recovery.clone();
+            let barrier = barrier.clone();
+            let batch_id = batch_id.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                recovery.compensate_unanchored_stage_before_dispatch(&batch_id, now + 3)
+            })
+        };
+        let stage_recovery = {
+            let recovery = recovery.clone();
+            let barrier = barrier.clone();
+            let batch_id = batch_id.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                recovery.recover_stage(&batch_id, now + 4)
+            })
+        };
+        barrier.wait();
+        let compensation = compensation.join().map_err(|_| "compensation panicked")?;
+        let stage_recovery = stage_recovery.join().map_err(|_| "recovery panicked")??;
+        let retained = operations
+            .load_by_operation_id(operation.binding().operation_id())?
+            .ok_or("operation disappeared")?;
+
+        match (compensation, stage_recovery) {
+            (Ok(compensated), EconomicRecoveryOutcome::Discarded(discarded)) => {
+                assert_eq!(
+                    compensated.terminal().state,
+                    AdmissionOperationState::CompensatedBeforeDispatch
+                );
+                assert_eq!(discarded.status(), EconomicStateStageStatus::Discarded);
+                assert!(retained.state().is_terminal());
+                assert_eq!(anchor.cas_calls.load(Ordering::SeqCst), 0);
+            }
+            (Err(_), EconomicRecoveryOutcome::Finalized(finalized)) => {
+                assert_eq!(finalized.status(), EconomicStateStageStatus::DbFinalized);
+                assert!(!retained.state().is_terminal());
+                assert_eq!(anchor.cas_calls.load(Ordering::SeqCst), 1);
+            }
+            (compensation, recovery) => {
+                return Err(format!(
+                    "invalid race result: compensation={compensation:?}, recovery={recovery:?}"
+                )
+                .into());
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn compensation_recovery_discards_a_stage_after_terminal_commit_ack_loss() -> TestResult {
+        let fixture = fixture();
+        let operations = fixture._authority.admission_operation_store();
+        let operation = prepared_dispatch_operation(&fixture.fence, "compensation-ack-loss");
+        let now = now_ms();
+        operations.begin(&operation, &fixture.fence, now)?;
+        let stage_claimant = identifier("claimant_id", "stage-owner");
+        let stage_lease = operations.claim_recovery(
+            operation.binding().operation_id(),
+            operation.version(),
+            &stage_claimant,
+            now + 1,
+            now + 1_001,
+            &fixture.fence,
+        )?;
+        let (advance, _) = verified_advance_for_operation(Some(
+            operation.binding().operation_id().as_str().to_owned(),
+        ))?;
+        fixture.cache.stage_batch(
+            &advance,
+            Some(chio_store_sqlite::EconomicOperationStageContext::new(
+                &operation,
+                &stage_lease,
+            )),
+            &fixture.fence,
+            now + 2,
+        )?;
+        let projection = verified_pre_dispatch_compensation_projection(
+            &operation,
+            AdmissionProjectionContext {
+                operation_id: operation.binding().operation_id().clone(),
+                request_id: operation.replay_key().request_id,
+                expected_operation_version: operation.version(),
+                trusted_time_unix_ms: now + 3,
+                coordinator_lease_id: stage_lease.coordinator_lease_id().clone(),
+                coordinator_lease_epoch: operation.coordinator_lease_epoch(),
+                store_fence: fixture.fence.clone(),
+            },
+        )?;
+        let terminal = operations.commit_admission_projection(&projection)?;
+        let anchor = Arc::new(FixtureAnchor::default());
+        lock(&anchor.reads).push_back(Ok(advance.current().clone()));
+        let recovery = recovery(&fixture, anchor);
+
+        let recovered = recovery
+            .compensate_unanchored_stage_before_dispatch(&advance.batch().batch_id, now + 4)?;
+
+        assert_eq!(recovered.terminal(), &terminal);
+        assert_eq!(
+            recovered.stage().status(),
+            EconomicStateStageStatus::Discarded
+        );
         Ok(())
     }
 

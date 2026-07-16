@@ -1,4 +1,9 @@
 use super::*;
+use crate::admission_operation::{
+    AdmissionOperationBindingInputV1, AdmissionOperationBindingV1, AdmissionOperationKind,
+    AdmissionParticipantRequirements, AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
+    SideEffectClass,
+};
 use crate::dispatch_status::{
     qualify_dispatch_status_provider_for_test, resolve_dispatch_status,
     AuthenticatedProviderAcceptance, AuthenticatedProviderCompletedOutcome,
@@ -10,6 +15,21 @@ use crate::tool_outcome::tests::{
     admission_digest, advance, committed_broker_operation, committed_operation, id,
     prepared_operation, projection_context, projection_context_under, provider_attempt, resolve,
     returned, successor_fence,
+};
+use chio_core::crypto::{Keypair, PublicKey};
+use chio_core_types::economic_continuity::{
+    verify_economic_effect_cancellation_advance, verify_economic_effect_cancellation_commit,
+    verify_economic_state_batch_advance, verify_economic_state_view,
+    EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1, EconomicAdmissionHandoffVerifier,
+    EconomicContentV1, EconomicEffectCancellationProofVerifier, EconomicEffectSlotV1,
+    EconomicEffectStateV1, EconomicEffectTargetV1, EconomicEffectTerminalV1,
+    EconomicNoEffectKindV1, EconomicRequestBindingV1, EconomicResourceHeadV1,
+    EconomicResourceKeyV1, EconomicStateAnchorError, EconomicStateAnchorPins,
+    EconomicStateAnchorViewV1, EconomicStateBatchV1, EconomicStateTransitionV1,
+    EconomicTransitionAuthorizationV1, EconomicTransitionProofVerifier,
+    VerifiedEconomicEffectNotDispatched, CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
+    CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA, CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
+    CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
 };
 use chio_core_types::provider_attempt::{
     ProviderAcceptanceBindingV1, ProviderAttemptPhaseV1, ProviderCancellationBindingV1,
@@ -102,6 +122,350 @@ fn predispatch_bundle() -> (
         .evidence_bundle()
         .unwrap();
     (operation, context, bundle)
+}
+
+#[test]
+fn qualified_pre_dispatch_snapshot_rejects_an_acquired_participant() {
+    let prepared = prepared_operation("request-qualified-predispatch");
+    let prepared_context = projection_context(&prepared);
+    assert!(
+        VerifiedPreDispatchNoEffect::from_qualified_operation_snapshot(
+            &prepared,
+            &prepared_context
+        )
+        .is_ok()
+    );
+
+    let broker = advance(
+        &prepared,
+        AdmissionOperationState::BrokerAttemptRegistered,
+        vec![AdmissionAttachment::BrokerAttempt(provider_attempt(
+            &prepared,
+            "attempt-qualified-predispatch",
+        ))],
+    );
+    assert!(
+        VerifiedPreDispatchNoEffect::from_qualified_operation_snapshot(
+            &broker,
+            &projection_context(&broker)
+        )
+        .is_err()
+    );
+}
+
+fn economic_cancellation(
+    operation: &AdmissionOperationV1,
+    kind: EconomicNoEffectKindV1,
+) -> Result<VerifiedEconomicEffectNotDispatched, Box<dyn std::error::Error>> {
+    struct Direct(EconomicNoEffectKindV1);
+    impl EconomicTransitionProofVerifier for Direct {
+        fn verify_transition(
+            &self,
+            _current: Option<&EconomicResourceHeadV1>,
+            _transition: &EconomicStateTransitionV1,
+        ) -> Result<EconomicTransitionAuthorizationV1, EconomicStateAnchorError> {
+            Ok(EconomicTransitionAuthorizationV1::Direct)
+        }
+    }
+    impl EconomicAdmissionHandoffVerifier for Direct {
+        fn verify_operation_active(
+            &self,
+            _operation_id: &str,
+        ) -> Result<(), EconomicStateAnchorError> {
+            Ok(())
+        }
+
+        fn verify_handoff(
+            &self,
+            _operation_id: &str,
+            _handoff: &EconomicAdmissionHandoffV1,
+        ) -> Result<(), EconomicStateAnchorError> {
+            Ok(())
+        }
+    }
+    impl EconomicEffectCancellationProofVerifier for Direct {
+        fn verify_cancellation(
+            &self,
+            _current: &EconomicEffectSlotV1,
+            _next: &EconomicEffectSlotV1,
+        ) -> Result<EconomicNoEffectKindV1, EconomicStateAnchorError> {
+            Ok(self.0)
+        }
+    }
+
+    fn signed_view(
+        keypair: &Keypair,
+        sequence: u64,
+        checkpoint_digest: String,
+        head: EconomicResourceHeadV1,
+    ) -> Result<EconomicStateAnchorViewV1, Box<dyn std::error::Error>> {
+        let mut view = EconomicStateAnchorViewV1 {
+            schema: CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA.to_owned(),
+            anchor_id: "anchor-1".to_owned(),
+            namespace: "economy-prod".to_owned(),
+            checkpoint_sequence: sequence,
+            checkpoint_digest,
+            heads_root: String::new(),
+            heads: vec![head],
+            absent_resource_keys: Vec::new(),
+            request_replays_root: String::new(),
+            request_replays: Vec::new(),
+            absent_request_keys: Vec::new(),
+            observed_at: 900 + sequence,
+            signer_key_id: "anchor-key-1".to_owned(),
+            signer_key_epoch: 1,
+            anchor_signature: String::new(),
+        };
+        view.seal(keypair)?;
+        Ok(view)
+    }
+
+    fn head(
+        slot: &EconomicEffectSlotV1,
+        version: u64,
+        predecessor_digest: Option<String>,
+    ) -> Result<EconomicResourceHeadV1, Box<dyn std::error::Error>> {
+        let state = EconomicContentV1::Inline {
+            value: serde_json::to_value(slot)?,
+        };
+        Ok(EconomicResourceHeadV1 {
+            schema: CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA.to_owned(),
+            anchor_id: slot.anchor_id.clone(),
+            namespace: slot.namespace.clone(),
+            resource_key: slot.resource_head_key(),
+            head_version: version,
+            resource_version: version,
+            lifecycle_fence: version,
+            lifecycle_state: match slot.state {
+                EconomicEffectStateV1::Ready => "ready",
+                EconomicEffectStateV1::NoEffect => "no_effect",
+                _ => "invalid",
+            }
+            .to_owned(),
+            state_digest: state.digest()?,
+            state,
+            operation_id: Some(slot.operation_id.clone()),
+            effect_idempotency_key: Some(slot.idempotency_key.clone()),
+            frost: None,
+            terminal_result: None,
+            trusted_clock_high_water: 900 + version,
+            predecessor_digest,
+        })
+    }
+
+    let context = projection_context(operation);
+    let (target_id, target_key_epoch) = operation.provider_attempt().map_or_else(
+        || ("economic-mutation-participant".to_owned(), 1),
+        |attempt| (attempt.transport_id.clone(), attempt.transport_key_epoch),
+    );
+    let keypair = Keypair::from_seed(&[0x51; 32]);
+    let pins = EconomicStateAnchorPins {
+        anchor_id: "anchor-1".to_owned(),
+        namespace: "economy-prod".to_owned(),
+        signer_key_id: "anchor-key-1".to_owned(),
+        signer_key_epoch: 1,
+        signer_public_key: PublicKey::from_bytes(keypair.public_key().as_bytes())?,
+    };
+    let mut slot = EconomicEffectSlotV1 {
+        schema: CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA.to_owned(),
+        slot_id: String::new(),
+        anchor_id: pins.anchor_id.clone(),
+        namespace: pins.namespace.clone(),
+        resource_key: EconomicResourceKeyV1 {
+            resource_family: "tool_dispatch".to_owned(),
+            scope_id: "local-system".to_owned(),
+            resource_id: operation.binding().operation_id().as_str().to_owned(),
+        },
+        operation_id: operation.binding().operation_id().as_str().to_owned(),
+        effect_kind: "tool_dispatch".to_owned(),
+        request: EconomicRequestBindingV1 {
+            request_namespace_digest: operation
+                .replay_key()
+                .request_namespace_digest
+                .as_str()
+                .to_owned(),
+            request_id: operation.replay_key().request_id.as_str().to_owned(),
+            request_binding_digest: operation
+                .binding()
+                .request_binding_hash()
+                .as_str()
+                .to_owned(),
+        },
+        admission_handoff: EconomicAdmissionHandoffV1 {
+            state: match operation.binding().kind() {
+                AdmissionOperationKind::GovernedEconomicMutation => {
+                    EconomicAdmissionHandoffStateV1::MutationSubmitted
+                }
+                _ => EconomicAdmissionHandoffStateV1::DispatchCommitted,
+            },
+            operation_version: operation.version(),
+            lifecycle_fence: operation.coordinator_lease_epoch(),
+            store_fence: context.store_fence,
+        },
+        target: EconomicEffectTargetV1 {
+            target_id,
+            target_key_epoch,
+            qualification_digest: admission_digest("economic-target").as_str().to_owned(),
+        },
+        action_digest: admission_digest("economic-action").as_str().to_owned(),
+        parameters_digest: admission_digest("economic-parameters").as_str().to_owned(),
+        resource_head_digest: admission_digest("economic-resource").as_str().to_owned(),
+        frost: None,
+        idempotency_key: admission_digest("economic-idempotency").as_str().to_owned(),
+        state: EconomicEffectStateV1::Ready,
+        terminal: None,
+    };
+    slot.slot_id = slot.recompute_slot_id()?;
+    let ready_head = head(&slot, 1, None)?;
+    let ready_digest = ready_head.digest()?;
+    let current = verify_economic_state_view(
+        signed_view(
+            &keypair,
+            1,
+            admission_digest("checkpoint-1").as_str().to_owned(),
+            ready_head,
+        )?,
+        &pins,
+    )?;
+    let proof = EconomicContentV1::Inline {
+        value: serde_json::json!({"notAccepted": true}),
+    };
+    slot.state = EconomicEffectStateV1::NoEffect;
+    slot.terminal = Some(EconomicEffectTerminalV1::NoEffect {
+        kind,
+        proof_id: "economic-cancellation-1".to_owned(),
+        proof_digest: proof.digest()?,
+        proof,
+    });
+    let cancelled_head = head(&slot, 2, Some(ready_digest.clone()))?;
+    let mut batch = EconomicStateBatchV1 {
+        schema: CHIO_ECONOMIC_STATE_BATCH_SCHEMA.to_owned(),
+        batch_id: String::new(),
+        checkpoint_digest: String::new(),
+        anchor_id: pins.anchor_id.clone(),
+        namespace: pins.namespace.clone(),
+        checkpoint_sequence: 2,
+        previous_checkpoint_digest: Some(current.view().checkpoint_digest.clone()),
+        expected_heads_root: String::new(),
+        next_heads_root: String::new(),
+        transitions: vec![EconomicStateTransitionV1 {
+            resource_key: cancelled_head.resource_key.clone(),
+            expected_head_digest: Some(ready_digest),
+            next_head: cancelled_head.clone(),
+            transition_proof_digest: admission_digest("transition-proof").as_str().to_owned(),
+            prepared_effect: None,
+        }],
+        effect_slots: Vec::new(),
+        request_replays: Vec::new(),
+        operation_id: Some(slot.operation_id.clone()),
+        issued_at: 902,
+        signer_key_id: pins.signer_key_id.clone(),
+        signer_key_epoch: pins.signer_key_epoch,
+        anchor_signature: String::new(),
+    };
+    batch.seal(&keypair)?;
+    let verifier = Direct(kind);
+    let advance = verify_economic_state_batch_advance(&current, batch, &pins, &verifier)?;
+    let cancellation = verify_economic_effect_cancellation_advance(advance, &verifier, &verifier)?;
+    let committed = verify_economic_state_view(
+        signed_view(
+            &keypair,
+            2,
+            cancellation.batch().checkpoint_digest.clone(),
+            cancelled_head,
+        )?,
+        &pins,
+    )?;
+    Ok(verify_economic_effect_cancellation_commit(
+        cancellation,
+        &committed,
+        &pins,
+    )?)
+}
+
+#[test]
+fn external_effect_cancellation_constructs_bound_transport_no_acceptance() {
+    let operation = committed_operation("request-economic-cancellation");
+    let context = projection_context(&operation);
+    let cancellation = economic_cancellation(
+        &operation,
+        EconomicNoEffectKindV1::VerifiedTransportNotAccepted,
+    )
+    .unwrap();
+
+    let proof = VerifiedTransportNotAccepted::from_verified_economic_effect(
+        &cancellation,
+        &operation,
+        &context,
+    )
+    .unwrap();
+    proof.validate_against(&operation, &context).unwrap();
+    let projection = crate::admission_operation::verified_economic_cancellation_projection(
+        &operation,
+        context.clone(),
+        &cancellation,
+    )
+    .unwrap();
+    assert!(matches!(
+        projection,
+        crate::admission_operation::AdmissionTerminalProjection::NotAcceptedAfterDispatchCommit { .. }
+    ));
+
+    let sibling = committed_operation("request-economic-cancellation-sibling");
+    assert!(VerifiedTransportNotAccepted::from_verified_economic_effect(
+        &cancellation,
+        &sibling,
+        &projection_context(&sibling),
+    )
+    .is_err());
+}
+
+fn submitted_mutation_operation(request_id: &str) -> AdmissionOperationV1 {
+    let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
+        kind: AdmissionOperationKind::GovernedEconomicMutation,
+        namespace: AuthenticatedRequestNamespace::for_local_system(id("coordinator-1")).unwrap(),
+        request_id: id(request_id),
+        capability_id: id("economic-mutation-capability"),
+        authorization_capability_hash: admission_digest("economic-mutation-authorization"),
+        request_binding: AdmissionRequestBindingV1::new(
+            admission_digest("economic-mutation-request"),
+            AdmissionParticipantRequirements::NONE,
+        )
+        .unwrap(),
+        policy_hash: admission_digest("economic-mutation-policy"),
+        effect_class: SideEffectClass::Monetary,
+    })
+    .unwrap();
+    let prepared = AdmissionOperationV1::prepare(binding, 7).unwrap();
+    let ready = advance(
+        &prepared,
+        AdmissionOperationState::MutationReady,
+        Vec::new(),
+    );
+    advance(
+        &ready,
+        AdmissionOperationState::MutationSubmitted,
+        Vec::new(),
+    )
+}
+
+#[test]
+fn external_effect_cancellation_constructs_bound_permanently_not_applied_result() {
+    let operation = submitted_mutation_operation("request-mutation-cancellation");
+    let context = projection_context(&operation);
+    let cancellation =
+        economic_cancellation(&operation, EconomicNoEffectKindV1::PermanentlyNotApplied).unwrap();
+
+    let projection = crate::admission_operation::verified_economic_cancellation_projection(
+        &operation,
+        context,
+        &cancellation,
+    )
+    .unwrap();
+    assert!(matches!(
+        projection,
+        crate::admission_operation::AdmissionTerminalProjection::EconomicMutationNotApplied { .. }
+    ));
 }
 
 #[test]

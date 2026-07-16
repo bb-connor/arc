@@ -2,6 +2,8 @@ use super::*;
 
 mod query;
 pub use query::*;
+mod effect;
+pub use effect::*;
 
 pub const CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA: &str = "chio.economy.anchor-view.v1";
 pub const CHIO_ECONOMIC_EFFECT_DISPATCH_COMMIT_SCHEMA: &str =
@@ -29,6 +31,7 @@ pub enum EconomicStateAnchorError {
     RequestReplayRetained(EconomicRequestKeyV1),
     AdmissionHandoffRejected,
     EffectDispatchRejected(&'static str),
+    EffectCancellationRejected(&'static str),
     TargetStatusRejected,
     IdempotentRecoveryRejected,
     Missing,
@@ -97,6 +100,12 @@ impl fmt::Display for EconomicStateAnchorError {
             }
             Self::EffectDispatchRejected(reason) => {
                 write!(formatter, "economic effect dispatch was rejected: {reason}")
+            }
+            Self::EffectCancellationRejected(reason) => {
+                write!(
+                    formatter,
+                    "economic effect cancellation was rejected: {reason}"
+                )
             }
             Self::TargetStatusRejected => write!(formatter, "economic target status was rejected"),
             Self::IdempotentRecoveryRejected => {
@@ -659,6 +668,8 @@ fn verify_transition_authorization(
 }
 
 pub trait EconomicAdmissionHandoffVerifier: Send + Sync {
+    fn verify_operation_active(&self, operation_id: &str) -> Result<(), EconomicStateAnchorError>;
+
     fn verify_handoff(
         &self,
         operation_id: &str,
@@ -708,8 +719,8 @@ pub fn verify_economic_effect_dispatch_advance(
         .ok_or_else(|| {
             EconomicStateAnchorError::CurrentHeadMissing(transition.resource_key.clone())
         })?;
-    let current_slot = effect_slot_from_head(current_head)?;
-    let next_slot = effect_slot_from_head(&transition.next_head)?;
+    let current_slot = economic_effect_slot_from_head(current_head)?;
+    let next_slot = economic_effect_slot_from_head(&transition.next_head)?;
     current_slot.validate_successor(&next_slot)?;
     if current_slot.state != EconomicEffectStateV1::Ready
         || next_slot.state != EconomicEffectStateV1::DispatchCommitted
@@ -748,7 +759,7 @@ pub fn reverify_economic_effect_dispatch_advance(
     Ok(())
 }
 
-fn effect_slot_from_head(
+pub fn economic_effect_slot_from_head(
     head: &EconomicResourceHeadV1,
 ) -> Result<EconomicEffectSlotV1, EconomicStateAnchorError> {
     let EconomicContentV1::Inline { value } = &head.state else {
@@ -1169,4 +1180,13 @@ pub trait EconomicStateAnchor: Send + Sync {
         &self,
         advance: VerifiedEconomicEffectDispatchAdvance,
     ) -> Result<VerifiedEconomicEffectDispatch, EconomicStateAnchorError>;
+
+    fn compare_and_swap_effect_cancellation(
+        &self,
+        _advance: VerifiedEconomicEffectCancellationAdvance,
+    ) -> Result<VerifiedEconomicEffectNotDispatched, EconomicStateAnchorError> {
+        Err(EconomicStateAnchorError::Unavailable(
+            "economic effect cancellation is not configured".to_string(),
+        ))
+    }
 }

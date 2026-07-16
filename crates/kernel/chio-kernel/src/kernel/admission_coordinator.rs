@@ -2,8 +2,6 @@ use std::fmt;
 use std::sync::Arc;
 
 use serde::Serialize;
-use std::collections::HashMap;
-use std::sync::{Mutex, MutexGuard, OnceLock, Weak};
 
 #[path = "admission_coordinator/terminal.rs"]
 mod terminal;
@@ -13,13 +11,14 @@ use super::*;
 use crate::admission_operation::{
     AdmissionAttachment, AdmissionBeginResult, AdmissionCompensationStatus,
     AdmissionCompletedProjection, AdmissionDigest, AdmissionDispatchState, AdmissionIdentifier,
-    AdmissionOperationBindingInputV1, AdmissionOperationBindingV1, AdmissionOperationCommand,
-    AdmissionOperationKind, AdmissionOperationState, AdmissionOperationV1,
-    AdmissionParticipantRequirements, AdmissionProjectionContext, AdmissionReceiptMetadataV1,
-    AdmissionReceiptSchema, AdmissionRequestBindingV1, AdmissionTerminalProjection,
-    AdmissionTerminalReplay, AuthenticatedRequestNamespace, ObservationAttemptZero,
-    PaymentTerminalEvidence, ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt,
-    SideEffectClass, StoreMutationFence, VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
+    AdmissionMutationGuard, AdmissionMutationSequencer, AdmissionOperationBindingInputV1,
+    AdmissionOperationBindingV1, AdmissionOperationCommand, AdmissionOperationKind,
+    AdmissionOperationState, AdmissionOperationV1, AdmissionParticipantRequirements,
+    AdmissionProjectionContext, AdmissionReceiptMetadataV1, AdmissionReceiptSchema,
+    AdmissionRequestBindingV1, AdmissionTerminalProjection, AdmissionTerminalReplay,
+    AuthenticatedRequestNamespace, ObservationAttemptZero, PaymentTerminalEvidence,
+    ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt, SideEffectClass,
+    StoreMutationFence, VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
     LOCAL_SYSTEM_TENANT_ID,
 };
 use crate::budget_store::{
@@ -45,30 +44,7 @@ pub(crate) struct DurableAdmissionRuntime {
     outcome_store: Arc<dyn QualifiedToolOutcomeStore>,
     fence: StoreMutationFence,
     claimant_id: AdmissionIdentifier,
-    mutation_sequencer: Arc<Mutex<()>>,
-}
-
-type AdmissionMutationSequencers = HashMap<String, Weak<Mutex<()>>>;
-
-fn mutation_sequencer_for_fence(fence: &StoreMutationFence) -> Arc<Mutex<()>> {
-    static SEQUENCERS: OnceLock<Mutex<AdmissionMutationSequencers>> = OnceLock::new();
-
-    let key = format!(
-        "{}\0{}\0{}",
-        fence.store_uuid, fence.lease_id, fence.owner_epoch
-    );
-    let registry = SEQUENCERS.get_or_init(|| Mutex::new(HashMap::new()));
-    let mut sequencers = match registry.lock() {
-        Ok(sequencers) => sequencers,
-        Err(poisoned) => poisoned.into_inner(),
-    };
-    sequencers.retain(|_, sequencer| sequencer.strong_count() > 0);
-    if let Some(sequencer) = sequencers.get(&key).and_then(Weak::upgrade) {
-        return sequencer;
-    }
-    let sequencer = Arc::new(Mutex::new(()));
-    sequencers.insert(key, Arc::downgrade(&sequencer));
-    sequencer
+    mutation_sequencer: AdmissionMutationSequencer,
 }
 
 impl fmt::Debug for DurableAdmissionRuntime {
@@ -98,18 +74,16 @@ impl DurableAdmissionRuntime {
         Ok(Self {
             store,
             outcome_store,
-            mutation_sequencer: mutation_sequencer_for_fence(&fence),
+            mutation_sequencer: AdmissionMutationSequencer::for_fence(&fence)?,
             fence,
             claimant_id,
         })
     }
 
-    fn lock_mutations(&self) -> Result<MutexGuard<'_, ()>, KernelError> {
-        self.mutation_sequencer.lock().map_err(|_| {
-            KernelError::DurableAdmission(
-                "durable admission mutation sequencer is poisoned".to_owned(),
-            )
-        })
+    fn lock_mutations(&self) -> Result<AdmissionMutationGuard<'_>, KernelError> {
+        self.mutation_sequencer
+            .lock()
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))
     }
 
     fn refresh_trusted_time(&self, requested_unix_ms: u64) -> u64 {

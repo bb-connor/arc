@@ -309,6 +309,14 @@ fn n_of_m_transition_verifier_binds_the_complete_frost_authorization(
 struct MatchingAdmissionHandoff;
 
 impl EconomicAdmissionHandoffVerifier for MatchingAdmissionHandoff {
+    fn verify_operation_active(&self, operation_id: &str) -> Result<(), EconomicStateAnchorError> {
+        if operation_id == digest("operation-1") {
+            Ok(())
+        } else {
+            Err(EconomicStateAnchorError::AdmissionHandoffRejected)
+        }
+    }
+
     fn verify_handoff(
         &self,
         operation_id: &str,
@@ -460,6 +468,191 @@ fn only_signed_cas_commit_mints_effect_dispatch_authority(
             .is_err()
     );
     Ok(())
+}
+
+#[derive(Debug)]
+struct CancellationVerifier {
+    kind: EconomicNoEffectKindV1,
+}
+
+impl EconomicEffectCancellationProofVerifier for CancellationVerifier {
+    fn verify_cancellation(
+        &self,
+        current: &EconomicEffectSlotV1,
+        next: &EconomicEffectSlotV1,
+    ) -> Result<EconomicNoEffectKindV1, EconomicStateAnchorError> {
+        if current.slot_id != next.slot_id || current.state != EconomicEffectStateV1::Ready {
+            return Err(EconomicStateAnchorError::EffectCancellationRejected(
+                "cancellation slot binding changed",
+            ));
+        }
+        Ok(self.kind)
+    }
+}
+
+fn cancellation_advance(
+    kind: EconomicNoEffectKindV1,
+    admission: &dyn EconomicAdmissionHandoffVerifier,
+) -> Result<
+    (
+        VerifiedEconomicEffectCancellationAdvance,
+        EconomicEffectSlotV1,
+        EconomicResourceHeadV1,
+    ),
+    Box<dyn core::error::Error>,
+> {
+    let ready = ready_effect_slot()?;
+    let ready_content = inline_content(serde_json::to_value(&ready)?);
+    let ready_head = EconomicResourceHeadV1 {
+        schema: CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA.to_string(),
+        anchor_id: ready.anchor_id.clone(),
+        namespace: ready.namespace.clone(),
+        resource_key: ready.resource_head_key(),
+        head_version: 1,
+        resource_version: 1,
+        lifecycle_fence: 1,
+        lifecycle_state: "ready".to_string(),
+        state_digest: ready_content.digest()?,
+        state: ready_content,
+        operation_id: Some(ready.operation_id.clone()),
+        effect_idempotency_key: Some(ready.idempotency_key.clone()),
+        frost: None,
+        terminal_result: None,
+        trusted_clock_high_water: 500,
+        predecessor_digest: None,
+    };
+    let ready_head_digest = ready_head.digest()?;
+    let current_view = verify_economic_state_view(
+        signed_view(
+            1,
+            digest("checkpoint-1"),
+            vec![ready_head],
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+        )?,
+        &pins(),
+    )?;
+    let proof = inline_content(json!({"cancellation": "anchor-cas"}));
+    let mut cancelled = ready;
+    cancelled.state = EconomicEffectStateV1::NoEffect;
+    cancelled.terminal = Some(EconomicEffectTerminalV1::NoEffect {
+        kind,
+        proof_id: "anchor-cancellation-1".to_string(),
+        proof_digest: proof.digest()?,
+        proof,
+    });
+    let cancelled_content = inline_content(serde_json::to_value(&cancelled)?);
+    let cancelled_head = EconomicResourceHeadV1 {
+        schema: CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA.to_string(),
+        anchor_id: cancelled.anchor_id.clone(),
+        namespace: cancelled.namespace.clone(),
+        resource_key: cancelled.resource_head_key(),
+        head_version: 2,
+        resource_version: 2,
+        lifecycle_fence: 2,
+        lifecycle_state: "no_effect".to_string(),
+        state_digest: cancelled_content.digest()?,
+        state: cancelled_content,
+        operation_id: Some(cancelled.operation_id.clone()),
+        effect_idempotency_key: Some(cancelled.idempotency_key.clone()),
+        frost: None,
+        terminal_result: None,
+        trusted_clock_high_water: 501,
+        predecessor_digest: Some(ready_head_digest.clone()),
+    };
+    let mut batch = unsigned_batch(vec![transition(
+        cancelled_head.clone(),
+        Some(ready_head_digest),
+    )]);
+    batch.checkpoint_sequence = 2;
+    batch.previous_checkpoint_digest = Some(current_view.view().checkpoint_digest.clone());
+    batch.operation_id = Some(cancelled.operation_id.clone());
+    batch.issued_at = 501;
+    batch.seal(&anchor_keypair())?;
+    let advance = verify_economic_state_batch_advance(
+        &current_view,
+        batch,
+        &pins(),
+        &DirectTransitionVerifier,
+    )?;
+    let cancellation = verify_economic_effect_cancellation_advance(
+        advance,
+        &CancellationVerifier { kind },
+        admission,
+    )?;
+    Ok((cancellation, cancelled, cancelled_head))
+}
+
+#[test]
+fn only_verified_cancellation_cas_mints_no_dispatch_authority(
+) -> Result<(), Box<dyn core::error::Error>> {
+    let (advance, cancelled, cancelled_head) = cancellation_advance(
+        EconomicNoEffectKindV1::PermanentlyNotApplied,
+        &MatchingAdmissionHandoff,
+    )?;
+    let committed = verify_economic_state_view(
+        signed_view(
+            2,
+            advance.batch().checkpoint_digest.clone(),
+            vec![cancelled_head.clone()],
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+        )?,
+        &pins(),
+    )?;
+    let authority = verify_economic_effect_cancellation_commit(advance, &committed, &pins())?;
+    assert_eq!(authority.slot(), &cancelled);
+    assert_eq!(
+        authority.kind(),
+        EconomicNoEffectKindV1::PermanentlyNotApplied
+    );
+    assert_eq!(
+        authority.checkpoint_digest(),
+        committed.view().checkpoint_digest
+    );
+    assert_eq!(authority.expected_head_version(), 1);
+    assert_eq!(authority.resulting_head_version(), 2);
+    assert_eq!(authority.expected_lifecycle_fence(), 1);
+    assert_eq!(authority.resulting_lifecycle_fence(), 2);
+    assert_eq!(
+        authority.expected_head_digest(),
+        cancelled_head
+            .predecessor_digest
+            .as_deref()
+            .ok_or("predecessor")?
+    );
+    assert_eq!(authority.resulting_head_digest(), cancelled_head.digest()?);
+
+    assert!(cancellation_advance(
+        EconomicNoEffectKindV1::VerifiedTransportNotAccepted,
+        &RejectingAdmissionHandoff,
+    )
+    .is_err());
+    assert!(cancellation_advance(
+        EconomicNoEffectKindV1::PreDispatch,
+        &RejectingAdmissionHandoff,
+    )
+    .is_err());
+    Ok(())
+}
+
+#[derive(Debug)]
+struct RejectingAdmissionHandoff;
+
+impl EconomicAdmissionHandoffVerifier for RejectingAdmissionHandoff {
+    fn verify_operation_active(&self, _operation_id: &str) -> Result<(), EconomicStateAnchorError> {
+        Err(EconomicStateAnchorError::AdmissionHandoffRejected)
+    }
+
+    fn verify_handoff(
+        &self,
+        _operation_id: &str,
+        _handoff: &EconomicAdmissionHandoffV1,
+    ) -> Result<(), EconomicStateAnchorError> {
+        Err(EconomicStateAnchorError::AdmissionHandoffRejected)
+    }
 }
 
 #[test]

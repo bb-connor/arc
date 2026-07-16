@@ -4,17 +4,19 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core::economic_continuity::{
-    assess_economic_state_readiness, reverify_economic_effect_dispatch_advance,
-    reverify_economic_state_batch_advance, verify_economic_effect_dispatch_commit,
+    assess_economic_state_readiness, reverify_economic_effect_cancellation_advance,
+    reverify_economic_effect_dispatch_advance, reverify_economic_state_batch_advance,
+    verify_economic_effect_cancellation_commit, verify_economic_effect_dispatch_commit,
     verify_economic_state_batch_commit, verify_economic_state_view,
-    EconomicAdmissionHandoffVerifier, EconomicCheckpointReadQuery, EconomicEffectDispatchCommitV1,
-    EconomicStateAnchor, EconomicStateAnchorError, EconomicStateAnchorPins,
-    EconomicStateAnchorViewV1, EconomicStateReadQuery, EconomicStateReadiness,
-    EconomicStateReadinessExpectation, EconomicTransitionProofVerifier,
+    EconomicAdmissionHandoffVerifier, EconomicCheckpointReadQuery,
+    EconomicEffectCancellationProofVerifier, EconomicEffectDispatchCommitV1, EconomicStateAnchor,
+    EconomicStateAnchorError, EconomicStateAnchorPins, EconomicStateAnchorViewV1,
+    EconomicStateReadQuery, EconomicStateReadiness, EconomicStateReadinessExpectation,
+    EconomicTransitionProofVerifier, VerifiedEconomicEffectCancellationAdvance,
     VerifiedEconomicEffectDispatch, VerifiedEconomicEffectDispatchAdvance,
-    VerifiedEconomicStateBatchAdvance, VerifiedEconomicStateView, MAX_ECONOMIC_BATCH_BYTES,
-    MAX_ECONOMIC_INLINE_CONTENT_BYTES, MAX_ECONOMIC_TERMINAL_CONTENT_BYTES,
-    MAX_ECONOMIC_TRANSITIONS,
+    VerifiedEconomicEffectNotDispatched, VerifiedEconomicStateBatchAdvance,
+    VerifiedEconomicStateView, MAX_ECONOMIC_BATCH_BYTES, MAX_ECONOMIC_INLINE_CONTENT_BYTES,
+    MAX_ECONOMIC_TERMINAL_CONTENT_BYTES, MAX_ECONOMIC_TRANSITIONS,
 };
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -23,10 +25,13 @@ pub const ECONOMIC_STATE_READ_PATH: &str = "/v1/economic-state/read";
 pub const ECONOMIC_STATE_CHECKPOINT_READ_PATH: &str = "/v1/economic-state/checkpoints/read";
 pub const ECONOMIC_STATE_CAS_PATH: &str = "/v1/economic-state/compare-and-swap";
 pub const ECONOMIC_EFFECT_DISPATCH_PATH: &str = "/v1/economic-state/effects/dispatch";
+pub const ECONOMIC_EFFECT_CANCELLATION_PATH: &str = "/v1/economic-state/effects/cancel";
 const ECONOMIC_STATE_REQUEST_LIMIT: usize = MAX_ECONOMIC_BATCH_BYTES;
 const ECONOMIC_STATE_RESPONSE_LIMIT: usize = MAX_ECONOMIC_TRANSITIONS
     * (MAX_ECONOMIC_INLINE_CONTENT_BYTES + MAX_ECONOMIC_TERMINAL_CONTENT_BYTES)
     + 4 * 1024 * 1024;
+
+pub use crate::economic_effect_coordinator::SequencedEconomicEffectCoordinator as SequencedEconomicEffectDispatcher;
 
 #[derive(Clone)]
 pub struct RemoteEconomicStateAnchorConfig {
@@ -182,6 +187,7 @@ pub struct RemoteEconomicStateAnchor {
     pins: EconomicStateAnchorPins,
     transition_verifier: Arc<dyn EconomicTransitionProofVerifier>,
     admission_verifier: Arc<dyn EconomicAdmissionHandoffVerifier>,
+    cancellation_verifier: Arc<dyn EconomicEffectCancellationProofVerifier>,
     transport: Arc<dyn EconomicStateAnchorTransport>,
 }
 
@@ -199,6 +205,7 @@ impl RemoteEconomicStateAnchor {
         config: RemoteEconomicStateAnchorConfig,
         transition_verifier: Arc<dyn EconomicTransitionProofVerifier>,
         admission_verifier: Arc<dyn EconomicAdmissionHandoffVerifier>,
+        cancellation_verifier: Arc<dyn EconomicEffectCancellationProofVerifier>,
     ) -> Result<Self, EconomicStateAnchorConfigError> {
         config.validate()?;
         let transport = Arc::new(HttpsEconomicStateAnchorTransport::new(&config)?);
@@ -206,6 +213,7 @@ impl RemoteEconomicStateAnchor {
             pins: config.pins,
             transition_verifier,
             admission_verifier,
+            cancellation_verifier,
             transport,
         })
     }
@@ -215,6 +223,7 @@ impl RemoteEconomicStateAnchor {
         config: RemoteEconomicStateAnchorConfig,
         transition_verifier: Arc<dyn EconomicTransitionProofVerifier>,
         admission_verifier: Arc<dyn EconomicAdmissionHandoffVerifier>,
+        cancellation_verifier: Arc<dyn EconomicEffectCancellationProofVerifier>,
         transport: Arc<dyn EconomicStateAnchorTransport>,
     ) -> Result<Self, EconomicStateAnchorConfigError> {
         config.validate()?;
@@ -222,6 +231,7 @@ impl RemoteEconomicStateAnchor {
             pins: config.pins,
             transition_verifier,
             admission_verifier,
+            cancellation_verifier,
             transport,
         })
     }
@@ -300,6 +310,10 @@ impl EconomicStateAnchor for RemoteEconomicStateAnchor {
             &self.pins,
             self.transition_verifier.as_ref(),
         )?;
+        if let Some(operation_id) = advance.batch().operation_id.as_deref() {
+            self.admission_verifier
+                .verify_operation_active(operation_id)?;
+        }
         let committed = verify_economic_state_view(
             self.post(ECONOMIC_STATE_CAS_PATH, advance.batch())?,
             &self.pins,
@@ -323,17 +337,26 @@ impl EconomicStateAnchor for RemoteEconomicStateAnchor {
         let committed = verify_economic_state_view(response.view, &self.pins)?;
         verify_economic_effect_dispatch_commit(advance, &committed, response.commit, &self.pins)
     }
+
+    fn compare_and_swap_effect_cancellation(
+        &self,
+        advance: VerifiedEconomicEffectCancellationAdvance,
+    ) -> Result<VerifiedEconomicEffectNotDispatched, EconomicStateAnchorError> {
+        cancellation::compare_and_swap(self, advance)
+    }
 }
 
 pub fn compose_economic_state_anchor(
     config: RemoteEconomicStateAnchorConfig,
     transition_verifier: Arc<dyn EconomicTransitionProofVerifier>,
     admission_verifier: Arc<dyn EconomicAdmissionHandoffVerifier>,
+    cancellation_verifier: Arc<dyn EconomicEffectCancellationProofVerifier>,
 ) -> Result<Arc<dyn EconomicStateAnchor>, EconomicStateAnchorConfigError> {
     Ok(Arc::new(RemoteEconomicStateAnchor::new(
         config,
         transition_verifier,
         admission_verifier,
+        cancellation_verifier,
     )?))
 }
 
@@ -380,10 +403,17 @@ fn readiness_for_error(error: &EconomicStateAnchorError) -> EconomicStateReadine
     }
 }
 
+mod cancellation;
+
+#[cfg(test)]
+#[path = "economic_state_anchor/cancellation_tests.rs"]
+mod cancellation_tests;
+
 #[cfg(test)]
 mod tests {
     use std::collections::VecDeque;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::mpsc;
     use std::sync::MutexGuard;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
@@ -401,6 +431,7 @@ mod tests {
         CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA, CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
         CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
     };
+    use chio_kernel::admission_operation::AdmissionMutationSequencer;
     use serde_json::json;
 
     use super::*;
@@ -527,12 +558,57 @@ mod tests {
     struct AdmissionVerifier;
 
     impl chio_core::economic_continuity::EconomicAdmissionHandoffVerifier for AdmissionVerifier {
+        fn verify_operation_active(
+            &self,
+            _operation_id: &str,
+        ) -> Result<(), EconomicStateAnchorError> {
+            Ok(())
+        }
+
         fn verify_handoff(
             &self,
             _operation_id: &str,
             _handoff: &EconomicAdmissionHandoffV1,
         ) -> Result<(), EconomicStateAnchorError> {
             Ok(())
+        }
+    }
+
+    #[derive(Debug)]
+    struct RejectingActiveAdmissionVerifier;
+
+    impl chio_core::economic_continuity::EconomicAdmissionHandoffVerifier
+        for RejectingActiveAdmissionVerifier
+    {
+        fn verify_operation_active(
+            &self,
+            _operation_id: &str,
+        ) -> Result<(), EconomicStateAnchorError> {
+            Err(EconomicStateAnchorError::AdmissionHandoffRejected)
+        }
+
+        fn verify_handoff(
+            &self,
+            _operation_id: &str,
+            _handoff: &EconomicAdmissionHandoffV1,
+        ) -> Result<(), EconomicStateAnchorError> {
+            Err(EconomicStateAnchorError::AdmissionHandoffRejected)
+        }
+    }
+
+    #[derive(Debug)]
+    struct RejectingCancellationVerifier;
+
+    impl EconomicEffectCancellationProofVerifier for RejectingCancellationVerifier {
+        fn verify_cancellation(
+            &self,
+            _current: &EconomicEffectSlotV1,
+            _next: &EconomicEffectSlotV1,
+        ) -> Result<chio_core::economic_continuity::EconomicNoEffectKindV1, EconomicStateAnchorError>
+        {
+            Err(EconomicStateAnchorError::EffectCancellationRejected(
+                "fixture does not authorize cancellation",
+            ))
         }
     }
 
@@ -544,6 +620,14 @@ mod tests {
     impl chio_core::economic_continuity::EconomicAdmissionHandoffVerifier
         for CountingAdmissionVerifier
     {
+        fn verify_operation_active(
+            &self,
+            _operation_id: &str,
+        ) -> Result<(), EconomicStateAnchorError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+
         fn verify_handoff(
             &self,
             _operation_id: &str,
@@ -614,6 +698,7 @@ mod tests {
             lifecycle_state: match slot.state {
                 EconomicEffectStateV1::Ready => "ready",
                 EconomicEffectStateV1::DispatchCommitted => "dispatch_committed",
+                EconomicEffectStateV1::NoEffect => "no_effect",
                 _ => "terminal",
             }
             .to_owned(),
@@ -800,6 +885,7 @@ mod tests {
             ),
             Arc::new(DirectTransitionVerifier),
             Arc::new(AdmissionVerifier),
+            Arc::new(RejectingCancellationVerifier),
             transport.clone(),
         )?;
 
@@ -848,6 +934,7 @@ mod tests {
             ),
             Arc::new(DirectTransitionVerifier),
             Arc::new(AdmissionVerifier),
+            Arc::new(RejectingCancellationVerifier),
             transport.clone(),
         )?;
 
@@ -903,7 +990,7 @@ mod tests {
             }],
             effect_slots: Vec::new(),
             request_replays: Vec::new(),
-            operation_id: None,
+            operation_id: Some(digest("operation-1")),
             issued_at: 101,
             signer_key_id: "anchor-key-1".to_owned(),
             signer_key_epoch: 1,
@@ -940,6 +1027,7 @@ mod tests {
             ),
             verifier.clone(),
             Arc::new(AdmissionVerifier),
+            Arc::new(RejectingCancellationVerifier),
             transport.clone(),
         )?;
 
@@ -953,6 +1041,22 @@ mod tests {
             serde_json::from_slice::<EconomicStateBatchV1>(&requests[0].1)?,
             *advance.batch()
         );
+        drop(requests);
+
+        let rejected_transport = Arc::new(FixtureTransport::default());
+        let rejecting_anchor = RemoteEconomicStateAnchor::with_fixture_transport(
+            config(
+                "https://anchor.example",
+                "anchor-token",
+                Duration::from_secs(5),
+            ),
+            verifier,
+            Arc::new(RejectingActiveAdmissionVerifier),
+            Arc::new(RejectingCancellationVerifier),
+            rejected_transport.clone(),
+        )?;
+        assert!(rejecting_anchor.compare_and_swap_batch(&advance).is_err());
+        assert!(lock_unpoisoned(&rejected_transport.requests).is_empty());
         Ok(())
     }
 
@@ -985,6 +1089,7 @@ mod tests {
             ),
             transition_verifier.clone(),
             admission_verifier.clone(),
+            Arc::new(RejectingCancellationVerifier),
             transport.clone(),
         )?;
 
@@ -994,6 +1099,90 @@ mod tests {
         assert_eq!(admission_verifier.calls.load(Ordering::SeqCst), 2);
         let requests = lock_unpoisoned(&transport.requests);
         assert_eq!(requests[0].0, ECONOMIC_EFFECT_DISPATCH_PATH);
+        Ok(())
+    }
+
+    struct BlockingEffectAnchor {
+        entered: Mutex<Option<mpsc::Sender<()>>>,
+        release: Mutex<mpsc::Receiver<()>>,
+    }
+
+    impl EconomicStateAnchor for BlockingEffectAnchor {
+        fn read_state(
+            &self,
+            _query: &EconomicStateReadQuery,
+        ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
+            Err(EconomicStateAnchorError::Missing)
+        }
+
+        fn read_checkpoint_state(
+            &self,
+            _query: &EconomicCheckpointReadQuery,
+        ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
+            Err(EconomicStateAnchorError::Missing)
+        }
+
+        fn compare_and_swap_batch(
+            &self,
+            _advance: &VerifiedEconomicStateBatchAdvance,
+        ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
+            Err(EconomicStateAnchorError::Missing)
+        }
+
+        fn compare_and_swap_effect_dispatch(
+            &self,
+            _advance: VerifiedEconomicEffectDispatchAdvance,
+        ) -> Result<VerifiedEconomicEffectDispatch, EconomicStateAnchorError> {
+            if let Some(sender) = lock_unpoisoned(&self.entered).take() {
+                sender
+                    .send(())
+                    .map_err(|error| EconomicStateAnchorError::Unavailable(error.to_string()))?;
+            }
+            lock_unpoisoned(&self.release)
+                .recv()
+                .map_err(|error| EconomicStateAnchorError::Unavailable(error.to_string()))?;
+            Err(EconomicStateAnchorError::Unavailable(
+                "blocked dispatch fixture released".to_owned(),
+            ))
+        }
+    }
+
+    #[test]
+    fn effect_dispatch_shares_the_admission_mutation_sequence() -> TestResult {
+        let transition_verifier = CountingTransitionVerifier::default();
+        let admission_verifier = CountingAdmissionVerifier::default();
+        let (advance, _) = dispatch_advance(&transition_verifier, &admission_verifier)?;
+        let fence = advance.slot().admission_handoff.store_fence.clone();
+        let (entered_sender, entered_receiver) = mpsc::channel();
+        let (release_sender, release_receiver) = mpsc::channel();
+        let dispatcher = Arc::new(SequencedEconomicEffectDispatcher::new(
+            Arc::new(BlockingEffectAnchor {
+                entered: Mutex::new(Some(entered_sender)),
+                release: Mutex::new(release_receiver),
+            }),
+            &fence,
+        )?);
+        let dispatch_thread = std::thread::spawn(move || dispatcher.dispatch(advance));
+        entered_receiver.recv_timeout(Duration::from_secs(1))?;
+
+        let competing = AdmissionMutationSequencer::for_fence(&fence)?;
+        let (acquired_sender, acquired_receiver) = mpsc::channel();
+        let competing_thread = std::thread::spawn(move || {
+            let _guard = competing.lock().map_err(|error| error.to_string())?;
+            acquired_sender.send(()).map_err(|error| error.to_string())
+        });
+        assert!(acquired_receiver
+            .recv_timeout(Duration::from_millis(25))
+            .is_err());
+        release_sender.send(())?;
+        assert!(dispatch_thread
+            .join()
+            .map_err(|_| "dispatch thread panicked")?
+            .is_err());
+        acquired_receiver.recv_timeout(Duration::from_secs(1))?;
+        competing_thread
+            .join()
+            .map_err(|_| "competing thread panicked")??;
         Ok(())
     }
 
@@ -1031,6 +1220,7 @@ mod tests {
             ),
             Arc::new(DirectTransitionVerifier),
             Arc::new(AdmissionVerifier),
+            Arc::new(RejectingCancellationVerifier),
             transport,
         )?;
 

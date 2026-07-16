@@ -8,6 +8,7 @@ mod capture;
 mod identity;
 mod projection;
 mod remote_projection;
+mod sequencer;
 mod state;
 mod store;
 
@@ -17,6 +18,7 @@ pub use capture::*;
 pub use identity::*;
 pub use projection::*;
 pub use remote_projection::*;
+pub use sequencer::*;
 pub use store::*;
 
 pub const ADMISSION_OPERATION_SCHEMA: &str = "chio.admission-operation.v1";
@@ -141,6 +143,8 @@ pub enum AdmissionOperationError {
     TerminalProjectionBindingMismatch,
     #[error("terminal projection store lacks required capability {capability}")]
     MissingProjectionCapability { capability: &'static str },
+    #[error("durable admission mutation sequencer is poisoned")]
+    MutationSequencerPoisoned,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

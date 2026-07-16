@@ -125,6 +125,21 @@ impl EconomicOperationStageBinding {
     pub fn coordinator_lease_epoch(&self) -> u64 {
         self.coordinator_lease_epoch
     }
+
+    #[must_use]
+    pub fn recovery_claimant_id(&self) -> &str {
+        &self.recovery_claimant_id
+    }
+
+    #[must_use]
+    pub const fn recovery_expires_at_unix_ms(&self) -> u64 {
+        self.recovery_expires_at_unix_ms
+    }
+
+    #[must_use]
+    pub const fn store_fence(&self) -> &StoreMutationFence {
+        &self.store_fence
+    }
 }
 
 #[derive(Clone, Copy)]

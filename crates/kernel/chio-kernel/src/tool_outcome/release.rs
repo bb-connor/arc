@@ -6,6 +6,10 @@ use super::*;
 use crate::admission_operation::{
     AdmissionAttachment, AdmissionAttachmentKind, AdmissionOperationState,
 };
+use chio_core_types::economic_continuity::{
+    EconomicAdmissionHandoffStateV1, EconomicEffectSlotV1, EconomicEffectStateV1,
+    EconomicEffectTerminalV1, EconomicNoEffectKindV1, VerifiedEconomicEffectNotDispatched,
+};
 use chio_core_types::provider_attempt::{
     ProviderAttemptCheckpointV1, ProviderAttemptPhaseV1, ProviderCancellationBindingV1,
 };
@@ -39,6 +43,7 @@ fn imported_digest(
 pub enum ReleaseEvidenceArtifactKindV1 {
     ParticipantQuerySnapshot,
     SignedTransportStatus,
+    EconomicEffectCancellation,
     MonotonicAttemptCheckpoint,
     TerminalToolOutcome,
     TerminalPostReturnEvaluation,
@@ -123,6 +128,20 @@ enum ReleaseParticipantV1 {
     Transport,
 }
 
+impl ReleaseParticipantV1 {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Broker => "broker",
+            Self::Budget => "budget",
+            Self::Approval => "approval",
+            Self::Nonce => "nonce",
+            Self::OutcomeEligibility => "outcome-eligibility",
+            Self::Payment => "payment",
+            Self::Transport => "transport",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum ParticipantNoEffectDispositionV1 {
@@ -144,6 +163,44 @@ struct ParticipantQueryRecordV1 {
 }
 
 impl ParticipantQueryRecordV1 {
+    fn from_qualified_operation(
+        operation: &AdmissionOperationV1,
+        participant: ReleaseParticipantV1,
+        context: &AdmissionProjectionContext,
+    ) -> Result<Self, ToolOutcomeError> {
+        #[derive(Serialize)]
+        struct SourceDigest<'a> {
+            operation: &'a AdmissionOperationV1,
+            participant: ReleaseParticipantV1,
+            store_fence: &'a StoreMutationFence,
+        }
+
+        Ok(Self {
+            source_record_id: release_id(
+                "participant_query_source_record_id",
+                format!(
+                    "{}:{}:{}",
+                    operation.binding().operation_id().as_str(),
+                    participant.as_str(),
+                    operation.version()
+                ),
+            )?,
+            source_record_digest: domain_digest(
+                "chio.qualified-predispatch-participant-query.v1",
+                &SourceDigest {
+                    operation,
+                    participant,
+                    store_fence: &context.store_fence,
+                },
+            )?,
+            source_record_version: operation.version(),
+            source_store_fence: context.store_fence.clone(),
+            source_commit_index: operation.version(),
+            observed_at_unix_ms: context.trusted_time_unix_ms,
+            source_attachments: Vec::new(),
+        })
+    }
+
     #[cfg(test)]
     fn for_test(
         source_record_id: AdmissionIdentifier,
@@ -222,7 +279,6 @@ impl VerifiedParticipantNoEffectEvidenceV1 {
         }
     }
 
-    #[cfg(test)]
     fn from_verified_source(
         operation: &AdmissionOperationV1,
         participant: ReleaseParticipantV1,
@@ -592,8 +648,83 @@ pub struct VerifiedPreDispatchNoEffect {
 }
 
 impl VerifiedPreDispatchNoEffect {
+    pub(crate) fn from_qualified_operation_snapshot(
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+    ) -> Result<Self, ToolOutcomeError> {
+        validate_pre_dispatch_context(operation, context)?;
+        let requirements = operation.binding().participant_requirements();
+        let participant = |kind, required| {
+            if !participant_attachments(operation, kind).is_empty() {
+                return Err(ToolOutcomeError::Binding(
+                    "predispatch.acquired_participant",
+                ));
+            }
+            if required {
+                Ok(VerifiedParticipantNoEffectV1::NeverAcquired {
+                    evidence: VerifiedParticipantNoEffectEvidenceV1::from_verified_source(
+                        operation,
+                        kind,
+                        ParticipantNoEffectDispositionV1::NeverAcquired,
+                        ParticipantQueryRecordV1::from_qualified_operation(
+                            operation, kind, context,
+                        )?,
+                    )?,
+                })
+            } else {
+                Ok(VerifiedParticipantNoEffectV1::NotRequired)
+            }
+        };
+        let participant_dispositions = PreDispatchParticipantDispositionsV1 {
+            broker: participant(ReleaseParticipantV1::Broker, requirements.broker_attempt)?,
+            budget: participant(ReleaseParticipantV1::Budget, requirements.budget_capture)?,
+            approval: participant(ReleaseParticipantV1::Approval, requirements.approval)?,
+            nonce: participant(ReleaseParticipantV1::Nonce, requirements.execution_nonce)?,
+            outcome_eligibility: participant(
+                ReleaseParticipantV1::OutcomeEligibility,
+                requirements.outcome_eligibility,
+            )?,
+            payment: participant(ReleaseParticipantV1::Payment, requirements.payment)?,
+            transport: VerifiedParticipantNoEffectV1::NotDispatched {
+                evidence: VerifiedParticipantNoEffectEvidenceV1::from_verified_source(
+                    operation,
+                    ReleaseParticipantV1::Transport,
+                    ParticipantNoEffectDispositionV1::NotDispatched,
+                    ParticipantQueryRecordV1::from_qualified_operation(
+                        operation,
+                        ReleaseParticipantV1::Transport,
+                        context,
+                    )?,
+                )?,
+            },
+        };
+        Self::from_verified_parts(
+            operation,
+            context,
+            participant_dispositions,
+            serde_json::json!({
+                "authority": "qualified_admission_projection_store",
+                "version": 1
+            }),
+        )
+    }
+
     #[cfg(test)]
     fn from_verified_snapshot(
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+        participant_dispositions: PreDispatchParticipantDispositionsV1,
+        verifier_policy: Value,
+    ) -> Result<Self, ToolOutcomeError> {
+        Self::from_verified_parts(
+            operation,
+            context,
+            participant_dispositions,
+            verifier_policy,
+        )
+    }
+
+    fn from_verified_parts(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
         participant_dispositions: PreDispatchParticipantDispositionsV1,
@@ -759,6 +890,20 @@ struct SignedTransportStatusArtifactV1 {
     verifier_identity: AdmissionIdentifier,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EconomicEffectCancellationArtifactV1 {
+    slot: EconomicEffectSlotV1,
+    expected_head_version: u64,
+    expected_head_digest: AdmissionDigest,
+    expected_lifecycle_fence: u64,
+    resulting_head_version: u64,
+    resulting_head_digest: AdmissionDigest,
+    resulting_lifecycle_fence: u64,
+    checkpoint_sequence: u64,
+    checkpoint_digest: AdmissionDigest,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct VerifiedTransportNotAccepted {
     operation_id: AdmissionOperationId,
@@ -784,6 +929,139 @@ pub struct VerifiedTransportNotAccepted {
 }
 
 impl VerifiedTransportNotAccepted {
+    pub(crate) fn from_verified_economic_effect(
+        cancellation: &VerifiedEconomicEffectNotDispatched,
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+    ) -> Result<Self, ToolOutcomeError> {
+        validate_projection_context(operation, context)?;
+        if cancellation.kind() != EconomicNoEffectKindV1::VerifiedTransportNotAccepted
+            || operation.state() != AdmissionOperationState::DispatchCommitted
+        {
+            return Err(ToolOutcomeError::Binding(
+                "transport_not_accepted.economic_kind",
+            ));
+        }
+        let commit = operation
+            .dispatch_commit()
+            .ok_or(ToolOutcomeError::Binding(
+                "transport_not_accepted.dispatch_commit",
+            ))?;
+        validate_retained_dispatch_commit(operation, commit)?;
+        let attempt = operation
+            .provider_attempt()
+            .ok_or(ToolOutcomeError::Binding(
+                "transport_not_accepted.provider_attempt",
+            ))?;
+        let slot = cancellation.slot();
+        slot.validate()
+            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
+        let Some(EconomicEffectTerminalV1::NoEffect {
+            kind: EconomicNoEffectKindV1::VerifiedTransportNotAccepted,
+            proof_id,
+            proof_digest,
+            ..
+        }) = &slot.terminal
+        else {
+            return Err(ToolOutcomeError::Binding(
+                "transport_not_accepted.economic_terminal",
+            ));
+        };
+        if slot.state != EconomicEffectStateV1::NoEffect
+            || slot.operation_id != operation.binding().operation_id().as_str()
+            || slot.request.request_namespace_digest
+                != operation.replay_key().request_namespace_digest.as_str()
+            || slot.request.request_id != operation.replay_key().request_id.as_str()
+            || slot.request.request_binding_digest
+                != operation.binding().request_binding_hash().as_str()
+            || slot.admission_handoff.state != EconomicAdmissionHandoffStateV1::DispatchCommitted
+            || slot.admission_handoff.operation_version != operation.version()
+            || slot.admission_handoff.lifecycle_fence != operation.coordinator_lease_epoch()
+            || slot.admission_handoff.store_fence != commit.store_fence
+            || slot.target.target_id != attempt.transport_id
+            || slot.target.target_key_epoch != attempt.transport_key_epoch
+            || cancellation.resulting_head_version() <= cancellation.expected_head_version()
+        {
+            return Err(ToolOutcomeError::Binding(
+                "transport_not_accepted.economic_binding",
+            ));
+        }
+        let cancellation_artifact = EconomicEffectCancellationArtifactV1 {
+            slot: slot.clone(),
+            expected_head_version: cancellation.expected_head_version(),
+            expected_head_digest: imported_digest(
+                "economic_cancellation.expected_head_digest",
+                cancellation.expected_head_digest(),
+            )?,
+            expected_lifecycle_fence: cancellation.expected_lifecycle_fence(),
+            resulting_head_version: cancellation.resulting_head_version(),
+            resulting_head_digest: imported_digest(
+                "economic_cancellation.resulting_head_digest",
+                cancellation.resulting_head_digest(),
+            )?,
+            resulting_lifecycle_fence: cancellation.resulting_lifecycle_fence(),
+            checkpoint_sequence: cancellation.checkpoint_sequence(),
+            checkpoint_digest: imported_digest(
+                "economic_cancellation.checkpoint_digest",
+                cancellation.checkpoint_digest(),
+            )?,
+        };
+        let cancellation_evidence = ImmutableReleaseArtifactV1::new(
+            ReleaseEvidenceArtifactKindV1::EconomicEffectCancellation,
+            release_id("economic_cancellation_evidence_id", proof_id.clone())?,
+            serde_json::to_value(&cancellation_artifact)
+                .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
+        )?;
+        let policy = ImmutableReleaseArtifactV1::new(
+            ReleaseEvidenceArtifactKindV1::VerifierPolicy,
+            release_id(
+                "verifier_policy_evidence_id",
+                format!("{}:economic-anchor-policy", slot.operation_id),
+            )?,
+            serde_json::to_value(VerifierPolicyArtifactV1 {
+                policy: serde_json::json!({
+                    "anchorId": slot.anchor_id,
+                    "namespace": slot.namespace,
+                    "targetQualificationDigest": slot.target.qualification_digest,
+                }),
+            })
+            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
+        )?;
+        let proof = Self {
+            operation_id: operation.binding().operation_id().clone(),
+            operation_version: operation.version(),
+            request_id: operation.replay_key().request_id,
+            request_binding_hash: operation.binding().request_binding_hash().clone(),
+            dispatch_operation_version: commit.committed_version,
+            dispatch_fence: commit.store_fence.owner_epoch,
+            projection_coordinator_lease_id: context.coordinator_lease_id.clone(),
+            projection_coordinator_lease_epoch: context.coordinator_lease_epoch,
+            projection_store_fence: context.store_fence.clone(),
+            transport_attempt_id: release_id("transport_attempt_id", attempt.attempt_id.clone())?,
+            transport_identity: release_id("transport_identity", attempt.transport_id.clone())?,
+            transport_key_epoch: attempt.transport_key_epoch,
+            signed_status_digest: imported_digest(
+                "transport_not_accepted.signed_status_digest",
+                proof_digest,
+            )?,
+            qualification_digest: imported_digest(
+                "transport_not_accepted.qualification_digest",
+                slot.target.qualification_digest.clone(),
+            )?,
+            cancellation_fence: cancellation.resulting_head_version(),
+            verified_at_unix_ms: context.trusted_time_unix_ms,
+            verifier_identity: release_id(
+                "transport_not_accepted.verifier_identity",
+                slot.anchor_id.clone(),
+            )?,
+            monotonic_checkpoint_digest: cancellation_artifact.checkpoint_digest.clone(),
+            verifier_policy_digest: policy.digest.clone(),
+            artifacts: vec![cancellation_evidence, policy],
+        };
+        proof.validate_against(operation, context)?;
+        Ok(proof)
+    }
+
     #[allow(dead_code)]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn from_verified_provider(
@@ -945,14 +1223,35 @@ impl VerifiedTransportNotAccepted {
             || self.verified_at_unix_ms > context.trusted_time_unix_ms
             || (self.projection_store_fence == context.store_fence
                 && self.projection_coordinator_lease_id != context.coordinator_lease_id)
-            || self.artifacts.len() != 3
-            || self.artifacts[0].kind != ReleaseEvidenceArtifactKindV1::SignedTransportStatus
+        {
+            return Err(ToolOutcomeError::Binding(
+                "transport_not_accepted.projection_context",
+            ));
+        }
+        match self.artifacts.first().map(|artifact| artifact.kind) {
+            Some(ReleaseEvidenceArtifactKindV1::SignedTransportStatus) => {
+                self.validate_provider_evidence(operation)
+            }
+            Some(ReleaseEvidenceArtifactKindV1::EconomicEffectCancellation) => {
+                self.validate_economic_evidence(operation)
+            }
+            _ => Err(ToolOutcomeError::Binding(
+                "transport_not_accepted.artifact_kind",
+            )),
+        }
+    }
+
+    fn validate_provider_evidence(
+        &self,
+        operation: &AdmissionOperationV1,
+    ) -> Result<(), ToolOutcomeError> {
+        if self.artifacts.len() != 3
             || self.artifacts[1].kind != ReleaseEvidenceArtifactKindV1::MonotonicAttemptCheckpoint
             || self.artifacts[2].kind != ReleaseEvidenceArtifactKindV1::VerifierPolicy
             || self.verifier_policy_digest != self.artifacts[2].digest
         {
             return Err(ToolOutcomeError::Binding(
-                "transport_not_accepted.projection_context",
+                "transport_not_accepted.provider_artifact_shape",
             ));
         }
         let evidence = transport::validate_artifacts(&self.artifacts, self.verified_at_unix_ms)?;
@@ -974,6 +1273,82 @@ impl VerifiedTransportNotAccepted {
         {
             return Err(ToolOutcomeError::Binding(
                 "transport_not_accepted.artifacts",
+            ));
+        }
+        self.artifacts
+            .iter()
+            .try_for_each(ImmutableReleaseArtifactV1::validate)
+    }
+
+    fn validate_economic_evidence(
+        &self,
+        operation: &AdmissionOperationV1,
+    ) -> Result<(), ToolOutcomeError> {
+        if self.artifacts.len() != 2
+            || self.artifacts[1].kind != ReleaseEvidenceArtifactKindV1::VerifierPolicy
+            || self.verifier_policy_digest != self.artifacts[1].digest
+        {
+            return Err(ToolOutcomeError::Binding(
+                "transport_not_accepted.economic_artifact_shape",
+            ));
+        }
+        let artifact: EconomicEffectCancellationArtifactV1 =
+            parse_artifact_value(&self.artifacts[0])?;
+        let _: VerifierPolicyArtifactV1 = parse_artifact_value(&self.artifacts[1])?;
+        artifact
+            .slot
+            .validate()
+            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
+        let attempt = operation
+            .provider_attempt()
+            .ok_or(ToolOutcomeError::Binding(
+                "transport_not_accepted.provider_attempt",
+            ))?;
+        let commit = operation
+            .dispatch_commit()
+            .ok_or(ToolOutcomeError::Binding(
+                "transport_not_accepted.dispatch_commit",
+            ))?;
+        let Some(EconomicEffectTerminalV1::NoEffect {
+            kind: EconomicNoEffectKindV1::VerifiedTransportNotAccepted,
+            proof_digest,
+            ..
+        }) = &artifact.slot.terminal
+        else {
+            return Err(ToolOutcomeError::Binding(
+                "transport_not_accepted.economic_terminal",
+            ));
+        };
+        if artifact.slot.state != EconomicEffectStateV1::NoEffect
+            || artifact.slot.operation_id != self.operation_id.as_str()
+            || artifact.slot.request.request_namespace_digest
+                != operation.replay_key().request_namespace_digest.as_str()
+            || artifact.slot.request.request_id != self.request_id.as_str()
+            || artifact.slot.request.request_binding_digest != self.request_binding_hash.as_str()
+            || artifact.slot.admission_handoff.state
+                != EconomicAdmissionHandoffStateV1::DispatchCommitted
+            || artifact.slot.admission_handoff.operation_version != self.operation_version
+            || artifact.slot.admission_handoff.lifecycle_fence
+                != self.projection_coordinator_lease_epoch
+            || artifact.slot.admission_handoff.store_fence != commit.store_fence
+            || artifact.slot.target.target_id != attempt.transport_id
+            || artifact.slot.target.target_key_epoch != attempt.transport_key_epoch
+            || artifact.slot.target.qualification_digest != self.qualification_digest.as_str()
+            || artifact.expected_head_version == 0
+            || artifact.resulting_head_version <= artifact.expected_head_version
+            || artifact.expected_lifecycle_fence == 0
+            || artifact.resulting_lifecycle_fence <= artifact.expected_lifecycle_fence
+            || artifact.checkpoint_sequence == 0
+            || artifact.checkpoint_digest != self.monotonic_checkpoint_digest
+            || artifact.resulting_head_version != self.cancellation_fence
+            || proof_digest != self.signed_status_digest.as_str()
+            || attempt.attempt_id != self.transport_attempt_id.as_str()
+            || attempt.transport_id != self.transport_identity.as_str()
+            || attempt.transport_key_epoch != self.transport_key_epoch
+            || artifact.slot.anchor_id != self.verifier_identity.as_str()
+        {
+            return Err(ToolOutcomeError::Binding(
+                "transport_not_accepted.economic_artifacts",
             ));
         }
         self.artifacts

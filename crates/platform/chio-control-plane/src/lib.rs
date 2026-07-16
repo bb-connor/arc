@@ -1,8 +1,8 @@
 #![allow(clippy::result_large_err, clippy::too_many_arguments)]
-
 use std::fs;
 use std::path::Path;
 
+pub use chio_agent_web_interop as agent_web;
 use chio_core::crypto::Keypair;
 use chio_errors::_generated::error_codes::{
     ATTEST_PROVENANCE_MISSING, CAPABILITY_SCOPE_EXCEEDED, CAPABILITY_SUBJECT_MISMATCH, CLI_IO,
@@ -14,8 +14,6 @@ use chio_errors::_generated::error_codes::{
 use chio_errors::{ChioError, ErrorCodeSpec};
 use chio_kernel::transport::TransportError;
 use chio_kernel::{ChioKernel, KernelConfig, StructuredErrorReport};
-
-pub use chio_agent_web_interop as agent_web;
 pub mod attestation;
 pub mod certify;
 mod durable_admission;
@@ -26,6 +24,8 @@ pub use durable_admission::{
     validate_distinct_database_paths, validate_durable_admission_participant_paths,
     DurableAdmissionRuntime,
 };
+pub mod economic_admission_cancellation;
+pub mod economic_effect_coordinator;
 pub mod economic_state_anchor;
 pub mod economic_state_recovery;
 pub mod enterprise_federation;

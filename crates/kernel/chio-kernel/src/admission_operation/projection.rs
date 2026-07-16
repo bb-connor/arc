@@ -10,6 +10,10 @@ use super::*;
 
 mod participant_evidence;
 pub use participant_evidence::*;
+mod economic_cancellation;
+pub use economic_cancellation::*;
+mod pre_dispatch_compensation;
+pub use pre_dispatch_compensation::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AdmissionReceiptSchema {
