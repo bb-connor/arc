@@ -727,25 +727,31 @@ fn monetary_reconciler_resolves_orphaned_intents_through_the_journal(
     let harness = support::money_journal_harness("chio-monetary-reconciler", 75)?;
 
     // Fabricate a monetary orphan: an open intent plus its Authorized
-    // journal row, exactly the state a crash after authorize leaves.
+    // journal row, exactly the state a crash after authorize leaves. The
+    // recording store handle is dropped before reconciliation because an
+    // open intent only becomes an orphan once its owning writer is gone;
+    // a live writer's in-flight intents are never claimed.
     let intent_db_path = support::unique_db_path("chio-monetary-reconciler-intents");
+    {
+        let crashed_writer = SqliteReceiptStore::open(&intent_db_path)?;
+        crashed_writer.record_dispatch_intent_with_timeout(
+            &DispatchIntentRecord {
+                request_id: "req-orphan".to_string(),
+                capability_id: "cap".to_string(),
+                tool_server: "srv".to_string(),
+                tool_name: "write_file".to_string(),
+                parameter_hash: "hash".to_string(),
+                side_effect_class: SideEffectClass::Monetary,
+                monetary: true,
+                rail: Some("x402".to_string()),
+                rail_authorization_id: Some("auth-req-orphan".to_string()),
+                tenant_id: None,
+                created_at_unix_ms: 1,
+            },
+            std::time::Duration::from_secs(5),
+        )?;
+    }
     let receipt_store = Arc::new(SqliteReceiptStore::open(&intent_db_path)?);
-    receipt_store.record_dispatch_intent_with_timeout(
-        &DispatchIntentRecord {
-            request_id: "req-orphan".to_string(),
-            capability_id: "cap".to_string(),
-            tool_server: "srv".to_string(),
-            tool_name: "write_file".to_string(),
-            parameter_hash: "hash".to_string(),
-            side_effect_class: SideEffectClass::Monetary,
-            monetary: true,
-            rail: Some("x402".to_string()),
-            rail_authorization_id: Some("auth-req-orphan".to_string()),
-            tenant_id: None,
-            created_at_unix_ms: 1,
-        },
-        std::time::Duration::from_secs(5),
-    )?;
 
     harness
         .budget_store
