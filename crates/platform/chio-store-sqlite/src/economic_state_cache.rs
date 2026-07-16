@@ -23,16 +23,41 @@ pub(crate) use persistence::verify_cache_sql_invariants;
 use persistence::*;
 
 const ECONOMIC_STATE_CACHE_SCHEMA_KEY: &str = "economic_state_cache";
-pub(crate) const ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
+pub(crate) const ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION: i32 = 2;
 const ECONOMIC_STATE_CACHE_SCHEMA_ANCHORS: &[&str] =
     &["economic_state_stages", "capability_grant_budgets"];
 const MAX_REASON_BYTES: usize = 4 * 1024;
 const MAX_VIEW_BYTES: usize = 4 * MAX_ECONOMIC_BATCH_BYTES;
+const MAX_DESCRIPTOR_BYTES: usize = 4 * MAX_ECONOMIC_BATCH_BYTES;
+const MAX_DESCRIPTOR_KIND_BYTES: usize = 128;
+const MAX_DESCRIPTOR_KEY_BYTES: usize = 2_048;
 const MAX_TRUSTED_UNIX_MS: u64 = (1_u64 << 53) - 1;
 const GENESIS_STAGE_COMMIT_DIGEST: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
 
 const ECONOMIC_STATE_CACHE_SCHEMA: &str = include_str!("economic_state_cache.sql");
+const ECONOMIC_STATE_CACHE_DESCRIPTOR_MIGRATION: &str = r#"
+ALTER TABLE economic_state_stages ADD COLUMN descriptor_kind TEXT
+    CHECK (descriptor_kind IS NULL OR length(descriptor_kind) BETWEEN 1 AND 128);
+ALTER TABLE economic_state_stages ADD COLUMN descriptor_key TEXT
+    CHECK (descriptor_key IS NULL OR length(descriptor_key) BETWEEN 1 AND 2048);
+ALTER TABLE economic_state_stages ADD COLUMN descriptor_digest TEXT
+    CHECK (descriptor_digest IS NULL OR (
+        length(descriptor_digest) = 64
+        AND descriptor_digest NOT GLOB '*[^0-9a-f]*'
+    ));
+ALTER TABLE economic_state_stages ADD COLUMN descriptor_json BLOB
+    CHECK (descriptor_json IS NULL OR length(descriptor_json) BETWEEN 1 AND 4194304);
+DROP TRIGGER IF EXISTS economic_state_stage_identity_immutable;
+CREATE TRIGGER economic_state_stage_identity_immutable
+BEFORE UPDATE OF batch_id, checkpoint_sequence, checkpoint_digest,
+    base_view_json, batch_json, operation_binding_json, descriptor_kind,
+    descriptor_key, descriptor_digest, descriptor_json, created_at_unix_ms
+ON economic_state_stages
+BEGIN
+    SELECT RAISE(ABORT, 'economic stage identity is immutable');
+END;
+"#;
 
 #[derive(Debug, thiserror::Error)]
 pub enum EconomicStateCacheError {
@@ -105,6 +130,90 @@ pub struct EconomicOperationStageBinding {
     store_fence: StoreMutationFence,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EconomicStateStageDescriptor {
+    kind: String,
+    key: String,
+    digest: String,
+    canonical_json: Vec<u8>,
+}
+
+impl EconomicStateStageDescriptor {
+    pub fn new<T: Serialize>(
+        kind: impl Into<String>,
+        key: impl Into<String>,
+        value: &T,
+    ) -> Result<Self, EconomicStateCacheError> {
+        let descriptor = Self {
+            kind: kind.into(),
+            key: key.into(),
+            digest: String::new(),
+            canonical_json: canonical_bounded(value, MAX_DESCRIPTOR_BYTES, "stage descriptor")?,
+        };
+        descriptor.with_digest()
+    }
+
+    fn from_stored(
+        kind: String,
+        key: String,
+        digest: String,
+        canonical_json: Vec<u8>,
+    ) -> Result<Self, EconomicStateCacheError> {
+        let descriptor = Self {
+            kind,
+            key,
+            digest,
+            canonical_json,
+        };
+        descriptor.validate()?;
+        Ok(descriptor)
+    }
+
+    fn with_digest(mut self) -> Result<Self, EconomicStateCacheError> {
+        self.digest = sha256_hex(&self.canonical_json);
+        self.validate()?;
+        Ok(self)
+    }
+
+    fn validate(&self) -> Result<(), EconomicStateCacheError> {
+        validate_descriptor_text(
+            &self.kind,
+            MAX_DESCRIPTOR_KIND_BYTES,
+            "stage descriptor kind",
+        )?;
+        validate_descriptor_text(&self.key, MAX_DESCRIPTOR_KEY_BYTES, "stage descriptor key")?;
+        validate_digest(&self.digest, "stage descriptor digest")?;
+        if self.canonical_json.is_empty()
+            || self.canonical_json.len() > MAX_DESCRIPTOR_BYTES
+            || sha256_hex(&self.canonical_json) != self.digest
+        {
+            return Err(invariant("economic stage descriptor is invalid"));
+        }
+        decode_exact::<serde_json::Value>(&self.canonical_json, "stage descriptor")?;
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn kind(&self) -> &str {
+        &self.kind
+    }
+
+    #[must_use]
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+
+    #[must_use]
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+
+    pub fn decode<T: DeserializeOwned + Serialize>(&self) -> Result<T, EconomicStateCacheError> {
+        self.validate()?;
+        decode_exact(&self.canonical_json, "stage descriptor")
+    }
+}
+
 impl EconomicOperationStageBinding {
     #[must_use]
     pub fn operation_id(&self) -> &str {
@@ -167,6 +276,7 @@ pub struct EconomicStateStageRecord {
     batch: EconomicStateBatchV1,
     committed_view: Option<EconomicStateAnchorViewV1>,
     operation_binding: Option<EconomicOperationStageBinding>,
+    descriptor: Option<EconomicStateStageDescriptor>,
     status: EconomicStateStageStatus,
     reason: Option<String>,
     version: u64,
@@ -194,6 +304,11 @@ impl EconomicStateStageRecord {
     #[must_use]
     pub fn operation_binding(&self) -> Option<&EconomicOperationStageBinding> {
         self.operation_binding.as_ref()
+    }
+
+    #[must_use]
+    pub fn descriptor(&self) -> Option<&EconomicStateStageDescriptor> {
+        self.descriptor.as_ref()
     }
 
     #[must_use]
@@ -287,7 +402,27 @@ impl SqliteEconomicStateCache {
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<EconomicStateStageRecord, EconomicStateCacheError> {
+        self.stage_batch_with_descriptor(
+            advance,
+            operation,
+            None,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    pub fn stage_batch_with_descriptor(
+        &self,
+        advance: &VerifiedEconomicStateBatchAdvance,
+        operation: Option<EconomicOperationStageContext<'_>>,
+        descriptor: Option<EconomicStateStageDescriptor>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<EconomicStateStageRecord, EconomicStateCacheError> {
         validate_trusted_time(trusted_now_unix_ms)?;
+        if let Some(descriptor) = &descriptor {
+            descriptor.validate()?;
+        }
         let base_view_bytes =
             canonical_bounded(advance.current().view(), MAX_VIEW_BYTES, "base view")?;
         let batch_bytes = advance.batch().canonical_bytes()?;
@@ -306,6 +441,9 @@ impl SqliteEconomicStateCache {
                 trusted_now_unix_ms,
             )?;
             if qualified != existing.operation_binding {
+                return Err(EconomicStateCacheError::Conflict);
+            }
+            if descriptor != existing.descriptor {
                 return Err(EconomicStateCacheError::Conflict);
             }
             transaction.commit().map_err(sqlite_error)?;
@@ -328,6 +466,7 @@ impl SqliteEconomicStateCache {
             batch: advance.batch().clone(),
             committed_view: None,
             operation_binding,
+            descriptor,
             status: EconomicStateStageStatus::DbStaged,
             reason: None,
             version: 1,
@@ -342,9 +481,14 @@ impl SqliteEconomicStateCache {
                 INSERT INTO economic_state_stages (
                     batch_id, checkpoint_sequence, checkpoint_digest,
                     base_view_json, batch_json, committed_view_json,
-                    operation_binding_json, status, reason, stage_version,
-                    snapshot_digest, created_at_unix_ms, updated_at_unix_ms
-                ) VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, NULL, 1, ?8, ?9, ?9)
+                    operation_binding_json, descriptor_kind, descriptor_key,
+                    descriptor_digest, descriptor_json, status, reason,
+                    stage_version, snapshot_digest, created_at_unix_ms,
+                    updated_at_unix_ms
+                ) VALUES (
+                    ?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8, ?9, ?10,
+                    ?11, NULL, 1, ?12, ?13, ?13
+                )
                 "#,
                 params![
                     &record.batch.batch_id,
@@ -353,6 +497,16 @@ impl SqliteEconomicStateCache {
                     base_view_bytes,
                     batch_bytes,
                     operation_binding_bytes,
+                    record.descriptor.as_ref().map(|value| value.kind.as_str()),
+                    record.descriptor.as_ref().map(|value| value.key.as_str()),
+                    record
+                        .descriptor
+                        .as_ref()
+                        .map(|value| value.digest.as_str()),
+                    record
+                        .descriptor
+                        .as_ref()
+                        .map(|value| value.canonical_json.as_slice()),
                     record.status.as_str(),
                     &record.snapshot_digest,
                     sqlite_i64(trusted_now_unix_ms, "trusted_now_unix_ms")?,
@@ -773,6 +927,26 @@ pub(crate) fn initialize_economic_state_cache_schema(
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
+    let stage_table_exists = transaction
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'economic_state_stages')",
+            [],
+            |row| row.get::<_, bool>(0),
+        )
+        .map_err(sqlite_error)?;
+    let descriptor_column_exists = stage_table_exists
+        && transaction
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM pragma_table_info('economic_state_stages') WHERE name = 'descriptor_kind')",
+                [],
+                |row| row.get::<_, bool>(0),
+            )
+            .map_err(sqlite_error)?;
+    if stage_table_exists && !descriptor_column_exists {
+        transaction
+            .execute_batch(ECONOMIC_STATE_CACHE_DESCRIPTOR_MIGRATION)
+            .map_err(sqlite_error)?;
+    }
     transaction
         .execute_batch(ECONOMIC_STATE_CACHE_SCHEMA)
         .map_err(sqlite_error)?;
@@ -871,6 +1045,22 @@ fn qualify_operation_binding(
         recovery_expires_at_unix_ms: lease.expires_at_unix_ms(),
         store_fence: active_fence.clone(),
     }))
+}
+
+fn validate_descriptor_text(
+    value: &str,
+    maximum: usize,
+    field: &'static str,
+) -> Result<(), EconomicStateCacheError> {
+    if value.is_empty()
+        || value.len() > maximum
+        || value.trim() != value
+        || value.chars().any(char::is_control)
+    {
+        Err(invariant(format!("{field} is invalid")))
+    } else {
+        Ok(())
+    }
 }
 
 #[cfg(test)]

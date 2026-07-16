@@ -15,6 +15,21 @@ CREATE TABLE IF NOT EXISTS economic_state_stages (
     operation_binding_json BLOB CHECK (
         operation_binding_json IS NULL OR length(operation_binding_json) BETWEEN 1 AND 65536
     ),
+    descriptor_kind TEXT CHECK (
+        descriptor_kind IS NULL OR length(descriptor_kind) BETWEEN 1 AND 128
+    ),
+    descriptor_key TEXT CHECK (
+        descriptor_key IS NULL OR length(descriptor_key) BETWEEN 1 AND 2048
+    ),
+    descriptor_digest TEXT CHECK (
+        descriptor_digest IS NULL OR (
+            length(descriptor_digest) = 64
+            AND descriptor_digest NOT GLOB '*[^0-9a-f]*'
+        )
+    ),
+    descriptor_json BLOB CHECK (
+        descriptor_json IS NULL OR length(descriptor_json) BETWEEN 1 AND 4194304
+    ),
     status TEXT NOT NULL CHECK (status IN (
         'db_staged', 'economic_anchor_advanced', 'db_finalized',
         'discarded', 'quarantined'
@@ -34,6 +49,12 @@ CREATE TABLE IF NOT EXISTS economic_state_stages (
         OR (status IN ('economic_anchor_advanced', 'db_finalized')
             AND committed_view_json IS NOT NULL AND reason IS NULL)
         OR (status IN ('discarded', 'quarantined') AND reason IS NOT NULL)
+    ),
+    CHECK (
+        (descriptor_kind IS NULL AND descriptor_key IS NULL
+            AND descriptor_digest IS NULL AND descriptor_json IS NULL)
+        OR (descriptor_kind IS NOT NULL AND descriptor_key IS NOT NULL
+            AND descriptor_digest IS NOT NULL AND descriptor_json IS NOT NULL)
     )
 );
 
@@ -141,7 +162,8 @@ END;
 
 CREATE TRIGGER IF NOT EXISTS economic_state_stage_identity_immutable
 BEFORE UPDATE OF batch_id, checkpoint_sequence, checkpoint_digest,
-    base_view_json, batch_json, operation_binding_json, created_at_unix_ms
+    base_view_json, batch_json, operation_binding_json, descriptor_kind,
+    descriptor_key, descriptor_digest, descriptor_json, created_at_unix_ms
 ON economic_state_stages
 BEGIN
     SELECT RAISE(ABORT, 'economic stage identity is immutable');

@@ -43,8 +43,10 @@ pub(super) fn load_stage_tx(
         .query_row(
             r#"
             SELECT base_view_json, batch_json, committed_view_json,
-                   operation_binding_json, status, reason, stage_version,
-                   snapshot_digest, created_at_unix_ms, updated_at_unix_ms
+                   operation_binding_json, descriptor_kind, descriptor_key,
+                   descriptor_digest, descriptor_json, status, reason,
+                   stage_version, snapshot_digest, created_at_unix_ms,
+                   updated_at_unix_ms
             FROM economic_state_stages WHERE batch_id = ?1
             "#,
             [batch_id],
@@ -88,6 +90,10 @@ struct StoredStage {
     batch: Vec<u8>,
     committed_view: Option<Vec<u8>>,
     operation_binding: Option<Vec<u8>>,
+    descriptor_kind: Option<String>,
+    descriptor_key: Option<String>,
+    descriptor_digest: Option<String>,
+    descriptor_json: Option<Vec<u8>>,
     status: String,
     reason: Option<String>,
     version: i64,
@@ -111,11 +117,24 @@ impl StoredStage {
             .as_deref()
             .map(|bytes| decode_exact(bytes, "economic operation binding"))
             .transpose()?;
+        let descriptor = match (
+            self.descriptor_kind,
+            self.descriptor_key,
+            self.descriptor_digest,
+            self.descriptor_json,
+        ) {
+            (Some(kind), Some(key), Some(digest), Some(json)) => Some(
+                EconomicStateStageDescriptor::from_stored(kind, key, digest, json)?,
+            ),
+            (None, None, None, None) => None,
+            _ => return Err(invariant("economic stage descriptor is incomplete")),
+        };
         Ok(EconomicStateStageRecord {
             base_view,
             batch,
             committed_view,
             operation_binding,
+            descriptor,
             status: EconomicStateStageStatus::parse(&self.status)?,
             reason: self.reason,
             version: stored_u64(self.version, "stage_version")?,
@@ -132,12 +151,16 @@ fn read_stored_stage(row: &Row<'_>) -> rusqlite::Result<StoredStage> {
         batch: row.get(1)?,
         committed_view: row.get(2)?,
         operation_binding: row.get(3)?,
-        status: row.get(4)?,
-        reason: row.get(5)?,
-        version: row.get(6)?,
-        snapshot_digest: row.get(7)?,
-        created_at: row.get(8)?,
-        updated_at: row.get(9)?,
+        descriptor_kind: row.get(4)?,
+        descriptor_key: row.get(5)?,
+        descriptor_digest: row.get(6)?,
+        descriptor_json: row.get(7)?,
+        status: row.get(8)?,
+        reason: row.get(9)?,
+        version: row.get(10)?,
+        snapshot_digest: row.get(11)?,
+        created_at: row.get(12)?,
+        updated_at: row.get(13)?,
     })
 }
 
@@ -193,6 +216,12 @@ struct StageSnapshot<'a> {
     batch_sha256: String,
     committed_view_sha256: Option<String>,
     operation_binding_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    descriptor_kind: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    descriptor_key: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    descriptor_digest: Option<&'a str>,
     status: EconomicStateStageStatus,
     reason: Option<&'a str>,
     version: u64,
@@ -226,6 +255,12 @@ pub(super) fn stage_snapshot_digest(
         batch_sha256: sha256_hex(&batch),
         committed_view_sha256: committed.as_deref().map(sha256_hex),
         operation_binding_sha256: binding.as_deref().map(sha256_hex),
+        descriptor_kind: record.descriptor.as_ref().map(|value| value.kind.as_str()),
+        descriptor_key: record.descriptor.as_ref().map(|value| value.key.as_str()),
+        descriptor_digest: record
+            .descriptor
+            .as_ref()
+            .map(|value| value.digest.as_str()),
         status: record.status,
         reason: record.reason.as_deref(),
         version: record.version,
@@ -354,6 +389,12 @@ pub(crate) fn verify_cache_sql_invariants(
                          AND staged.head_digest = head.head_digest
                          AND staged.head_json = head.head_json
                    )
+            )
+            OR EXISTS(
+                SELECT 1 FROM economic_state_stages
+                WHERE (descriptor_kind IS NULL) <> (descriptor_key IS NULL)
+                   OR (descriptor_kind IS NULL) <> (descriptor_digest IS NULL)
+                   OR (descriptor_kind IS NULL) <> (descriptor_json IS NULL)
             )
             "#,
             [],

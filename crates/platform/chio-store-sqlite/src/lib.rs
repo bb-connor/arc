@@ -190,7 +190,8 @@ pub use batch_approval_store::SqliteBatchApprovalStore;
 pub use budget_store::{BudgetStoreSnapshot, SqliteBudgetStore};
 pub use economic_state_cache::{
     EconomicOperationStageBinding, EconomicOperationStageContext, EconomicStateCacheError,
-    EconomicStateStageRecord, EconomicStateStageStatus, SqliteEconomicStateCache,
+    EconomicStateStageDescriptor, EconomicStateStageRecord, EconomicStateStageStatus,
+    SqliteEconomicStateCache,
 };
 pub use encrypted_blob::{
     decrypt_blob, encrypt_blob, BlobHandle, BlobStoreError, DecryptError, EncryptError,
