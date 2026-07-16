@@ -5,18 +5,24 @@ use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{sha256_hex, Keypair};
 use chio_core_types::economic_continuity::{
     verify_economic_state_batch_advance, verify_economic_state_batch_commit,
-    verify_economic_state_view, EconomicContentV1, EconomicFrostBindingV1, EconomicResourceHeadV1,
+    verify_economic_state_view, EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1,
+    EconomicContentV1, EconomicEffectSlotV1, EconomicEffectStateV1, EconomicEffectTargetV1,
+    EconomicFrostBindingV1, EconomicRequestBindingV1, EconomicResourceHeadV1,
     EconomicResourceKeyV1, EconomicStateAnchorError, EconomicStateAnchorPins,
     EconomicStateAnchorViewV1, EconomicStateBatchV1, EconomicTransitionAuthorizationV1,
-    CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA, CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
-    CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
+    CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
+    CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA, CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
 };
+use chio_core_types::StoreMutationFence;
 use chio_credit::clearing::{
-    clearing_reservation_root, compose_clearing_lifecycle_transition, AnchoredClearingObligationV1,
+    clearing_reservation_root, compose_clearing_dispatch_transition,
+    compose_clearing_lifecycle_transition, AnchoredClearingObligationV1,
     ClearingLifecycleAuthorityVerifier, ClearingLifecycleBatchVerifier,
     ClearingLifecycleProofResolver, ClearingObligationInputV1, ClearingRoundLifecycleRecordV1,
-    ClearingRoundTransitionProofV1, ClearingRoundTransitionV1, NettingRoundCoreV1,
-    CLEARING_ALGORITHM_V1, CLEARING_ROUND_CORE_SCHEMA,
+    ClearingRoundTransitionProofV1, ClearingRoundTransitionV1, ClearingSettlementIntentV1,
+    NettingRoundCoreV1, SignedClearingSettlementIntentV1, CLEARING_ALGORITHM_V1,
+    CLEARING_ROUND_CORE_SCHEMA, CLEARING_SETTLEMENT_DISPATCH_EFFECT_KIND,
+    CLEARING_SETTLEMENT_INTENT_SCHEMA,
 };
 use chio_credit::obligation::{
     ObligationAtomInputV1, ObligationAtomV1, ObligationCreditElectionV1,
@@ -218,9 +224,9 @@ fn signed_batch(
         expected_heads_root: String::new(),
         next_heads_root: String::new(),
         transitions: projection.transitions().to_vec(),
-        effect_slots: Vec::new(),
-        request_replays: Vec::new(),
-        operation_id: None,
+        effect_slots: projection.effect_slots().to_vec(),
+        request_replays: projection.request_replays().to_vec(),
+        operation_id: projection.operation_id().map(str::to_owned),
         issued_at: current.observed_at + 1,
         signer_key_id: "anchor-key-1".to_owned(),
         signer_key_epoch: 1,
@@ -305,6 +311,76 @@ fn anchored_obligations(
                 })
         })
         .collect()
+}
+
+fn signed_dispatch_intent(
+    round_core_digest: &str,
+    label: &str,
+) -> Result<SignedClearingSettlementIntentV1, Box<dyn std::error::Error>> {
+    Ok(SignedClearingSettlementIntentV1::sign(
+        ClearingSettlementIntentV1 {
+            schema: CLEARING_SETTLEMENT_INTENT_SCHEMA.to_owned(),
+            intent_id: format!("intent-{label}"),
+            round_core_digest: round_core_digest.to_owned(),
+            ordinal: 1,
+            debtor_participant_id: "debtor-1".to_owned(),
+            creditor_participant_id: "creditor-1".to_owned(),
+            creditor_settlement_destination: "acct:creditor-1".to_owned(),
+            amount: MonetaryAmount {
+                currency: "USD".to_owned(),
+                units: 100,
+            },
+            contributing_reservation_root: digest("contributing-reservations"),
+            dispatch_idempotency_key: digest(&format!("dispatch-key-{label}")),
+        },
+        &Keypair::from_seed(&[51; 32]),
+    )?)
+}
+
+fn dispatch_slot(
+    source_round_head: &EconomicResourceHeadV1,
+    intent: &SignedClearingSettlementIntentV1,
+    label: &str,
+) -> Result<EconomicEffectSlotV1, Box<dyn std::error::Error>> {
+    let mut slot = EconomicEffectSlotV1 {
+        schema: CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA.to_owned(),
+        slot_id: String::new(),
+        anchor_id: source_round_head.anchor_id.clone(),
+        namespace: source_round_head.namespace.clone(),
+        resource_key: source_round_head.resource_key.clone(),
+        operation_id: digest(&format!("operation-{label}")),
+        effect_kind: CLEARING_SETTLEMENT_DISPATCH_EFFECT_KIND.to_owned(),
+        request: EconomicRequestBindingV1 {
+            request_namespace_digest: digest("request-namespace"),
+            request_id: format!("request-{label}"),
+            request_binding_digest: digest(&format!("request-binding-{label}")),
+        },
+        admission_handoff: EconomicAdmissionHandoffV1 {
+            state: EconomicAdmissionHandoffStateV1::DispatchCommitted,
+            operation_version: 6,
+            lifecycle_fence: 9,
+            store_fence: StoreMutationFence {
+                store_uuid: "store-1".to_owned(),
+                lease_id: "lease-1".to_owned(),
+                owner_epoch: 3,
+            },
+        },
+        target: EconomicEffectTargetV1 {
+            target_id: "settlement-rail".to_owned(),
+            target_key_epoch: 2,
+            qualification_digest: digest("settlement-rail-qualification"),
+        },
+        action_digest: intent.digest()?,
+        parameters_digest: intent.body.digest()?,
+        resource_head_digest: source_round_head.digest()?,
+        frost: None,
+        idempotency_key: intent.body.dispatch_idempotency_key.clone(),
+        state: EconomicEffectStateV1::Ready,
+        terminal: None,
+    };
+    slot.slot_id = slot.recompute_slot_id()?;
+    slot.validate()?;
+    Ok(slot)
 }
 
 #[test]
@@ -425,7 +501,7 @@ fn finalization_and_abort_compete_on_one_complete_external_projection() -> TestR
 }
 
 #[test]
-fn finalizing_abort_requires_a_burn_and_finalized_rounds_cannot_abort() -> TestResult {
+fn finalizing_abort_requires_a_burn_and_dispatch_is_effect_fenced() -> TestResult {
     let inputs = vec![reserved_obligation(1)?];
     let core = core(&inputs)?;
     let reserved = ClearingRoundLifecycleRecordV1::reserved(&core)?;
@@ -537,6 +613,130 @@ fn finalizing_abort_requires_a_burn_and_finalized_rounds_cannot_abort() -> TestR
             frost_burn_checkpoint_digest: Some(digest("burned-slot")),
         },
         504,
+    )
+    .is_err());
+
+    let first_intent = signed_dispatch_intent(&core.digest()?, "first")?;
+    let first_slot = dispatch_slot(&finalized_head, &first_intent, "first")?;
+    let first_dispatch = compose_clearing_dispatch_transition(
+        &finalized_head,
+        &finalized_obligations,
+        &first_intent,
+        first_slot.clone(),
+        504,
+    )?;
+    validate_schema(
+        "clearing-round-transition-proof.v1.json",
+        first_dispatch.proof(),
+    )?;
+    assert_eq!(first_dispatch.transitions().len(), inputs.len() + 2);
+    assert_eq!(
+        first_dispatch.effect_slots(),
+        std::slice::from_ref(&first_slot)
+    );
+    assert_eq!(
+        first_dispatch.operation_id(),
+        Some(first_slot.operation_id.as_str())
+    );
+    let mut dispatch_view = signed_view(2, digest("finalized-checkpoint"), finalized_heads)?;
+    dispatch_view.absent_resource_keys = vec![first_slot.resource_head_key()];
+    dispatch_view.absent_request_keys = vec![first_slot.request.key()];
+    dispatch_view.seal(&anchor_key())?;
+    let verified_dispatch_view = verify_economic_state_view(dispatch_view.clone(), &pins())?;
+    let dispatch_batch = signed_batch(&first_dispatch, &dispatch_view)?;
+    let dispatch_proofs = BTreeMap::from([(
+        first_dispatch.proof().digest()?,
+        first_dispatch.proof().clone(),
+    )]);
+    let dispatch_verifier = ClearingLifecycleBatchVerifier::new(
+        Arc::new(Proofs(dispatch_proofs)),
+        Arc::new(DirectAuthority),
+    );
+    verify_economic_state_batch_advance(
+        &verified_dispatch_view,
+        dispatch_batch.clone(),
+        &pins(),
+        &dispatch_verifier,
+    )?;
+    let mut substituted_slot = dispatch_batch.clone();
+    substituted_slot.effect_slots[0]
+        .request
+        .request_binding_digest = digest("substituted-request-binding");
+    let substituted_slot_value = serde_json::to_value(&substituted_slot.effect_slots[0])?;
+    let substituted_slot_digest = substituted_slot.effect_slots[0].digest()?;
+    let substituted_slot_key = substituted_slot.effect_slots[0].resource_head_key();
+    substituted_slot.request_replays[0].request = substituted_slot.effect_slots[0].request.clone();
+    for transition in &mut substituted_slot.transitions {
+        if transition.resource_key == substituted_slot_key {
+            transition.next_head.state = EconomicContentV1::Inline {
+                value: substituted_slot_value.clone(),
+            };
+            transition.next_head.state_digest = transition.next_head.state.digest()?;
+        }
+        if let Some(prepared) = &mut transition.prepared_effect {
+            prepared.effect_slot_digest = substituted_slot_digest.clone();
+        }
+    }
+    substituted_slot.seal(&anchor_key())?;
+    assert!(verify_economic_state_batch_advance(
+        &verified_dispatch_view,
+        substituted_slot,
+        &pins(),
+        &dispatch_verifier,
+    )
+    .is_err());
+    let mut incomplete_dispatch = dispatch_batch;
+    incomplete_dispatch
+        .transitions
+        .retain(|transition| transition.resource_key.resource_id != inputs[0].atom.obligation_id());
+    incomplete_dispatch.seal(&anchor_key())?;
+    assert!(verify_economic_state_batch_advance(
+        &verified_dispatch_view,
+        incomplete_dispatch,
+        &pins(),
+        &dispatch_verifier,
+    )
+    .is_err());
+
+    let first_dispatch_heads = next_heads(&first_dispatch);
+    let dispatching_head = first_dispatch_heads
+        .iter()
+        .find(|head| head.resource_key.resource_family == "clearing_round")
+        .ok_or("missing dispatching round head")?;
+    let dispatching_obligations = anchored_obligations(&inputs, &first_dispatch_heads)
+        .ok_or("first dispatch omitted an obligation head")?;
+    let second_intent = signed_dispatch_intent(&core.digest()?, "second")?;
+    let second_slot = dispatch_slot(dispatching_head, &second_intent, "second")?;
+    let second_dispatch = compose_clearing_dispatch_transition(
+        dispatching_head,
+        &dispatching_obligations,
+        &second_intent,
+        second_slot,
+        505,
+    )?;
+    let second_round_head = second_dispatch
+        .transitions()
+        .iter()
+        .find(|transition| transition.resource_key.resource_family == "clearing_round")
+        .map(|transition| &transition.next_head)
+        .ok_or("missing second dispatch round head")?;
+    let EconomicContentV1::Inline { value } = &second_round_head.state else {
+        return Err("second dispatch round state is not inline".into());
+    };
+    let second_record: ClearingRoundLifecycleRecordV1 = serde_json::from_value(value.clone())?;
+    assert_eq!(
+        second_record.first_dispatch_operation_id(),
+        Some(first_slot.operation_id.as_str())
+    );
+    let mut reused_operation = dispatch_slot(dispatching_head, &second_intent, "second")?;
+    reused_operation.operation_id = first_slot.operation_id.clone();
+    reused_operation.slot_id = reused_operation.recompute_slot_id()?;
+    assert!(compose_clearing_dispatch_transition(
+        dispatching_head,
+        &dispatching_obligations,
+        &second_intent,
+        reused_operation,
+        505,
     )
     .is_err());
     Ok(())

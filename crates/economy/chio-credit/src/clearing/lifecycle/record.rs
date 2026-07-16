@@ -47,6 +47,11 @@ impl ClearingRoundLifecycleRecordV1 {
     }
 
     #[must_use]
+    pub fn first_dispatch_operation_id(&self) -> Option<&str> {
+        self.first_dispatch_operation_id.as_deref()
+    }
+
+    #[must_use]
     pub fn last_transition_digest(&self) -> &str {
         &self.last_transition_digest
     }

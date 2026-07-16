@@ -46,7 +46,7 @@
         "dispatchStatusCount": { "$ref": "#/$defs/boundedCount" },
         "dispatchStatuses": {
           "type": "array",
-          "maxItems": 127,
+          "maxItems": 126,
           "items": { "$ref": "#/$defs/dispatchStatus" }
         },
         "authorityId": { "$ref": "#/$defs/text" },
@@ -63,7 +63,7 @@
     "text": { "type": "string", "minLength": 1, "maxLength": 2048 },
     "positiveInteger": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
     "nonNegativeInteger": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-    "boundedCount": { "type": "integer", "minimum": 0, "maximum": 127 },
+    "boundedCount": { "type": "integer", "minimum": 0, "maximum": 126 },
     "cryptoMaterial": { "type": "string", "minLength": 1, "maxLength": 16384 },
     "disposition": {
       "oneOf": [

@@ -2,27 +2,31 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use chio_core_types::economic_continuity::{
-    EconomicContentV1, EconomicFrostBindingV1, EconomicResourceHeadV1, EconomicResourceKeyV1,
-    EconomicStateAnchorError, EconomicStateBatchV1, EconomicStateTransitionV1,
-    EconomicTransitionAuthorizationV1, EconomicTransitionProofVerifier, VerifiedEconomicStateView,
-    CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA, MAX_ECONOMIC_TRANSITIONS,
+    EconomicContentV1, EconomicEffectSlotV1, EconomicFrostBindingV1, EconomicRequestReplayV1,
+    EconomicResourceHeadV1, EconomicResourceKeyV1, EconomicStateAnchorError, EconomicStateBatchV1,
+    EconomicStateTransitionV1, EconomicTransitionAuthorizationV1, EconomicTransitionProofVerifier,
+    VerifiedEconomicStateView, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA, MAX_ECONOMIC_TRANSITIONS,
 };
 use serde::{Deserialize, Serialize};
 
 use super::*;
 use crate::obligation::ObligationDispositionTransitionV1;
 
+mod dispatch;
 mod record;
 mod replay;
 mod validation;
 
+pub use dispatch::compose_clearing_dispatch_transition;
 pub use replay::*;
+use validation::{reservation_head_root, reservation_root};
 pub(super) use validation::{validate_round_core, validate_round_head};
 
 pub const CLEARING_ROUND_LIFECYCLE_SCHEMA: &str = "chio.clearing.round-lifecycle.v1";
 pub const CLEARING_ROUND_TRANSITION_PROOF_SCHEMA: &str = "chio.clearing.round-transition-proof.v1";
 pub const CLEARING_ROUND_RESOURCE_FAMILY: &str = "clearing_round";
 pub const CLEARING_OBLIGATION_RESOURCE_FAMILY: &str = "obligation_disposition";
+pub const CLEARING_SETTLEMENT_DISPATCH_EFFECT_KIND: &str = "settlement_dispatch";
 
 const ROUND_LIFECYCLE_GENESIS_DOMAIN: &[u8] = b"chio.clearing.round-lifecycle.genesis.v1\0";
 const ROUND_TRANSITION_PROOF_DOMAIN: &[u8] = b"chio.clearing.round-transition-proof.digest.v1\0";
@@ -126,7 +130,7 @@ impl ClearingRoundLifecycleRecordV1 {
         validate_digest("reservation_root", &self.reservation_root)?;
         validate_positive("reservation_count", self.reservation_count)?;
         if usize::try_from(self.reservation_count).map_err(|_| ClearingError::ArithmeticOverflow)?
-            + 1
+            + 2
             > MAX_ECONOMIC_TRANSITIONS
         {
             return Err(ClearingError::IncompleteLifecycleProjection);
@@ -262,7 +266,9 @@ impl ClearingRoundLifecycleRecordV1 {
                 }
             }
             ClearingRoundTransitionV1::BeginDispatch { operation_id, .. } => {
-                next.first_dispatch_operation_id = Some(operation_id.clone());
+                if next.first_dispatch_operation_id.is_none() {
+                    next.first_dispatch_operation_id = Some(operation_id.clone());
+                }
             }
             ClearingRoundTransitionV1::BeginReconciliation { .. }
             | ClearingRoundTransitionV1::Satisfy { .. }
@@ -303,6 +309,7 @@ pub enum ClearingRoundTransitionV1 {
     },
     BeginDispatch {
         operation_id: String,
+        effect_slot_digest: String,
         authority_digest: String,
     },
     BeginReconciliation {
@@ -378,9 +385,11 @@ impl ClearingRoundTransitionV1 {
             }
             Self::BeginDispatch {
                 operation_id,
+                effect_slot_digest,
                 authority_digest,
             } => {
                 validate_digest("operation_id", operation_id)?;
+                validate_digest("effect_slot_digest", effect_slot_digest)?;
                 validate_digest("dispatch_authority_digest", authority_digest)
             }
             Self::BeginReconciliation {
@@ -435,9 +444,11 @@ impl ClearingRoundTransitionV1 {
             (ClearingRoundLifecycleStateV1::Aborting, Self::Abort { .. }) => {
                 Ok(ClearingRoundLifecycleStateV1::Aborted)
             }
-            (ClearingRoundLifecycleStateV1::Finalized, Self::BeginDispatch { .. }) => {
-                Ok(ClearingRoundLifecycleStateV1::Dispatching)
-            }
+            (
+                ClearingRoundLifecycleStateV1::Finalized
+                | ClearingRoundLifecycleStateV1::Dispatching,
+                Self::BeginDispatch { .. },
+            ) => Ok(ClearingRoundLifecycleStateV1::Dispatching),
             (ClearingRoundLifecycleStateV1::Dispatching, Self::BeginReconciliation { .. }) => {
                 Ok(ClearingRoundLifecycleStateV1::Reconciling)
             }
@@ -557,7 +568,7 @@ impl ClearingRoundTransitionProofV1 {
                     .checked_add(1)
                     .ok_or(ClearingError::ArithmeticOverflow)?
             || self.next_round_version != self.next_round_fence
-            || self.reservations.len() + 1 > MAX_ECONOMIC_TRANSITIONS
+            || self.reservations.len() + 2 > MAX_ECONOMIC_TRANSITIONS
             || usize::try_from(self.reservation_count)
                 .map_err(|_| ClearingError::ArithmeticOverflow)?
                 != self.reservations.len()
@@ -605,6 +616,9 @@ pub struct AnchoredClearingObligationV1 {
 pub struct ClearingLifecycleProjectionV1 {
     proof: ClearingRoundTransitionProofV1,
     transitions: Vec<EconomicStateTransitionV1>,
+    effect_slots: Vec<EconomicEffectSlotV1>,
+    request_replays: Vec<EconomicRequestReplayV1>,
+    operation_id: Option<String>,
 }
 
 impl ClearingLifecycleProjectionV1 {
@@ -617,9 +631,41 @@ impl ClearingLifecycleProjectionV1 {
     pub fn transitions(&self) -> &[EconomicStateTransitionV1] {
         &self.transitions
     }
+
+    #[must_use]
+    pub fn effect_slots(&self) -> &[EconomicEffectSlotV1] {
+        &self.effect_slots
+    }
+
+    #[must_use]
+    pub fn request_replays(&self) -> &[EconomicRequestReplayV1] {
+        &self.request_replays
+    }
+
+    #[must_use]
+    pub fn operation_id(&self) -> Option<&str> {
+        self.operation_id.as_deref()
+    }
 }
 
 pub fn compose_clearing_lifecycle_transition(
+    current_round_head: &EconomicResourceHeadV1,
+    reservations: &[AnchoredClearingObligationV1],
+    transition: ClearingRoundTransitionV1,
+    trusted_clock_high_water: u64,
+) -> Result<ClearingLifecycleProjectionV1, ClearingError> {
+    if matches!(transition, ClearingRoundTransitionV1::BeginDispatch { .. }) {
+        return Err(ClearingError::IllegalLifecycleTransition);
+    }
+    compose_lifecycle_transition(
+        current_round_head,
+        reservations,
+        transition,
+        trusted_clock_high_water,
+    )
+}
+
+fn compose_lifecycle_transition(
     current_round_head: &EconomicResourceHeadV1,
     reservations: &[AnchoredClearingObligationV1],
     transition: ClearingRoundTransitionV1,
@@ -708,7 +754,13 @@ pub fn compose_clearing_lifecycle_transition(
         });
     }
     transitions.sort_by(|left, right| left.resource_key.cmp(&right.resource_key));
-    Ok(ClearingLifecycleProjectionV1 { proof, transitions })
+    Ok(ClearingLifecycleProjectionV1 {
+        proof,
+        transitions,
+        effect_slots: Vec::new(),
+        request_replays: Vec::new(),
+        operation_id: None,
+    })
 }
 
 pub trait ClearingLifecycleProofResolver: Send + Sync {
@@ -786,7 +838,7 @@ pub fn clearing_reservation_root(
         .map(|obligation| obligation.atom.obligation_id())
         .collect::<BTreeSet<_>>();
     if obligations.is_empty()
-        || obligations.len() + 1 > MAX_ECONOMIC_TRANSITIONS
+        || obligations.len() + 2 > MAX_ECONOMIC_TRANSITIONS
         || obligation_ids.len() != obligations.len()
         || !obligations
             .windows(2)
@@ -847,37 +899,6 @@ fn reservation_binding(
         atom: reservation.input.atom.clone(),
         disposition: reservation.input.disposition.clone(),
     })
-}
-
-fn reservation_root(
-    reservations: &[ClearingReservationHeadBindingV1],
-) -> Result<String, ClearingError> {
-    let mut reservations = reservations.iter().collect::<Vec<_>>();
-    reservations.sort_by_key(|reservation| reservation.source_sequence);
-    let digests = reservations
-        .iter()
-        .map(|reservation| reservation.disposition.digest(&reservation.atom))
-        .collect::<Result<Vec<_>, _>>()?;
-    domain_digest(RESERVATION_ROOT_DOMAIN, &digests)
-}
-
-fn reservation_head_root(
-    reservations: &[ClearingReservationHeadBindingV1],
-) -> Result<String, ClearingError> {
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase")]
-    struct HeadLeaf<'a> {
-        resource_key: &'a EconomicResourceKeyV1,
-        expected_head_digest: &'a str,
-    }
-    let leaves = reservations
-        .iter()
-        .map(|reservation| HeadLeaf {
-            resource_key: &reservation.resource_key,
-            expected_head_digest: &reservation.expected_head_digest,
-        })
-        .collect::<Vec<_>>();
-    domain_digest(RESERVATION_HEAD_ROOT_DOMAIN, &leaves)
 }
 
 fn next_round_head(
@@ -1005,7 +1026,16 @@ fn verify_projection(
 ) -> Result<(), ClearingError> {
     proof.validate()?;
     let proof_digest = proof.digest()?;
-    if batch.transitions.len() != proof.reservations.len() + 1
+    let dispatch = matches!(
+        proof.transition,
+        ClearingRoundTransitionV1::BeginDispatch { .. }
+    );
+    let expected_transition_count = proof
+        .reservations
+        .len()
+        .checked_add(if dispatch { 2 } else { 1 })
+        .ok_or(ClearingError::ArithmeticOverflow)?;
+    if batch.transitions.len() != expected_transition_count
         || batch
             .transitions
             .iter()
@@ -1055,6 +1085,23 @@ fn verify_projection(
             != Some(proof.source_round_head_digest.as_str())
         || validate_round_head(&round_transition.next_head, &actual_next).is_err()
         || round_transition.next_head.frost.as_ref() != proof.transition.frost()
+    {
+        return Err(ClearingError::IncompleteLifecycleProjection);
+    }
+    if dispatch {
+        dispatch::verify_dispatch_projection(
+            batch,
+            proof,
+            current_round,
+            round_transition,
+            &source_record,
+        )?;
+    } else if !batch.effect_slots.is_empty()
+        || !batch.request_replays.is_empty()
+        || batch
+            .transitions
+            .iter()
+            .any(|transition| transition.prepared_effect.is_some())
     {
         return Err(ClearingError::IncompleteLifecycleProjection);
     }

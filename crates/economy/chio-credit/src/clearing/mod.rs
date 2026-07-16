@@ -35,7 +35,7 @@ pub const CLEARING_ZERO_DISPATCH_PROOF_SCHEMA: &str = "chio.clearing.zero-dispat
 pub const CLEARING_ROUND_ABORT_SCHEMA: &str = "chio.clearing.round-abort.v1";
 
 pub(super) const MAX_CLEARING_INPUTS: usize =
-    chio_core_types::economic_continuity::MAX_ECONOMIC_TRANSITIONS - 1;
+    chio_core_types::economic_continuity::MAX_ECONOMIC_TRANSITIONS - 2;
 pub(super) const MAX_CLEARING_PARTICIPANTS: usize = 1_024;
 pub(super) const MAX_CLEARING_IDENTITIES_PER_PARTICIPANT: usize = 64;
 pub(super) const MAX_TEXT_BYTES: usize = 2_048;
@@ -344,6 +344,12 @@ pub struct ClearingSettlementIntentV1 {
     pub amount: MonetaryAmount,
     pub contributing_reservation_root: String,
     pub dispatch_idempotency_key: String,
+}
+
+impl ClearingSettlementIntentV1 {
+    pub fn digest(&self) -> Result<String, ClearingError> {
+        domain_digest(INTENT_DIGEST_DOMAIN, self)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

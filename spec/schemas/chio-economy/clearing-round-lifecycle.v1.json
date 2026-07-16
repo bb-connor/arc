@@ -24,7 +24,7 @@
     "roundCoreDigest": { "$ref": "#/$defs/digest" },
     "inputManifestDigest": { "$ref": "#/$defs/digest" },
     "reservationRoot": { "$ref": "#/$defs/digest" },
-    "reservationCount": { "type": "integer", "minimum": 1, "maximum": 127 },
+    "reservationCount": { "type": "integer", "minimum": 1, "maximum": 126 },
     "state": {
       "enum": [
         "reserved",

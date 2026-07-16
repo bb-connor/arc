@@ -37,12 +37,12 @@
     "nextRoundVersion": { "$ref": "#/$defs/positiveInteger" },
     "nextRoundFence": { "$ref": "#/$defs/positiveInteger" },
     "reservationRoot": { "$ref": "#/$defs/digest" },
-    "reservationCount": { "type": "integer", "minimum": 1, "maximum": 127 },
+    "reservationCount": { "type": "integer", "minimum": 1, "maximum": 126 },
     "reservationHeadRoot": { "$ref": "#/$defs/digest" },
     "reservations": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 127,
+      "maxItems": 126,
       "items": { "$ref": "#/$defs/reservation" }
     },
     "transition": { "$ref": "#/$defs/transition" }
@@ -157,10 +157,11 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "operation_id", "authority_digest"],
+          "required": ["kind", "operation_id", "effect_slot_digest", "authority_digest"],
           "properties": {
             "kind": { "const": "begin_dispatch" },
             "operation_id": { "$ref": "#/$defs/digest" },
+            "effect_slot_digest": { "$ref": "#/$defs/digest" },
             "authority_digest": { "$ref": "#/$defs/digest" }
           }
         },

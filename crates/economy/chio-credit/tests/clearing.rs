@@ -2,22 +2,26 @@ use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{sha256_hex, Keypair};
 use chio_core_types::economic_continuity::{
-    EconomicContentV1, EconomicFrostBindingV1, EconomicResourceHeadV1, EconomicResourceKeyV1,
-    EconomicTransitionAuthorizationV1, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
+    EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1, EconomicContentV1,
+    EconomicEffectSlotV1, EconomicEffectStateV1, EconomicEffectTargetV1, EconomicFrostBindingV1,
+    EconomicRequestBindingV1, EconomicResourceHeadV1, EconomicResourceKeyV1,
+    EconomicTransitionAuthorizationV1, CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
+    CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
 };
+use chio_core_types::StoreMutationFence;
 use chio_credit::clearing::{
-    compose_clearing_lifecycle_transition, compute_netting_round, prepare_clearing_round_abort,
-    prepare_clearing_round_finalization, prepare_clearing_zero_dispatch_proof,
-    sign_clearing_round_abort, sign_clearing_round_finalization, sign_clearing_zero_dispatch_proof,
-    sign_netting_round, verify_clearing_lifecycle_replay_authority,
-    verify_clearing_participant_acceptances, verify_clearing_round_abort,
-    verify_clearing_zero_dispatch_proof, verify_netting_round, verify_signed_netting_round,
-    AnchoredClearingObligationV1, ClearingAbortReplayV1, ClearingAcceptancesReplayV1,
-    ClearingAuthorityTrustV1, ClearingDisputeWindowResolver, ClearingDisputeWindowStatusV1,
-    ClearingFinalizationReplayV1, ClearingInputManifestBodyV1, ClearingInputManifestEntryV1,
-    ClearingIntentDispatchStatusV1, ClearingLifecycleAuthorityPinsV1,
-    ClearingLifecycleReplayEvidenceV1, ClearingLifecycleReplayV1, ClearingObligationInputV1,
-    ClearingParticipantAcceptanceBodyV1, ClearingParticipantBindingV1,
+    compose_clearing_dispatch_transition, compose_clearing_lifecycle_transition,
+    compute_netting_round, prepare_clearing_round_abort, prepare_clearing_round_finalization,
+    prepare_clearing_zero_dispatch_proof, sign_clearing_round_abort,
+    sign_clearing_round_finalization, sign_clearing_zero_dispatch_proof, sign_netting_round,
+    verify_clearing_lifecycle_replay_authority, verify_clearing_participant_acceptances,
+    verify_clearing_round_abort, verify_clearing_zero_dispatch_proof, verify_netting_round,
+    verify_signed_netting_round, AnchoredClearingObligationV1, ClearingAbortReplayV1,
+    ClearingAcceptancesReplayV1, ClearingAuthorityTrustV1, ClearingDispatchReplayV1,
+    ClearingDisputeWindowResolver, ClearingDisputeWindowStatusV1, ClearingFinalizationReplayV1,
+    ClearingInputManifestBodyV1, ClearingInputManifestEntryV1, ClearingIntentDispatchStatusV1,
+    ClearingLifecycleAuthorityPinsV1, ClearingLifecycleReplayEvidenceV1, ClearingLifecycleReplayV1,
+    ClearingObligationInputV1, ClearingParticipantAcceptanceBodyV1, ClearingParticipantBindingV1,
     ClearingParticipantSnapshotAcknowledgementBodyV1, ClearingParticipantSnapshotBodyV1,
     ClearingRoundAbortReasonV1, ClearingRoundFinalizationBodyV1, ClearingRoundLifecycleRecordV1,
     ClearingRoundRequestV1, ClearingRoundTransitionV1, ClearingZeroDispatchTrustV1,
@@ -26,6 +30,7 @@ use chio_credit::clearing::{
     SignedNettingRoundCoreV1, CLEARING_ALGORITHM_V1, CLEARING_INPUT_MANIFEST_SCHEMA,
     CLEARING_LIFECYCLE_REPLAY_FORMAT, CLEARING_PARTICIPANT_ACCEPTANCE_SCHEMA,
     CLEARING_PARTICIPANT_SNAPSHOT_ACKNOWLEDGEMENT_SCHEMA, CLEARING_PARTICIPANT_SNAPSHOT_SCHEMA,
+    CLEARING_SETTLEMENT_DISPATCH_EFFECT_KIND,
 };
 use chio_credit::obligation::{
     ObligationAtomInputV1, ObligationAtomV1, ObligationCreditElectionV1,
@@ -828,6 +833,135 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
             frost: frost.binding.clone(),
         }
     );
+
+    let finalized_heads = finalized
+        .transitions()
+        .iter()
+        .map(|transition| transition.next_head.clone())
+        .collect::<Vec<_>>();
+    let finalized_head = finalized_heads
+        .iter()
+        .find(|head| head.resource_key.resource_family == "clearing_round")
+        .ok_or("missing finalized round head")?;
+    let finalized_obligations =
+        advance_anchored_obligations(&request.obligations, &finalized_heads)?;
+    let signed_intent = &signed_output.intents[0];
+    let mut effect_slot = EconomicEffectSlotV1 {
+        schema: CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA.to_owned(),
+        slot_id: String::new(),
+        anchor_id: finalized_head.anchor_id.clone(),
+        namespace: finalized_head.namespace.clone(),
+        resource_key: finalized_head.resource_key.clone(),
+        operation_id: digest("clearing-dispatch-operation"),
+        effect_kind: CLEARING_SETTLEMENT_DISPATCH_EFFECT_KIND.to_owned(),
+        request: EconomicRequestBindingV1 {
+            request_namespace_digest: digest("settlement-request-namespace"),
+            request_id: "settlement-request-1".to_owned(),
+            request_binding_digest: digest("settlement-request-binding"),
+        },
+        admission_handoff: EconomicAdmissionHandoffV1 {
+            state: EconomicAdmissionHandoffStateV1::DispatchCommitted,
+            operation_version: 6,
+            lifecycle_fence: 9,
+            store_fence: StoreMutationFence {
+                store_uuid: "admission-store-primary".to_owned(),
+                lease_id: "admission-lease-1".to_owned(),
+                owner_epoch: 4,
+            },
+        },
+        target: EconomicEffectTargetV1 {
+            target_id: "settlement-rail".to_owned(),
+            target_key_epoch: 2,
+            qualification_digest: digest("settlement-rail-qualification"),
+        },
+        action_digest: signed_intent.digest()?,
+        parameters_digest: signed_intent.body.digest()?,
+        resource_head_digest: finalized_head.digest()?,
+        frost: None,
+        idempotency_key: signed_intent.body.dispatch_idempotency_key.clone(),
+        state: EconomicEffectStateV1::Ready,
+        terminal: None,
+    };
+    effect_slot.slot_id = effect_slot.recompute_slot_id()?;
+    let dispatch_projection = compose_clearing_dispatch_transition(
+        finalized_head,
+        &finalized_obligations,
+        signed_intent,
+        effect_slot.clone(),
+        561,
+    )?;
+    let dispatch_replay = ClearingLifecycleReplayV1 {
+        format: CLEARING_LIFECYCLE_REPLAY_FORMAT.to_owned(),
+        proof: dispatch_projection.proof().clone(),
+        evidence: ClearingLifecycleReplayEvidenceV1::BeginDispatch {
+            dispatch: Box::new(ClearingDispatchReplayV1 {
+                request: request.clone(),
+                signed_output: signed_output.clone(),
+                intent_id: signed_intent.body.intent_id.clone(),
+                effect_slot: effect_slot.clone(),
+            }),
+        },
+    };
+    assert_eq!(
+        verify_clearing_lifecycle_replay_authority(
+            finalized_head,
+            &dispatch_replay,
+            &replay_pins,
+            None,
+            None,
+        )?,
+        EconomicTransitionAuthorizationV1::Direct
+    );
+    let canonical_dispatch_replay = canonical_json_bytes(&dispatch_replay)?;
+    let decoded_dispatch_replay: ClearingLifecycleReplayV1 =
+        serde_json::from_slice(&canonical_dispatch_replay)?;
+    assert_eq!(decoded_dispatch_replay, dispatch_replay);
+
+    let mut wrong_source = dispatch_replay.clone();
+    let ClearingLifecycleReplayEvidenceV1::BeginDispatch { dispatch } = &mut wrong_source.evidence
+    else {
+        return Err("dispatch replay used the wrong evidence".into());
+    };
+    dispatch.effect_slot.resource_head_digest = digest("wrong-round-head");
+    assert!(verify_clearing_lifecycle_replay_authority(
+        finalized_head,
+        &wrong_source,
+        &replay_pins,
+        None,
+        None,
+    )
+    .is_err());
+
+    let mut wrong_intent = dispatch_replay.clone();
+    let ClearingLifecycleReplayEvidenceV1::BeginDispatch { dispatch } = &mut wrong_intent.evidence
+    else {
+        return Err("dispatch replay used the wrong evidence".into());
+    };
+    dispatch.intent_id = "missing-intent".to_owned();
+    assert!(verify_clearing_lifecycle_replay_authority(
+        finalized_head,
+        &wrong_intent,
+        &replay_pins,
+        None,
+        None,
+    )
+    .is_err());
+
+    let mut wrong_idempotency = dispatch_replay.clone();
+    let ClearingLifecycleReplayEvidenceV1::BeginDispatch { dispatch } =
+        &mut wrong_idempotency.evidence
+    else {
+        return Err("dispatch replay used the wrong evidence".into());
+    };
+    dispatch.effect_slot.idempotency_key = digest("wrong-idempotency-key");
+    assert!(verify_clearing_lifecycle_replay_authority(
+        finalized_head,
+        &wrong_idempotency,
+        &replay_pins,
+        None,
+        None,
+    )
+    .is_err());
     let canonical_replay = canonical_json_bytes(&finalization_replay)?;
     let decoded_replay: ClearingLifecycleReplayV1 = serde_json::from_slice(&canonical_replay)?;
     assert_eq!(decoded_replay, finalization_replay);
@@ -1362,6 +1496,16 @@ fn duplicate_mixed_currency_and_incomplete_inputs_reject() -> TestResult {
     )?;
     assert!(compute_netting_round(
         &incomplete,
+        &trust(&participant_authority, &obligation_authority)
+    )
+    .is_err());
+
+    let oversized = (1..=127)
+        .map(|sequence| reserved_obligation(sequence, "A", "B", "USD", 1))
+        .collect::<Result<Vec<_>, _>>()?;
+    let oversized = signed_request(oversized, &participant_authority, &obligation_authority)?;
+    assert!(compute_netting_round(
+        &oversized,
         &trust(&participant_authority, &obligation_authority)
     )
     .is_err());

@@ -40,7 +40,7 @@
         "contributingAtomDigests": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 127,
+          "maxItems": 126,
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/digest" }
         }
