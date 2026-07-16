@@ -7,10 +7,12 @@ use crate::obligation::{
     ObligationAtomV1, ObligationDispositionRecordV1, ObligationDispositionV1, ObligationError,
 };
 
+mod abort;
 mod engine;
 mod finalization;
 mod lifecycle;
 
+pub use abort::*;
 pub use engine::{
     compute_netting_round, sign_netting_round, verify_netting_round, verify_signed_netting_round,
 };
@@ -29,6 +31,8 @@ pub const CLEARING_TRANSFORMATION_SCHEMA: &str = "chio.clearing.atom-transformat
 pub const CLEARING_OUTPUT_MANIFEST_SCHEMA: &str = "chio.clearing.output-manifest.v1";
 pub const CLEARING_PARTICIPANT_ACCEPTANCE_SCHEMA: &str = "chio.clearing.participant-acceptance.v1";
 pub const CLEARING_ROUND_FINALIZATION_SCHEMA: &str = "chio.clearing.round-finalization.v1";
+pub const CLEARING_ZERO_DISPATCH_PROOF_SCHEMA: &str = "chio.clearing.zero-dispatch-proof.v1";
+pub const CLEARING_ROUND_ABORT_SCHEMA: &str = "chio.clearing.round-abort.v1";
 
 pub(super) const MAX_CLEARING_INPUTS: usize =
     chio_core_types::economic_continuity::MAX_ECONOMIC_TRANSITIONS - 1;

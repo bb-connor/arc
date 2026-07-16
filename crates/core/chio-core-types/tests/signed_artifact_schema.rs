@@ -93,6 +93,11 @@ fn clearing_signed_artifact_schemas_are_registered() {
             "chio.clearing.round-finalization.v1",
             "clearing_round_finalization",
         ),
+        (
+            "chio.clearing.zero-dispatch-proof.v1",
+            "clearing_zero_dispatch_proof",
+        ),
+        ("chio.clearing.round-abort.v1", "clearing_round_abort"),
     ] {
         assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
         assert!(chio_core_types::built_in_signed_artifact_registry()

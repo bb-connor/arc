@@ -5,14 +5,17 @@ use chio_core_types::economic_continuity::{
     CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
 };
 use chio_credit::clearing::{
-    compose_clearing_lifecycle_transition, compute_netting_round,
-    prepare_clearing_round_finalization, sign_clearing_round_finalization, sign_netting_round,
-    verify_clearing_participant_acceptances, verify_netting_round, verify_signed_netting_round,
+    compose_clearing_lifecycle_transition, compute_netting_round, prepare_clearing_round_abort,
+    prepare_clearing_round_finalization, prepare_clearing_zero_dispatch_proof,
+    sign_clearing_round_abort, sign_clearing_round_finalization, sign_clearing_zero_dispatch_proof,
+    sign_netting_round, verify_clearing_participant_acceptances, verify_clearing_round_abort,
+    verify_clearing_zero_dispatch_proof, verify_netting_round, verify_signed_netting_round,
     AnchoredClearingObligationV1, ClearingAuthorityTrustV1, ClearingDisputeWindowResolver,
     ClearingDisputeWindowStatusV1, ClearingInputManifestBodyV1, ClearingInputManifestEntryV1,
-    ClearingObligationInputV1, ClearingParticipantAcceptanceBodyV1, ClearingParticipantBindingV1,
-    ClearingParticipantSnapshotAcknowledgementBodyV1, ClearingParticipantSnapshotBodyV1,
-    ClearingRoundLifecycleRecordV1, ClearingRoundRequestV1, ClearingRoundTransitionV1,
+    ClearingIntentDispatchStatusV1, ClearingObligationInputV1, ClearingParticipantAcceptanceBodyV1,
+    ClearingParticipantBindingV1, ClearingParticipantSnapshotAcknowledgementBodyV1,
+    ClearingParticipantSnapshotBodyV1, ClearingRoundAbortReasonV1, ClearingRoundLifecycleRecordV1,
+    ClearingRoundRequestV1, ClearingRoundTransitionV1, ClearingZeroDispatchTrustV1,
     SignedClearingInputManifestV1, SignedClearingParticipantAcceptanceV1,
     SignedClearingParticipantSnapshotAcknowledgementV1, SignedClearingParticipantSnapshotV1,
     SignedNettingRoundCoreV1, CLEARING_ALGORITHM_V1, CLEARING_INPUT_MANIFEST_SCHEMA,
@@ -21,7 +24,7 @@ use chio_credit::clearing::{
 };
 use chio_credit::obligation::{
     ObligationAtomInputV1, ObligationAtomV1, ObligationCreditElectionV1,
-    ObligationDispositionRecordV1, ObligationDispositionTransitionV1,
+    ObligationDispositionRecordV1, ObligationDispositionTransitionV1, ObligationDispositionV1,
 };
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -610,6 +613,200 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
             unresolved_dispute_count: 1,
         },
         &finalization_trust,
+    )
+    .is_err());
+    Ok(())
+}
+
+#[test]
+fn signed_abort_releases_only_after_complete_zero_dispatch_and_the_winning_fence() -> TestResult {
+    let participant_authority = Keypair::from_seed(&[31; 32]);
+    let obligation_authority = Keypair::from_seed(&[32; 32]);
+    let admission_authority = Keypair::from_seed(&[33; 32]);
+    let request = signed_request(
+        vec![
+            reserved_obligation(1, "A", "B", "USD", 100)?,
+            reserved_obligation(2, "B", "C", "USD", 100)?,
+        ],
+        &participant_authority,
+        &obligation_authority,
+    )?;
+    let mut clearing_trust = trust(&participant_authority, &obligation_authority);
+    let output = compute_netting_round(&request, &clearing_trust)?;
+    let signed_output =
+        sign_netting_round(&request, &output, &clearing_trust, &participant_authority)?;
+    let reserved = ClearingRoundLifecycleRecordV1::reserved(&output.core)?;
+    let reserved_head = clearing_head(&reserved)?;
+    let anchored = anchored_obligations(&request.obligations, &output.core.governance_scope_id)?;
+    let proposed = compose_clearing_lifecycle_transition(
+        &reserved_head,
+        &anchored,
+        ClearingRoundTransitionV1::Propose {
+            output_manifest_digest: output.output_manifest.digest()?,
+            authority_digest: signed_output.output_manifest.digest()?,
+        },
+        501,
+    )?;
+    let proposed_heads = proposed
+        .transitions()
+        .iter()
+        .map(|transition| transition.next_head.clone())
+        .collect::<Vec<_>>();
+    let proposed_head = proposed_heads
+        .iter()
+        .find(|head| head.resource_key.resource_family == "clearing_round")
+        .ok_or("missing proposed round head")?;
+    let proposed_obligations = advance_anchored_obligations(&request.obligations, &proposed_heads)?;
+
+    clearing_trust.trusted_time_unix_ms = 520;
+    let proof_trust = ClearingZeroDispatchTrustV1 {
+        authority_id: "admission-authority".to_owned(),
+        authority_key: admission_authority.public_key(),
+        authority_key_epoch: 9,
+        admission_store_id: "admission-store-primary".to_owned(),
+        admission_commit_sequence: 12,
+        admission_commit_digest: digest("admission-commit"),
+        trusted_time_unix_ms: 520,
+    };
+    let statuses = output
+        .intents
+        .iter()
+        .map(ClearingIntentDispatchStatusV1::absent)
+        .collect::<Result<Vec<_>, _>>()?;
+    let proof_body = prepare_clearing_zero_dispatch_proof(
+        proposed_head,
+        &request,
+        Some(&signed_output),
+        statuses.clone(),
+        &clearing_trust,
+        &proof_trust,
+        560,
+    )?;
+    let signed_proof =
+        sign_clearing_zero_dispatch_proof(proof_body, &proof_trust, &admission_authority)?;
+    validate_schema("clearing-zero-dispatch-proof.v1.json", &signed_proof)?;
+    let verified_proof = verify_clearing_zero_dispatch_proof(
+        proposed_head,
+        &request,
+        Some(&signed_output),
+        &signed_proof,
+        &clearing_trust,
+        &proof_trust,
+    )?;
+    let mut advanced_checkpoint = proof_trust.clone();
+    advanced_checkpoint.admission_commit_sequence += 1;
+    advanced_checkpoint.admission_commit_digest = digest("advanced-admission-commit");
+    assert!(verify_clearing_zero_dispatch_proof(
+        proposed_head,
+        &request,
+        Some(&signed_output),
+        &signed_proof,
+        &clearing_trust,
+        &advanced_checkpoint,
+    )
+    .is_err());
+
+    clearing_trust.trusted_time_unix_ms = 525;
+    let abort_body = prepare_clearing_round_abort(
+        proposed_head,
+        &verified_proof,
+        ClearingRoundAbortReasonV1::OperatorCancelled,
+        digest("abort-authority"),
+        None,
+        &clearing_trust,
+    )?;
+    let signed_abort =
+        sign_clearing_round_abort(abort_body, &clearing_trust, &obligation_authority)?;
+    validate_schema("clearing-round-abort.v1.json", &signed_abort)?;
+    let verified_abort = verify_clearing_round_abort(
+        proposed_head,
+        &verified_proof,
+        &signed_abort,
+        None,
+        &clearing_trust,
+    )?;
+    let aborting = compose_clearing_lifecycle_transition(
+        proposed_head,
+        &proposed_obligations,
+        verified_abort.begin_abort_transition(),
+        525,
+    )?;
+    let aborting_heads = aborting
+        .transitions()
+        .iter()
+        .map(|transition| transition.next_head.clone())
+        .collect::<Vec<_>>();
+    let aborting_head = aborting_heads
+        .iter()
+        .find(|head| head.resource_key.resource_family == "clearing_round")
+        .ok_or("missing aborting round head")?;
+    let aborting_obligations = advance_anchored_obligations(&request.obligations, &aborting_heads)?;
+    let aborted = compose_clearing_lifecycle_transition(
+        aborting_head,
+        &aborting_obligations,
+        verified_abort.abort_transition(aborting_head, aborting.proof())?,
+        526,
+    )?;
+    let aborted_round = aborted
+        .transitions()
+        .iter()
+        .find(|transition| transition.resource_key.resource_family == "clearing_round")
+        .ok_or("missing aborted round head")?;
+    assert_eq!(aborted_round.next_head.lifecycle_state, "aborted");
+    for transition in aborted
+        .transitions()
+        .iter()
+        .filter(|transition| transition.resource_key.resource_family == "obligation_disposition")
+    {
+        let EconomicContentV1::Inline { value } = &transition.next_head.state else {
+            return Err("released obligation did not contain inline state".into());
+        };
+        let disposition: ObligationDispositionRecordV1 = serde_json::from_value(value.clone())?;
+        assert_eq!(disposition.disposition(), &ObligationDispositionV1::PerCall);
+    }
+
+    let mut incomplete = statuses;
+    incomplete.pop();
+    assert!(prepare_clearing_zero_dispatch_proof(
+        proposed_head,
+        &request,
+        Some(&signed_output),
+        incomplete,
+        &clearing_trust,
+        &proof_trust,
+        560,
+    )
+    .is_err());
+    assert!(sign_clearing_round_abort(
+        signed_abort.body.clone(),
+        &clearing_trust,
+        &participant_authority,
+    )
+    .is_err());
+    assert!(verified_abort
+        .abort_transition(proposed_head, aborting.proof())
+        .is_err());
+    let mut substituted_proof = aborting.proof().clone();
+    let ClearingRoundTransitionV1::BeginAbort {
+        zero_dispatch_proof_digest,
+        ..
+    } = &mut substituted_proof.transition
+    else {
+        return Err("aborting proof used the wrong transition".into());
+    };
+    *zero_dispatch_proof_digest = digest("substituted-zero-dispatch");
+    assert!(verified_abort
+        .abort_transition(aborting_head, &substituted_proof)
+        .is_err());
+    let mut expired_trust = clearing_trust;
+    expired_trust.trusted_time_unix_ms = 560;
+    assert!(prepare_clearing_round_abort(
+        proposed_head,
+        &verified_proof,
+        ClearingRoundAbortReasonV1::OperatorCancelled,
+        digest("abort-authority"),
+        None,
+        &expired_trust,
     )
     .is_err());
     Ok(())

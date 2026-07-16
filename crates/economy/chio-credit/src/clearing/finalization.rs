@@ -103,7 +103,7 @@ impl ClearingRoundFinalizationBodyV1 {
         Ok(preimage)
     }
 
-    fn validate(&self) -> Result<(), ClearingError> {
+    pub(super) fn validate(&self) -> Result<(), ClearingError> {
         if self.schema != CLEARING_ROUND_FINALIZATION_SCHEMA {
             return Err(ClearingError::InvalidField("round_finalization_schema"));
         }

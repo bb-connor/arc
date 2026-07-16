@@ -4,25 +4,25 @@ use std::sync::Mutex;
 
 use chio_core::{is_supported_signed_artifact_schema, sha256_hex, Keypair};
 use chio_credit::clearing::{
-    verify_clearing_round_finalization_frost, ClearingRoundFinalizationBodyV1,
-    CLEARING_ROUND_FINALIZATION_SCHEMA,
+    verify_clearing_round_finalization_burn, verify_clearing_round_finalization_frost,
+    ClearingRoundFinalizationBodyV1, CLEARING_ROUND_FINALIZATION_SCHEMA,
 };
 use chio_federation::frost::{
     frost_action_registration, frost_authorization_session_id, frost_authorization_slot_id,
-    registered_frost_actions, resolve_active_roster_for_execution, verify_for_execution,
-    verify_historical_evidence, ActiveFrostRosterResolver, ExpectedFrostAuthorization,
-    FrostActionPreimageV1, FrostAnchorError, FrostAnchoredAuthorizationSlot,
-    FrostArtifactAuthorityRole, FrostArtifactTrustRoot, FrostArtifactTrustStore,
-    FrostAuthorizationBodyV1, FrostAuthorizationDomain, FrostAuthorizationSlotAnchor,
-    FrostAuthorizationSlotCheckpointV1, FrostAuthorizationSlotState, FrostAuthorizationV1,
-    FrostChannelCloseActionV1, FrostCredentialsPassportRevokeActionV1, FrostEpochAnchor,
-    FrostEpochCheckpointV1, FrostGovernanceCaseEnforceSanctionActionV1,
+    registered_frost_actions, resolve_active_roster_for_execution,
+    verify_burned_frost_authorization_slot, verify_for_execution, verify_historical_evidence,
+    ActiveFrostRosterResolver, ExpectedFrostAuthorization, FrostActionPreimageV1, FrostAnchorError,
+    FrostAnchoredAuthorizationSlot, FrostArtifactAuthorityRole, FrostArtifactTrustRoot,
+    FrostArtifactTrustStore, FrostAuthorizationBodyV1, FrostAuthorizationDomain,
+    FrostAuthorizationSlotAnchor, FrostAuthorizationSlotCheckpointV1, FrostAuthorizationSlotState,
+    FrostAuthorizationV1, FrostChannelCloseActionV1, FrostCredentialsPassportRevokeActionV1,
+    FrostEpochAnchor, FrostEpochCheckpointV1, FrostGovernanceCaseEnforceSanctionActionV1,
     FrostHistoricalRosterResolver, FrostParticipantV1, FrostPouncerRevokeCredentialActionV1,
     FrostRosterKeyOrigin, FrostRosterResolutionError, FrostRosterRotateActionV1, FrostRosterV1,
-    FrostSettleCommitmentActionV1, VerifiedFrostAuthorization,
-    CHIO_FROST_AUTHORIZATION_BODY_SCHEMA, CHIO_FROST_AUTHORIZATION_SCHEMA,
-    CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA, CHIO_FROST_CHANNEL_CLOSE_ACTION_SCHEMA,
-    CHIO_FROST_CLEARING_ROUND_FINALIZE_ACTION_SCHEMA,
+    FrostSettleCommitmentActionV1, VerifiedBurnedFrostAuthorizationSlot,
+    VerifiedFrostAuthorization, CHIO_FROST_AUTHORIZATION_BODY_SCHEMA,
+    CHIO_FROST_AUTHORIZATION_SCHEMA, CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
+    CHIO_FROST_CHANNEL_CLOSE_ACTION_SCHEMA, CHIO_FROST_CLEARING_ROUND_FINALIZE_ACTION_SCHEMA,
     CHIO_FROST_CREDENTIALS_PASSPORT_REVOKE_ACTION_SCHEMA, CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA,
     CHIO_FROST_GOVERNANCE_CASE_ENFORCE_SANCTION_ACTION_SCHEMA,
     CHIO_FROST_POUNCER_REVOKE_CREDENTIAL_ACTION_SCHEMA, CHIO_FROST_ROSTER_ROTATE_ACTION_SCHEMA,
@@ -499,6 +499,65 @@ fn sign_slot(checkpoint: &mut FrostAuthorizationSlotCheckpointV1) {
         .unwrap_or_else(|error| panic!("compute slot checkpoint digest: {error}"));
 }
 
+fn burned_slot(fixture: &RuntimeFixture, burned_at: u64) -> VerifiedBurnedFrostAuthorizationSlot {
+    let signing_bytes = fixture
+        .proof
+        .body
+        .signing_bytes()
+        .unwrap_or_else(|error| panic!("canonicalize burned authorization body: {error}"));
+    let body = &fixture.proof.body;
+    let mut bound = FrostAuthorizationSlotCheckpointV1 {
+        schema: CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA.to_string(),
+        anchor_id: "frost-slot-anchor.primary".to_string(),
+        checkpoint_digest: String::new(),
+        scope_id: body.scope_id.clone(),
+        slot_id: frost_authorization_slot_id(body)
+            .unwrap_or_else(|error| panic!("compute burned authorization slot id: {error}")),
+        slot_version: 1,
+        predecessor_digest: None,
+        domain: body.domain,
+        ladder_action_class: body.ladder_action_class.clone(),
+        resource_id: body.resource_id.clone(),
+        resource_version: body.resource_version,
+        resource_fence: body.resource_fence,
+        authorization_id: body.authorization_id.clone(),
+        signing_message_digest: sha256_hex(&signing_bytes),
+        action_digest: body.action_digest.clone(),
+        roster_digest: body.roster_digest.clone(),
+        key_epoch: body.key_epoch,
+        session_id: frost_authorization_session_id(body)
+            .unwrap_or_else(|error| panic!("compute burned authorization session id: {error}")),
+        state: FrostAuthorizationSlotState::Bound,
+        aggregate_signature_digest: None,
+        authorization_blob_digest: None,
+        availability_receipt: None,
+        clock_high_water: body.issued_at,
+        anchor_key_id: "frost-slot-anchor.v1".to_string(),
+        anchor_signature: String::new(),
+    };
+    sign_slot(&mut bound);
+    let mut burned = FrostAuthorizationSlotCheckpointV1 {
+        checkpoint_digest: String::new(),
+        slot_version: 2,
+        predecessor_digest: Some(bound.checkpoint_digest.clone()),
+        state: FrostAuthorizationSlotState::Burned,
+        clock_high_water: burned_at,
+        anchor_signature: String::new(),
+        ..bound.clone()
+    };
+    sign_slot(&mut burned);
+    verify_burned_frost_authorization_slot(
+        &bound,
+        &FrostAnchoredAuthorizationSlot {
+            checkpoint: burned,
+            authorization_blob: None,
+        },
+        &artifact_trust(),
+        burned_at,
+    )
+    .unwrap_or_else(|error| panic!("verify burned authorization slot: {error}"))
+}
+
 fn threshold_group(case: &ActionCase, seed: u8) -> (SigningKey, Vec<FrostParticipantV1>, String) {
     let participant_ids = (1..=case.quorum_m)
         .map(|index| format!("operator-{index}"))
@@ -905,6 +964,30 @@ fn clearing_consumer_accepts_only_its_verified_finalization_action() {
     let mut wrong_head = body;
     wrong_head.source_lifecycle_fence += 1;
     assert!(verify_clearing_round_finalization_frost(&wrong_head, &verified, 500).is_err());
+}
+
+#[test]
+fn clearing_abort_accepts_only_the_exact_burned_finalization_slot() {
+    let mut body = clearing_finalization_body();
+    body.finalized_at_unix_ms = 400;
+    let mut case = action_cases()
+        .into_iter()
+        .find(|case| case.domain == FrostAuthorizationDomain::ClearingRoundFinalize)
+        .unwrap_or_else(|| panic!("clearing finalization action case"));
+    case.preimage = body
+        .frost_action_preimage()
+        .unwrap_or_else(|error| panic!("build burned clearing action: {error}"));
+    let fixture = runtime_fixture(&case, 0xb6);
+    let burned = burned_slot(&fixture, 500);
+    let checkpoint_digest = verify_clearing_round_finalization_burn(&body, &burned, 500)
+        .unwrap_or_else(|error| panic!("verify clearing finalization burn: {error}"));
+    assert_eq!(checkpoint_digest, burned.checkpoint().checkpoint_digest);
+
+    let mut wrong_fence = body.clone();
+    wrong_fence.source_lifecycle_fence += 1;
+    wrong_fence.source_lifecycle_version += 1;
+    assert!(verify_clearing_round_finalization_burn(&wrong_fence, &burned, 500).is_err());
+    assert!(verify_clearing_round_finalization_burn(&body, &burned, 499).is_err());
 }
 
 #[test]

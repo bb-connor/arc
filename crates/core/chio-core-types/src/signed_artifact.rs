@@ -45,6 +45,9 @@ pub const CHIO_CLEARING_OUTPUT_MANIFEST_V1_SCHEMA: &str = "chio.clearing.output-
 pub const CHIO_CLEARING_PARTICIPANT_ACCEPTANCE_V1_SCHEMA: &str =
     "chio.clearing.participant-acceptance.v1";
 pub const CHIO_CLEARING_ROUND_FINALIZATION_V1_SCHEMA: &str = "chio.clearing.round-finalization.v1";
+pub const CHIO_CLEARING_ZERO_DISPATCH_PROOF_V1_SCHEMA: &str =
+    "chio.clearing.zero-dispatch-proof.v1";
+pub const CHIO_CLEARING_ROUND_ABORT_V1_SCHEMA: &str = "chio.clearing.round-abort.v1";
 pub const CHIO_TRANSACTION_PASSPORT_V1_SCHEMA: &str = "chio.transaction-passport.v1";
 pub const CHIO_TRANSACTION_EVIDENCE_GRAPH_V1_SCHEMA: &str = "chio.transaction.evidence-graph.v1";
 pub const CHIO_TRANSACTION_CLAIM_SET_V1_SCHEMA: &str = "chio.transaction.claim-set.v1";
@@ -291,6 +294,14 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_CLEARING_ROUND_FINALIZATION_V1_SCHEMA,
         Some(("clearing_round_finalization", "ws4-clearing-v1")),
+    ),
+    (
+        CHIO_CLEARING_ZERO_DISPATCH_PROOF_V1_SCHEMA,
+        Some(("clearing_zero_dispatch_proof", "ws4-clearing-v1")),
+    ),
+    (
+        CHIO_CLEARING_ROUND_ABORT_V1_SCHEMA,
+        Some(("clearing_round_abort", "ws4-clearing-v1")),
     ),
     (CHIO_SESSION_ANCHOR_SCHEMA, None),
     (CHIO_REQUEST_LINEAGE_RECORD_SCHEMA, None),
