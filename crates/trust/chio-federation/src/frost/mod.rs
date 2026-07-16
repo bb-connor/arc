@@ -50,7 +50,8 @@ pub use types::{
 };
 pub use verify::{
     frost_authorization_session_id, frost_authorization_slot_id,
-    resolve_active_roster_for_execution, verify_for_execution, verify_historical_evidence,
+    resolve_active_roster_for_execution, verify_for_execution,
+    verify_historical_completed_authorization, verify_historical_evidence,
     ExpectedFrostAuthorization, FrostAnchoredAuthorizationSlot, FrostAuthorizationSlotAnchor,
     FrostAuthorizationSlotCheckpointV1, FrostAuthorizationSlotState, FrostAuthorizationV1,
     FrostVerificationError, HistoricalFrostEvidence, VerifiedFrostAuthorization,

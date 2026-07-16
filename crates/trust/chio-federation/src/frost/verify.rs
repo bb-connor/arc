@@ -621,6 +621,86 @@ pub fn verify_historical_evidence(
     })
 }
 
+pub fn verify_historical_completed_authorization(
+    proof: &FrostAuthorizationV1,
+    bound: &FrostAuthorizationSlotCheckpointV1,
+    completed: &FrostAnchoredAuthorizationSlot,
+    resolver: &dyn FrostHistoricalRosterResolver,
+    artifact_trust: &FrostArtifactTrustStore,
+) -> Result<VerifiedFrostAuthorization, FrostVerificationError> {
+    proof.validate()?;
+    let roster = resolver
+        .resolve_historical_roster(
+            &proof.body.roster_digest,
+            proof.body.key_epoch,
+            proof.body.issued_at,
+        )?
+        .ok_or(FrostVerificationError::EpochMismatch(
+            "historical roster is absent",
+        ))?;
+    artifact_trust
+        .verify_roster(&roster)
+        .map_err(|error| FrostVerificationError::ArtifactTrust(error.to_string()))?;
+    if proof.body.issued_at < roster.valid_from || proof.body.issued_at >= roster.valid_until {
+        return Err(FrostVerificationError::NotCurrent(
+            "historical roster at authorization issuance",
+        ));
+    }
+    let completed_at = completed.checkpoint.clock_high_water;
+    if proof.body.issued_at > completed_at
+        || completed_at >= proof.body.expires_at
+        || completed_at < roster.valid_from
+        || completed_at >= roster.valid_until
+    {
+        return Err(FrostVerificationError::NotCurrent(
+            "historical authorization completion window",
+        ));
+    }
+    verify_roster_binding(proof, &roster)?;
+    verify_group_signature(proof, &roster)?;
+    artifact_trust
+        .verify_authorization_slot_checkpoint(bound)
+        .map_err(|error| FrostVerificationError::ArtifactTrust(error.to_string()))?;
+    verify_completed_slot_artifact(proof, completed, artifact_trust, completed_at)?;
+    let checkpoint = &completed.checkpoint;
+    if bound.state != FrostAuthorizationSlotState::Bound
+        || bound.slot_version != 1
+        || bound.predecessor_digest.is_some()
+        || bound.aggregate_signature_digest.is_some()
+        || bound.authorization_blob_digest.is_some()
+        || bound.availability_receipt.is_some()
+        || checkpoint.slot_version != 2
+        || checkpoint.predecessor_digest.as_deref() != Some(bound.checkpoint_digest.as_str())
+        || checkpoint.schema != bound.schema
+        || checkpoint.anchor_id != bound.anchor_id
+        || checkpoint.anchor_key_id != bound.anchor_key_id
+        || checkpoint.scope_id != bound.scope_id
+        || checkpoint.slot_id != bound.slot_id
+        || checkpoint.domain != bound.domain
+        || checkpoint.ladder_action_class != bound.ladder_action_class
+        || checkpoint.resource_id != bound.resource_id
+        || checkpoint.resource_version != bound.resource_version
+        || checkpoint.resource_fence != bound.resource_fence
+        || checkpoint.authorization_id != bound.authorization_id
+        || checkpoint.signing_message_digest != bound.signing_message_digest
+        || checkpoint.action_digest != bound.action_digest
+        || checkpoint.roster_digest != bound.roster_digest
+        || checkpoint.key_epoch != bound.key_epoch
+        || checkpoint.session_id != bound.session_id
+        || checkpoint.clock_high_water < bound.clock_high_water
+    {
+        return Err(FrostVerificationError::SlotMismatch(
+            "completed slot is not the exact bound-checkpoint successor",
+        ));
+    }
+    let canonical = proof.canonical_bytes()?;
+    Ok(VerifiedFrostAuthorization {
+        body: proof.body.clone(),
+        authorization_slot_id: frost_authorization_slot_id(&proof.body)?,
+        proof_digest: sha256_hex(&canonical),
+    })
+}
+
 pub fn frost_authorization_slot_id(
     body: &FrostAuthorizationBodyV1,
 ) -> Result<String, FrostVerificationError> {

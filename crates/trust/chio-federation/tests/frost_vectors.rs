@@ -1,7 +1,8 @@
 use chio_core_types::{sha256_hex, Keypair};
 use chio_federation::frost::{
     frost_action_registration, frost_authorization_session_id, frost_authorization_slot_id,
-    resolve_active_roster_for_execution, verify_for_execution, verify_historical_evidence,
+    resolve_active_roster_for_execution, verify_for_execution,
+    verify_historical_completed_authorization, verify_historical_evidence,
     ActiveFrostRosterResolver, ExpectedFrostAuthorization, FrostAnchorError,
     FrostAnchoredAuthorizationSlot, FrostArtifactAuthorityRole, FrostArtifactTrustRoot,
     FrostArtifactTrustStore, FrostAuthorizationBodyV1, FrostAuthorizationDomain,
@@ -279,6 +280,44 @@ fn sign_epoch_checkpoint(checkpoint: &mut FrostEpochCheckpointV1) {
     checkpoint.checkpoint_digest = checkpoint
         .recompute_checkpoint_digest()
         .unwrap_or_else(|error| panic!("epoch checkpoint digest must compute: {error}"));
+}
+
+fn sign_slot_checkpoint(checkpoint: &mut FrostAuthorizationSlotCheckpointV1) {
+    checkpoint.anchor_signature = slot_anchor_authority()
+        .sign(
+            &checkpoint
+                .signing_bytes()
+                .unwrap_or_else(|error| panic!("slot checkpoint must canonicalize: {error}")),
+        )
+        .to_hex();
+    checkpoint.checkpoint_digest = checkpoint
+        .recompute_checkpoint_digest()
+        .unwrap_or_else(|error| panic!("slot checkpoint digest must compute: {error}"));
+}
+
+fn historical_slot_pair(
+    fixture: &Fixture,
+) -> (
+    FrostAuthorizationSlotCheckpointV1,
+    FrostAnchoredAuthorizationSlot,
+) {
+    let mut bound = fixture.slot.checkpoint.clone();
+    bound.slot_version = 1;
+    bound.predecessor_digest = None;
+    bound.state = FrostAuthorizationSlotState::Bound;
+    bound.aggregate_signature_digest = None;
+    bound.authorization_blob_digest = None;
+    bound.availability_receipt = None;
+    bound.anchor_signature.clear();
+    bound.checkpoint_digest.clear();
+    sign_slot_checkpoint(&mut bound);
+
+    let mut completed = fixture.slot.clone();
+    completed.checkpoint.predecessor_digest = Some(bound.checkpoint_digest.clone());
+    completed.checkpoint.anchor_signature.clear();
+    completed.checkpoint.checkpoint_digest.clear();
+    sign_slot_checkpoint(&mut completed.checkpoint);
+    (bound, completed)
 }
 
 fn fixture_with_keys(roster_key: &str, signing_key: &str) -> Fixture {
@@ -655,4 +694,63 @@ fn retired_epoch_is_historical_evidence_but_not_execution_authority() {
         historical.authorization_id(),
         retired.proof.body.authorization_id
     );
+}
+
+#[test]
+fn historical_completion_requires_the_exact_bound_slot_and_live_completion_window() {
+    let fixture = fixture();
+    let (bound, completed) = historical_slot_pair(&fixture);
+    let verified = verify_historical_completed_authorization(
+        &fixture.proof,
+        &bound,
+        &completed,
+        &TestHistoricalResolver {
+            roster: fixture.roster.clone(),
+        },
+        &artifact_trust(),
+    )
+    .unwrap_or_else(|error| panic!("historical completed authorization must verify: {error}"));
+    assert_eq!(
+        verified.authorization_id(),
+        fixture.proof.body.authorization_id
+    );
+    assert_eq!(verified.action_digest(), fixture.proof.body.action_digest);
+
+    let mut substituted_bound = bound.clone();
+    substituted_bound.action_digest = "cc".repeat(32);
+    substituted_bound.anchor_signature.clear();
+    substituted_bound.checkpoint_digest.clear();
+    sign_slot_checkpoint(&mut substituted_bound);
+    let mut substituted_completed = completed.clone();
+    substituted_completed.checkpoint.predecessor_digest =
+        Some(substituted_bound.checkpoint_digest.clone());
+    substituted_completed.checkpoint.anchor_signature.clear();
+    substituted_completed.checkpoint.checkpoint_digest.clear();
+    sign_slot_checkpoint(&mut substituted_completed.checkpoint);
+    assert!(verify_historical_completed_authorization(
+        &fixture.proof,
+        &substituted_bound,
+        &substituted_completed,
+        &TestHistoricalResolver {
+            roster: fixture.roster.clone(),
+        },
+        &artifact_trust(),
+    )
+    .is_err());
+
+    let mut expired = completed;
+    expired.checkpoint.clock_high_water = fixture.proof.body.expires_at;
+    expired.checkpoint.anchor_signature.clear();
+    expired.checkpoint.checkpoint_digest.clear();
+    sign_slot_checkpoint(&mut expired.checkpoint);
+    assert!(verify_historical_completed_authorization(
+        &fixture.proof,
+        &bound,
+        &expired,
+        &TestHistoricalResolver {
+            roster: fixture.roster,
+        },
+        &artifact_trust(),
+    )
+    .is_err());
 }
