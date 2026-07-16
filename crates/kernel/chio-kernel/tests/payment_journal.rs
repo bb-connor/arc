@@ -451,6 +451,7 @@ fn priced_call_walks_journal_to_closed() -> Result<(), Box<dyn std::error::Error
 #[test]
 fn boot_reconcile_resolves_every_incomplete_row() -> Result<(), Box<dyn std::error::Error>> {
     use chio_kernel::payment::{PaymentJournalRecord, PaymentSettleAction, PaymentSettleIntent};
+    use chio_kernel::RailSettlementState;
 
     let harness = support::money_journal_harness("chio-boot-reconcile", 75)?;
     let store = &harness.budget_store;
@@ -477,8 +478,25 @@ fn boot_reconcile_resolves_every_incomplete_row() -> Result<(), Box<dyn std::err
     hold_placed.authorization_id = None;
     store.record_payment_journal(&hold_placed)?;
 
-    // Crash after authorize, before any terminal action was committed.
+    // Crash after authorize, before any terminal action was committed. The
+    // prepaid rail's settlement_state truthfully reports the funds already
+    // moved (the CountingRail's default answer, matching the in-tree X402/
+    // ACP adapters), so reconciliation must record it with a receipt rather
+    // than release it: releasing here would reverse the local hold and
+    // erase the only record of a charge that already happened.
     store.record_payment_journal(&base("req-auth", PaymentJournalState::Authorized))?;
+
+    // A second Authorized crash, this one a genuine hold-only case: the
+    // rail reports a live hold with no settlement, so reconciliation must
+    // still release the price-free hold. Both branches of the Authorized
+    // arm are covered in the same pass.
+    store.record_payment_journal(&base("req-auth-held", PaymentJournalState::Authorized))?;
+    harness.rail.script_settlement_state(
+        "req-auth-held",
+        RailSettlementState::Held {
+            authorization_id: "auth-req-auth-held".to_string(),
+        },
+    );
 
     // Crash inside the rail call: the committed capture is durable.
     store.record_payment_journal(&base("req-settling", PaymentJournalState::HoldPlaced))?;
@@ -542,8 +560,8 @@ fn boot_reconcile_resolves_every_incomplete_row() -> Result<(), Box<dyn std::err
     let report = harness.kernel.reconcile_payment_journal(0)?;
     let receipts_after = harness.receipt_store.max_tool_receipt_seq()?;
     assert_eq!(
-        report.resolved, 4,
-        "four rows resolve terminally: {report:?}"
+        report.resolved, 5,
+        "five rows resolve terminally: {report:?}"
     );
     assert_eq!(
         report.reconcile_failed, 1,
@@ -557,12 +575,12 @@ fn boot_reconcile_resolves_every_incomplete_row() -> Result<(), Box<dyn std::err
         "unresolved rows after reconcile: {remaining:?}"
     );
 
-    // The committed capture replayed exactly once; req-auth is the only
-    // genuine price-free hold and releases. req-hold's rail query reports
-    // the prepaid rail's real answer (already settled at authorize), so
-    // reconciliation must record it with a receipt rather than release it:
-    // releasing here would reverse the local hold and erase the only
-    // record of a charge that already happened.
+    // The committed capture replayed exactly once; req-auth-held is the
+    // only genuine price-free hold and releases. req-hold and req-auth's
+    // rail queries report the prepaid rail's real answer (already settled
+    // at authorize), so reconciliation must record them with a receipt
+    // rather than release them: releasing here would reverse the local
+    // hold and erase the only record of a charge that already happened.
     assert_eq!(
         harness
             .rail
@@ -577,13 +595,14 @@ fn boot_reconcile_resolves_every_incomplete_row() -> Result<(), Box<dyn std::err
             .releases
             .load(std::sync::atomic::Ordering::SeqCst),
         1,
-        "only req-auth releases; req-hold reports settled funds and is reconciled with a receipt instead"
+        "only req-auth-held releases; req-hold and req-auth report settled funds and are \
+         reconciled with a receipt instead"
     );
     assert_eq!(
         receipts_after - receipts_before,
-        3,
-        "req-hold, req-settling, and req-settled each emit a reconciliation receipt; \
-         req-auth releases and req-corrupt incidents without one"
+        4,
+        "req-hold, req-auth, req-settling, and req-settled each emit a reconciliation \
+         receipt; req-auth-held releases and req-corrupt incidents without one"
     );
 
     // Idempotent: a second pass finds nothing and moves no money.
@@ -727,10 +746,11 @@ fn monetary_reconciler_resolves_orphaned_intents_through_the_journal(
     let harness = support::money_journal_harness("chio-monetary-reconciler", 75)?;
 
     // Fabricate a monetary orphan: an open intent plus its Authorized
-    // journal row, exactly the state a crash after authorize leaves. The
-    // recording store handle is dropped before reconciliation because an
-    // open intent only becomes an orphan once its owning writer is gone;
-    // a live writer's in-flight intents are never claimed.
+    // journal row, exactly the state a crash after authorize leaves for a
+    // prepaid rail (funds already moved). The recording store handle is
+    // dropped before reconciliation because an open intent only becomes an
+    // orphan once its owning writer is gone; a live writer's in-flight
+    // intents are never claimed.
     let intent_db_path = support::unique_db_path("chio-monetary-reconciler-intents");
     {
         let crashed_writer = SqliteReceiptStore::open(&intent_db_path)?;
@@ -771,17 +791,26 @@ fn monetary_reconciler_resolves_orphaned_intents_through_the_journal(
             created_at_unix_ms: 1,
         })?;
 
+    let receipts_before = harness.receipt_store.max_tool_receipt_seq()?;
     let reconciler = MonetaryDispatchIntentReconciler {
         kernel: &harness.kernel,
     };
     let report = receipt_store.reconcile_dispatch_intents(&reconciler)?;
+    let receipts_after = harness.receipt_store.max_tool_receipt_seq()?;
     assert_eq!(report.open, 1);
     assert_eq!(
-        report.replayed, 1,
-        "an Authorized orphan releases its hold: funds never moved, safe to replay: {report:?}"
+        report.monetary_reconciled, 1,
+        "an Authorized orphan whose rail truthfully reports funds already moved must be \
+         reconciled with a receipt, never silently replayed: {report:?}"
+    );
+    assert_eq!(
+        report.replayed, 0,
+        "funds already moved: this is never safe to replay: {report:?}"
     );
 
-    // The journal row reached a terminal state and the rail hold released.
+    // The journal row reached a terminal state, the rail hold was never
+    // released, and a reconciliation receipt was emitted for the
+    // already-moved amount.
     assert!(harness
         .budget_store
         .list_incomplete_payment_journal(u64::MAX)?
@@ -791,10 +820,112 @@ fn monetary_reconciler_resolves_orphaned_intents_through_the_journal(
             .rail
             .releases
             .load(std::sync::atomic::Ordering::SeqCst),
-        1
+        0,
+        "funds already moved on the rail; releasing would erase the only record of the charge"
+    );
+    assert_eq!(
+        receipts_after - receipts_before,
+        1,
+        "a reconciliation receipt must be emitted for the already-moved funds"
     );
 
     let _ = std::fs::remove_file(&intent_db_path);
+    harness.cleanup();
+    Ok(())
+}
+
+#[test]
+fn authorized_reconcile_records_a_receipt_for_prepaid_funds_already_moved(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::payment::PaymentJournalRecord;
+
+    // The priority-1 regression: a prepaid rail crash after authorize (funds
+    // already moved) must NEVER release the hold silently. The Authorized
+    // state spans the entire tool-execution window for the in-tree prepaid
+    // X402/ACP adapters (the post-execution settle is skipped once
+    // authorization.settled == true), so this crash window is wide, not
+    // narrow, and boot reconciliation must resolve it with a durable
+    // receipt naming the rail and authorization id -- never a silent
+    // release with no record of the charge.
+    let harness = support::money_journal_harness("chio-authorized-prepaid-crash", 75)?;
+    let store = &harness.budget_store;
+
+    store.record_payment_journal(&PaymentJournalRecord {
+        request_id: "req-prepaid-crash".to_string(),
+        capability_id: "cap".to_string(),
+        grant_index: 0,
+        hold_id: Some("hold-req-prepaid-crash".to_string()),
+        rail: "x402".to_string(),
+        authorization_id: Some("auth-prepaid-crash".to_string()),
+        transaction_id: None,
+        amount_units: 100,
+        settle_action: None,
+        settle_amount_units: None,
+        currency: "USD".to_string(),
+        state: PaymentJournalState::Authorized,
+        created_at_unix_ms: 1,
+    })?;
+
+    let receipts_before = harness.receipt_store.max_tool_receipt_seq()?;
+    let report = harness.kernel.reconcile_payment_journal(0)?;
+    let receipts_after = harness.receipt_store.max_tool_receipt_seq()?;
+
+    assert_eq!(
+        report.resolved, 1,
+        "the prepaid Authorized row resolves terminally: {report:?}"
+    );
+    assert_eq!(
+        report.reconcile_failed, 0,
+        "no incident: the rail answered: {report:?}"
+    );
+
+    assert_eq!(
+        harness
+            .rail
+            .releases
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "an Authorized row whose funds already moved must never be silently released"
+    );
+    assert_eq!(
+        harness
+            .rail
+            .captures
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "the Authorized arm never replays a capture: a settled row is recorded, not captured"
+    );
+    assert_eq!(
+        receipts_after - receipts_before,
+        1,
+        "exactly one reconciliation receipt for the already-moved funds"
+    );
+
+    assert!(
+        store.list_incomplete_payment_journal(u64::MAX)?.is_empty(),
+        "the row must reach a terminal state (ClosedReconciled), not stay open"
+    );
+
+    // The reconciliation receipt names the rail and authorization id so an
+    // operator can match it against rail-side records (F70 acceptance).
+    let (_, receipt_bytes) = harness
+        .receipt_store
+        .receipts_canonical_bytes_range(receipts_after, receipts_after)?
+        .into_iter()
+        .next()
+        .ok_or("the reconciliation receipt must be durable")?;
+    let receipt_json: serde_json::Value = serde_json::from_slice(&receipt_bytes)?;
+    let reconciliation = &receipt_json["metadata"]["payment_reconciliation"];
+    assert_eq!(reconciliation["rail"], serde_json::json!("x402"));
+    assert_eq!(
+        reconciliation["authorizationId"],
+        serde_json::json!("auth-prepaid-crash")
+    );
+    assert_eq!(
+        reconciliation["requestId"],
+        serde_json::json!("req-prepaid-crash")
+    );
+
     harness.cleanup();
     Ok(())
 }

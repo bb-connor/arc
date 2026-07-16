@@ -181,19 +181,66 @@ fn resolve_incomplete_payment_journal_row(
         }
         PaymentJournalState::Authorized => {
             // Authorize succeeded but no terminal action was ever committed.
-            // No capture amount was chosen, so the only sound, price-free
-            // completion is to release the hold.
+            // For the in-tree prepaid X402/ACP adapters, funds move inside
+            // authorize itself, and this state spans the entire tool-
+            // execution window (the post-execution settle is skipped when
+            // authorization.settled == true, so the journal never advances
+            // past Authorized until close). A crash anywhere in that window
+            // must not be resolved by guessing: the side-effect-free state
+            // query keyed by the durable reference and authorization id
+            // answers whether funds already moved, exactly like the
+            // HoldPlaced arm above, so a release is never issued against
+            // money that already moved.
             let Some(authorization_id) = record.authorization_id.as_deref() else {
                 return Ok(PaymentReconcileOutcome::ReconcileFailed {
                     detail: "authorized row missing authorization_id".to_string(),
                 });
             };
-            Ok(release_hold_and_report(
-                kernel,
-                adapter,
-                record,
-                authorization_id,
-            ))
+            match adapter.settlement_state(&record.request_id, Some(authorization_id)) {
+                Ok(RailSettlementState::NoAuthorization) => {
+                    // The rail has no record of this authorization: nothing
+                    // to release, and funds never moved.
+                    reverse_hold_best_effort(kernel, record);
+                    Ok(PaymentReconcileOutcome::Released)
+                }
+                Ok(RailSettlementState::Held { authorization_id }) => {
+                    // A live hold with no settlement: no price was ever
+                    // chosen, so release is the only sound, price-free
+                    // completion.
+                    Ok(release_hold_and_report(
+                        kernel,
+                        adapter,
+                        record,
+                        &authorization_id,
+                    ))
+                }
+                Ok(RailSettlementState::Settled {
+                    authorization_id,
+                    result,
+                }) => {
+                    // Funds already moved -- the common case for the
+                    // in-tree prepaid rails, which settle at authorize.
+                    // Releasing here would reverse the local hold and erase
+                    // the only record of the charge. Record the rail
+                    // reference and emit a reconciliation receipt for the
+                    // already-moved amount instead.
+                    let mut settled_record = record.clone();
+                    settled_record.authorization_id = Some(authorization_id.clone());
+                    settled_record.transaction_id = Some(result.transaction_id.clone());
+                    emit_reconciliation_receipt(kernel, &settled_record)?;
+                    Ok(PaymentReconcileOutcome::ClosedReconciled {
+                        rail_reference: format!("{}:{authorization_id}", record.rail),
+                    })
+                }
+                Err(error) => {
+                    // The adapter cannot say whether funds moved: never
+                    // guess. A silent release here could erase the only
+                    // record of a charge that already happened.
+                    Ok(PaymentReconcileOutcome::ReconcileFailed {
+                        detail: format!("settlement state during reconcile is unknown: {error}"),
+                    })
+                }
+            }
         }
         PaymentJournalState::Settling => {
             // A terminal action IS durable; replay it exactly. The adapter
