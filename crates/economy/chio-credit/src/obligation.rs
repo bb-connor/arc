@@ -647,7 +647,11 @@ fn domain_digest<T: Serialize>(domain: &[u8], value: &T) -> Result<String, Oblig
 }
 
 fn validate_text(field: &'static str, value: &str) -> Result<(), ObligationError> {
-    if value.is_empty() || value.trim() != value || value.len() > MAX_TEXT_BYTES {
+    if value.is_empty()
+        || value.trim() != value
+        || value.len() > MAX_TEXT_BYTES
+        || value.chars().any(char::is_control)
+    {
         Err(ObligationError::InvalidField(field))
     } else {
         Ok(())

@@ -1558,6 +1558,54 @@
       "artifactKind": "economic_effect_dispatch_commit",
       "introducedBy": "economic-state-continuity-v1",
       "schemaFile": "spec/schemas/chio-economy/effect-dispatch-commit.v1.json"
+    },
+    {
+      "schema": "chio.clearing.participant-snapshot.v1",
+      "artifactKind": "clearing_participant_snapshot",
+      "introducedBy": "ws4-clearing-v1",
+      "schemaFile": "spec/schemas/chio-economy/clearing-participant-snapshot.v1.json"
+    },
+    {
+      "schema": "chio.clearing.participant-snapshot-acknowledgement.v1",
+      "artifactKind": "clearing_participant_snapshot_acknowledgement",
+      "introducedBy": "ws4-clearing-v1",
+      "schemaFile": "spec/schemas/chio-economy/clearing-participant-snapshot-acknowledgement.v1.json"
+    },
+    {
+      "schema": "chio.clearing.input-manifest.v1",
+      "artifactKind": "clearing_input_manifest",
+      "introducedBy": "ws4-clearing-v1",
+      "schemaFile": "spec/schemas/chio-economy/clearing-input-manifest.v1.json"
+    },
+    {
+      "schema": "chio.clearing.netting-round-core.v1",
+      "artifactKind": "clearing_netting_round_core",
+      "introducedBy": "ws4-clearing-v1",
+      "schemaFile": "spec/schemas/chio-economy/clearing-netting-round-core.v1.json"
+    },
+    {
+      "schema": "chio.clearing.participant-statement.v1",
+      "artifactKind": "clearing_participant_statement",
+      "introducedBy": "ws4-clearing-v1",
+      "schemaFile": "spec/schemas/chio-economy/clearing-participant-statement.v1.json"
+    },
+    {
+      "schema": "chio.clearing.settlement-intent.v1",
+      "artifactKind": "clearing_settlement_intent",
+      "introducedBy": "ws4-clearing-v1",
+      "schemaFile": "spec/schemas/chio-economy/clearing-settlement-intent.v1.json"
+    },
+    {
+      "schema": "chio.clearing.atom-transformation.v1",
+      "artifactKind": "clearing_atom_transformation",
+      "introducedBy": "ws4-clearing-v1",
+      "schemaFile": "spec/schemas/chio-economy/clearing-atom-transformation.v1.json"
+    },
+    {
+      "schema": "chio.clearing.output-manifest.v1",
+      "artifactKind": "clearing_output_manifest",
+      "introducedBy": "ws4-clearing-v1",
+      "schemaFile": "spec/schemas/chio-economy/clearing-output-manifest.v1.json"
     }
   ]
 }

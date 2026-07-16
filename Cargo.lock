@@ -3202,6 +3202,7 @@ version = "0.1.0"
 dependencies = [
  "chio-appraisal",
  "chio-core-types",
+ "chio-spec-validate",
  "chio-underwriting",
  "proptest",
  "serde",
