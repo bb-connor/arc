@@ -36,6 +36,7 @@ pub const CLEARING_ROUND_ABORT_SCHEMA: &str = "chio.clearing.round-abort.v1";
 
 pub(super) const MAX_CLEARING_INPUTS: usize =
     chio_core_types::economic_continuity::MAX_ECONOMIC_TRANSITIONS - 2;
+pub(super) const MAX_CLEARING_SETTLEMENT_INTENTS: usize = MAX_CLEARING_INPUTS * 2 - 1;
 pub(super) const MAX_CLEARING_PARTICIPANTS: usize = 1_024;
 pub(super) const MAX_CLEARING_IDENTITIES_PER_PARTICIPANT: usize = 64;
 pub(super) const MAX_TEXT_BYTES: usize = 2_048;

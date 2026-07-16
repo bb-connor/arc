@@ -64,17 +64,7 @@ pub struct ClearingDispatchReplayV1 {
 
 impl ClearingDispatchReplayV1 {
     fn signed_intent(&self) -> Result<&SignedClearingSettlementIntentV1, ClearingError> {
-        validate_text("dispatch_intent_id", &self.intent_id)?;
-        let mut intents = self
-            .signed_output
-            .intents
-            .iter()
-            .filter(|intent| intent.body.intent_id == self.intent_id);
-        let intent = intents.next().ok_or(ClearingError::AuthorityVerification)?;
-        if intents.next().is_some() {
-            return Err(ClearingError::AuthorityVerification);
-        }
-        Ok(intent)
+        unique_signed_intent(&self.signed_output, &self.intent_id)
     }
 
     fn validate(&self) -> Result<(), ClearingError> {
@@ -93,6 +83,75 @@ impl ClearingDispatchReplayV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ClearingReconciliationReplayV1 {
+    pub request: ClearingRoundRequestV1,
+    pub signed_output: SignedClearingRoundOutputV1,
+    pub intent_id: String,
+    pub source_effect_slot_head: EconomicResourceHeadV1,
+    pub signed_reconciliation: SignedClearingSettlementReconciliationV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ClearingSatisfactionReplayV1 {
+    pub request: ClearingRoundRequestV1,
+    pub signed_output: SignedClearingRoundOutputV1,
+    pub signed_satisfaction: SignedClearingRoundSatisfactionV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ClearingZeroIntentReconciliationReplayV1 {
+    pub request: ClearingRoundRequestV1,
+    pub signed_output: SignedClearingRoundOutputV1,
+    pub signed_reconciliation: SignedClearingZeroIntentReconciliationV1,
+}
+
+impl ClearingReconciliationReplayV1 {
+    fn signed_intent(&self) -> Result<&SignedClearingSettlementIntentV1, ClearingError> {
+        unique_signed_intent(&self.signed_output, &self.intent_id)
+    }
+
+    fn validate(&self) -> Result<(), ClearingError> {
+        self.signed_reconciliation.body.validate()?;
+        self.source_effect_slot_head
+            .validate()
+            .map_err(|_| ClearingError::InvalidField("reconciliation_effect_slot_head"))?;
+        let intent = self.signed_intent()?;
+        let body = &self.signed_reconciliation.body;
+        if body.intent_id != self.intent_id
+            || body.intent_digest != intent.body.digest()?
+            || body.effect_slot_id != self.source_effect_slot_head.resource_key.resource_id
+            || body.source_effect_slot_digest
+                != self
+                    .source_effect_slot_head
+                    .digest()
+                    .map_err(|_| ClearingError::AuthorityVerification)?
+        {
+            return Err(ClearingError::AuthorityVerification);
+        }
+        Ok(())
+    }
+}
+
+fn unique_signed_intent<'a>(
+    signed_output: &'a SignedClearingRoundOutputV1,
+    intent_id: &str,
+) -> Result<&'a SignedClearingSettlementIntentV1, ClearingError> {
+    validate_text("dispatch_intent_id", intent_id)?;
+    let mut intents = signed_output
+        .intents
+        .iter()
+        .filter(|intent| intent.body.intent_id == intent_id);
+    let intent = intents.next().ok_or(ClearingError::AuthorityVerification)?;
+    if intents.next().is_some() {
+        return Err(ClearingError::AuthorityVerification);
+    }
+    Ok(intent)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ClearingLifecycleReplayEvidenceV1 {
     Proposal {
@@ -107,6 +166,15 @@ pub enum ClearingLifecycleReplayEvidenceV1 {
     },
     BeginDispatch {
         dispatch: Box<ClearingDispatchReplayV1>,
+    },
+    Reconciliation {
+        reconciliation: Box<ClearingReconciliationReplayV1>,
+    },
+    Satisfaction {
+        satisfaction: Box<ClearingSatisfactionReplayV1>,
+    },
+    ZeroIntentReconciliation {
+        reconciliation: Box<ClearingZeroIntentReconciliationReplayV1>,
     },
     BeginAbort {
         abort: Box<ClearingAbortReplayV1>,
@@ -147,6 +215,14 @@ impl ClearingLifecycleReplayV1 {
                 ClearingRoundTransitionV1::BeginDispatch { .. },
                 ClearingLifecycleReplayEvidenceV1::BeginDispatch { .. }
             ) | (
+                ClearingRoundTransitionV1::BeginReconciliation { .. }
+                    | ClearingRoundTransitionV1::Incident { .. },
+                ClearingLifecycleReplayEvidenceV1::Reconciliation { .. }
+            ) | (
+                ClearingRoundTransitionV1::Satisfy { .. },
+                ClearingLifecycleReplayEvidenceV1::Satisfaction { .. }
+                    | ClearingLifecycleReplayEvidenceV1::ZeroIntentReconciliation { .. }
+            ) | (
                 ClearingRoundTransitionV1::BeginAbort { .. },
                 ClearingLifecycleReplayEvidenceV1::BeginAbort { .. }
             ) | (
@@ -159,6 +235,18 @@ impl ClearingLifecycleReplayV1 {
         }
         if let ClearingLifecycleReplayEvidenceV1::BeginDispatch { dispatch } = &self.evidence {
             dispatch.validate()?;
+        }
+        if let ClearingLifecycleReplayEvidenceV1::Reconciliation { reconciliation } = &self.evidence
+        {
+            reconciliation.validate()?;
+        }
+        if let ClearingLifecycleReplayEvidenceV1::Satisfaction { satisfaction } = &self.evidence {
+            satisfaction.signed_satisfaction.body.validate()?;
+        }
+        if let ClearingLifecycleReplayEvidenceV1::ZeroIntentReconciliation { reconciliation } =
+            &self.evidence
+        {
+            reconciliation.signed_reconciliation.body.validate()?;
         }
         Ok(())
     }
@@ -183,6 +271,21 @@ impl ClearingLifecycleReplayV1 {
             ClearingLifecycleReplayEvidenceV1::BeginDispatch { dispatch } => {
                 dispatch.request.generated_at_unix_ms
             }
+            ClearingLifecycleReplayEvidenceV1::Reconciliation { reconciliation } => {
+                reconciliation
+                    .signed_reconciliation
+                    .body
+                    .observed_at_unix_ms
+            }
+            ClearingLifecycleReplayEvidenceV1::Satisfaction { satisfaction } => {
+                satisfaction.signed_satisfaction.body.satisfied_at_unix_ms
+            }
+            ClearingLifecycleReplayEvidenceV1::ZeroIntentReconciliation { reconciliation } => {
+                reconciliation
+                    .signed_reconciliation
+                    .body
+                    .reconciled_at_unix_ms
+            }
             ClearingLifecycleReplayEvidenceV1::BeginAbort { abort }
             | ClearingLifecycleReplayEvidenceV1::Abort { abort, .. } => {
                 abort.abort.body.authorized_at_unix_ms
@@ -198,6 +301,9 @@ impl ClearingLifecycleReplayV1 {
             | ClearingLifecycleReplayEvidenceV1::BeginFinalization { .. }
             | ClearingLifecycleReplayEvidenceV1::Finalize { .. }
             | ClearingLifecycleReplayEvidenceV1::BeginDispatch { .. }
+            | ClearingLifecycleReplayEvidenceV1::Reconciliation { .. }
+            | ClearingLifecycleReplayEvidenceV1::Satisfaction { .. }
+            | ClearingLifecycleReplayEvidenceV1::ZeroIntentReconciliation { .. }
             | ClearingLifecycleReplayEvidenceV1::Abort { .. } => return None,
         };
         Some((
@@ -286,9 +392,28 @@ pub fn verify_clearing_lifecycle_replay(
     frost_trust: Option<&FrostArtifactTrustStore>,
     dispute_resolver: Option<&dyn ClearingDisputeWindowResolver>,
 ) -> Result<EconomicTransitionAuthorizationV1, ClearingError> {
+    verify_clearing_lifecycle_replay_with_outcome(
+        current,
+        batch,
+        replay,
+        pins,
+        frost_trust,
+        dispute_resolver,
+        None,
+    )
+}
+
+pub fn verify_clearing_lifecycle_replay_with_outcome(
+    current: &VerifiedEconomicStateView,
+    batch: &EconomicStateBatchV1,
+    replay: &ClearingLifecycleReplayV1,
+    pins: &ClearingLifecycleAuthorityPinsV1,
+    frost_trust: Option<&FrostArtifactTrustStore>,
+    dispute_resolver: Option<&dyn ClearingDisputeWindowResolver>,
+    settlement_outcome_verifier: Option<&dyn ClearingSettlementOutcomeVerifier>,
+) -> Result<EconomicTransitionAuthorizationV1, ClearingError> {
     replay.validate()?;
     pins.validate()?;
-    verify_projection(current, batch, &replay.proof)?;
     let round_key = EconomicResourceKeyV1 {
         resource_family: CLEARING_ROUND_RESOURCE_FAMILY.to_owned(),
         scope_id: replay.proof.governance_scope_id.clone(),
@@ -298,13 +423,21 @@ pub fn verify_clearing_lifecycle_replay(
         .view()
         .head(&round_key)
         .ok_or(ClearingError::IncompleteLifecycleProjection)?;
-    verify_clearing_lifecycle_replay_authority(
+    let verified = verify_replay_authority(
         source_round_head,
         replay,
         pins,
         frost_trust,
         dispute_resolver,
-    )
+        settlement_outcome_verifier,
+    )?;
+    verify_projection(
+        current,
+        batch,
+        &replay.proof,
+        verified.expected_reconciliation_slot(),
+    )?;
+    Ok(verified.authorization().clone())
 }
 
 pub fn verify_clearing_lifecycle_replay_authority(
@@ -314,6 +447,64 @@ pub fn verify_clearing_lifecycle_replay_authority(
     frost_trust: Option<&FrostArtifactTrustStore>,
     dispute_resolver: Option<&dyn ClearingDisputeWindowResolver>,
 ) -> Result<EconomicTransitionAuthorizationV1, ClearingError> {
+    verify_clearing_lifecycle_replay_authority_with_outcome(
+        source_round_head,
+        replay,
+        pins,
+        frost_trust,
+        dispute_resolver,
+        None,
+    )
+}
+
+pub fn verify_clearing_lifecycle_replay_authority_with_outcome(
+    source_round_head: &EconomicResourceHeadV1,
+    replay: &ClearingLifecycleReplayV1,
+    pins: &ClearingLifecycleAuthorityPinsV1,
+    frost_trust: Option<&FrostArtifactTrustStore>,
+    dispute_resolver: Option<&dyn ClearingDisputeWindowResolver>,
+    settlement_outcome_verifier: Option<&dyn ClearingSettlementOutcomeVerifier>,
+) -> Result<EconomicTransitionAuthorizationV1, ClearingError> {
+    Ok(
+        verify_clearing_lifecycle_replay_authority_verification_with_outcome(
+            source_round_head,
+            replay,
+            pins,
+            frost_trust,
+            dispute_resolver,
+            settlement_outcome_verifier,
+        )?
+        .authorization()
+        .clone(),
+    )
+}
+
+pub fn verify_clearing_lifecycle_replay_authority_verification_with_outcome(
+    source_round_head: &EconomicResourceHeadV1,
+    replay: &ClearingLifecycleReplayV1,
+    pins: &ClearingLifecycleAuthorityPinsV1,
+    frost_trust: Option<&FrostArtifactTrustStore>,
+    dispute_resolver: Option<&dyn ClearingDisputeWindowResolver>,
+    settlement_outcome_verifier: Option<&dyn ClearingSettlementOutcomeVerifier>,
+) -> Result<ClearingLifecycleAuthorityVerificationV1, ClearingError> {
+    verify_replay_authority(
+        source_round_head,
+        replay,
+        pins,
+        frost_trust,
+        dispute_resolver,
+        settlement_outcome_verifier,
+    )
+}
+
+fn verify_replay_authority(
+    source_round_head: &EconomicResourceHeadV1,
+    replay: &ClearingLifecycleReplayV1,
+    pins: &ClearingLifecycleAuthorityPinsV1,
+    frost_trust: Option<&FrostArtifactTrustStore>,
+    dispute_resolver: Option<&dyn ClearingDisputeWindowResolver>,
+    settlement_outcome_verifier: Option<&dyn ClearingSettlementOutcomeVerifier>,
+) -> Result<ClearingLifecycleAuthorityVerificationV1, ClearingError> {
     replay.validate()?;
     pins.validate()?;
     if source_round_head
@@ -323,6 +514,7 @@ pub fn verify_clearing_lifecycle_replay_authority(
     {
         return Err(ClearingError::IncompleteLifecycleProjection);
     }
+    let mut reconciliation_slot = None;
     let authorization = match &replay.evidence {
         ClearingLifecycleReplayEvidenceV1::Proposal {
             request,
@@ -349,6 +541,29 @@ pub fn verify_clearing_lifecycle_replay_authority(
             verify_dispatch_replay(source_round_head, &replay.proof, dispatch, pins)?;
             EconomicTransitionAuthorizationV1::Direct
         }
+        ClearingLifecycleReplayEvidenceV1::Reconciliation { reconciliation } => {
+            reconciliation_slot = Some(verify_reconciliation_replay(
+                source_round_head,
+                &replay.proof,
+                reconciliation,
+                pins,
+                settlement_outcome_verifier.ok_or(ClearingError::AuthorityVerification)?,
+            )?);
+            EconomicTransitionAuthorizationV1::Direct
+        }
+        ClearingLifecycleReplayEvidenceV1::Satisfaction { satisfaction } => {
+            verify_satisfaction_replay(source_round_head, &replay.proof, satisfaction, pins)?;
+            EconomicTransitionAuthorizationV1::Direct
+        }
+        ClearingLifecycleReplayEvidenceV1::ZeroIntentReconciliation { reconciliation } => {
+            verify_zero_intent_reconciliation_replay(
+                source_round_head,
+                &replay.proof,
+                reconciliation,
+                pins,
+            )?;
+            EconomicTransitionAuthorizationV1::Direct
+        }
         ClearingLifecycleReplayEvidenceV1::BeginAbort { abort } => {
             let verified = verify_abort_replay(source_round_head, abort, pins, frost_trust)?;
             if replay.proof.transition != verified.begin_abort_transition() {
@@ -370,7 +585,10 @@ pub fn verify_clearing_lifecycle_replay_authority(
             EconomicTransitionAuthorizationV1::Direct
         }
     };
-    Ok(authorization)
+    Ok(match reconciliation_slot {
+        Some(slot) => ClearingLifecycleAuthorityVerificationV1::reconciled(authorization, slot),
+        None => ClearingLifecycleAuthorityVerificationV1::direct(authorization),
+    })
 }
 
 pub struct ClearingLifecycleReplayBatchVerifier {
@@ -378,6 +596,7 @@ pub struct ClearingLifecycleReplayBatchVerifier {
     pins: ClearingLifecycleAuthorityPinsV1,
     frost_trust: Option<Arc<FrostArtifactTrustStore>>,
     dispute_resolver: Option<Arc<dyn ClearingDisputeWindowResolver>>,
+    settlement_outcome_verifier: Option<Arc<dyn ClearingSettlementOutcomeVerifier>>,
 }
 
 impl ClearingLifecycleReplayBatchVerifier {
@@ -394,7 +613,17 @@ impl ClearingLifecycleReplayBatchVerifier {
             pins,
             frost_trust,
             dispute_resolver,
+            settlement_outcome_verifier: None,
         })
+    }
+
+    #[must_use]
+    pub fn with_settlement_outcome_verifier(
+        mut self,
+        verifier: Arc<dyn ClearingSettlementOutcomeVerifier>,
+    ) -> Self {
+        self.settlement_outcome_verifier = Some(verifier);
+        self
     }
 }
 
@@ -414,13 +643,14 @@ impl EconomicTransitionProofVerifier for ClearingLifecycleReplayBatchVerifier {
         current: &VerifiedEconomicStateView,
         batch: &EconomicStateBatchV1,
     ) -> Result<Vec<EconomicTransitionAuthorizationV1>, EconomicStateAnchorError> {
-        let authorization = verify_clearing_lifecycle_replay(
+        let authorization = verify_clearing_lifecycle_replay_with_outcome(
             current,
             batch,
             &self.replay,
             &self.pins,
             self.frost_trust.as_deref(),
             self.dispute_resolver.as_deref(),
+            self.settlement_outcome_verifier.as_deref(),
         )
         .map_err(|_| rejected_batch(batch))?;
         Ok(vec![authorization; batch.transitions.len()])
@@ -487,6 +717,9 @@ fn verify_dispatch_replay(
     )?;
     let expected_transition = ClearingRoundTransitionV1::BeginDispatch {
         operation_id: replay.effect_slot.operation_id.clone(),
+        intent_id: intent.intent_id.clone(),
+        intent_digest: intent.digest()?,
+        effect_slot_id: replay.effect_slot.slot_id.clone(),
         effect_slot_digest: replay
             .effect_slot
             .digest()
@@ -507,6 +740,188 @@ fn verify_dispatch_replay(
         || proof.source_state != record.state()
         || proof.source_round_version != record.row_version()
         || proof.source_round_fence != record.fence()
+        || proof.transition != expected_transition
+    {
+        return Err(ClearingError::AuthorityVerification);
+    }
+    Ok(())
+}
+
+fn verify_reconciliation_replay(
+    source_round_head: &EconomicResourceHeadV1,
+    proof: &ClearingRoundTransitionProofV1,
+    replay: &ClearingReconciliationReplayV1,
+    pins: &ClearingLifecycleAuthorityPinsV1,
+    outcome_verifier: &dyn ClearingSettlementOutcomeVerifier,
+) -> Result<EconomicEffectSlotV1, ClearingError> {
+    replay.validate()?;
+    let body = &replay.signed_reconciliation.body;
+    let output_trust = pins.clearing_trust(replay.request.generated_at_unix_ms)?;
+    let output =
+        verify_signed_netting_round(&replay.request, &output_trust, &replay.signed_output)?;
+    let reconciliation_trust = pins.clearing_trust(body.observed_at_unix_ms)?;
+    let signed_intent = replay.signed_intent()?;
+    let intent = output
+        .intents
+        .iter()
+        .find(|intent| intent.intent_id == replay.intent_id)
+        .ok_or(ClearingError::AuthorityVerification)?;
+    if signed_intent.body != *intent {
+        return Err(ClearingError::AuthorityVerification);
+    }
+    let (_, next_slot) = reconciliation::verify_reconciliation(
+        source_round_head,
+        &replay.source_effect_slot_head,
+        signed_intent,
+        &replay.signed_reconciliation,
+        &reconciliation_trust,
+        outcome_verifier,
+    )?;
+    let reconciliation_digest = replay.signed_reconciliation.digest()?;
+    let expected_transition = match body.observed_status {
+        ClearingSettlementObservedStatusV1::Settled
+        | ClearingSettlementObservedStatusV1::PermanentNoEffect => {
+            ClearingRoundTransitionV1::BeginReconciliation {
+                reconciliation_digest,
+                intent_id: body.intent_id.clone(),
+                intent_digest: body.intent_digest.clone(),
+                effect_slot_id: body.effect_slot_id.clone(),
+                observed_status: body.observed_status,
+                attempt_number: body.attempt_number,
+                authority_digest: body.authority_digest.clone(),
+            }
+        }
+        ClearingSettlementObservedStatusV1::Unknown => ClearingRoundTransitionV1::Incident {
+            reconciliation_digest,
+            intent_id: body.intent_id.clone(),
+            intent_digest: body.intent_digest.clone(),
+            effect_slot_id: body.effect_slot_id.clone(),
+            attempt_number: body.attempt_number,
+            authority_digest: body.authority_digest.clone(),
+        },
+    };
+    let record: ClearingRoundLifecycleRecordV1 = decode_inline(source_round_head)?;
+    if output.core.digest()? != proof.round_core_digest
+        || output.output_manifest.digest()? != body.output_manifest_digest
+        || record.round_id() != output.core.round_id
+        || record.round_core_digest() != proof.round_core_digest
+        || body.observed_at_unix_ms != proof.trusted_clock_high_water
+        || proof.transition != expected_transition
+    {
+        return Err(ClearingError::AuthorityVerification);
+    }
+    Ok(next_slot)
+}
+
+fn verify_satisfaction_replay(
+    source_round_head: &EconomicResourceHeadV1,
+    proof: &ClearingRoundTransitionProofV1,
+    replay: &ClearingSatisfactionReplayV1,
+    pins: &ClearingLifecycleAuthorityPinsV1,
+) -> Result<(), ClearingError> {
+    let body = &replay.signed_satisfaction.body;
+    body.validate()?;
+    let output_trust = pins.clearing_trust(replay.request.generated_at_unix_ms)?;
+    let output =
+        verify_signed_netting_round(&replay.request, &output_trust, &replay.signed_output)?;
+    let trust = pins.clearing_trust(body.satisfied_at_unix_ms)?;
+    let record: ClearingRoundLifecycleRecordV1 = decode_inline(source_round_head)?;
+    record.validate()?;
+    validate_round_head(source_round_head, &record)?;
+    satisfaction::validate_completed_intents(&record, &output)?;
+    let satisfaction_digest = replay.signed_satisfaction.digest()?;
+    let expected_transition = ClearingRoundTransitionV1::Satisfy {
+        satisfaction_digest,
+        authority_digest: body.authority_digest.clone(),
+    };
+    if replay.signed_satisfaction.signer_key != trust.obligation_authority_key
+        || body.disposition_authority_id != trust.obligation_authority_id
+        || body.disposition_authority_key_epoch != trust.obligation_key_epoch
+        || !replay.signed_satisfaction.verify_signature()?
+        || body.satisfied_at_unix_ms < source_round_head.trusted_clock_high_water
+        || body.round_id != record.round_id
+        || body.round_core_digest != record.round_core_digest
+        || body.output_manifest_digest != output.output_manifest.digest()?
+        || record.output_manifest_digest.as_deref() != Some(body.output_manifest_digest.as_str())
+        || record.finalization_digest.as_deref() != Some(body.finalization_digest.as_str())
+        || body.settlement_intent_root != output.output_manifest.settlement_intent_root
+        || body.settlement_intent_count != output.output_manifest.settlement_intent_count
+        || body.intent_progress_root != satisfaction::intent_progress_root(&record.intent_progress)?
+        || body.reservation_root != record.reservation_root
+        || body.reservation_count != record.reservation_count
+        || body.reservation_head_root != proof.reservation_head_root
+        || body.source_lifecycle_head_digest != proof.source_round_head_digest
+        || body.source_lifecycle_version != record.row_version
+        || body.source_lifecycle_fence != record.fence
+        || body.next_lifecycle_version != proof.next_round_version
+        || body.next_lifecycle_fence != proof.next_round_fence
+        || body.satisfied_at_unix_ms != proof.trusted_clock_high_water
+        || proof.round_core_digest != output.core.digest()?
+        || proof.transition != expected_transition
+    {
+        return Err(ClearingError::AuthorityVerification);
+    }
+    Ok(())
+}
+
+fn verify_zero_intent_reconciliation_replay(
+    source_round_head: &EconomicResourceHeadV1,
+    proof: &ClearingRoundTransitionProofV1,
+    replay: &ClearingZeroIntentReconciliationReplayV1,
+    pins: &ClearingLifecycleAuthorityPinsV1,
+) -> Result<(), ClearingError> {
+    let body = &replay.signed_reconciliation.body;
+    body.validate()?;
+    let output_trust = pins.clearing_trust(replay.request.generated_at_unix_ms)?;
+    let output =
+        verify_signed_netting_round(&replay.request, &output_trust, &replay.signed_output)?;
+    let trust = pins.clearing_trust(body.reconciled_at_unix_ms)?;
+    let record: ClearingRoundLifecycleRecordV1 = decode_inline(source_round_head)?;
+    record.validate()?;
+    validate_round_head(source_round_head, &record)?;
+    let expected_bindings = proof
+        .reservations
+        .iter()
+        .map(|reservation| ClearingZeroIntentAtomBindingV1 {
+            source_sequence: reservation.source_sequence,
+            obligation_id: reservation.resource_key.resource_id.clone(),
+            expected_head_digest: reservation.expected_head_digest.clone(),
+            expected_resource_version: reservation.expected_resource_version,
+            expected_lifecycle_fence: reservation.expected_lifecycle_fence,
+        })
+        .collect::<Vec<_>>();
+    let reconciliation_digest = replay.signed_reconciliation.digest()?;
+    let expected_transition = ClearingRoundTransitionV1::Satisfy {
+        satisfaction_digest: reconciliation_digest,
+        authority_digest: body.authority_digest.clone(),
+    };
+    if replay.signed_reconciliation.signer_key != trust.obligation_authority_key
+        || body.disposition_authority_id != trust.obligation_authority_id
+        || body.disposition_authority_key_epoch != trust.obligation_key_epoch
+        || !replay.signed_reconciliation.verify_signature()?
+        || body.reconciled_at_unix_ms < source_round_head.trusted_clock_high_water
+        || record.state != ClearingRoundLifecycleStateV1::Finalized
+        || !record.intent_progress.is_empty()
+        || record.first_dispatch_operation_id.is_some()
+        || !output.intents.is_empty()
+        || output.output_manifest.settlement_intent_count != 0
+        || body.settlement_intent_count != 0
+        || body.round_id != record.round_id
+        || body.round_core_digest != record.round_core_digest
+        || body.output_manifest_digest != output.output_manifest.digest()?
+        || record.output_manifest_digest.as_deref() != Some(body.output_manifest_digest.as_str())
+        || record.finalization_digest.as_deref() != Some(body.finalization_digest.as_str())
+        || body.empty_intent_root != output.output_manifest.settlement_intent_root
+        || body.reservation_root != record.reservation_root
+        || body.reservation_count != record.reservation_count
+        || body.atom_bindings != expected_bindings
+        || body.source_lifecycle_head_digest != proof.source_round_head_digest
+        || body.source_lifecycle_version != record.row_version
+        || body.source_lifecycle_fence != record.fence
+        || body.next_lifecycle_version != proof.next_round_version
+        || body.next_lifecycle_fence != proof.next_round_fence
+        || body.reconciled_at_unix_ms != proof.trusted_clock_high_water
+        || proof.round_core_digest != output.core.digest()?
         || proof.transition != expected_transition
     {
         return Err(ClearingError::AuthorityVerification);

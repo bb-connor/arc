@@ -272,6 +272,10 @@ pub enum ObligationDispositionV1 {
     ClearingReserved {
         round_id: String,
     },
+    ClearingSatisfied {
+        round_id: String,
+        satisfaction_digest: String,
+    },
 }
 
 impl ObligationDispositionV1 {
@@ -295,6 +299,13 @@ impl ObligationDispositionV1 {
                 validate_text("reservation_id", reservation_id)
             }
             Self::ClearingReserved { round_id } => validate_text("round_id", round_id),
+            Self::ClearingSatisfied {
+                round_id,
+                satisfaction_digest,
+            } => {
+                validate_text("round_id", round_id)?;
+                validate_digest("satisfaction_digest", satisfaction_digest)
+            }
         }
     }
 }
@@ -324,6 +335,11 @@ pub enum ObligationDispositionTransitionV1 {
         round_id: String,
         abort_digest: String,
         zero_dispatch_proof_digest: String,
+        authority_digest: String,
+    },
+    SatisfyClearing {
+        round_id: String,
+        satisfaction_digest: String,
         authority_digest: String,
     },
 }
@@ -370,6 +386,15 @@ impl ObligationDispositionTransitionV1 {
                 validate_text("round_id", round_id)?;
                 validate_digest("abort_digest", abort_digest)?;
                 validate_digest("zero_dispatch_proof_digest", zero_dispatch_proof_digest)?;
+                validate_digest("authority_digest", authority_digest)
+            }
+            Self::SatisfyClearing {
+                round_id,
+                satisfaction_digest,
+                authority_digest,
+            } => {
+                validate_text("round_id", round_id)?;
+                validate_digest("satisfaction_digest", satisfaction_digest)?;
                 validate_digest("authority_digest", authority_digest)
             }
         }
@@ -457,6 +482,17 @@ impl ObligationDispositionRecordV1 {
                     round_id: released, ..
                 },
             ) if round_id == released => ObligationDispositionV1::PerCall,
+            (
+                ObligationDispositionV1::ClearingReserved { round_id },
+                ObligationDispositionTransitionV1::SatisfyClearing {
+                    round_id: satisfied,
+                    satisfaction_digest,
+                    ..
+                },
+            ) if round_id == satisfied => ObligationDispositionV1::ClearingSatisfied {
+                round_id: round_id.clone(),
+                satisfaction_digest: satisfaction_digest.clone(),
+            },
             _ => return Err(ObligationError::IllegalDispositionTransition),
         };
         let version = self
@@ -554,6 +590,17 @@ impl ObligationDispositionRecordV1 {
                     ..
                 },
             ) => round_id == transitioned,
+            (
+                ObligationDispositionV1::ClearingSatisfied {
+                    round_id,
+                    satisfaction_digest,
+                },
+                ObligationDispositionTransitionV1::SatisfyClearing {
+                    round_id: transitioned_round,
+                    satisfaction_digest: transitioned_satisfaction,
+                    ..
+                },
+            ) => round_id == transitioned_round && satisfaction_digest == transitioned_satisfaction,
             _ => false,
         };
         if valid {

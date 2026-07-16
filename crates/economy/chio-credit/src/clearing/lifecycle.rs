@@ -13,14 +13,20 @@ use super::*;
 use crate::obligation::ObligationDispositionTransitionV1;
 
 mod dispatch;
+mod reconciliation;
 mod record;
 mod replay;
+mod satisfaction;
 mod validation;
+mod zero_intent;
 
 pub use dispatch::compose_clearing_dispatch_transition;
+pub use reconciliation::*;
 pub use replay::*;
+pub use satisfaction::*;
 use validation::{reservation_head_root, reservation_root};
 pub(super) use validation::{validate_round_core, validate_round_head};
+pub use zero_intent::*;
 
 pub const CLEARING_ROUND_LIFECYCLE_SCHEMA: &str = "chio.clearing.round-lifecycle.v1";
 pub const CLEARING_ROUND_TRANSITION_PROOF_SCHEMA: &str = "chio.clearing.round-transition-proof.v1";
@@ -31,6 +37,7 @@ pub const CLEARING_SETTLEMENT_DISPATCH_EFFECT_KIND: &str = "settlement_dispatch"
 const ROUND_LIFECYCLE_GENESIS_DOMAIN: &[u8] = b"chio.clearing.round-lifecycle.genesis.v1\0";
 const ROUND_TRANSITION_PROOF_DOMAIN: &[u8] = b"chio.clearing.round-transition-proof.digest.v1\0";
 const RESERVATION_HEAD_ROOT_DOMAIN: &[u8] = b"chio.clearing.reservation-head-root.v1\0";
+const INTENT_RECONCILIATION_CHAIN_DOMAIN: &[u8] = b"chio.clearing.intent-reconciliation-chain.v1\0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -45,6 +52,174 @@ pub enum ClearingRoundLifecycleStateV1 {
     Aborting,
     Aborted,
     Incident,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ClearingIntentProgressV1 {
+    intent_id: String,
+    intent_digest: String,
+    attempt_count: u64,
+    no_effect_count: u64,
+    ambiguity_count: u64,
+    reconciliation_count: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reconciliation_chain_digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    active_effect_slot_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    unknown_effect_slot_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    completed_effect_slot_id: Option<String>,
+}
+
+impl ClearingIntentProgressV1 {
+    fn dispatched(
+        intent_id: String,
+        intent_digest: String,
+        effect_slot_id: String,
+    ) -> Result<Self, ClearingError> {
+        let progress = Self {
+            intent_id,
+            intent_digest,
+            attempt_count: 1,
+            no_effect_count: 0,
+            ambiguity_count: 0,
+            reconciliation_count: 0,
+            reconciliation_chain_digest: None,
+            active_effect_slot_id: Some(effect_slot_id),
+            unknown_effect_slot_id: None,
+            completed_effect_slot_id: None,
+        };
+        progress.validate()?;
+        Ok(progress)
+    }
+
+    fn register_dispatch(&mut self, effect_slot_id: String) -> Result<(), ClearingError> {
+        if self.active_effect_slot_id.is_some()
+            || self.unknown_effect_slot_id.is_some()
+            || self.completed_effect_slot_id.is_some()
+        {
+            return Err(ClearingError::IllegalLifecycleTransition);
+        }
+        self.attempt_count = self
+            .attempt_count
+            .checked_add(1)
+            .filter(|count| *count <= I_JSON_MAX_SAFE_INTEGER)
+            .ok_or(ClearingError::ArithmeticOverflow)?;
+        self.active_effect_slot_id = Some(effect_slot_id);
+        self.validate()
+    }
+
+    fn reconcile(
+        &mut self,
+        effect_slot_id: &str,
+        observed_status: ClearingSettlementObservedStatusV1,
+        attempt_number: u64,
+        reconciliation_digest: &str,
+    ) -> Result<(), ClearingError> {
+        if self.attempt_count != attempt_number {
+            return Err(ClearingError::AuthorityVerification);
+        }
+        let active = self.active_effect_slot_id.as_deref() == Some(effect_slot_id);
+        let unknown = self.unknown_effect_slot_id.as_deref() == Some(effect_slot_id);
+        match observed_status {
+            ClearingSettlementObservedStatusV1::Settled if active || unknown => {
+                self.active_effect_slot_id = None;
+                self.unknown_effect_slot_id = None;
+                self.completed_effect_slot_id = Some(effect_slot_id.to_owned());
+            }
+            ClearingSettlementObservedStatusV1::PermanentNoEffect if active || unknown => {
+                self.active_effect_slot_id = None;
+                self.unknown_effect_slot_id = None;
+                self.no_effect_count = self
+                    .no_effect_count
+                    .checked_add(1)
+                    .filter(|count| *count <= I_JSON_MAX_SAFE_INTEGER)
+                    .ok_or(ClearingError::ArithmeticOverflow)?;
+            }
+            ClearingSettlementObservedStatusV1::Unknown if active => {
+                self.active_effect_slot_id = None;
+                self.unknown_effect_slot_id = Some(effect_slot_id.to_owned());
+                self.ambiguity_count = self
+                    .ambiguity_count
+                    .checked_add(1)
+                    .filter(|count| *count <= I_JSON_MAX_SAFE_INTEGER)
+                    .ok_or(ClearingError::ArithmeticOverflow)?;
+            }
+            _ => return Err(ClearingError::IllegalLifecycleTransition),
+        }
+        validate_digest("progress_reconciliation_digest", reconciliation_digest)?;
+        self.reconciliation_count = self
+            .reconciliation_count
+            .checked_add(1)
+            .filter(|count| *count <= I_JSON_MAX_SAFE_INTEGER)
+            .ok_or(ClearingError::ArithmeticOverflow)?;
+        self.reconciliation_chain_digest = Some(domain_digest(
+            INTENT_RECONCILIATION_CHAIN_DOMAIN,
+            &(
+                self.reconciliation_chain_digest.as_deref(),
+                reconciliation_digest,
+            ),
+        )?);
+        self.validate()
+    }
+
+    fn validate(&self) -> Result<(), ClearingError> {
+        validate_text("progress_intent_id", &self.intent_id)?;
+        validate_digest("progress_intent_digest", &self.intent_digest)?;
+        validate_positive("progress_attempt_count", self.attempt_count)?;
+        if self.no_effect_count > I_JSON_MAX_SAFE_INTEGER
+            || self.ambiguity_count > I_JSON_MAX_SAFE_INTEGER
+        {
+            return Err(ClearingError::InvalidField("progress_no_effect_count"));
+        }
+        if self.reconciliation_count > I_JSON_MAX_SAFE_INTEGER
+            || self.reconciliation_chain_digest.is_some() != (self.reconciliation_count != 0)
+        {
+            return Err(ClearingError::InvalidField("progress_reconciliation"));
+        }
+        validate_optional_digest(
+            "progress_reconciliation_chain_digest",
+            self.reconciliation_chain_digest.as_deref(),
+        )?;
+        for slot_id in [
+            self.active_effect_slot_id.as_deref(),
+            self.unknown_effect_slot_id.as_deref(),
+            self.completed_effect_slot_id.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            validate_digest("progress_effect_slot_id", slot_id)?;
+        }
+        let unresolved = u64::from(
+            self.active_effect_slot_id.is_some() || self.unknown_effect_slot_id.is_some(),
+        );
+        let completed = u64::from(self.completed_effect_slot_id.is_some());
+        if self.active_effect_slot_id.is_some() && self.unknown_effect_slot_id.is_some()
+            || completed != 0 && unresolved != 0
+            || self
+                .reconciliation_count
+                .checked_add(u64::from(self.active_effect_slot_id.is_some()))
+                != self
+                    .attempt_count
+                    .checked_add(self.ambiguity_count)
+                    .and_then(|count| {
+                        count.checked_sub(u64::from(self.unknown_effect_slot_id.is_some()))
+                    })
+            || self.no_effect_count > self.reconciliation_count
+            || self.ambiguity_count > self.reconciliation_count
+            || self
+                .no_effect_count
+                .checked_add(unresolved)
+                .and_then(|count| count.checked_add(completed))
+                != Some(self.attempt_count)
+        {
+            return Err(ClearingError::InvalidField("intent_progress"));
+        }
+        Ok(())
+    }
 }
 
 impl ClearingRoundLifecycleStateV1 {
@@ -90,6 +265,8 @@ pub struct ClearingRoundLifecycleRecordV1 {
     abort_digest: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     first_dispatch_operation_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    intent_progress: Vec<ClearingIntentProgressV1>,
     last_transition_digest: String,
 }
 
@@ -113,6 +290,7 @@ impl ClearingRoundLifecycleRecordV1 {
             finalization_digest: None,
             abort_digest: None,
             first_dispatch_operation_id: None,
+            intent_progress: Vec::new(),
             last_transition_digest: domain_digest(ROUND_LIFECYCLE_GENESIS_DOMAIN, core)?,
         };
         record.validate()?;
@@ -166,6 +344,17 @@ impl ClearingRoundLifecycleRecordV1 {
         if let Some(operation_id) = self.first_dispatch_operation_id.as_deref() {
             validate_digest("first_dispatch_operation_id", operation_id)?;
         }
+        if self.intent_progress.len() > MAX_CLEARING_SETTLEMENT_INTENTS
+            || !self
+                .intent_progress
+                .windows(2)
+                .all(|pair| pair[0].intent_id < pair[1].intent_id)
+        {
+            return Err(ClearingError::InvalidField("intent_progress"));
+        }
+        for progress in &self.intent_progress {
+            progress.validate()?;
+        }
         let valid = match self.state {
             ClearingRoundLifecycleStateV1::Reserved => {
                 self.output_manifest_digest.is_none()
@@ -173,6 +362,7 @@ impl ClearingRoundLifecycleRecordV1 {
                     && self.finalization_digest.is_none()
                     && self.abort_digest.is_none()
                     && self.first_dispatch_operation_id.is_none()
+                    && self.intent_progress.is_empty()
             }
             ClearingRoundLifecycleStateV1::Proposed => {
                 self.output_manifest_digest.is_some()
@@ -180,6 +370,7 @@ impl ClearingRoundLifecycleRecordV1 {
                     && self.finalization_digest.is_none()
                     && self.abort_digest.is_none()
                     && self.first_dispatch_operation_id.is_none()
+                    && self.intent_progress.is_empty()
             }
             ClearingRoundLifecycleStateV1::Finalizing => {
                 self.output_manifest_digest.is_some()
@@ -187,6 +378,7 @@ impl ClearingRoundLifecycleRecordV1 {
                     && self.finalization_digest.is_none()
                     && self.abort_digest.is_none()
                     && self.first_dispatch_operation_id.is_none()
+                    && self.intent_progress.is_empty()
             }
             ClearingRoundLifecycleStateV1::Finalized => {
                 self.output_manifest_digest.is_some()
@@ -194,6 +386,7 @@ impl ClearingRoundLifecycleRecordV1 {
                     && self.finalization_digest.is_some()
                     && self.abort_digest.is_none()
                     && self.first_dispatch_operation_id.is_none()
+                    && self.intent_progress.is_empty()
             }
             ClearingRoundLifecycleStateV1::Dispatching
             | ClearingRoundLifecycleStateV1::Reconciling
@@ -203,17 +396,25 @@ impl ClearingRoundLifecycleRecordV1 {
                     && self.finalization_digest.is_some()
                     && self.abort_digest.is_none()
                     && self.first_dispatch_operation_id.is_some()
+                    && !self.intent_progress.is_empty()
             }
             ClearingRoundLifecycleStateV1::Satisfied => {
                 self.output_manifest_digest.is_some()
                     && self.participant_acceptance_root.is_some()
                     && self.finalization_digest.is_some()
                     && self.abort_digest.is_none()
+                    && self.first_dispatch_operation_id.is_some() != self.intent_progress.is_empty()
+                    && self.intent_progress.iter().all(|progress| {
+                        progress.active_effect_slot_id.is_none()
+                            && progress.unknown_effect_slot_id.is_none()
+                            && progress.completed_effect_slot_id.is_some()
+                    })
             }
             ClearingRoundLifecycleStateV1::Aborting | ClearingRoundLifecycleStateV1::Aborted => {
                 self.finalization_digest.is_none()
                     && self.abort_digest.is_some()
                     && self.first_dispatch_operation_id.is_none()
+                    && self.intent_progress.is_empty()
             }
         };
         if valid {
@@ -265,17 +466,96 @@ impl ClearingRoundLifecycleRecordV1 {
                     return Err(ClearingError::IllegalLifecycleTransition);
                 }
             }
-            ClearingRoundTransitionV1::BeginDispatch { operation_id, .. } => {
+            ClearingRoundTransitionV1::BeginDispatch {
+                operation_id,
+                intent_id,
+                intent_digest,
+                effect_slot_id,
+                ..
+            } => {
                 if next.first_dispatch_operation_id.is_none() {
                     next.first_dispatch_operation_id = Some(operation_id.clone());
                 }
+                match next
+                    .intent_progress
+                    .binary_search_by(|progress| progress.intent_id.cmp(intent_id))
+                {
+                    Ok(index) => {
+                        if next.intent_progress[index].intent_digest != *intent_digest {
+                            return Err(ClearingError::AuthorityVerification);
+                        }
+                        next.intent_progress[index].register_dispatch(effect_slot_id.clone())?;
+                    }
+                    Err(index) => next.intent_progress.insert(
+                        index,
+                        ClearingIntentProgressV1::dispatched(
+                            intent_id.clone(),
+                            intent_digest.clone(),
+                            effect_slot_id.clone(),
+                        )?,
+                    ),
+                }
             }
-            ClearingRoundTransitionV1::BeginReconciliation { .. }
-            | ClearingRoundTransitionV1::Satisfy { .. }
-            | ClearingRoundTransitionV1::Incident { .. } => {}
+            ClearingRoundTransitionV1::BeginReconciliation {
+                reconciliation_digest,
+                intent_id,
+                intent_digest,
+                effect_slot_id,
+                observed_status,
+                attempt_number,
+                ..
+            } => next.reconcile_intent(
+                intent_id,
+                intent_digest,
+                effect_slot_id,
+                *observed_status,
+                *attempt_number,
+                reconciliation_digest,
+            )?,
+            ClearingRoundTransitionV1::Incident {
+                reconciliation_digest,
+                intent_id,
+                intent_digest,
+                effect_slot_id,
+                attempt_number,
+                ..
+            } => next.reconcile_intent(
+                intent_id,
+                intent_digest,
+                effect_slot_id,
+                ClearingSettlementObservedStatusV1::Unknown,
+                *attempt_number,
+                reconciliation_digest,
+            )?,
+            ClearingRoundTransitionV1::Satisfy { .. } => {}
         }
         next.validate()?;
         Ok(next)
+    }
+
+    fn reconcile_intent(
+        &mut self,
+        intent_id: &str,
+        intent_digest: &str,
+        effect_slot_id: &str,
+        observed_status: ClearingSettlementObservedStatusV1,
+        attempt_number: u64,
+        reconciliation_digest: &str,
+    ) -> Result<(), ClearingError> {
+        let index = self
+            .intent_progress
+            .binary_search_by(|progress| progress.intent_id.as_str().cmp(intent_id))
+            .map_err(|_| ClearingError::AuthorityVerification)?;
+        let progress = &mut self.intent_progress[index];
+        if progress.intent_digest != intent_digest {
+            return Err(ClearingError::AuthorityVerification);
+        }
+        progress.reconcile(
+            effect_slot_id,
+            observed_status,
+            attempt_number,
+            reconciliation_digest,
+        )
     }
 }
 
@@ -309,19 +589,31 @@ pub enum ClearingRoundTransitionV1 {
     },
     BeginDispatch {
         operation_id: String,
+        intent_id: String,
+        intent_digest: String,
+        effect_slot_id: String,
         effect_slot_digest: String,
         authority_digest: String,
     },
     BeginReconciliation {
         reconciliation_digest: String,
+        intent_id: String,
+        intent_digest: String,
+        effect_slot_id: String,
+        observed_status: ClearingSettlementObservedStatusV1,
+        attempt_number: u64,
         authority_digest: String,
     },
     Satisfy {
-        reconciliation_digest: String,
+        satisfaction_digest: String,
         authority_digest: String,
     },
     Incident {
-        incident_digest: String,
+        reconciliation_digest: String,
+        intent_id: String,
+        intent_digest: String,
+        effect_slot_id: String,
+        attempt_number: u64,
         authority_digest: String,
     },
 }
@@ -385,29 +677,58 @@ impl ClearingRoundTransitionV1 {
             }
             Self::BeginDispatch {
                 operation_id,
+                intent_id,
+                intent_digest,
+                effect_slot_id,
                 effect_slot_digest,
                 authority_digest,
             } => {
                 validate_digest("operation_id", operation_id)?;
+                validate_text("dispatch_intent_id", intent_id)?;
+                validate_digest("dispatch_intent_digest", intent_digest)?;
+                validate_digest("dispatch_effect_slot_id", effect_slot_id)?;
                 validate_digest("effect_slot_digest", effect_slot_digest)?;
                 validate_digest("dispatch_authority_digest", authority_digest)
             }
             Self::BeginReconciliation {
                 reconciliation_digest,
-                authority_digest,
-            }
-            | Self::Satisfy {
-                reconciliation_digest,
+                intent_id,
+                intent_digest,
+                effect_slot_id,
+                observed_status,
+                attempt_number,
                 authority_digest,
             } => {
                 validate_digest("reconciliation_digest", reconciliation_digest)?;
+                validate_text("reconciliation_intent_id", intent_id)?;
+                validate_digest("reconciliation_intent_digest", intent_digest)?;
+                validate_digest("reconciliation_effect_slot_id", effect_slot_id)?;
+                validate_positive("reconciliation_attempt_number", *attempt_number)?;
+                if *observed_status == ClearingSettlementObservedStatusV1::Unknown {
+                    return Err(ClearingError::InvalidField("reconciliation_status"));
+                }
                 validate_digest("reconciliation_authority_digest", authority_digest)
             }
-            Self::Incident {
-                incident_digest,
+            Self::Satisfy {
+                satisfaction_digest,
                 authority_digest,
             } => {
-                validate_digest("incident_digest", incident_digest)?;
+                validate_digest("satisfaction_digest", satisfaction_digest)?;
+                validate_digest("satisfaction_authority_digest", authority_digest)
+            }
+            Self::Incident {
+                reconciliation_digest,
+                intent_id,
+                intent_digest,
+                effect_slot_id,
+                attempt_number,
+                authority_digest,
+            } => {
+                validate_digest("incident_reconciliation_digest", reconciliation_digest)?;
+                validate_text("incident_intent_id", intent_id)?;
+                validate_digest("incident_intent_digest", intent_digest)?;
+                validate_digest("incident_effect_slot_id", effect_slot_id)?;
+                validate_positive("incident_attempt_number", *attempt_number)?;
                 validate_digest("incident_authority_digest", authority_digest)
             }
         }
@@ -446,17 +767,30 @@ impl ClearingRoundTransitionV1 {
             }
             (
                 ClearingRoundLifecycleStateV1::Finalized
-                | ClearingRoundLifecycleStateV1::Dispatching,
+                | ClearingRoundLifecycleStateV1::Dispatching
+                | ClearingRoundLifecycleStateV1::Reconciling,
                 Self::BeginDispatch { .. },
             ) => Ok(ClearingRoundLifecycleStateV1::Dispatching),
-            (ClearingRoundLifecycleStateV1::Dispatching, Self::BeginReconciliation { .. }) => {
-                Ok(ClearingRoundLifecycleStateV1::Reconciling)
+            (ClearingRoundLifecycleStateV1::Incident, Self::BeginDispatch { .. }) => {
+                Ok(ClearingRoundLifecycleStateV1::Incident)
+            }
+            (
+                ClearingRoundLifecycleStateV1::Dispatching
+                | ClearingRoundLifecycleStateV1::Reconciling,
+                Self::BeginReconciliation { .. },
+            ) => Ok(ClearingRoundLifecycleStateV1::Reconciling),
+            (ClearingRoundLifecycleStateV1::Incident, Self::BeginReconciliation { .. }) => {
+                Ok(ClearingRoundLifecycleStateV1::Incident)
             }
             (
                 ClearingRoundLifecycleStateV1::Finalized
+                | ClearingRoundLifecycleStateV1::Dispatching
                 | ClearingRoundLifecycleStateV1::Reconciling,
                 Self::Satisfy { .. },
             ) => Ok(ClearingRoundLifecycleStateV1::Satisfied),
+            (ClearingRoundLifecycleStateV1::Incident, Self::Satisfy { .. }) => {
+                Ok(ClearingRoundLifecycleStateV1::Satisfied)
+            }
             (
                 ClearingRoundLifecycleStateV1::Dispatching
                 | ClearingRoundLifecycleStateV1::Reconciling,
@@ -476,6 +810,10 @@ impl ClearingRoundTransitionV1 {
     fn releases_reservations(&self) -> bool {
         matches!(self, Self::Abort { .. })
     }
+
+    fn satisfies_reservations(&self) -> bool {
+        matches!(self, Self::Satisfy { .. })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -484,6 +822,8 @@ pub struct ClearingReservationHeadBindingV1 {
     pub source_sequence: u64,
     pub resource_key: EconomicResourceKeyV1,
     pub expected_head_digest: String,
+    pub expected_resource_version: u64,
+    pub expected_lifecycle_fence: u64,
     pub atom: ObligationAtomV1,
     pub disposition: ObligationDispositionRecordV1,
 }
@@ -497,6 +837,14 @@ impl ClearingReservationHeadBindingV1 {
         validate_digest(
             "expected_obligation_head_digest",
             &self.expected_head_digest,
+        )?;
+        validate_positive(
+            "expected_obligation_resource_version",
+            self.expected_resource_version,
+        )?;
+        validate_positive(
+            "expected_obligation_lifecycle_fence",
+            self.expected_lifecycle_fence,
         )?;
         self.atom.validate()?;
         self.disposition.validate_against(&self.atom)?;
@@ -531,6 +879,7 @@ pub struct ClearingRoundTransitionProofV1 {
     pub source_round_fence: u64,
     pub next_round_version: u64,
     pub next_round_fence: u64,
+    pub trusted_clock_high_water: u64,
     pub reservation_root: String,
     pub reservation_count: u64,
     pub reservation_head_root: String,
@@ -552,6 +901,10 @@ impl ClearingRoundTransitionProofV1 {
         validate_positive("source_round_fence", self.source_round_fence)?;
         validate_positive("next_round_version", self.next_round_version)?;
         validate_positive("next_round_fence", self.next_round_fence)?;
+        validate_positive(
+            "transition_trusted_clock_high_water",
+            self.trusted_clock_high_water,
+        )?;
         validate_digest("reservation_root", &self.reservation_root)?;
         validate_positive("reservation_count", self.reservation_count)?;
         validate_digest("reservation_head_root", &self.reservation_head_root)?;
@@ -654,7 +1007,13 @@ pub fn compose_clearing_lifecycle_transition(
     transition: ClearingRoundTransitionV1,
     trusted_clock_high_water: u64,
 ) -> Result<ClearingLifecycleProjectionV1, ClearingError> {
-    if matches!(transition, ClearingRoundTransitionV1::BeginDispatch { .. }) {
+    if matches!(
+        transition,
+        ClearingRoundTransitionV1::BeginDispatch { .. }
+            | ClearingRoundTransitionV1::BeginReconciliation { .. }
+            | ClearingRoundTransitionV1::Satisfy { .. }
+            | ClearingRoundTransitionV1::Incident { .. }
+    ) {
         return Err(ClearingError::IllegalLifecycleTransition);
     }
     compose_lifecycle_transition(
@@ -707,6 +1066,7 @@ fn compose_lifecycle_transition(
         source_round_fence: current_record.fence,
         next_round_version,
         next_round_fence: next_round_version,
+        trusted_clock_high_water,
         reservation_root: current_record.reservation_root.clone(),
         reservation_count: current_record.reservation_count,
         reservation_head_root: reservation_head_root(&bindings)?,
@@ -742,6 +1102,13 @@ fn compose_lifecycle_transition(
                 frost.clone(),
                 trusted_clock_high_water,
             )?
+        } else if proof.transition.satisfies_reservations() {
+            satisfied_obligation_head(
+                current,
+                &proof.transition,
+                frost.clone(),
+                trusted_clock_high_water,
+            )?
         } else {
             preserved_obligation_head(&current.head, frost.clone(), trusted_clock_high_water)?
         };
@@ -767,11 +1134,48 @@ pub trait ClearingLifecycleProofResolver: Send + Sync {
     fn resolve(&self, proof_digest: &str) -> Result<ClearingRoundTransitionProofV1, ClearingError>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClearingLifecycleAuthorityVerificationV1 {
+    authorization: EconomicTransitionAuthorizationV1,
+    expected_reconciliation_slot: Option<EconomicEffectSlotV1>,
+}
+
+impl ClearingLifecycleAuthorityVerificationV1 {
+    #[must_use]
+    pub const fn direct(authorization: EconomicTransitionAuthorizationV1) -> Self {
+        Self {
+            authorization,
+            expected_reconciliation_slot: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn reconciled(
+        authorization: EconomicTransitionAuthorizationV1,
+        expected_reconciliation_slot: EconomicEffectSlotV1,
+    ) -> Self {
+        Self {
+            authorization,
+            expected_reconciliation_slot: Some(expected_reconciliation_slot),
+        }
+    }
+
+    #[must_use]
+    pub const fn authorization(&self) -> &EconomicTransitionAuthorizationV1 {
+        &self.authorization
+    }
+
+    #[must_use]
+    pub const fn expected_reconciliation_slot(&self) -> Option<&EconomicEffectSlotV1> {
+        self.expected_reconciliation_slot.as_ref()
+    }
+}
+
 pub trait ClearingLifecycleAuthorityVerifier: Send + Sync {
     fn verify(
         &self,
         proof: &ClearingRoundTransitionProofV1,
-    ) -> Result<EconomicTransitionAuthorizationV1, ClearingError>;
+    ) -> Result<ClearingLifecycleAuthorityVerificationV1, ClearingError>;
 }
 
 pub struct ClearingLifecycleBatchVerifier {
@@ -819,12 +1223,29 @@ impl EconomicTransitionProofVerifier for ClearingLifecycleBatchVerifier {
             .proof_resolver
             .resolve(&round_transition.transition_proof_digest)
             .map_err(|_| rejected_batch(batch))?;
-        verify_projection(current, batch, &proof).map_err(|_| rejected_batch(batch))?;
-        let authorization = self
+        let verified = self
             .authority_verifier
             .verify(&proof)
             .map_err(|_| rejected_batch(batch))?;
-        Ok(vec![authorization; batch.transitions.len()])
+        let reconciliation = matches!(
+            proof.transition,
+            ClearingRoundTransitionV1::BeginReconciliation { .. }
+                | ClearingRoundTransitionV1::Incident { .. }
+        );
+        if reconciliation && verified.expected_reconciliation_slot().is_none() {
+            return Err(rejected_batch(batch));
+        }
+        verify_projection(
+            current,
+            batch,
+            &proof,
+            verified.expected_reconciliation_slot(),
+        )
+        .map_err(|_| rejected_batch(batch))?;
+        Ok(vec![
+            verified.authorization().clone();
+            batch.transitions.len()
+        ])
     }
 }
 
@@ -896,6 +1317,8 @@ fn reservation_binding(
             .head
             .digest()
             .map_err(|_| ClearingError::InvalidField("obligation_head"))?,
+        expected_resource_version: reservation.head.resource_version,
+        expected_lifecycle_fence: reservation.head.lifecycle_fence,
         atom: reservation.input.atom.clone(),
         disposition: reservation.input.disposition.clone(),
     })
@@ -1019,10 +1442,69 @@ fn released_obligation_head(
     Ok(next)
 }
 
+fn satisfied_obligation_head(
+    current: &AnchoredClearingObligationV1,
+    transition: &ClearingRoundTransitionV1,
+    frost: Option<EconomicFrostBindingV1>,
+    trusted_clock_high_water: u64,
+) -> Result<EconomicResourceHeadV1, ClearingError> {
+    let ClearingRoundTransitionV1::Satisfy {
+        satisfaction_digest,
+        authority_digest,
+    } = transition
+    else {
+        return Err(ClearingError::IllegalLifecycleTransition);
+    };
+    let round_id = match current.input.disposition.disposition() {
+        ObligationDispositionV1::ClearingReserved { round_id } => round_id.clone(),
+        _ => return Err(ClearingError::InvalidField("obligation_disposition")),
+    };
+    let disposition = current.input.disposition.advance(
+        &current.input.atom,
+        ObligationDispositionTransitionV1::SatisfyClearing {
+            round_id,
+            satisfaction_digest: satisfaction_digest.clone(),
+            authority_digest: authority_digest.clone(),
+        },
+    )?;
+    let state = inline_content(&disposition)?;
+    let next = EconomicResourceHeadV1 {
+        schema: CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA.to_owned(),
+        anchor_id: current.head.anchor_id.clone(),
+        namespace: current.head.namespace.clone(),
+        resource_key: current.head.resource_key.clone(),
+        head_version: increment(current.head.head_version)?,
+        resource_version: increment(current.head.resource_version)?,
+        lifecycle_fence: disposition.lifecycle_fence(),
+        lifecycle_state: "clearing_satisfied".to_owned(),
+        state_digest: state
+            .digest()
+            .map_err(|_| ClearingError::InvalidField("obligation_disposition"))?,
+        state,
+        operation_id: None,
+        effect_idempotency_key: None,
+        frost,
+        terminal_result: None,
+        trusted_clock_high_water,
+        predecessor_digest: Some(
+            current
+                .head
+                .digest()
+                .map_err(|_| ClearingError::InvalidField("obligation_head"))?,
+        ),
+    };
+    current
+        .head
+        .validate_successor(&next)
+        .map_err(|_| ClearingError::InvalidField("next_obligation_head"))?;
+    Ok(next)
+}
+
 fn verify_projection(
     current: &VerifiedEconomicStateView,
     batch: &EconomicStateBatchV1,
     proof: &ClearingRoundTransitionProofV1,
+    expected_reconciliation_slot: Option<&EconomicEffectSlotV1>,
 ) -> Result<(), ClearingError> {
     proof.validate()?;
     let proof_digest = proof.digest()?;
@@ -1030,16 +1512,21 @@ fn verify_projection(
         proof.transition,
         ClearingRoundTransitionV1::BeginDispatch { .. }
     );
+    let reconciliation = matches!(
+        proof.transition,
+        ClearingRoundTransitionV1::BeginReconciliation { .. }
+            | ClearingRoundTransitionV1::Incident { .. }
+    );
     let expected_transition_count = proof
         .reservations
         .len()
-        .checked_add(if dispatch { 2 } else { 1 })
+        .checked_add(if dispatch || reconciliation { 2 } else { 1 })
         .ok_or(ClearingError::ArithmeticOverflow)?;
     if batch.transitions.len() != expected_transition_count
-        || batch
-            .transitions
-            .iter()
-            .any(|transition| transition.transition_proof_digest != proof_digest)
+        || batch.transitions.iter().any(|transition| {
+            transition.transition_proof_digest != proof_digest
+                || transition.next_head.trusted_clock_high_water != proof.trusted_clock_high_water
+        })
     {
         return Err(ClearingError::IncompleteLifecycleProjection);
     }
@@ -1096,6 +1583,13 @@ fn verify_projection(
             round_transition,
             &source_record,
         )?;
+    } else if reconciliation {
+        reconciliation::verify_reconciliation_projection(
+            current,
+            batch,
+            proof,
+            expected_reconciliation_slot,
+        )?;
     } else if !batch.effect_slots.is_empty()
         || !batch.request_replays.is_empty()
         || batch
@@ -1119,6 +1613,8 @@ fn verify_projection(
             .digest()
             .map_err(|_| ClearingError::IncompleteLifecycleProjection)?
             != reservation.expected_head_digest
+            || current_head.resource_version != reservation.expected_resource_version
+            || current_head.lifecycle_fence != reservation.expected_lifecycle_fence
             || transition.expected_head_digest.as_deref()
                 != Some(reservation.expected_head_digest.as_str())
         {
@@ -1137,6 +1633,13 @@ fn verify_projection(
         }
         let expected_next_head = if proof.transition.releases_reservations() {
             released_obligation_head(
+                &expected,
+                &proof.transition,
+                proof.transition.frost().cloned(),
+                transition.next_head.trusted_clock_high_water,
+            )?
+        } else if proof.transition.satisfies_reservations() {
+            satisfied_obligation_head(
                 &expected,
                 &proof.transition,
                 proof.transition.frost().cloned(),

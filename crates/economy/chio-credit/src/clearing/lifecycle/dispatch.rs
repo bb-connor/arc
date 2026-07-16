@@ -36,6 +36,9 @@ pub fn compose_clearing_dispatch_transition(
         reservations,
         ClearingRoundTransitionV1::BeginDispatch {
             operation_id: operation_id.clone(),
+            intent_id: signed_intent.body.intent_id.clone(),
+            intent_digest: signed_intent.body.digest()?,
+            effect_slot_id: effect_slot.slot_id.clone(),
             effect_slot_digest: effect_slot_digest.clone(),
             authority_digest,
         },
@@ -96,7 +99,10 @@ pub(super) fn verify_dispatch_slot_binding(
     let parameters_digest = intent.digest()?;
     if !matches!(
         record.state,
-        ClearingRoundLifecycleStateV1::Finalized | ClearingRoundLifecycleStateV1::Dispatching
+        ClearingRoundLifecycleStateV1::Finalized
+            | ClearingRoundLifecycleStateV1::Dispatching
+            | ClearingRoundLifecycleStateV1::Reconciling
+            | ClearingRoundLifecycleStateV1::Incident
     ) || intent.round_core_digest != record.round_core_digest
         || effect_slot.anchor_id != current_round_head.anchor_id
         || effect_slot.namespace != current_round_head.namespace
@@ -109,9 +115,7 @@ pub(super) fn verify_dispatch_slot_binding(
                 .digest()
                 .map_err(|_| ClearingError::InvalidField("current_round_head"))?
         || effect_slot.idempotency_key != intent.dispatch_idempotency_key
-        || (record.state == ClearingRoundLifecycleStateV1::Dispatching
-            && current_round_head.operation_id.as_deref()
-                == Some(effect_slot.operation_id.as_str()))
+        || current_round_head.operation_id.as_deref() == Some(effect_slot.operation_id.as_str())
         || effect_slot.admission_handoff.state != EconomicAdmissionHandoffStateV1::DispatchCommitted
         || effect_slot.state != EconomicEffectStateV1::Ready
         || effect_slot.terminal.is_some()
@@ -161,6 +165,9 @@ pub(super) fn verify_dispatch_projection(
 ) -> Result<(), ClearingError> {
     let ClearingRoundTransitionV1::BeginDispatch {
         operation_id,
+        intent_id: _,
+        intent_digest,
+        effect_slot_id,
         effect_slot_digest,
         authority_digest,
     } = &proof.transition
@@ -194,9 +201,14 @@ pub(super) fn verify_dispatch_projection(
         ready_effect_slot_head(slot, round_transition.next_head.trusted_clock_high_water)?;
     if !matches!(
         source_record.state,
-        ClearingRoundLifecycleStateV1::Finalized | ClearingRoundLifecycleStateV1::Dispatching
+        ClearingRoundLifecycleStateV1::Finalized
+            | ClearingRoundLifecycleStateV1::Dispatching
+            | ClearingRoundLifecycleStateV1::Reconciling
+            | ClearingRoundLifecycleStateV1::Incident
     ) || batch.operation_id.as_deref() != Some(operation_id)
         || slot.operation_id != *operation_id
+        || slot.slot_id != *effect_slot_id
+        || slot.parameters_digest != *intent_digest
         || actual_effect_slot_digest != *effect_slot_digest
         || slot.action_digest != *authority_digest
         || slot.resource_key != current_round.resource_key

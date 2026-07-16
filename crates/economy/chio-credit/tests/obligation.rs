@@ -108,6 +108,34 @@ fn obligation_disposition_is_exclusive_and_round_release_is_exact() -> TestResul
     )?;
     assert_eq!(released.disposition(), &ObligationDispositionV1::PerCall);
 
+    let satisfied = reserved.advance(
+        &atom,
+        ObligationDispositionTransitionV1::SatisfyClearing {
+            round_id: "round-1".to_owned(),
+            satisfaction_digest: digest("satisfaction"),
+            authority_digest: digest("satisfaction-authority"),
+        },
+    )?;
+    assert_eq!(
+        satisfied.disposition(),
+        &ObligationDispositionV1::ClearingSatisfied {
+            round_id: "round-1".to_owned(),
+            satisfaction_digest: digest("satisfaction"),
+        }
+    );
+    assert_eq!(satisfied.atom_digest(), reserved.atom_digest());
+    assert!(satisfied
+        .advance(
+            &atom,
+            ObligationDispositionTransitionV1::ReleaseClearing {
+                round_id: "round-1".to_owned(),
+                abort_digest: digest("abort"),
+                zero_dispatch_proof_digest: digest("zero-dispatch"),
+                authority_digest: digest("release-authority"),
+            },
+        )
+        .is_err());
+
     let channelized = produced.advance(
         &atom,
         ObligationDispositionTransitionV1::ReserveChannel {

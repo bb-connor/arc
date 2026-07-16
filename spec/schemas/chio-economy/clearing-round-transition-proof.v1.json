@@ -17,6 +17,7 @@
     "sourceRoundFence",
     "nextRoundVersion",
     "nextRoundFence",
+    "trustedClockHighWater",
     "reservationRoot",
     "reservationCount",
     "reservationHeadRoot",
@@ -36,6 +37,7 @@
     "sourceRoundFence": { "$ref": "#/$defs/positiveInteger" },
     "nextRoundVersion": { "$ref": "#/$defs/positiveInteger" },
     "nextRoundFence": { "$ref": "#/$defs/positiveInteger" },
+    "trustedClockHighWater": { "$ref": "#/$defs/positiveInteger" },
     "reservationRoot": { "$ref": "#/$defs/digest" },
     "reservationCount": { "type": "integer", "minimum": 1, "maximum": 126 },
     "reservationHeadRoot": { "$ref": "#/$defs/digest" },
@@ -78,11 +80,13 @@
     "reservation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sourceSequence", "resourceKey", "expectedHeadDigest", "atom", "disposition"],
+      "required": ["sourceSequence", "resourceKey", "expectedHeadDigest", "expectedResourceVersion", "expectedLifecycleFence", "atom", "disposition"],
       "properties": {
         "sourceSequence": { "$ref": "#/$defs/positiveInteger" },
         "resourceKey": { "$ref": "#/$defs/resourceKey" },
         "expectedHeadDigest": { "$ref": "#/$defs/digest" },
+        "expectedResourceVersion": { "$ref": "#/$defs/positiveInteger" },
+        "expectedLifecycleFence": { "$ref": "#/$defs/positiveInteger" },
         "atom": { "$ref": "https://chio-protocol.dev/schemas/chio-economy/obligation-atom/v1" },
         "disposition": { "$ref": "https://chio-protocol.dev/schemas/chio-economy/obligation-disposition/v1" }
       }
@@ -157,10 +161,13 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "operation_id", "effect_slot_digest", "authority_digest"],
+          "required": ["kind", "operation_id", "intent_id", "intent_digest", "effect_slot_id", "effect_slot_digest", "authority_digest"],
           "properties": {
             "kind": { "const": "begin_dispatch" },
             "operation_id": { "$ref": "#/$defs/digest" },
+            "intent_id": { "$ref": "#/$defs/text" },
+            "intent_digest": { "$ref": "#/$defs/digest" },
+            "effect_slot_id": { "$ref": "#/$defs/digest" },
             "effect_slot_digest": { "$ref": "#/$defs/digest" },
             "authority_digest": { "$ref": "#/$defs/digest" }
           }
@@ -168,20 +175,39 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "reconciliation_digest", "authority_digest"],
+          "required": ["kind", "reconciliation_digest", "intent_id", "intent_digest", "effect_slot_id", "observed_status", "attempt_number", "authority_digest"],
           "properties": {
-            "kind": { "enum": ["begin_reconciliation", "satisfy"] },
+            "kind": { "const": "begin_reconciliation" },
             "reconciliation_digest": { "$ref": "#/$defs/digest" },
+            "intent_id": { "$ref": "#/$defs/text" },
+            "intent_digest": { "$ref": "#/$defs/digest" },
+            "effect_slot_id": { "$ref": "#/$defs/digest" },
+            "observed_status": { "enum": ["settled", "permanent_no_effect"] },
+            "attempt_number": { "$ref": "#/$defs/positiveInteger" },
             "authority_digest": { "$ref": "#/$defs/digest" }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "incident_digest", "authority_digest"],
+          "required": ["kind", "satisfaction_digest", "authority_digest"],
+          "properties": {
+            "kind": { "const": "satisfy" },
+            "satisfaction_digest": { "$ref": "#/$defs/digest" },
+            "authority_digest": { "$ref": "#/$defs/digest" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "reconciliation_digest", "intent_id", "intent_digest", "effect_slot_id", "attempt_number", "authority_digest"],
           "properties": {
             "kind": { "const": "incident" },
-            "incident_digest": { "$ref": "#/$defs/digest" },
+            "reconciliation_digest": { "$ref": "#/$defs/digest" },
+            "intent_id": { "$ref": "#/$defs/text" },
+            "intent_digest": { "$ref": "#/$defs/digest" },
+            "effect_slot_id": { "$ref": "#/$defs/digest" },
+            "attempt_number": { "$ref": "#/$defs/positiveInteger" },
             "authority_digest": { "$ref": "#/$defs/digest" }
           }
         }

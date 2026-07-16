@@ -3,11 +3,13 @@ use std::sync::Arc;
 use chio_core::economic_continuity::{EconomicResourceKeyV1, VerifiedEconomicStateBatchAdvance};
 use chio_core::StoreMutationFence;
 use chio_credit::clearing::{
-    verify_clearing_lifecycle_replay, verify_clearing_lifecycle_replay_authority,
-    ClearingDisputeWindowResolver, ClearingError, ClearingLifecycleAuthorityPinsV1,
+    verify_clearing_lifecycle_replay_authority_verification_with_outcome,
+    verify_clearing_lifecycle_replay_with_outcome, ClearingDisputeWindowResolver, ClearingError,
+    ClearingLifecycleAuthorityPinsV1, ClearingLifecycleAuthorityVerificationV1,
     ClearingLifecycleAuthorityVerifier, ClearingLifecycleBatchVerifier,
     ClearingLifecycleProofResolver, ClearingLifecycleReplayV1, ClearingRoundTransitionProofV1,
-    CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND, CLEARING_ROUND_RESOURCE_FAMILY,
+    ClearingSettlementOutcomeVerifier, CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND,
+    CLEARING_ROUND_RESOURCE_FAMILY,
 };
 use chio_federation::frost::FrostArtifactTrustStore;
 
@@ -31,6 +33,7 @@ pub struct SqliteClearingLifecycleStore {
     pins: ClearingLifecycleAuthorityPinsV1,
     frost_trust: Option<Arc<FrostArtifactTrustStore>>,
     dispute_resolver: Arc<dyn ClearingDisputeWindowResolver>,
+    settlement_outcome_verifier: Option<Arc<dyn ClearingSettlementOutcomeVerifier>>,
 }
 
 impl SqliteClearingLifecycleStore {
@@ -46,7 +49,17 @@ impl SqliteClearingLifecycleStore {
             pins,
             frost_trust,
             dispute_resolver,
+            settlement_outcome_verifier: None,
         })
+    }
+
+    #[must_use]
+    pub fn with_settlement_outcome_verifier(
+        mut self,
+        verifier: Arc<dyn ClearingSettlementOutcomeVerifier>,
+    ) -> Self {
+        self.settlement_outcome_verifier = Some(verifier);
+        self
     }
 
     pub fn stage(
@@ -56,13 +69,14 @@ impl SqliteClearingLifecycleStore {
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<EconomicStateStageRecord, ClearingLifecycleStoreError> {
-        verify_clearing_lifecycle_replay(
+        verify_clearing_lifecycle_replay_with_outcome(
             advance.current(),
             advance.batch(),
             replay,
             &self.pins,
             self.frost_trust.as_deref(),
             Some(self.dispute_resolver.as_ref()),
+            self.settlement_outcome_verifier.as_deref(),
         )?;
         if replay.authorized_at_unix_ms() > trusted_now_unix_ms {
             return Err(ClearingError::AuthorityVerification.into());
@@ -134,8 +148,7 @@ impl ClearingLifecycleAuthorityVerifier for SqliteClearingLifecycleStore {
     fn verify(
         &self,
         proof: &ClearingRoundTransitionProofV1,
-    ) -> Result<chio_core::economic_continuity::EconomicTransitionAuthorizationV1, ClearingError>
-    {
+    ) -> Result<ClearingLifecycleAuthorityVerificationV1, ClearingError> {
         let proof_digest = proof.digest()?;
         let (record, replay) = self
             .load_replay(&proof_digest)
@@ -152,12 +165,13 @@ impl ClearingLifecycleAuthorityVerifier for SqliteClearingLifecycleStore {
             .base_view()
             .head(&round_key)
             .ok_or(ClearingError::IncompleteLifecycleProjection)?;
-        verify_clearing_lifecycle_replay_authority(
+        verify_clearing_lifecycle_replay_authority_verification_with_outcome(
             source_round_head,
             &replay,
             &self.pins,
             self.frost_trust.as_deref(),
             Some(self.dispute_resolver.as_ref()),
+            self.settlement_outcome_verifier.as_deref(),
         )
     }
 }

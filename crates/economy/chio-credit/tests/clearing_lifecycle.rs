@@ -7,22 +7,26 @@ use chio_core_types::economic_continuity::{
     verify_economic_state_batch_advance, verify_economic_state_batch_commit,
     verify_economic_state_view, EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1,
     EconomicContentV1, EconomicEffectSlotV1, EconomicEffectStateV1, EconomicEffectTargetV1,
-    EconomicFrostBindingV1, EconomicRequestBindingV1, EconomicResourceHeadV1,
-    EconomicResourceKeyV1, EconomicStateAnchorError, EconomicStateAnchorPins,
-    EconomicStateAnchorViewV1, EconomicStateBatchV1, EconomicTransitionAuthorizationV1,
-    CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
-    CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA, CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
+    EconomicEffectTerminalV1, EconomicFrostBindingV1, EconomicRequestBindingV1,
+    EconomicResourceHeadV1, EconomicResourceKeyV1, EconomicStateAnchorError,
+    EconomicStateAnchorPins, EconomicStateAnchorViewV1, EconomicStateBatchV1,
+    EconomicTransitionAuthorizationV1, CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
+    CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA, CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
+    CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
 };
 use chio_core_types::StoreMutationFence;
 use chio_credit::clearing::{
     clearing_reservation_root, compose_clearing_dispatch_transition,
-    compose_clearing_lifecycle_transition, AnchoredClearingObligationV1,
-    ClearingLifecycleAuthorityVerifier, ClearingLifecycleBatchVerifier,
-    ClearingLifecycleProofResolver, ClearingObligationInputV1, ClearingRoundLifecycleRecordV1,
-    ClearingRoundTransitionProofV1, ClearingRoundTransitionV1, ClearingSettlementIntentV1,
-    NettingRoundCoreV1, SignedClearingSettlementIntentV1, CLEARING_ALGORITHM_V1,
-    CLEARING_ROUND_CORE_SCHEMA, CLEARING_SETTLEMENT_DISPATCH_EFFECT_KIND,
-    CLEARING_SETTLEMENT_INTENT_SCHEMA,
+    compose_clearing_lifecycle_transition, compose_clearing_reconciliation_transition,
+    AnchoredClearingObligationV1, ClearingAuthorityTrustV1,
+    ClearingLifecycleAuthorityVerificationV1, ClearingLifecycleAuthorityVerifier,
+    ClearingLifecycleBatchVerifier, ClearingLifecycleProofResolver, ClearingObligationInputV1,
+    ClearingRoundLifecycleRecordV1, ClearingRoundTransitionProofV1, ClearingRoundTransitionV1,
+    ClearingSettlementIntentV1, ClearingSettlementObservedStatusV1,
+    ClearingSettlementOutcomeVerifier, ClearingSettlementReconciliationBodyV1, NettingRoundCoreV1,
+    SignedClearingSettlementIntentV1, SignedClearingSettlementReconciliationV1,
+    CLEARING_ALGORITHM_V1, CLEARING_ROUND_CORE_SCHEMA, CLEARING_SETTLEMENT_DISPATCH_EFFECT_KIND,
+    CLEARING_SETTLEMENT_INTENT_SCHEMA, CLEARING_SETTLEMENT_RECONCILIATION_SCHEMA,
 };
 use chio_credit::obligation::{
     ObligationAtomInputV1, ObligationAtomV1, ObligationCreditElectionV1,
@@ -260,8 +264,11 @@ impl ClearingLifecycleAuthorityVerifier for DirectAuthority {
     fn verify(
         &self,
         _proof: &ClearingRoundTransitionProofV1,
-    ) -> Result<EconomicTransitionAuthorizationV1, chio_credit::clearing::ClearingError> {
-        Ok(EconomicTransitionAuthorizationV1::Direct)
+    ) -> Result<ClearingLifecycleAuthorityVerificationV1, chio_credit::clearing::ClearingError>
+    {
+        Ok(ClearingLifecycleAuthorityVerificationV1::direct(
+            EconomicTransitionAuthorizationV1::Direct,
+        ))
     }
 }
 
@@ -272,15 +279,19 @@ impl ClearingLifecycleAuthorityVerifier for MatchingAuthority {
     fn verify(
         &self,
         proof: &ClearingRoundTransitionProofV1,
-    ) -> Result<EconomicTransitionAuthorizationV1, chio_credit::clearing::ClearingError> {
-        match &proof.transition {
+    ) -> Result<ClearingLifecycleAuthorityVerificationV1, chio_credit::clearing::ClearingError>
+    {
+        let authorization = match &proof.transition {
             ClearingRoundTransitionV1::Finalize { frost, .. } => {
-                Ok(EconomicTransitionAuthorizationV1::NOfM {
+                EconomicTransitionAuthorizationV1::NOfM {
                     frost: frost.clone(),
-                })
+                }
             }
-            _ => Ok(EconomicTransitionAuthorizationV1::Direct),
-        }
+            _ => EconomicTransitionAuthorizationV1::Direct,
+        };
+        Ok(ClearingLifecycleAuthorityVerificationV1::direct(
+            authorization,
+        ))
     }
 }
 
@@ -381,6 +392,267 @@ fn dispatch_slot(
     slot.slot_id = slot.recompute_slot_id()?;
     slot.validate()?;
     Ok(slot)
+}
+
+struct DispatchedRoundFixture {
+    inputs: Vec<ClearingObligationInputV1>,
+    core: NettingRoundCoreV1,
+    intent: SignedClearingSettlementIntentV1,
+    slot: EconomicEffectSlotV1,
+    round_head: EconomicResourceHeadV1,
+    obligation_heads: Vec<AnchoredClearingObligationV1>,
+    effect_slot_head: EconomicResourceHeadV1,
+}
+
+fn dispatched_round_fixture() -> Result<DispatchedRoundFixture, Box<dyn std::error::Error>> {
+    let inputs = vec![reserved_obligation(1)?];
+    let core = core(&inputs)?;
+    let mut obligations = vec![AnchoredClearingObligationV1 {
+        input: inputs[0].clone(),
+        head: obligation_head(&inputs[0], &core.governance_scope_id)?,
+    }];
+    let reserved_head = round_head(&ClearingRoundLifecycleRecordV1::reserved(&core)?)?;
+    let proposed = compose_clearing_lifecycle_transition(
+        &reserved_head,
+        &obligations,
+        ClearingRoundTransitionV1::Propose {
+            output_manifest_digest: digest("output-manifest"),
+            authority_digest: digest("proposal-authority"),
+        },
+        501,
+    )?;
+    let proposed_heads = next_heads(&proposed);
+    obligations = anchored_obligations(&inputs, &proposed_heads)
+        .ok_or("proposal omitted an obligation head")?;
+    let finalizing = compose_clearing_lifecycle_transition(
+        &proposed_heads[0],
+        &obligations,
+        ClearingRoundTransitionV1::BeginFinalization {
+            acceptance_root: digest("acceptances"),
+            acceptance_count: 1,
+            authority_digest: digest("finalization-authority"),
+        },
+        502,
+    )?;
+    let finalizing_heads = next_heads(&finalizing);
+    obligations = anchored_obligations(&inputs, &finalizing_heads)
+        .ok_or("finalization omitted an obligation head")?;
+    let finalized = compose_clearing_lifecycle_transition(
+        &finalizing_heads[0],
+        &obligations,
+        ClearingRoundTransitionV1::Finalize {
+            finalization_digest: digest("finalization"),
+            frost: EconomicFrostBindingV1 {
+                authorization_slot_id: digest("authorization-slot"),
+                authorization_id: digest("authorization"),
+                action_digest: digest("finalization-action"),
+                signed_envelope_digest: digest("frost-envelope"),
+            },
+        },
+        503,
+    )?;
+    let finalized_heads = next_heads(&finalized);
+    let finalized_head = finalized_heads[0].clone();
+    obligations = anchored_obligations(&inputs, &finalized_heads)
+        .ok_or("finalized projection omitted an obligation head")?;
+    let intent = signed_dispatch_intent(&core.digest()?, "reconciliation")?;
+    let slot = dispatch_slot(&finalized_head, &intent, "reconciliation")?;
+    let dispatch = compose_clearing_dispatch_transition(
+        &finalized_head,
+        &obligations,
+        &intent,
+        slot.clone(),
+        504,
+    )?;
+    let dispatch_heads = next_heads(&dispatch);
+    let round_head = dispatch_heads
+        .iter()
+        .find(|head| head.resource_key.resource_family == "clearing_round")
+        .ok_or("dispatch omitted the round head")?
+        .clone();
+    let effect_slot_head = dispatch_heads
+        .iter()
+        .find(|head| head.resource_key == slot.resource_head_key())
+        .ok_or("dispatch omitted the effect slot head")?
+        .clone();
+    let obligation_heads = anchored_obligations(&inputs, &dispatch_heads)
+        .ok_or("dispatch omitted an obligation head")?;
+    Ok(DispatchedRoundFixture {
+        inputs,
+        core,
+        intent,
+        slot,
+        round_head,
+        obligation_heads,
+        effect_slot_head,
+    })
+}
+
+fn effect_slot_successor(
+    current: &EconomicResourceHeadV1,
+    slot: &EconomicEffectSlotV1,
+    trusted_clock_high_water: u64,
+) -> Result<EconomicResourceHeadV1, Box<dyn std::error::Error>> {
+    let state = content(slot)?;
+    let next = EconomicResourceHeadV1 {
+        schema: CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA.to_owned(),
+        anchor_id: current.anchor_id.clone(),
+        namespace: current.namespace.clone(),
+        resource_key: current.resource_key.clone(),
+        head_version: current.head_version + 1,
+        resource_version: current.resource_version + 1,
+        lifecycle_fence: current.lifecycle_fence + 1,
+        lifecycle_state: match slot.state {
+            EconomicEffectStateV1::DispatchCommitted => "dispatch_committed",
+            EconomicEffectStateV1::Completed => "completed",
+            EconomicEffectStateV1::NoEffect => "no_effect",
+            EconomicEffectStateV1::Unknown => "unknown",
+            EconomicEffectStateV1::Ready => "ready",
+        }
+        .to_owned(),
+        state_digest: state.digest()?,
+        state,
+        operation_id: Some(slot.operation_id.clone()),
+        effect_idempotency_key: Some(slot.idempotency_key.clone()),
+        frost: slot.frost.clone(),
+        terminal_result: None,
+        trusted_clock_high_water,
+        predecessor_digest: Some(current.digest()?),
+    };
+    current.validate_successor(&next)?;
+    Ok(next)
+}
+
+#[derive(Debug)]
+struct SettledOutcome;
+
+impl ClearingSettlementOutcomeVerifier for SettledOutcome {
+    fn verify_outcome(
+        &self,
+        _slot: &EconomicEffectSlotV1,
+        settlement_outcome_digest: &str,
+        _external_references: &[String],
+    ) -> Result<Option<EconomicEffectTerminalV1>, chio_credit::clearing::ClearingError> {
+        if settlement_outcome_digest != digest("settlement-outcome") {
+            return Err(chio_credit::clearing::ClearingError::AuthorityVerification);
+        }
+        let result = EconomicContentV1::Inline {
+            value: serde_json::json!({"settlementReference": "rail-transaction-1"}),
+        };
+        let result_digest = result
+            .digest()
+            .map_err(|_| chio_credit::clearing::ClearingError::AuthorityVerification)?;
+        Ok(Some(EconomicEffectTerminalV1::Completed {
+            result_id: "rail-transaction-1".to_owned(),
+            result_digest,
+            result,
+        }))
+    }
+}
+
+#[derive(Debug)]
+struct PermanentNoEffectOutcome;
+
+impl ClearingSettlementOutcomeVerifier for PermanentNoEffectOutcome {
+    fn verify_outcome(
+        &self,
+        _slot: &EconomicEffectSlotV1,
+        settlement_outcome_digest: &str,
+        _external_references: &[String],
+    ) -> Result<Option<EconomicEffectTerminalV1>, chio_credit::clearing::ClearingError> {
+        if settlement_outcome_digest != digest("no-effect-outcome") {
+            return Err(chio_credit::clearing::ClearingError::AuthorityVerification);
+        }
+        let proof = EconomicContentV1::Inline {
+            value: serde_json::json!({"targetStatus": "permanently_not_applied"}),
+        };
+        let proof_digest = proof
+            .digest()
+            .map_err(|_| chio_credit::clearing::ClearingError::AuthorityVerification)?;
+        Ok(Some(EconomicEffectTerminalV1::NoEffect {
+            kind:
+                chio_core_types::economic_continuity::EconomicNoEffectKindV1::PermanentlyNotApplied,
+            proof_id: "rail-no-effect-1".to_owned(),
+            proof_digest,
+            proof,
+        }))
+    }
+}
+
+#[derive(Debug)]
+struct UnknownOutcome;
+
+impl ClearingSettlementOutcomeVerifier for UnknownOutcome {
+    fn verify_outcome(
+        &self,
+        _slot: &EconomicEffectSlotV1,
+        settlement_outcome_digest: &str,
+        _external_references: &[String],
+    ) -> Result<Option<EconomicEffectTerminalV1>, chio_credit::clearing::ClearingError> {
+        if settlement_outcome_digest != digest("unknown-outcome") {
+            return Err(chio_credit::clearing::ClearingError::AuthorityVerification);
+        }
+        Ok(None)
+    }
+}
+
+fn signed_reconciliation(
+    core: &NettingRoundCoreV1,
+    intent: &SignedClearingSettlementIntentV1,
+    round_head: &EconomicResourceHeadV1,
+    effect_slot_head: &EconomicResourceHeadV1,
+    observed_status: ClearingSettlementObservedStatusV1,
+) -> Result<SignedClearingSettlementReconciliationV1, Box<dyn std::error::Error>> {
+    let settlement_outcome_digest = match observed_status {
+        ClearingSettlementObservedStatusV1::Settled => digest("settlement-outcome"),
+        ClearingSettlementObservedStatusV1::PermanentNoEffect => digest("no-effect-outcome"),
+        ClearingSettlementObservedStatusV1::Unknown => digest("unknown-outcome"),
+    };
+    let observed_at_unix_ms = round_head
+        .trusted_clock_high_water
+        .max(effect_slot_head.trusted_clock_high_water)
+        + 1;
+    Ok(SignedClearingSettlementReconciliationV1::sign(
+        ClearingSettlementReconciliationBodyV1 {
+            schema: CLEARING_SETTLEMENT_RECONCILIATION_SCHEMA.to_owned(),
+            round_id: core.round_id.clone(),
+            round_core_digest: core.digest()?,
+            output_manifest_digest: digest("output-manifest"),
+            intent_id: intent.body.intent_id.clone(),
+            intent_digest: intent.body.digest()?,
+            effect_slot_id: effect_slot_head.resource_key.resource_id.clone(),
+            source_effect_slot_digest: effect_slot_head.digest()?,
+            settlement_outcome_digest,
+            external_references: vec!["rail:transaction:1".to_owned()],
+            observed_status,
+            attempt_number: 1,
+            source_lifecycle_head_digest: round_head.digest()?,
+            source_lifecycle_version: round_head.resource_version,
+            source_lifecycle_fence: round_head.lifecycle_fence,
+            next_lifecycle_version: round_head.resource_version + 1,
+            next_lifecycle_fence: round_head.lifecycle_fence + 1,
+            authority_digest: digest("reconciliation-authority"),
+            disposition_authority_id: "obligation-authority".to_owned(),
+            disposition_authority_key_epoch: 1,
+            observed_at_unix_ms,
+        },
+        &Keypair::from_seed(&[52; 32]),
+    )?)
+}
+
+fn reconciliation_trust() -> ClearingAuthorityTrustV1 {
+    ClearingAuthorityTrustV1 {
+        clearing_authority_id: "clearing-authority".to_owned(),
+        clearing_authority_key: Keypair::from_seed(&[51; 32]).public_key(),
+        clearing_authority_key_epoch: 1,
+        participant_authority_id: "participant-authority".to_owned(),
+        participant_authority_key: Keypair::from_seed(&[53; 32]).public_key(),
+        participant_key_epoch: 1,
+        obligation_authority_id: "obligation-authority".to_owned(),
+        obligation_authority_key: Keypair::from_seed(&[52; 32]).public_key(),
+        obligation_key_epoch: 1,
+        trusted_time_unix_ms: 506,
+    }
 }
 
 #[test]
@@ -703,6 +975,24 @@ fn finalizing_abort_requires_a_burn_and_dispatch_is_effect_fenced() -> TestResul
         .iter()
         .find(|head| head.resource_key.resource_family == "clearing_round")
         .ok_or("missing dispatching round head")?;
+    let EconomicContentV1::Inline {
+        value: dispatching_record,
+    } = &dispatching_head.state
+    else {
+        return Err("dispatching round state is not inline".into());
+    };
+    assert_eq!(
+        dispatching_record["intentProgress"],
+        serde_json::json!([{
+            "intentId": first_intent.body.intent_id,
+            "intentDigest": first_intent.body.digest()?,
+            "attemptCount": 1,
+            "noEffectCount": 0,
+            "ambiguityCount": 0,
+            "reconciliationCount": 0,
+            "activeEffectSlotId": first_slot.slot_id,
+        }])
+    );
     let dispatching_obligations = anchored_obligations(&inputs, &first_dispatch_heads)
         .ok_or("first dispatch omitted an obligation head")?;
     let second_intent = signed_dispatch_intent(&core.digest()?, "second")?;
@@ -739,6 +1029,351 @@ fn finalizing_abort_requires_a_burn_and_dispatch_is_effect_fenced() -> TestResul
         505,
     )
     .is_err());
+    Ok(())
+}
+
+#[test]
+fn terminal_clearing_transitions_require_a_dedicated_projection() -> TestResult {
+    let inputs = vec![reserved_obligation(1)?];
+    let core = core(&inputs)?;
+    let mut anchored = vec![AnchoredClearingObligationV1 {
+        input: inputs[0].clone(),
+        head: obligation_head(&inputs[0], &core.governance_scope_id)?,
+    }];
+    let reserved_head = round_head(&ClearingRoundLifecycleRecordV1::reserved(&core)?)?;
+    let proposed = compose_clearing_lifecycle_transition(
+        &reserved_head,
+        &anchored,
+        ClearingRoundTransitionV1::Propose {
+            output_manifest_digest: digest("output-manifest"),
+            authority_digest: digest("proposal-authority"),
+        },
+        501,
+    )?;
+    let proposed_heads = next_heads(&proposed);
+    let proposed_head = proposed_heads[0].clone();
+    anchored = anchored_obligations(&inputs, &proposed_heads)
+        .ok_or("proposal omitted an obligation head")?;
+    let finalizing = compose_clearing_lifecycle_transition(
+        &proposed_head,
+        &anchored,
+        ClearingRoundTransitionV1::BeginFinalization {
+            acceptance_root: digest("acceptances"),
+            acceptance_count: 1,
+            authority_digest: digest("finalization-authority"),
+        },
+        502,
+    )?;
+    let finalizing_heads = next_heads(&finalizing);
+    let finalizing_head = finalizing_heads[0].clone();
+    anchored = anchored_obligations(&inputs, &finalizing_heads)
+        .ok_or("finalization omitted an obligation head")?;
+    let finalized = compose_clearing_lifecycle_transition(
+        &finalizing_head,
+        &anchored,
+        ClearingRoundTransitionV1::Finalize {
+            finalization_digest: digest("finalization"),
+            frost: EconomicFrostBindingV1 {
+                authorization_slot_id: digest("authorization-slot"),
+                authorization_id: digest("authorization"),
+                action_digest: digest("finalization-action"),
+                signed_envelope_digest: digest("frost-envelope"),
+            },
+        },
+        503,
+    )?;
+    let finalized_heads = next_heads(&finalized);
+    let finalized_head = finalized_heads[0].clone();
+    anchored = anchored_obligations(&inputs, &finalized_heads)
+        .ok_or("finalized projection omitted an obligation head")?;
+    let intent = signed_dispatch_intent(&core.digest()?, "terminal")?;
+    let slot = dispatch_slot(&finalized_head, &intent, "terminal")?;
+    let dispatch =
+        compose_clearing_dispatch_transition(&finalized_head, &anchored, &intent, slot, 504)?;
+    let dispatch_heads = next_heads(&dispatch);
+    let dispatching_head = dispatch_heads
+        .iter()
+        .find(|head| head.resource_key.resource_family == "clearing_round")
+        .ok_or("dispatch omitted the round head")?;
+    let dispatching_obligations = anchored_obligations(&inputs, &dispatch_heads)
+        .ok_or("dispatch omitted an obligation head")?;
+
+    for transition in [
+        ClearingRoundTransitionV1::BeginReconciliation {
+            reconciliation_digest: digest("reconciliation"),
+            intent_id: "intent-terminal".to_owned(),
+            intent_digest: digest("intent-terminal"),
+            effect_slot_id: digest("effect-slot-terminal"),
+            observed_status: ClearingSettlementObservedStatusV1::Settled,
+            attempt_number: 1,
+            authority_digest: digest("reconciliation-authority"),
+        },
+        ClearingRoundTransitionV1::Incident {
+            reconciliation_digest: digest("incident"),
+            intent_id: "intent-terminal".to_owned(),
+            intent_digest: digest("intent-terminal"),
+            effect_slot_id: digest("effect-slot-terminal"),
+            attempt_number: 1,
+            authority_digest: digest("incident-authority"),
+        },
+    ] {
+        assert!(matches!(
+            compose_clearing_lifecycle_transition(
+                dispatching_head,
+                &dispatching_obligations,
+                transition,
+                505,
+            ),
+            Err(chio_credit::clearing::ClearingError::IllegalLifecycleTransition)
+        ));
+    }
+    Ok(())
+}
+
+#[test]
+fn settled_reconciliation_terminalizes_the_slot_and_round_attempt_together() -> TestResult {
+    let fixture = dispatched_round_fixture()?;
+    let mut committed_slot = fixture.slot.clone();
+    committed_slot.state = EconomicEffectStateV1::DispatchCommitted;
+    let committed_slot_head =
+        effect_slot_successor(&fixture.effect_slot_head, &committed_slot, 505)?;
+    let body = ClearingSettlementReconciliationBodyV1 {
+        schema: CLEARING_SETTLEMENT_RECONCILIATION_SCHEMA.to_owned(),
+        round_id: fixture.core.round_id.clone(),
+        round_core_digest: fixture.core.digest()?,
+        output_manifest_digest: digest("output-manifest"),
+        intent_id: fixture.intent.body.intent_id.clone(),
+        intent_digest: fixture.intent.body.digest()?,
+        effect_slot_id: committed_slot.slot_id.clone(),
+        source_effect_slot_digest: committed_slot_head.digest()?,
+        settlement_outcome_digest: digest("settlement-outcome"),
+        external_references: vec!["rail:transaction:1".to_owned()],
+        observed_status: ClearingSettlementObservedStatusV1::Settled,
+        attempt_number: 1,
+        source_lifecycle_head_digest: fixture.round_head.digest()?,
+        source_lifecycle_version: fixture.round_head.resource_version,
+        source_lifecycle_fence: fixture.round_head.lifecycle_fence,
+        next_lifecycle_version: fixture.round_head.resource_version + 1,
+        next_lifecycle_fence: fixture.round_head.lifecycle_fence + 1,
+        authority_digest: digest("reconciliation-authority"),
+        disposition_authority_id: "obligation-authority".to_owned(),
+        disposition_authority_key_epoch: 1,
+        observed_at_unix_ms: 506,
+    };
+    let reconciliation =
+        SignedClearingSettlementReconciliationV1::sign(body, &Keypair::from_seed(&[52; 32]))?;
+    validate_schema(
+        "clearing-settlement-reconciliation.v1.json",
+        &reconciliation,
+    )?;
+    let projection = compose_clearing_reconciliation_transition(
+        &fixture.round_head,
+        &fixture.obligation_heads,
+        &committed_slot_head,
+        &fixture.intent,
+        &reconciliation,
+        &reconciliation_trust(),
+        &SettledOutcome,
+    )?;
+    assert_eq!(projection.transitions().len(), fixture.inputs.len() + 2);
+    validate_schema(
+        "clearing-round-transition-proof.v1.json",
+        projection.proof(),
+    )?;
+    assert!(projection.effect_slots().is_empty());
+    assert!(projection.request_replays().is_empty());
+    assert_eq!(
+        projection.operation_id(),
+        Some(committed_slot.operation_id.as_str())
+    );
+    let next_slot_head = projection
+        .transitions()
+        .iter()
+        .find(|transition| transition.resource_key == committed_slot.resource_head_key())
+        .map(|transition| &transition.next_head)
+        .ok_or("reconciliation omitted the effect slot")?;
+    let EconomicContentV1::Inline { value: next_slot } = &next_slot_head.state else {
+        return Err("reconciled effect slot is not inline".into());
+    };
+    assert_eq!(next_slot["state"], "completed");
+    let next_round_head = projection
+        .transitions()
+        .iter()
+        .find(|transition| transition.resource_key.resource_family == "clearing_round")
+        .map(|transition| &transition.next_head)
+        .ok_or("reconciliation omitted the round head")?;
+    let EconomicContentV1::Inline { value: next_round } = &next_round_head.state else {
+        return Err("reconciled round state is not inline".into());
+    };
+    assert_eq!(next_round["state"], "reconciling");
+    let progress = &next_round["intentProgress"][0];
+    assert_eq!(progress["intentId"], fixture.intent.body.intent_id);
+    assert_eq!(progress["intentDigest"], fixture.intent.body.digest()?);
+    assert_eq!(progress["attemptCount"], 1);
+    assert_eq!(progress["noEffectCount"], 0);
+    assert_eq!(progress["ambiguityCount"], 0);
+    assert_eq!(progress["reconciliationCount"], 1);
+    assert_eq!(progress["completedEffectSlotId"], committed_slot.slot_id);
+    assert_eq!(
+        progress["reconciliationChainDigest"].as_str().map(str::len),
+        Some(64)
+    );
+    let mut current_heads = vec![fixture.round_head.clone(), committed_slot_head];
+    current_heads.extend(
+        fixture
+            .obligation_heads
+            .iter()
+            .map(|obligation| obligation.head.clone()),
+    );
+    let current_view = signed_view(5, digest("reconciliation-checkpoint"), current_heads)?;
+    let verified_current = verify_economic_state_view(current_view.clone(), &pins())?;
+    let batch = signed_batch(&projection, &current_view)?;
+    let proofs = BTreeMap::from([(projection.proof().digest()?, projection.proof().clone())]);
+    let verifier =
+        ClearingLifecycleBatchVerifier::new(Arc::new(Proofs(proofs)), Arc::new(DirectAuthority));
+    assert!(
+        verify_economic_state_batch_advance(&verified_current, batch, &pins(), &verifier).is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn no_effect_retries_and_unknown_outcomes_remain_effect_slot_fenced() -> TestResult {
+    let fixture = dispatched_round_fixture()?;
+    let mut committed_slot = fixture.slot.clone();
+    committed_slot.state = EconomicEffectStateV1::DispatchCommitted;
+    let committed_slot_head =
+        effect_slot_successor(&fixture.effect_slot_head, &committed_slot, 505)?;
+    let no_effect_reconciliation = signed_reconciliation(
+        &fixture.core,
+        &fixture.intent,
+        &fixture.round_head,
+        &committed_slot_head,
+        ClearingSettlementObservedStatusV1::PermanentNoEffect,
+    )?;
+    let no_effect = compose_clearing_reconciliation_transition(
+        &fixture.round_head,
+        &fixture.obligation_heads,
+        &committed_slot_head,
+        &fixture.intent,
+        &no_effect_reconciliation,
+        &reconciliation_trust(),
+        &PermanentNoEffectOutcome,
+    )?;
+    let no_effect_heads = next_heads(&no_effect);
+    let no_effect_round_head = no_effect_heads
+        .iter()
+        .find(|head| head.resource_key.resource_family == "clearing_round")
+        .ok_or("no-effect reconciliation omitted the round head")?;
+    let no_effect_obligations = anchored_obligations(&fixture.inputs, &no_effect_heads)
+        .ok_or("no-effect reconciliation omitted an obligation head")?;
+    let retry_slot = dispatch_slot(no_effect_round_head, &fixture.intent, "retry")?;
+    let retry = compose_clearing_dispatch_transition(
+        no_effect_round_head,
+        &no_effect_obligations,
+        &fixture.intent,
+        retry_slot.clone(),
+        507,
+    )?;
+    let retry_round = next_heads(&retry)
+        .into_iter()
+        .find(|head| head.resource_key.resource_family == "clearing_round")
+        .ok_or("retry dispatch omitted the round head")?;
+    let EconomicContentV1::Inline { value: retry_state } = retry_round.state else {
+        return Err("retry round state is not inline".into());
+    };
+    assert_eq!(retry_state["intentProgress"][0]["attemptCount"], 2);
+    assert_eq!(retry_state["intentProgress"][0]["noEffectCount"], 1);
+    assert_eq!(
+        retry_state["intentProgress"][0]["activeEffectSlotId"],
+        retry_slot.slot_id
+    );
+
+    let fixture = dispatched_round_fixture()?;
+    let mut committed_slot = fixture.slot.clone();
+    committed_slot.state = EconomicEffectStateV1::DispatchCommitted;
+    let committed_slot_head =
+        effect_slot_successor(&fixture.effect_slot_head, &committed_slot, 505)?;
+    let unknown_reconciliation = signed_reconciliation(
+        &fixture.core,
+        &fixture.intent,
+        &fixture.round_head,
+        &committed_slot_head,
+        ClearingSettlementObservedStatusV1::Unknown,
+    )?;
+    let unknown = compose_clearing_reconciliation_transition(
+        &fixture.round_head,
+        &fixture.obligation_heads,
+        &committed_slot_head,
+        &fixture.intent,
+        &unknown_reconciliation,
+        &reconciliation_trust(),
+        &UnknownOutcome,
+    )?;
+    let unknown_heads = next_heads(&unknown);
+    let unknown_round_head = unknown_heads
+        .iter()
+        .find(|head| head.resource_key.resource_family == "clearing_round")
+        .ok_or("unknown reconciliation omitted the round head")?;
+    let unknown_slot_head = unknown_heads
+        .iter()
+        .find(|head| head.resource_key == committed_slot.resource_head_key())
+        .ok_or("unknown reconciliation omitted the effect slot head")?;
+    let unknown_obligations = anchored_obligations(&fixture.inputs, &unknown_heads)
+        .ok_or("unknown reconciliation omitted an obligation head")?;
+    assert_eq!(unknown_round_head.lifecycle_state, "incident");
+    let blocked_retry_slot = dispatch_slot(unknown_round_head, &fixture.intent, "blocked-retry")?;
+    assert!(compose_clearing_dispatch_transition(
+        unknown_round_head,
+        &unknown_obligations,
+        &fixture.intent,
+        blocked_retry_slot,
+        507,
+    )
+    .is_err());
+    let remaining_intent = signed_dispatch_intent(&fixture.core.digest()?, "remaining")?;
+    let remaining_slot = dispatch_slot(unknown_round_head, &remaining_intent, "remaining")?;
+    compose_clearing_dispatch_transition(
+        unknown_round_head,
+        &unknown_obligations,
+        &remaining_intent,
+        remaining_slot,
+        507,
+    )?;
+
+    let settled_reconciliation = signed_reconciliation(
+        &fixture.core,
+        &fixture.intent,
+        unknown_round_head,
+        unknown_slot_head,
+        ClearingSettlementObservedStatusV1::Settled,
+    )?;
+    let mut trust = reconciliation_trust();
+    trust.trusted_time_unix_ms = 508;
+    let resolved = compose_clearing_reconciliation_transition(
+        unknown_round_head,
+        &unknown_obligations,
+        unknown_slot_head,
+        &fixture.intent,
+        &settled_reconciliation,
+        &trust,
+        &SettledOutcome,
+    )?;
+    let resolved_round = next_heads(&resolved)
+        .into_iter()
+        .find(|head| head.resource_key.resource_family == "clearing_round")
+        .ok_or("resolved reconciliation omitted the round head")?;
+    let EconomicContentV1::Inline {
+        value: resolved_state,
+    } = resolved_round.state
+    else {
+        return Err("resolved round state is not inline".into());
+    };
+    assert_eq!(resolved_state["state"], "incident");
+    assert_eq!(
+        resolved_state["intentProgress"][0]["completedEffectSlotId"],
+        committed_slot.slot_id
+    );
     Ok(())
 }
 

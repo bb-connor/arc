@@ -84,7 +84,11 @@ pub(in crate::clearing) fn validate_round_head(
             head.operation_id.as_deref(),
             head.effect_idempotency_key.as_deref(),
         ),
-        (ClearingRoundLifecycleStateV1::Dispatching, Some(_), Some(_)) | (_, None, None)
+        (
+            ClearingRoundLifecycleStateV1::Dispatching | ClearingRoundLifecycleStateV1::Incident,
+            Some(_),
+            Some(_)
+        ) | (_, None, None)
     );
     if head.resource_key.resource_family != CLEARING_ROUND_RESOURCE_FAMILY
         || head.resource_key.scope_id != record.governance_scope_id

@@ -63,6 +63,16 @@
             "kind": { "const": "clearing_reserved" },
             "round_id": { "$ref": "#/$defs/text" }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "round_id", "satisfaction_digest"],
+          "properties": {
+            "kind": { "const": "clearing_satisfied" },
+            "round_id": { "$ref": "#/$defs/text" },
+            "satisfaction_digest": { "$ref": "#/$defs/digest" }
+          }
         }
       ]
     },
@@ -119,6 +129,17 @@
             "round_id": { "$ref": "#/$defs/text" },
             "abort_digest": { "$ref": "#/$defs/digest" },
             "zero_dispatch_proof_digest": { "$ref": "#/$defs/digest" },
+            "authority_digest": { "$ref": "#/$defs/digest" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "round_id", "satisfaction_digest", "authority_digest"],
+          "properties": {
+            "kind": { "const": "satisfy_clearing" },
+            "round_id": { "$ref": "#/$defs/text" },
+            "satisfaction_digest": { "$ref": "#/$defs/digest" },
             "authority_digest": { "$ref": "#/$defs/digest" }
           }
         }

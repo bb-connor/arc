@@ -1596,6 +1596,24 @@
       "schemaFile": "spec/schemas/chio-economy/clearing-settlement-intent.v1.json"
     },
     {
+      "schema": "chio.clearing.settlement-reconciliation.v1",
+      "artifactKind": "clearing_settlement_reconciliation",
+      "introducedBy": "ws4-clearing-v1",
+      "schemaFile": "spec/schemas/chio-economy/clearing-settlement-reconciliation.v1.json"
+    },
+    {
+      "schema": "chio.clearing.round-satisfaction.v1",
+      "artifactKind": "clearing_round_satisfaction",
+      "introducedBy": "ws4-clearing-v1",
+      "schemaFile": "spec/schemas/chio-economy/clearing-round-satisfaction.v1.json"
+    },
+    {
+      "schema": "chio.clearing.zero-intent-reconciliation.v1",
+      "artifactKind": "clearing_zero_intent_reconciliation",
+      "introducedBy": "ws4-clearing-v1",
+      "schemaFile": "spec/schemas/chio-economy/clearing-zero-intent-reconciliation.v1.json"
+    },
+    {
       "schema": "chio.clearing.atom-transformation.v1",
       "artifactKind": "clearing_atom_transformation",
       "introducedBy": "ws4-clearing-v1",
