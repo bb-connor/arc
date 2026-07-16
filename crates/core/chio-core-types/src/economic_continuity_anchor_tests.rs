@@ -193,6 +193,100 @@ fn batch_advance_rechecks_current_heads_sequence_signature_and_consumer_proofs(
     Ok(())
 }
 
+#[derive(Debug)]
+struct CompleteBatchVerifier {
+    required_keys: Vec<EconomicResourceKeyV1>,
+}
+
+impl EconomicTransitionProofVerifier for CompleteBatchVerifier {
+    fn verify_transition(
+        &self,
+        _current: Option<&EconomicResourceHeadV1>,
+        _transition: &EconomicStateTransitionV1,
+    ) -> Result<EconomicTransitionAuthorizationV1, EconomicStateAnchorError> {
+        Ok(EconomicTransitionAuthorizationV1::Direct)
+    }
+
+    fn verify_batch(
+        &self,
+        current: &VerifiedEconomicStateView,
+        batch: &EconomicStateBatchV1,
+    ) -> Result<Vec<EconomicTransitionAuthorizationV1>, EconomicStateAnchorError> {
+        let present = batch
+            .transitions
+            .iter()
+            .map(|transition| transition.resource_key.clone())
+            .collect::<Vec<_>>();
+        if present != self.required_keys
+            || !self
+                .required_keys
+                .iter()
+                .all(|key| current.view().head(key).is_some())
+        {
+            return Err(EconomicStateAnchorError::TransitionProofRejected(
+                self.required_keys[0].clone(),
+            ));
+        }
+        Ok(vec![
+            EconomicTransitionAuthorizationV1::Direct;
+            batch.transitions.len()
+        ])
+    }
+}
+
+#[test]
+fn batch_verifier_rejects_an_incomplete_multi_resource_projection(
+) -> Result<(), Box<dyn core::error::Error>> {
+    let round_key = resource_key("round-1");
+    let obligation_key = EconomicResourceKeyV1 {
+        resource_family: "obligation_disposition".to_string(),
+        scope_id: "scope-1".to_string(),
+        resource_id: digest("obligation-1"),
+    };
+    let round = head(round_key.clone(), 1, 1, None)?;
+    let obligation = head(obligation_key.clone(), 1, 1, None)?;
+    let round_digest = round.digest()?;
+    let obligation_digest = obligation.digest()?;
+    let current = verify_economic_state_view(
+        signed_view(
+            1,
+            digest("checkpoint-1"),
+            vec![round, obligation],
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+        )?,
+        &pins(),
+    )?;
+    let verifier = CompleteBatchVerifier {
+        required_keys: vec![round_key.clone(), obligation_key.clone()],
+    };
+
+    let next_round = head(round_key, 2, 2, Some(round_digest.clone()))?;
+    let mut incomplete = unsigned_batch(vec![transition(
+        next_round.clone(),
+        Some(round_digest.clone()),
+    )]);
+    incomplete.checkpoint_sequence = 2;
+    incomplete.previous_checkpoint_digest = Some(current.view().checkpoint_digest.clone());
+    incomplete.seal(&anchor_keypair())?;
+    assert!(verify_economic_state_batch_advance(&current, incomplete, &pins(), &verifier).is_err());
+
+    let next_obligation = head(obligation_key, 2, 2, Some(obligation_digest.clone()))?;
+    let mut complete = unsigned_batch(vec![
+        transition(next_round, Some(round_digest)),
+        transition(next_obligation, Some(obligation_digest)),
+    ]);
+    complete
+        .transitions
+        .sort_by(|left, right| left.resource_key.cmp(&right.resource_key));
+    complete.checkpoint_sequence = 2;
+    complete.previous_checkpoint_digest = Some(current.view().checkpoint_digest.clone());
+    complete.seal(&anchor_keypair())?;
+    verify_economic_state_batch_advance(&current, complete, &pins(), &verifier)?;
+    Ok(())
+}
+
 #[test]
 fn retained_request_mapping_rejects_conflict_before_batch_cas(
 ) -> Result<(), Box<dyn core::error::Error>> {

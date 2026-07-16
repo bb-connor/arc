@@ -481,6 +481,20 @@ pub trait EconomicTransitionProofVerifier: Send + Sync {
         current: Option<&EconomicResourceHeadV1>,
         transition: &EconomicStateTransitionV1,
     ) -> Result<EconomicTransitionAuthorizationV1, EconomicStateAnchorError>;
+
+    fn verify_batch(
+        &self,
+        current: &VerifiedEconomicStateView,
+        batch: &EconomicStateBatchV1,
+    ) -> Result<Vec<EconomicTransitionAuthorizationV1>, EconomicStateAnchorError> {
+        batch
+            .transitions
+            .iter()
+            .map(|transition| {
+                self.verify_transition(current.view().head(&transition.resource_key), transition)
+            })
+            .collect()
+    }
 }
 
 #[derive(Debug)]
@@ -545,8 +559,15 @@ pub fn verify_economic_state_batch_advance(
                 ))
             }
         }
-        let authorization = verifier.verify_transition(prior, transition)?;
-        verify_transition_authorization(transition, &authorization)?;
+    }
+    let authorizations = verifier.verify_batch(current, &batch)?;
+    if authorizations.len() != batch.transitions.len() {
+        return Err(EconomicStateAnchorError::InvalidView(
+            "transition authorization count mismatch",
+        ));
+    }
+    for (transition, authorization) in batch.transitions.iter().zip(&authorizations) {
+        verify_transition_authorization(transition, authorization)?;
     }
     for replay in &batch.request_replays {
         if matches!(
