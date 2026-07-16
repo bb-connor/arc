@@ -857,6 +857,14 @@ impl ChioKernel {
                         .as_ref()
                         .map(|adapter| adapter.rail_id().to_string())
                         .unwrap_or_default();
+                    // Resolved exactly as the terminal receipt and the
+                    // dispatch intent resolve it (request-scoped entry
+                    // first, thread-local scope otherwise), so a recovered
+                    // charge's reconciliation receipt is never dropped from
+                    // the owning tenant's receipt view.
+                    let tenant_id = self
+                        .receipt_tenant_id_for_request(Some(request_id))
+                        .unwrap_or_else(current_scoped_receipt_tenant_id);
                     crate::payment::PaymentJournalRecord {
                         request_id: request_id.to_string(),
                         capability_id: cap.id.clone(),
@@ -871,6 +879,7 @@ impl ChioKernel {
                         currency: currency.clone(),
                         state: crate::payment::PaymentJournalState::HoldPlaced,
                         created_at_unix_ms: now_ms,
+                        tenant_id,
                     }
                 });
 

@@ -355,7 +355,7 @@ impl BudgetStore for SqliteBudgetStore {
         let mut statement = connection.prepare(
             "SELECT request_id, capability_id, grant_index, hold_id, rail, authorization_id, \
                     transaction_id, amount_units, settle_action, settle_amount_units, currency, \
-                    state, created_at \
+                    state, created_at, tenant_id \
              FROM payment_journal \
              WHERE state NOT IN ('closed', 'reconcile_failed') AND created_at <= ?1 \
              ORDER BY created_at ASC",
@@ -376,6 +376,7 @@ impl BudgetStore for SqliteBudgetStore {
                 row.get(10)?,
                 row.get(11)?,
                 row.get(12)?,
+                row.get(13)?,
             ))
         })?;
         let mut out = Vec::new();
@@ -393,7 +394,7 @@ impl BudgetStore for SqliteBudgetStore {
         let mut statement = connection.prepare(
             "SELECT request_id, capability_id, grant_index, hold_id, rail, authorization_id, \
                     transaction_id, amount_units, settle_action, settle_amount_units, currency, \
-                    state, created_at \
+                    state, created_at, tenant_id \
              FROM payment_journal \
              WHERE request_id = ?1 AND state NOT IN ('closed', 'reconcile_failed')",
         )?;
@@ -412,6 +413,7 @@ impl BudgetStore for SqliteBudgetStore {
                 row.get(10)?,
                 row.get(11)?,
                 row.get(12)?,
+                row.get(13)?,
             ))
         })?;
         let Some(row) = rows.next() else {
@@ -1597,6 +1599,7 @@ type PaymentJournalRow = (
     String,
     String,
     i64,
+    Option<String>,
 );
 
 /// Decode one `payment_journal` row into the kernel-owned record type.
@@ -1617,6 +1620,7 @@ fn payment_journal_row_to_record(
         currency,
         state,
         created_at,
+        tenant_id,
     ) = row;
     Ok(chio_kernel::payment::PaymentJournalRecord {
         request_id,
@@ -1635,6 +1639,7 @@ fn payment_journal_row_to_record(
         currency,
         state: parse_journal_state(&state)?,
         created_at_unix_ms: created_at.max(0) as u64,
+        tenant_id,
     })
 }
 
@@ -1657,8 +1662,8 @@ fn insert_payment_journal_tx(
     let changed = transaction.execute(
         "INSERT INTO payment_journal (request_id, capability_id, grant_index, hold_id, rail, \
          authorization_id, transaction_id, amount_units, settle_action, settle_amount_units, \
-         currency, state, created_at, updated_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14) \
+         currency, state, created_at, updated_at, tenant_id) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) \
          ON CONFLICT(request_id) DO NOTHING",
         params![
             entry.request_id,
@@ -1677,6 +1682,7 @@ fn insert_payment_journal_tx(
             journal_state_str(entry.state),
             entry.created_at_unix_ms.min(i64::MAX as u64) as i64,
             journal_now_unix_ms(),
+            entry.tenant_id,
         ],
     )?;
     if changed == 0 {

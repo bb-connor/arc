@@ -339,6 +339,14 @@ pub struct PaymentJournalRecord {
     pub currency: String,
     pub state: PaymentJournalState,
     pub created_at_unix_ms: u64,
+    /// Tenant that owns this request, resolved exactly as the terminal
+    /// receipt resolves it (request-scoped entry first, thread-local scope
+    /// otherwise). `None` in single-tenant deployments. Threaded onto a
+    /// reconciliation receipt so a recovered charge is never dropped from
+    /// the owning tenant's receipt view (see [`crate::kernel::ChioKernel`]
+    /// reconciliation).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant_id: Option<String>,
 }
 
 /// Thin prepaid HTTP payment bridge for x402-style per-request settlement.

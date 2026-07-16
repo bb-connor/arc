@@ -471,6 +471,7 @@ fn boot_reconcile_resolves_every_incomplete_row() -> Result<(), Box<dyn std::err
         currency: "USD".to_string(),
         state,
         created_at_unix_ms: 1,
+        tenant_id: None,
     };
 
     // Crash before or during authorize: no authorization id is durable.
@@ -648,6 +649,7 @@ fn hold_placed_reconcile_only_releases_a_proven_hold_never_a_settlement(
         currency: "USD".to_string(),
         state: PaymentJournalState::HoldPlaced,
         created_at_unix_ms: 1,
+        tenant_id: None,
     };
 
     // A prepaid adapter crashed in the HoldPlaced window after authorize
@@ -789,6 +791,7 @@ fn monetary_reconciler_resolves_orphaned_intents_through_the_journal(
             currency: "USD".to_string(),
             state: PaymentJournalState::Authorized,
             created_at_unix_ms: 1,
+            tenant_id: None,
         })?;
 
     let receipts_before = harness.receipt_store.max_tool_receipt_seq()?;
@@ -892,6 +895,7 @@ fn reconcile_failed_journal_row_dead_letters_the_dispatch_intent_and_flips_healt
             currency: "USD".to_string(),
             state: PaymentJournalState::HoldPlaced,
             created_at_unix_ms: 1,
+            tenant_id: None,
         })?;
     harness.budget_store.advance_payment_journal(
         "req-incident",
@@ -962,6 +966,7 @@ fn authorized_reconcile_records_a_receipt_for_prepaid_funds_already_moved(
         currency: "USD".to_string(),
         state: PaymentJournalState::Authorized,
         created_at_unix_ms: 1,
+        tenant_id: None,
     })?;
 
     let receipts_before = harness.receipt_store.max_tool_receipt_seq()?;
@@ -1022,6 +1027,136 @@ fn authorized_reconcile_records_a_receipt_for_prepaid_funds_already_moved(
     assert_eq!(
         reconciliation["requestId"],
         serde_json::json!("req-prepaid-crash")
+    );
+
+    harness.cleanup();
+    Ok(())
+}
+
+#[test]
+fn tenant_scoped_money_path_stamps_journal_row_and_reconciliation_receipt(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_core::session::{
+        EnterpriseFederationMethod, EnterpriseIdentityContext, OAuthBearerFederatedClaims,
+        OAuthBearerSessionAuthInput, OperationContext, RequestId, SessionAuthContext,
+        SessionOperation, ToolCallOperation,
+    };
+    use chio_kernel::SessionOperationResponse;
+    use std::collections::BTreeMap;
+
+    let harness = support::money_journal_harness("chio-tenant-journal", 75)?;
+
+    // A session whose OAuth bearer carries an enterprise tenant claim: the
+    // same resolution every receipt and journaled dispatch intent uses.
+    let auth =
+        SessionAuthContext::streamable_http_oauth_bearer_with_claims(OAuthBearerSessionAuthInput {
+            principal: Some("oidc:https://issuer.example#sub:user-blue".to_string()),
+            issuer: Some("https://issuer.example".to_string()),
+            subject: Some("user-blue".to_string()),
+            audience: Some("chio-mcp".to_string()),
+            scopes: vec!["mcp:invoke".to_string()],
+            federated_claims: OAuthBearerFederatedClaims::default(),
+            enterprise_identity: Some(EnterpriseIdentityContext {
+                provider_id: "provider-tenant-test".to_string(),
+                provider_record_id: None,
+                provider_kind: "oidc_jwks".to_string(),
+                federation_method: EnterpriseFederationMethod::Jwt,
+                principal: "oidc:https://issuer.example#sub:user-blue".to_string(),
+                subject_key: "subject-key-blue".to_string(),
+                client_id: Some("client-abc".to_string()),
+                object_id: None,
+                tenant_id: Some("tenant-blue".to_string()),
+                organization_id: None,
+                groups: Vec::new(),
+                roles: Vec::new(),
+                source_subject: None,
+                attribute_sources: BTreeMap::new(),
+                trust_material_ref: None,
+            }),
+            token_fingerprint: Some("fp-blue".to_string()),
+            origin: Some("https://app.example".to_string()),
+        });
+
+    let agent_id = harness.capability.subject.to_hex();
+    let session_id = harness
+        .kernel
+        .open_session(agent_id.clone(), vec![harness.capability.clone()])?;
+    harness.kernel.set_session_auth_context(&session_id, auth)?;
+    harness.kernel.activate_session(&session_id)?;
+
+    let context = OperationContext::new(session_id.clone(), RequestId::new("req-T"), agent_id);
+    let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        capability: harness.capability.clone(),
+        server_id: "srv".to_string(),
+        tool_name: "write_file".to_string(),
+        arguments: serde_json::json!({ "payload": "hello" }),
+        governed_intent: None,
+        execution_nonce: None,
+        model_metadata: None,
+        extra_metadata: None,
+    }));
+    let response = harness
+        .kernel
+        .evaluate_session_operation(&context, &operation)?;
+    let SessionOperationResponse::ToolCall(response) = response else {
+        return Err("expected a tool call response".into());
+    };
+    assert!(matches!(response.verdict, Verdict::Allow));
+    assert_eq!(response.receipt.tenant_id.as_deref(), Some("tenant-blue"));
+
+    // The in-flight journal row carries the session's resolved tenant: a
+    // crash in any window after this point leaves a tenant-attributed
+    // record for reconciliation.
+    let seen = harness
+        .journal_rows_seen_at_invoke
+        .lock()
+        .expect("probe lock");
+    let row = seen
+        .iter()
+        .find(|row| row.request_id == "req-T")
+        .expect("the in-flight journal row is visible during dispatch");
+    assert_eq!(
+        row.tenant_id.as_deref(),
+        Some("tenant-blue"),
+        "the journal row must carry the request's resolved tenant"
+    );
+    let orphan = chio_kernel::payment::PaymentJournalRecord {
+        request_id: "req-T-crash".to_string(),
+        authorization_id: Some("auth-req-T-crash".to_string()),
+        hold_id: Some("hold-req-T-crash".to_string()),
+        ..row.clone()
+    };
+    drop(seen);
+
+    // Crash simulation: the same tenant-attributed row orphaned in the
+    // Authorized window. Boot reconciliation emits a reconciliation receipt
+    // stamped with the row's tenant, so the recovered charge lands in the
+    // owning tenant's receipt view.
+    harness.budget_store.record_payment_journal(&orphan)?;
+    let receipts_before = harness.receipt_store.max_tool_receipt_seq()?;
+    let report = harness.kernel.reconcile_payment_journal(0)?;
+    let receipts_after = harness.receipt_store.max_tool_receipt_seq()?;
+    assert_eq!(
+        report.resolved, 1,
+        "the orphan resolves terminally: {report:?}"
+    );
+    assert_eq!(
+        receipts_after - receipts_before,
+        1,
+        "exactly one reconciliation receipt for the already-moved funds"
+    );
+
+    let (_, receipt_bytes) = harness
+        .receipt_store
+        .receipts_canonical_bytes_range(receipts_after, receipts_after)?
+        .into_iter()
+        .next()
+        .ok_or("the reconciliation receipt must be durable")?;
+    let receipt: chio_core::receipt::body::ChioReceipt = serde_json::from_slice(&receipt_bytes)?;
+    assert_eq!(
+        receipt.tenant_id.as_deref(),
+        Some("tenant-blue"),
+        "the reconciliation receipt must carry the journal row's tenant"
     );
 
     harness.cleanup();

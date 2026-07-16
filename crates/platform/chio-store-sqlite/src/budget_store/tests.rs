@@ -2680,6 +2680,7 @@ fn payment_journal_insert_advance_close_and_conflict() {
         currency: "USD".to_string(),
         state: PaymentJournalState::HoldPlaced,
         created_at_unix_ms: 1_000,
+        tenant_id: Some("tenant-J".to_string()),
     };
     store.record_payment_journal(&record).expect("insert");
 
@@ -2773,6 +2774,7 @@ fn payment_journal_insert_advance_close_and_conflict() {
     assert_eq!(row.settle_action, Some(PaymentSettleAction::Capture));
     assert_eq!(row.settle_amount_units, Some(80));
     assert_eq!(row.state, PaymentJournalState::Settled);
+    assert_eq!(row.tenant_id.as_deref(), Some("tenant-J"));
 
     // Close is idempotent.
     assert!(store.close_payment_journal("req-J").expect("close"));
@@ -2815,6 +2817,7 @@ fn get_payment_journal_is_scoped_identically_to_the_incomplete_listing() {
         settle_amount_units: None,
         currency: "USD".to_string(),
         state: PaymentJournalState::HoldPlaced,
+        tenant_id: Some("tenant-K".to_string()),
         created_at_unix_ms: 1_000,
     };
     store.record_payment_journal(&record).expect("insert");
@@ -2866,6 +2869,7 @@ fn payment_journal_reconcile_failed_rail_finds_only_reconcile_failed_rows() {
         currency: "USD".to_string(),
         state: PaymentJournalState::HoldPlaced,
         created_at_unix_ms: 1_000,
+        tenant_id: None,
     };
     store.record_payment_journal(&record).expect("insert");
 
@@ -2928,6 +2932,7 @@ fn authorize_budget_hold_writes_journal_atomically() {
         currency: "USD".to_string(),
         state: PaymentJournalState::HoldPlaced,
         created_at_unix_ms: 2_000,
+        tenant_id: None,
     };
     store
         .authorize_budget_hold(BudgetAuthorizeHoldRequest {

@@ -88,7 +88,8 @@ impl SqliteBudgetStore {
                 currency            TEXT NOT NULL,
                 state               TEXT NOT NULL,
                 created_at          INTEGER NOT NULL,
-                updated_at          INTEGER NOT NULL
+                updated_at          INTEGER NOT NULL,
+                tenant_id           TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_payment_journal_state

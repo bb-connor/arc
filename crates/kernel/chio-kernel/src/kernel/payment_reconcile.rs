@@ -409,7 +409,7 @@ fn emit_reconciliation_receipt(
         metadata: Some(metadata),
         timestamp,
         trust_level: chio_core::receipt::kinds::TrustLevel::default(),
-        tenant_id: None,
+        tenant_id: record.tenant_id.clone(),
     })?;
     kernel.record_chio_receipt(&receipt)
 }
