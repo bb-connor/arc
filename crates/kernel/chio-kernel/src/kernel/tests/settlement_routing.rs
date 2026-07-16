@@ -101,6 +101,19 @@ impl chio_settle::SettlementHook for RetryableSettlementHook {
     }
 }
 
+struct FailingSettlementHook;
+
+impl chio_settle::SettlementHook for FailingSettlementHook {
+    fn observe(
+        &self,
+        _observation: &chio_settle::SettlementObservation,
+    ) -> Result<chio_settle::SettlementOutcome, chio_settle::SettlementHookError> {
+        Err(chio_settle::SettlementHookError::Transient(
+            "settlement rpc endpoint unreachable".to_string(),
+        ))
+    }
+}
+
 fn monetary_kernel_with_retry_store() -> (
     ChioKernel,
     std::sync::Arc<RecordingRetryStore>,
@@ -180,6 +193,41 @@ fn retryable_outcome_persists_a_bounded_attempt_row() {
     let attempt = retry_store
         .attempt(&response.receipt.id)
         .expect("retryable outcome must persist an attempt row");
+    assert_eq!(attempt.attempts, 1);
+    assert!(
+        attempt.next_visible_at > attempt.finalized_at,
+        "backoff must push visibility past finalization"
+    );
+    assert_eq!(retry_store.dead_letter_count(), 0);
+}
+
+#[test]
+fn hook_failure_persists_a_bounded_attempt_row() {
+    let mut kernel = make_kernel(make_monetary_config());
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+    let retry_store = std::sync::Arc::new(RecordingRetryStore::default());
+    kernel.set_settlement_retry_store(retry_store.clone());
+    kernel
+        .set_settlement_observer(std::sync::Arc::new(FailingSettlementHook))
+        .expect("observer install succeeds once the retry store is present");
+
+    let agent_kp = Keypair::generate();
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&priced_request("req-settle-hook-err", &cap, &agent_kp))
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Allow);
+
+    // The hook error consumed the same bounded envelope as a Retryable
+    // outcome: a durable attempt row `chio settle drive` picks up, instead
+    // of a warn-only log nothing ever retries.
+    let attempt = retry_store
+        .attempt(&response.receipt.id)
+        .expect("a hook failure must persist a settle_attempts row");
     assert_eq!(attempt.attempts, 1);
     assert!(
         attempt.next_visible_at > attempt.finalized_at,

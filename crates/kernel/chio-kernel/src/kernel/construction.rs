@@ -1193,7 +1193,20 @@ impl ChioKernel {
                 Ok(()) => return,
                 Err(error) => (error.to_string(), true),
             },
-            Status::HookFailed { error } => (error.clone(), true),
+            Status::HookFailed { error } => {
+                // A hook error is a transient settlement failure (an RPC
+                // outage looks exactly like a rail returning Retryable), so
+                // it consumes the same bounded retry/dead-letter envelope:
+                // a durable settle_attempts row that `chio settle drive`
+                // picks up, dead-lettering after the policy's max attempts.
+                // Warn-only routing would leave the outcome undriven and
+                // unbounded.
+                let outcome = chio_settle::SettlementOutcome::retryable(error.clone());
+                match self.classify_and_persist(receipt, &outcome) {
+                    Ok(()) => return,
+                    Err(persist_error) => (persist_error.to_string(), true),
+                }
+            }
         };
         tracing::warn!(
             receipt_id = %receipt.id,
