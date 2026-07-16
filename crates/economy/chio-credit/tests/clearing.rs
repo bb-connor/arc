@@ -2,7 +2,7 @@ use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{sha256_hex, Keypair};
 use chio_core_types::economic_continuity::{
-    EconomicContentV1, EconomicResourceHeadV1, EconomicResourceKeyV1,
+    EconomicContentV1, EconomicFrostBindingV1, EconomicResourceHeadV1, EconomicResourceKeyV1,
     EconomicTransitionAuthorizationV1, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
 };
 use chio_credit::clearing::{
@@ -12,24 +12,38 @@ use chio_credit::clearing::{
     sign_netting_round, verify_clearing_lifecycle_replay_authority,
     verify_clearing_participant_acceptances, verify_clearing_round_abort,
     verify_clearing_zero_dispatch_proof, verify_netting_round, verify_signed_netting_round,
-    AnchoredClearingObligationV1, ClearingAbortReplayV1, ClearingAuthorityTrustV1,
-    ClearingDisputeWindowResolver, ClearingDisputeWindowStatusV1, ClearingInputManifestBodyV1,
-    ClearingInputManifestEntryV1, ClearingIntentDispatchStatusV1, ClearingLifecycleAuthorityPinsV1,
+    AnchoredClearingObligationV1, ClearingAbortReplayV1, ClearingAcceptancesReplayV1,
+    ClearingAuthorityTrustV1, ClearingDisputeWindowResolver, ClearingDisputeWindowStatusV1,
+    ClearingFinalizationReplayV1, ClearingInputManifestBodyV1, ClearingInputManifestEntryV1,
+    ClearingIntentDispatchStatusV1, ClearingLifecycleAuthorityPinsV1,
     ClearingLifecycleReplayEvidenceV1, ClearingLifecycleReplayV1, ClearingObligationInputV1,
     ClearingParticipantAcceptanceBodyV1, ClearingParticipantBindingV1,
     ClearingParticipantSnapshotAcknowledgementBodyV1, ClearingParticipantSnapshotBodyV1,
-    ClearingRoundAbortReasonV1, ClearingRoundLifecycleRecordV1, ClearingRoundRequestV1,
-    ClearingRoundTransitionV1, ClearingZeroDispatchTrustV1, SignedClearingInputManifestV1,
-    SignedClearingParticipantAcceptanceV1, SignedClearingParticipantSnapshotAcknowledgementV1,
-    SignedClearingParticipantSnapshotV1, SignedNettingRoundCoreV1, CLEARING_ALGORITHM_V1,
-    CLEARING_INPUT_MANIFEST_SCHEMA, CLEARING_LIFECYCLE_REPLAY_FORMAT,
-    CLEARING_PARTICIPANT_ACCEPTANCE_SCHEMA, CLEARING_PARTICIPANT_SNAPSHOT_ACKNOWLEDGEMENT_SCHEMA,
-    CLEARING_PARTICIPANT_SNAPSHOT_SCHEMA,
+    ClearingRoundAbortReasonV1, ClearingRoundFinalizationBodyV1, ClearingRoundLifecycleRecordV1,
+    ClearingRoundRequestV1, ClearingRoundTransitionV1, ClearingZeroDispatchTrustV1,
+    SignedClearingInputManifestV1, SignedClearingParticipantAcceptanceV1,
+    SignedClearingParticipantSnapshotAcknowledgementV1, SignedClearingParticipantSnapshotV1,
+    SignedNettingRoundCoreV1, CLEARING_ALGORITHM_V1, CLEARING_INPUT_MANIFEST_SCHEMA,
+    CLEARING_LIFECYCLE_REPLAY_FORMAT, CLEARING_PARTICIPANT_ACCEPTANCE_SCHEMA,
+    CLEARING_PARTICIPANT_SNAPSHOT_ACKNOWLEDGEMENT_SCHEMA, CLEARING_PARTICIPANT_SNAPSHOT_SCHEMA,
 };
 use chio_credit::obligation::{
     ObligationAtomInputV1, ObligationAtomV1, ObligationCreditElectionV1,
     ObligationDispositionRecordV1, ObligationDispositionTransitionV1, ObligationDispositionV1,
 };
+use chio_federation::frost::{
+    frost_action_registration, frost_authorization_session_id, frost_authorization_slot_id,
+    FrostAnchoredAuthorizationSlot, FrostArtifactAuthorityRole, FrostArtifactTrustRoot,
+    FrostArtifactTrustStore, FrostAuthorizationBodyV1, FrostAuthorizationDomain,
+    FrostAuthorizationSlotCheckpointV1, FrostAuthorizationSlotState, FrostAuthorizationV1,
+    FrostParticipantV1, FrostRosterKeyOrigin, FrostRosterV1, CHIO_FROST_AUTHORIZATION_BODY_SCHEMA,
+    CHIO_FROST_AUTHORIZATION_SCHEMA, CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
+    CHIO_FROST_ROSTER_SCHEMA, FROST_ED25519_SHA512_SUITE_ID,
+};
+use frost_ed25519::keys::{SigningShare, VerifyingShare};
+use frost_ed25519::SigningKey;
+use rand_chacha::ChaCha20Rng;
+use rand_core::SeedableRng;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -50,6 +64,191 @@ fn validate_schema(name: &str, artifact: &impl serde::Serialize) -> TestResult {
 
 fn digest(value: &str) -> String {
     sha256_hex(value.as_bytes())
+}
+
+const FROST_SECRET_KEY: &str = "7b1c33d3f5291d85de664833beb1ad469f7fb6025a0ec78b3a790c6e13a98304";
+const FROST_VERIFYING_KEY: &str =
+    "15d21ccd7ee42959562fc8aa63224c8851fb3ec85a3faf66040d380fb9738673";
+const FROST_SHARES: [&str; 3] = [
+    "929dcc590407aae7d388761cddb0c0db6f5627aea8e217f4a033f2ec83d93509",
+    "a91e66e012e4364ac9aaa405fcafd370402d9859f7b6685c07eed76bf409e80d",
+    "d3cb090a075eb154e82fdb4b3cb507f110040905468bb9c46da8bdea643a9a02",
+];
+
+struct FrostFinalizationFixture {
+    roster: FrostRosterV1,
+    authorization: FrostAuthorizationV1,
+    bound_slot: FrostAuthorizationSlotCheckpointV1,
+    completed_slot: FrostAnchoredAuthorizationSlot,
+    trust: FrostArtifactTrustStore,
+    binding: EconomicFrostBindingV1,
+}
+
+fn roster_authority() -> Keypair {
+    Keypair::from_seed(&[0x42; 32])
+}
+
+fn slot_authority() -> Keypair {
+    Keypair::from_seed(&[0x44; 32])
+}
+
+fn frost_verifying_share(share: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let signing_share = SigningShare::deserialize(&hex::decode(share)?)?;
+    Ok(hex::encode(
+        VerifyingShare::from(signing_share).serialize()?,
+    ))
+}
+
+fn sign_frost_roster(roster: &mut FrostRosterV1) -> TestResult {
+    roster.roster_id = roster.recompute_roster_id()?;
+    roster.roster_authority_signature = roster_authority().sign(&roster.signing_bytes()?).to_hex();
+    roster.roster_digest = roster.recompute_roster_digest()?;
+    Ok(())
+}
+
+fn sign_frost_slot(checkpoint: &mut FrostAuthorizationSlotCheckpointV1) -> TestResult {
+    checkpoint.anchor_signature = slot_authority().sign(&checkpoint.signing_bytes()?).to_hex();
+    checkpoint.checkpoint_digest = checkpoint.recompute_checkpoint_digest()?;
+    Ok(())
+}
+
+fn frost_finalization_fixture(
+    finalization: &ClearingRoundFinalizationBodyV1,
+) -> Result<FrostFinalizationFixture, Box<dyn std::error::Error>> {
+    let mut roster = FrostRosterV1 {
+        schema: CHIO_FROST_ROSTER_SCHEMA.to_owned(),
+        roster_id: String::new(),
+        roster_digest: String::new(),
+        authority_scope: "treaty".to_owned(),
+        scope_id: finalization.governance_scope_id.clone(),
+        allowed_domains: vec![FrostAuthorizationDomain::ClearingRoundFinalize],
+        key_epoch: 4,
+        threshold: 2,
+        participant_count: 3,
+        participants: FROST_SHARES
+            .iter()
+            .enumerate()
+            .map(|(index, share)| {
+                Ok(FrostParticipantV1 {
+                    participant_id: format!("operator-{}", index + 1),
+                    verification_share: frost_verifying_share(share)?,
+                })
+            })
+            .collect::<Result<Vec<_>, Box<dyn std::error::Error>>>()?,
+        group_public_key: FROST_VERIFYING_KEY.to_owned(),
+        suite_id: FROST_ED25519_SHA512_SUITE_ID.to_owned(),
+        key_origin: FrostRosterKeyOrigin::DistributedDkg,
+        ceremony_transcript_digest: digest("clearing-frost-ceremony"),
+        predecessor_roster_digest: Some(digest("clearing-frost-predecessor")),
+        valid_from: 500,
+        valid_until: 590,
+        roster_authority_key_id: "authority.treaty.v1".to_owned(),
+        roster_authority_signature: String::new(),
+    };
+    sign_frost_roster(&mut roster)?;
+    let action = finalization.frost_action_preimage()?;
+    let registration = frost_action_registration(FrostAuthorizationDomain::ClearingRoundFinalize)
+        .ok_or("clearing finalization FROST domain is disabled")?;
+    let mut body = FrostAuthorizationBodyV1 {
+        schema: CHIO_FROST_AUTHORIZATION_BODY_SCHEMA.to_owned(),
+        authorization_id: String::new(),
+        domain: registration.domain,
+        ladder_action_class: registration.ladder_action_class.to_owned(),
+        ladder_contract_digest: registration.ladder_contract_digest()?,
+        quorum_n: registration.quorum_n,
+        quorum_m: registration.quorum_m,
+        quorum_scope: registration.quorum_scope.to_owned(),
+        scope_id: finalization.governance_scope_id.clone(),
+        resource_id: action.resource_id().to_owned(),
+        resource_version: action.resource_version(),
+        resource_fence: action.resource_fence(),
+        action_digest: action.action_digest()?,
+        roster_digest: roster.roster_digest.clone(),
+        key_epoch: roster.key_epoch,
+        issued_at: 555,
+        expires_at: 580,
+    };
+    body.authorization_id = body.recompute_authorization_id()?;
+    let signing_bytes = body.signing_bytes()?;
+    let signing_key = SigningKey::deserialize(&hex::decode(FROST_SECRET_KEY)?)?;
+    let signature = signing_key.sign(ChaCha20Rng::from_seed([7; 32]), &signing_bytes);
+    let signature_bytes = signature.serialize()?;
+    let authorization = FrostAuthorizationV1 {
+        schema: CHIO_FROST_AUTHORIZATION_SCHEMA.to_owned(),
+        body,
+        suite_id: FROST_ED25519_SHA512_SUITE_ID.to_owned(),
+        group_signature: hex::encode(&signature_bytes),
+    };
+    let authorization_blob = authorization.canonical_bytes()?;
+    let mut bound_slot = FrostAuthorizationSlotCheckpointV1 {
+        schema: CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA.to_owned(),
+        anchor_id: "slot-anchor.primary".to_owned(),
+        checkpoint_digest: String::new(),
+        scope_id: authorization.body.scope_id.clone(),
+        slot_id: frost_authorization_slot_id(&authorization.body)?,
+        slot_version: 1,
+        predecessor_digest: None,
+        domain: authorization.body.domain,
+        ladder_action_class: authorization.body.ladder_action_class.clone(),
+        resource_id: authorization.body.resource_id.clone(),
+        resource_version: authorization.body.resource_version,
+        resource_fence: authorization.body.resource_fence,
+        authorization_id: authorization.body.authorization_id.clone(),
+        signing_message_digest: sha256_hex(&signing_bytes),
+        action_digest: authorization.body.action_digest.clone(),
+        roster_digest: authorization.body.roster_digest.clone(),
+        key_epoch: authorization.body.key_epoch,
+        session_id: frost_authorization_session_id(&authorization.body)?,
+        state: FrostAuthorizationSlotState::Bound,
+        aggregate_signature_digest: None,
+        authorization_blob_digest: None,
+        availability_receipt: None,
+        clock_high_water: 555,
+        anchor_key_id: "slot-anchor-key.v1".to_owned(),
+        anchor_signature: String::new(),
+    };
+    sign_frost_slot(&mut bound_slot)?;
+    let mut completed_checkpoint = bound_slot.clone();
+    completed_checkpoint.slot_version = 2;
+    completed_checkpoint.predecessor_digest = Some(bound_slot.checkpoint_digest.clone());
+    completed_checkpoint.state = FrostAuthorizationSlotState::Completed;
+    completed_checkpoint.aggregate_signature_digest = Some(sha256_hex(&signature_bytes));
+    completed_checkpoint.authorization_blob_digest = Some(sha256_hex(&authorization_blob));
+    completed_checkpoint.availability_receipt =
+        Some("availability.slot-anchor.primary.v1".to_owned());
+    completed_checkpoint.clock_high_water = 560;
+    completed_checkpoint.anchor_signature.clear();
+    completed_checkpoint.checkpoint_digest.clear();
+    sign_frost_slot(&mut completed_checkpoint)?;
+    let trust = FrostArtifactTrustStore::new([
+        FrostArtifactTrustRoot {
+            role: FrostArtifactAuthorityRole::Roster,
+            key_id: "authority.treaty.v1".to_owned(),
+            public_key: roster_authority().public_key(),
+        },
+        FrostArtifactTrustRoot {
+            role: FrostArtifactAuthorityRole::AuthorizationSlotAnchor,
+            key_id: "slot-anchor-key.v1".to_owned(),
+            public_key: slot_authority().public_key(),
+        },
+    ])?;
+    let binding = EconomicFrostBindingV1 {
+        authorization_slot_id: frost_authorization_slot_id(&authorization.body)?,
+        authorization_id: authorization.body.authorization_id.clone(),
+        action_digest: authorization.body.action_digest.clone(),
+        signed_envelope_digest: sha256_hex(&authorization_blob),
+    };
+    Ok(FrostFinalizationFixture {
+        roster,
+        authorization,
+        bound_slot,
+        completed_slot: FrostAnchoredAuthorizationSlot {
+            checkpoint: completed_checkpoint,
+            authorization_blob: Some(authorization_blob),
+        },
+        trust,
+        binding,
+    })
 }
 
 fn participant_key(participant: &str) -> Keypair {
@@ -523,6 +722,137 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
     assert_eq!(action.resource_version(), finalizing_head.resource_version);
     assert_eq!(action.resource_fence(), finalizing_head.lifecycle_fence);
 
+    let replay_pins = ClearingLifecycleAuthorityPinsV1 {
+        clearing_authority_id: finalization_trust.clearing_authority_id.clone(),
+        clearing_authority_key: finalization_trust.clearing_authority_key.clone(),
+        clearing_authority_key_epoch: finalization_trust.clearing_authority_key_epoch,
+        participant_authority_id: finalization_trust.participant_authority_id.clone(),
+        participant_authority_key: finalization_trust.participant_authority_key.clone(),
+        participant_key_epoch: finalization_trust.participant_key_epoch,
+        obligation_authority_id: finalization_trust.obligation_authority_id.clone(),
+        obligation_authority_key: finalization_trust.obligation_authority_key.clone(),
+        obligation_key_epoch: finalization_trust.obligation_key_epoch,
+        zero_dispatch_authority_id: "admission-authority".to_owned(),
+        zero_dispatch_authority_key: Keypair::from_seed(&[23; 32]).public_key(),
+        zero_dispatch_authority_key_epoch: 1,
+        admission_store_id: "admission-store-primary".to_owned(),
+    };
+    let dispute_status = closed_dispute_window.resolve_closed_window(
+        &request.round_id,
+        &output.core.digest()?,
+        &output.output_manifest.digest()?,
+        request.dispute_window_ends_at_unix_ms,
+    )?;
+    let acceptances_replay = ClearingAcceptancesReplayV1 {
+        request: request.clone(),
+        signed_output: signed_output.clone(),
+        acceptances: acceptances.clone(),
+        dispute_status,
+        verified_at_unix_ms: finalization_trust.trusted_time_unix_ms,
+    };
+    let begin_replay = ClearingLifecycleReplayV1 {
+        format: CLEARING_LIFECYCLE_REPLAY_FORMAT.to_owned(),
+        proof: finalizing.proof().clone(),
+        evidence: ClearingLifecycleReplayEvidenceV1::BeginFinalization {
+            acceptances: Box::new(acceptances_replay.clone()),
+        },
+    };
+    assert_eq!(
+        verify_clearing_lifecycle_replay_authority(
+            proposed_head,
+            &begin_replay,
+            &replay_pins,
+            None,
+            Some(&closed_dispute_window),
+        )?,
+        EconomicTransitionAuthorizationV1::Direct
+    );
+    let mut forged_dispute_replay = begin_replay;
+    let ClearingLifecycleReplayEvidenceV1::BeginFinalization {
+        acceptances: replay_acceptances,
+    } = &mut forged_dispute_replay.evidence
+    else {
+        return Err("begin-finalization replay used the wrong evidence".into());
+    };
+    replay_acceptances.dispute_status.checkpoint_digest = digest("forged-dispute-checkpoint");
+    assert!(verify_clearing_lifecycle_replay_authority(
+        proposed_head,
+        &forged_dispute_replay,
+        &replay_pins,
+        None,
+        Some(&closed_dispute_window),
+    )
+    .is_err());
+
+    let frost = frost_finalization_fixture(&finalization_body)?;
+    let finalizing_heads = finalizing
+        .transitions()
+        .iter()
+        .map(|transition| transition.next_head.clone())
+        .collect::<Vec<_>>();
+    let finalizing_obligations =
+        advance_anchored_obligations(&request.obligations, &finalizing_heads)?;
+    let finalized = compose_clearing_lifecycle_transition(
+        finalizing_head,
+        &finalizing_obligations,
+        ClearingRoundTransitionV1::Finalize {
+            finalization_digest: signed_finalization.digest()?,
+            frost: frost.binding.clone(),
+        },
+        560,
+    )?;
+    let finalization_replay = ClearingLifecycleReplayV1 {
+        format: CLEARING_LIFECYCLE_REPLAY_FORMAT.to_owned(),
+        proof: finalized.proof().clone(),
+        evidence: ClearingLifecycleReplayEvidenceV1::Finalize {
+            finalization: Box::new(ClearingFinalizationReplayV1 {
+                begin_finalization_proof: finalizing.proof().clone(),
+                acceptances: acceptances_replay,
+                signed_finalization: signed_finalization.clone(),
+                frost_authorization: frost.authorization,
+                historical_roster: frost.roster,
+                bound_slot: frost.bound_slot,
+                completed_slot: frost.completed_slot,
+            }),
+        },
+    };
+    assert_eq!(
+        verify_clearing_lifecycle_replay_authority(
+            finalizing_head,
+            &finalization_replay,
+            &replay_pins,
+            Some(&frost.trust),
+            Some(&closed_dispute_window),
+        )?,
+        EconomicTransitionAuthorizationV1::NOfM {
+            frost: frost.binding.clone(),
+        }
+    );
+    let canonical_replay = canonical_json_bytes(&finalization_replay)?;
+    let decoded_replay: ClearingLifecycleReplayV1 = serde_json::from_slice(&canonical_replay)?;
+    assert_eq!(decoded_replay, finalization_replay);
+    let mut substituted_lineage = finalization_replay;
+    let ClearingLifecycleReplayEvidenceV1::Finalize { finalization } =
+        &mut substituted_lineage.evidence
+    else {
+        return Err("finalization replay used the wrong evidence".into());
+    };
+    let ClearingRoundTransitionV1::BeginFinalization {
+        authority_digest, ..
+    } = &mut finalization.begin_finalization_proof.transition
+    else {
+        return Err("finalization replay lineage used the wrong transition".into());
+    };
+    *authority_digest = digest("substituted-acceptance-authority");
+    assert!(verify_clearing_lifecycle_replay_authority(
+        finalizing_head,
+        &substituted_lineage,
+        &replay_pins,
+        Some(&frost.trust),
+        Some(&closed_dispute_window),
+    )
+    .is_err());
+
     let mut alternate_acceptances = acceptances.clone();
     alternate_acceptances[0] = SignedClearingParticipantAcceptanceV1::sign(
         ClearingParticipantAcceptanceBodyV1 {
@@ -786,6 +1116,7 @@ fn signed_abort_releases_only_after_complete_zero_dispatch_and_the_winning_fence
             &proposal_replay,
             &replay_pins,
             None,
+            None,
         )?,
         EconomicTransitionAuthorizationV1::Direct
     );
@@ -808,6 +1139,7 @@ fn signed_abort_releases_only_after_complete_zero_dispatch_and_the_winning_fence
             proposed_head,
             &begin_replay,
             &replay_pins,
+            None,
             None,
         )?,
         EconomicTransitionAuthorizationV1::Direct
@@ -835,6 +1167,7 @@ fn signed_abort_releases_only_after_complete_zero_dispatch_and_the_winning_fence
             &completion_replay,
             &replay_pins,
             None,
+            None,
         )?,
         EconomicTransitionAuthorizationV1::Direct
     );
@@ -853,6 +1186,7 @@ fn signed_abort_releases_only_after_complete_zero_dispatch_and_the_winning_fence
         aborting_head,
         &substituted_replay,
         &replay_pins,
+        None,
         None,
     )
     .is_err());

@@ -26,7 +26,8 @@ pub struct ClearingParticipantAcceptanceBodyV1 {
 pub type SignedClearingParticipantAcceptanceV1 =
     SignedClearingEnvelopeV1<ClearingParticipantAcceptanceBodyV1>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ClearingDisputeWindowStatusV1 {
     pub round_id: String,
     pub round_core_digest: String,
@@ -45,6 +46,26 @@ pub trait ClearingDisputeWindowResolver: Send + Sync {
         output_manifest_digest: &str,
         dispute_window_ends_at_unix_ms: u64,
     ) -> Result<ClearingDisputeWindowStatusV1, ClearingError>;
+
+    fn resolve_closed_window_checkpoint(
+        &self,
+        round_id: &str,
+        round_core_digest: &str,
+        output_manifest_digest: &str,
+        dispute_window_ends_at_unix_ms: u64,
+        checkpoint_digest: &str,
+    ) -> Result<ClearingDisputeWindowStatusV1, ClearingError> {
+        let status = self.resolve_closed_window(
+            round_id,
+            round_core_digest,
+            output_manifest_digest,
+            dispute_window_ends_at_unix_ms,
+        )?;
+        if status.checkpoint_digest != checkpoint_digest {
+            return Err(ClearingError::AuthorityVerification);
+        }
+        Ok(status)
+    }
 }
 
 #[derive(Debug, Clone)]

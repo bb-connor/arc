@@ -3,11 +3,11 @@ use std::sync::Arc;
 use chio_core::economic_continuity::{EconomicResourceKeyV1, VerifiedEconomicStateBatchAdvance};
 use chio_core::StoreMutationFence;
 use chio_credit::clearing::{
-    verify_clearing_lifecycle_replay, verify_clearing_lifecycle_replay_authority, ClearingError,
-    ClearingLifecycleAuthorityPinsV1, ClearingLifecycleAuthorityVerifier,
-    ClearingLifecycleBatchVerifier, ClearingLifecycleProofResolver, ClearingLifecycleReplayV1,
-    ClearingRoundTransitionProofV1, CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND,
-    CLEARING_ROUND_RESOURCE_FAMILY,
+    verify_clearing_lifecycle_replay, verify_clearing_lifecycle_replay_authority,
+    ClearingDisputeWindowResolver, ClearingError, ClearingLifecycleAuthorityPinsV1,
+    ClearingLifecycleAuthorityVerifier, ClearingLifecycleBatchVerifier,
+    ClearingLifecycleProofResolver, ClearingLifecycleReplayV1, ClearingRoundTransitionProofV1,
+    CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND, CLEARING_ROUND_RESOURCE_FAMILY,
 };
 use chio_federation::frost::FrostArtifactTrustStore;
 
@@ -30,6 +30,7 @@ pub struct SqliteClearingLifecycleStore {
     cache: SqliteEconomicStateCache,
     pins: ClearingLifecycleAuthorityPinsV1,
     frost_trust: Option<Arc<FrostArtifactTrustStore>>,
+    dispute_resolver: Arc<dyn ClearingDisputeWindowResolver>,
 }
 
 impl SqliteClearingLifecycleStore {
@@ -37,12 +38,14 @@ impl SqliteClearingLifecycleStore {
         cache: SqliteEconomicStateCache,
         pins: ClearingLifecycleAuthorityPinsV1,
         frost_trust: Option<Arc<FrostArtifactTrustStore>>,
+        dispute_resolver: Arc<dyn ClearingDisputeWindowResolver>,
     ) -> Result<Self, ClearingLifecycleStoreError> {
         pins.validate()?;
         Ok(Self {
             cache,
             pins,
             frost_trust,
+            dispute_resolver,
         })
     }
 
@@ -59,6 +62,7 @@ impl SqliteClearingLifecycleStore {
             replay,
             &self.pins,
             self.frost_trust.as_deref(),
+            Some(self.dispute_resolver.as_ref()),
         )?;
         if replay.authorized_at_unix_ms() > trusted_now_unix_ms {
             return Err(ClearingError::AuthorityVerification.into());
@@ -153,6 +157,7 @@ impl ClearingLifecycleAuthorityVerifier for SqliteClearingLifecycleStore {
             &replay,
             &self.pins,
             self.frost_trust.as_deref(),
+            Some(self.dispute_resolver.as_ref()),
         )
     }
 }
