@@ -420,6 +420,21 @@ impl BudgetStore for SqliteBudgetStore {
         Ok(Some(payment_journal_row_to_record(row?)?))
     }
 
+    fn payment_journal_reconcile_failed_rail(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<String>, BudgetStoreError> {
+        let connection = self.connection()?;
+        connection
+            .query_row(
+                "SELECT rail FROM payment_journal WHERE request_id = ?1 AND state = 'reconcile_failed'",
+                params![request_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(BudgetStoreError::from)
+    }
+
     fn reverse_charge_cost(
         &self,
         capability_id: &str,

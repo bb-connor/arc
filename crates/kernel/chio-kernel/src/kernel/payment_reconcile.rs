@@ -440,9 +440,34 @@ impl DispatchIntentReconciler for MonetaryDispatchIntentReconciler<'_> {
             })
             .map_err(|error| ReceiptStoreError::Pool(error.to_string()))?;
         let Some(record) = row else {
-            // No incomplete journal row: the money path already terminated
-            // (closed against a receipt, or an incident already stands).
-            // Record the rail reference the intent carries.
+            // No incomplete journal row. This is usually a clean
+            // termination (closed against a receipt), but the money-path
+            // pass may instead have already given up on this exact request
+            // and left a ReconcileFailed row: get_payment_journal never
+            // surfaces that row (it is a closed incident, not an
+            // incomplete one), so treating it the same as a clean close
+            // would hide a genuine, unresolved money-path incident behind
+            // a healthy dispatch-intent surface. Check for that incident
+            // before reporting clean.
+            let reconcile_failed_rail = self
+                .kernel
+                .with_budget_store(|store| {
+                    store
+                        .payment_journal_reconcile_failed_rail(&intent.request_id)
+                        .map_err(KernelError::from)
+                })
+                .map_err(|error| ReceiptStoreError::Pool(error.to_string()))?;
+            if let Some(rail) = reconcile_failed_rail {
+                return Ok(DispatchIntentResolution::DeadLetter {
+                    detail: format!(
+                        "payment journal reconcile failed for rail {rail}; an operator must \
+                         resolve the payment-journal incident before this intent can be \
+                         treated as clean"
+                    ),
+                });
+            }
+            // The money path already terminated cleanly. Record the rail
+            // reference the intent carries.
             let rail_reference = intent
                 .rail_authorization_id
                 .clone()

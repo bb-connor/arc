@@ -2839,6 +2839,75 @@ fn get_payment_journal_is_scoped_identically_to_the_incomplete_listing() {
 }
 
 #[test]
+fn payment_journal_reconcile_failed_rail_finds_only_reconcile_failed_rows() {
+    use chio_kernel::budget_store::BudgetStore;
+    use chio_kernel::payment::{PaymentJournalRecord, PaymentJournalState};
+
+    let path = unique_db_path("payment-journal-reconcile-failed-rail");
+    let store = SqliteBudgetStore::open(&path).expect("open budget store");
+
+    // Absent request id: no row, no error, and no incident.
+    assert!(store
+        .payment_journal_reconcile_failed_rail("req-missing")
+        .expect("lookup an absent row")
+        .is_none());
+
+    let record = PaymentJournalRecord {
+        request_id: "req-L".to_string(),
+        capability_id: "cap".to_string(),
+        grant_index: 0,
+        hold_id: Some("hold-1".to_string()),
+        rail: "x402".to_string(),
+        authorization_id: Some("auth-L".to_string()),
+        transaction_id: None,
+        amount_units: 100,
+        settle_action: None,
+        settle_amount_units: None,
+        currency: "USD".to_string(),
+        state: PaymentJournalState::HoldPlaced,
+        created_at_unix_ms: 1_000,
+    };
+    store.record_payment_journal(&record).expect("insert");
+
+    // An open (non-incident) row is invisible to this targeted lookup,
+    // matching get_payment_journal's scope: only a ReconcileFailed row is
+    // an incident.
+    assert!(store
+        .payment_journal_reconcile_failed_rail("req-L")
+        .expect("lookup an open row")
+        .is_none());
+
+    store
+        .advance_payment_journal(
+            "req-L",
+            PaymentJournalState::HoldPlaced,
+            PaymentJournalState::ReconcileFailed,
+            None,
+            None,
+            None,
+        )
+        .expect("advance to ReconcileFailed");
+
+    // Now the row is a durable incident: the targeted lookup surfaces its
+    // rail so a caller can dead-letter the intent with a useful detail.
+    assert_eq!(
+        store
+            .payment_journal_reconcile_failed_rail("req-L")
+            .expect("lookup a reconcile-failed row"),
+        Some("x402".to_string())
+    );
+
+    // get_payment_journal never surfaces this row: it is a closed
+    // incident, not an incomplete one.
+    assert!(store
+        .get_payment_journal("req-L")
+        .expect("lookup a reconcile-failed row via get_payment_journal")
+        .is_none());
+
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
 fn authorize_budget_hold_writes_journal_atomically() {
     use chio_kernel::budget_store::{BudgetAuthorizeHoldRequest, BudgetStore};
     use chio_kernel::payment::{PaymentJournalRecord, PaymentJournalState};

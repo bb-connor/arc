@@ -615,6 +615,24 @@ pub trait BudgetStore: Send + Sync {
             .find(|row| row.request_id == request_id))
     }
 
+    /// Rail recorded on `request_id`'s payment-journal row, if (and only if)
+    /// that row is currently `ReconcileFailed`: a durable operator incident
+    /// the money-path pass already gave up on. Distinct from
+    /// [`Self::get_payment_journal`], which never surfaces a reconcile-
+    /// failed row (see its doc) -- the monetary dispatch-intent reconciler
+    /// uses this targeted lookup so such a row is promoted into a
+    /// dead-letter instead of being reported as a clean resolution, keeping
+    /// the incident visible to RFC-0003's health-flipping dead-letter
+    /// surface. Default: `Ok(None)`, for stores without the journal or
+    /// without this targeted lookup (they report no incidents, matching
+    /// `list_incomplete_payment_journal`'s empty default).
+    fn payment_journal_reconcile_failed_rail(
+        &self,
+        _request_id: &str,
+    ) -> Result<Option<String>, BudgetStoreError> {
+        Ok(None)
+    }
+
     fn authorize_budget_hold(
         &self,
         request: BudgetAuthorizeHoldRequest,

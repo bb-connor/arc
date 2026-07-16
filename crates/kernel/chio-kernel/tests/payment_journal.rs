@@ -835,6 +835,104 @@ fn monetary_reconciler_resolves_orphaned_intents_through_the_journal(
 }
 
 #[test]
+fn reconcile_failed_journal_row_dead_letters_the_dispatch_intent_and_flips_health(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::payment::PaymentJournalRecord;
+    use chio_kernel::receipt_store::{DispatchIntentRecord, SideEffectClass};
+    use chio_kernel::MonetaryDispatchIntentReconciler;
+    use chio_store_sqlite::SqliteReceiptStore;
+    use std::sync::Arc;
+
+    let harness = support::money_journal_harness("chio-reconcile-failed-health", 75)?;
+
+    // Fabricate an orphaned monetary intent whose payment-journal row is
+    // ALREADY a ReconcileFailed incident: the money-path pass already gave
+    // up on it (rail unreachable, corrupt row, replay failure, ...).
+    // get_payment_journal never surfaces a reconcile-failed row (it is a
+    // closed incident, not an incomplete one), so without the fix the
+    // reconciler would see `None` and report this intent as cleanly
+    // reconciled, hiding the incident from the health surface.
+    let intent_db_path = support::unique_db_path("chio-reconcile-failed-health-intents");
+    {
+        let crashed_writer = SqliteReceiptStore::open(&intent_db_path)?;
+        crashed_writer.record_dispatch_intent_with_timeout(
+            &DispatchIntentRecord {
+                request_id: "req-incident".to_string(),
+                capability_id: "cap".to_string(),
+                tool_server: "srv".to_string(),
+                tool_name: "write_file".to_string(),
+                parameter_hash: "hash".to_string(),
+                side_effect_class: SideEffectClass::Monetary,
+                monetary: true,
+                rail: Some("x402".to_string()),
+                rail_authorization_id: Some("auth-req-incident".to_string()),
+                tenant_id: None,
+                created_at_unix_ms: 1,
+            },
+            std::time::Duration::from_secs(5),
+        )?;
+    }
+    let receipt_store = Arc::new(SqliteReceiptStore::open(&intent_db_path)?);
+
+    // Write the journal row exactly as the money-path pass leaves it after
+    // giving up: HoldPlaced, then advanced straight to ReconcileFailed.
+    harness
+        .budget_store
+        .record_payment_journal(&PaymentJournalRecord {
+            request_id: "req-incident".to_string(),
+            capability_id: "cap".to_string(),
+            grant_index: 0,
+            hold_id: Some("hold-req-incident".to_string()),
+            rail: "x402".to_string(),
+            authorization_id: Some("auth-req-incident".to_string()),
+            transaction_id: None,
+            amount_units: 100,
+            settle_action: None,
+            settle_amount_units: None,
+            currency: "USD".to_string(),
+            state: PaymentJournalState::HoldPlaced,
+            created_at_unix_ms: 1,
+        })?;
+    harness.budget_store.advance_payment_journal(
+        "req-incident",
+        PaymentJournalState::HoldPlaced,
+        PaymentJournalState::ReconcileFailed,
+        None,
+        None,
+        None,
+    )?;
+
+    let reconciler = MonetaryDispatchIntentReconciler {
+        kernel: &harness.kernel,
+    };
+    let report = receipt_store.reconcile_dispatch_intents(&reconciler)?;
+    assert_eq!(report.open, 1);
+    assert_eq!(
+        report.dead_lettered, 1,
+        "a ReconcileFailed journal row must dead-letter its dispatch intent, never report it \
+         clean: {report:?}"
+    );
+    assert_eq!(
+        report.monetary_reconciled, 0,
+        "an unresolved payment-journal incident must never count as reconciled: {report:?}"
+    );
+
+    let health = receipt_store.receipt_store_health()?;
+    assert_eq!(
+        health.dead_letter_dispatch_intents, 1,
+        "the dead-lettered intent must be visible on the health report"
+    );
+    assert!(
+        !health.healthy,
+        "an unresolved payment-journal incident must flip store health unhealthy"
+    );
+
+    let _ = std::fs::remove_file(&intent_db_path);
+    harness.cleanup();
+    Ok(())
+}
+
+#[test]
 fn authorized_reconcile_records_a_receipt_for_prepaid_funds_already_moved(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use chio_kernel::payment::PaymentJournalRecord;
