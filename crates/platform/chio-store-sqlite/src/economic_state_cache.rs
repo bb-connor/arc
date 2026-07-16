@@ -8,6 +8,7 @@ use chio_core::economic_continuity::{
     VerifiedEconomicStateView, MAX_ECONOMIC_BATCH_BYTES,
 };
 use chio_core::{sha256_hex, StoreMutationFence};
+use chio_credit::clearing::CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND;
 use chio_kernel::admission_operation::{
     AdmissionOperationState, AdmissionOperationV1, AdmissionRecoveryLease,
     PersistedAdmissionOperationV1,
@@ -23,7 +24,7 @@ pub(crate) use persistence::verify_cache_sql_invariants;
 use persistence::*;
 
 const ECONOMIC_STATE_CACHE_SCHEMA_KEY: &str = "economic_state_cache";
-pub(crate) const ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION: i32 = 2;
+pub(crate) const ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION: i32 = 3;
 const ECONOMIC_STATE_CACHE_SCHEMA_ANCHORS: &[&str] =
     &["economic_state_stages", "capability_grant_budgets"];
 const MAX_REASON_BYTES: usize = 4 * 1024;
@@ -257,6 +258,19 @@ pub struct EconomicOperationStageContext<'a> {
     recovery_lease: &'a AdmissionRecoveryLease,
 }
 
+pub(crate) struct EconomicStageAdmissionCheckpoint<'a> {
+    pub(crate) store_id: &'a str,
+    pub(crate) sequence: u64,
+    pub(crate) digest: &'a str,
+}
+
+struct EconomicStageOptions<'a> {
+    operation: Option<EconomicOperationStageContext<'a>>,
+    descriptor: Option<EconomicStateStageDescriptor>,
+    admission_checkpoint: Option<EconomicStageAdmissionCheckpoint<'a>>,
+    consumer_descriptor_kind: Option<&'static str>,
+}
+
 impl<'a> EconomicOperationStageContext<'a> {
     #[must_use]
     pub const fn new(
@@ -419,9 +433,63 @@ impl SqliteEconomicStateCache {
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<EconomicStateStageRecord, EconomicStateCacheError> {
+        self.stage_batch_inner(
+            advance,
+            EconomicStageOptions {
+                operation,
+                descriptor,
+                admission_checkpoint: None,
+                consumer_descriptor_kind: None,
+            },
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    pub(crate) fn stage_clearing_lifecycle_batch(
+        &self,
+        advance: &VerifiedEconomicStateBatchAdvance,
+        descriptor: EconomicStateStageDescriptor,
+        checkpoint: Option<EconomicStageAdmissionCheckpoint<'_>>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<EconomicStateStageRecord, EconomicStateCacheError> {
+        self.stage_batch_inner(
+            advance,
+            EconomicStageOptions {
+                operation: None,
+                descriptor: Some(descriptor),
+                admission_checkpoint: checkpoint,
+                consumer_descriptor_kind: Some(CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND),
+            },
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn stage_batch_inner(
+        &self,
+        advance: &VerifiedEconomicStateBatchAdvance,
+        options: EconomicStageOptions<'_>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<EconomicStateStageRecord, EconomicStateCacheError> {
+        let EconomicStageOptions {
+            operation,
+            descriptor,
+            admission_checkpoint,
+            consumer_descriptor_kind,
+        } = options;
         validate_trusted_time(trusted_now_unix_ms)?;
         if let Some(descriptor) = &descriptor {
             descriptor.validate()?;
+            let reserved = descriptor.kind() == CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND;
+            if reserved
+                != (consumer_descriptor_kind == Some(CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND))
+                || consumer_descriptor_kind.is_some_and(|kind| kind != descriptor.kind())
+            {
+                return Err(EconomicStateCacheError::Conflict);
+            }
         }
         let base_view_bytes =
             canonical_bounded(advance.current().view(), MAX_VIEW_BYTES, "base view")?;
@@ -448,6 +516,30 @@ impl SqliteEconomicStateCache {
             }
             transaction.commit().map_err(sqlite_error)?;
             return Ok(existing);
+        }
+        if let Some(descriptor) = &descriptor {
+            let retained_batch_id = transaction
+                .query_row(
+                    r#"
+                    SELECT batch_id FROM economic_state_stages
+                    WHERE descriptor_kind = ?1 AND descriptor_key = ?2
+                    "#,
+                    params![descriptor.kind(), descriptor.key()],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .map_err(sqlite_error)?;
+            if retained_batch_id.is_some() {
+                return Err(EconomicStateCacheError::Conflict);
+            }
+        }
+        if let Some(checkpoint) = admission_checkpoint {
+            verify_stage_admission_checkpoint(
+                &transaction,
+                &checkpoint,
+                active_fence,
+                trusted_now_unix_ms,
+            )?;
         }
         let operation_binding = qualify_operation_binding(
             &transaction,
@@ -810,6 +902,35 @@ impl SqliteEconomicStateCache {
         Ok(record)
     }
 
+    pub(crate) fn load_stage_by_descriptor(
+        &self,
+        kind: &str,
+        key: &str,
+    ) -> Result<Option<EconomicStateStageRecord>, EconomicStateCacheError> {
+        validate_descriptor_text(kind, MAX_DESCRIPTOR_KIND_BYTES, "stage descriptor kind")?;
+        validate_descriptor_text(key, MAX_DESCRIPTOR_KEY_BYTES, "stage descriptor key")?;
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let batch_id = transaction
+            .query_row(
+                r#"
+                SELECT batch_id FROM economic_state_stages
+                WHERE descriptor_kind = ?1 AND descriptor_key = ?2
+                "#,
+                params![kind, key],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(sqlite_error)?;
+        let record = batch_id
+            .as_deref()
+            .map(|batch_id| load_stage_tx(&transaction, batch_id))
+            .transpose()?
+            .flatten();
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(record)
+    }
+
     pub fn list_pending(
         &self,
         limit: usize,
@@ -1061,6 +1182,30 @@ fn validate_descriptor_text(
     } else {
         Ok(())
     }
+}
+
+fn verify_stage_admission_checkpoint(
+    transaction: &Transaction<'_>,
+    expected: &EconomicStageAdmissionCheckpoint<'_>,
+    active_fence: &StoreMutationFence,
+    trusted_now_unix_ms: u64,
+) -> Result<(), EconomicStateCacheError> {
+    validate_descriptor_text(
+        expected.store_id,
+        MAX_DESCRIPTOR_KEY_BYTES,
+        "admission store id",
+    )?;
+    validate_digest(expected.digest, "admission commit digest")?;
+    let current = crate::admission_operation_store::verify_admission_commit_chain(transaction)
+        .map_err(|error| invariant(error.to_string()))?;
+    if expected.store_id != active_fence.store_uuid
+        || expected.sequence != current.head_sequence
+        || expected.digest != current.chain_digest
+        || trusted_now_unix_ms < current.trusted_time_high_water_unix_ms
+    {
+        return Err(EconomicStateCacheError::Conflict);
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -1,24 +1,28 @@
+use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{sha256_hex, Keypair};
 use chio_core_types::economic_continuity::{
     EconomicContentV1, EconomicResourceHeadV1, EconomicResourceKeyV1,
-    CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
+    EconomicTransitionAuthorizationV1, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
 };
 use chio_credit::clearing::{
     compose_clearing_lifecycle_transition, compute_netting_round, prepare_clearing_round_abort,
     prepare_clearing_round_finalization, prepare_clearing_zero_dispatch_proof,
     sign_clearing_round_abort, sign_clearing_round_finalization, sign_clearing_zero_dispatch_proof,
-    sign_netting_round, verify_clearing_participant_acceptances, verify_clearing_round_abort,
+    sign_netting_round, verify_clearing_lifecycle_replay_authority,
+    verify_clearing_participant_acceptances, verify_clearing_round_abort,
     verify_clearing_zero_dispatch_proof, verify_netting_round, verify_signed_netting_round,
-    AnchoredClearingObligationV1, ClearingAuthorityTrustV1, ClearingDisputeWindowResolver,
-    ClearingDisputeWindowStatusV1, ClearingInputManifestBodyV1, ClearingInputManifestEntryV1,
-    ClearingIntentDispatchStatusV1, ClearingObligationInputV1, ClearingParticipantAcceptanceBodyV1,
-    ClearingParticipantBindingV1, ClearingParticipantSnapshotAcknowledgementBodyV1,
-    ClearingParticipantSnapshotBodyV1, ClearingRoundAbortReasonV1, ClearingRoundLifecycleRecordV1,
-    ClearingRoundRequestV1, ClearingRoundTransitionV1, ClearingZeroDispatchTrustV1,
-    SignedClearingInputManifestV1, SignedClearingParticipantAcceptanceV1,
-    SignedClearingParticipantSnapshotAcknowledgementV1, SignedClearingParticipantSnapshotV1,
-    SignedNettingRoundCoreV1, CLEARING_ALGORITHM_V1, CLEARING_INPUT_MANIFEST_SCHEMA,
+    AnchoredClearingObligationV1, ClearingAbortReplayV1, ClearingAuthorityTrustV1,
+    ClearingDisputeWindowResolver, ClearingDisputeWindowStatusV1, ClearingInputManifestBodyV1,
+    ClearingInputManifestEntryV1, ClearingIntentDispatchStatusV1, ClearingLifecycleAuthorityPinsV1,
+    ClearingLifecycleReplayEvidenceV1, ClearingLifecycleReplayV1, ClearingObligationInputV1,
+    ClearingParticipantAcceptanceBodyV1, ClearingParticipantBindingV1,
+    ClearingParticipantSnapshotAcknowledgementBodyV1, ClearingParticipantSnapshotBodyV1,
+    ClearingRoundAbortReasonV1, ClearingRoundLifecycleRecordV1, ClearingRoundRequestV1,
+    ClearingRoundTransitionV1, ClearingZeroDispatchTrustV1, SignedClearingInputManifestV1,
+    SignedClearingParticipantAcceptanceV1, SignedClearingParticipantSnapshotAcknowledgementV1,
+    SignedClearingParticipantSnapshotV1, SignedNettingRoundCoreV1, CLEARING_ALGORITHM_V1,
+    CLEARING_INPUT_MANIFEST_SCHEMA, CLEARING_LIFECYCLE_REPLAY_FORMAT,
     CLEARING_PARTICIPANT_ACCEPTANCE_SCHEMA, CLEARING_PARTICIPANT_SNAPSHOT_ACKNOWLEDGEMENT_SCHEMA,
     CLEARING_PARTICIPANT_SNAPSHOT_SCHEMA,
 };
@@ -753,6 +757,105 @@ fn signed_abort_releases_only_after_complete_zero_dispatch_and_the_winning_fence
         .find(|transition| transition.resource_key.resource_family == "clearing_round")
         .ok_or("missing aborted round head")?;
     assert_eq!(aborted_round.next_head.lifecycle_state, "aborted");
+    let replay_pins = ClearingLifecycleAuthorityPinsV1 {
+        clearing_authority_id: clearing_trust.clearing_authority_id.clone(),
+        clearing_authority_key: clearing_trust.clearing_authority_key.clone(),
+        clearing_authority_key_epoch: clearing_trust.clearing_authority_key_epoch,
+        participant_authority_id: clearing_trust.participant_authority_id.clone(),
+        participant_authority_key: clearing_trust.participant_authority_key.clone(),
+        participant_key_epoch: clearing_trust.participant_key_epoch,
+        obligation_authority_id: clearing_trust.obligation_authority_id.clone(),
+        obligation_authority_key: clearing_trust.obligation_authority_key.clone(),
+        obligation_key_epoch: clearing_trust.obligation_key_epoch,
+        zero_dispatch_authority_id: proof_trust.authority_id.clone(),
+        zero_dispatch_authority_key: proof_trust.authority_key.clone(),
+        zero_dispatch_authority_key_epoch: proof_trust.authority_key_epoch,
+        admission_store_id: proof_trust.admission_store_id.clone(),
+    };
+    let proposal_replay = ClearingLifecycleReplayV1 {
+        format: CLEARING_LIFECYCLE_REPLAY_FORMAT.to_owned(),
+        proof: proposed.proof().clone(),
+        evidence: ClearingLifecycleReplayEvidenceV1::Proposal {
+            request: Box::new(request.clone()),
+            signed_output: Box::new(signed_output.clone()),
+        },
+    };
+    assert_eq!(
+        verify_clearing_lifecycle_replay_authority(
+            &reserved_head,
+            &proposal_replay,
+            &replay_pins,
+            None,
+        )?,
+        EconomicTransitionAuthorizationV1::Direct
+    );
+    let abort_replay = ClearingAbortReplayV1 {
+        request: request.clone(),
+        signed_output: Some(signed_output.clone()),
+        zero_dispatch_proof: signed_proof.clone(),
+        abort: signed_abort.clone(),
+        finalization_burn: None,
+    };
+    let begin_replay = ClearingLifecycleReplayV1 {
+        format: CLEARING_LIFECYCLE_REPLAY_FORMAT.to_owned(),
+        proof: aborting.proof().clone(),
+        evidence: ClearingLifecycleReplayEvidenceV1::BeginAbort {
+            abort: Box::new(abort_replay.clone()),
+        },
+    };
+    assert_eq!(
+        verify_clearing_lifecycle_replay_authority(
+            proposed_head,
+            &begin_replay,
+            &replay_pins,
+            None,
+        )?,
+        EconomicTransitionAuthorizationV1::Direct
+    );
+    assert_eq!(
+        begin_replay.admission_checkpoint(),
+        Some((
+            proof_trust.admission_store_id.as_str(),
+            proof_trust.admission_commit_sequence,
+            proof_trust.admission_commit_digest.as_str(),
+        ))
+    );
+    let completion_replay = ClearingLifecycleReplayV1 {
+        format: CLEARING_LIFECYCLE_REPLAY_FORMAT.to_owned(),
+        proof: aborted.proof().clone(),
+        evidence: ClearingLifecycleReplayEvidenceV1::Abort {
+            preabort_round_head: Box::new(proposed_head.clone()),
+            begin_abort_proof: Box::new(aborting.proof().clone()),
+            abort: Box::new(abort_replay),
+        },
+    };
+    assert_eq!(
+        verify_clearing_lifecycle_replay_authority(
+            aborting_head,
+            &completion_replay,
+            &replay_pins,
+            None,
+        )?,
+        EconomicTransitionAuthorizationV1::Direct
+    );
+    let canonical_replay = canonical_json_bytes(&completion_replay)?;
+    let decoded_replay: ClearingLifecycleReplayV1 = serde_json::from_slice(&canonical_replay)?;
+    assert_eq!(decoded_replay, completion_replay);
+    let mut substituted_replay = completion_replay;
+    let ClearingLifecycleReplayEvidenceV1::Abort {
+        begin_abort_proof, ..
+    } = &mut substituted_replay.evidence
+    else {
+        return Err("completion replay used the wrong evidence".into());
+    };
+    begin_abort_proof.source_round_head_digest = digest("substituted-source");
+    assert!(verify_clearing_lifecycle_replay_authority(
+        aborting_head,
+        &substituted_replay,
+        &replay_pins,
+        None,
+    )
+    .is_err());
     for transition in aborted
         .transitions()
         .iter()

@@ -58,6 +58,10 @@ CREATE TABLE IF NOT EXISTS economic_state_stages (
     )
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS economic_state_stages_descriptor_identity
+    ON economic_state_stages(descriptor_kind, descriptor_key)
+    WHERE descriptor_kind IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS economic_state_stage_heads (
     batch_id TEXT NOT NULL,
     resource_key_digest TEXT NOT NULL CHECK (

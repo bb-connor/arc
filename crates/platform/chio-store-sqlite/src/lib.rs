@@ -32,6 +32,7 @@ pub mod authority;
 pub mod batch_approval_store;
 pub mod budget_store;
 pub mod capability_lineage;
+pub mod clearing_lifecycle_store;
 pub mod dead_letters;
 pub mod economic_state_cache;
 pub mod encrypted_blob;
@@ -188,6 +189,7 @@ pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use batch_approval_store::SqliteBatchApprovalStore;
 pub use budget_store::{BudgetStoreSnapshot, SqliteBudgetStore};
+pub use clearing_lifecycle_store::{ClearingLifecycleStoreError, SqliteClearingLifecycleStore};
 pub use economic_state_cache::{
     EconomicOperationStageBinding, EconomicOperationStageContext, EconomicStateCacheError,
     EconomicStateStageDescriptor, EconomicStateStageRecord, EconomicStateStageStatus,

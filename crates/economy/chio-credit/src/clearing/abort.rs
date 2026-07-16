@@ -19,7 +19,7 @@ pub struct ClearingZeroDispatchTrustV1 {
 }
 
 impl ClearingZeroDispatchTrustV1 {
-    fn validate(&self) -> Result<(), ClearingError> {
+    pub(super) fn validate(&self) -> Result<(), ClearingError> {
         validate_text("zero_dispatch_authority_id", &self.authority_id)?;
         validate_positive(
             "zero_dispatch_authority_key_epoch",

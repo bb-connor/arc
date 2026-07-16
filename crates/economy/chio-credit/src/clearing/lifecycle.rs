@@ -13,8 +13,10 @@ use super::*;
 use crate::obligation::ObligationDispositionTransitionV1;
 
 mod record;
+mod replay;
 mod validation;
 
+pub use replay::*;
 pub(super) use validation::{validate_round_core, validate_round_head};
 
 pub const CLEARING_ROUND_LIFECYCLE_SCHEMA: &str = "chio.clearing.round-lifecycle.v1";

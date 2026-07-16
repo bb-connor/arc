@@ -323,7 +323,7 @@ fn stage_retains_exact_bytes_and_rejects_a_stale_serving_fence() -> TestResult {
 #[test]
 fn stage_commits_one_exact_consumer_descriptor_with_the_batch() -> TestResult {
     let fixture = fixture();
-    let (advance, _) = verified_advance()?;
+    let (advance, committed) = verified_advance()?;
     let descriptor_body = json!({
         "roundId": "round-1",
         "roundCoreDigest": digest("round-core"),
@@ -375,6 +375,88 @@ fn stage_commits_one_exact_consumer_descriptor_with_the_batch() -> TestResult {
         fixture
             .cache
             .stage_batch(&advance, None, &fixture.fence, 1_003),
+        Err(EconomicStateCacheError::Conflict)
+    ));
+    let (successor, _) = verified_successor(&committed)?;
+    assert!(matches!(
+        fixture.cache.stage_batch_with_descriptor(
+            &successor,
+            None,
+            Some(EconomicStateStageDescriptor::new(
+                "clearing_round",
+                "round-1",
+                &descriptor_body,
+            )?),
+            &fixture.fence,
+            1_004,
+        ),
+        Err(EconomicStateCacheError::Conflict)
+    ));
+    Ok(())
+}
+
+#[test]
+fn reserved_descriptor_and_admission_checkpoint_are_one_stage_fence() -> TestResult {
+    let fixture = fixture();
+    let (advance, committed) = verified_advance()?;
+    let descriptor_body = json!({"proof": digest("proof-1")});
+    let descriptor = EconomicStateStageDescriptor::new(
+        CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND,
+        digest("proof-1"),
+        &descriptor_body,
+    )?;
+    let staged = fixture.cache.stage_clearing_lifecycle_batch(
+        &advance,
+        descriptor.clone(),
+        Some(EconomicStageAdmissionCheckpoint {
+            store_id: &fixture.fence.store_uuid,
+            sequence: 0,
+            digest: crate::admission_operation_store::GENESIS_CHAIN_DIGEST,
+        }),
+        &fixture.fence,
+        1_000,
+    )?;
+    assert_eq!(staged.descriptor(), Some(&descriptor));
+    assert_eq!(
+        fixture.cache.load_stage_by_descriptor(
+            CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND,
+            &digest("proof-1"),
+        )?,
+        Some(staged)
+    );
+
+    let (successor, _) = verified_successor(&committed)?;
+    let stale = EconomicStateStageDescriptor::new(
+        CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND,
+        digest("proof-2"),
+        &json!({"proof": digest("proof-2")}),
+    )?;
+    assert!(matches!(
+        fixture.cache.stage_clearing_lifecycle_batch(
+            &successor,
+            stale,
+            Some(EconomicStageAdmissionCheckpoint {
+                store_id: &fixture.fence.store_uuid,
+                sequence: 1,
+                digest: &digest("missing-admission-commit"),
+            }),
+            &fixture.fence,
+            1_001,
+        ),
+        Err(EconomicStateCacheError::Conflict)
+    ));
+    assert!(matches!(
+        fixture.cache.stage_batch_with_descriptor(
+            &successor,
+            None,
+            Some(EconomicStateStageDescriptor::new(
+                CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND,
+                digest("proof-1"),
+                &descriptor_body,
+            )?),
+            &fixture.fence,
+            1_002,
+        ),
         Err(EconomicStateCacheError::Conflict)
     ));
     Ok(())
@@ -519,6 +601,22 @@ fn version_one_cache_migrates_descriptor_identity_without_rewriting_stages() -> 
         .ok_or("migrated stage is missing")?;
     assert_eq!(migrated, legacy_stage);
     transaction.commit()?;
+
+    connection.execute_batch("DROP INDEX economic_state_stages_descriptor_identity")?;
+    crate::stamp_schema_version(&connection, ECONOMIC_STATE_CACHE_SCHEMA_KEY, 2)?;
+    initialize_economic_state_cache_schema(&mut connection)?;
+    let descriptor_index: bool = connection.query_row(
+        r#"
+        SELECT EXISTS(
+            SELECT 1 FROM sqlite_schema
+            WHERE type = 'index'
+              AND name = 'economic_state_stages_descriptor_identity'
+        )
+        "#,
+        [],
+        |row| row.get(0),
+    )?;
+    assert!(descriptor_index);
     Ok(())
 }
 
