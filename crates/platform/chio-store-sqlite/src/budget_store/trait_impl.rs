@@ -120,26 +120,39 @@ impl BudgetStore for SqliteBudgetStore {
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         // Read the open hold's remainder and owning grant inside the
         // transaction; a non-open or absent hold is an idempotent no-op.
-        let row: Option<(String, i64, i64)> = transaction
+        let row: Option<(String, i64, i64, bool)> = transaction
             .query_row(
-                "SELECT capability_id, grant_index, remaining_exposure_units \
+                "SELECT capability_id, grant_index, remaining_exposure_units, \
+                        invocation_count_debited \
                  FROM budget_authorization_holds WHERE hold_id = ?1 AND disposition = 'open'",
                 params![hold_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .optional()?;
-        let Some((capability_id, grant_index, remaining)) = row else {
+        let Some((capability_id, grant_index, remaining, invocation_count_debited)) = row else {
             return Ok(false);
         };
         let remaining = remaining.max(0);
         let now = unix_now();
-        // Release capacity by exactly the remainder. Never touch realized
-        // spend: an expired hold returns capacity without recording spend.
+        // Release capacity by exactly the remainder and return the hold's
+        // invocation debit, mirroring the normal reverse path: the call
+        // never completed, so it must not permanently consume a
+        // max_invocations slot. Never touch realized spend: an expired hold
+        // returns capacity without recording spend.
         transaction.execute(
             "UPDATE capability_grant_budgets \
-             SET total_cost_exposed = MAX(total_cost_exposed - ?1, 0), updated_at = ?2 \
+             SET total_cost_exposed = MAX(total_cost_exposed - ?1, 0), \
+                 invocation_count = CASE WHEN ?5 THEN MAX(invocation_count - 1, 0) \
+                                         ELSE invocation_count END, \
+                 updated_at = ?2 \
              WHERE capability_id = ?3 AND grant_index = ?4",
-            params![remaining, now, capability_id, grant_index],
+            params![
+                remaining,
+                now,
+                capability_id,
+                grant_index,
+                invocation_count_debited
+            ],
         )?;
         transaction.execute(
             "UPDATE budget_authorization_holds \

@@ -3043,9 +3043,10 @@ fn expire_open_hold_releases_exposure_without_recording_spend() {
 
     let usage = store.get_usage("cap", 0).expect("usage").expect("record");
     // The exposure dropped by exactly the released remainder; no realized
-    // spend was recorded.
+    // spend was recorded, and the hold's invocation debit was returned.
     assert_eq!(usage.total_cost_exposed, 0);
     assert_eq!(usage.total_cost_realized_spend, 0);
+    assert_eq!(usage.invocation_count, 0);
 
     // The mutation log carries the expire event.
     let events = store
@@ -3055,6 +3056,58 @@ fn expire_open_hold_releases_exposure_without_recording_spend() {
         .iter()
         .any(|event| event.kind == BudgetMutationKind::ExpireHold));
     assert_eq!(store.open_hold_count().expect("count after"), 0);
+
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn expire_open_hold_returns_the_invocation_slot() {
+    use chio_kernel::budget_store::{
+        BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetStore,
+    };
+
+    let path = unique_db_path("hold-sweep-invocation");
+    let store = SqliteBudgetStore::open(&path).expect("open");
+    let authorize = |hold: &str| BudgetAuthorizeHoldRequest {
+        capability_id: "cap".to_string(),
+        grant_index: 0,
+        max_invocations: Some(1),
+        requested_exposure_units: 70,
+        max_cost_per_invocation: Some(70),
+        max_total_cost_units: Some(500),
+        hold_id: Some(hold.to_string()),
+        event_id: Some(format!("{hold}:authorize")),
+        authority: None,
+        payment_journal: None,
+    };
+
+    // The single invocation slot is consumed by the first hold.
+    assert!(matches!(
+        store
+            .authorize_budget_hold(authorize("hold-inv-1"))
+            .expect("authorize"),
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+    let usage = store.get_usage("cap", 0).expect("usage").expect("record");
+    assert_eq!(usage.invocation_count, 1);
+
+    // Expiring the orphaned hold returns the slot: the call never
+    // completed, so it must not permanently consume max_invocations.
+    assert!(store.expire_open_hold("hold-inv-1").expect("expire"));
+    let usage = store.get_usage("cap", 0).expect("usage").expect("record");
+    assert_eq!(
+        usage.invocation_count, 0,
+        "expiry must reverse the invocation debit exactly like the normal reverse path"
+    );
+    assert_eq!(usage.total_cost_exposed, 0);
+
+    // A retry after the sweep fits the same one-invocation grant again.
+    assert!(matches!(
+        store
+            .authorize_budget_hold(authorize("hold-inv-2"))
+            .expect("authorize retry"),
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
 
     let _ = std::fs::remove_file(&path);
 }
