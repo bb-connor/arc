@@ -1,109 +1,165 @@
-# Chio Policy Expansion: Spec Re-Convergence, Integrity, Consolidation, Expressiveness
+# Chio Policy Expansion: One Language Family, Authority-Specific Documents
 
-- Status: Draft for review (2026-07-15)
-- Scope: two repositories - `arc` (Chio engine, `crates/guards/chio-policy` and its consumers) and `hush` (the open HushSpec specification at `standalone/hush`, published as `hushspec` on crates.io, `@hushspec/core` on npm, `hushspec` on PyPI)
+- Status: Draft v2 for review (2026-07-15). v1 was reviewed and rejected; this revision incorporates all eleven findings.
+- Repositories in scope: `arc` (Chio engine and control plane), `hush` (HushSpec specification, four SDKs, `h2h`), `chio-open-code-plugin` (preset templates), `@chio/bridge` host packages. The v1 claim of two-repository scope was inaccurate.
 - Related: `docs/superpowers/specs/2026-07-09-protocol-primitives-design.md`, `docs/superpowers/specs/2026-07-09-security-folder-design.md`, `docs/formal/plan/FV-C4-policy-smt-analyzer.md`, `docs/architecture/reliability/RFC-0013-money-path-durability.md`, `docs/release/RISK_REGISTER.md`
 
 ## 1. Problem statement
 
-A July 2026 research sweep (four-agent: crate internals, enforcement surfaces, docs/roadmap, external landscape) assessed whether Chio policies cover the full use-case scope. Findings, condensed:
+A July 2026 research sweep assessed whether Chio policies cover the full use-case scope. Verified findings:
 
-**Coverage inside the lane is strong.** HushSpec-driven enforcement covers tool access, egress with SSRF companions, filesystem, shell, computer-use, secrets, patch integrity, velocity, single-gate human-in-loop, prompt-injection/jailbreak detection, posture state machines, origin profiles, reputation-gated issuance, and runtime-assurance gating. Against the strongest external anchor (the seven governance properties agent protocols cannot express, per the 2026 protocol-governance-gaps analysis, arXiv 2606.31498), Chio has audit fully covered and temporal, spend, revocation, and delegation partially covered. Obligations and provenance are missing. Cedar, the rigor benchmark, deliberately covers none of obligations, velocity, sessions, or HITL: that is the whitespace this program targets.
+**Coverage inside the session-guardrail lane is strong.** HushSpec-driven enforcement covers tool access, egress with SSRF companions, filesystem, shell, computer-use, secrets, patch integrity, velocity, single-gate human-in-loop, injection/jailbreak detection, posture state machines, origin profiles, and reputation- and runtime-assurance-gated issuance. Cedar, the formal-rigor benchmark, deliberately covers none of obligations, velocity, sessions, or HITL; that whitespace is where this program aims. (v1 cited arXiv 2606.31498 for a seven-property gap taxonomy; that paper is actually a six-dimension community-governance study and does not support the claim. The citation is removed. The gap scorecard now rests on the verified internal evidence below and the named-system survey.)
 
-**Three gap clusters block expansion from being honest:**
+**Three verified gap clusters:**
 
-1. **Wired-vs-staged holes inside existing features.** The `ChioApproverSet {n, of}` multi-party approval shape parses but is an inert passthrough. `Warn` decisions exist in the reference evaluator but do not survive compilation; `jailbreak.warn_threshold` is parsed then dropped (`crates/guards/chio-policy/src/compiler/detection.rs`). Governance metadata (`expiry_date`, `lifecycle_state`) is descriptive only. `CryptoFloor` is mirrored at the kernel boundary by hand instead of wired from the policy loader. `merge` is not deny-absorptive, so a child policy can silently relax a parent.
-2. **Fragmentation across roughly six policy planes.** The control-plane loader forks between HushSpec and a legacy Chio-YAML format that reaches guard knobs HushSpec cannot (`chio-control-plane/src/policy/loader.rs`). Kernel budget and monetary caps ride capability-token fields. Federation admission uses separate signed policy records. The Claude Code host path is gated by a Python `CodeAgentPolicy` with hardcoded constants while the kernel tool-call route is advisory-only. Many guard defaults are hardcoded or Chio-YAML-only.
-3. **Spec schism between arc and hush.** The open HushSpec repo is the normative home (spec prose, JSON Schemas, conformance levels L0-L3, testkit, four SDKs, Ed25519 policy signing, a receipt schema with an `enforcement` disposition). But the two implementations have diverged three ways at the same version number `0.1.0`:
-   - hush spec prose defines 10 rule blocks; hush schema and SDKs implement 12 (`browser_automation`, `code_execution` are undocumented in prose).
-   - arc implements 14 (`velocity`, `human_in_loop` exist nowhere in hush).
-   - arc adds three extension keys (`reputation`, `runtime_assurance`, `chio`) that hush section 9.5 requires conformant parsers to reject, and arc's builtin-extends prefixes (`chio:`, `hushspec:`) differ from hush's (`builtin:`). arc does not depend on the `hushspec` crate; there is no conformance coupling in either direction. A policy written for one engine is not portable to the other, which defeats the format's stated thesis.
+1. **Wired-vs-staged holes.** `ChioApproverSet {n, of}` parses but is inert. `Warn` does not survive compilation; `jailbreak.warn_threshold` is parsed then dropped (`crates/guards/chio-policy/src/compiler/detection.rs`). Governance metadata is advisory in both repos (hush explicitly so: `hush/crates/hushspec/src/governance.rs`). There is no crypto-floor field anywhere in the HushSpec document model (`crates/guards/chio-policy/src/models.rs`), so nothing exists to wire. `merge` is not deny-absorptive.
+2. **Plane fragmentation.** The control-plane loader forks between HushSpec and legacy Chio-YAML (`chio-control-plane/src/policy/loader.rs:24`). Kernel budget and monetary caps ride capability tokens. Federation admission uses separate signed records. The Python host gate (`sdks/python/chio-code-agent/.../policy.py`) is a bespoke parser with hardcoded constants, and it is the authoritative gate on that path.
+3. **Spec schism, worse than prose drift.** At the same version string `0.1.0`: hush prose defines 10 rule blocks; hush schemas and SDK models parse 12; arc parses 14 plus three extension keys hush section 9.5 requires parsers to reject. hush's reference evaluator routes only 8 action types and **returns Allow for unknown action types** (`hush/crates/hushspec/src/evaluate.rs:110`), so `browser_automation` and `code_execution` are parsed but fail-open at evaluation, and the evaluator fixture enum omits both. Extends addressing has three dialects in the wild: hush `builtin:`, arc `chio:`/`hushspec:`, plugin `chio://preset/...`. Policy signing covers only the leaf file's raw bytes (`hush/crates/hushspec/src/signing.rs:91`) while arc resolves unsigned parents and auxiliary assets after verification. arc does not consume the hush crate, vectors, or receipt schema.
 
-## 2. Goals
+## 2. Architecture frame: language family, not one authoring plane
 
-- One normative spec, one conformance story: hush is the standard; arc is the flagship Level 3 engine with a published profile of its extensions.
-- Every schema field that parses either enforces or is rejected. No inert shapes.
-- HushSpec becomes the single authoring plane for guard config, issuance ceilings, and host-side gating in the Chio ecosystem.
-- New expressiveness lands spec-first in hush where portable (obligations, memory governance, delegation), vendor-scoped where Chio-specific.
+v1 proposed "HushSpec becomes the single authoring plane." That is the wrong security abstraction: guard configuration, capability issuance, host admission, and runtime enforcement have different owners, signers, consumers, and lifecycles (federation admission already respects this by design).
 
-## 3. Non-goals
+The frame this program adopts:
 
-- Topical confinement rails, learned/behavioral policy mining, a general content-moderation taxonomy (classifier and host territory; external guards already bridge to SaaS moderation).
-- An SMT backend for policy analysis (FV-C4 phase 3 already defers it; the decidable fragment suffices).
-- Merging federation admission policy (signed `FederatedOpenAdmissionPolicy` records) into HushSpec. Different trust domain and lifecycle; document the boundary instead.
-- Payment-mandate policy. Deferred until RFC-0013 money-path durability lands (settlement hook results are currently discarded; policy must not govern a rail that drops outcomes).
-- Freezing HushSpec at v1.0. This program targets 0.2.0; the v0.x series explicitly permits iteration.
+- **One interchange language.** HushSpec grammar, schemas, and conformance vectors are the shared syntax and semantics, specified in hush.
+- **Authority-specific signed documents.** Issuer policy (Capability Authority ceilings), runtime policy (kernel guards), and host policy (client-side gate) are separate documents with separate signers and lifecycles, all written in the language.
+- **Monotonic composition.** Issuer ceilings are authoritative maxima. Runtime and host documents may only narrow the effective policy (a meet in the decision lattice), never widen it. Compilation and issuance must reject a document that attempts to widen an upstream authority's bound.
 
-## 4. Program shape: four phases
+## 3. Goals
 
-Phases are ordered by dependency, not priority. Phase 0 unblocks honest versions of everything after it. Phases 1 and 2 are arc-side and can proceed in parallel once Phase 0's version/namespace decisions are fixed. Phase 3 items are independently shippable.
+- One specification with a version-gated grammar and a module-support contract, so a document either enforces as written on a given engine or is rejected by that engine (parse-only tooling may losslessly preserve content it does not interpret).
+- Conformance that covers arc's real enforcement path end to end, not just the reference evaluator.
+- Signed provenance for the effective policy (resolved chain plus assets), bound into receipts.
+- New expressiveness lands spec-first where portable, vendor-scoped where Chio-specific, and never as core until its state and conformance contracts exist.
 
-### Phase 0: Spec re-convergence (hush + arc)
+## 4. Non-goals
 
-**0.1 HushSpec 0.2.0 in hush.** Add prose sections for `browser_automation` and `code_execution` (closing hush's own prose-vs-schema gap). Upstream `velocity` and `human_in_loop` from arc as core rule blocks 3.13 and 3.14: both are portable, runtime-agnostic semantics (token-bucket rate and spend caps in minor units plus currency; confirmation globs, monetary approval thresholds, timeout with deny/defer). The `human_in_loop` core block gains an optional `approvers { n, of, timeout_seconds }` sub-block, lifting the n-of-m shape out of the vendor slot and into the standard, with single-gate confirmation as the base level. Update the core JSON Schema, all four SDKs, fixtures, and conformance vectors in the same release.
+- Topical confinement, learned policy mining, general content moderation, SMT analysis backends (unchanged from v1).
+- Merging federation admission into HushSpec (separate authority; documented boundary).
+- Payment mandates before RFC-0013 lands.
+- Upstreaming stateful velocity or multiparty approval into hush 0.2 **core** (v1 proposed this; withdrawn, see 5.3).
+- Freezing at v1.0.
 
-**0.2 Companion specs for reputation and runtime assurance.** Both schemas are engine-agnostic (scoring weights, tier ceilings, attestation tiers, verifier bindings) even though Chio is today's only implementation. Add `spec/hushspec-reputation.md` and `spec/hushspec-runtime-assurance.md` in hush, mirroring the posture/origins/detection companion pattern: core parsers MUST accept the keys, MAY ignore contents. This legalizes arc's two extension keys.
+## 5. Spec mechanics (hush 0.2)
 
-**0.3 Vendor extension namespace.** Amend hush section 9.5: `extensions.vendor.<name>` is a registered namespace whose contents are an opaque mapping. Parsers MUST accept declared vendor keys structurally and MUST reject undeclared top-level extension keys as before. Engines interpret only their own vendor namespace. arc migrates `extensions.chio` (market_hours, signing, k8s_namespaces, rollback) to `extensions.vendor.chio`, with a deprecation alias for one minor version and a `chio policy migrate` rewrite. The advanced HITL sub-block leaves the vendor slot entirely (absorbed by 0.1).
+### 5.1 Version-gated grammar
 
-**0.4 Extends-prefix unification.** Spec 0.2.0 names `builtin:<name>` the canonical builtin prefix. arc accepts `builtin:` and keeps `chio:`/`hushspec:` as parse-time aliases flagged by the analyzer (Phase 3.4). hush SDKs keep accepting bare names.
+Today one v0 schema accepts any `0.x.y` string and one union model parses everything, so a document declaring `hushspec: "0.1.0"` would silently accept 0.2-only fields. 0.2 fixes this: structural validation dispatches on the declared version **before** model conversion; the exact 0.1 grammar is frozen as its own schema; 0.2-only constructs in a document declaring 0.1 are rejected. "An engine supports 0.1 and 0.2" is distinct from "a 0.1 document is reinterpreted as 0.2." Strict conformance mode and migration mode are separate, explicitly selected modes.
 
-**0.5 Conformance coupling.** arc CI gains a job that runs the hush conformance vectors (the `hushspec-evaluator-test.v0.schema.json` format) against `chio-policy`'s reference evaluator, and arc publishes `spec/HUSHSPEC_PROFILE.md`: conformance level (3), supported spec versions, implemented companion extensions, vendor blocks, and every intentional delta. Vectors are vendored with a sync-check script (same pattern as the supply-chain baselines) rather than a live git dependency.
+### 5.2 Module-support contract (required-module negotiation)
 
-**0.6 Adopt signing and enforcement disposition in arc.** The arc policy loader verifies hush `PolicySignature` (Ed25519) sidecar files when present, and the control plane gains a `require_signed_policies` toggle (fail-closed when set). arc's `DecisionReceipt` adds the receipt schema's `enforcement` field (`evaluated` vs `enforce` vs `monitor`), which Phase 3.4's dry-run mode requires. Monitor mode follows hush section 6.2 exactly: operator config, never a document property, panic always enforces.
+Companion "parsers MAY ignore contents" semantics let a document carrying a security restriction load on an engine that silently ignores it. 0.2 replaces this with an in-document contract:
 
-**Versioning consequence:** both repos move `HUSHSPEC_SUPPORTED_VERSIONS` to `["0.1.0", "0.2.0"]`. 0.1.0 documents remain valid 0.2.0 documents (additions are optional fields and new blocks; v0 minor rules permit this).
+- A top-level `requires` list declares every companion, extension module, and vendor block the document uses: `{module, version, enforcement: required | optional}`.
+- An enforcement engine MUST reject a document whose `requires` names a `required` module it does not enforce at that version.
+- `optional` modules an engine does not enforce load with the block inert, and the receipt records the inert module list.
+- A companion or vendor block present in the body but absent from `requires` is a validation error.
+- Parse-only tooling (formatters, `h2h` inspect, signers) preserves unsupported content losslessly and never claims enforcement.
 
-### Phase 1: Integrity (arc)
+Vendor namespace: `extensions.vendor.<name>` with a registration file in hush (name, owner, schema URL, version), opaque-mapping round-trip guaranteed, and whole-block `replace` merge semantics unless the vendor registers a structured schema. arc migrates `extensions.chio` to `extensions.vendor.chio` behind an explicit migration mode; aliases live only in that mode and removal is tied to two arc minor releases, a date, and observed legacy-load telemetry.
 
-Make the schema honest. Every item is small; together they close the wired-vs-staged gap.
+arc's `reputation` and `runtime_assurance` extension keys also move under `extensions.vendor.chio` for 0.2 (their current types embed Chio tier and verifier concepts; v1's plan to mirror them into companion specs is withdrawn). Extracting genuinely neutral vocabularies into companions is a candidate for 0.3, gated on the module contract, not a 0.2 commitment. This gives every arc-parsed key a conformant home under 0.2.
 
-- **1.1 Enforce n-of-m approval.** Implement threshold governed approval per the protocol-primitives design (the threshold verifier also unblocks `chio-quarantine`'s approval-requiring response plans). Policy surface: the new core `human_in_loop.approvers` block from 0.1. Compilation target: approval-token collection with n distinct approver identities before the constraint clears; timeout follows the existing `on_timeout` deny/defer semantics.
-- **1.2 Warn survives compilation.** Per hush section 6, `warn` means permitted pending confirmation, and engines that cannot confirm SHOULD deny. The compiled plane maps warn-producing constructs to the existing confirmation machinery (`RequireApprovalAbove`, approval queue) where a confirmation channel exists, and to deny where none does. `jailbreak.warn_threshold` either wires to an advisory signal with receipt evidence or becomes a validation error; silently dropping it is removed as an option.
-- **1.3 Governance metadata enforcement.** `expiry_date` in the past or `lifecycle_state` not in {approved, deployed} rejects at load behind a control-plane setting (`enforce_governance_metadata`, default on for HushSpec-format loads, with a documented override for development). Clock injected, not sampled ambiently.
-- **1.4 CryptoFloor wiring.** The HushSpec/control-plane load path translates the parsed floor into `set_capability_crypto_floor` at kernel construction instead of relying on operators to mirror it by hand.
-- **1.5 Relaxation visibility.** Document the non-deny-absorptive merge property in hush section 4 prose, and emit a validation warning when a child clears or narrows a parent block that carried deny semantics. Full refinement checking stays in FV-C4 (Phase 3.4); this is the cheap tripwire.
-- **1.6 Money-path fail-closed minimums.** F72 (currency-mismatch cap bypass in `BudgetTree`) is an unconditional fail-closed fix: mismatch denies. F68's minimum (settlement observer outcome logged and dead-lettered instead of discarded) proceeds under RFC-0013 coordination; full retry machinery stays in that RFC.
-- **1.7 Doc drift.** Fix the stale "12 guard types" compiler header and test name (17 real). Remove the false retry/dead-letter claim in `chio-settle/src/hook.rs`. Add the risk-register TOCTOU caveats to `PARTNER_PROOF.md`. Resolve the stale-leader-fencing contradiction between `QUALIFICATION.md` and `CHIO_BOUNDED_OPERATIONAL_PROFILE.md` in whichever direction the evidence supports.
+Extends addressing: 0.2 canonicalizes `builtin:<name>`; `chio:`, `hushspec:`, and `chio://preset/...` parse only in migration mode and rewrite via `chio policy migrate`.
 
-### Phase 2: Consolidation (arc)
+### 5.3 Velocity and multiparty approval: incubating companions, not core
 
-One authoring plane.
+Both are stateful. arc's velocity guard is process-local and keyed by capability/grant, with no currency field on the rule (`crates/guards/chio-policy/src/models/rules.rs:311`); hush's evaluator input carries no clock, usage state, cost, or approval artifacts, and its fixture format supports only independent actions. Neither repo can define or test portable semantics today, and n-of-m approval is a stateful cryptographic protocol (wire, storage, signer identity), not a rule block.
 
-- **2.1 Retire the Chio-YAML policy fork.** Expose the Chio-YAML-only guard knobs through HushSpec: portable ones (sql_query, vector_db result caps, warehouse cost ceilings, query-result limits) proposed upstream as a `data_access` core block or data companion spec in hush 0.3; Chio-specific ones (cloud_guardrails providers, external threat-intel providers, wasm_guard entries) under `extensions.vendor.chio.guards`. Ship `chio policy migrate` (Chio-YAML in, HushSpec out), loader deprecation warnings for the legacy format, and a removal target two arc minor releases out.
-- **2.2 Policy-authored issuance ceilings.** HushSpec becomes the source for default token constraints at issuance: monetary caps (`max_total_cost`, `max_cost_per_invocation`), invocation ceilings, and delegation depth flow from policy blocks to the Capability Authority the same way reputation tiers already do (`chio-control-plane/src/issuance/scope.rs`). Kernel-side enforcement is unchanged; what changes is where operators author the numbers.
-- **2.3 Host-side unification on the hush SDKs.** The Python `CodeAgentPolicy` replaces its bespoke parser and hardcoded constants with the published `hushspec` PyPI package evaluating the same `code_agent.yaml` (which already ships byte-identical in arc and the plugin). Hardcoded writable-roots/git-deny/approval constants move into that document. `@chio/bridge` hosts gate client-side with `@hushspec/core`. Kernel remains authoritative where connected; the host gate becomes a conformant HushSpec evaluator instead of a lookalike.
-- **2.4 Federation boundary documented.** A short doc states why federation admission stays a separate signed record system (different trust domain, different lifecycle, different signers) so the fragmentation reads as a decision instead of an accident.
+0.2 therefore ships `hushspec-velocity.md` and `hushspec-approval.md` as **incubating companion specs** that must define the full state contract before any core promotion: clock authority, state key (subject identity), persistence and restart behavior, consistency model, cost and currency semantics, whether the current action counts against the window, approver identity and signature verification, replay protection, timeout precedence, and missing-state fail-closed behavior. Single-gate confirmation stays core (it already is, via `tool_access.require_confirmation` and warn). arc remains the reference implementation through the protocol-primitives threshold-approval workstream, which is its own cross-cutting project (wire format, storage, verification), not a Phase 1 compiler task.
 
-### Phase 3: New expressiveness (spec-first in hush, enforcement in arc)
+### 5.4 Reference-evaluator corrections in hush
 
-- **3.1 Obligations.** New companion spec `hushspec-obligations.md`: an `on_allow` duties model (redact, notify, log-extra, watermark, annotate-receipt) attached to rule blocks, with the invariant that an undischargeable obligation converts allow to deny (fail-closed). The receipt schema gains an `obligations[]` array with per-obligation discharge status, making Chio the engine where obligations are provable after the fact, which no incumbent engine offers. arc implementation generalizes the existing `PostInvocationPipeline`/SanitizerHook into an obligation executor.
-- **3.2 Delegation constraints.** Policy surface for what the kernel already enforces from tokens plus the protocol-primitives aggregate budgets: `delegation { max_depth, require_attenuation, allowed_delegates (workload-identity matches), family_budgets }`. Placement: core rule block in hush 0.3 (the concepts are portable; SPIFFE-shaped identity matching already exists in both schemas).
-- **3.3 Memory governance.** New core rule block `memory_access` (hush 0.3): store allowlists, write constraints, provenance labels on entries, retention TTL, and read receipts. Closes the risk register's HIGH "agent memory stores ungoverned" item (`docs/release/RISK_REGISTER.md`). arc already carries a `MemoryStoreAllowlist` token constraint to build on; add a MemoryGuard for the rest.
-- **3.4 Policy tooling as product surface.** `chio policy analyze` per FV-C4 (shadowing, unreachable rules, contradictions, policy-diff refinement with witnesses; bounded analyzer, no SMT), now with two additions from this program: extends-alias and relaxation warnings (1.5, 0.4). Dry-run/shadow mode uses the 0.6 enforcement disposition so operators can stage a policy in monitor and diff receipts before enforcing. Decision replay reuses the hush evaluator-test vector format so a receipt log replays as a conformance run. A thin `h2h lint` in hush mirrors the analyzer's document-level checks later; the full analyzer stays arc-side.
-- **3.5 Payment mandates (deferred, named).** When RFC-0013 lands, a `hushspec-mandates.md` companion (which mandates an agent may sign, per-transaction and cumulative caps, allowed rails/counterparties) pairs with AP2/x402-era agent commerce. Listed so the roadmap shows the intent without widening claims now.
+- Unknown action types MUST deny (fail-closed), replacing today's Allow arm.
+- `browser_automation` and `code_execution` get routed evaluation semantics in all four SDKs, prose sections, and fixture-enum entries, or they are removed from the schemas until they do. No "implemented" claim while parse-only.
+- Prose sections for the two blocks close the existing prose-vs-schema gap only together with the above.
 
-## 5. Placement litmus
+## 6. Trust and provenance
 
-A capability lands in hush core when it is runtime-agnostic and most agents need it (velocity, human_in_loop, memory_access, delegation). It lands as a hush companion spec when portable but optional (obligations, reputation, runtime assurance, future mandates). It lands under `extensions.vendor.chio` when it encodes Chio deployment specifics (market hours, k8s namespaces, rollback, provider-specific guard config). When in doubt, vendor first; promotion to companion or core is a compatible move, demotion is not.
+### 6.1 Signed effective policy, not signed leaf
 
-## 6. Testing
+Signing the leaf file while resolving unsigned parents and assets means the effective semantics can change without invalidating the signature. 0.2 defines:
 
-- hush: every 0.2.0 addition ships with schema updates, four-SDK parity tests (the repo's existing cross-SDK parity audit discipline), fixtures, and new conformance vectors covering velocity, human_in_loop (including n-of-m), and vendor-namespace acceptance/rejection.
-- arc: the CI conformance job (0.5) is the drift tripwire from day one. Phase 1 items each carry the test shape of the feature they complete (n-of-m approval-token collection, warn-to-confirmation mapping, expired-metadata rejection, crypto-floor construction wiring, currency-mismatch deny). Phase 2.3 is verified by running the hush Python SDK's own test suite against `code_agent.yaml` plus golden-decision parity tests between the old Python gate and the new evaluator on a recorded corpus of tool calls.
-- Property tests: extend `property_evaluate.rs` invariants to the new blocks (deny precedence, determinism, merge identity).
+- A trusted-key registry with signer roles (issuer, operator, host), `key_id` lookup, revocation, rotation, and freshness windows. A present-but-invalid signature always rejects (never falls back to unsigned handling).
+- Resolution returns a **provenance manifest** (every ancestor and security-relevant asset with digests), not only a merged document.
+- Verification covers either every input in the manifest or a signed canonical resolved-bundle manifest; operator chooses per trust domain, both are conformance-tested.
+- Receipts bind the effective-policy digest and the provenance manifest digest.
+- Negative vectors: tampered parent, unsigned parent, wrong key, revoked key, stale signature, changed asset.
 
-## 7. Risks
+### 6.2 Receipt contract
 
-- **Two-repo coordination.** Spec 0.2.0 (hush) must merge before arc's 0.2.0 support; the conformance job pins vendored vectors so arc never floats against an unreleased spec. Mitigation: land 0.1-compatible arc work (1.3-1.7, 2.1 vendor-side, 2.4) independent of the spec release.
-- **Migration churn.** `extensions.chio` to `extensions.vendor.chio` and `chio:` to `builtin:` break existing documents. Mitigation: parse-time aliases for one minor version, `chio policy migrate`, analyzer warnings, changelog callouts.
-- **Host swap regression risk (2.3).** The Python gate is the authoritative gate today. Mitigation: golden-decision parity corpus before cutover, monitor-mode soak using 0.6, keep the old path behind a flag for one release.
-- **Scope creep in 0.2.0.** The spec release is intentionally limited to prose-gap closure, two upstreamed blocks, two companion specs, vendor namespace, and prefix canonicalization. `data_access`, `delegation`, `memory_access` wait for 0.3.
-- **Claim discipline.** Nothing in this program is announced as covered until the conformance vectors pass and the profile doc lists it as wired. The profile doc is the single place that says what is real.
+arc adopts the hush receipt schema v0 as published or declares an explicit arc profile projection of it. The schema's real shape (v1 misdescribed it): per-rule trace entries `{rule_block, outcome, evaluated}` plus an enforcement object `{mode: enforce | monitor, outcome: allowed | confirmed | blocked | would_block}`. arc's current `DecisionReceipt` lacks both the rule trace and the enforcement object and gains them. Monitor mode follows hush core section 6.2 (operator config, never a document property; panic always enforces).
 
-## 8. Deliverables checklist
+Replay is impossible from receipts alone (no action content, arguments, origin/posture input, state, or policy body). Tooling that replays defines a **replay bundle**: hash-addressed policy and input store keyed by the receipt's digests.
 
-Phase 0: hush spec 0.2.0 (prose, schemas, SDKs, vectors); arc `HUSHSPEC_PROFILE.md`; arc conformance CI job; signing verification + `enforcement` receipt field in arc; vendor-namespace migration with aliases.
-Phase 1: n-of-m enforcement; warn compilation semantics; metadata enforcement; crypto-floor wiring; relaxation warning; F72 fix and F68 minimum; drift fixes.
-Phase 2: Chio-YAML migration tool + deprecation; policy-authored issuance ceilings; host SDK unification; federation boundary doc.
-Phase 3: obligations companion + executor; delegation block; memory_access block + guard; `chio policy analyze` + dry-run + replay.
+## 7. Conformance
+
+- **Corpus vendoring.** arc vendors the complete hush corpus - valid, invalid, merge, resolution, and evaluator fixtures - with a pinned corpus hash checked in CI (sync script, same pattern as supply-chain baselines).
+- **Stateful sequence fixtures.** A new fixture family with injected clock, identities, costs, approval artifacts, initial state, expected end state, and expected receipt, for the incubating velocity/approval companions and posture transitions.
+- **arc end-to-end profile tests.** Beyond the reference evaluator: parse, resolve, validate, compile, control-plane materialization, kernel enforcement, receipt emission, asserted against expected decisions and expected receipts. This is the layer where v1's warn-loss finding lives, and reference-evaluator-only conformance cannot see it.
+- **Compilation honesty.** `compile_policy` rejects constructs it cannot faithfully represent instead of silently narrowing or widening; every such rejection is a named error with a vector.
+- arc publishes `spec/HUSHSPEC_PROFILE.md`: conformance level per hush's cumulative L0-L3 definition, supported spec versions, enforced modules with versions, vendor blocks, and every intentional delta. The profile doc is the only place that says what is real.
+
+## 8. arc-side corrections (former Phase 1, re-scoped)
+
+- **Warn semantics.** Compiled plane maps warn-producing constructs to the confirmation machinery where a channel exists and to deny where none does (hush core section 6: engines that cannot confirm SHOULD deny). `jailbreak.warn_threshold` wires to an advisory signal with receipt evidence or becomes a validation error.
+- **Governance metadata.** hush semantics stay advisory (per its spec and `governance.rs`). arc adds a **deployment-admission profile** outside evaluator conformance: control-plane load rejects expired `expiry_date` or non-{approved, deployed} `lifecycle_state` when `enforce_governance_metadata` is on. Semantics specified: absent metadata admits, `effective_date` in the future rejects, boundaries inclusive, timestamps UTC, clock injected.
+- **Crypto floor.** There is no policy field today; define one first: `extensions.vendor.chio.security.crypto_floor` (versioned vendor block). Precedence: effective floor = the stricter of operator-configured minimum and policy-declared minimum; a document can never lower the operator floor. Loader wires the result to `set_capability_crypto_floor`.
+- **Relaxation semantics.** "Narrowing" is rule-specific: shrinking a blocklist relaxes, shrinking an allowlist tightens. Define the relaxation order per rule kind; a child relaxing a parent in production mode requires explicit signed authorization (an `allow_relaxation` grant naming the block), not a log line.
+- **Money-path minimums.** F72 (currency-mismatch cap bypass in `chio-metering`) fixes unconditionally: mismatch denies. F68's minimum (log plus dead-letter instead of discarding the settlement observer result) proceeds inside RFC-0013's plan, on which it depends.
+- **Drift fixes.** Stale "12 guard types" header and test name; false retry/dead-letter comment in `chio-settle/src/hook.rs`; `PARTNER_PROOF.md` TOCTOU caveats; the `QUALIFICATION.md` vs `CHIO_BOUNDED_OPERATIONAL_PROFILE.md` stale-leader-fencing contradiction resolved in whichever direction the evidence supports.
+
+## 9. Consolidation as compiler family (former Phase 2, dependencies made explicit)
+
+- **9.1 Chio-YAML retirement.** `chio policy migrate` (legacy in, HushSpec out; unsupported legacy fields are migration **errors**, not warnings), loader deprecation warnings, removal after two arc minor releases with telemetry. Vendor-side knobs (cloud_guardrails, external threat intel, wasm_guard entries) land under `extensions.vendor.chio.guards` and depend only on 5.2. Portable data knobs (sql_query, vector/warehouse/query caps) are proposed as a `data_access` block in hush 0.3 and that slice of migration waits for it.
+- **9.2 Policy-authored issuance ceilings.** Issuer documents author default token constraints (monetary caps, invocation ceilings) the way reputation tiers already flow (`chio-control-plane/src/issuance/scope.rs`). Delegation-depth authoring moves out of this item; it belongs to the delegation module (10.2) and is blocked on it.
+- **9.3 Host-gate unification.** Blocked on: (a) 9.1 migration of `code_agent.yaml` (currently legacy Chio-YAML with `kernel:`/`guards:` sections - the "byte-identical" pair is the arc Python default and the chio-cli preset; the plugin template is a separate HushSpec document), (b) a **normative host action adapter** specifying path canonicalization (resolve, cwd containment, original/resolved/relative forms), command classification, and TOCTOU posture, because hush middleware today passes raw paths into glob evaluation and would regress the Python gate's traversal/symlink protections, and (c) issuance-schema work from 9.2. The adapter ships with adversarial path tests: `..` traversal, absolute paths, symlinks, non-existing write targets, cwd changes, and TOCTOU behavior. Cutover process: dual-run old and new gates with reviewed expected deltas (not blind golden parity), monitor-mode soak, one-release rollback flag.
+- **9.4 Federation boundary doc.** Unchanged from v1.
+
+## 10. New expressiveness (former Phase 3)
+
+- **10.1 Obligations, split by enforcement point.** Three classes with distinct failure semantics: (a) **pre-dispatch prerequisites**, whose failure prevents invocation; (b) **output transformations** (redact, watermark), whose failure suppresses output and records that invocation occurred; (c) **post-effect duties** (notify, escalate), which require durable retry, idempotency keys, deadlines, evidence, and possibly compensation, because a tool side effect may already be committed (`crates/kernel/chio-kernel/src/post_invocation.rs`, `kernel/responses/finalization.rs`). The v1 claim "undischargeable obligation converts allow to deny" applies only to class (a), or to tools that opt into a prepare/commit protocol. A receipt's "discharged" entry is evidence, not proof, unless it binds an attested executor and an evidence digest; the companion spec says exactly that.
+- **10.2 Delegation module.** `delegation { max_depth, require_attenuation, allowed_delegates, family_budgets }` as a hush 0.3 module. Workload-identity matching exists in arc only today (not in hush schemas or evaluators); the module spec ports the match grammar, and hush SDKs implement it before the module leaves incubation.
+- **10.3 Memory governance.** `memory_access` module (hush 0.3): store allowlists, write constraints, provenance labels, retention TTL, read receipts. Builds on arc's existing `MemoryStoreAllowlist` token constraint; closes the risk register's HIGH ungoverned-memory item.
+- **10.4 Tooling.** `chio policy analyze` per FV-C4 plus relaxation-order and extends-alias lint; dry-run via monitor mode and receipt `enforcement`; decision replay via the 6.2 replay bundle. A thin `h2h lint` mirrors document-level checks later; the full analyzer stays arc-side.
+- **10.5 Payment mandates.** Deferred behind RFC-0013; named so the roadmap shows intent without widening claims.
+
+## 11. Dependency graph and scope
+
+```mermaid
+flowchart TD
+    A["5.1 version-gated grammar (hush)"] --> B["5.2 module contract + vendor ns (hush)"]
+    B --> C["9.1 Chio-YAML migration, vendor slice (arc)"]
+    A --> D["5.4 evaluator fail-closed + routing (hush, 4 SDKs)"]
+    B --> E["5.3 velocity/approval incubating companions (hush)"]
+    P["protocol-primitives threshold approval (arc: wire+storage+crypto)"] --> E
+    F["6.1 signed provenance (hush spec + arc loader)"] --> G["6.2 receipt contract (arc)"]
+    D --> H["7 conformance corpus + stateful fixtures + arc e2e (both)"]
+    F --> H
+    H --> I["9.3 host-gate unification (arc + plugin + bridge)"]
+    C --> I
+    J["9.2 issuance ceilings (arc)"] --> I
+    K["hush 0.3: data_access, delegation, memory_access"] --> L["9.1 data slice; 10.2; 10.3"]
+    M["RFC-0013 (arc)"] --> N["8 F68 minimum; 10.5 mandates"]
+    H --> O["10.4 analyze + dry-run + replay (arc, h2h)"]
+```
+
+arc-only items with no hush dependency (start anytime): warn semantics, governance admission profile, crypto-floor vendor block definition, relaxation order, F72, drift fixes, 9.4.
+
+## 12. Exit gates (measurable)
+
+- **Spec 0.2 release**: all four SDKs pass the 0.2 corpus; unknown-action deny vectors green in all four; package install smoke tests (crates.io, npm, PyPI, Go module) pass.
+- **Conformance coupling**: arc CI pins the corpus hash; arc end-to-end profile run shows **zero unexplained differential decisions** against the reference evaluator on the full corpus; every explained delta is listed in `HUSHSPEC_PROFILE.md`.
+- **Migration**: `chio policy migrate` round-trips the arc fixture corpus losslessly (re-emit and re-parse equal), and rejects unsupported legacy fields with named errors.
+- **Host cutover (9.3)**: dual-run delta report reviewed and signed off; 14-day monitor-mode soak with zero unexplained `would_block` events; rollback rehearsed and documented before enforce.
+- **Signing**: all six negative vectors (tampered/unsigned parent, wrong/revoked key, stale signature, changed asset) reject in arc and `h2h`.
+- **Claim discipline**: nothing is announced as covered until its vectors pass and the profile doc lists it as wired.
+
+## 13. Risks
+
+- **Cross-repo sequencing.** hush 0.2 must land before arc's 0.2 support; the pinned corpus keeps arc from floating against an unreleased spec. arc-only items (section 8) de-risk the critical path.
+- **Version-gating rework.** Freezing the 0.1 grammar retroactively may reclassify existing in-the-wild documents; migration mode plus `h2h lint` gives a detection and rewrite path.
+- **Host cutover regression.** Mitigated by the adapter spec, dual-run with reviewed deltas, soak, and rollback gate (section 12).
+- **Companion incubation stalls.** Velocity/approval could sit incubating indefinitely; each has a named owner workstream (velocity: guard-state contract; approval: protocol-primitives) and promotion criteria written into the companion spec itself.
+- **Scope discipline.** 0.2 is limited to sections 5-7. `data_access`, delegation, and memory wait for 0.3 regardless of pressure.
