@@ -370,7 +370,7 @@ mod support {
             journal_rows_seen_at_invoke: Arc::clone(&journal_rows_seen_at_invoke),
             reported_cost_units,
         }));
-        kernel.set_payment_adapter(Box::new(SharedRail(Arc::clone(&rail))));
+        kernel.set_payment_adapter(Box::new(SharedRail(Arc::clone(&rail))))?;
         kernel.set_budget_store_handle(Arc::clone(&budget_store) as Arc<dyn chio_kernel::BudgetStore>);
         kernel.set_receipt_store_handle(
             Arc::clone(&receipt_store) as Arc<dyn chio_kernel::ReceiptStore>
@@ -465,6 +465,76 @@ fn priced_call_walks_journal_to_closed() -> Result<(), Box<dyn std::error::Error
     );
 
     harness.cleanup();
+    Ok(())
+}
+
+#[test]
+fn adapter_installed_after_store_attach_still_reconciles_the_journal(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_core::crypto::Keypair;
+    use chio_kernel::payment::PaymentJournalRecord;
+    use chio_kernel::ChioKernel;
+    use chio_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore};
+    use std::sync::Arc;
+
+    let receipt_db_path = support::unique_db_path("chio-late-adapter-receipts");
+    let budget_db_path = support::unique_db_path("chio-late-adapter-budget");
+    let receipt_store = Arc::new(SqliteReceiptStore::open(&receipt_db_path)?);
+    let budget_store = Arc::new(SqliteBudgetStore::open(&budget_db_path)?);
+
+    // A prior run's crash left an Authorized prepaid orphan.
+    budget_store.record_payment_journal(&PaymentJournalRecord {
+        request_id: "req-late".to_string(),
+        capability_id: "cap".to_string(),
+        grant_index: 0,
+        hold_id: Some("hold-req-late".to_string()),
+        rail: "x402".to_string(),
+        authorization_id: Some("auth-req-late".to_string()),
+        transaction_id: None,
+        amount_units: 100,
+        settle_action: None,
+        settle_amount_units: None,
+        currency: "USD".to_string(),
+        state: PaymentJournalState::Authorized,
+        created_at_unix_ms: 1,
+        tenant_id: None,
+    })?;
+
+    // Store-then-adapter ordering: the attach-time money pass is inert
+    // without a rail adapter (the journal is not active), so the orphan
+    // survives the attach untouched.
+    let mut kernel = ChioKernel::new(support::money_config(Keypair::generate()));
+    kernel.set_budget_store_handle(Arc::clone(&budget_store) as Arc<dyn chio_kernel::BudgetStore>);
+    kernel.set_receipt_store_handle(
+        Arc::clone(&receipt_store) as Arc<dyn chio_kernel::ReceiptStore>
+    )?;
+    assert_eq!(
+        budget_store
+            .list_incomplete_payment_journal(u64::MAX)?
+            .len(),
+        1,
+        "the attach-time pass cannot resolve money rows without a rail adapter"
+    );
+
+    // Installing the adapter makes the orphan resolvable, so the same
+    // reconciliation pass the attach runs must run here.
+    let receipts_before = receipt_store.max_tool_receipt_seq()?;
+    kernel.set_payment_adapter(Box::new(support::CountingRail::new()))?;
+    let receipts_after = receipt_store.max_tool_receipt_seq()?;
+    assert!(
+        budget_store
+            .list_incomplete_payment_journal(u64::MAX)?
+            .is_empty(),
+        "adapter install must reconcile the surviving journal rows"
+    );
+    assert_eq!(
+        receipts_after - receipts_before,
+        1,
+        "the prepaid orphan reconciles with a receipt at adapter install"
+    );
+
+    let _ = std::fs::remove_file(&receipt_db_path);
+    let _ = std::fs::remove_file(&budget_db_path);
     Ok(())
 }
 

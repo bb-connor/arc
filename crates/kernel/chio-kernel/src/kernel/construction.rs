@@ -907,8 +907,39 @@ impl ChioKernel {
         Ok(())
     }
 
-    pub fn set_payment_adapter(&mut self, payment_adapter: Box<dyn PaymentAdapter>) {
+    /// Install the payment rail adapter. Fail-closed recovery mirror of the
+    /// store attach: when a receipt store is already attached, the attach-
+    /// time money pass ran while the journal was inert (no adapter), so any
+    /// incomplete payment-journal rows from a prior run are still open.
+    /// Installing the adapter makes them resolvable, so the same
+    /// reconciliation pass runs here; a pass that cannot complete uninstalls
+    /// the adapter and refuses, exactly as a failed attach refuses the
+    /// store, so the kernel never serves priced calls over an unreconciled
+    /// journal.
+    pub fn set_payment_adapter(
+        &mut self,
+        payment_adapter: Box<dyn PaymentAdapter>,
+    ) -> Result<(), KernelError> {
         self.payment_adapter = Some(payment_adapter);
+        if self.receipt_store.is_some() && self.payment_journal_active() {
+            match self.reconcile_payment_journal(0) {
+                Ok(report) => {
+                    if report.resolved > 0 || report.reconcile_failed > 0 {
+                        tracing::warn!(
+                            resolved = report.resolved,
+                            reconcile_failed = report.reconcile_failed,
+                            "payment journal rows survived a restart; reconciled at adapter \
+                             install"
+                        );
+                    }
+                }
+                Err(error) => {
+                    self.payment_adapter = None;
+                    return Err(error);
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn set_price_oracle(&mut self, price_oracle: Box<dyn PriceOracle>) {

@@ -403,7 +403,7 @@ mod support {
             fail_after_effect,
         }));
         if monetary {
-            kernel.set_payment_adapter(Box::new(RecordingRail));
+            kernel.set_payment_adapter(Box::new(RecordingRail))?;
             // With the journal enabled and a payment adapter installed, the
             // money path requires a journal-capable budget store; the
             // default in-memory store fails closed.
