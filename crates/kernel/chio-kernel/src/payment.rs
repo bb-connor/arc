@@ -448,10 +448,21 @@ impl PaymentAdapter for X402PaymentAdapter {
         authorization_id: Option<&str>,
     ) -> Result<RailSettlementState, PaymentError> {
         // Prepaid rail: funds move at authorize and capture is a local
-        // no-op, so the state query is a pure read reporting Settled for
-        // the known reference. Reconciliation must never release a hold
-        // here; the funds already moved.
-        let authorization_id = authorization_id.unwrap_or(reference).to_string();
+        // no-op, so a durable authorization id is proof authorize returned
+        // and the truthful answer is Settled - reconciliation must never
+        // release a hold discovered through it. With only the reference
+        // (the HoldPlaced crash window) authorize may never have reached
+        // the rail, and this thin bridge has no reference-keyed rail
+        // query: answering Settled would fabricate a reconciliation
+        // receipt for money that may never have moved, so fail closed to
+        // an operator incident instead.
+        let Some(authorization_id) = authorization_id else {
+            return Err(PaymentError::Unavailable(format!(
+                "x402 adapter cannot confirm settlement for reference `{reference}` without \
+                 a durable authorization id"
+            )));
+        };
+        let authorization_id = authorization_id.to_string();
         Ok(RailSettlementState::Settled {
             authorization_id: authorization_id.clone(),
             result: PaymentResult {
@@ -561,10 +572,21 @@ impl PaymentAdapter for AcpPaymentAdapter {
         authorization_id: Option<&str>,
     ) -> Result<RailSettlementState, PaymentError> {
         // The shared-payment-token hold settles at authorize time and the
-        // local capture/release are no-ops, so the state query is a pure
-        // read reporting Settled for the known reference. Reconciliation
-        // must never release a hold here; the funds already moved.
-        let authorization_id = authorization_id.unwrap_or(reference).to_string();
+        // local capture/release are no-ops, so a durable authorization id
+        // is proof authorize returned and the truthful answer is Settled -
+        // reconciliation must never release a hold discovered through it.
+        // With only the reference (the HoldPlaced crash window) authorize
+        // may never have reached the rail, and this thin bridge has no
+        // reference-keyed rail query: answering Settled would fabricate a
+        // reconciliation receipt for money that may never have moved, so
+        // fail closed to an operator incident instead.
+        let Some(authorization_id) = authorization_id else {
+            return Err(PaymentError::Unavailable(format!(
+                "acp adapter cannot confirm settlement for reference `{reference}` without \
+                 a durable authorization id"
+            )));
+        };
+        let authorization_id = authorization_id.to_string();
         Ok(RailSettlementState::Settled {
             authorization_id: authorization_id.clone(),
             result: PaymentResult {
@@ -858,7 +880,8 @@ mod tests {
     #[test]
     fn prepaid_adapters_answer_settlement_state_without_moving_funds() {
         // The base URLs are never contacted: the prepaid state query is a
-        // pure read. Both adapters report Settled, never Held, because
+        // pure read. With a durable authorization id (proof authorize
+        // returned) both adapters report Settled, never Held, because
         // their funds move at authorize: reconciliation must never release
         // a hold discovered through this query.
         let x402 = X402PaymentAdapter::new("http://127.0.0.1:1");
@@ -879,17 +902,6 @@ mod tests {
             }
             other => panic!("expected Settled, got {other:?}"),
         }
-        // Answerable by the durable reference alone, for the crash window
-        // where no authorization id is durable yet.
-        match x402
-            .settlement_state("req-x", None)
-            .expect("keyed by reference")
-        {
-            RailSettlementState::Settled {
-                authorization_id, ..
-            } => assert_eq!(authorization_id, "req-x"),
-            other => panic!("expected Settled, got {other:?}"),
-        }
 
         let acp = AcpPaymentAdapter::new("http://127.0.0.1:1");
         assert_eq!(acp.rail_id(), "acp");
@@ -904,6 +916,32 @@ mod tests {
                 ));
             }
             other => panic!("expected Settled, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn prepaid_adapters_never_fabricate_settlement_for_a_bare_reference() {
+        // The HoldPlaced crash window queries by reference with no
+        // authorization id precisely because authorize may never have
+        // reached the rail. These thin bridges have no reference-keyed
+        // rail query, so the only truthful answer is an error that lands
+        // reconciliation in a ReconcileFailed incident - never a
+        // fabricated Settled that would emit a reconciliation receipt for
+        // money that may never have moved.
+        let x402 = X402PaymentAdapter::new("http://127.0.0.1:1");
+        match x402.settlement_state("req-x", None) {
+            Err(PaymentError::Unavailable(detail)) => {
+                assert!(detail.contains("req-x"));
+            }
+            other => panic!("expected Unavailable, got {other:?}"),
+        }
+
+        let acp = AcpPaymentAdapter::new("http://127.0.0.1:1");
+        match acp.settlement_state("req-a", None) {
+            Err(PaymentError::Unavailable(detail)) => {
+                assert!(detail.contains("req-a"));
+            }
+            other => panic!("expected Unavailable, got {other:?}"),
         }
     }
 

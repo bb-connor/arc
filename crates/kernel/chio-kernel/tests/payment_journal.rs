@@ -34,9 +34,12 @@ mod support {
 
     /// Payment rail that settles locally and counts every capture/release so
     /// tests can prove money moved at most once. `settlement_state` answers
-    /// like the in-tree prepaid rails (funds move at authorize) unless a
-    /// test scripts a different answer for a specific reference, so crash-
-    /// window scenarios other than "already settled" stay reachable.
+    /// like the in-tree prepaid rails unless a test scripts a different
+    /// answer for a specific reference: with a durable authorization id
+    /// (proof authorize returned) funds already moved at authorize, so the
+    /// answer is Settled; with only the reference the rail cannot confirm
+    /// anything and fails closed, so crash-window scenarios other than
+    /// "already settled" stay reachable.
     pub struct CountingRail {
         pub captures: AtomicUsize,
         pub releases: AtomicUsize,
@@ -171,9 +174,15 @@ mod support {
                     .clone()
                     .map_err(chio_kernel::PaymentError::Unavailable);
             }
-            let authorization_id = authorization_id
-                .map(str::to_string)
-                .unwrap_or_else(|| format!("auth-{reference}"));
+            // Mirror the in-tree prepaid adapters: a durable authorization
+            // id proves authorize returned (funds moved), a bare reference
+            // proves nothing and fails closed.
+            let Some(authorization_id) = authorization_id.map(str::to_string) else {
+                return Err(chio_kernel::PaymentError::Unavailable(format!(
+                    "prepaid test rail cannot confirm settlement for reference `{reference}` \
+                     without a durable authorization id"
+                )));
+            };
             Ok(chio_kernel::RailSettlementState::Settled {
                 authorization_id: authorization_id.clone(),
                 result: chio_kernel::PaymentResult {
@@ -609,7 +618,7 @@ fn failed_settle_leaves_the_journal_open_for_boot_reconciliation(
 #[test]
 fn boot_reconcile_resolves_every_incomplete_row() -> Result<(), Box<dyn std::error::Error>> {
     use chio_kernel::payment::{PaymentJournalRecord, PaymentSettleAction, PaymentSettleIntent};
-    use chio_kernel::RailSettlementState;
+    use chio_kernel::{PaymentResult, RailSettlementState, RailSettlementStatus};
 
     let harness = support::money_journal_harness("chio-boot-reconcile", 75)?;
     let store = &harness.budget_store;
@@ -633,9 +642,24 @@ fn boot_reconcile_resolves_every_incomplete_row() -> Result<(), Box<dyn std::err
     };
 
     // Crash before or during authorize: no authorization id is durable.
+    // This rail CAN answer a reference-keyed query (a capability the thin
+    // in-tree prepaid bridges lack) and truthfully reports the funds
+    // already moved, so reconciliation must record the charge, never
+    // release it.
     let mut hold_placed = base("req-hold", PaymentJournalState::HoldPlaced);
     hold_placed.authorization_id = None;
     store.record_payment_journal(&hold_placed)?;
+    harness.rail.script_settlement_state(
+        "req-hold",
+        RailSettlementState::Settled {
+            authorization_id: "auth-req-hold".to_string(),
+            result: PaymentResult {
+                transaction_id: "txn-req-hold".to_string(),
+                settlement_status: RailSettlementStatus::Settled,
+                metadata: serde_json::json!({}),
+            },
+        },
+    );
 
     // Crash after authorize, before any terminal action was committed. The
     // prepaid rail's settlement_state truthfully reports the funds already
@@ -889,6 +913,71 @@ fn hold_placed_reconcile_only_releases_a_proven_hold_never_a_settlement(
     let again = harness.kernel.reconcile_payment_journal(0)?;
     assert_eq!(again.resolved, 0);
     assert_eq!(again.reconcile_failed, 0);
+
+    harness.cleanup();
+    Ok(())
+}
+
+#[test]
+fn reference_only_query_on_an_unauthorized_reference_never_fabricates_a_receipt(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_kernel::payment::PaymentJournalRecord;
+
+    // The inverse of the Authorized-arm defect: a HoldPlaced crash where
+    // authorize may never have reached the rail. The prepaid rail has no
+    // reference-keyed query (the unscripted default mirrors the in-tree
+    // X402/ACP bridges), so reconciliation must raise an operator incident,
+    // never fabricate a Settled answer that emits a reconciliation receipt
+    // for money that may never have moved, and never release.
+    let harness = support::money_journal_harness("chio-bare-reference", 75)?;
+    let store = &harness.budget_store;
+
+    store.record_payment_journal(&PaymentJournalRecord {
+        request_id: "req-unauthorized".to_string(),
+        capability_id: "cap".to_string(),
+        grant_index: 0,
+        hold_id: Some("hold-req-unauthorized".to_string()),
+        rail: "x402".to_string(),
+        authorization_id: None,
+        transaction_id: None,
+        amount_units: 100,
+        settle_action: None,
+        settle_amount_units: None,
+        currency: "USD".to_string(),
+        state: PaymentJournalState::HoldPlaced,
+        created_at_unix_ms: 1,
+        tenant_id: None,
+    })?;
+
+    let receipts_before = harness.receipt_store.max_tool_receipt_seq()?;
+    let report = harness.kernel.reconcile_payment_journal(0)?;
+    let receipts_after = harness.receipt_store.max_tool_receipt_seq()?;
+
+    assert_eq!(report.resolved, 0);
+    assert_eq!(
+        report.reconcile_failed, 1,
+        "an unconfirmable reference is an operator incident: {report:?}"
+    );
+    assert_eq!(
+        receipts_after - receipts_before,
+        0,
+        "no reconciliation receipt may be fabricated for unconfirmed funds"
+    );
+    assert_eq!(
+        harness
+            .rail
+            .releases
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "never guess in either direction: no release without a proven hold"
+    );
+    assert_eq!(
+        harness
+            .rail
+            .captures
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
 
     harness.cleanup();
     Ok(())
