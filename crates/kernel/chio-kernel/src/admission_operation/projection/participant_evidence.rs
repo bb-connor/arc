@@ -1,4 +1,5 @@
 use chio_core::capability::scope::MonetaryAmount;
+pub use chio_credit::obligation::ObligationDispositionV1;
 
 use super::*;
 
@@ -168,15 +169,6 @@ attached_terminal_participant!(
     OutcomeEligibility,
     OutcomeEligibilityDigest
 );
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ObligationDispositionV1 {
-    PerCall,
-    Assigned,
-    Channelized,
-    ClearingReserved,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ObligationProjection {

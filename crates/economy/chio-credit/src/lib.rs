@@ -22,6 +22,7 @@ pub use chio_underwriting as underwriting;
 
 pub mod hook;
 pub mod local_account;
+pub mod obligation;
 pub mod risk_reports;
 pub mod store_binding;
 
