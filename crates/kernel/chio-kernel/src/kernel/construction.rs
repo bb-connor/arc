@@ -19,6 +19,13 @@ use super::*;
 pub enum KernelBuildError {
     #[error("invalid hot-path deadline config: {0}")]
     InvalidDeadlineConfig(String),
+    #[error(
+        "settlement observer requires a durable settlement retry store: call \
+         set_settlement_retry_store before set_settlement_observer, so every retryable or \
+         permanent settlement outcome lands a settle_attempts or settle_dead_letters row \
+         instead of a warn-only log"
+    )]
+    MissingSettlementRetryStore,
 }
 
 impl ChioKernel {
@@ -966,22 +973,30 @@ impl ChioKernel {
     /// receipt bytes; the hook MUST NOT mutate the receipt store and
     /// MUST NOT block the dispatch path on its own latency. Hook
     /// failures are surfaced through
-    /// [`Self::run_settlement_observer`]'s return value and are routed
-    /// through the retry/dead-letter machinery when a settlement retry
-    /// store is installed (see [`Self::set_settlement_retry_store`]);
-    /// without one they are logged loud and counted via
-    /// `chio_settlement_unresolved_total`.
+    /// [`Self::run_settlement_observer`]'s return value and routed through
+    /// the retry/dead-letter machinery.
+    ///
+    /// Fail-closed wiring: a durable settlement retry store MUST already
+    /// be installed (see [`Self::set_settlement_retry_store`]) so every
+    /// retryable or permanent outcome lands a durable `settle_attempts` or
+    /// `settle_dead_letters` row. An observer without one would degrade
+    /// those outcomes to a warn plus a counter, so the install is rejected
+    /// here, at wiring time, never discovered at first use.
     pub fn set_settlement_observer(
         &mut self,
         hook: std::sync::Arc<dyn chio_settle::SettlementHook>,
-    ) {
+    ) -> Result<(), KernelBuildError> {
+        if self.settlement_retry_store.is_none() {
+            return Err(KernelBuildError::MissingSettlementRetryStore);
+        }
         self.settlement_observer = Some(hook);
+        Ok(())
     }
 
     /// Install the durable settlement retry/dead-letter sink the observer
-    /// routing consumer writes to. Without one, unresolved settlement
-    /// outcomes still fail loud (a warning plus the
-    /// `chio_settlement_unresolved_total` counter), never silently dropped.
+    /// routing consumer writes to. Required before
+    /// [`Self::set_settlement_observer`]: an observer whose outcomes have
+    /// no durable sink is refused at wiring time.
     pub fn set_settlement_retry_store(
         &mut self,
         store: std::sync::Arc<dyn crate::settlement_retry::SettlementRetryStore>,

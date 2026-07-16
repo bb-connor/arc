@@ -109,9 +109,11 @@ fn monetary_kernel_with_retry_store() -> (
 ) {
     let mut kernel = make_kernel(make_monetary_config());
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
-    kernel.set_settlement_observer(std::sync::Arc::new(RetryableSettlementHook));
     let retry_store = std::sync::Arc::new(RecordingRetryStore::default());
     kernel.set_settlement_retry_store(retry_store.clone());
+    kernel
+        .set_settlement_observer(std::sync::Arc::new(RetryableSettlementHook))
+        .expect("observer install succeeds once the retry store is present");
 
     let agent_kp = Keypair::generate();
     let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
@@ -136,6 +138,34 @@ fn priced_request(request_id: &str, cap: &CapabilityToken, agent: &Keypair) -> T
         model_metadata: None,
         federated_origin_kernel_id: None,
     }
+}
+
+#[test]
+fn observer_install_without_a_retry_store_is_rejected() {
+    let mut kernel = make_kernel(make_monetary_config());
+
+    let error = kernel
+        .set_settlement_observer(std::sync::Arc::new(RetryableSettlementHook))
+        .expect_err("an observer without a durable retry store must be rejected at wiring time");
+    assert!(
+        matches!(error, KernelBuildError::MissingSettlementRetryStore),
+        "the rejection must name the missing retry store: {error}"
+    );
+    assert!(
+        error.to_string().contains("set_settlement_retry_store"),
+        "the error must tell the embedder which call is missing: {error}"
+    );
+    assert!(
+        kernel.settlement_observer().is_none(),
+        "a rejected install must leave no observer wired"
+    );
+
+    // The same install succeeds once the durable sink is present.
+    kernel.set_settlement_retry_store(std::sync::Arc::new(RecordingRetryStore::default()));
+    kernel
+        .set_settlement_observer(std::sync::Arc::new(RetryableSettlementHook))
+        .expect("observer install succeeds once the retry store is present");
+    assert!(kernel.settlement_observer().is_some());
 }
 
 #[test]
