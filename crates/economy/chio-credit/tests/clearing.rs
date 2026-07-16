@@ -1,14 +1,23 @@
 use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{sha256_hex, Keypair};
+use chio_core_types::economic_continuity::{
+    EconomicContentV1, EconomicResourceHeadV1, EconomicResourceKeyV1,
+    CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
+};
 use chio_credit::clearing::{
-    compute_netting_round, sign_netting_round, verify_netting_round, verify_signed_netting_round,
-    ClearingAuthorityTrustV1, ClearingInputManifestBodyV1, ClearingInputManifestEntryV1,
-    ClearingObligationInputV1, ClearingParticipantBindingV1,
+    compose_clearing_lifecycle_transition, compute_netting_round,
+    prepare_clearing_round_finalization, sign_clearing_round_finalization, sign_netting_round,
+    verify_clearing_participant_acceptances, verify_netting_round, verify_signed_netting_round,
+    AnchoredClearingObligationV1, ClearingAuthorityTrustV1, ClearingDisputeWindowResolver,
+    ClearingDisputeWindowStatusV1, ClearingInputManifestBodyV1, ClearingInputManifestEntryV1,
+    ClearingObligationInputV1, ClearingParticipantAcceptanceBodyV1, ClearingParticipantBindingV1,
     ClearingParticipantSnapshotAcknowledgementBodyV1, ClearingParticipantSnapshotBodyV1,
-    ClearingRoundRequestV1, SignedClearingInputManifestV1,
+    ClearingRoundLifecycleRecordV1, ClearingRoundRequestV1, ClearingRoundTransitionV1,
+    SignedClearingInputManifestV1, SignedClearingParticipantAcceptanceV1,
     SignedClearingParticipantSnapshotAcknowledgementV1, SignedClearingParticipantSnapshotV1,
     SignedNettingRoundCoreV1, CLEARING_ALGORITHM_V1, CLEARING_INPUT_MANIFEST_SCHEMA,
-    CLEARING_PARTICIPANT_SNAPSHOT_ACKNOWLEDGEMENT_SCHEMA, CLEARING_PARTICIPANT_SNAPSHOT_SCHEMA,
+    CLEARING_PARTICIPANT_ACCEPTANCE_SCHEMA, CLEARING_PARTICIPANT_SNAPSHOT_ACKNOWLEDGEMENT_SCHEMA,
+    CLEARING_PARTICIPANT_SNAPSHOT_SCHEMA,
 };
 use chio_credit::obligation::{
     ObligationAtomInputV1, ObligationAtomV1, ObligationCreditElectionV1,
@@ -184,6 +193,144 @@ fn trust(
     }
 }
 
+fn signed_acceptances(
+    output: &chio_credit::clearing::ClearingRoundOutputV1,
+) -> Result<Vec<SignedClearingParticipantAcceptanceV1>, Box<dyn std::error::Error>> {
+    let output_manifest_digest = output.output_manifest.digest()?;
+    output
+        .participant_statements
+        .iter()
+        .map(|statement| {
+            Ok(SignedClearingParticipantAcceptanceV1::sign(
+                ClearingParticipantAcceptanceBodyV1 {
+                    schema: CLEARING_PARTICIPANT_ACCEPTANCE_SCHEMA.to_owned(),
+                    round_id: output.core.round_id.clone(),
+                    round_core_digest: output.core.digest()?,
+                    output_manifest_digest: output_manifest_digest.clone(),
+                    participant_statement_digest: statement.digest()?,
+                    participant_id: statement.participant_id.clone(),
+                    key_epoch: 1,
+                    accepted_at_unix_ms: 510,
+                    expires_at_unix_ms: 600,
+                },
+                &participant_key(&statement.participant_id),
+            )?)
+        })
+        .collect()
+}
+
+struct DisputeWindow {
+    unresolved_dispute_count: u64,
+}
+
+impl ClearingDisputeWindowResolver for DisputeWindow {
+    fn resolve_closed_window(
+        &self,
+        round_id: &str,
+        round_core_digest: &str,
+        output_manifest_digest: &str,
+        dispute_window_ends_at_unix_ms: u64,
+    ) -> Result<ClearingDisputeWindowStatusV1, chio_credit::clearing::ClearingError> {
+        Ok(ClearingDisputeWindowStatusV1 {
+            round_id: round_id.to_owned(),
+            round_core_digest: round_core_digest.to_owned(),
+            output_manifest_digest: output_manifest_digest.to_owned(),
+            dispute_window_ends_at_unix_ms,
+            observed_through_unix_ms: dispute_window_ends_at_unix_ms,
+            unresolved_dispute_count: self.unresolved_dispute_count,
+            checkpoint_digest: digest("dispute-window-checkpoint"),
+        })
+    }
+}
+
+fn clearing_head(
+    record: &ClearingRoundLifecycleRecordV1,
+) -> Result<EconomicResourceHeadV1, Box<dyn std::error::Error>> {
+    let state = EconomicContentV1::Inline {
+        value: serde_json::to_value(record)?,
+    };
+    Ok(EconomicResourceHeadV1 {
+        schema: CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA.to_owned(),
+        anchor_id: "anchor-1".to_owned(),
+        namespace: "economy-prod".to_owned(),
+        resource_key: EconomicResourceKeyV1 {
+            resource_family: "clearing_round".to_owned(),
+            scope_id: record.governance_scope_id().to_owned(),
+            resource_id: record.round_id().to_owned(),
+        },
+        head_version: record.row_version(),
+        resource_version: record.row_version(),
+        lifecycle_fence: record.fence(),
+        lifecycle_state: record.state().as_str().to_owned(),
+        state_digest: state.digest()?,
+        state,
+        operation_id: None,
+        effect_idempotency_key: None,
+        frost: None,
+        terminal_result: None,
+        trusted_clock_high_water: 500,
+        predecessor_digest: None,
+    })
+}
+
+fn anchored_obligations(
+    obligations: &[ClearingObligationInputV1],
+    scope_id: &str,
+) -> Result<Vec<AnchoredClearingObligationV1>, Box<dyn std::error::Error>> {
+    obligations
+        .iter()
+        .map(|input| {
+            let state = EconomicContentV1::Inline {
+                value: serde_json::to_value(&input.disposition)?,
+            };
+            Ok(AnchoredClearingObligationV1 {
+                input: input.clone(),
+                head: EconomicResourceHeadV1 {
+                    schema: CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA.to_owned(),
+                    anchor_id: "anchor-1".to_owned(),
+                    namespace: "economy-prod".to_owned(),
+                    resource_key: EconomicResourceKeyV1 {
+                        resource_family: "obligation_disposition".to_owned(),
+                        scope_id: scope_id.to_owned(),
+                        resource_id: input.atom.obligation_id().to_owned(),
+                    },
+                    head_version: 1,
+                    resource_version: input.disposition.version(),
+                    lifecycle_fence: input.disposition.lifecycle_fence(),
+                    lifecycle_state: "clearing_reserved".to_owned(),
+                    state_digest: state.digest()?,
+                    state,
+                    operation_id: None,
+                    effect_idempotency_key: None,
+                    frost: None,
+                    terminal_result: None,
+                    trusted_clock_high_water: 500,
+                    predecessor_digest: None,
+                },
+            })
+        })
+        .collect()
+}
+
+fn advance_anchored_obligations(
+    inputs: &[ClearingObligationInputV1],
+    heads: &[EconomicResourceHeadV1],
+) -> Result<Vec<AnchoredClearingObligationV1>, Box<dyn std::error::Error>> {
+    inputs
+        .iter()
+        .map(|input| {
+            let head = heads
+                .iter()
+                .find(|head| head.resource_key.resource_id == input.atom.obligation_id())
+                .ok_or("missing obligation head")?;
+            Ok(AnchoredClearingObligationV1 {
+                input: input.clone(),
+                head: head.clone(),
+            })
+        })
+        .collect()
+}
+
 #[test]
 fn acyclic_chain_reduces_to_one_direct_intent() -> TestResult {
     let participant_authority = Keypair::from_seed(&[1; 32]);
@@ -272,6 +419,199 @@ fn acyclic_chain_reduces_to_one_direct_intent() -> TestResult {
         &trust(&participant_authority, &obligation_authority),
     )?;
     assert_eq!(output, shuffled_output);
+    Ok(())
+}
+
+#[test]
+fn participant_acceptances_bind_every_affected_statement_after_the_dispute_window() -> TestResult {
+    let participant_authority = Keypair::from_seed(&[21; 32]);
+    let obligation_authority = Keypair::from_seed(&[22; 32]);
+    let request = signed_request(
+        vec![
+            reserved_obligation(1, "A", "B", "USD", 100)?,
+            reserved_obligation(2, "B", "C", "USD", 100)?,
+        ],
+        &participant_authority,
+        &obligation_authority,
+    )?;
+    let mut finalization_trust = trust(&participant_authority, &obligation_authority);
+    let admission_trust = finalization_trust.clone();
+    let output = compute_netting_round(&request, &admission_trust)?;
+    let signed_output =
+        sign_netting_round(&request, &output, &admission_trust, &participant_authority)?;
+    let acceptances = signed_acceptances(&output)?;
+    let closed_dispute_window = DisputeWindow {
+        unresolved_dispute_count: 0,
+    };
+    finalization_trust.trusted_time_unix_ms = 550;
+
+    let verified = verify_clearing_participant_acceptances(
+        &request,
+        &signed_output,
+        &acceptances,
+        &closed_dispute_window,
+        &finalization_trust,
+    )?;
+    assert_eq!(verified.acceptance_count(), 3);
+    assert_eq!(verified.round_id(), "round-1");
+    assert_eq!(
+        verified.output_manifest_digest(),
+        output.output_manifest.digest()?
+    );
+    for acceptance in &acceptances {
+        validate_schema("clearing-participant-acceptance.v1.json", acceptance)?;
+    }
+    assert!(matches!(
+        verified.begin_finalization_transition(),
+        ClearingRoundTransitionV1::BeginFinalization {
+            acceptance_count: 3,
+            ..
+        }
+    ));
+
+    let reserved = ClearingRoundLifecycleRecordV1::reserved(&output.core)?;
+    let reserved_head = clearing_head(&reserved)?;
+    let anchored = anchored_obligations(&request.obligations, &output.core.governance_scope_id)?;
+    let proposed = compose_clearing_lifecycle_transition(
+        &reserved_head,
+        &anchored,
+        ClearingRoundTransitionV1::Propose {
+            output_manifest_digest: output.output_manifest.digest()?,
+            authority_digest: signed_output.output_manifest.digest()?,
+        },
+        501,
+    )?;
+    let proposed_heads = proposed
+        .transitions()
+        .iter()
+        .map(|transition| transition.next_head.clone())
+        .collect::<Vec<_>>();
+    let proposed_head = proposed_heads
+        .iter()
+        .find(|head| head.resource_key.resource_family == "clearing_round")
+        .ok_or("missing proposed round head")?;
+    let proposed_obligations = advance_anchored_obligations(&request.obligations, &proposed_heads)?;
+    let finalizing = compose_clearing_lifecycle_transition(
+        proposed_head,
+        &proposed_obligations,
+        verified.begin_finalization_transition(),
+        502,
+    )?;
+    let finalizing_head = finalizing
+        .transitions()
+        .iter()
+        .find(|transition| transition.resource_key.resource_family == "clearing_round")
+        .map(|transition| &transition.next_head)
+        .ok_or("missing finalizing round head")?;
+    let finalization_body =
+        prepare_clearing_round_finalization(finalizing_head, &verified, &finalization_trust)?;
+    let signed_finalization = sign_clearing_round_finalization(
+        finalization_body.clone(),
+        &finalization_trust,
+        &participant_authority,
+    )?;
+    validate_schema("clearing-round-finalization.v1.json", &signed_finalization)?;
+    let action = finalization_body.frost_action_preimage()?;
+    assert_eq!(action.resource_id(), "round-1");
+    assert_eq!(action.resource_version(), finalizing_head.resource_version);
+    assert_eq!(action.resource_fence(), finalizing_head.lifecycle_fence);
+
+    let mut alternate_acceptances = acceptances.clone();
+    alternate_acceptances[0] = SignedClearingParticipantAcceptanceV1::sign(
+        ClearingParticipantAcceptanceBodyV1 {
+            accepted_at_unix_ms: 511,
+            ..alternate_acceptances[0].body.clone()
+        },
+        &participant_key("A"),
+    )?;
+    let alternate_verified = verify_clearing_participant_acceptances(
+        &request,
+        &signed_output,
+        &alternate_acceptances,
+        &closed_dispute_window,
+        &finalization_trust,
+    )?;
+    assert!(prepare_clearing_round_finalization(
+        finalizing_head,
+        &alternate_verified,
+        &finalization_trust,
+    )
+    .is_err());
+
+    let mut expired_finalization_trust = finalization_trust.clone();
+    expired_finalization_trust.trusted_time_unix_ms = 600;
+    assert!(prepare_clearing_round_finalization(
+        finalizing_head,
+        &verified,
+        &expired_finalization_trust,
+    )
+    .is_err());
+
+    let mut incomplete = acceptances.clone();
+    incomplete.pop();
+    assert!(verify_clearing_participant_acceptances(
+        &request,
+        &signed_output,
+        &incomplete,
+        &closed_dispute_window,
+        &finalization_trust,
+    )
+    .is_err());
+
+    let mut wrong_statement = acceptances.clone();
+    wrong_statement[0] = SignedClearingParticipantAcceptanceV1::sign(
+        ClearingParticipantAcceptanceBodyV1 {
+            participant_statement_digest: output.participant_statements[1].digest()?,
+            ..wrong_statement[0].body.clone()
+        },
+        &participant_key("A"),
+    )?;
+    assert!(verify_clearing_participant_acceptances(
+        &request,
+        &signed_output,
+        &wrong_statement,
+        &closed_dispute_window,
+        &finalization_trust,
+    )
+    .is_err());
+
+    let mut expired = acceptances.clone();
+    expired[0] = SignedClearingParticipantAcceptanceV1::sign(
+        ClearingParticipantAcceptanceBodyV1 {
+            expires_at_unix_ms: 550,
+            ..expired[0].body.clone()
+        },
+        &participant_key("A"),
+    )?;
+    assert!(verify_clearing_participant_acceptances(
+        &request,
+        &signed_output,
+        &expired,
+        &closed_dispute_window,
+        &finalization_trust,
+    )
+    .is_err());
+
+    finalization_trust.trusted_time_unix_ms = 499;
+    assert!(verify_clearing_participant_acceptances(
+        &request,
+        &signed_output,
+        &acceptances,
+        &closed_dispute_window,
+        &finalization_trust,
+    )
+    .is_err());
+    finalization_trust.trusted_time_unix_ms = 550;
+    assert!(verify_clearing_participant_acceptances(
+        &request,
+        &signed_output,
+        &acceptances,
+        &DisputeWindow {
+            unresolved_dispute_count: 1,
+        },
+        &finalization_trust,
+    )
+    .is_err());
     Ok(())
 }
 

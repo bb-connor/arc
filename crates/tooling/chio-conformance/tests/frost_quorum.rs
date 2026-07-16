@@ -3,6 +3,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use chio_core::{is_supported_signed_artifact_schema, sha256_hex, Keypair};
+use chio_credit::clearing::{
+    verify_clearing_round_finalization_frost, ClearingRoundFinalizationBodyV1,
+    CLEARING_ROUND_FINALIZATION_SCHEMA,
+};
 use chio_federation::frost::{
     frost_action_registration, frost_authorization_session_id, frost_authorization_slot_id,
     registered_frost_actions, resolve_active_roster_for_execution, verify_for_execution,
@@ -11,14 +15,14 @@ use chio_federation::frost::{
     FrostArtifactAuthorityRole, FrostArtifactTrustRoot, FrostArtifactTrustStore,
     FrostAuthorizationBodyV1, FrostAuthorizationDomain, FrostAuthorizationSlotAnchor,
     FrostAuthorizationSlotCheckpointV1, FrostAuthorizationSlotState, FrostAuthorizationV1,
-    FrostChannelCloseActionV1, FrostClearingRoundFinalizeActionV1,
-    FrostCredentialsPassportRevokeActionV1, FrostEpochAnchor, FrostEpochCheckpointV1,
-    FrostGovernanceCaseEnforceSanctionActionV1, FrostHistoricalRosterResolver, FrostParticipantV1,
-    FrostPouncerRevokeCredentialActionV1, FrostRosterKeyOrigin, FrostRosterResolutionError,
-    FrostRosterRotateActionV1, FrostRosterV1, FrostSettleCommitmentActionV1,
-    VerifiedFrostAuthorization, CHIO_FROST_AUTHORIZATION_BODY_SCHEMA,
-    CHIO_FROST_AUTHORIZATION_SCHEMA, CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
-    CHIO_FROST_CHANNEL_CLOSE_ACTION_SCHEMA, CHIO_FROST_CLEARING_ROUND_FINALIZE_ACTION_SCHEMA,
+    FrostChannelCloseActionV1, FrostCredentialsPassportRevokeActionV1, FrostEpochAnchor,
+    FrostEpochCheckpointV1, FrostGovernanceCaseEnforceSanctionActionV1,
+    FrostHistoricalRosterResolver, FrostParticipantV1, FrostPouncerRevokeCredentialActionV1,
+    FrostRosterKeyOrigin, FrostRosterResolutionError, FrostRosterRotateActionV1, FrostRosterV1,
+    FrostSettleCommitmentActionV1, VerifiedFrostAuthorization,
+    CHIO_FROST_AUTHORIZATION_BODY_SCHEMA, CHIO_FROST_AUTHORIZATION_SCHEMA,
+    CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA, CHIO_FROST_CHANNEL_CLOSE_ACTION_SCHEMA,
+    CHIO_FROST_CLEARING_ROUND_FINALIZE_ACTION_SCHEMA,
     CHIO_FROST_CREDENTIALS_PASSPORT_REVOKE_ACTION_SCHEMA, CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA,
     CHIO_FROST_GOVERNANCE_CASE_ENFORCE_SANCTION_ACTION_SCHEMA,
     CHIO_FROST_POUNCER_REVOKE_CREDENTIAL_ACTION_SCHEMA, CHIO_FROST_ROSTER_ROTATE_ACTION_SCHEMA,
@@ -201,17 +205,9 @@ fn action_cases() -> Vec<ActionCase> {
             quorum_n: 2,
             quorum_m: 3,
             action_schema: CHIO_FROST_CLEARING_ROUND_FINALIZE_ACTION_SCHEMA,
-            preimage: FrostActionPreimageV1::ClearingRoundFinalize(
-                FrostClearingRoundFinalizeActionV1 {
-                    schema: CHIO_FROST_CLEARING_ROUND_FINALIZE_ACTION_SCHEMA.to_string(),
-                    round_finalization_body_digest: digest(0x12),
-                    output_manifest_root: digest(0x13),
-                    acceptance_root: digest(0x14),
-                    round_id: "clearing.round.conformance".to_string(),
-                    resource_version: 2,
-                    resource_fence: 12,
-                },
-            ),
+            preimage: clearing_finalization_body()
+                .frost_action_preimage()
+                .unwrap_or_else(|error| panic!("build clearing finalization action: {error}")),
         },
         ActionCase {
             domain: FrostAuthorizationDomain::ChannelClose,
@@ -313,6 +309,24 @@ fn action_cases() -> Vec<ActionCase> {
             }),
         },
     ]
+}
+
+fn clearing_finalization_body() -> ClearingRoundFinalizationBodyV1 {
+    ClearingRoundFinalizationBodyV1 {
+        schema: CLEARING_ROUND_FINALIZATION_SCHEMA.to_string(),
+        round_id: "clearing.round.conformance".to_string(),
+        governance_scope_id: "treaty.conformance".to_string(),
+        round_core_digest: digest(0x12),
+        output_manifest_digest: digest(0x13),
+        participant_acceptance_root: digest(0x14),
+        participant_acceptance_count: 3,
+        source_lifecycle_head_digest: digest(0x15),
+        source_lifecycle_version: 12,
+        source_lifecycle_fence: 12,
+        clearing_authority_id: "clearing.authority.conformance".to_string(),
+        clearing_authority_key_epoch: 7,
+        finalized_at_unix_ms: 500,
+    }
 }
 
 struct ActiveResolver {
@@ -859,6 +873,38 @@ fn every_registered_ladder_action_verifies_its_exact_contract_and_preimage() {
             .unwrap_or_else(|error| panic!("recompute cross-paired id: {error}"));
         assert!(cross_paired.validate().is_err());
     }
+}
+
+#[test]
+fn clearing_consumer_accepts_only_its_verified_finalization_action() {
+    let mut case = action_cases()
+        .into_iter()
+        .find(|case| case.domain == FrostAuthorizationDomain::ClearingRoundFinalize)
+        .unwrap_or_else(|| panic!("clearing finalization action case"));
+    let premature_fixture = runtime_fixture(&case, 0xb4);
+    let premature = premature_fixture.verify();
+    assert!(verify_clearing_round_finalization_frost(
+        &clearing_finalization_body(),
+        &premature,
+        500,
+    )
+    .is_err());
+
+    let mut body = clearing_finalization_body();
+    body.finalized_at_unix_ms = 400;
+    case.preimage = body
+        .frost_action_preimage()
+        .unwrap_or_else(|error| panic!("build current clearing action: {error}"));
+    let fixture = runtime_fixture(&case, 0xb5);
+    let verified = fixture.verify();
+    let binding = verify_clearing_round_finalization_frost(&body, &verified, 500)
+        .unwrap_or_else(|error| panic!("verify clearing finalization consumer: {error}"));
+    assert_eq!(binding.authorization_id, verified.authorization_id());
+    assert_eq!(binding.action_digest, verified.action_digest());
+
+    let mut wrong_head = body;
+    wrong_head.source_lifecycle_fence += 1;
+    assert!(verify_clearing_round_finalization_frost(&wrong_head, &verified, 500).is_err());
 }
 
 #[test]

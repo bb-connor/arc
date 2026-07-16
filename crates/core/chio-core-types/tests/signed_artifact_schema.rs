@@ -54,6 +54,59 @@ fn economic_continuity_schemas_are_registered() {
 }
 
 #[test]
+fn clearing_signed_artifact_schemas_are_registered() {
+    for (schema, artifact_kind) in [
+        (
+            "chio.clearing.participant-snapshot.v1",
+            "clearing_participant_snapshot",
+        ),
+        (
+            "chio.clearing.participant-snapshot-acknowledgement.v1",
+            "clearing_participant_snapshot_acknowledgement",
+        ),
+        ("chio.clearing.input-manifest.v1", "clearing_input_manifest"),
+        (
+            "chio.clearing.netting-round-core.v1",
+            "clearing_netting_round_core",
+        ),
+        (
+            "chio.clearing.participant-statement.v1",
+            "clearing_participant_statement",
+        ),
+        (
+            "chio.clearing.settlement-intent.v1",
+            "clearing_settlement_intent",
+        ),
+        (
+            "chio.clearing.atom-transformation.v1",
+            "clearing_atom_transformation",
+        ),
+        (
+            "chio.clearing.output-manifest.v1",
+            "clearing_output_manifest",
+        ),
+        (
+            "chio.clearing.participant-acceptance.v1",
+            "clearing_participant_acceptance",
+        ),
+        (
+            "chio.clearing.round-finalization.v1",
+            "clearing_round_finalization",
+        ),
+    ] {
+        assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
+        assert!(chio_core_types::built_in_signed_artifact_registry()
+            .iter()
+            .any(|entry| entry.schema == schema
+                && entry.artifact_kind == artifact_kind
+                && entry.introduced_by == "ws4-clearing-v1"));
+    }
+    assert!(!chio_core_types::is_supported_signed_artifact_schema(
+        "chio.clearing.round-finalization.v2"
+    ));
+}
+
+#[test]
 fn known_signed_artifact_schemas_match_public_registry_or_internal_exemption() {
     let registry: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),

@@ -439,6 +439,11 @@ impl VerifiedFrostAuthorization {
     }
 
     #[must_use]
+    pub const fn issued_at(&self) -> u64 {
+        self.body.issued_at
+    }
+
+    #[must_use]
     pub const fn quorum_n(&self) -> u16 {
         self.body.quorum_n
     }

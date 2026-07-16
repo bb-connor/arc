@@ -8,11 +8,13 @@ use crate::obligation::{
 };
 
 mod engine;
+mod finalization;
 mod lifecycle;
 
 pub use engine::{
     compute_netting_round, sign_netting_round, verify_netting_round, verify_signed_netting_round,
 };
+pub use finalization::*;
 pub use lifecycle::*;
 
 pub const CLEARING_ALGORITHM_V1: &str = "balance_match.v1";
@@ -25,6 +27,8 @@ pub const CLEARING_PARTICIPANT_STATEMENT_SCHEMA: &str = "chio.clearing.participa
 pub const CLEARING_SETTLEMENT_INTENT_SCHEMA: &str = "chio.clearing.settlement-intent.v1";
 pub const CLEARING_TRANSFORMATION_SCHEMA: &str = "chio.clearing.atom-transformation.v1";
 pub const CLEARING_OUTPUT_MANIFEST_SCHEMA: &str = "chio.clearing.output-manifest.v1";
+pub const CLEARING_PARTICIPANT_ACCEPTANCE_SCHEMA: &str = "chio.clearing.participant-acceptance.v1";
+pub const CLEARING_ROUND_FINALIZATION_SCHEMA: &str = "chio.clearing.round-finalization.v1";
 
 pub(super) const MAX_CLEARING_INPUTS: usize =
     chio_core_types::economic_continuity::MAX_ECONOMIC_TRANSITIONS - 1;
@@ -46,6 +50,8 @@ pub(super) const INTENT_ROOT_DOMAIN: &[u8] = b"chio.clearing.intent-root.v1\0";
 pub(super) const TRANSFORMATION_ROOT_DOMAIN: &[u8] = b"chio.clearing.transformation-root.v1\0";
 pub(super) const INTENT_ID_DOMAIN: &[u8] = b"chio.clearing.intent.id.v1\0";
 pub(super) const DISPATCH_KEY_DOMAIN: &[u8] = b"chio.clearing.dispatch-key.v1\0";
+pub(super) const SIGNED_ENVELOPE_DIGEST_DOMAIN: &[u8] =
+    b"chio.clearing.signed-envelope.digest.v1\0";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -74,6 +80,10 @@ where
         self.signer_key
             .verify_canonical(&self.body, &self.signature)
             .map_err(|_| ClearingError::AuthorityVerification)
+    }
+
+    pub fn digest(&self) -> Result<String, ClearingError> {
+        domain_digest(SIGNED_ENVELOPE_DIGEST_DOMAIN, self)
     }
 }
 
@@ -309,6 +319,12 @@ pub struct ClearingParticipantStatementV1 {
     pub bilateral_credit_cancelled_units: u64,
     pub net_balance: ClearingBalanceV1,
     pub contributing_atom_digests: Vec<String>,
+}
+
+impl ClearingParticipantStatementV1 {
+    pub fn digest(&self) -> Result<String, ClearingError> {
+        domain_digest(STATEMENT_DIGEST_DOMAIN, self)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

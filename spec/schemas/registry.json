@@ -1608,6 +1608,12 @@
       "schemaFile": "spec/schemas/chio-economy/clearing-output-manifest.v1.json"
     },
     {
+      "schema": "chio.clearing.participant-acceptance.v1",
+      "artifactKind": "clearing_participant_acceptance",
+      "introducedBy": "ws4-clearing-v1",
+      "schemaFile": "spec/schemas/chio-economy/clearing-participant-acceptance.v1.json"
+    },
+    {
       "schema": "chio.obligation.atom.v1",
       "artifactKind": "obligation_atom",
       "introducedBy": "agent-economy-obligation-v1",
@@ -1624,6 +1630,12 @@
       "artifactKind": "clearing_round_lifecycle",
       "introducedBy": "ws4-clearing-v1",
       "schemaFile": "spec/schemas/chio-economy/clearing-round-lifecycle.v1.json"
+    },
+    {
+      "schema": "chio.clearing.round-finalization.v1",
+      "artifactKind": "clearing_round_finalization",
+      "introducedBy": "ws4-clearing-v1",
+      "schemaFile": "spec/schemas/chio-economy/clearing-round-finalization.v1.json"
     },
     {
       "schema": "chio.clearing.round-transition-proof.v1",

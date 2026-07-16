@@ -12,6 +12,10 @@ use serde::{Deserialize, Serialize};
 use super::*;
 use crate::obligation::ObligationDispositionTransitionV1;
 
+mod validation;
+
+pub(super) use validation::{validate_round_core, validate_round_head};
+
 pub const CLEARING_ROUND_LIFECYCLE_SCHEMA: &str = "chio.clearing.round-lifecycle.v1";
 pub const CLEARING_ROUND_TRANSITION_PROOF_SCHEMA: &str = "chio.clearing.round-transition-proof.v1";
 pub const CLEARING_ROUND_RESOURCE_FAMILY: &str = "clearing_round";
@@ -70,6 +74,10 @@ pub struct ClearingRoundLifecycleRecordV1 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     output_manifest_digest: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    participant_acceptance_root: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    participant_acceptance_count: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     finalization_digest: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     abort_digest: Option<String>,
@@ -93,6 +101,8 @@ impl ClearingRoundLifecycleRecordV1 {
             row_version: 1,
             fence: 1,
             output_manifest_digest: None,
+            participant_acceptance_root: None,
+            participant_acceptance_count: None,
             finalization_digest: None,
             abort_digest: None,
             first_dispatch_operation_id: None,
@@ -128,6 +138,22 @@ impl ClearingRoundLifecycleRecordV1 {
             "output_manifest_digest",
             self.output_manifest_digest.as_deref(),
         )?;
+        validate_optional_digest(
+            "participant_acceptance_root",
+            self.participant_acceptance_root.as_deref(),
+        )?;
+        if let Some(count) = self.participant_acceptance_count {
+            validate_positive("participant_acceptance_count", count)?;
+            if usize::try_from(count).map_err(|_| ClearingError::ArithmeticOverflow)?
+                > MAX_CLEARING_PARTICIPANTS
+            {
+                return Err(ClearingError::InvalidField("participant_acceptance_count"));
+            }
+        }
+        if self.participant_acceptance_root.is_some() != self.participant_acceptance_count.is_some()
+        {
+            return Err(ClearingError::InvalidField("participant_acceptance"));
+        }
         validate_optional_digest("finalization_digest", self.finalization_digest.as_deref())?;
         validate_optional_digest("abort_digest", self.abort_digest.as_deref())?;
         if let Some(operation_id) = self.first_dispatch_operation_id.as_deref() {
@@ -136,18 +162,28 @@ impl ClearingRoundLifecycleRecordV1 {
         let valid = match self.state {
             ClearingRoundLifecycleStateV1::Reserved => {
                 self.output_manifest_digest.is_none()
+                    && self.participant_acceptance_root.is_none()
                     && self.finalization_digest.is_none()
                     && self.abort_digest.is_none()
                     && self.first_dispatch_operation_id.is_none()
             }
-            ClearingRoundLifecycleStateV1::Proposed | ClearingRoundLifecycleStateV1::Finalizing => {
+            ClearingRoundLifecycleStateV1::Proposed => {
                 self.output_manifest_digest.is_some()
+                    && self.participant_acceptance_root.is_none()
+                    && self.finalization_digest.is_none()
+                    && self.abort_digest.is_none()
+                    && self.first_dispatch_operation_id.is_none()
+            }
+            ClearingRoundLifecycleStateV1::Finalizing => {
+                self.output_manifest_digest.is_some()
+                    && self.participant_acceptance_root.is_some()
                     && self.finalization_digest.is_none()
                     && self.abort_digest.is_none()
                     && self.first_dispatch_operation_id.is_none()
             }
             ClearingRoundLifecycleStateV1::Finalized => {
                 self.output_manifest_digest.is_some()
+                    && self.participant_acceptance_root.is_some()
                     && self.finalization_digest.is_some()
                     && self.abort_digest.is_none()
                     && self.first_dispatch_operation_id.is_none()
@@ -156,12 +192,14 @@ impl ClearingRoundLifecycleRecordV1 {
             | ClearingRoundLifecycleStateV1::Reconciling
             | ClearingRoundLifecycleStateV1::Incident => {
                 self.output_manifest_digest.is_some()
+                    && self.participant_acceptance_root.is_some()
                     && self.finalization_digest.is_some()
                     && self.abort_digest.is_none()
                     && self.first_dispatch_operation_id.is_some()
             }
             ClearingRoundLifecycleStateV1::Satisfied => {
                 self.output_manifest_digest.is_some()
+                    && self.participant_acceptance_root.is_some()
                     && self.finalization_digest.is_some()
                     && self.abort_digest.is_none()
             }
@@ -200,6 +238,14 @@ impl ClearingRoundLifecycleRecordV1 {
                 output_manifest_digest,
                 ..
             } => next.output_manifest_digest = Some(output_manifest_digest.clone()),
+            ClearingRoundTransitionV1::BeginFinalization {
+                acceptance_root,
+                acceptance_count,
+                ..
+            } => {
+                next.participant_acceptance_root = Some(acceptance_root.clone());
+                next.participant_acceptance_count = Some(*acceptance_count);
+            }
             ClearingRoundTransitionV1::Finalize {
                 finalization_digest,
                 ..
@@ -215,8 +261,7 @@ impl ClearingRoundLifecycleRecordV1 {
             ClearingRoundTransitionV1::BeginDispatch { operation_id, .. } => {
                 next.first_dispatch_operation_id = Some(operation_id.clone());
             }
-            ClearingRoundTransitionV1::BeginFinalization { .. }
-            | ClearingRoundTransitionV1::BeginReconciliation { .. }
+            ClearingRoundTransitionV1::BeginReconciliation { .. }
             | ClearingRoundTransitionV1::Satisfy { .. }
             | ClearingRoundTransitionV1::Incident { .. } => {}
         }
@@ -232,6 +277,26 @@ impl ClearingRoundLifecycleRecordV1 {
     #[must_use]
     pub fn governance_scope_id(&self) -> &str {
         &self.governance_scope_id
+    }
+
+    #[must_use]
+    pub fn round_core_digest(&self) -> &str {
+        &self.round_core_digest
+    }
+
+    #[must_use]
+    pub fn output_manifest_digest(&self) -> Option<&str> {
+        self.output_manifest_digest.as_deref()
+    }
+
+    #[must_use]
+    pub fn participant_acceptance_root(&self) -> Option<&str> {
+        self.participant_acceptance_root.as_deref()
+    }
+
+    #[must_use]
+    pub const fn participant_acceptance_count(&self) -> Option<u64> {
+        self.participant_acceptance_count
     }
 
     #[must_use]
@@ -313,6 +378,12 @@ impl ClearingRoundTransitionV1 {
             } => {
                 validate_digest("acceptance_root", acceptance_root)?;
                 validate_positive("acceptance_count", *acceptance_count)?;
+                if usize::try_from(*acceptance_count)
+                    .map_err(|_| ClearingError::ArithmeticOverflow)?
+                    > MAX_CLEARING_PARTICIPANTS
+                {
+                    return Err(ClearingError::InvalidField("acceptance_count"));
+                }
                 validate_digest("finalization_authority_digest", authority_digest)
             }
             Self::Finalize {
@@ -777,67 +848,6 @@ pub fn clearing_reservation_root(
     domain_digest(RESERVATION_ROOT_DOMAIN, &digests)
 }
 
-fn validate_round_core(core: &NettingRoundCoreV1) -> Result<(), ClearingError> {
-    if core.schema != CLEARING_ROUND_CORE_SCHEMA {
-        return Err(ClearingError::InvalidField("round_core_schema"));
-    }
-    validate_text("round_id", &core.round_id)?;
-    validate_positive("epoch", core.epoch)?;
-    validate_text("governance_scope_id", &core.governance_scope_id)?;
-    validate_text("clearing_authority_id", &core.clearing_authority_id)?;
-    validate_positive(
-        "clearing_authority_key_epoch",
-        core.clearing_authority_key_epoch,
-    )?;
-    validate_currency(&core.currency)?;
-    if core.algorithm_version != CLEARING_ALGORITHM_V1 {
-        return Err(ClearingError::InvalidField("algorithm_version"));
-    }
-    validate_digest(
-        "participant_snapshot_digest",
-        &core.participant_snapshot_digest,
-    )?;
-    validate_digest("input_manifest_digest", &core.input_manifest_digest)?;
-    validate_positive("input_count", core.input_count)?;
-    if usize::try_from(core.input_count).map_err(|_| ClearingError::ArithmeticOverflow)? + 1
-        > MAX_ECONOMIC_TRANSITIONS
-    {
-        return Err(ClearingError::IncompleteLifecycleProjection);
-    }
-    validate_digest("reservation_root", &core.reservation_root)?;
-    validate_positive(
-        "dispute_window_ends_at_unix_ms",
-        core.dispute_window_ends_at_unix_ms,
-    )?;
-    validate_positive("generated_at_unix_ms", core.generated_at_unix_ms)?;
-    if core.dispute_window_ends_at_unix_ms <= core.generated_at_unix_ms {
-        return Err(ClearingError::InvalidField("dispute_window"));
-    }
-    Ok(())
-}
-
-fn validate_round_head(
-    head: &EconomicResourceHeadV1,
-    record: &ClearingRoundLifecycleRecordV1,
-) -> Result<(), ClearingError> {
-    let expected_state = serde_json::to_value(record)
-        .map_err(|error| ClearingError::Canonicalization(error.to_string()))?;
-    if head.resource_key.resource_family != CLEARING_ROUND_RESOURCE_FAMILY
-        || head.resource_key.scope_id != record.governance_scope_id
-        || head.resource_key.resource_id != record.round_id
-        || head.resource_version != record.row_version
-        || head.lifecycle_fence != record.fence
-        || head.lifecycle_state != record.state.as_str()
-        || !matches!(&head.state, EconomicContentV1::Inline { value } if value == &expected_state)
-        || head.operation_id.is_some()
-        || head.effect_idempotency_key.is_some()
-        || head.terminal_result.is_some()
-    {
-        return Err(ClearingError::InvalidField("current_round_head"));
-    }
-    Ok(())
-}
-
 fn reservation_binding(
     record: &ClearingRoundLifecycleRecordV1,
     reservation: &AnchoredClearingObligationV1,
@@ -1141,7 +1151,7 @@ fn verify_projection(
     Ok(())
 }
 
-fn decode_inline<T>(head: &EconomicResourceHeadV1) -> Result<T, ClearingError>
+pub(super) fn decode_inline<T>(head: &EconomicResourceHeadV1) -> Result<T, ClearingError>
 where
     T: for<'de> Deserialize<'de>,
 {

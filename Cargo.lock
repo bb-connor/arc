@@ -2997,6 +2997,7 @@ dependencies = [
  "chio-anchor",
  "chio-api-protect",
  "chio-core-types",
+ "chio-credit",
  "chio-custody-hw",
  "chio-egress-contract",
  "chio-external-guards",
@@ -3202,6 +3203,7 @@ version = "0.1.0"
 dependencies = [
  "chio-appraisal",
  "chio-core-types",
+ "chio-federation",
  "chio-spec-validate",
  "chio-underwriting",
  "proptest",

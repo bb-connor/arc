@@ -30,6 +30,21 @@ pub const CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_V1_SCHEMA: &str =
 pub const CHIO_FROST_AUTHORIZATION_V1_SCHEMA: &str = "chio.frost.authorization.v1";
 pub const CHIO_FROST_EPOCH_CHECKPOINT_V1_SCHEMA: &str = "chio.frost.epoch-checkpoint.v1";
 pub const CHIO_FROST_ROSTER_V1_SCHEMA: &str = "chio.frost.roster.v1";
+pub const CHIO_CLEARING_PARTICIPANT_SNAPSHOT_V1_SCHEMA: &str =
+    "chio.clearing.participant-snapshot.v1";
+pub const CHIO_CLEARING_PARTICIPANT_SNAPSHOT_ACKNOWLEDGEMENT_V1_SCHEMA: &str =
+    "chio.clearing.participant-snapshot-acknowledgement.v1";
+pub const CHIO_CLEARING_INPUT_MANIFEST_V1_SCHEMA: &str = "chio.clearing.input-manifest.v1";
+pub const CHIO_CLEARING_NETTING_ROUND_CORE_V1_SCHEMA: &str = "chio.clearing.netting-round-core.v1";
+pub const CHIO_CLEARING_PARTICIPANT_STATEMENT_V1_SCHEMA: &str =
+    "chio.clearing.participant-statement.v1";
+pub const CHIO_CLEARING_SETTLEMENT_INTENT_V1_SCHEMA: &str = "chio.clearing.settlement-intent.v1";
+pub const CHIO_CLEARING_ATOM_TRANSFORMATION_V1_SCHEMA: &str =
+    "chio.clearing.atom-transformation.v1";
+pub const CHIO_CLEARING_OUTPUT_MANIFEST_V1_SCHEMA: &str = "chio.clearing.output-manifest.v1";
+pub const CHIO_CLEARING_PARTICIPANT_ACCEPTANCE_V1_SCHEMA: &str =
+    "chio.clearing.participant-acceptance.v1";
+pub const CHIO_CLEARING_ROUND_FINALIZATION_V1_SCHEMA: &str = "chio.clearing.round-finalization.v1";
 pub const CHIO_TRANSACTION_PASSPORT_V1_SCHEMA: &str = "chio.transaction-passport.v1";
 pub const CHIO_TRANSACTION_EVIDENCE_GRAPH_V1_SCHEMA: &str = "chio.transaction.evidence-graph.v1";
 pub const CHIO_TRANSACTION_CLAIM_SET_V1_SCHEMA: &str = "chio.transaction.claim-set.v1";
@@ -233,6 +248,49 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
             "economic_effect_dispatch_commit",
             "economic-state-continuity-v1",
         )),
+    ),
+    (
+        CHIO_CLEARING_PARTICIPANT_SNAPSHOT_V1_SCHEMA,
+        Some(("clearing_participant_snapshot", "ws4-clearing-v1")),
+    ),
+    (
+        CHIO_CLEARING_PARTICIPANT_SNAPSHOT_ACKNOWLEDGEMENT_V1_SCHEMA,
+        Some((
+            "clearing_participant_snapshot_acknowledgement",
+            "ws4-clearing-v1",
+        )),
+    ),
+    (
+        CHIO_CLEARING_INPUT_MANIFEST_V1_SCHEMA,
+        Some(("clearing_input_manifest", "ws4-clearing-v1")),
+    ),
+    (
+        CHIO_CLEARING_NETTING_ROUND_CORE_V1_SCHEMA,
+        Some(("clearing_netting_round_core", "ws4-clearing-v1")),
+    ),
+    (
+        CHIO_CLEARING_PARTICIPANT_STATEMENT_V1_SCHEMA,
+        Some(("clearing_participant_statement", "ws4-clearing-v1")),
+    ),
+    (
+        CHIO_CLEARING_SETTLEMENT_INTENT_V1_SCHEMA,
+        Some(("clearing_settlement_intent", "ws4-clearing-v1")),
+    ),
+    (
+        CHIO_CLEARING_ATOM_TRANSFORMATION_V1_SCHEMA,
+        Some(("clearing_atom_transformation", "ws4-clearing-v1")),
+    ),
+    (
+        CHIO_CLEARING_OUTPUT_MANIFEST_V1_SCHEMA,
+        Some(("clearing_output_manifest", "ws4-clearing-v1")),
+    ),
+    (
+        CHIO_CLEARING_PARTICIPANT_ACCEPTANCE_V1_SCHEMA,
+        Some(("clearing_participant_acceptance", "ws4-clearing-v1")),
+    ),
+    (
+        CHIO_CLEARING_ROUND_FINALIZATION_V1_SCHEMA,
+        Some(("clearing_round_finalization", "ws4-clearing-v1")),
     ),
     (CHIO_SESSION_ANCHOR_SCHEMA, None),
     (CHIO_REQUEST_LINEAGE_RECORD_SCHEMA, None),

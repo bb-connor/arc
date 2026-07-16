@@ -1,4 +1,4 @@
-1f0617754b82f45523048a68365a7c8cc3c4091027d1697ba89e537655b4da20  spec/schemas/MANIFEST.sha256
+a8e8606ec837cc2cdce7d41dabbe823013c8eeaa5231547a96958667fdd1d57f  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -39,10 +39,12 @@ ee4bb4d7d95da7232a7bbcee225eaa504046c4b563f3c3f77e6abdf777d231e6  spec/schemas/c
 03df827a69622c98fa8e10a297cc20ddfbffdde125faf95756623ec558f59aef  spec/schemas/chio-economy/clearing-input-manifest.v1.json
 99bcee40b192b155bc45e442ab1f84730056ff4e737d88db472aa1df0f90ac24  spec/schemas/chio-economy/clearing-netting-round-core.v1.json
 2970d8609c2440c7d4577b7c801eb27b4b902ad7352995fcb1d08daccaea0ca8  spec/schemas/chio-economy/clearing-output-manifest.v1.json
+8bc496f1cf087e942e5a53711ac27752850044df8e16216db16a388f011f8735  spec/schemas/chio-economy/clearing-participant-acceptance.v1.json
 7176e8ca6d09922f2281c1d57e29d841fef39392bb10c3c2bab82f0ecc8c0a68  spec/schemas/chio-economy/clearing-participant-snapshot-acknowledgement.v1.json
 70f6b26ffc99d8569a932c837c78370be802b093986d06013509cf65d4b543a7  spec/schemas/chio-economy/clearing-participant-snapshot.v1.json
 19ad01226af54a7117f69a3d3b2d8126876e9194532f7884a4ed09956cc2cc77  spec/schemas/chio-economy/clearing-participant-statement.v1.json
-21779d4e28a36a7297b4f587883283123821617d44972660af5fded0674a727c  spec/schemas/chio-economy/clearing-round-lifecycle.v1.json
+4323690cc618bdaf9d5a94f176e8cbd367ec1707f6db23b449496488e3469ce1  spec/schemas/chio-economy/clearing-round-finalization.v1.json
+27a659005c19e3f5d483f7d68d38051edd13b9e2dbf9c3bb83d2814af8dc8ca6  spec/schemas/chio-economy/clearing-round-lifecycle.v1.json
 4545e6fd7c177b1d09ce7adbb15fb6158179b7506bd3836cb8e672739ce3d082  spec/schemas/chio-economy/clearing-round-transition-proof.v1.json
 cadc8a9bae7789bbe509b2139e6c3fec445aefac96b7ca25adbfe68b217abc1f  spec/schemas/chio-economy/clearing-settlement-intent.v1.json
 7b46ec4afb9b7ee3afc707a57df8551a2a044990578aa5bb79cfc98fce284b49  spec/schemas/chio-economy/effect-dispatch-commit.v1.json
@@ -316,4 +318,4 @@ ff4f655a0f0c7afda5c0674f3afde1e3961f1d58292584ed39f8bb5b96e30c8b  spec/schemas/c
 63540f55a91b96cf071cece6b3465e8c3bba82512a91a5f83b05affc757033f4  spec/schemas/chio-wire/v1/trust-control/terminate.schema.json
 4646a51a6d23c27f0ba3951923e029ab9568bfa87f1b373ad2b1334be0ca7f62  spec/schemas/chio-workflow/v1/preflight-plan.schema.json
 3374b9d40520b66cae420da1f9c8bb07fed6bfbd62ae918615e2f88b6e1b7700  spec/schemas/chio-workflow/v1/preflight-report.schema.json
-321ca9556095afe7b8b2a06014c7d96b8e34419e1b4c8de3faeb2e2e1d092b94  spec/schemas/registry.json
+9e4333b2e15099f750df9cea7a57043b4ba32e3cd47746695aa8279fbb75e995  spec/schemas/registry.json

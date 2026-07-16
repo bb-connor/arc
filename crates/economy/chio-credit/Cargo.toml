@@ -14,6 +14,7 @@ name = "chio_credit"
 [dependencies]
 chio-appraisal = { workspace = true }
 chio-core-types = { workspace = true }
+chio-federation = { workspace = true }
 chio-underwriting = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

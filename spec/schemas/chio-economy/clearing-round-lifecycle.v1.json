@@ -42,6 +42,8 @@
     "rowVersion": { "$ref": "#/$defs/positiveInteger" },
     "fence": { "$ref": "#/$defs/positiveInteger" },
     "outputManifestDigest": { "$ref": "#/$defs/digest" },
+    "participantAcceptanceRoot": { "$ref": "#/$defs/digest" },
+    "participantAcceptanceCount": { "type": "integer", "minimum": 1, "maximum": 1024 },
     "finalizationDigest": { "$ref": "#/$defs/digest" },
     "abortDigest": { "$ref": "#/$defs/digest" },
     "firstDispatchOperationId": { "$ref": "#/$defs/digest" },

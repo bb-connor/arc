@@ -459,6 +459,15 @@ fn finalizing_abort_requires_a_burn_and_finalized_rounds_cannot_abort() -> TestR
     )?;
     let finalizing_heads = next_heads(&finalizing);
     let finalizing_head = finalizing_heads[0].clone();
+    let EconomicContentV1::Inline { value } = &finalizing_head.state else {
+        return Err("finalizing head did not contain inline state".into());
+    };
+    let mut impossible_record = value.clone();
+    impossible_record["participantAcceptanceCount"] = serde_json::json!(1025);
+    let impossible_record: ClearingRoundLifecycleRecordV1 =
+        serde_json::from_value(impossible_record)?;
+    assert!(impossible_record.validate().is_err());
+    assert!(validate_schema("clearing-round-lifecycle.v1.json", &impossible_record,).is_err());
     anchored = anchored_obligations(&inputs, &finalizing_heads)
         .ok_or("projection omitted an obligation head")?;
     assert!(compose_clearing_lifecycle_transition(

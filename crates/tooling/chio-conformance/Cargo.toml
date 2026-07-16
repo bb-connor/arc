@@ -104,6 +104,7 @@ serde_yaml = { workspace = true }
 # browser kernel through its native (non-wasm32) cargo test surface.
 chio-kernel-browser = { workspace = true }
 chio-federation = { workspace = true, features = ["demo"] }
+chio-credit = { workspace = true }
 frost-ed25519 = { workspace = true }
 rand_chacha = { workspace = true }
 rand_core = { workspace = true }
