@@ -457,8 +457,14 @@ pub struct PassportCredentialMembershipProofV2 {
     deny_unknown_fields
 )]
 pub enum PassportCredentialV2 {
-    Reputation(ReputationCredential),
-    Financial(FinancialCredentialEnvelope),
+    Reputation(Box<ReputationCredential>),
+    Financial(Box<FinancialCredentialEnvelope>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PassportValidityWindowV2 {
+    pub issued_at: u64,
+    pub expires_at: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -588,7 +594,7 @@ pub use financial_authority::*;
 #[derive(Debug, Clone, PartialEq)]
 pub enum VersionedAgentPassport {
     V1(AgentPassport),
-    V2(AgentPassportV2),
+    V2(Box<AgentPassportV2>),
 }
 
 impl Serialize for VersionedAgentPassport {
@@ -640,7 +646,7 @@ fn decode_versioned_agent_passport_value(
                 .map_err(|error| CredentialError::InvalidVersionedPassport(error.to_string()))?;
             validate_agent_passport_v2_contract(&passport)
                 .map_err(|error| CredentialError::InvalidVersionedPassport(error.to_string()))?;
-            Ok(VersionedAgentPassport::V2(passport))
+            Ok(VersionedAgentPassport::V2(Box::new(passport)))
         }
         other => Err(CredentialError::UnsupportedVersionedPassportSchema(
             other.to_string(),
@@ -656,6 +662,7 @@ pub fn upgrade_v1_passport(passport: AgentPassport) -> AgentPassportV2 {
         credentials: passport
             .credentials
             .into_iter()
+            .map(Box::new)
             .map(PassportCredentialV2::Reputation)
             .collect(),
         merkle_roots: passport.merkle_roots,
@@ -687,7 +694,7 @@ pub fn try_downgrade_v2_passport(
         .credentials
         .into_iter()
         .map(|credential| match credential {
-            PassportCredentialV2::Reputation(credential) => Ok(credential),
+            PassportCredentialV2::Reputation(credential) => Ok(*credential),
             PassportCredentialV2::Financial(_) => {
                 Err(CredentialError::PassportDowngradeWouldLoseData)
             }

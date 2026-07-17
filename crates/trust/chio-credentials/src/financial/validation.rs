@@ -263,27 +263,26 @@ pub(super) fn validate_financial_evidence(
             .ok_or_else(|| invalid_financial_error("financial source range is empty"))?
             .leaf
             .query_key;
+        let boundary_context = FinancialCompletenessBoundaryContext {
+            index_root: &index_root,
+            index_size,
+            source_family: credential.family,
+            subject: credential.credential_subject.id(),
+            window: &evidence.window,
+        };
         validate_financial_completeness_boundary(
             &body.lower_boundary,
             first_index,
             first_key,
             true,
-            &index_root,
-            index_size,
-            credential.family,
-            credential.credential_subject.id(),
-            &evidence.window,
+            &boundary_context,
         )?;
         validate_financial_completeness_boundary(
             &body.upper_boundary,
             last_index,
             last_key,
             false,
-            &index_root,
-            index_size,
-            credential.family,
-            credential.credential_subject.id(),
-            &evidence.window,
+            &boundary_context,
         )?;
         let declared_artifacts = body
             .source_artifact_digests
@@ -505,16 +504,20 @@ fn validate_financial_committed_leaf_proof(
     Ok(())
 }
 
+struct FinancialCompletenessBoundaryContext<'a> {
+    index_root: &'a chio_core::Hash,
+    index_size: u64,
+    source_family: FinancialCredentialFamilyV1,
+    subject: &'a str,
+    window: &'a FinancialCredentialWindowV1,
+}
+
 fn validate_financial_completeness_boundary(
     boundary: &FinancialSourceCompletenessBoundaryV1,
     range_index: u64,
     range_key: &FinancialSourceQueryKeyV1,
     lower: bool,
-    index_root: &chio_core::Hash,
-    index_size: u64,
-    source_family: FinancialCredentialFamilyV1,
-    subject: &str,
-    window: &FinancialCredentialWindowV1,
+    context: &FinancialCompletenessBoundaryContext<'_>,
 ) -> Result<(), CredentialError> {
     match boundary {
         FinancialSourceCompletenessBoundaryV1::SourceEdge => {
@@ -523,14 +526,18 @@ fn validate_financial_completeness_boundary(
             } else {
                 range_index
                     .checked_add(1)
-                    .is_some_and(|next| next == index_size)
+                    .is_some_and(|next| next == context.index_size)
             };
             if !at_edge {
                 return invalid_financial("financial source boundary edge is invalid");
             }
         }
         FinancialSourceCompletenessBoundaryV1::Adjacent { leaf_proof } => {
-            validate_financial_committed_leaf_proof(leaf_proof, index_root, index_size)?;
+            validate_financial_committed_leaf_proof(
+                leaf_proof,
+                context.index_root,
+                context.index_size,
+            )?;
             let expected = if lower {
                 leaf_proof.leaf.index.checked_add(1)
             } else {
@@ -546,10 +553,11 @@ fn validate_financial_completeness_boundary(
             } else {
                 leaf_proof.leaf.query_key > *range_key
             };
-            let adjacent_in_range = leaf_proof.leaf.query_key.source_family == source_family
-                && leaf_proof.leaf.query_key.subject == subject
-                && leaf_proof.leaf.query_key.occurred_at >= window.starts_at
-                && leaf_proof.leaf.query_key.occurred_at < window.ends_at;
+            let adjacent_in_range = leaf_proof.leaf.query_key.source_family
+                == context.source_family
+                && leaf_proof.leaf.query_key.subject == context.subject
+                && leaf_proof.leaf.query_key.occurred_at >= context.window.starts_at
+                && leaf_proof.leaf.query_key.occurred_at < context.window.ends_at;
             if expected != Some(actual) || !correctly_ordered || adjacent_in_range {
                 return invalid_financial("financial source adjacent boundary is invalid");
             }

@@ -14,7 +14,7 @@ use chio_credentials::{
     ExposureHistoryCredentialSubjectV1, ExposureHistoryPositionV1, FinancialCredentialEnvelope,
     FinancialCredentialEvidenceV1, FinancialCredentialFamilyV1, FinancialCredentialSubjectV1,
     FinancialCredentialWindowV1, FinancialSourceDisclosureV1, LossHistoryCredentialSubjectV1,
-    OfflinePassportPresentationChallengeUseStoreV2, PassportCredentialV2,
+    OfflinePassportPresentationChallengeUseStoreV2, PassportCredentialV2, PassportValidityWindowV2,
     PremiumHistoryCredentialSubjectV1, SettlementReliabilityCredentialSubjectV1,
     SignedPassportPresentationChallengeV2, SignedPassportSourceManifestV2, TrustTier,
     VersionedAgentPassport, AGENT_PASSPORT_SCHEMA_V2,
@@ -28,6 +28,13 @@ use chio_reputation::{
 
 const ISSUED_AT: u64 = 1_710_000_000;
 const EXPIRES_AT: u64 = ISSUED_AT + 86_400;
+
+const fn validity(issued_at: u64, expires_at: u64) -> PassportValidityWindowV2 {
+    PassportValidityWindowV2 {
+        issued_at,
+        expires_at,
+    }
+}
 
 trait TestResultExt<T, E> {
     fn test_ok(self, context: &str) -> T;
@@ -134,7 +141,7 @@ fn reputation_credential_with_composite(
 ) -> PassportCredentialV2 {
     let mut scorecard = scorecard(&holder.public_key().to_hex());
     scorecard.composite_score = MetricValue::Known(composite);
-    PassportCredentialV2::Reputation(
+    PassportCredentialV2::Reputation(Box::new(
         issue_reputation_credential(
             issuer,
             scorecard,
@@ -155,7 +162,7 @@ fn reputation_credential_with_composite(
             EXPIRES_AT,
         )
         .test_ok("issue reputation credential"),
-    )
+    ))
 }
 
 fn reputation_credential_at(
@@ -164,7 +171,7 @@ fn reputation_credential_at(
     issued_at: u64,
     expires_at: u64,
 ) -> PassportCredentialV2 {
-    PassportCredentialV2::Reputation(
+    PassportCredentialV2::Reputation(Box::new(
         issue_reputation_credential(
             issuer,
             scorecard(&holder.public_key().to_hex()),
@@ -185,7 +192,7 @@ fn reputation_credential_at(
             expires_at,
         )
         .test_ok("issue dated reputation credential"),
-    )
+    ))
 }
 
 fn passport_v1(holder: &Keypair) -> AgentPassport {
@@ -203,7 +210,7 @@ fn passport_v1(holder: &Keypair) -> AgentPassport {
 
 fn valid_passport_v1(issuer: &Keypair, holder: &Keypair) -> AgentPassport {
     let credential = match reputation_credential(issuer, holder) {
-        PassportCredentialV2::Reputation(credential) => credential,
+        PassportCredentialV2::Reputation(credential) => *credential,
         PassportCredentialV2::Financial(_) => unreachable!("reputation fixture is typed"),
     };
     AgentPassport {
@@ -465,8 +472,7 @@ fn validated_v2_builder_binds_manifest_credentials_and_schema_first_admission() 
         vec![credential],
         vec!["root".to_string()],
         Vec::new(),
-        ISSUED_AT,
-        EXPIRES_AT + 1_000,
+        validity(ISSUED_AT, EXPIRES_AT + 1_000),
         None,
     )
     .test_ok("build bound v2 passport");
@@ -517,7 +523,7 @@ fn validated_v2_builder_binds_manifest_credentials_and_schema_first_admission() 
     ));
     let decoded = match decode_versioned_agent_passport(&encoded).test_ok("decode lossless upgrade")
     {
-        VersionedAgentPassport::V2(passport) => passport,
+        VersionedAgentPassport::V2(passport) => *passport,
         VersionedAgentPassport::V1(_) => panic!("v2 schema dispatches to v2"),
     };
     inspect_agent_passport_v2(&decoded, ISSUED_AT + 1).test_ok("inspect lossless upgrade");
@@ -529,14 +535,14 @@ fn validated_v2_builder_binds_manifest_credentials_and_schema_first_admission() 
     let financial_without_manifest = AgentPassportV2 {
         schema: AGENT_PASSPORT_SCHEMA_V2.to_string(),
         subject: did(&holder),
-        credentials: vec![PassportCredentialV2::Financial(
+        credentials: vec![PassportCredentialV2::Financial(Box::new(
             synthetic_financial_credential(
                 financial_subjects()
                     .into_iter()
                     .next()
                     .unwrap_or_else(|| panic!("credit fixture is present")),
             ),
-        )],
+        ))],
         merkle_roots: Vec::new(),
         enterprise_identity_provenance: Vec::new(),
         issued_at: "2024-03-09T16:00:00Z".to_string(),
@@ -561,7 +567,7 @@ fn upgraded_v2_rejects_a_nested_reputation_credential_before_its_issuance() {
     let credentials = [current, future]
         .into_iter()
         .map(|credential| match credential {
-            PassportCredentialV2::Reputation(credential) => credential,
+            PassportCredentialV2::Reputation(credential) => *credential,
             PassportCredentialV2::Financial(_) => unreachable!("reputation fixture is typed"),
         })
         .collect();
@@ -607,8 +613,7 @@ fn holder_signed_v2_response_is_exactly_selected_and_consumed_once() {
         "nonce-a",
         manifest.body.source_passport_id.clone(),
         vec![selector],
-        ISSUED_AT,
-        ISSUED_AT + 100,
+        validity(ISSUED_AT, ISSUED_AT + 100),
     )
     .test_ok("create challenge");
     let response = respond_to_passport_presentation_challenge_v2(
@@ -667,8 +672,7 @@ fn invalid_holder_signature_does_not_consume_the_challenge() {
             family: proofs[0].leaf.family.clone(),
             credential_ref_digest: proofs[0].leaf.credential_ref_digest.clone(),
         }],
-        ISSUED_AT,
-        ISSUED_AT + 100,
+        validity(ISSUED_AT, ISSUED_AT + 100),
     )
     .test_ok("create challenge");
     let response = respond_to_passport_presentation_challenge_v2(
@@ -722,8 +726,7 @@ fn presentation_selectors_reject_omission_extra_substitution_and_leaf_mismatch()
         "nonce-exact",
         manifest.body.source_passport_id.clone(),
         selectors.clone(),
-        ISSUED_AT,
-        ISSUED_AT + 100,
+        validity(ISSUED_AT, ISSUED_AT + 100),
     )
     .test_ok("create exact challenge");
 
@@ -746,8 +749,7 @@ fn presentation_selectors_reject_omission_extra_substitution_and_leaf_mismatch()
         "nonce-extra",
         manifest.body.source_passport_id.clone(),
         vec![selectors[0].clone()],
-        ISSUED_AT,
-        ISSUED_AT + 100,
+        validity(ISSUED_AT, ISSUED_AT + 100),
     )
     .test_ok("create single-selector challenge");
     assert!(matches!(
@@ -771,8 +773,7 @@ fn presentation_selectors_reject_omission_extra_substitution_and_leaf_mismatch()
         "nonce-substitution",
         manifest.body.source_passport_id.clone(),
         substituted_selectors,
-        ISSUED_AT,
-        ISSUED_AT + 100,
+        validity(ISSUED_AT, ISSUED_AT + 100),
     )
     .test_ok("create substituted challenge");
     assert!(matches!(
@@ -814,8 +815,7 @@ fn v2_passport_and_presentation_reject_unknown_fields() {
         vec![credential.clone()],
         vec!["root".to_string()],
         Vec::new(),
-        ISSUED_AT,
-        EXPIRES_AT,
+        validity(ISSUED_AT, EXPIRES_AT),
         None,
     )
     .test_ok("build v2 passport");
@@ -866,8 +866,7 @@ fn v2_passport_and_presentation_reject_unknown_fields() {
             family: proofs[0].leaf.family.clone(),
             credential_ref_digest: proofs[0].leaf.credential_ref_digest.clone(),
         }],
-        ISSUED_AT,
-        ISSUED_AT + 100,
+        validity(ISSUED_AT, ISSUED_AT + 100),
     )
     .test_ok("create challenge");
     let response = respond_to_passport_presentation_challenge_v2(
@@ -925,8 +924,7 @@ fn signed_v2_challenge_rejects_digest_signature_and_unknown_field_tampering() {
             family: proofs[0].leaf.family.clone(),
             credential_ref_digest: proofs[0].leaf.credential_ref_digest.clone(),
         }],
-        ISSUED_AT,
-        ISSUED_AT + 100,
+        validity(ISSUED_AT, ISSUED_AT + 100),
     )
     .test_ok("create signed challenge");
     inspect_passport_presentation_challenge_v2(&challenge, ISSUED_AT + 1)
@@ -985,8 +983,7 @@ fn manifest_present_passport_rejects_outer_metadata_tampering_and_addition() {
         vec![credential],
         vec!["root".to_string()],
         Vec::new(),
-        ISSUED_AT,
-        EXPIRES_AT,
+        validity(ISSUED_AT, EXPIRES_AT),
         None,
     )
     .test_ok("build authenticated metadata passport");

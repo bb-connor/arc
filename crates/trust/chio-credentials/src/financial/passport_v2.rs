@@ -112,8 +112,7 @@ pub fn build_agent_passport_v2(
     credentials: Vec<PassportCredentialV2>,
     merkle_roots: Vec<String>,
     enterprise_identity_provenance: Vec<EnterpriseIdentityProvenance>,
-    issued_at: u64,
-    valid_until: u64,
+    validity: PassportValidityWindowV2,
     trust_tier: Option<TrustTier>,
 ) -> Result<(AgentPassportV2, Vec<PassportCredentialMembershipProofV2>), CredentialError> {
     let subject = subject.into();
@@ -129,8 +128,8 @@ pub fn build_agent_passport_v2(
         issuer_keypair,
         &subject,
         &credentials,
-        issued_at,
-        valid_until,
+        validity.issued_at,
+        validity.expires_at,
         trust_tier,
     )?;
     let passport = AgentPassportV2 {
@@ -139,7 +138,7 @@ pub fn build_agent_passport_v2(
         credentials,
         merkle_roots,
         enterprise_identity_provenance,
-        issued_at: rfc3339_from_unix(issued_at)?,
+        issued_at: rfc3339_from_unix(validity.issued_at)?,
         valid_until: rfc3339_from_unix(source_manifest.body.expires_at)?,
         trust_tier,
         source_manifest: Some(source_manifest),
@@ -264,7 +263,7 @@ fn legacy_passport_view(passport: &AgentPassportV2) -> Result<AgentPassport, Cre
         .credentials
         .iter()
         .map(|credential| match credential {
-            PassportCredentialV2::Reputation(credential) => Ok(credential.clone()),
+            PassportCredentialV2::Reputation(credential) => Ok(credential.as_ref().clone()),
             PassportCredentialV2::Financial(_) => {
                 invalid_financial("financial credentials require a signed source manifest")
             }
@@ -339,8 +338,7 @@ pub fn create_passport_presentation_challenge_v2(
     nonce: impl Into<String>,
     source_passport_id: impl Into<String>,
     selectors: Vec<PassportCredentialSelectorV2>,
-    issued_at: u64,
-    expires_at: u64,
+    validity: PassportValidityWindowV2,
 ) -> Result<SignedPassportPresentationChallengeV2, CredentialError> {
     let mut challenge = PassportPresentationChallengeV2 {
         schema: PASSPORT_PRESENTATION_CHALLENGE_SCHEMA_V2.to_string(),
@@ -348,8 +346,8 @@ pub fn create_passport_presentation_challenge_v2(
         verifier_key_epoch,
         challenge_id: challenge_id.into(),
         nonce: nonce.into(),
-        issued_at: rfc3339_from_unix(issued_at)?,
-        expires_at: rfc3339_from_unix(expires_at)?,
+        issued_at: rfc3339_from_unix(validity.issued_at)?,
+        expires_at: rfc3339_from_unix(validity.expires_at)?,
         source_passport_id: source_passport_id.into(),
         selectors: normalize_selectors(selectors)?,
         challenge_digest: String::new(),
@@ -779,7 +777,7 @@ fn derive_passport_metadata(
                     .iter()
                     .cloned(),
             );
-            reputation_credentials.push(credential.clone());
+            reputation_credentials.push(credential.as_ref().clone());
         }
     }
     Ok((

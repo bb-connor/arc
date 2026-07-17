@@ -510,7 +510,7 @@ fn evaluate_financial_thresholds(
     Ok(())
 }
 
-fn normalize_proof_digests(values: &mut Vec<String>) -> Result<(), CredentialError> {
+fn normalize_proof_digests(values: &mut [String]) -> Result<(), CredentialError> {
     if values.is_empty() {
         return Err(authority_error("financial source proof set is empty"));
     }
