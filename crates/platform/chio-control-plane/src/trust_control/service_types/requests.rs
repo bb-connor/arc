@@ -462,6 +462,8 @@ pub struct ReceiptQueryHttpQuery {
     #[serde(default)]
     pub max_cost: Option<u64>,
     #[serde(default)]
+    pub cost_currency: Option<String>,
+    #[serde(default)]
     pub cursor: Option<u64>,
     #[serde(default)]
     pub limit: Option<usize>,

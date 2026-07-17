@@ -85,7 +85,8 @@ CREATE TABLE IF NOT EXISTS admission_operation_commits (
     operation_version INTEGER NOT NULL CHECK (operation_version > 0),
     mutation_kind TEXT NOT NULL CHECK (
         mutation_kind IN (
-            'begin', 'compare_and_swap', 'recovery_claim', 'participant_update'
+            'begin', 'compare_and_swap', 'recovery_claim', 'participant_update',
+            'channel_reservation_finalized'
         )
     ),
     operation_digest TEXT NOT NULL
@@ -118,14 +119,16 @@ CREATE TABLE IF NOT EXISTS admission_operation_commits (
         REFERENCES chio_serving_leases(store_uuid, owner_epoch),
     CHECK (
         (mutation_kind = 'begin'
-         AND recovery_claim_digest IS NULL
-         AND participant_digest IS NULL)
+         AND recovery_claim_digest IS NULL)
         OR (mutation_kind = 'recovery_claim'
             AND recovery_claim_digest IS NOT NULL
             AND participant_digest IS NULL)
         OR (mutation_kind = 'compare_and_swap'
             AND recovery_claim_digest IS NOT NULL)
         OR (mutation_kind = 'participant_update'
+            AND recovery_claim_digest IS NOT NULL
+            AND participant_digest IS NOT NULL)
+        OR (mutation_kind = 'channel_reservation_finalized'
             AND recovery_claim_digest IS NOT NULL
             AND participant_digest IS NOT NULL)
     )
@@ -276,7 +279,7 @@ CREATE TABLE IF NOT EXISTS admission_operation_terminal_records (
         'receipt', 'incident', 'tool_outcome', 'payment_terminal',
         'authorization_consumption', 'outcome_eligibility',
         'observation_attempt_zero', 'obligation', 'release_proof',
-        'economic_mutation_result', 'mutation_audit'
+        'channel_terminal', 'economic_mutation_result', 'mutation_audit'
     )),
     record_id TEXT NOT NULL CHECK (length(record_id) BETWEEN 1 AND 512),
     record_digest TEXT NOT NULL CHECK (
@@ -303,6 +306,115 @@ CREATE TRIGGER IF NOT EXISTS admission_operation_terminal_records_no_delete
 BEFORE DELETE ON admission_operation_terminal_records
 BEGIN
     SELECT RAISE(ABORT, 'admission terminal record is immutable');
+END;
+
+CREATE TABLE IF NOT EXISTS obligation_atoms (
+    obligation_id TEXT NOT NULL PRIMARY KEY CHECK (
+        length(obligation_id) = 64
+        AND obligation_id NOT GLOB '*[^0-9a-f]*'
+    ),
+    operation_id TEXT NOT NULL UNIQUE,
+    atom_digest TEXT NOT NULL UNIQUE CHECK (
+        length(atom_digest) = 64
+        AND atom_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    source_receipt_id TEXT NOT NULL UNIQUE CHECK (
+        length(source_receipt_id) BETWEEN 1 AND 512
+    ),
+    source_receipt_digest TEXT NOT NULL UNIQUE CHECK (
+        length(source_receipt_digest) = 64
+        AND source_receipt_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    atom_json BLOB NOT NULL CHECK (length(atom_json) BETWEEN 1 AND 1048576),
+    committed_at_unix_ms INTEGER NOT NULL CHECK (committed_at_unix_ms > 0),
+    store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),
+    store_lease_id TEXT NOT NULL CHECK (store_lease_id <> ''),
+    store_owner_epoch INTEGER NOT NULL CHECK (store_owner_epoch > 0),
+    UNIQUE (obligation_id, atom_digest),
+    FOREIGN KEY (operation_id)
+        REFERENCES admission_operation_terminal_projections(operation_id),
+    FOREIGN KEY (store_uuid, store_owner_epoch)
+        REFERENCES chio_serving_leases(store_uuid, owner_epoch)
+);
+
+CREATE TRIGGER IF NOT EXISTS obligation_atoms_exact_lease
+BEFORE INSERT ON obligation_atoms
+WHEN NOT EXISTS (
+    SELECT 1 FROM chio_serving_leases
+    WHERE store_uuid = NEW.store_uuid
+      AND owner_epoch = NEW.store_owner_epoch
+      AND lease_id = NEW.store_lease_id
+      AND end_head_index IS NULL
+)
+BEGIN
+    SELECT RAISE(ABORT, 'obligation atom has no exact serving lease');
+END;
+
+CREATE TRIGGER IF NOT EXISTS obligation_atoms_immutable
+BEFORE UPDATE ON obligation_atoms
+BEGIN
+    SELECT RAISE(ABORT, 'obligation atom is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS obligation_atoms_no_delete
+BEFORE DELETE ON obligation_atoms
+BEGIN
+    SELECT RAISE(ABORT, 'obligation atom is immutable');
+END;
+
+CREATE TABLE IF NOT EXISTS obligation_disposition_records (
+    obligation_id TEXT NOT NULL,
+    version INTEGER NOT NULL CHECK (version > 0),
+    lifecycle_fence INTEGER NOT NULL CHECK (lifecycle_fence = version),
+    atom_digest TEXT NOT NULL CHECK (
+        length(atom_digest) = 64
+        AND atom_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    disposition_digest TEXT NOT NULL UNIQUE CHECK (
+        length(disposition_digest) = 64
+        AND disposition_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    operation_id TEXT NOT NULL,
+    record_json BLOB NOT NULL CHECK (length(record_json) BETWEEN 1 AND 1048576),
+    committed_at_unix_ms INTEGER NOT NULL CHECK (committed_at_unix_ms > 0),
+    store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),
+    store_lease_id TEXT NOT NULL CHECK (store_lease_id <> ''),
+    store_owner_epoch INTEGER NOT NULL CHECK (store_owner_epoch > 0),
+    PRIMARY KEY (obligation_id, version),
+    FOREIGN KEY (obligation_id, atom_digest)
+        REFERENCES obligation_atoms(obligation_id, atom_digest),
+    FOREIGN KEY (operation_id)
+        REFERENCES admission_operation_terminal_projections(operation_id),
+    FOREIGN KEY (store_uuid, store_owner_epoch)
+        REFERENCES chio_serving_leases(store_uuid, owner_epoch)
+);
+
+CREATE INDEX IF NOT EXISTS obligation_disposition_records_operation
+    ON obligation_disposition_records(operation_id, obligation_id, version);
+
+CREATE TRIGGER IF NOT EXISTS obligation_disposition_records_exact_lease
+BEFORE INSERT ON obligation_disposition_records
+WHEN NOT EXISTS (
+    SELECT 1 FROM chio_serving_leases
+    WHERE store_uuid = NEW.store_uuid
+      AND owner_epoch = NEW.store_owner_epoch
+      AND lease_id = NEW.store_lease_id
+      AND end_head_index IS NULL
+)
+BEGIN
+    SELECT RAISE(ABORT, 'obligation disposition has no exact serving lease');
+END;
+
+CREATE TRIGGER IF NOT EXISTS obligation_disposition_records_immutable
+BEFORE UPDATE ON obligation_disposition_records
+BEGIN
+    SELECT RAISE(ABORT, 'obligation disposition record is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS obligation_disposition_records_no_delete
+BEFORE DELETE ON obligation_disposition_records
+BEGIN
+    SELECT RAISE(ABORT, 'obligation disposition record is immutable');
 END;
 
 CREATE TABLE IF NOT EXISTS admission_operation_authorization_consumptions (

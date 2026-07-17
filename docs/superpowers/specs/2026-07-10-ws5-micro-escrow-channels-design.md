@@ -218,13 +218,18 @@ versioned schema identifiers, and signatures over immutable bodies.
   acknowledgement, initial state, and final consent.
 - `chio.channel.reservation.v1` binds `reservation_id`, channel and open
   digests, stable request reference, exact next sequence, expected prior state
-  digest, quote digest, trusted receipt-authority digest, maximum
+  digest, the domain-separated digest of the exact request, admission handoff,
+  provider target, and action binding, trusted receipt-authority digest, maximum
   `MonetaryAmount`, exact maximum token base units, expiry, disposition-store
   expected version, expected channel state version and lifecycle fence, and the
   payer plus channel-authority signatures. It is the
   payer's irrevocable one-shot authorization for the exact receipt-derived next
   state and is durably persisted before tool dispatch. V1 permits one live
   reservation per channel.
+- A positive-charge obligation uses the reservation proposal digest as its
+  economic-intent digest. This binds the obligation to the complete signed
+  pre-service authority, including the exact service binding and charge ceiling,
+  without depending on a separate unverifiable quote artifact.
 - `chio.channel.state.v1` binds `channel_id`, exact `seq`,
   `prev_state_digest`, `cumulative_owed`, ordered receipt-id root and count,
   the new trusted-kernel receipt and

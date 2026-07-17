@@ -282,6 +282,317 @@ fn concurrent_writable_opens_serialize_lineage_migration_and_stamp() {
 }
 
 #[test]
+fn receipt_cost_projection_migration_backfills_full_u64_domain(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-receipts-cost-projection-migration");
+    let store = SqliteReceiptStore::open(&path)?;
+    let signed_max = u64::try_from(i64::MAX)?;
+    store.append_chio_receipt(&sample_receipt_with_id("no-cost"))?;
+    for (id, cost) in [
+        ("signed-max", signed_max),
+        ("unsigned-boundary", signed_max + 1),
+        ("unsigned-max", u64::MAX),
+    ] {
+        store.append_chio_receipt(&sample_financial_receipt(id, cost)?)?;
+    }
+    drop(store);
+
+    let connection = rusqlite::Connection::open(&path)?;
+    connection.execute_batch(
+        "DROP INDEX IF EXISTS idx_chio_tool_receipts_cost;\
+         DROP INDEX IF EXISTS idx_chio_tool_receipts_cost_global;\
+         ALTER TABLE chio_tool_receipts DROP COLUMN cost_charged_be;\
+         ALTER TABLE chio_tool_receipts DROP COLUMN cost_currency;",
+    )?;
+    crate::stamp_schema_version(&connection, "receipt", 2)?;
+    drop(connection);
+
+    let migrated = SqliteReceiptStore::open(&path)?;
+    let connection = migrated.connection()?;
+    let rows = connection
+        .prepare("SELECT cost_currency, cost_charged_be FROM chio_tool_receipts ORDER BY seq ASC")?
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, Option<String>>(0)?,
+                row.get::<_, Option<Vec<u8>>>(1)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(
+        rows,
+        vec![
+            (None, None),
+            (
+                Some("USD".to_string()),
+                Some(signed_max.to_be_bytes().to_vec())
+            ),
+            (
+                Some("USD".to_string()),
+                Some((signed_max + 1).to_be_bytes().to_vec())
+            ),
+            (
+                Some("USD".to_string()),
+                Some(u64::MAX.to_be_bytes().to_vec())
+            ),
+        ]
+    );
+    let index_columns = connection
+        .prepare("PRAGMA index_info(idx_chio_tool_receipts_cost)")?
+        .query_map([], |row| row.get::<_, String>(2))?
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(
+        index_columns,
+        vec!["tenant_id", "cost_currency", "cost_charged_be", "seq"]
+    );
+    let global_index_columns = connection
+        .prepare("PRAGMA index_info(idx_chio_tool_receipts_cost_global)")?
+        .query_map([], |row| row.get::<_, String>(2))?
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(
+        global_index_columns,
+        vec!["cost_currency", "cost_charged_be", "seq"]
+    );
+    let version: i32 = connection.query_row(
+        "SELECT version FROM chio_store_schema_versions WHERE store_key = 'receipt'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(
+        version,
+        crate::receipt_store::RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION
+    );
+
+    drop(connection);
+    drop(migrated);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn receipt_cost_projection_migration_rolls_back_malformed_receipt(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-receipts-cost-projection-malformed");
+    let store = SqliteReceiptStore::open(&path)?;
+    store.append_chio_receipt(&sample_financial_receipt("valid-cost", 7)?)?;
+    store.append_chio_receipt(&sample_financial_receipt("malformed-cost", 8)?)?;
+    drop(store);
+
+    let mut connection = rusqlite::Connection::open(&path)?;
+    connection.execute_batch(
+        "DROP TRIGGER chio_tool_receipts_reject_update;\
+         DROP INDEX idx_chio_tool_receipts_cost;\
+         DROP INDEX idx_chio_tool_receipts_cost_global;\
+         ALTER TABLE chio_tool_receipts DROP COLUMN cost_charged_be;\
+         ALTER TABLE chio_tool_receipts DROP COLUMN cost_currency;\
+         UPDATE chio_tool_receipts SET raw_json = '{' WHERE seq = 2;",
+    )?;
+    let migration =
+        connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+    let error = match migrate_receipt_cost_projection(&migration) {
+        Ok(()) => {
+            return Err(std::io::Error::other("malformed receipt migration succeeded").into())
+        }
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("failed to decode"));
+    migration.rollback()?;
+    let projected_columns: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('chio_tool_receipts') \
+         WHERE name IN ('cost_currency', 'cost_charged_be')",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(projected_columns, 0);
+
+    drop(connection);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn receipt_cost_projection_migration_rolls_back_divergent_projection(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-receipts-cost-projection-divergent");
+    let store = SqliteReceiptStore::open(&path)?;
+    store.append_chio_receipt(&sample_financial_receipt("missing-cost", 7)?)?;
+    store.append_chio_receipt(&sample_financial_receipt("divergent-cost", 8)?)?;
+    drop(store);
+
+    let mut connection = rusqlite::Connection::open(&path)?;
+    connection.execute_batch("DROP TRIGGER chio_tool_receipts_reject_update")?;
+    connection.execute(
+        "UPDATE chio_tool_receipts SET cost_currency = NULL, cost_charged_be = NULL WHERE seq = 1",
+        [],
+    )?;
+    connection.execute(
+        "UPDATE chio_tool_receipts SET cost_charged_be = ?1 WHERE seq = 2",
+        [0_u64.to_be_bytes().as_slice()],
+    )?;
+    let migration =
+        connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+    let error = match migrate_receipt_cost_projection(&migration) {
+        Ok(()) => {
+            return Err(std::io::Error::other("divergent projection migration succeeded").into())
+        }
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("different cost projection"));
+    migration.rollback()?;
+    let first_projection = connection.query_row(
+        "SELECT cost_currency, cost_charged_be FROM chio_tool_receipts WHERE seq = 1",
+        [],
+        |row| {
+            Ok((
+                row.get::<_, Option<String>>(0)?,
+                row.get::<_, Option<Vec<u8>>>(1)?,
+            ))
+        },
+    )?;
+    assert_eq!(first_projection, (None, None));
+
+    drop(connection);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn receipt_cost_projection_columns_reject_invalid_pairs() -> Result<(), Box<dyn std::error::Error>>
+{
+    let path = unique_db_path("chio-receipts-cost-projection-constraints");
+    drop(SqliteReceiptStore::open(&path)?);
+    let mut connection = rusqlite::Connection::open(&path)?;
+    let transaction = connection.transaction()?;
+
+    for (index, currency, cost) in [
+        (0, Some("USD"), None),
+        (1, None, Some(vec![0_u8; 8])),
+        (2, Some("usd"), Some(vec![0_u8; 8])),
+        (3, Some("USD"), Some(vec![0_u8; 7])),
+    ] {
+        let result = transaction.execute(
+            "INSERT INTO chio_tool_receipts (
+                 receipt_id, timestamp, capability_id, tool_server, tool_name,
+                 decision_kind, policy_hash, content_hash, raw_json,
+                 cost_currency, cost_charged_be
+             ) VALUES (?1, 1, 'cap', 'server', 'tool', 'allow', 'policy', 'content', '{}', ?2, ?3)",
+            rusqlite::params![format!("invalid-{index}"), currency, cost],
+        );
+        assert!(
+            result.is_err(),
+            "invalid cost projection {index} was accepted"
+        );
+    }
+
+    transaction.rollback()?;
+    drop(connection);
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
+fn explicit_audit_rejects_missing_or_divergent_cost_projection(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for (suffix, replacement) in [("missing", None), ("divergent", Some(0_u64.to_be_bytes()))] {
+        let path = unique_db_path(&format!("chio-receipts-cost-projection-{suffix}"));
+        let store = SqliteReceiptStore::open(&path)?;
+        store.append_chio_receipt(&sample_financial_receipt(suffix, u64::MAX)?)?;
+        drop(store);
+
+        let connection = rusqlite::Connection::open(&path)?;
+        connection.execute_batch("DROP TRIGGER chio_tool_receipts_reject_update")?;
+        match replacement {
+            Some(key) => {
+                connection.execute(
+                    "UPDATE chio_tool_receipts SET cost_charged_be = ?1",
+                    [key.as_slice()],
+                )?;
+            }
+            None => {
+                connection.execute(
+                    "UPDATE chio_tool_receipts SET cost_currency = NULL, cost_charged_be = NULL",
+                    [],
+                )?;
+            }
+        }
+        ensure_transparency_projection_guards(&connection)?;
+        drop(connection);
+
+        let reopened = SqliteReceiptStore::open_existing(&path)?;
+        let Err(error) = reopened.audit_receipt_cost_projection() else {
+            return Err("cost projection audit unexpectedly succeeded".into());
+        };
+        assert!(error.to_string().contains("different cost projection"));
+        drop(reopened);
+        let _ = fs::remove_file(path);
+    }
+    Ok(())
+}
+
+#[test]
+fn current_receipt_schema_rejects_substituted_cost_indexes(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for (name, columns) in [
+        (
+            "idx_chio_tool_receipts_cost",
+            "tenant_id, cost_currency, seq, cost_charged_be",
+        ),
+        (
+            "idx_chio_tool_receipts_cost_global",
+            "cost_currency, seq, cost_charged_be",
+        ),
+    ] {
+        let path = unique_db_path(&format!("chio-receipts-{name}-substituted"));
+        drop(SqliteReceiptStore::open(&path)?);
+
+        let connection = rusqlite::Connection::open(&path)?;
+        connection.execute_batch(&format!(
+            "DROP INDEX {name}; CREATE INDEX {name} ON chio_tool_receipts({columns});"
+        ))?;
+        drop(connection);
+
+        let error = match SqliteReceiptStore::open_existing(&path) {
+            Ok(_) => {
+                return Err(std::io::Error::other("substituted cost index was accepted").into())
+            }
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("cost projection schema"));
+
+        let _ = fs::remove_file(path);
+    }
+    Ok(())
+}
+
+#[test]
+fn current_receipt_schema_rejects_substituted_immutability_guard(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("chio-receipts-cost-guard-substituted");
+    drop(SqliteReceiptStore::open(&path)?);
+
+    let connection = rusqlite::Connection::open(&path)?;
+    connection.execute_batch(
+        "DROP TRIGGER chio_tool_receipts_reject_update;
+         CREATE TRIGGER chio_tool_receipts_reject_update
+         BEFORE UPDATE ON chio_tool_receipts
+         BEGIN
+             SELECT 1;
+         END;",
+    )?;
+    drop(connection);
+
+    let error = match SqliteReceiptStore::open_existing(&path) {
+        Ok(_) => {
+            return Err(std::io::Error::other("substituted immutability guard was accepted").into())
+        }
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("cost projection schema"));
+
+    let _ = fs::remove_file(path);
+    Ok(())
+}
+
+#[test]
 fn open_refuses_foreign_database_without_switching_it_to_wal() {
     let path = unique_db_path("chio-receipts-foreign-no-wal");
 

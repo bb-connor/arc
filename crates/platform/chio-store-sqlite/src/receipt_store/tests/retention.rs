@@ -148,6 +148,44 @@ fn store_with_archived_first_checkpoint(
 }
 
 #[test]
+fn retention_preserves_exact_cost_projection() -> Result<(), Box<dyn std::error::Error>> {
+    let path = unique_db_path("cost-projection-retention");
+    let archive = unique_db_path("cost-projection-retention-archive");
+    let archive_path = archive.to_str().ok_or("archive path is not valid utf-8")?;
+    let keypair = super::support::receipt_test_keypair();
+    let store = SqliteReceiptStore::open(&path)?;
+    store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
+    for (id, cost) in [("archived-cost-max", u64::MAX), ("archived-cost-zero", 0)] {
+        store.append_chio_receipt_returning_seq(&super::support::sample_financial_receipt(
+            id, cost,
+        )?)?;
+    }
+    store.flush_receipt_writes()?;
+    assert_eq!(store.archive_receipts_before(2, archive_path)?, 2);
+
+    let archived = rusqlite::Connection::open(&archive)?;
+    let projections = archived
+        .prepare("SELECT cost_currency, cost_charged_be FROM chio_tool_receipts ORDER BY seq ASC")?
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(
+        projections,
+        vec![
+            ("USD".to_string(), u64::MAX.to_be_bytes().to_vec()),
+            ("USD".to_string(), 0_u64.to_be_bytes().to_vec()),
+        ]
+    );
+
+    drop(archived);
+    drop(store);
+    let _ = std::fs::remove_file(path);
+    let _ = std::fs::remove_file(archive);
+    Ok(())
+}
+
+#[test]
 fn checkpoint_chain_watermark_exemption() -> Result<(), Box<dyn std::error::Error>> {
     use crate::receipt_store::support::verify_checkpoint_chain_integrity;
 
@@ -1688,6 +1726,7 @@ fn repair_creates_missing_watermark_ledger_on_legacy_store(
                        BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END; \
                      DROP TABLE IF EXISTS receipt_retention_watermark;",
                 )?;
+                super::support::restore_transparency_projection_guards(connection)?;
                 connection.execute_batch("DETACH DATABASE archive")?;
                 Ok(())
             }
@@ -1956,6 +1995,7 @@ fn repair_rejects_divergent_archive_identity() -> Result<(), Box<dyn std::error:
                        BEFORE DELETE ON chio_tool_receipts \
                        BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END;",
                 )?;
+                super::support::restore_transparency_projection_guards(connection)?;
                 connection.execute_batch("DETACH DATABASE archive")?;
                 Ok(())
             }
@@ -2043,6 +2083,7 @@ fn repair_refuses_partial_checkpoint_batch() -> Result<(), Box<dyn std::error::E
                        BEFORE DELETE ON chio_tool_receipts \
                        BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END;",
                 )?;
+                super::support::restore_transparency_projection_guards(connection)?;
                 connection.execute_batch("DETACH DATABASE archive")?;
                 Ok(())
             }
@@ -2136,6 +2177,7 @@ fn repair_refuses_incomplete_prefix_archive() -> Result<(), Box<dyn std::error::
                        BEFORE DELETE ON claim_receipt_log_entries \
                        BEGIN SELECT RAISE(ABORT, 'claim_receipt_log_entries is append-only'); END;",
                 )?;
+                super::support::restore_transparency_projection_guards(connection)?;
                 connection.execute_batch("DETACH DATABASE archive")?;
                 Ok(())
             }
@@ -2234,6 +2276,7 @@ fn repair_is_idempotent_when_watermark_already_covers_boundary(
                        BEFORE DELETE ON chio_tool_receipts \
                        BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END;",
                 )?;
+                super::support::restore_transparency_projection_guards(connection)?;
                 connection.execute_batch("DETACH DATABASE archive")?;
                 // The ledger must name the real archive the botched rotation
                 // co-archived [1,2] into, so the reopen's watermark check finds
@@ -3417,6 +3460,7 @@ fn repair_tombstones_archived_ids_to_block_reuse() -> Result<(), Box<dyn std::er
                        BEFORE DELETE ON chio_tool_receipts \
                        BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END;",
                 )?;
+                super::support::restore_transparency_projection_guards(connection)?;
                 connection.execute_batch("DETACH DATABASE archive")?;
                 Ok(())
             }
@@ -3499,6 +3543,7 @@ fn repair_tombstones_already_deleted_prefix_ids() -> Result<(), Box<dyn std::err
                        BEFORE DELETE ON claim_receipt_log_entries \
                        BEGIN SELECT RAISE(ABORT, 'claim receipt log entries are immutable'); END;",
                 )?;
+                super::support::restore_transparency_projection_guards(connection)?;
                 connection.execute_batch("DETACH DATABASE archive")?;
                 Ok(())
             }
@@ -3620,6 +3665,7 @@ fn repair_rejects_archive_that_does_not_back_the_watermark(
                        BEFORE DELETE ON claim_receipt_log_entries \
                        BEGIN SELECT RAISE(ABORT, 'claim receipt log entries are immutable'); END;",
                 )?;
+                super::support::restore_transparency_projection_guards(connection)?;
                 crate::receipt_store::support::insert_receipt_retention_watermark(
                     connection,
                     2,
@@ -3976,6 +4022,7 @@ fn repair_rejects_corrupted_archive_prefix() -> Result<(), Box<dyn std::error::E
                        BEFORE DELETE ON claim_receipt_log_entries \
                        BEGIN SELECT RAISE(ABORT, 'claim_receipt_log_entries is append-only'); END;",
                 )?;
+                super::support::restore_transparency_projection_guards(connection)?;
                 connection.execute_batch("DETACH DATABASE archive")?;
                 Ok(())
             }
@@ -4068,6 +4115,7 @@ fn repair_refuses_when_ledger_names_missing_archive() -> Result<(), Box<dyn std:
                        BEFORE DELETE ON chio_tool_receipts \
                        BEGIN SELECT RAISE(ABORT, 'chio_tool_receipts is append-only'); END;",
                 )?;
+                super::support::restore_transparency_projection_guards(connection)?;
                 connection.execute_batch("DETACH DATABASE archive")?;
                 // Record a covering watermark that names a path with no archive.
                 let missing = format!("{archive_path}.missing");

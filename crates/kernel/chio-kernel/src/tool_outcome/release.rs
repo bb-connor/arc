@@ -125,6 +125,7 @@ enum ReleaseParticipantV1 {
     Nonce,
     OutcomeEligibility,
     Payment,
+    Channel,
     Transport,
 }
 
@@ -137,6 +138,7 @@ impl ReleaseParticipantV1 {
             Self::Nonce => "nonce",
             Self::OutcomeEligibility => "outcome-eligibility",
             Self::Payment => "payment",
+            Self::Channel => "channel",
             Self::Transport => "transport",
         }
     }
@@ -429,14 +431,17 @@ impl VerifiedParticipantNoEffectV1 {
                 verification_store_fence,
                 verified_at_unix_ms,
             ),
-            Self::ReleasedBeforeDispatch { evidence } if required && attached => evidence
-                .validate_for(
+            Self::ReleasedBeforeDispatch { evidence }
+                if required && attached && participant != ReleaseParticipantV1::Channel =>
+            {
+                evidence.validate_for(
                     operation,
                     participant,
                     ParticipantNoEffectDispositionV1::ReleasedBeforeDispatch,
                     verification_store_fence,
                     verified_at_unix_ms,
-                ),
+                )
+            }
             Self::NotDispatched { evidence }
                 if participant == ReleaseParticipantV1::Transport
                     && required
@@ -471,6 +476,7 @@ fn participant_attachments(
         ReleaseParticipantV1::Nonce => &[AdmissionAttachmentKind::ExecutionNonce],
         ReleaseParticipantV1::OutcomeEligibility => &[AdmissionAttachmentKind::OutcomeEligibility],
         ReleaseParticipantV1::Payment => &[AdmissionAttachmentKind::PaymentParticipant],
+        ReleaseParticipantV1::Channel => &[AdmissionAttachmentKind::ChannelReservation],
         ReleaseParticipantV1::Transport => &[],
     };
     kinds
@@ -488,6 +494,7 @@ struct PreDispatchParticipantDispositionsV1 {
     nonce: VerifiedParticipantNoEffectV1,
     outcome_eligibility: VerifiedParticipantNoEffectV1,
     payment: VerifiedParticipantNoEffectV1,
+    channel: VerifiedParticipantNoEffectV1,
     transport: VerifiedParticipantNoEffectV1,
 }
 
@@ -501,6 +508,7 @@ impl PreDispatchParticipantDispositionsV1 {
         nonce: VerifiedParticipantNoEffectV1,
         outcome_eligibility: VerifiedParticipantNoEffectV1,
         payment: VerifiedParticipantNoEffectV1,
+        channel: VerifiedParticipantNoEffectV1,
         transport: VerifiedParticipantNoEffectV1,
     ) -> Self {
         Self {
@@ -510,6 +518,7 @@ impl PreDispatchParticipantDispositionsV1 {
             nonce,
             outcome_eligibility,
             payment,
+            channel,
             transport,
         }
     }
@@ -563,6 +572,13 @@ impl PreDispatchParticipantDispositionsV1 {
             verification_store_fence,
             verified_at_unix_ms,
         )?;
+        self.channel.validate_for(
+            operation,
+            ReleaseParticipantV1::Channel,
+            required.channel,
+            verification_store_fence,
+            verified_at_unix_ms,
+        )?;
         self.transport.validate_for(
             operation,
             ReleaseParticipantV1::Transport,
@@ -585,6 +601,7 @@ fn required_release_participants(operation: &AdmissionOperationV1) -> Vec<Releas
             ReleaseParticipantV1::OutcomeEligibility,
         ),
         (required.payment, ReleaseParticipantV1::Payment),
+        (required.channel, ReleaseParticipantV1::Channel),
         (true, ReleaseParticipantV1::Transport),
     ]
     .into_iter()
@@ -657,7 +674,11 @@ impl VerifiedPreDispatchNoEffect {
         let participant = |kind, required| {
             if !participant_attachments(operation, kind).is_empty() {
                 return Err(ToolOutcomeError::Binding(
-                    "predispatch.acquired_participant",
+                    if kind == ReleaseParticipantV1::Channel {
+                        "predispatch.channel_cancellation_required"
+                    } else {
+                        "predispatch.acquired_participant"
+                    },
                 ));
             }
             if required {
@@ -675,6 +696,7 @@ impl VerifiedPreDispatchNoEffect {
                 Ok(VerifiedParticipantNoEffectV1::NotRequired)
             }
         };
+        let channel = participant(ReleaseParticipantV1::Channel, requirements.channel)?;
         let participant_dispositions = PreDispatchParticipantDispositionsV1 {
             broker: participant(ReleaseParticipantV1::Broker, requirements.broker_attempt)?,
             budget: participant(ReleaseParticipantV1::Budget, requirements.budget_capture)?,
@@ -685,6 +707,7 @@ impl VerifiedPreDispatchNoEffect {
                 requirements.outcome_eligibility,
             )?,
             payment: participant(ReleaseParticipantV1::Payment, requirements.payment)?,
+            channel,
             transport: VerifiedParticipantNoEffectV1::NotDispatched {
                 evidence: VerifiedParticipantNoEffectEvidenceV1::from_verified_source(
                     operation,

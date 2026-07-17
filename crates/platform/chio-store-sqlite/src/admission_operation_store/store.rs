@@ -7,67 +7,36 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<AdmissionBeginResult, AdmissionOperationStoreError> {
-        operation.validate()?;
-        if operation.state() != AdmissionOperationState::Prepared || operation.version() != 1 {
-            return Err(invariant("begin requires a version-one Prepared operation"));
-        }
-        if operation.coordinator_lease_epoch() != fence.owner_epoch {
-            return Err(AdmissionOperationStoreError::Fenced);
-        }
-        let encoded = encode_operation(operation)?;
-        let replay_key = operation.replay_key();
-        let mut connection = self.connection()?;
-        let transaction = self.begin_write(&mut connection, Some(fence))?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms)?;
-
-        if let Some(existing) = load_by_replay_key_tx(&transaction, &replay_key)? {
-            let result = match existing.operation.classify_replay(operation) {
-                AdmissionReplayClassification::Exact { terminal_replay } => {
-                    AdmissionBeginResult::ExactReplay {
-                        operation: existing.operation,
-                        terminal_replay,
-                    }
-                }
-                AdmissionReplayClassification::Conflict => AdmissionBeginResult::Conflict {
-                    existing_operation_id: existing.operation.binding().operation_id().clone(),
-                },
-            };
-            transaction.commit().map_err(sqlite_error)?;
-            return Ok(result);
-        }
-        if load_by_operation_id_tx(&transaction, operation.binding().operation_id())?.is_some() {
+        if operation.binding().participant_requirements().channel {
             return Err(invariant(
-                "operation id is already bound to a different replay key",
+                "channel operations require the atomic channel prepared begin",
             ));
         }
-
-        let changed = transaction
-            .execute(
-                r#"
-                INSERT INTO admission_operations (
-                    operation_id, request_namespace_digest, request_id,
-                    operation_json, state, terminal, coordinator_lease_epoch,
-                    version, created_at_unix_ms, updated_at_unix_ms
-                ) VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, ?8, ?8)
-                "#,
-                params![
-                    operation.binding().operation_id().as_str(),
-                    replay_key.request_namespace_digest.as_str(),
-                    replay_key.request_id.as_str(),
-                    encoded,
-                    state_name(operation.state()),
-                    sqlite_i64(
-                        operation.coordinator_lease_epoch(),
-                        "coordinator_lease_epoch"
-                    )?,
-                    sqlite_i64(operation.version(), "version")?,
-                    sqlite_i64(trusted_now_unix_ms, "created_at_unix_ms")?,
-                ],
-            )
-            .map_err(sqlite_error)?;
-        if changed != 1 {
-            return Err(invariant("begin did not insert exactly one operation"));
-        }
+        let mut connection = self.connection()?;
+        let transaction = self.begin_write(&mut connection, Some(fence))?;
+        let encoded =
+            match begin_prepared_operation_tx(&transaction, operation, fence, trusted_now_unix_ms)?
+            {
+                PreparedAdmissionBeginTxResult::Created { encoded } => encoded,
+                PreparedAdmissionBeginTxResult::ExactReplay {
+                    operation,
+                    terminal_replay,
+                } => {
+                    transaction.commit().map_err(sqlite_error)?;
+                    return Ok(AdmissionBeginResult::ExactReplay {
+                        operation: *operation,
+                        terminal_replay,
+                    });
+                }
+                PreparedAdmissionBeginTxResult::Conflict {
+                    existing_operation_id,
+                } => {
+                    transaction.commit().map_err(sqlite_error)?;
+                    return Ok(AdmissionBeginResult::Conflict {
+                        existing_operation_id,
+                    });
+                }
+            };
         append_operation_commit(
             &transaction,
             operation,
@@ -116,6 +85,8 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         verify_trusted_time(&transaction, trusted_now_unix_ms)?;
         let stored = load_by_operation_id_tx(&transaction, command.operation_id())?
             .ok_or(AdmissionOperationStoreError::NotFound)?;
+        ensure_no_reserved_terminal_stage(&transaction, command.operation_id())?;
+        qualify_generic_channel_command(&transaction, &stored.operation, command)?;
         if trusted_now_unix_ms < stored.updated_at_unix_ms {
             return Err(invariant("trusted operation time regressed"));
         }
@@ -183,7 +154,7 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         expires_at_unix_ms: u64,
         fence: &StoreMutationFence,
     ) -> Result<UntrustedAdmissionRecoveryClaim, AdmissionOperationStoreError> {
-        validate_trusted_now(trusted_now_unix_ms, "trusted_now_unix_ms")?;
+        validate_trusted_time(trusted_now_unix_ms, "trusted_now_unix_ms")?;
         validate_trusted_time(expires_at_unix_ms, "expires_at_unix_ms")?;
         if expected_version == 0 {
             return Err(AdmissionOperationError::ZeroVersionOrEpoch.into());
@@ -211,6 +182,24 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
                 actual: stored.operation.version(),
             }
             .into());
+        }
+        if crate::economic_state_cache::has_reserved_terminal_stage(
+            &transaction,
+            operation_id.as_str(),
+        )
+        .map_err(map_economic_cache_error)?
+        {
+            if let Some(active) = stored.recovery_claim.as_ref().filter(|active| {
+                active.expires_at_unix_ms() > trusted_now_unix_ms
+                    && active.store_fence() == fence
+                    && active.claimant_id() == claimant_id
+                    && active.claimed_version() == expected_version
+            }) {
+                let active = active.clone();
+                transaction.commit().map_err(sqlite_error)?;
+                return Ok(active);
+            }
+            return Err(AdmissionOperationStoreError::Fenced);
         }
 
         let coordinator_lease_id = coordinator_lease_id_for_epoch(

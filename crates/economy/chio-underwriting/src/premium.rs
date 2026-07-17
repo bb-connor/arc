@@ -288,6 +288,8 @@ pub enum PremiumDeclineReason {
     MissingComplianceScore,
     /// Inputs were malformed (for example currency or base rate).
     InvalidInputs,
+    LegacyPrecisionUnsafe,
+    ArithmeticOverflow,
 }
 
 /// Price a premium for `agent_id` against `scope` over `lookback_window`.
@@ -343,8 +345,48 @@ pub fn price_premium(
         };
     }
 
-    let score_adjustment = risk_multiplier(combined_score);
-    let quoted_cents = compute_quoted_cents(inputs.base_rate_cents, score_adjustment);
+    if inputs.base_rate_cents > (1_u64 << 53) {
+        return PremiumQuote::Declined {
+            agent_id: agent_id.to_string(),
+            scope: scope.to_string(),
+            lookback_window,
+            combined_score: Some(combined_score),
+            reason: PremiumDeclineReason::LegacyPrecisionUnsafe,
+            justification: format!(
+                "premium base_rate_cents {} exceeds the exact legacy integer domain",
+                inputs.base_rate_cents
+            ),
+        };
+    }
+
+    let adjustment_bps = match risk_adjustment_basis_points(combined_score) {
+        Ok(adjustment_bps) => adjustment_bps,
+        Err(reason) => {
+            return PremiumQuote::Declined {
+                agent_id: agent_id.to_string(),
+                scope: scope.to_string(),
+                lookback_window,
+                combined_score: Some(combined_score),
+                reason,
+                justification: "premium score is outside the quotable schedule".to_string(),
+            };
+        }
+    };
+    let score_adjustment = f64::from(adjustment_bps) / 10_000.0;
+    let quoted_cents = match compute_fixed_point_quote(inputs.base_rate_cents, adjustment_bps) {
+        Ok(quoted_cents) => quoted_cents,
+        Err(reason) => {
+            return PremiumQuote::Declined {
+                agent_id: agent_id.to_string(),
+                scope: scope.to_string(),
+                lookback_window,
+                combined_score: Some(combined_score),
+                reason,
+                justification: "premium monetary arithmetic exceeded its bounded domain"
+                    .to_string(),
+            };
+        }
+    };
 
     PremiumQuote::Quoted {
         agent_id: agent_id.to_string(),
@@ -413,24 +455,30 @@ fn behavioral_penalty(z: Option<f64>, inputs: &PremiumInputs) -> (u32, String) {
     }
 }
 
-fn compute_quoted_cents(base: u64, multiplier: f64) -> u64 {
-    // `base * (1 + multiplier)` on integer cents, with saturating fallback
-    // so an absurd multiplier never overflows silently.
-    if !multiplier.is_finite() || multiplier < 0.0 {
-        return u64::MAX;
+fn risk_adjustment_basis_points(score: u32) -> Result<u32, PremiumDeclineReason> {
+    if score > PREMIUM_LOW_RISK_FLOOR {
+        Ok(10_000)
+    } else if score >= PREMIUM_MEDIUM_RISK_FLOOR {
+        Ok(20_000)
+    } else if score >= PREMIUM_HIGH_RISK_FLOOR {
+        Ok(50_000)
+    } else {
+        Err(PremiumDeclineReason::ScoreBelowFloor)
     }
-    let factor = 1.0 + multiplier;
-    let product = (base as f64) * factor;
-    if !product.is_finite() || product < 0.0 {
-        return u64::MAX;
-    }
-    // Round to nearest cent to keep the formula deterministic regardless of
-    // fp noise; clamp into u64 range.
-    let rounded = product.round();
-    if rounded >= (u64::MAX as f64) {
-        return u64::MAX;
-    }
-    rounded as u64
+}
+
+fn compute_fixed_point_quote(base: u64, adjustment_bps: u32) -> Result<u64, PremiumDeclineReason> {
+    let factor = 10_000_u128
+        .checked_add(u128::from(adjustment_bps))
+        .ok_or(PremiumDeclineReason::ArithmeticOverflow)?;
+    let numerator = u128::from(base)
+        .checked_mul(factor)
+        .ok_or(PremiumDeclineReason::ArithmeticOverflow)?;
+    let rounded = numerator
+        .checked_add(5_000)
+        .ok_or(PremiumDeclineReason::ArithmeticOverflow)?
+        / 10_000;
+    u64::try_from(rounded).map_err(|_| PremiumDeclineReason::ArithmeticOverflow)
 }
 
 #[cfg(test)]
@@ -589,6 +637,36 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn legacy_pricing_accepts_the_exact_integer_precision_boundary() {
+        let mut boundary = inputs(Some(950), None);
+        boundary.base_rate_cents = 1_u64 << 53;
+        let quote = price_premium("agent-x", "scope", window(), &boundary);
+        assert_eq!(quote.quoted_cents(), Some(1_u64 << 54));
+    }
+
+    #[test]
+    fn legacy_pricing_denies_beyond_the_exact_integer_precision_boundary() {
+        let mut unsafe_base = inputs(Some(950), None);
+        unsafe_base.base_rate_cents = (1_u64 << 53) + 1;
+        let quote = price_premium("agent-x", "scope", window(), &unsafe_base);
+        assert!(matches!(
+            quote,
+            PremiumQuote::Declined {
+                reason: PremiumDeclineReason::LegacyPrecisionUnsafe,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn fixed_point_pricing_rejects_a_result_above_u64() {
+        assert_eq!(
+            compute_fixed_point_quote(u64::MAX, 10_000),
+            Err(PremiumDeclineReason::ArithmeticOverflow)
+        );
     }
 
     #[test]

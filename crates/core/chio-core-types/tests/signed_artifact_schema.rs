@@ -78,6 +78,18 @@ fn clearing_signed_artifact_schemas_are_registered() {
             "clearing_settlement_intent",
         ),
         (
+            "chio.clearing.settlement-reconciliation.v1",
+            "clearing_settlement_reconciliation",
+        ),
+        (
+            "chio.clearing.round-satisfaction.v1",
+            "clearing_round_satisfaction",
+        ),
+        (
+            "chio.clearing.zero-intent-reconciliation.v1",
+            "clearing_zero_intent_reconciliation",
+        ),
+        (
             "chio.clearing.atom-transformation.v1",
             "clearing_atom_transformation",
         ),
@@ -109,6 +121,214 @@ fn clearing_signed_artifact_schemas_are_registered() {
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
         "chio.clearing.round-finalization.v2"
     ));
+}
+
+#[test]
+fn channel_signed_artifact_schemas_are_registered() {
+    for (schema, artifact_kind) in [
+        (
+            "chio.channel.funding-evidence.v1",
+            "channel_funding_evidence",
+        ),
+        ("chio.channel.open-intent.v1", "channel_open_intent"),
+        (
+            "chio.channel.funding-acknowledgement.v1",
+            "channel_funding_acknowledgement",
+        ),
+        ("chio.channel.open.v1", "channel_open"),
+        ("chio.channel.reservation.v1", "channel_reservation"),
+        ("chio.channel.state.v1", "channel_state"),
+        ("chio.channel.close.v1", "channel_close"),
+        ("chio.channel.dispute.v1", "channel_dispute"),
+        (
+            "chio.channel.release-authorization.v1",
+            "channel_release_authorization",
+        ),
+        (
+            "chio.channel.terminal-outcome-commitment.v1",
+            "channel_terminal_outcome_commitment",
+        ),
+    ] {
+        assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
+        assert!(chio_core_types::built_in_signed_artifact_registry()
+            .iter()
+            .any(|entry| entry.schema == schema
+                && entry.artifact_kind == artifact_kind
+                && entry.introduced_by == "micro-escrow-channels-v1"));
+    }
+    assert!(!chio_core_types::is_supported_signed_artifact_schema(
+        "chio.channel.open.v2"
+    ));
+}
+
+#[test]
+fn financial_credential_signed_artifact_schemas_are_registered() {
+    for (schema, artifact_kind) in [
+        (
+            "chio.fincred.credit-scorecard.v1",
+            "financial_credit_scorecard",
+        ),
+        (
+            "chio.fincred.exposure-history.v1",
+            "financial_exposure_history",
+        ),
+        (
+            "chio.fincred.settlement-reliability.v1",
+            "financial_settlement_reliability",
+        ),
+        (
+            "chio.fincred.premium-history.v1",
+            "financial_premium_history",
+        ),
+        ("chio.fincred.loss-history.v1", "financial_loss_history"),
+        ("chio.fincred.source-member.v1", "financial_source_member"),
+        (
+            "chio.fincred.source-checkpoint.v1",
+            "financial_source_checkpoint",
+        ),
+        (
+            "chio.fincred.source-completeness-attestation.v1",
+            "financial_source_completeness_attestation",
+        ),
+        (
+            "chio.agent-passport.source-manifest.v2",
+            "agent_passport_source_manifest",
+        ),
+        (
+            "chio.agent-passport-presentation-challenge.v2",
+            "agent_passport_presentation_challenge",
+        ),
+    ] {
+        assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
+        assert!(chio_core_types::built_in_signed_artifact_registry()
+            .iter()
+            .any(|entry| entry.schema == schema
+                && entry.artifact_kind == artifact_kind
+                && entry.introduced_by == "financial-credentials-v1"));
+    }
+    assert!(!chio_core_types::is_supported_signed_artifact_schema(
+        "chio.fincred.credit-scorecard.v2"
+    ));
+}
+
+#[test]
+fn fiscal_signed_artifact_schemas_are_registered() {
+    for (schema, artifact_kind) in [
+        ("chio.fiscal.charter.v1", "fiscal_charter"),
+        ("chio.fiscal.schedule.v1", "fiscal_schedule"),
+        ("chio.fiscal.proposal.v1", "fiscal_proposal"),
+        (
+            "chio.fiscal.proposal-admission.v1",
+            "fiscal_proposal_admission",
+        ),
+        ("chio.fiscal.approval.v1", "fiscal_approval"),
+        ("chio.fiscal.activation.v1", "fiscal_activation"),
+        (
+            "chio.fiscal.consumer-readiness.v1",
+            "fiscal_consumer_readiness",
+        ),
+        (
+            "chio.fiscal.continuity-checkpoint.v1",
+            "fiscal_continuity_checkpoint",
+        ),
+    ] {
+        assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
+        assert!(chio_core_types::built_in_signed_artifact_registry()
+            .iter()
+            .any(|entry| entry.schema == schema
+                && entry.artifact_kind == artifact_kind
+                && entry.introduced_by == "fiscal-constitutions-v1"));
+    }
+    assert!(!chio_core_types::is_supported_signed_artifact_schema(
+        "chio.fiscal.charter.v2"
+    ));
+}
+
+#[test]
+fn fiscal_genesis_policy_remains_outside_the_signed_artifact_registry() {
+    let schema = "chio.fiscal.genesis-policy.v1";
+    assert!(!chio_core_types::is_supported_signed_artifact_schema(
+        schema
+    ));
+    assert!(chio_core_types::built_in_signed_artifact_registry()
+        .iter()
+        .all(|entry| entry.schema != schema));
+
+    let registry: serde_json::Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../spec/schemas/registry.json"
+    )))
+    .expect("schema registry parses");
+    assert!(registry
+        .get("artifacts")
+        .and_then(serde_json::Value::as_array)
+        .expect("registry artifacts are present")
+        .iter()
+        .all(|entry| entry.get("schema").and_then(serde_json::Value::as_str) != Some(schema)));
+}
+
+#[test]
+fn fiscal_signed_artifact_registry_names_exact_schema_files() {
+    let registry: serde_json::Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../spec/schemas/registry.json"
+    )))
+    .expect("schema registry parses");
+    let rows: BTreeMap<&str, &str> = registry
+        .get("artifacts")
+        .and_then(serde_json::Value::as_array)
+        .expect("registry artifacts are present")
+        .iter()
+        .filter_map(|entry| {
+            let schema = entry.get("schema")?.as_str()?;
+            schema.starts_with("chio.fiscal.").then(|| {
+                (
+                    schema,
+                    entry
+                        .get("schemaFile")
+                        .and_then(serde_json::Value::as_str)
+                        .expect("fiscal registry entry has schemaFile"),
+                )
+            })
+        })
+        .collect();
+    assert_eq!(
+        rows,
+        BTreeMap::from([
+            (
+                "chio.fiscal.activation.v1",
+                "spec/schemas/chio-fiscal/v1/activation.schema.json",
+            ),
+            (
+                "chio.fiscal.approval.v1",
+                "spec/schemas/chio-fiscal/v1/approval.schema.json",
+            ),
+            (
+                "chio.fiscal.charter.v1",
+                "spec/schemas/chio-fiscal/v1/charter.schema.json",
+            ),
+            (
+                "chio.fiscal.consumer-readiness.v1",
+                "spec/schemas/chio-fiscal/v1/consumer-readiness.schema.json",
+            ),
+            (
+                "chio.fiscal.continuity-checkpoint.v1",
+                "spec/schemas/chio-fiscal/v1/continuity-checkpoint.schema.json",
+            ),
+            (
+                "chio.fiscal.proposal-admission.v1",
+                "spec/schemas/chio-fiscal/v1/proposal-admission.schema.json",
+            ),
+            (
+                "chio.fiscal.proposal.v1",
+                "spec/schemas/chio-fiscal/v1/proposal.schema.json",
+            ),
+            (
+                "chio.fiscal.schedule.v1",
+                "spec/schemas/chio-fiscal/v1/schedule.schema.json",
+            ),
+        ])
+    );
 }
 
 #[test]

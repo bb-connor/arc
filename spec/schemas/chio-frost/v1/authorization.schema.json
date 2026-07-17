@@ -40,13 +40,13 @@
         "quorumScope": { "$ref": "#/$defs/identifier" },
         "scopeId": { "$ref": "#/$defs/identifier" },
         "resourceId": { "$ref": "#/$defs/identifier" },
-        "resourceVersion": { "type": "integer", "minimum": 1 },
-        "resourceFence": { "type": "integer", "minimum": 1 },
+        "resourceVersion": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "resourceFence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
         "actionDigest": { "$ref": "#/$defs/digest" },
         "rosterDigest": { "$ref": "#/$defs/digest" },
-        "keyEpoch": { "type": "integer", "minimum": 1 },
-        "issuedAt": { "type": "integer", "minimum": 0 },
-        "expiresAt": { "type": "integer", "minimum": 1 }
+        "keyEpoch": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "issuedAt": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "expiresAt": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
       }
     },
     "suiteId": { "const": "FROST-ED25519-SHA512-v1" },

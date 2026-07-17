@@ -61,6 +61,8 @@ members = [
     "crates/economy/chio-appraisal",
     "crates/economy/chio-autonomy",
     "crates/economy/chio-credit",
+    "crates/economy/chio-fincred",
+    "crates/economy/chio-fiscal",
     "crates/economy/chio-link",
     "crates/economy/chio-listing",
     "crates/economy/chio-market",
@@ -378,6 +380,8 @@ chio-core = { path = "crates/core/chio-core" }
 chio-core-types = { path = "crates/core/chio-core-types" }
 chio-credentials = { path = "crates/trust/chio-credentials" }
 chio-credit = { path = "crates/economy/chio-credit" }
+chio-fincred = { path = "crates/economy/chio-fincred" }
+chio-fiscal = { path = "crates/economy/chio-fiscal" }
 chio-cross-protocol = { path = "crates/protocol/chio-cross-protocol" }
 # `default-features = false` at the workspace root so consumers can opt out of
 # the `default = ["passkey", "sqlite-store"]` graph (e.g. mobile staticlib and

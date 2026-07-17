@@ -255,6 +255,7 @@ impl SqliteReceiptStore {
             }
             configure_sqlite_connection(&mut connection)?;
             super::support::ensure_transparency_projection_guards(&connection)?;
+            verify_receipt_cost_projection(&connection)?;
             let settlement_store_binding = settlement_store_binding_if_ready(&connection)?;
             drop(connection);
 
@@ -290,7 +291,7 @@ impl SqliteReceiptStore {
         // name alone, so first reject one whose generic anchor lacks the receipt
         // shape, keeping a foreign file that merely reuses the name out.
         reject_foreign_legacy_receipt_anchor(&connection)?;
-        crate::check_schema_version(
+        let on_disk_schema_version = crate::check_schema_version(
             &connection,
             RECEIPT_STORE_SCHEMA_KEY,
             RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION,
@@ -313,7 +314,22 @@ impl SqliteReceiptStore {
                 decision_kind TEXT NOT NULL,
                 policy_hash TEXT NOT NULL,
                 content_hash TEXT NOT NULL,
-                raw_json TEXT NOT NULL
+                raw_json TEXT NOT NULL,
+                cost_currency TEXT CHECK (
+                    cost_currency IS NULL OR (
+                        typeof(cost_currency) = 'text' AND
+                        length(cost_currency) = 3 AND
+                        cost_currency NOT GLOB '*[^A-Z]*'
+                    )
+                ),
+                cost_charged_be BLOB CHECK (
+                    (cost_currency IS NULL AND cost_charged_be IS NULL) OR
+                    (
+                        cost_currency IS NOT NULL AND
+                        typeof(cost_charged_be) = 'blob' AND
+                        length(cost_charged_be) = 8
+                    )
+                )
             );
 
             CREATE INDEX IF NOT EXISTS idx_chio_tool_receipts_timestamp
@@ -1233,6 +1249,12 @@ impl SqliteReceiptStore {
             super::support::backfill_provenance_lineage_tables(&mut connection)?;
             super::support::backfill_claim_receipt_log_entries(&mut connection)?;
             super::support::backfill_checkpoint_transparency_projections(&mut connection)?;
+            if on_disk_schema_version < RECEIPT_COST_PROJECTION_SCHEMA_VERSION {
+                let migration = connection
+                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+                migrate_receipt_cost_projection(&migration)?;
+                migration.commit()?;
+            }
             Ok(())
         })();
         let guard_result = super::support::ensure_transparency_projection_guards(&connection);
@@ -1246,6 +1268,7 @@ impl SqliteReceiptStore {
                 )));
             }
         }
+        verify_receipt_cost_projection(&connection)?;
 
         let migration =
             connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;

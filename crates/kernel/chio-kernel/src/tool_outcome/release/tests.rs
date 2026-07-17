@@ -1,6 +1,7 @@
 use super::*;
 use crate::admission_operation::{
-    AdmissionOperationBindingInputV1, AdmissionOperationBindingV1, AdmissionOperationKind,
+    verified_pre_dispatch_compensation_projection, AdmissionOperationBindingInputV1,
+    AdmissionOperationBindingV1, AdmissionOperationError, AdmissionOperationKind,
     AdmissionParticipantRequirements, AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
     SideEffectClass,
 };
@@ -93,6 +94,7 @@ fn no_effect_dispositions(
         VerifiedParticipantNoEffectV1::NotRequired,
         VerifiedParticipantNoEffectV1::NotRequired,
         VerifiedParticipantNoEffectV1::NotRequired,
+        VerifiedParticipantNoEffectV1::NotRequired,
         not_dispatched(operation),
     )
 }
@@ -122,6 +124,114 @@ fn predispatch_bundle() -> (
         .evidence_bundle()
         .unwrap();
     (operation, context, bundle)
+}
+
+fn prepared_channel_operation(
+    request_id: &str,
+) -> Result<AdmissionOperationV1, AdmissionOperationError> {
+    let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
+        kind: AdmissionOperationKind::ToolDispatch,
+        namespace: AuthenticatedRequestNamespace::for_local_system(id(
+            "channel-release-coordinator",
+        ))?,
+        request_id: id(request_id),
+        capability_id: id("channel-release-capability"),
+        authorization_capability_hash: admission_digest("channel-release-authorization"),
+        request_binding: AdmissionRequestBindingV1::new(
+            admission_digest("channel-release-request"),
+            AdmissionParticipantRequirements {
+                broker_attempt: true,
+                budget_capture: true,
+                obligation: true,
+                channel: true,
+                ..AdmissionParticipantRequirements::NONE
+            },
+        )?,
+        policy_hash: admission_digest("channel-release-policy"),
+        effect_class: SideEffectClass::Monetary,
+    })?;
+    AdmissionOperationV1::prepare(binding, 7)
+}
+
+#[test]
+fn channel_reservation_requires_typed_predispatch_cancellation(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let prepared = prepared_channel_operation("request-channel-release")?;
+    let prepared_context = projection_context(&prepared);
+    let prepared_proof = VerifiedPreDispatchNoEffect::from_qualified_operation_snapshot(
+        &prepared,
+        &prepared_context,
+    )?;
+    assert!(prepared_proof
+        .snapshot
+        .participant_manifest
+        .required_participants
+        .contains(&ReleaseParticipantV1::Channel));
+    assert!(matches!(
+        &prepared_proof
+            .snapshot
+            .participant_manifest
+            .participant_dispositions
+            .channel,
+        VerifiedParticipantNoEffectV1::NeverAcquired { .. }
+    ));
+    assert!(
+        verified_pre_dispatch_compensation_projection(&prepared, prepared_context.clone()).is_ok()
+    );
+
+    let proposal = AdmissionAttachment::ChannelReservationProposalDigest(admission_digest(
+        "channel-release-proposal",
+    ));
+    let broker = advance(
+        &prepared,
+        AdmissionOperationState::BrokerAttemptRegistered,
+        vec![
+            AdmissionAttachment::BrokerAttempt(provider_attempt(
+                &prepared,
+                "channel-release-attempt",
+            )),
+            proposal,
+        ],
+    );
+    assert!(participant_attachments(&broker, ReleaseParticipantV1::Channel).is_empty());
+    let budget = advance(
+        &broker,
+        AdmissionOperationState::BudgetAuthorized,
+        vec![AdmissionAttachment::BudgetHoldId(id(
+            "channel-release-hold",
+        ))],
+    );
+    let reservation = AdmissionAttachment::ChannelReservationDigest(admission_digest(
+        "channel-release-reservation",
+    ));
+    let ready = advance(
+        &budget,
+        AdmissionOperationState::ReadyToDispatch,
+        vec![reservation.clone()],
+    );
+    assert_eq!(
+        participant_attachments(&ready, ReleaseParticipantV1::Channel),
+        vec![reservation]
+    );
+    let capture = advance(&ready, AdmissionOperationState::CapturePending, Vec::new());
+
+    for operation in [&ready, &capture] {
+        assert_eq!(
+            VerifiedPreDispatchNoEffect::from_qualified_operation_snapshot(
+                operation,
+                &projection_context(operation),
+            ),
+            Err(ToolOutcomeError::Binding(
+                "predispatch.channel_cancellation_required"
+            ))
+        );
+        assert!(verified_pre_dispatch_compensation_projection(
+            operation,
+            projection_context(operation),
+        )
+        .is_err());
+    }
+    Ok(())
 }
 
 #[test]
@@ -651,6 +761,7 @@ fn predispatch_manifest_binds_required_participants_and_exact_attachments() {
             VerifiedParticipantNoEffectV1::NotRequired,
             VerifiedParticipantNoEffectV1::NotRequired,
             VerifiedParticipantNoEffectV1::NotRequired,
+            VerifiedParticipantNoEffectV1::NotRequired,
             not_dispatched(&budget),
         )
     };
@@ -718,6 +829,7 @@ fn predispatch_release_rejects_evidence_and_future_time_substitution() {
     let dispositions = PreDispatchParticipantDispositionsV1::from_verified_parts(
         VerifiedParticipantNoEffectV1::NotRequired,
         budget_evidence,
+        VerifiedParticipantNoEffectV1::NotRequired,
         VerifiedParticipantNoEffectV1::NotRequired,
         VerifiedParticipantNoEffectV1::NotRequired,
         VerifiedParticipantNoEffectV1::NotRequired,

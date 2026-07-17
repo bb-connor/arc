@@ -84,8 +84,6 @@ struct DurablePaymentSettlementInput<'a> {
     journal: crate::payment::PaymentJournalRecord,
     disposition: &'a SettlementDispositionV1,
     context: &'a AdmissionProjectionContext,
-    terminal_outcome: &'a ToolOutcomeRecordV1,
-    terminal_evaluation: &'a PostReturnEvaluationRecordV1,
     trusted_now_unix_ms: u64,
 }
 
@@ -854,8 +852,6 @@ impl ChioKernel {
             mut journal,
             disposition,
             context,
-            terminal_outcome,
-            terminal_evaluation,
             trusted_now_unix_ms,
         } = input;
         let (amount_units, settle_action) = match disposition {
@@ -905,13 +901,9 @@ impl ChioKernel {
                     None,
                 ),
                 crate::payment::PaymentSettleAction::Release => {
-                    let proof = crate::tool_outcome::VerifiedContractualZeroCharge::from_records(
-                        &admission.operation,
-                        context,
-                        terminal_outcome,
-                        terminal_evaluation,
-                    )
-                    .map_err(tool_outcome_error)?;
+                    let proof = runtime
+                        .verify_contractual_zero_charge(&admission.operation, context)
+                        .map_err(tool_outcome_error)?;
                     let evidence =
                         crate::tool_outcome::MonetaryReleaseAuthority::ContractualZeroCharge(
                             Box::new(proof),
@@ -1248,7 +1240,7 @@ impl ChioKernel {
                 disposition: &settlement_disposition,
             },
         )?;
-        let (terminal_evaluation, terminal_outcome) = match evaluation.state() {
+        let (_terminal_evaluation, terminal_outcome) = match evaluation.state() {
             PostReturnEvaluationStateV1::Evaluating => {
                 for (index, expected_digest) in step_result_digests.iter().enumerate() {
                     match evaluation.step_result_digest(index) {
@@ -1394,19 +1386,13 @@ impl ChioKernel {
                     journal,
                     disposition: &settlement_disposition,
                     context: &context,
-                    terminal_outcome: &terminal_outcome,
-                    terminal_evaluation: &terminal_evaluation,
                     trusted_now_unix_ms,
                 })
             })
             .transpose()?;
-        let tool_outcome = ToolOutcomeTerminalEvidenceV1::from_records(
-            &admission.operation,
-            &context,
-            &terminal_outcome,
-            &terminal_evaluation,
-        )
-        .map_err(tool_outcome_error)?;
+        let tool_outcome = runtime
+            .verify_terminal_outcome(&admission.operation, &context)
+            .map_err(tool_outcome_error)?;
         let projected_operation_version =
             admission
                 .operation
@@ -1566,6 +1552,26 @@ impl ChioKernel {
         } else {
             None
         };
+        let channel_prepared = if admission
+            .operation
+            .binding()
+            .participant_requirements()
+            .channel
+        {
+            Some(
+                crate::admission_operation::prepare_channel_terminal_projection(
+                    runtime.channel_terminal_authority.as_deref(),
+                    &admission.operation,
+                    &context,
+                    &receipt,
+                    &tool_outcome,
+                    &self.config.keypair,
+                )
+                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
+            )
+        } else {
+            None
+        };
         let projected_receipt = receipt.receipt().clone();
         let projection =
             AdmissionTerminalProjection::Completed(Box::new(AdmissionCompletedProjection {
@@ -1576,14 +1582,44 @@ impl ChioKernel {
                 authorization: None,
                 eligibility: None,
                 observer_work,
-                obligation: None,
+                obligation: channel_prepared
+                    .as_ref()
+                    .and_then(|prepared| prepared.obligation().cloned()),
+                channel_terminal: channel_prepared
+                    .as_ref()
+                    .map(|prepared| prepared.channel().clone()),
             }));
-        let terminal = runtime
-            .store
-            .commit_admission_projection(&projection)
-            .map_err(|error| {
-                KernelError::DurableAdmission(format!("atomic terminal projection failed: {error}"))
-            })?;
+        let terminal = if let Some(prepared) = channel_prepared.as_ref() {
+            let authority = runtime
+                .channel_terminal_authority
+                .as_deref()
+                .ok_or_else(|| {
+                    KernelError::DurableAdmission(
+                        "qualified channel terminal authority disappeared".to_owned(),
+                    )
+                })?;
+            crate::admission_operation::commit_prepared_channel_terminal_projection(
+                authority,
+                &admission.operation,
+                &lease,
+                &projection,
+                &runtime.store.admission_projection_capabilities(),
+                prepared,
+                &self.config.keypair,
+                &runtime.fence,
+                trusted_now_unix_ms,
+            )
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
+        } else {
+            runtime
+                .store
+                .commit_admission_projection(&projection)
+                .map_err(|error| {
+                    KernelError::DurableAdmission(format!(
+                        "atomic terminal projection failed: {error}"
+                    ))
+                })?
+        };
         if terminal.state != AdmissionOperationState::Completed {
             return Err(KernelError::DurableAdmission(
                 "terminal projection did not complete the operation".to_owned(),

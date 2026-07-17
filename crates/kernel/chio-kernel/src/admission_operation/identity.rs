@@ -214,6 +214,8 @@ pub struct AdmissionParticipantRequirements {
     pub authorization_consumption: bool,
     pub observation_attempt_zero: bool,
     pub obligation: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub channel: bool,
 }
 
 impl AdmissionParticipantRequirements {
@@ -227,16 +229,19 @@ impl AdmissionParticipantRequirements {
         authorization_consumption: false,
         observation_attempt_zero: false,
         obligation: false,
+        channel: false,
     };
 
     fn validate(self) -> Result<(), AdmissionOperationError> {
-        if (self.broker_attempt || self.payment) && !self.budget_capture {
+        if (self.broker_attempt || self.payment || self.channel) && !self.budget_capture
+            || self.channel && (self.payment || !self.obligation)
+        {
             return Err(AdmissionOperationError::InvalidParticipantRequirements);
         }
         Ok(())
     }
 
-    fn validate_for_kind(
+    pub(super) fn validate_for_kind(
         self,
         kind: AdmissionOperationKind,
     ) -> Result<(), AdmissionOperationError> {
@@ -257,6 +262,10 @@ impl AdmissionParticipantRequirements {
             Err(AdmissionOperationError::InvalidParticipantRequirements)
         }
     }
+}
+
+const fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

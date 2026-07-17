@@ -53,8 +53,6 @@ fn completed_projection_cannot_omit_required_atomic_sidecars() {
         &operation,
         &context,
         &receipt,
-        identifier("obligation_id", "obligation-1"),
-        digest("obligation_atom_digest", POLICY_HASH),
         identifier("debtor_id", "debtor-1"),
         identifier("original_creditor_id", "creditor-1"),
         MonetaryAmount {
@@ -110,6 +108,7 @@ fn completed_projection_cannot_omit_required_atomic_sidecars() {
         tool_outcome: None,
         payment_evidence: None,
         eligibility: None,
+        channel_terminal: None,
     };
     validate_completed_participant_presence(requirements, &completed)
         .expect("all immutable participant requirements are present");
@@ -163,6 +162,59 @@ fn completed_projection_cannot_omit_required_atomic_sidecars() {
     full_projection_capabilities()
         .validate_for(&operation, &projection)
         .expect("store capabilities cover every immutable participant requirement");
+}
+
+#[test]
+fn completed_channel_projection_requires_store_capability() -> Result<(), AdmissionOperationError> {
+    let operation = finalizing_tool_operation_with(channel_requirements());
+    let context = projection_context(&operation);
+    let outcome_id = digest("outcome_id", POLICY_HASH);
+    let outcome_version = 3;
+    let mut metadata = receipt_metadata(
+        &operation,
+        &context,
+        AdmissionOperationState::Completed,
+        AdmissionCompensationStatus::NotCompensated,
+    );
+    metadata.tool_outcome_id = Some(outcome_id.clone());
+    metadata.tool_outcome_version = Some(outcome_version);
+    let kernel = Keypair::generate();
+    let receipt = verify_completed_receipt(
+        &operation,
+        &context,
+        signed_projection_receipt(&operation, Some(metadata), &kernel),
+        &kernel,
+        Some((&outcome_id, outcome_version)),
+    )?;
+    let completed = AdmissionCompletedProjection {
+        context,
+        receipt,
+        tool_outcome: None,
+        payment_evidence: None,
+        authorization: None,
+        eligibility: None,
+        observer_work: None,
+        obligation: None,
+        channel_terminal: None,
+    };
+
+    assert_eq!(
+        validate_completed_participant_presence(channel_requirements(), &completed),
+        Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+    );
+    let projection = AdmissionTerminalProjection::Completed(Box::new(completed));
+
+    assert_eq!(
+        AdmissionProjectionCapabilities {
+            channel_terminal: false,
+            ..full_projection_capabilities()
+        }
+        .validate_for(&operation, &projection),
+        Err(AdmissionOperationError::MissingProjectionCapability {
+            capability: "channel_terminal"
+        })
+    );
+    Ok(())
 }
 
 #[test]
@@ -294,8 +346,6 @@ fn terminal_participant_evidence_rejects_cross_binding_and_substitution() {
         &operation,
         &context,
         &receipt,
-        identifier("obligation_id", "obligation-1"),
-        digest("obligation_atom_digest", REQUEST_HASH),
         identifier("debtor_id", "debtor-1"),
         identifier("original_creditor_id", "creditor-1"),
         MonetaryAmount {
@@ -310,18 +360,20 @@ fn terminal_participant_evidence_rejects_cross_binding_and_substitution() {
     )
     .expect("canonical obligation atom must qualify");
     let encoded = serde_json::to_value(&obligation).expect("obligation evidence must serialize");
-    assert_eq!(encoded["debtor_id"], "debtor-1");
-    assert_eq!(encoded["original_creditor_id"], "creditor-1");
-    assert_eq!(encoded["amount"]["units"], 25);
-    assert_eq!(encoded["due_at_unix_ms"], 2_000);
+    assert_eq!(encoded["atom"]["debtorId"], "debtor-1");
+    assert_eq!(encoded["atom"]["originalCreditorId"], "creditor-1");
+    assert_eq!(encoded["atom"]["amount"]["units"], 25);
+    assert_eq!(encoded["atom"]["dueAtUnixMs"], 2_000);
+    assert_eq!(
+        encoded["disposition_record"]["disposition"]["kind"],
+        "per_call"
+    );
     assert_eq!(encoded["source"]["outcome_id"], POLICY_HASH);
     assert!(matches!(
         ObligationProjection::from_source_verified(
             &operation,
             &context,
             &receipt,
-            identifier("obligation_id", "obligation-2"),
-            digest("obligation_atom_digest", REQUEST_HASH),
             identifier("debtor_id", "debtor-1"),
             identifier("original_creditor_id", "creditor-1"),
             MonetaryAmount {
@@ -485,6 +537,7 @@ fn terminal_projection_accepts_new_owner_fence_only_on_the_same_store() {
             eligibility: None,
             observer_work: None,
             obligation: None,
+            channel_terminal: None,
         }));
     let terminal = operation
         .apply_terminal_projection(&recovered, &full_projection_capabilities())
@@ -575,6 +628,7 @@ fn signed_terminal_projection_envelope_rejects_canonical_body_tampering() {
             eligibility: None,
             observer_work: None,
             obligation: None,
+            channel_terminal: None,
         }));
     let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
         &operation,
@@ -600,6 +654,51 @@ fn signed_terminal_projection_envelope_rejects_canonical_body_tampering() {
         tampered.verify(),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     ));
+}
+
+#[test]
+fn signed_terminal_projection_rejects_channel_attachment_substitution(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let operation = finalizing_tool_operation_with(channel_requirements());
+    let context = projection_context(&operation);
+    let kernel = Keypair::generate();
+    let incident = AdmissionIncident::from_verified(
+        &operation,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        identifier("incident_id", "channel-outcome-unknown"),
+        digest("incident_digest", POLICY_HASH),
+    )?;
+    let projection = AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
+        context,
+        incident: Box::new(incident),
+    };
+    let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
+        &operation,
+        &projection,
+        &full_projection_capabilities(),
+        &kernel,
+    )?;
+
+    let mut encoded = serde_json::to_value(&envelope)?;
+    let attachments = encoded["body"]["source_operation"]["attachments"]
+        .as_array_mut()
+        .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+    let reservation = attachments
+        .iter_mut()
+        .find(|attachment| attachment.get("ChannelReservationDigest").is_some())
+        .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+    reservation["ChannelReservationDigest"] = serde_json::Value::String(AUTH_HASH.to_owned());
+    let canonical_body = canonical_json_bytes(&encoded["body"])?;
+    let mut preimage = b"chio.signed-admission-terminal-projection.v1\0".to_vec();
+    preimage.extend_from_slice(&canonical_body);
+    encoded["signature"] = serde_json::to_value(kernel.sign(&preimage))?;
+    let tampered: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(encoded)?;
+    assert_eq!(
+        tampered.verify(),
+        Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+    );
+    Ok(())
 }
 
 #[test]
@@ -631,6 +730,7 @@ fn signed_terminal_projection_envelope_rejects_signer_substitution() {
             eligibility: None,
             observer_work: None,
             obligation: None,
+            channel_terminal: None,
         }));
     let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
         &operation,

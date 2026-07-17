@@ -676,6 +676,19 @@ impl ChioKernel {
         Ok(())
     }
 
+    pub fn set_channel_terminal_authority(
+        &mut self,
+        authority: Arc<dyn crate::admission_operation::QualifiedChannelTerminalAuthority>,
+    ) -> Result<(), KernelError> {
+        let runtime = self.durable_admission_runtime.as_mut().ok_or_else(|| {
+            KernelError::DurableAdmission(
+                "channel terminal authority requires a durable admission store".to_owned(),
+            )
+        })?;
+        runtime.set_channel_terminal_authority(authority);
+        Ok(())
+    }
+
     pub fn set_receipt_store_handle(
         &mut self,
         receipt_store: Arc<dyn ReceiptStore>,

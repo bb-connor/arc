@@ -1,10 +1,12 @@
+use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
 use serde::{Deserialize, Serialize};
 
 use super::registry::frost_action_registration;
 use super::types::{
-    validate_digest, validate_identifier, validate_nonzero, validate_positive_base_units,
-    validate_text, FrostAuthorizationDomain, FrostAuthorizationError,
+    validate_base_units, validate_digest, validate_identifier, validate_positive_base_units,
+    validate_positive_safe_integer, validate_safe_integer, validate_text, FrostAuthorizationDomain,
+    FrostAuthorizationError,
 };
 
 pub const CHIO_FROST_SETTLE_COMMITMENT_ACTION_SCHEMA: &str =
@@ -52,8 +54,12 @@ pub struct FrostClearingRoundFinalizeActionV1 {
 pub struct FrostChannelCloseActionV1 {
     pub schema: String,
     pub close_body_digest: String,
+    pub effective_close_digest: String,
     pub channel_id: String,
     pub final_state_digest: String,
+    pub final_state_sequence: u64,
+    pub final_cumulative_owed: MonetaryAmount,
+    pub channel_state_version: u64,
     pub escrow_reservation_version: u64,
     pub token_base_unit_release: String,
     pub publisher_fence: u64,
@@ -175,7 +181,7 @@ impl FrostActionPreimageV1 {
         match self {
             Self::SettleCommitment(action) => action.resource_version,
             Self::ClearingRoundFinalize(action) => action.resource_version,
-            Self::ChannelClose(action) => action.escrow_reservation_version,
+            Self::ChannelClose(action) => action.channel_state_version,
             Self::PouncerRevokeCredential(action) => action.resource_version,
             Self::GovernanceCaseEnforceSanction(action) => action.resource_version,
             Self::CredentialsPassportRevoke(action) => action.resource_version,
@@ -252,8 +258,8 @@ fn validate_settlement(
     validate_identifier(&action.asset_id, "asset_id")?;
     validate_identifier(&action.operation_id, "operation_id")?;
     validate_identifier(&action.rail_idempotency_key, "rail_idempotency_key")?;
-    validate_nonzero(action.resource_version, "resource_version")?;
-    validate_nonzero(action.resource_fence, "resource_fence")
+    validate_positive_safe_integer(action.resource_version, "resource_version")?;
+    validate_positive_safe_integer(action.resource_fence, "resource_fence")
 }
 
 fn validate_clearing(
@@ -266,23 +272,39 @@ fn validate_clearing(
     validate_digest(&action.output_manifest_root, "output_manifest_root")?;
     validate_digest(&action.acceptance_root, "acceptance_root")?;
     validate_identifier(&action.round_id, "round_id")?;
-    validate_nonzero(action.resource_version, "resource_version")?;
-    validate_nonzero(action.resource_fence, "resource_fence")
+    validate_positive_safe_integer(action.resource_version, "resource_version")?;
+    validate_positive_safe_integer(action.resource_fence, "resource_fence")
 }
 
 fn validate_channel_close(
     action: &FrostChannelCloseActionV1,
 ) -> Result<(), FrostAuthorizationError> {
     validate_digest(&action.close_body_digest, "close_body_digest")?;
+    validate_digest(&action.effective_close_digest, "effective_close_digest")?;
     validate_identifier(&action.channel_id, "channel_id")?;
     validate_digest(&action.final_state_digest, "final_state_digest")?;
-    validate_nonzero(
+    validate_safe_integer(action.final_state_sequence, "final_state_sequence")?;
+    validate_safe_integer(action.final_cumulative_owed.units, "final_cumulative_owed")?;
+    if action.final_cumulative_owed.currency.len() != 3
+        || !action
+            .final_cumulative_owed
+            .currency
+            .bytes()
+            .all(|byte| byte.is_ascii_uppercase())
+    {
+        return Err(FrostAuthorizationError::InvalidField {
+            field: "final_cumulative_owed",
+            detail: "currency must be a 3-letter uppercase code",
+        });
+    }
+    validate_positive_safe_integer(action.channel_state_version, "channel_state_version")?;
+    validate_positive_safe_integer(
         action.escrow_reservation_version,
         "escrow_reservation_version",
     )?;
-    validate_positive_base_units(&action.token_base_unit_release, "token_base_unit_release")?;
-    validate_nonzero(action.publisher_fence, "publisher_fence")?;
-    validate_nonzero(action.lifecycle_fence, "lifecycle_fence")
+    validate_base_units(&action.token_base_unit_release, "token_base_unit_release")?;
+    validate_positive_safe_integer(action.publisher_fence, "publisher_fence")?;
+    validate_positive_safe_integer(action.lifecycle_fence, "lifecycle_fence")
 }
 
 fn validate_credential_revocation(
@@ -292,12 +314,12 @@ fn validate_credential_revocation(
     validate_identifier(&action.credential_id, "credential_id")?;
     validate_identifier(&action.issuer_id, "issuer_id")?;
     validate_identifier(&action.subject_id, "subject_id")?;
-    validate_nonzero(action.registry_epoch, "registry_epoch")?;
-    validate_nonzero(action.anchor_epoch, "anchor_epoch")?;
+    validate_positive_safe_integer(action.registry_epoch, "registry_epoch")?;
+    validate_positive_safe_integer(action.anchor_epoch, "anchor_epoch")?;
     validate_text(&action.reason, "reason")?;
     validate_digest(&action.evidence_root, "evidence_root")?;
-    validate_nonzero(action.resource_version, "resource_version")?;
-    validate_nonzero(action.resource_fence, "resource_fence")
+    validate_positive_safe_integer(action.resource_version, "resource_version")?;
+    validate_positive_safe_integer(action.resource_fence, "resource_fence")
 }
 
 fn validate_sanction(
@@ -309,8 +331,8 @@ fn validate_sanction(
     validate_digest(&action.sanction_body_digest, "sanction_body_digest")?;
     validate_digest(&action.evidence_root, "evidence_root")?;
     validate_identifier(&action.enforcement_target, "enforcement_target")?;
-    validate_nonzero(action.resource_version, "resource_version")?;
-    validate_nonzero(action.resource_fence, "resource_fence")
+    validate_positive_safe_integer(action.resource_version, "resource_version")?;
+    validate_positive_safe_integer(action.resource_fence, "resource_fence")
 }
 
 fn validate_passport_revocation(
@@ -320,11 +342,11 @@ fn validate_passport_revocation(
     validate_identifier(&action.passport_id, "passport_id")?;
     validate_identifier(&action.issuer_id, "issuer_id")?;
     validate_identifier(&action.subject_id, "subject_id")?;
-    validate_nonzero(action.revocation_generation, "revocation_generation")?;
+    validate_positive_safe_integer(action.revocation_generation, "revocation_generation")?;
     validate_text(&action.reason, "reason")?;
     validate_digest(&action.evidence_root, "evidence_root")?;
-    validate_nonzero(action.resource_version, "resource_version")?;
-    validate_nonzero(action.resource_fence, "resource_fence")
+    validate_positive_safe_integer(action.resource_version, "resource_version")?;
+    validate_positive_safe_integer(action.resource_fence, "resource_fence")
 }
 
 fn validate_roster_rotation(
@@ -342,14 +364,15 @@ fn validate_roster_rotation(
         });
     }
     validate_identifier(&action.scope_id, "scope_id")?;
-    validate_nonzero(action.current_key_epoch, "current_key_epoch")?;
+    validate_positive_safe_integer(action.current_key_epoch, "current_key_epoch")?;
+    validate_positive_safe_integer(action.new_key_epoch, "new_key_epoch")?;
     if action.current_key_epoch.checked_add(1) != Some(action.new_key_epoch) {
         return Err(FrostAuthorizationError::InvalidField {
             field: "new_key_epoch",
             detail: "must be current_key_epoch plus one",
         });
     }
-    validate_nonzero(
+    validate_positive_safe_integer(
         action.current_checkpoint_sequence,
         "current_checkpoint_sequence",
     )?;
@@ -357,6 +380,6 @@ fn validate_roster_rotation(
         &action.current_checkpoint_digest,
         "current_checkpoint_digest",
     )?;
-    validate_nonzero(action.activation_fence, "activation_fence")?;
+    validate_positive_safe_integer(action.activation_fence, "activation_fence")?;
     validate_digest(&action.old_session_burn_root, "old_session_burn_root")
 }

@@ -39,6 +39,7 @@ pub enum MarketplaceLimitTier {
 /// The ceilings are monotonically increasing with tier so that a higher
 /// tier never receives a smaller credit limit than a lower tier.
 pub const MARKETPLACE_TIER_LIMIT_UNITS: [u64; 4] = [10_000, 50_000, 250_000, 1_000_000];
+pub const MARKETPLACE_TIER_LIMIT_CURRENCY: &str = "USD";
 
 /// Inputs consumed by [`compute_marketplace_credit_limit`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -89,6 +90,16 @@ pub fn compute_marketplace_credit_limit(
             currency: request.currency.clone(),
             applied_tier: request.reputation_tier,
             reason: "publisher_credentials_revoked".to_owned(),
+        };
+    }
+
+    if request.currency != MARKETPLACE_TIER_LIMIT_CURRENCY {
+        return MarketplaceCreditLimitDecision {
+            outcome: UnderwritingDecisionOutcome::Deny,
+            limit_units: 0,
+            currency: request.currency.clone(),
+            applied_tier: request.reputation_tier,
+            reason: "unsupported_limit_currency".to_owned(),
         };
     }
 
@@ -155,6 +166,19 @@ mod tests {
         ));
         assert_eq!(decision.limit_units, 0);
         assert_eq!(decision.reason, "publisher_credentials_revoked");
+    }
+
+    #[test]
+    fn legacy_limits_deny_an_unconfigured_currency() {
+        let mut unsupported = request(MarketplaceLimitTier::Tier3, false);
+        unsupported.currency = "EUR".to_owned();
+        let decision = compute_marketplace_credit_limit(&unsupported);
+        assert!(matches!(
+            decision.outcome,
+            UnderwritingDecisionOutcome::Deny
+        ));
+        assert_eq!(decision.limit_units, 0);
+        assert_eq!(decision.reason, "unsupported_limit_currency");
     }
 
     #[test]

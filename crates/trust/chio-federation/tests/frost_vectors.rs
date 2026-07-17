@@ -1,17 +1,21 @@
+use std::path::PathBuf;
+
 use chio_core_types::{sha256_hex, Keypair};
 use chio_federation::frost::{
     frost_action_registration, frost_authorization_session_id, frost_authorization_slot_id,
     resolve_active_roster_for_execution, verify_for_execution,
     verify_historical_completed_authorization, verify_historical_evidence,
-    ActiveFrostRosterResolver, ExpectedFrostAuthorization, FrostAnchorError,
+    ActiveFrostRosterResolver, ExpectedFrostAuthorization, FrostActionPreimageV1, FrostAnchorError,
     FrostAnchoredAuthorizationSlot, FrostArtifactAuthorityRole, FrostArtifactTrustRoot,
     FrostArtifactTrustStore, FrostAuthorizationBodyV1, FrostAuthorizationDomain,
-    FrostAuthorizationSlotAnchor, FrostAuthorizationSlotCheckpointV1, FrostAuthorizationSlotState,
-    FrostAuthorizationV1, FrostEpochAnchor, FrostEpochCheckpointV1, FrostHistoricalRosterResolver,
-    FrostParticipantV1, FrostRosterKeyOrigin, FrostRosterResolutionError, FrostRosterV1,
+    FrostAuthorizationError, FrostAuthorizationSlotAnchor, FrostAuthorizationSlotCheckpointV1,
+    FrostAuthorizationSlotState, FrostAuthorizationV1, FrostChannelCloseActionV1, FrostEpochAnchor,
+    FrostEpochCheckpointV1, FrostHistoricalRosterResolver, FrostParticipantV1, FrostRosterError,
+    FrostRosterKeyOrigin, FrostRosterResolutionError, FrostRosterV1, FrostVerificationError,
+    VerifiedFrostAuthorization, VerifiedHistoricalCompletedFrostAuthorization,
     CHIO_FROST_AUTHORIZATION_BODY_SCHEMA, CHIO_FROST_AUTHORIZATION_SCHEMA,
-    CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA, CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA,
-    CHIO_FROST_ROSTER_SCHEMA, FROST_ED25519_SHA512_SUITE_ID,
+    CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA, CHIO_FROST_CHANNEL_CLOSE_ACTION_SCHEMA,
+    CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA, CHIO_FROST_ROSTER_SCHEMA, FROST_ED25519_SHA512_SUITE_ID,
 };
 use frost_ed25519::keys::{SigningShare, VerifyingShare};
 use frost_ed25519::{Signature, SigningKey, VerifyingKey};
@@ -424,6 +428,361 @@ fn fixture() -> Fixture {
 }
 
 #[test]
+fn signed_frost_numbers_enforce_ijson_boundaries() {
+    const MAX_SAFE: u64 = (1_u64 << 53) - 1;
+    const UNSAFE: u64 = MAX_SAFE + 1;
+
+    let channel_close = FrostActionPreimageV1::ChannelClose(FrostChannelCloseActionV1 {
+        schema: CHIO_FROST_CHANNEL_CLOSE_ACTION_SCHEMA.to_string(),
+        close_body_digest: "11".repeat(32),
+        effective_close_digest: "33".repeat(32),
+        channel_id: "channel.ch-974".to_string(),
+        final_state_digest: "22".repeat(32),
+        final_state_sequence: MAX_SAFE,
+        final_cumulative_owed: chio_core_types::capability::scope::MonetaryAmount {
+            units: MAX_SAFE,
+            currency: "USD".to_owned(),
+        },
+        channel_state_version: MAX_SAFE,
+        escrow_reservation_version: MAX_SAFE,
+        token_base_unit_release: "0".to_string(),
+        publisher_fence: MAX_SAFE,
+        lifecycle_fence: MAX_SAFE,
+    });
+    channel_close
+        .action_digest()
+        .unwrap_or_else(|error| panic!("maximum safe channel action must validate: {error}"));
+    for field in [
+        "final_state_sequence",
+        "final_cumulative_owed",
+        "channel_state_version",
+        "escrow_reservation_version",
+        "publisher_fence",
+        "lifecycle_fence",
+    ] {
+        let mut invalid = channel_close.clone();
+        let FrostActionPreimageV1::ChannelClose(action) = &mut invalid else {
+            panic!("fixture must remain a channel close action");
+        };
+        match field {
+            "final_state_sequence" => action.final_state_sequence = UNSAFE,
+            "final_cumulative_owed" => action.final_cumulative_owed.units = UNSAFE,
+            "channel_state_version" => action.channel_state_version = UNSAFE,
+            "escrow_reservation_version" => action.escrow_reservation_version = UNSAFE,
+            "publisher_fence" => action.publisher_fence = UNSAFE,
+            "lifecycle_fence" => action.lifecycle_fence = UNSAFE,
+            _ => unreachable!(),
+        }
+        assert_eq!(
+            invalid.action_digest(),
+            Err(FrostAuthorizationError::InvalidField {
+                field,
+                detail: if matches!(field, "final_state_sequence" | "final_cumulative_owed") {
+                    "must be an I-JSON safe integer"
+                } else {
+                    "must be a positive I-JSON safe integer"
+                },
+            })
+        );
+    }
+
+    let fixture = fixture();
+    let mut body = fixture.proof.body.clone();
+    body.resource_version = MAX_SAFE;
+    body.resource_fence = MAX_SAFE;
+    body.key_epoch = MAX_SAFE;
+    body.issued_at = MAX_SAFE - 1;
+    body.expires_at = MAX_SAFE;
+    body.authorization_id = body
+        .recompute_authorization_id()
+        .unwrap_or_else(|error| panic!("maximum safe authorization id must compute: {error}"));
+    body.validate()
+        .unwrap_or_else(|error| panic!("maximum safe authorization must validate: {error}"));
+    for field in [
+        "resource_version",
+        "resource_fence",
+        "key_epoch",
+        "issued_at",
+        "expires_at",
+    ] {
+        let mut invalid = body.clone();
+        match field {
+            "resource_version" => invalid.resource_version = UNSAFE,
+            "resource_fence" => invalid.resource_fence = UNSAFE,
+            "key_epoch" => invalid.key_epoch = UNSAFE,
+            "issued_at" => invalid.issued_at = UNSAFE,
+            "expires_at" => invalid.expires_at = UNSAFE,
+            _ => unreachable!(),
+        }
+        invalid.authorization_id = invalid
+            .recompute_authorization_id()
+            .unwrap_or_else(|error| panic!("unsafe authorization id must compute: {error}"));
+        let detail = if matches!(field, "issued_at" | "expires_at") {
+            "must be an I-JSON safe integer"
+        } else {
+            "must be a positive I-JSON safe integer"
+        };
+        assert_eq!(
+            invalid.validate(),
+            Err(FrostAuthorizationError::InvalidField { field, detail })
+        );
+    }
+
+    let mut checkpoint = fixture.slot.checkpoint.clone();
+    checkpoint.slot_version = MAX_SAFE;
+    checkpoint.resource_version = body.resource_version;
+    checkpoint.resource_fence = body.resource_fence;
+    checkpoint.slot_id = frost_authorization_slot_id(&body)
+        .unwrap_or_else(|error| panic!("maximum safe slot id must compute: {error}"));
+    checkpoint.authorization_id = body.authorization_id.clone();
+    checkpoint.signing_message_digest = sha256_hex(
+        &body
+            .signing_bytes()
+            .unwrap_or_else(|error| panic!("maximum safe body must canonicalize: {error}")),
+    );
+    checkpoint.key_epoch = body.key_epoch;
+    checkpoint.session_id = frost_authorization_session_id(&body)
+        .unwrap_or_else(|error| panic!("maximum safe session id must compute: {error}"));
+    checkpoint.clock_high_water = MAX_SAFE;
+    checkpoint.anchor_signature.clear();
+    checkpoint.checkpoint_digest.clear();
+    sign_slot_checkpoint(&mut checkpoint);
+    checkpoint
+        .validate()
+        .unwrap_or_else(|error| panic!("maximum safe slot checkpoint must validate: {error}"));
+    for field in [
+        "slot_version",
+        "resource_version",
+        "resource_fence",
+        "key_epoch",
+        "clock_high_water",
+    ] {
+        let mut invalid = checkpoint.clone();
+        match field {
+            "slot_version" => invalid.slot_version = UNSAFE,
+            "resource_version" => invalid.resource_version = UNSAFE,
+            "resource_fence" => invalid.resource_fence = UNSAFE,
+            "key_epoch" => invalid.key_epoch = UNSAFE,
+            "clock_high_water" => invalid.clock_high_water = UNSAFE,
+            _ => unreachable!(),
+        }
+        assert_eq!(
+            invalid.validate(),
+            Err(FrostVerificationError::Authorization(
+                FrostAuthorizationError::InvalidField {
+                    field,
+                    detail: "must be a positive I-JSON safe integer",
+                }
+            ))
+        );
+    }
+
+    let mut roster = fixture.roster.clone();
+    roster.key_epoch = MAX_SAFE;
+    roster.valid_from = MAX_SAFE - 1;
+    roster.valid_until = MAX_SAFE;
+    sign_roster(&mut roster);
+    roster
+        .validate()
+        .unwrap_or_else(|error| panic!("maximum safe roster must validate: {error}"));
+    for field in ["key_epoch", "valid_from", "valid_until"] {
+        let mut invalid = roster.clone();
+        match field {
+            "key_epoch" => invalid.key_epoch = UNSAFE,
+            "valid_from" => invalid.valid_from = UNSAFE,
+            "valid_until" => invalid.valid_until = UNSAFE,
+            _ => unreachable!(),
+        }
+        assert_eq!(
+            invalid.validate(),
+            Err(FrostRosterError::InvalidField {
+                field,
+                detail: if field == "key_epoch" {
+                    "must be a positive I-JSON safe integer"
+                } else {
+                    "must be an I-JSON safe integer"
+                },
+            })
+        );
+    }
+
+    let mut epoch_checkpoint = fixture.epoch_checkpoint.clone();
+    epoch_checkpoint.checkpoint_sequence = MAX_SAFE;
+    epoch_checkpoint.key_epoch = MAX_SAFE;
+    epoch_checkpoint.activation_fence = MAX_SAFE;
+    epoch_checkpoint.clock_high_water = MAX_SAFE;
+    epoch_checkpoint.anchor_signature.clear();
+    epoch_checkpoint.checkpoint_digest.clear();
+    sign_epoch_checkpoint(&mut epoch_checkpoint);
+    epoch_checkpoint
+        .validate()
+        .unwrap_or_else(|error| panic!("maximum safe epoch checkpoint must validate: {error}"));
+    for field in [
+        "checkpoint_sequence",
+        "key_epoch",
+        "activation_fence",
+        "clock_high_water",
+    ] {
+        let mut invalid = epoch_checkpoint.clone();
+        match field {
+            "checkpoint_sequence" => invalid.checkpoint_sequence = UNSAFE,
+            "key_epoch" => invalid.key_epoch = UNSAFE,
+            "activation_fence" => invalid.activation_fence = UNSAFE,
+            "clock_high_water" => invalid.clock_high_water = UNSAFE,
+            _ => unreachable!(),
+        }
+        assert_eq!(
+            invalid.validate(),
+            Err(FrostRosterError::InvalidField {
+                field,
+                detail: "must be a positive I-JSON safe integer",
+            })
+        );
+    }
+
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let family = root.join("spec/schemas/chio-frost/v1");
+    let authorization_schema_path = family.join("authorization.schema.json");
+    let authorization_schema = chio_spec_validate::load_json(&authorization_schema_path)
+        .unwrap_or_else(|error| panic!("authorization schema must load: {error}"));
+    let mut proof = fixture.proof;
+    proof.body = body;
+    let proof_value = serde_json::to_value(proof)
+        .unwrap_or_else(|error| panic!("maximum safe authorization must serialize: {error}"));
+    chio_spec_validate::validate_value(
+        &authorization_schema_path,
+        &authorization_schema,
+        &PathBuf::from("<maximum safe authorization>"),
+        &proof_value,
+    )
+    .unwrap_or_else(|error| panic!("maximum safe authorization schema failed: {error}"));
+    for field in [
+        "resourceVersion",
+        "resourceFence",
+        "keyEpoch",
+        "issuedAt",
+        "expiresAt",
+    ] {
+        let mut invalid = proof_value.clone();
+        invalid["body"][field] = serde_json::json!(UNSAFE);
+        assert!(
+            chio_spec_validate::validate_value(
+                &authorization_schema_path,
+                &authorization_schema,
+                &PathBuf::from(format!("<unsafe {field}>")),
+                &invalid,
+            )
+            .is_err(),
+            "authorization schema accepted unsafe {field}"
+        );
+    }
+
+    let checkpoint_schema_path = family.join("authorization-slot-checkpoint.schema.json");
+    let checkpoint_schema = chio_spec_validate::load_json(&checkpoint_schema_path)
+        .unwrap_or_else(|error| panic!("slot checkpoint schema must load: {error}"));
+    let checkpoint_value = serde_json::to_value(checkpoint)
+        .unwrap_or_else(|error| panic!("maximum safe checkpoint must serialize: {error}"));
+    chio_spec_validate::validate_value(
+        &checkpoint_schema_path,
+        &checkpoint_schema,
+        &PathBuf::from("<maximum safe slot checkpoint>"),
+        &checkpoint_value,
+    )
+    .unwrap_or_else(|error| panic!("maximum safe checkpoint schema failed: {error}"));
+    for field in [
+        "slotVersion",
+        "resourceVersion",
+        "resourceFence",
+        "keyEpoch",
+        "clockHighWater",
+    ] {
+        let mut invalid = checkpoint_value.clone();
+        invalid[field] = serde_json::json!(UNSAFE);
+        assert!(
+            chio_spec_validate::validate_value(
+                &checkpoint_schema_path,
+                &checkpoint_schema,
+                &PathBuf::from(format!("<unsafe {field}>")),
+                &invalid,
+            )
+            .is_err(),
+            "slot checkpoint schema accepted unsafe {field}"
+        );
+    }
+
+    let roster_schema_path = family.join("roster.schema.json");
+    let roster_schema = chio_spec_validate::load_json(&roster_schema_path)
+        .unwrap_or_else(|error| panic!("roster schema must load: {error}"));
+    let roster_value = serde_json::to_value(roster)
+        .unwrap_or_else(|error| panic!("maximum safe roster must serialize: {error}"));
+    chio_spec_validate::validate_value(
+        &roster_schema_path,
+        &roster_schema,
+        &PathBuf::from("<maximum safe roster>"),
+        &roster_value,
+    )
+    .unwrap_or_else(|error| panic!("maximum safe roster schema failed: {error}"));
+    for field in ["keyEpoch", "validFrom", "validUntil"] {
+        let mut invalid = roster_value.clone();
+        invalid[field] = serde_json::json!(UNSAFE);
+        assert!(
+            chio_spec_validate::validate_value(
+                &roster_schema_path,
+                &roster_schema,
+                &PathBuf::from(format!("<unsafe {field}>")),
+                &invalid,
+            )
+            .is_err(),
+            "roster schema accepted unsafe {field}"
+        );
+    }
+
+    let epoch_schema_path = family.join("epoch-checkpoint.schema.json");
+    let epoch_schema = chio_spec_validate::load_json(&epoch_schema_path)
+        .unwrap_or_else(|error| panic!("epoch checkpoint schema must load: {error}"));
+    let epoch_value = serde_json::to_value(epoch_checkpoint)
+        .unwrap_or_else(|error| panic!("maximum safe epoch checkpoint must serialize: {error}"));
+    chio_spec_validate::validate_value(
+        &epoch_schema_path,
+        &epoch_schema,
+        &PathBuf::from("<maximum safe epoch checkpoint>"),
+        &epoch_value,
+    )
+    .unwrap_or_else(|error| panic!("maximum safe epoch schema failed: {error}"));
+    for field in [
+        "checkpointSequence",
+        "keyEpoch",
+        "activationFence",
+        "clockHighWater",
+    ] {
+        let mut invalid = epoch_value.clone();
+        invalid[field] = serde_json::json!(UNSAFE);
+        assert!(
+            chio_spec_validate::validate_value(
+                &epoch_schema_path,
+                &epoch_schema,
+                &PathBuf::from(format!("<unsafe {field}>")),
+                &invalid,
+            )
+            .is_err(),
+            "epoch checkpoint schema accepted unsafe {field}"
+        );
+    }
+    let mut invalid_currency = channel_close;
+    let FrostActionPreimageV1::ChannelClose(action) = &mut invalid_currency else {
+        panic!("fixture must remain a channel close action");
+    };
+    action.final_cumulative_owed.currency = "usd".to_owned();
+    assert_eq!(
+        invalid_currency.action_digest(),
+        Err(FrostAuthorizationError::InvalidField {
+            field: "final_cumulative_owed",
+            detail: "currency must be a 3-letter uppercase code",
+        })
+    );
+}
+
+#[test]
 fn upstream_official_vector_and_active_execution_authorization_verify() {
     let verifying_key = VerifyingKey::deserialize(&decode_hex(OFFICIAL_VERIFYING_KEY))
         .unwrap_or_else(|error| panic!("official verifying key must decode: {error}"));
@@ -715,6 +1074,18 @@ fn historical_completion_requires_the_exact_bound_slot_and_live_completion_windo
         fixture.proof.body.authorization_id
     );
     assert_eq!(verified.action_digest(), fixture.proof.body.action_digest);
+    assert_eq!(
+        verified.completed_at(),
+        completed.checkpoint.clock_high_water
+    );
+    assert_eq!(
+        (&verified as &dyn std::any::Any).type_id(),
+        std::any::TypeId::of::<VerifiedHistoricalCompletedFrostAuthorization>(),
+    );
+    assert_ne!(
+        std::any::TypeId::of::<VerifiedHistoricalCompletedFrostAuthorization>(),
+        std::any::TypeId::of::<VerifiedFrostAuthorization>(),
+    );
 
     let mut substituted_bound = bound.clone();
     substituted_bound.action_digest = "cc".repeat(32);

@@ -279,6 +279,10 @@ impl SqliteAuthorityStore {
             crate::admission_operation_store::initialize_admission_operation_schema(
                 &mut connection,
             )?;
+            crate::channel_lifecycle_store::initialize_channel_lifecycle_schema(&mut connection)?;
+            crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
+                &mut connection,
+            )?;
             crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
                 .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
             initialize_global_commit_schema(&connection)?;
@@ -325,6 +329,14 @@ impl SqliteAuthorityStore {
                 "economic_state_cache",
                 crate::economic_state_cache::ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION,
             ),
+            (
+                "channel_lifecycle",
+                crate::channel_lifecycle_store::CHANNEL_LIFECYCLE_SUPPORTED_SCHEMA_VERSION,
+            ),
+            (
+                "channel_release_publisher",
+                crate::channel_release_publisher_store::CHANNEL_RELEASE_PUBLISHER_SUPPORTED_SCHEMA_VERSION,
+            ),
         ] {
             crate::check_schema_version(
                 &connection,
@@ -339,6 +351,10 @@ impl SqliteAuthorityStore {
         verify_serving_owner_schema(&connection)?;
         initialize_serving_lease_schema(&connection)?;
         crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
+        crate::channel_lifecycle_store::initialize_channel_lifecycle_schema(&mut connection)?;
+        crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
+            &mut connection,
+        )?;
         crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
 
@@ -461,6 +477,10 @@ impl SqliteAuthorityStore {
         )?;
         initialize_serving_lease_schema(&connection)?;
         crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
+        crate::channel_lifecycle_store::initialize_channel_lifecycle_schema(&mut connection)?;
+        crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
+            &mut connection,
+        )?;
         crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
         verify_global_commit_schema(&connection)?;
@@ -483,6 +503,14 @@ impl SqliteAuthorityStore {
             (
                 "economic_state_cache",
                 crate::economic_state_cache::ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION,
+            ),
+            (
+                "channel_lifecycle",
+                crate::channel_lifecycle_store::CHANNEL_LIFECYCLE_SUPPORTED_SCHEMA_VERSION,
+            ),
+            (
+                "channel_release_publisher",
+                crate::channel_release_publisher_store::CHANNEL_RELEASE_PUBLISHER_SUPPORTED_SCHEMA_VERSION,
             ),
         ] {
             crate::check_schema_version(
@@ -622,6 +650,10 @@ impl SqliteAuthorityStore {
             poisoned: AtomicBool::new(false),
             expected_data_version: AtomicU64::new(expected_data_version),
         });
+        crate::channel_release_publisher_store::quarantine_incomplete_dispatches_at_startup(
+            &mut connection,
+            &owner,
+        )?;
         Ok(Self {
             connection: Arc::new(Mutex::new(connection)),
             owner,
@@ -672,6 +704,26 @@ impl SqliteAuthorityStore {
     #[must_use]
     pub fn economic_state_cache(&self) -> crate::economic_state_cache::SqliteEconomicStateCache {
         crate::economic_state_cache::SqliteEconomicStateCache::open_alongside(
+            self.connection.clone(),
+            self.owner.clone(),
+        )
+    }
+
+    #[must_use]
+    pub fn channel_lifecycle_store(
+        &self,
+    ) -> crate::channel_lifecycle_store::SqliteChannelLifecycleStore {
+        crate::channel_lifecycle_store::SqliteChannelLifecycleStore::open_alongside(
+            self.connection.clone(),
+            self.owner.clone(),
+        )
+    }
+
+    #[must_use]
+    pub fn channel_release_publisher_store(
+        &self,
+    ) -> crate::channel_release_publisher_store::SqliteChannelReleasePublisherStore {
+        crate::channel_release_publisher_store::SqliteChannelReleasePublisherStore::open_alongside(
             self.connection.clone(),
             self.owner.clone(),
         )
@@ -1357,6 +1409,10 @@ fn verify_authority_store_invariants(
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     crate::economic_state_cache::verify_cache_sql_invariants(connection)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::channel_lifecycle_store::verify_channel_lifecycle_invariants(connection)?;
+    crate::channel_release_publisher_store::verify_channel_release_publisher_invariants(
+        connection,
+    )?;
     Ok(())
 }
 

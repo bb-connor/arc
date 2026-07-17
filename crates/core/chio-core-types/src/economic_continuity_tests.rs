@@ -364,6 +364,113 @@ fn batch_binds_prepared_effect_slot_and_request_replay() -> Result<(), Box<dyn c
     Ok(())
 }
 
+#[test]
+fn composite_prepared_effect_batch_accepts_two_exact_operation_owners(
+) -> Result<(), Box<dyn core::error::Error>> {
+    let (mut batch, _) = unsigned_prepared_effect_batch()?;
+    let mut slot = ready_effect_slot()?;
+    slot.resource_key = resource_key("round-2");
+    slot.operation_id = digest("operation-2");
+    slot.effect_kind = "settlement_refund".to_string();
+    slot.request.request_id = "request-2".to_string();
+    slot.request.request_binding_digest = digest("request-binding-2");
+    slot.action_digest = digest("action-2");
+    slot.parameters_digest = digest("parameters-2");
+    slot.resource_head_digest = digest("resource-head-2");
+    slot.idempotency_key = digest("idempotency-key-2");
+    slot.slot_id = slot.recompute_slot_id()?;
+    slot.validate()?;
+
+    let mut owner_head = head(resource_key("round-2"), 1, 1, None)?;
+    owner_head.operation_id = Some(slot.operation_id.clone());
+    owner_head.effect_idempotency_key = Some(slot.idempotency_key.clone());
+    let mut owner_transition = transition(owner_head, None);
+    owner_transition.prepared_effect = Some(EconomicPreparedEffectV1 {
+        operation_id: slot.operation_id.clone(),
+        action_digest: slot.action_digest.clone(),
+        effect_slot_id: slot.slot_id.clone(),
+        effect_slot_digest: slot.digest()?,
+        authorization: EconomicActionAuthorizationV1::Direct,
+    });
+    let slot_content = inline_content(serde_json::to_value(&slot)?);
+    let slot_head = EconomicResourceHeadV1 {
+        schema: CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA.to_string(),
+        anchor_id: slot.anchor_id.clone(),
+        namespace: slot.namespace.clone(),
+        resource_key: slot.resource_head_key(),
+        head_version: 1,
+        resource_version: 1,
+        lifecycle_fence: 1,
+        lifecycle_state: "ready".to_string(),
+        state_digest: slot_content.digest()?,
+        state: slot_content,
+        operation_id: Some(slot.operation_id.clone()),
+        effect_idempotency_key: Some(slot.idempotency_key.clone()),
+        frost: None,
+        terminal_result: None,
+        trusted_clock_high_water: 110,
+        predecessor_digest: None,
+    };
+    batch.transitions.push(owner_transition);
+    batch.transitions.push(transition(slot_head, None));
+    batch
+        .transitions
+        .sort_by(|left, right| left.resource_key.cmp(&right.resource_key));
+    batch.effect_slots.push(slot.clone());
+    batch
+        .effect_slots
+        .sort_by(|left, right| left.slot_id.cmp(&right.slot_id));
+    batch.request_replays.push(EconomicRequestReplayV1 {
+        request: slot.request.clone(),
+        operation_id: slot.operation_id.clone(),
+        effect_slot_ids: vec![slot.slot_id.clone()],
+    });
+    batch.request_replays.sort_by(|left, right| {
+        (
+            &left.request.request_namespace_digest,
+            &left.request.request_id,
+        )
+            .cmp(&(
+                &right.request.request_namespace_digest,
+                &right.request.request_id,
+            ))
+    });
+    batch.operation_id = None;
+
+    let keypair = Keypair::from_seed(&[17; 32]);
+    batch.seal(&keypair)?;
+    batch.verify_signature(&keypair.public_key())?;
+    let canonical = batch.canonical_bytes()?;
+    assert_eq!(
+        serde_json::from_slice::<EconomicStateBatchV1>(&canonical)?,
+        batch
+    );
+
+    let mut terminal_mix = batch.clone();
+    let result = inline_content(json!({"status": "completed"}));
+    let terminal_transition = terminal_mix
+        .transitions
+        .iter_mut()
+        .find(|transition| transition.prepared_effect.is_some())
+        .ok_or("prepared effect owner is missing")?;
+    terminal_transition.next_head.lifecycle_state = "completed".to_string();
+    terminal_transition.next_head.terminal_result = Some(EconomicTerminalResultV1 {
+        result_id: "terminal-result".to_string(),
+        result_digest: result.digest()?,
+        result,
+    });
+    assert!(terminal_mix.seal(&keypair).is_err());
+
+    let (mut single_owner, _) = unsigned_prepared_effect_batch()?;
+    single_owner.operation_id = None;
+    assert!(single_owner.seal(&keypair).is_err());
+
+    let mut stray_owner = batch;
+    stray_owner.request_replays[0].operation_id = digest("operation-3");
+    assert!(stray_owner.seal(&keypair).is_err());
+    Ok(())
+}
+
 pub(crate) fn unsigned_prepared_effect_batch(
 ) -> Result<(EconomicStateBatchV1, EconomicEffectSlotV1), Box<dyn core::error::Error>> {
     let slot = ready_effect_slot()?;

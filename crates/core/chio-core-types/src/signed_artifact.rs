@@ -39,6 +39,11 @@ pub const CHIO_CLEARING_NETTING_ROUND_CORE_V1_SCHEMA: &str = "chio.clearing.nett
 pub const CHIO_CLEARING_PARTICIPANT_STATEMENT_V1_SCHEMA: &str =
     "chio.clearing.participant-statement.v1";
 pub const CHIO_CLEARING_SETTLEMENT_INTENT_V1_SCHEMA: &str = "chio.clearing.settlement-intent.v1";
+pub const CHIO_CLEARING_SETTLEMENT_RECONCILIATION_V1_SCHEMA: &str =
+    "chio.clearing.settlement-reconciliation.v1";
+pub const CHIO_CLEARING_ROUND_SATISFACTION_V1_SCHEMA: &str = "chio.clearing.round-satisfaction.v1";
+pub const CHIO_CLEARING_ZERO_INTENT_RECONCILIATION_V1_SCHEMA: &str =
+    "chio.clearing.zero-intent-reconciliation.v1";
 pub const CHIO_CLEARING_ATOM_TRANSFORMATION_V1_SCHEMA: &str =
     "chio.clearing.atom-transformation.v1";
 pub const CHIO_CLEARING_OUTPUT_MANIFEST_V1_SCHEMA: &str = "chio.clearing.output-manifest.v1";
@@ -48,6 +53,42 @@ pub const CHIO_CLEARING_ROUND_FINALIZATION_V1_SCHEMA: &str = "chio.clearing.roun
 pub const CHIO_CLEARING_ZERO_DISPATCH_PROOF_V1_SCHEMA: &str =
     "chio.clearing.zero-dispatch-proof.v1";
 pub const CHIO_CLEARING_ROUND_ABORT_V1_SCHEMA: &str = "chio.clearing.round-abort.v1";
+pub const CHIO_CHANNEL_FUNDING_EVIDENCE_V1_SCHEMA: &str = "chio.channel.funding-evidence.v1";
+pub const CHIO_CHANNEL_OPEN_INTENT_V1_SCHEMA: &str = "chio.channel.open-intent.v1";
+pub const CHIO_CHANNEL_FUNDING_ACKNOWLEDGEMENT_V1_SCHEMA: &str =
+    "chio.channel.funding-acknowledgement.v1";
+pub const CHIO_CHANNEL_OPEN_V1_SCHEMA: &str = "chio.channel.open.v1";
+pub const CHIO_CHANNEL_RESERVATION_V1_SCHEMA: &str = "chio.channel.reservation.v1";
+pub const CHIO_CHANNEL_STATE_V1_SCHEMA: &str = "chio.channel.state.v1";
+pub const CHIO_CHANNEL_CLOSE_V1_SCHEMA: &str = "chio.channel.close.v1";
+pub const CHIO_CHANNEL_DISPUTE_V1_SCHEMA: &str = "chio.channel.dispute.v1";
+pub const CHIO_CHANNEL_RELEASE_AUTHORIZATION_V1_SCHEMA: &str =
+    "chio.channel.release-authorization.v1";
+pub const CHIO_CHANNEL_TERMINAL_OUTCOME_COMMITMENT_V1_SCHEMA: &str =
+    "chio.channel.terminal-outcome-commitment.v1";
+pub const CHIO_FINCRED_CREDIT_SCORECARD_V1_SCHEMA: &str = "chio.fincred.credit-scorecard.v1";
+pub const CHIO_FINCRED_EXPOSURE_HISTORY_V1_SCHEMA: &str = "chio.fincred.exposure-history.v1";
+pub const CHIO_FINCRED_SETTLEMENT_RELIABILITY_V1_SCHEMA: &str =
+    "chio.fincred.settlement-reliability.v1";
+pub const CHIO_FINCRED_PREMIUM_HISTORY_V1_SCHEMA: &str = "chio.fincred.premium-history.v1";
+pub const CHIO_FINCRED_LOSS_HISTORY_V1_SCHEMA: &str = "chio.fincred.loss-history.v1";
+pub const CHIO_FINCRED_SOURCE_MEMBER_V1_SCHEMA: &str = "chio.fincred.source-member.v1";
+pub const CHIO_FINCRED_SOURCE_CHECKPOINT_V1_SCHEMA: &str = "chio.fincred.source-checkpoint.v1";
+pub const CHIO_FINCRED_SOURCE_COMPLETENESS_ATTESTATION_V1_SCHEMA: &str =
+    "chio.fincred.source-completeness-attestation.v1";
+pub const CHIO_AGENT_PASSPORT_SOURCE_MANIFEST_V2_SCHEMA: &str =
+    "chio.agent-passport.source-manifest.v2";
+pub const CHIO_AGENT_PASSPORT_PRESENTATION_CHALLENGE_V2_SCHEMA: &str =
+    "chio.agent-passport-presentation-challenge.v2";
+pub const CHIO_FISCAL_CHARTER_V1_SCHEMA: &str = "chio.fiscal.charter.v1";
+pub const CHIO_FISCAL_SCHEDULE_V1_SCHEMA: &str = "chio.fiscal.schedule.v1";
+pub const CHIO_FISCAL_PROPOSAL_V1_SCHEMA: &str = "chio.fiscal.proposal.v1";
+pub const CHIO_FISCAL_PROPOSAL_ADMISSION_V1_SCHEMA: &str = "chio.fiscal.proposal-admission.v1";
+pub const CHIO_FISCAL_APPROVAL_V1_SCHEMA: &str = "chio.fiscal.approval.v1";
+pub const CHIO_FISCAL_ACTIVATION_V1_SCHEMA: &str = "chio.fiscal.activation.v1";
+pub const CHIO_FISCAL_CONSUMER_READINESS_V1_SCHEMA: &str = "chio.fiscal.consumer-readiness.v1";
+pub const CHIO_FISCAL_CONTINUITY_CHECKPOINT_V1_SCHEMA: &str =
+    "chio.fiscal.continuity-checkpoint.v1";
 pub const CHIO_TRANSACTION_PASSPORT_V1_SCHEMA: &str = "chio.transaction-passport.v1";
 pub const CHIO_TRANSACTION_EVIDENCE_GRAPH_V1_SCHEMA: &str = "chio.transaction.evidence-graph.v1";
 pub const CHIO_TRANSACTION_CLAIM_SET_V1_SCHEMA: &str = "chio.transaction.claim-set.v1";
@@ -280,6 +321,18 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("clearing_settlement_intent", "ws4-clearing-v1")),
     ),
     (
+        CHIO_CLEARING_SETTLEMENT_RECONCILIATION_V1_SCHEMA,
+        Some(("clearing_settlement_reconciliation", "ws4-clearing-v1")),
+    ),
+    (
+        CHIO_CLEARING_ROUND_SATISFACTION_V1_SCHEMA,
+        Some(("clearing_round_satisfaction", "ws4-clearing-v1")),
+    ),
+    (
+        CHIO_CLEARING_ZERO_INTENT_RECONCILIATION_V1_SCHEMA,
+        Some(("clearing_zero_intent_reconciliation", "ws4-clearing-v1")),
+    ),
+    (
         CHIO_CLEARING_ATOM_TRANSFORMATION_V1_SCHEMA,
         Some(("clearing_atom_transformation", "ws4-clearing-v1")),
     ),
@@ -302,6 +355,133 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_CLEARING_ROUND_ABORT_V1_SCHEMA,
         Some(("clearing_round_abort", "ws4-clearing-v1")),
+    ),
+    (
+        CHIO_CHANNEL_FUNDING_EVIDENCE_V1_SCHEMA,
+        Some(("channel_funding_evidence", "micro-escrow-channels-v1")),
+    ),
+    (
+        CHIO_CHANNEL_OPEN_INTENT_V1_SCHEMA,
+        Some(("channel_open_intent", "micro-escrow-channels-v1")),
+    ),
+    (
+        CHIO_CHANNEL_FUNDING_ACKNOWLEDGEMENT_V1_SCHEMA,
+        Some((
+            "channel_funding_acknowledgement",
+            "micro-escrow-channels-v1",
+        )),
+    ),
+    (
+        CHIO_CHANNEL_OPEN_V1_SCHEMA,
+        Some(("channel_open", "micro-escrow-channels-v1")),
+    ),
+    (
+        CHIO_CHANNEL_RESERVATION_V1_SCHEMA,
+        Some(("channel_reservation", "micro-escrow-channels-v1")),
+    ),
+    (
+        CHIO_CHANNEL_STATE_V1_SCHEMA,
+        Some(("channel_state", "micro-escrow-channels-v1")),
+    ),
+    (
+        CHIO_CHANNEL_CLOSE_V1_SCHEMA,
+        Some(("channel_close", "micro-escrow-channels-v1")),
+    ),
+    (
+        CHIO_CHANNEL_DISPUTE_V1_SCHEMA,
+        Some(("channel_dispute", "micro-escrow-channels-v1")),
+    ),
+    (
+        CHIO_CHANNEL_RELEASE_AUTHORIZATION_V1_SCHEMA,
+        Some(("channel_release_authorization", "micro-escrow-channels-v1")),
+    ),
+    (
+        CHIO_CHANNEL_TERMINAL_OUTCOME_COMMITMENT_V1_SCHEMA,
+        Some((
+            "channel_terminal_outcome_commitment",
+            "micro-escrow-channels-v1",
+        )),
+    ),
+    (
+        CHIO_FINCRED_CREDIT_SCORECARD_V1_SCHEMA,
+        Some(("financial_credit_scorecard", "financial-credentials-v1")),
+    ),
+    (
+        CHIO_FINCRED_EXPOSURE_HISTORY_V1_SCHEMA,
+        Some(("financial_exposure_history", "financial-credentials-v1")),
+    ),
+    (
+        CHIO_FINCRED_SETTLEMENT_RELIABILITY_V1_SCHEMA,
+        Some((
+            "financial_settlement_reliability",
+            "financial-credentials-v1",
+        )),
+    ),
+    (
+        CHIO_FINCRED_PREMIUM_HISTORY_V1_SCHEMA,
+        Some(("financial_premium_history", "financial-credentials-v1")),
+    ),
+    (
+        CHIO_FINCRED_LOSS_HISTORY_V1_SCHEMA,
+        Some(("financial_loss_history", "financial-credentials-v1")),
+    ),
+    (
+        CHIO_FINCRED_SOURCE_MEMBER_V1_SCHEMA,
+        Some(("financial_source_member", "financial-credentials-v1")),
+    ),
+    (
+        CHIO_FINCRED_SOURCE_CHECKPOINT_V1_SCHEMA,
+        Some(("financial_source_checkpoint", "financial-credentials-v1")),
+    ),
+    (
+        CHIO_FINCRED_SOURCE_COMPLETENESS_ATTESTATION_V1_SCHEMA,
+        Some((
+            "financial_source_completeness_attestation",
+            "financial-credentials-v1",
+        )),
+    ),
+    (
+        CHIO_AGENT_PASSPORT_SOURCE_MANIFEST_V2_SCHEMA,
+        Some(("agent_passport_source_manifest", "financial-credentials-v1")),
+    ),
+    (
+        CHIO_AGENT_PASSPORT_PRESENTATION_CHALLENGE_V2_SCHEMA,
+        Some((
+            "agent_passport_presentation_challenge",
+            "financial-credentials-v1",
+        )),
+    ),
+    (
+        CHIO_FISCAL_CHARTER_V1_SCHEMA,
+        Some(("fiscal_charter", "fiscal-constitutions-v1")),
+    ),
+    (
+        CHIO_FISCAL_SCHEDULE_V1_SCHEMA,
+        Some(("fiscal_schedule", "fiscal-constitutions-v1")),
+    ),
+    (
+        CHIO_FISCAL_PROPOSAL_V1_SCHEMA,
+        Some(("fiscal_proposal", "fiscal-constitutions-v1")),
+    ),
+    (
+        CHIO_FISCAL_PROPOSAL_ADMISSION_V1_SCHEMA,
+        Some(("fiscal_proposal_admission", "fiscal-constitutions-v1")),
+    ),
+    (
+        CHIO_FISCAL_APPROVAL_V1_SCHEMA,
+        Some(("fiscal_approval", "fiscal-constitutions-v1")),
+    ),
+    (
+        CHIO_FISCAL_ACTIVATION_V1_SCHEMA,
+        Some(("fiscal_activation", "fiscal-constitutions-v1")),
+    ),
+    (
+        CHIO_FISCAL_CONSUMER_READINESS_V1_SCHEMA,
+        Some(("fiscal_consumer_readiness", "fiscal-constitutions-v1")),
+    ),
+    (
+        CHIO_FISCAL_CONTINUITY_CHECKPOINT_V1_SCHEMA,
+        Some(("fiscal_continuity_checkpoint", "fiscal-constitutions-v1")),
     ),
     (CHIO_SESSION_ANCHOR_SCHEMA, None),
     (CHIO_REQUEST_LINEAGE_RECORD_SCHEMA, None),

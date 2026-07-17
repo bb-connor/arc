@@ -8,6 +8,7 @@ use super::{read_u64, sqlite_u64, SqliteServingOwnerError};
 
 pub(crate) const GLOBAL_GENESIS_DIGEST: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
+const CURRENT_PROJECTION_KINDS: &str = "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication'";
 
 const GLOBAL_COMMIT_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS authority_global_commit_meta (
@@ -30,7 +31,7 @@ CREATE TABLE IF NOT EXISTS authority_global_commits (
     commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     projection_kind TEXT NOT NULL CHECK (
-        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic')
+        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication')
     ),
     projection_key TEXT NOT NULL,
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence >= 0),
@@ -162,6 +163,14 @@ struct RevocationReference<'a> {
     revoked_at: i64,
 }
 
+#[derive(Serialize)]
+struct VersionedProjectionReference<'a> {
+    format: &'static str,
+    projection_key: &'a str,
+    projection_sequence: u64,
+    tables: Vec<TableSnapshot>,
+}
+
 type SchemaCatalogEntry = (String, String, String, Option<String>);
 
 pub(crate) fn initialize_global_commit_schema(
@@ -178,6 +187,7 @@ pub(crate) fn initialize_global_commit_schema(
             return Ok(());
         }
         let supported_legacy = [
+            pre_channel_release_global_commit_schema(),
             pre_economic_global_commit_schema(),
             pre_payment_global_commit_schema(),
             legacy_global_commit_schema(),
@@ -212,22 +222,29 @@ pub(crate) fn verify_global_commit_schema(
 
 fn legacy_global_commit_schema() -> String {
     GLOBAL_COMMIT_SCHEMA.replace(
-        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic'",
+        CURRENT_PROJECTION_KINDS,
         "'baseline', 'admission', 'budget', 'revocation'",
     )
 }
 
 fn pre_payment_global_commit_schema() -> String {
     GLOBAL_COMMIT_SCHEMA.replace(
-        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic'",
+        CURRENT_PROJECTION_KINDS,
         "'baseline', 'admission', 'budget', 'revocation', 'frost'",
     )
 }
 
 fn pre_economic_global_commit_schema() -> String {
     GLOBAL_COMMIT_SCHEMA.replace(
-        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic'",
+        CURRENT_PROJECTION_KINDS,
         "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment'",
+    )
+}
+
+fn pre_channel_release_global_commit_schema() -> String {
+    GLOBAL_COMMIT_SCHEMA.replace(
+        CURRENT_PROJECTION_KINDS,
+        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic'",
     )
 }
 
@@ -804,6 +821,9 @@ fn projection_reference_digest(
             )
             .optional()?
             .ok_or_else(|| invalid("economic projection reference is absent")),
+        "channel_release_publication" => {
+            channel_release_projection_reference_digest(connection, key, sequence)
+        }
         _ => Err(invalid("unknown global authority projection kind")),
     }
 }
@@ -812,6 +832,33 @@ fn verify_projection_reference(
     connection: &Connection,
     commit: &CommitRow,
 ) -> Result<(), SqliteServingOwnerError> {
+    if commit.projection_kind == "channel_release_publication" {
+        let stored_version =
+            load_channel_release_projection_sequence(connection, &commit.projection_key)?;
+        if stored_version < commit.projection_sequence {
+            return Err(invalid(
+                "channel release publication projection history was truncated",
+            ));
+        }
+        let superseded = connection.query_row(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM authority_global_commits
+                WHERE projection_kind = ?1 AND projection_key = ?2
+                  AND projection_sequence > ?3
+            )
+            "#,
+            params![
+                &commit.projection_kind,
+                &commit.projection_key,
+                sqlite_u64(commit.projection_sequence, "versioned projection sequence")?,
+            ],
+            |row| row.get::<_, bool>(0),
+        )?;
+        if superseded {
+            return Ok(());
+        }
+    }
     if commit.projection_kind == "payment" {
         let stored_version = connection
             .query_row(
@@ -908,6 +955,44 @@ fn verify_projection_reference(
         ));
     }
     Ok(())
+}
+
+fn channel_release_projection_reference_digest(
+    connection: &Connection,
+    key: &str,
+    sequence: u64,
+) -> Result<String, SqliteServingOwnerError> {
+    let stored_sequence = load_channel_release_projection_sequence(connection, key)?;
+    if stored_sequence != sequence {
+        return Err(invalid(
+            "channel release publication sequence does not match its record",
+        ));
+    }
+    digest(&VersionedProjectionReference {
+        format: "chio.sqlite-authority-channel-release-publication-reference.v1",
+        projection_key: key,
+        projection_sequence: sequence,
+        tables: vec![table_snapshot(
+            connection,
+            "chio_channel_release_publications",
+            Some(("channel_id", key)),
+        )?],
+    })
+}
+
+fn load_channel_release_projection_sequence(
+    connection: &Connection,
+    key: &str,
+) -> Result<u64, SqliteServingOwnerError> {
+    let stored = connection
+        .query_row(
+            "SELECT record_version FROM chio_channel_release_publications WHERE channel_id = ?1",
+            [key],
+            |row| row.get::<_, i64>(0),
+        )
+        .optional()?
+        .ok_or_else(|| invalid("channel release publication reference is absent"))?;
+    read_u64(stored, "channel release publication sequence")
 }
 
 fn revocation_reference_digest(
@@ -1017,6 +1102,7 @@ fn verify_pristine_baseline(connection: &Connection) -> Result<(), SqliteServing
                 | "admission_operation_commit_meta"
                 | "budget_replication_meta"
                 | "budget_snapshot_coverage"
+                | "chio_channel_release_publisher_meta"
         ) {
             continue;
         }
@@ -1069,6 +1155,11 @@ fn verify_pristine_baseline(connection: &Connection) -> Result<(), SqliteServing
                 SELECT 1 FROM budget_snapshot_coverage
                 WHERE singleton = 1 AND covered_head = 0
             )
+            AND (SELECT COUNT(*) FROM chio_channel_release_publisher_meta) = 1
+            AND EXISTS(
+                SELECT 1 FROM chio_channel_release_publisher_meta
+                WHERE singleton = 1 AND trusted_time_high_water_unix_ms = 0
+            )
         "#,
         [GLOBAL_GENESIS_DIGEST],
         |row| row.get::<_, bool>(0),
@@ -1093,13 +1184,34 @@ fn verify_live_baseline_projection(connection: &Connection) -> Result<(), Sqlite
     if committed == baseline_projection_digest(connection)? {
         return Ok(());
     }
-    if payment_projection_is_empty(connection)?
+    if channel_release_projection_is_empty(connection)?
+        && committed == pre_channel_release_baseline_projection_digest(connection)?
+    {
+        return Ok(());
+    }
+    if channel_release_projection_is_empty(connection)?
+        && channel_projection_is_empty(connection)?
+        && committed == pre_channel_baseline_projection_digest(connection)?
+    {
+        return Ok(());
+    }
+    if channel_release_projection_is_empty(connection)?
+        && payment_projection_is_empty(connection)?
         && committed == pre_payment_baseline_projection_digest(connection)?
     {
         return Ok(());
     }
-    if payment_projection_is_empty(connection)?
+    if channel_release_projection_is_empty(connection)?
+        && channel_projection_is_empty(connection)?
+        && payment_projection_is_empty(connection)?
+        && committed == pre_channel_pre_payment_baseline_projection_digest(connection)?
+    {
+        return Ok(());
+    }
+    if channel_release_projection_is_empty(connection)?
+        && payment_projection_is_empty(connection)?
         && frost_projection_is_empty(connection)?
+        && channel_projection_is_empty(connection)?
         && committed == legacy_baseline_projection_digest(connection)?
     {
         return Ok(());
@@ -1109,12 +1221,52 @@ fn verify_live_baseline_projection(connection: &Connection) -> Result<(), Sqlite
     ))
 }
 
+fn pre_channel_baseline_projection_digest(
+    connection: &Connection,
+) -> Result<String, SqliteServingOwnerError> {
+    baseline_projection_digest_for_tables(
+        connection,
+        table_names(connection, false)?
+            .into_iter()
+            .filter(|table| {
+                !table.starts_with("channel_") && !table.starts_with("chio_channel_release_")
+            })
+            .collect(),
+    )
+}
+
+fn pre_channel_release_baseline_projection_digest(
+    connection: &Connection,
+) -> Result<String, SqliteServingOwnerError> {
+    baseline_projection_digest_for_tables(
+        connection,
+        table_names(connection, false)?
+            .into_iter()
+            .filter(|table| !table.starts_with("chio_channel_release_"))
+            .collect(),
+    )
+}
+
 fn pre_payment_baseline_projection_digest(
     connection: &Connection,
 ) -> Result<String, SqliteServingOwnerError> {
     baseline_projection_digest_for_tables(
         connection,
-        authority_table_names(connection, true, false)?,
+        without_channel_release_tables(authority_table_names(connection, true, false)?),
+    )
+}
+
+fn pre_channel_pre_payment_baseline_projection_digest(
+    connection: &Connection,
+) -> Result<String, SqliteServingOwnerError> {
+    baseline_projection_digest_for_tables(
+        connection,
+        authority_table_names(connection, true, false)?
+            .into_iter()
+            .filter(|table| {
+                !table.starts_with("channel_") && !table.starts_with("chio_channel_release_")
+            })
+            .collect(),
     )
 }
 
@@ -1158,6 +1310,30 @@ fn payment_projection_is_empty(connection: &Connection) -> Result<bool, SqliteSe
     projection_is_empty(connection, "payment_")
 }
 
+fn channel_release_projection_is_empty(
+    connection: &Connection,
+) -> Result<bool, SqliteServingOwnerError> {
+    connection
+        .query_row(
+            r#"
+            SELECT
+                (SELECT COUNT(*) FROM chio_channel_release_publications) = 0
+                AND (SELECT COUNT(*) FROM chio_channel_release_publisher_meta) = 1
+                AND EXISTS(
+                    SELECT 1 FROM chio_channel_release_publisher_meta
+                    WHERE singleton = 1 AND trusted_time_high_water_unix_ms = 0
+                )
+            "#,
+            [],
+            |row| row.get::<_, bool>(0),
+        )
+        .map_err(Into::into)
+}
+
+fn channel_projection_is_empty(connection: &Connection) -> Result<bool, SqliteServingOwnerError> {
+    projection_is_empty(connection, "channel_")
+}
+
 fn projection_is_empty(
     connection: &Connection,
     table_prefix: &str,
@@ -1178,9 +1354,17 @@ fn projection_is_empty(
     Ok(true)
 }
 
+fn without_channel_release_tables(tables: Vec<String>) -> Vec<String> {
+    tables
+        .into_iter()
+        .filter(|table| !table.starts_with("chio_channel_release_"))
+        .collect()
+}
+
 fn verify_global_projection_coverage(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
+    verify_channel_release_projection_coverage(connection)?;
     let incomplete = connection.query_row(
         r#"
         SELECT
@@ -1258,6 +1442,49 @@ fn verify_global_projection_coverage(
     Ok(())
 }
 
+fn verify_channel_release_projection_coverage(
+    connection: &Connection,
+) -> Result<(), SqliteServingOwnerError> {
+    let exact = connection.query_row(
+        r#"
+        SELECT
+            NOT EXISTS(
+                SELECT 1 FROM chio_channel_release_publications AS local
+                WHERE (
+                    SELECT COUNT(*) FROM authority_global_commits AS global
+                    WHERE global.projection_kind = 'channel_release_publication'
+                      AND global.projection_key = local.channel_id
+                      AND global.projection_sequence BETWEEN 1 AND local.record_version
+                ) <> local.record_version
+                OR (
+                    SELECT COUNT(DISTINCT global.projection_sequence)
+                    FROM authority_global_commits AS global
+                    WHERE global.projection_kind = 'channel_release_publication'
+                      AND global.projection_key = local.channel_id
+                      AND global.projection_sequence BETWEEN 1 AND local.record_version
+                ) <> local.record_version
+            )
+            AND NOT EXISTS(
+                SELECT 1 FROM authority_global_commits AS global
+                WHERE global.projection_kind = 'channel_release_publication'
+                  AND NOT EXISTS(
+                      SELECT 1 FROM chio_channel_release_publications AS local
+                      WHERE local.channel_id = global.projection_key
+                        AND local.record_version >= global.projection_sequence
+                  )
+            )
+        "#,
+        [],
+        |row| row.get::<_, bool>(0),
+    )?;
+    if !exact {
+        return Err(invalid(
+            "channel release global projection coverage is not exact",
+        ));
+    }
+    Ok(())
+}
+
 fn table_names(
     connection: &Connection,
     budget_event_only: bool,
@@ -1295,6 +1522,8 @@ fn authority_table_names(
               OR name GLOB 'admission_operation*'
               OR name GLOB 'admission_authority_*'
               OR name GLOB 'budget_*'
+              OR name GLOB 'channel_*'
+              OR name GLOB 'chio_channel_release_*'
               OR (?1 AND name GLOB 'frost_*')
               OR (?2 AND name GLOB 'payment_*')
           )
@@ -1470,6 +1699,8 @@ mod tests {
         connection.execute_batch(
             r#"
                 CREATE TABLE budget_mutation_events (event_id TEXT PRIMARY KEY);
+                CREATE TABLE channel_lifecycle_records (channel_id TEXT PRIMARY KEY);
+                CREATE TABLE channel_prepared_admission_plans (operation_id TEXT PRIMARY KEY);
                 CREATE TABLE frost_nonce_commitments (nonce_id TEXT PRIMARY KEY);
                 CREATE TABLE payment_journal (operation_id TEXT PRIMARY KEY);
                 CREATE TABLE payment_release_evidence (evidence_id TEXT PRIMARY KEY);
@@ -1486,6 +1717,8 @@ mod tests {
             table_names(&connection, false)?,
             vec![
                 "budget_mutation_events",
+                "channel_lifecycle_records",
+                "channel_prepared_admission_plans",
                 "frost_nonce_commitments",
                 "payment_journal",
                 "payment_release_evidence",
@@ -1510,6 +1743,78 @@ mod tests {
         )?;
 
         assert!(!payment_projection_is_empty(&connection)?);
+        Ok(())
+    }
+
+    #[test]
+    fn pre_channel_compatibility_requires_every_channel_table_to_be_empty(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let connection = projection_fixture()?;
+        assert!(projection_is_empty(&connection, "channel_")?);
+
+        connection.execute(
+            "INSERT INTO channel_prepared_admission_plans (operation_id) VALUES ('operation-1')",
+            [],
+        )?;
+
+        assert!(!projection_is_empty(&connection, "channel_")?);
+        Ok(())
+    }
+
+    #[test]
+    fn channel_release_projection_references_are_exact_and_unknown_kinds_stay_closed(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let connection = Connection::open_in_memory()?;
+        connection.execute_batch(
+            r#"
+            CREATE TABLE chio_channel_release_publications (
+                channel_id TEXT PRIMARY KEY,
+                record_version INTEGER NOT NULL,
+                publication_binding_digest TEXT NOT NULL,
+                status TEXT NOT NULL
+            );
+            CREATE TABLE authority_global_commits (
+                projection_kind TEXT NOT NULL,
+                projection_key TEXT NOT NULL,
+                projection_sequence INTEGER NOT NULL
+            );
+            INSERT INTO chio_channel_release_publications
+                (channel_id, record_version, publication_binding_digest, status)
+            VALUES ('channel-1', 1, 'binding-1', 'dispatch_committed');
+            INSERT INTO authority_global_commits
+                (projection_kind, projection_key, projection_sequence)
+            VALUES ('channel_release_publication', 'channel-1', 1);
+            "#,
+        )?;
+
+        assert!(projection_reference_digest(
+            &connection,
+            "channel_release_publication",
+            "channel-1",
+            1,
+        )
+        .is_ok());
+        assert!(projection_reference_digest(
+            &connection,
+            "channel_release_publication",
+            "channel-1",
+            2,
+        )
+        .is_err());
+        assert!(projection_reference_digest(&connection, "unknown", "channel-1", 1).is_err());
+        assert!(verify_channel_release_projection_coverage(&connection).is_ok());
+
+        connection.execute_batch(
+            r#"
+            UPDATE chio_channel_release_publications SET record_version = 3;
+            INSERT INTO authority_global_commits
+                (projection_kind, projection_key, projection_sequence)
+            VALUES
+                ('channel_release_publication', 'channel-1', 1),
+                ('channel_release_publication', 'channel-1', 3);
+            "#,
+        )?;
+        assert!(verify_channel_release_projection_coverage(&connection).is_err());
         Ok(())
     }
 }

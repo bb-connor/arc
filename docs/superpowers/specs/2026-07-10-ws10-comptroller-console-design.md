@@ -34,7 +34,7 @@ The substrate exists:
   `delegation_depth`, `root_budget_holder`, and `settlement_status`
   (`SettlementStatus`, same file lines 113-124).
 - The receipt query surface is cursor-paginated over the `seq` column with
-  `minCost`/`maxCost` filters and a 200-row cap
+  currency-bound `minCost`/`maxCost` filters and a 200-row cap
   (`docs/reference/RECEIPT_QUERY_API.md:14-63`; `ReceiptQuery` at
   `crates/kernel/chio-kernel/src/receipt_query.rs:93-127`). Cost filtering runs
   as `json_extract(r.raw_json, '$.metadata.financial.cost_charged')`
@@ -613,6 +613,15 @@ fixtures, and unknown-schema negatives before any verifier accepts it.
   Rust-parsed reference oracle. It swaps only after row-count, root, in-range
   parity, and reference-oracle checks pass. Derived columns and projection leaves
   are rebuildable indexes, never a second source of financial truth.
+  Current-version opens perform only a fixed-size canonical manifest check over
+  the cost columns, index, and receipt immutability guards. Full row
+  reconciliation occurs only inside the transactional migration or an explicit
+  operator audit. Archive reopen applies the same fixed column/index check.
+  Query SQL selects exact branches for currency-only, lower-bound, upper-bound,
+  and closed-range filters so both page and count use the cost index, and both
+  statements execute in one deferred reader transaction. Either bound requires
+  one three-letter uppercase currency. TypeScript clients encode cost bounds as
+  `bigint`; Python clients use their arbitrary-precision integer.
 - `chio-metrics-spec` gains spend-family metric names next to the existing
   `CHIO_*` constants (`crates/observability/chio-metrics-spec/src/lib.rs:115+`),
   for example `chio_spend_events_total`, `chio_spend_burn_rate_units`, and
@@ -779,6 +788,10 @@ asserted, and incomplete-corpus signals are never underwriting facts. The public
   and lexicographic order matches unsigned numeric order. Row-count, root,
   extraction, in-range parity, tenant-time-index count/root mismatch, or
   reference-oracle mismatch aborts the transactional swap.
+  Current-version schema corruption that substitutes columns, index order, or
+  named immutability guards must fail on open without scanning receipt rows. A
+  one-reader pool must complete page and count from one snapshot. Query-plan
+  assertions require the cost index for both bounded statements.
 - Conformance: `chio.spend.*` and underwriting-v2 schema coverage plus registry, hash manifest,
   `KNOWN_SIGNED_ARTIFACT_SCHEMAS`, positive fixtures, and unknown-schema
   negatives; the workspace gate passes.

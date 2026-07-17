@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn update_stage(
+pub(crate) fn update_stage(
     transaction: &Transaction<'_>,
     record: &EconomicStateStageRecord,
     committed_view_bytes: Option<Vec<u8>>,
@@ -35,7 +35,7 @@ pub(super) fn update_stage(
     Ok(())
 }
 
-pub(super) fn load_stage_tx(
+pub(crate) fn load_stage_tx(
     transaction: &Transaction<'_>,
     batch_id: &str,
 ) -> Result<Option<EconomicStateStageRecord>, EconomicStateCacheError> {
@@ -112,11 +112,23 @@ impl StoredStage {
             .as_deref()
             .map(|bytes| decode_exact(bytes, "committed anchor view"))
             .transpose()?;
-        let operation_binding = self
+        let operation_binding: Option<EconomicOperationStageBinding> = self
             .operation_binding
             .as_deref()
             .map(|bytes| decode_exact(bytes, "economic operation binding"))
             .transpose()?;
+        if let Some(binding) = &operation_binding {
+            binding.validate()?;
+        }
+        let created_at_unix_ms = stored_u64(self.created_at, "created_at_unix_ms")?;
+        if operation_binding.as_ref().is_some_and(|binding| {
+            binding.recovery_expires_at_unix_ms() <= created_at_unix_ms
+                || binding
+                    .not_after_unix_ms()
+                    .is_some_and(|not_after| not_after <= created_at_unix_ms)
+        }) {
+            return Err(invariant("economic operation binding window is invalid"));
+        }
         let descriptor = match (
             self.descriptor_kind,
             self.descriptor_key,
@@ -138,7 +150,7 @@ impl StoredStage {
             status: EconomicStateStageStatus::parse(&self.status)?,
             reason: self.reason,
             version: stored_u64(self.version, "stage_version")?,
-            created_at_unix_ms: stored_u64(self.created_at, "created_at_unix_ms")?,
+            created_at_unix_ms,
             updated_at_unix_ms: stored_u64(self.updated_at, "updated_at_unix_ms")?,
             snapshot_digest: self.snapshot_digest,
         })
@@ -287,7 +299,7 @@ struct StageCommit<'a> {
     recorded_at_unix_ms: u64,
 }
 
-pub(super) fn append_stage_commit(
+pub(crate) fn append_stage_commit(
     transaction: &Transaction<'_>,
     record: &EconomicStateStageRecord,
     mutation_kind: &'static str,

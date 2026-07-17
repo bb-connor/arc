@@ -232,6 +232,8 @@ fn receipt_audit_with_schema(
         // This validates the persisted chain (fail-closed) but cannot reach a
         // live kernel's in-memory writer head; see `offline_repair_notice`.
         store.reseed_verified_head()?;
+    } else {
+        store.audit_receipt_cost_projection()?;
     }
     let report = store.receipt_checkpoint_status(Some(1))?;
     if backend.json_output {

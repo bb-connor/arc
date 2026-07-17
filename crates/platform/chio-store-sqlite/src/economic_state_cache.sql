@@ -55,6 +55,10 @@ CREATE TABLE IF NOT EXISTS economic_state_stages (
             AND descriptor_digest IS NULL AND descriptor_json IS NULL)
         OR (descriptor_kind IS NOT NULL AND descriptor_key IS NOT NULL
             AND descriptor_digest IS NOT NULL AND descriptor_json IS NOT NULL)
+    ),
+    UNIQUE (
+        batch_id, checkpoint_sequence, checkpoint_digest,
+        descriptor_kind, descriptor_key, descriptor_digest
     )
 );
 

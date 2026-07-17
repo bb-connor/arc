@@ -190,6 +190,57 @@ fn verified_advance_for_operation(
     Ok((advance, committed))
 }
 
+fn verified_channel_shaped_advance() -> TestResult<VerifiedEconomicStateBatchAdvance> {
+    let channel_key = EconomicResourceKeyV1 {
+        resource_family: chio_settle::channel::CHANNEL_LIFECYCLE_RESOURCE_FAMILY.to_owned(),
+        scope_id: "market-1".to_owned(),
+        resource_id: digest("channel-resource"),
+    };
+    let mut resource_head = head()?;
+    resource_head.resource_key = channel_key.clone();
+    let current = verify_economic_state_view(
+        signed_view(
+            1,
+            digest("channel-checkpoint-1"),
+            Vec::new(),
+            vec![channel_key.clone()],
+        )?,
+        &pins(),
+    )?;
+    let mut batch = EconomicStateBatchV1 {
+        schema: CHIO_ECONOMIC_STATE_BATCH_SCHEMA.to_owned(),
+        batch_id: String::new(),
+        checkpoint_digest: String::new(),
+        anchor_id: "anchor-1".to_owned(),
+        namespace: "economy-prod".to_owned(),
+        checkpoint_sequence: 2,
+        previous_checkpoint_digest: Some(current.view().checkpoint_digest.clone()),
+        expected_heads_root: String::new(),
+        next_heads_root: String::new(),
+        transitions: vec![EconomicStateTransitionV1 {
+            resource_key: channel_key,
+            expected_head_digest: None,
+            next_head: resource_head,
+            transition_proof_digest: digest("channel-transition-proof"),
+            prepared_effect: None,
+        }],
+        effect_slots: Vec::new(),
+        request_replays: Vec::new(),
+        operation_id: Some(digest("channel-operation")),
+        issued_at: 101,
+        signer_key_id: "anchor-key-1".to_owned(),
+        signer_key_epoch: 1,
+        anchor_signature: String::new(),
+    };
+    batch.seal(&Keypair::from_seed(&[0x41; 32]))?;
+    Ok(verify_economic_state_batch_advance(
+        &current,
+        batch,
+        &pins(),
+        &DirectVerifier,
+    )?)
+}
+
 fn verified_successor(
     current: &VerifiedEconomicStateView,
 ) -> TestResult<(VerifiedEconomicStateBatchAdvance, VerifiedEconomicStateView)> {
@@ -317,6 +368,33 @@ fn stage_retains_exact_bytes_and_rejects_a_stale_serving_fence() -> TestResult {
         fixture.cache.stage_batch(&advance, None, &stale, 1_002),
         Err(EconomicStateCacheError::Fenced)
     ));
+    Ok(())
+}
+
+#[test]
+fn generic_stage_rejects_channel_content_even_under_a_generic_descriptor() -> TestResult {
+    let fixture = fixture();
+    let advance = verified_channel_shaped_advance()?;
+    let descriptor = EconomicStateStageDescriptor::new(
+        "generic.replay.v1",
+        "generic-channel-label",
+        &json!({"kind": "generic"}),
+    )?;
+
+    assert!(matches!(
+        fixture.cache.stage_batch_with_descriptor(
+            &advance,
+            None,
+            Some(descriptor),
+            &fixture.fence,
+            1_000,
+        ),
+        Err(EconomicStateCacheError::Conflict)
+    ));
+    assert!(fixture
+        .cache
+        .load_stage(&advance.batch().batch_id)?
+        .is_none());
     Ok(())
 }
 
@@ -459,6 +537,95 @@ fn reserved_descriptor_and_admission_checkpoint_are_one_stage_fence() -> TestRes
         ),
         Err(EconomicStateCacheError::Conflict)
     ));
+    Ok(())
+}
+
+#[test]
+fn generic_staging_rejects_reserved_admission_terminal_projection() -> TestResult {
+    let fixture = fixture();
+    let (advance, _) = verified_advance()?;
+    let descriptor = EconomicStateStageDescriptor::new(
+        ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND,
+        digest("operation-1"),
+        &json!({"projection": digest("projection-1")}),
+    )?;
+
+    assert!(matches!(
+        fixture.cache.stage_batch_with_descriptor(
+            &advance,
+            None,
+            Some(descriptor),
+            &fixture.fence,
+            1_000,
+        ),
+        Err(EconomicStateCacheError::Conflict)
+    ));
+    Ok(())
+}
+
+#[test]
+fn committed_view_match_preserves_the_generic_single_transition_path() -> TestResult {
+    let (advance, committed) = verified_advance()?;
+
+    assert!(committed_view_matches_batch(
+        committed.view(),
+        advance.batch()
+    ));
+    Ok(())
+}
+
+#[test]
+fn committed_view_match_binds_all_channel_heads_by_resource_identity() -> TestResult {
+    let (advance, _) = verified_advance()?;
+    let mut heads = Vec::new();
+    let mut transitions = Vec::new();
+    for resource_family in [
+        "channel_escrow_reservation",
+        "channel_lifecycle",
+        "effect_slot",
+    ]
+    .into_iter()
+    {
+        let mut next_head = head()?;
+        next_head.resource_key = EconomicResourceKeyV1 {
+            resource_family: resource_family.to_owned(),
+            scope_id: "channel-scope".to_owned(),
+            resource_id: "channel-1".to_owned(),
+        };
+        let state = EconomicContentV1::Inline {
+            value: json!({"resourceFamily": resource_family}),
+        };
+        next_head.state_digest = state.digest()?;
+        next_head.state = state;
+        transitions.push(EconomicStateTransitionV1 {
+            resource_key: next_head.resource_key.clone(),
+            expected_head_digest: Some(digest(&format!("prior-{resource_family}"))),
+            next_head: next_head.clone(),
+            transition_proof_digest: digest(&format!("proof-{resource_family}")),
+            prepared_effect: None,
+        });
+        heads.push(next_head);
+    }
+    let committed = signed_view(2, digest("channel-checkpoint"), heads, Vec::new())?;
+    let mut batch = advance.batch().clone();
+    batch.transitions = transitions;
+
+    assert_eq!(
+        batch.transitions[2].resource_key.resource_family,
+        "effect_slot"
+    );
+    assert!(committed_view_matches_batch(&committed, &batch));
+
+    for transition in &batch.transitions {
+        let mut substituted = committed.clone();
+        let head = substituted
+            .heads
+            .iter_mut()
+            .find(|head| head.resource_key == transition.resource_key)
+            .ok_or("committed transition head is missing")?;
+        head.lifecycle_state = "substituted".to_owned();
+        assert!(!committed_view_matches_batch(&substituted, &batch));
+    }
     Ok(())
 }
 
@@ -804,6 +971,152 @@ fn operation_bound_stage_requires_the_exact_current_recovery_claim() -> TestResu
     );
     assert_eq!(binding.operation_version(), operation.version());
     assert_eq!(binding.operation_state(), operation.state());
+    Ok(())
+}
+
+#[test]
+fn operation_bound_stage_expiry_is_durable_and_ijson_bounded() -> TestResult {
+    let temp = tempfile::tempdir()?;
+    let database = temp.path().join("authority.db");
+    let lock_root = temp.path().join("locks");
+    fs::create_dir(&lock_root)?;
+    SqliteAuthorityStore::provision(&database, &lock_root)?;
+    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let fence = authority.mutation_fence();
+    let cache = authority.economic_state_cache();
+    let operations = authority.admission_operation_store();
+    let operation = prepared_economic_operation(&fence, "request-stage-expiry-restart");
+    let now = now_ms();
+    let not_after = now + 500;
+    operations.begin(&operation, &fence, now)?;
+    let lease = operations.claim_recovery(
+        operation.binding().operation_id(),
+        operation.version(),
+        &identifier("claimant_id", "economic-stage-recovery"),
+        now + 1,
+        now + 1_001,
+        &fence,
+    )?;
+    let (advance, _) = verified_advance_for_operation(Some(
+        operation.binding().operation_id().as_str().to_owned(),
+    ))?;
+    let context =
+        EconomicOperationStageContext::new(&operation, &lease).with_not_after_unix_ms(not_after)?;
+    let staged = cache.stage_batch(&advance, Some(context), &fence, now + 2)?;
+    assert_eq!(staged.not_after_unix_ms(), Some(not_after));
+    assert_eq!(
+        staged
+            .operation_binding()
+            .ok_or("operation binding is missing")?
+            .not_after_unix_ms(),
+        Some(not_after)
+    );
+    assert!(EconomicOperationStageContext::new(&operation, &lease)
+        .with_not_after_unix_ms(0)
+        .is_err());
+    assert!(EconomicOperationStageContext::new(&operation, &lease)
+        .with_not_after_unix_ms(MAX_TRUSTED_UNIX_MS + 1)
+        .is_err());
+    let batch_id = advance.batch().batch_id.clone();
+    drop(operations);
+    drop(cache);
+    drop(authority);
+
+    let reopened = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let loaded = reopened
+        .economic_state_cache()
+        .load_stage(&batch_id)?
+        .ok_or("economic stage is missing after restart")?;
+    assert_eq!(loaded.not_after_unix_ms(), Some(not_after));
+    Ok(())
+}
+
+#[test]
+fn operation_bound_stage_replay_rejects_a_different_expiry() -> TestResult {
+    let fixture = fixture();
+    let operations = fixture._authority.admission_operation_store();
+    let operation = prepared_economic_operation(&fixture.fence, "request-stage-expiry-replay");
+    let now = now_ms();
+    operations.begin(&operation, &fixture.fence, now)?;
+    let lease = operations.claim_recovery(
+        operation.binding().operation_id(),
+        operation.version(),
+        &identifier("claimant_id", "economic-stage-recovery"),
+        now + 1,
+        now + 1_001,
+        &fixture.fence,
+    )?;
+    let (advance, _) = verified_advance_for_operation(Some(
+        operation.binding().operation_id().as_str().to_owned(),
+    ))?;
+    let first =
+        EconomicOperationStageContext::new(&operation, &lease).with_not_after_unix_ms(now + 500)?;
+    fixture
+        .cache
+        .stage_batch(&advance, Some(first), &fixture.fence, now + 2)?;
+    let conflicting =
+        EconomicOperationStageContext::new(&operation, &lease).with_not_after_unix_ms(now + 501)?;
+
+    assert!(matches!(
+        fixture
+            .cache
+            .stage_batch(&advance, Some(conflicting), &fixture.fence, now + 3),
+        Err(EconomicStateCacheError::Conflict)
+    ));
+    Ok(())
+}
+
+#[test]
+fn operation_bound_stage_expiry_rejects_invalid_stored_bindings() -> TestResult {
+    for invalid in [0, MAX_TRUSTED_UNIX_MS + 1] {
+        let fixture = fixture();
+        let operations = fixture._authority.admission_operation_store();
+        let operation = prepared_economic_operation(&fixture.fence, "request-stage-expiry-hostile");
+        let now = now_ms();
+        operations.begin(&operation, &fixture.fence, now)?;
+        let lease = operations.claim_recovery(
+            operation.binding().operation_id(),
+            operation.version(),
+            &identifier("claimant_id", "economic-stage-recovery"),
+            now + 1,
+            now + 1_001,
+            &fixture.fence,
+        )?;
+        let (advance, _) = verified_advance_for_operation(Some(
+            operation.binding().operation_id().as_str().to_owned(),
+        ))?;
+        let context = EconomicOperationStageContext::new(&operation, &lease)
+            .with_not_after_unix_ms(now + 500)?;
+        let staged = fixture
+            .cache
+            .stage_batch(&advance, Some(context), &fixture.fence, now + 2)?;
+        let mut stored = serde_json::to_value(
+            staged
+                .operation_binding()
+                .ok_or("operation binding is missing")?,
+        )?;
+        stored
+            .as_object_mut()
+            .ok_or("operation binding is not an object")?
+            .insert("notAfterUnixMs".to_owned(), json!(invalid));
+        let encoded = canonical_json_bytes(&stored)?;
+        let mut connection = fixture.cache.connection()?;
+        let transaction = connection.transaction()?;
+        transaction.execute_batch(
+            "DROP TRIGGER economic_state_stage_identity_immutable;
+             DROP TRIGGER economic_state_stage_versioned;",
+        )?;
+        transaction.execute(
+            "UPDATE economic_state_stages SET operation_binding_json = ?1 WHERE batch_id = ?2",
+            rusqlite::params![encoded, &advance.batch().batch_id],
+        )?;
+
+        assert!(matches!(
+            load_stage_tx(&transaction, &advance.batch().batch_id),
+            Err(EconomicStateCacheError::Invariant(message))
+                if message.contains("not_after_unix_ms")
+        ));
+    }
     Ok(())
 }
 

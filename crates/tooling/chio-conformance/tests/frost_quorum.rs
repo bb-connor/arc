@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+use chio_core::capability::scope::MonetaryAmount;
 use chio_core::{is_supported_signed_artifact_schema, sha256_hex, Keypair};
 use chio_credit::clearing::{
     verify_clearing_round_finalization_burn, verify_clearing_round_finalization_frost,
@@ -218,8 +219,15 @@ fn action_cases() -> Vec<ActionCase> {
             preimage: FrostActionPreimageV1::ChannelClose(FrostChannelCloseActionV1 {
                 schema: CHIO_FROST_CHANNEL_CLOSE_ACTION_SCHEMA.to_string(),
                 close_body_digest: digest(0x15),
+                effective_close_digest: digest(0x17),
                 channel_id: "channel.conformance".to_string(),
                 final_state_digest: digest(0x16),
+                final_state_sequence: 2,
+                final_cumulative_owed: MonetaryAmount {
+                    units: 250,
+                    currency: "USD".to_owned(),
+                },
+                channel_state_version: 4,
                 escrow_reservation_version: 3,
                 token_base_unit_release: "250".to_string(),
                 publisher_fence: 13,

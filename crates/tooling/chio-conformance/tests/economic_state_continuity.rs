@@ -605,6 +605,7 @@ fn ready_effect_slot() -> TestResult<EconomicEffectSlotV1> {
         state: EconomicEffectStateV1::Ready,
         terminal: None,
     };
+    slot.resource_head_digest = resource_head(slot.resource_key.clone(), 1, 0, None)?.digest()?;
     slot.slot_id = slot.recompute_slot_id()?;
     slot.validate()?;
     Ok(slot)
@@ -649,7 +650,12 @@ fn effect_dispatch_advance(
     current_view: EconomicStateAnchorViewV1,
 ) -> TestResult<VerifiedEconomicEffectDispatchAdvance> {
     let current = verify_economic_state_view(current_view, &pins())?;
-    let ready_head = current.view().heads.first().ok_or("ready head is absent")?;
+    let ready_head = current
+        .view()
+        .heads
+        .iter()
+        .find(|head| head.resource_key.resource_family == "effect_slot")
+        .ok_or("ready head is absent")?;
     let ready_head_digest = ready_head.digest()?;
     let EconomicContentV1::Inline { value } = &ready_head.state else {
         return Err("ready effect slot is not inline".into());
@@ -694,7 +700,12 @@ fn effect_cancellation_advance(
     current_view: EconomicStateAnchorViewV1,
 ) -> TestResult<VerifiedEconomicEffectCancellationAdvance> {
     let current = verify_economic_state_view(current_view, &pins())?;
-    let ready_head = current.view().heads.first().ok_or("ready head is absent")?;
+    let ready_head = current
+        .view()
+        .heads
+        .iter()
+        .find(|head| head.resource_key.resource_family == "effect_slot")
+        .ok_or("ready head is absent")?;
     let ready_head_digest = ready_head.digest()?;
     let EconomicContentV1::Inline { value } = &ready_head.state else {
         return Err("ready effect slot is not inline".into());
@@ -749,10 +760,11 @@ fn effect_cancellation_advance(
 fn concurrent_effect_dispatch_mints_exactly_one_authority() -> TestResult {
     let ready = ready_effect_slot()?;
     let ready_head = effect_head(&ready, 1, None)?;
+    let target_head = resource_head(ready.resource_key.clone(), 1, 0, None)?;
     let current = signed_view(
         1,
         digest("effect-genesis"),
-        vec![ready_head],
+        vec![ready_head, target_head],
         Vec::new(),
         Vec::new(),
         Vec::new(),
@@ -778,7 +790,8 @@ fn concurrent_effect_dispatch_mints_exactly_one_authority() -> TestResult {
     let current = anchor.current()?;
     let head = current
         .heads
-        .first()
+        .iter()
+        .find(|head| head.resource_key.resource_family == "effect_slot")
         .ok_or("committed effect head is absent")?;
     let EconomicContentV1::Inline { value } = &head.state else {
         return Err("committed effect slot is not inline".into());
@@ -791,10 +804,11 @@ fn concurrent_effect_dispatch_mints_exactly_one_authority() -> TestResult {
 #[test]
 fn cancellation_and_dispatch_have_one_linearization_winner() -> TestResult {
     let ready = ready_effect_slot()?;
+    let target_head = resource_head(ready.resource_key.clone(), 1, 0, None)?;
     let current = signed_view(
         1,
         digest("effect-race-genesis"),
-        vec![effect_head(&ready, 1, None)?],
+        vec![effect_head(&ready, 1, None)?, target_head],
         Vec::new(),
         Vec::new(),
         Vec::new(),
@@ -818,7 +832,11 @@ fn cancellation_and_dispatch_have_one_linearization_winner() -> TestResult {
         1
     );
     let current = anchor.current()?;
-    let head = current.heads.first().ok_or("effect head is absent")?;
+    let head = current
+        .heads
+        .iter()
+        .find(|head| head.resource_key.resource_family == "effect_slot")
+        .ok_or("effect head is absent")?;
     let EconomicContentV1::Inline { value } = &head.state else {
         return Err("effect slot is not inline".into());
     };

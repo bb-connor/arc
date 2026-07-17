@@ -349,6 +349,7 @@ impl ReceiptStore for RemoteAdmissionAuthority {
             outcome_eligibility: true,
             observation_attempt_zero: true,
             obligation: true,
+            channel_terminal: true,
             economic_mutation_terminal: true,
         }
     }

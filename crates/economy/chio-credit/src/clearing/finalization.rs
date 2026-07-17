@@ -2,6 +2,7 @@ use super::*;
 use chio_core_types::economic_continuity::{EconomicFrostBindingV1, EconomicResourceHeadV1};
 use chio_federation::frost::{
     FrostActionPreimageV1, FrostClearingRoundFinalizeActionV1, VerifiedFrostAuthorization,
+    VerifiedHistoricalCompletedFrostAuthorization,
     CHIO_FROST_CLEARING_ROUND_FINALIZE_ACTION_SCHEMA,
 };
 
@@ -420,6 +421,53 @@ pub fn verify_clearing_round_finalization(
     frost: &VerifiedFrostAuthorization,
     trust: &ClearingAuthorityTrustV1,
 ) -> Result<VerifiedClearingRoundFinalizationV1, ClearingError> {
+    verify_clearing_round_finalization_envelope(current_round_head, acceptances, signed, trust)?;
+    let body = &signed.body;
+    let frost = verify_clearing_round_finalization_frost(body, frost, trust.trusted_time_unix_ms)?;
+    Ok(VerifiedClearingRoundFinalizationV1 {
+        body: body.clone(),
+        finalization_digest: signed.digest()?,
+        frost,
+    })
+}
+
+pub(super) fn verify_historical_clearing_round_finalization(
+    current_round_head: &EconomicResourceHeadV1,
+    acceptances: &VerifiedClearingParticipantAcceptancesV1,
+    signed: &SignedClearingRoundFinalizationV1,
+    frost: &VerifiedHistoricalCompletedFrostAuthorization,
+    trust: &ClearingAuthorityTrustV1,
+) -> Result<VerifiedClearingRoundFinalizationV1, ClearingError> {
+    verify_clearing_round_finalization_envelope(current_round_head, acceptances, signed, trust)?;
+    let body = &signed.body;
+    if frost.issued_at() < body.finalized_at_unix_ms
+        || frost.completed_at() != trust.trusted_time_unix_ms
+        || frost.scope_id() != body.governance_scope_id
+        || frost
+            .verify_action_preimage(&body.frost_action_preimage()?)
+            .is_err()
+    {
+        return Err(ClearingError::AuthorityVerification);
+    }
+    let frost = frost_binding(
+        frost.authorization_slot_id(),
+        frost.authorization_id(),
+        frost.action_digest(),
+        frost.proof_digest(),
+    )?;
+    Ok(VerifiedClearingRoundFinalizationV1 {
+        body: body.clone(),
+        finalization_digest: signed.digest()?,
+        frost,
+    })
+}
+
+fn verify_clearing_round_finalization_envelope(
+    current_round_head: &EconomicResourceHeadV1,
+    acceptances: &VerifiedClearingParticipantAcceptancesV1,
+    signed: &SignedClearingRoundFinalizationV1,
+    trust: &ClearingAuthorityTrustV1,
+) -> Result<(), ClearingError> {
     trust.validate()?;
     let record = finalizing_record(current_round_head)?;
     let body = &signed.body;
@@ -455,12 +503,7 @@ pub fn verify_clearing_round_finalization(
     {
         return Err(ClearingError::AuthorityVerification);
     }
-    let frost = verify_clearing_round_finalization_frost(body, frost, trust.trusted_time_unix_ms)?;
-    Ok(VerifiedClearingRoundFinalizationV1 {
-        body: body.clone(),
-        finalization_digest: signed.digest()?,
-        frost,
-    })
+    Ok(())
 }
 
 pub fn verify_clearing_round_finalization_frost(
@@ -480,11 +523,25 @@ pub fn verify_clearing_round_finalization_frost(
     {
         return Err(ClearingError::AuthorityVerification);
     }
+    frost_binding(
+        frost.authorization_slot_id(),
+        frost.authorization_id(),
+        frost.action_digest(),
+        frost.proof_digest(),
+    )
+}
+
+fn frost_binding(
+    authorization_slot_id: &str,
+    authorization_id: &str,
+    action_digest: &str,
+    proof_digest: &str,
+) -> Result<EconomicFrostBindingV1, ClearingError> {
     let binding = EconomicFrostBindingV1 {
-        authorization_slot_id: frost.authorization_slot_id().to_owned(),
-        authorization_id: frost.authorization_id().to_owned(),
-        action_digest: frost.action_digest().to_owned(),
-        signed_envelope_digest: frost.proof_digest().to_owned(),
+        authorization_slot_id: authorization_slot_id.to_owned(),
+        authorization_id: authorization_id.to_owned(),
+        action_digest: action_digest.to_owned(),
+        signed_envelope_digest: proof_digest.to_owned(),
     };
     binding
         .validate()

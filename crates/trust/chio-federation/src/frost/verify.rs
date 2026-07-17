@@ -10,7 +10,7 @@ use super::roster::{
 };
 use super::trust::FrostArtifactTrustStore;
 use super::types::{
-    validate_digest, validate_identifier, validate_nonzero, FrostAuthorizationBodyV1,
+    validate_digest, validate_identifier, validate_positive_safe_integer, FrostAuthorizationBodyV1,
     FrostAuthorizationDomain, FrostAuthorizationError,
 };
 
@@ -220,7 +220,7 @@ impl FrostAuthorizationSlotCheckpointV1 {
         validate_digest(&self.checkpoint_digest, "checkpoint_digest")?;
         validate_identifier(&self.scope_id, "scope_id")?;
         validate_digest(&self.slot_id, "slot_id")?;
-        validate_nonzero(self.slot_version, "slot_version")?;
+        validate_positive_safe_integer(self.slot_version, "slot_version")?;
         match (self.slot_version, self.predecessor_digest.as_deref()) {
             (1, None) => {}
             (1, Some(_)) => {
@@ -244,15 +244,15 @@ impl FrostAuthorizationSlotCheckpointV1 {
             ));
         }
         validate_identifier(&self.resource_id, "resource_id")?;
-        validate_nonzero(self.resource_version, "resource_version")?;
-        validate_nonzero(self.resource_fence, "resource_fence")?;
+        validate_positive_safe_integer(self.resource_version, "resource_version")?;
+        validate_positive_safe_integer(self.resource_fence, "resource_fence")?;
         validate_digest(&self.authorization_id, "authorization_id")?;
         validate_digest(&self.signing_message_digest, "signing_message_digest")?;
         validate_digest(&self.action_digest, "action_digest")?;
         validate_digest(&self.roster_digest, "roster_digest")?;
-        validate_nonzero(self.key_epoch, "key_epoch")?;
+        validate_positive_safe_integer(self.key_epoch, "key_epoch")?;
         validate_digest(&self.session_id, "session_id")?;
-        validate_nonzero(self.clock_high_water, "clock_high_water")?;
+        validate_positive_safe_integer(self.clock_high_water, "clock_high_water")?;
         validate_identifier(&self.anchor_key_id, "anchor_key_id")?;
         validate_fixed_hex(&self.anchor_signature, 128, "anchor_signature")?;
 
@@ -489,6 +489,58 @@ impl HistoricalFrostEvidence {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct VerifiedHistoricalCompletedFrostAuthorization {
+    body: FrostAuthorizationBodyV1,
+    authorization_slot_id: String,
+    proof_digest: String,
+    completed_at: u64,
+}
+
+impl VerifiedHistoricalCompletedFrostAuthorization {
+    #[must_use]
+    pub fn authorization_id(&self) -> &str {
+        &self.body.authorization_id
+    }
+
+    #[must_use]
+    pub fn authorization_slot_id(&self) -> &str {
+        &self.authorization_slot_id
+    }
+
+    #[must_use]
+    pub fn proof_digest(&self) -> &str {
+        &self.proof_digest
+    }
+
+    #[must_use]
+    pub fn scope_id(&self) -> &str {
+        &self.body.scope_id
+    }
+
+    #[must_use]
+    pub fn action_digest(&self) -> &str {
+        &self.body.action_digest
+    }
+
+    #[must_use]
+    pub const fn issued_at(&self) -> u64 {
+        self.body.issued_at
+    }
+
+    #[must_use]
+    pub const fn completed_at(&self) -> u64 {
+        self.completed_at
+    }
+
+    pub fn verify_action_preimage(
+        &self,
+        preimage: &super::action::FrostActionPreimageV1,
+    ) -> Result<(), FrostAuthorizationError> {
+        self.body.validate_action_preimage(preimage)
+    }
+}
+
 pub fn resolve_active_roster_for_execution(
     scope_id: &str,
     resolver: &dyn ActiveFrostRosterResolver,
@@ -627,7 +679,7 @@ pub fn verify_historical_completed_authorization(
     completed: &FrostAnchoredAuthorizationSlot,
     resolver: &dyn FrostHistoricalRosterResolver,
     artifact_trust: &FrostArtifactTrustStore,
-) -> Result<VerifiedFrostAuthorization, FrostVerificationError> {
+) -> Result<VerifiedHistoricalCompletedFrostAuthorization, FrostVerificationError> {
     proof.validate()?;
     let roster = resolver
         .resolve_historical_roster(
@@ -694,10 +746,11 @@ pub fn verify_historical_completed_authorization(
         ));
     }
     let canonical = proof.canonical_bytes()?;
-    Ok(VerifiedFrostAuthorization {
+    Ok(VerifiedHistoricalCompletedFrostAuthorization {
         body: proof.body.clone(),
         authorization_slot_id: frost_authorization_slot_id(&proof.body)?,
         proof_digest: sha256_hex(&canonical),
+        completed_at,
     })
 }
 

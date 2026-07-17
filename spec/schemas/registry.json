@@ -1672,6 +1672,192 @@
       "artifactKind": "clearing_round_transition_proof",
       "introducedBy": "ws4-clearing-v1",
       "schemaFile": "spec/schemas/chio-economy/clearing-round-transition-proof.v1.json"
+    },
+    {
+      "schema": "chio.channel.close.v1",
+      "artifactKind": "channel_close",
+      "introducedBy": "micro-escrow-channels-v1",
+      "schemaFile": "spec/schemas/chio-economy/channel-close.v1.json"
+    },
+    {
+      "schema": "chio.channel.dispute.v1",
+      "artifactKind": "channel_dispute",
+      "introducedBy": "micro-escrow-channels-v1",
+      "schemaFile": "spec/schemas/chio-economy/channel-dispute.v1.json"
+    },
+    {
+      "schema": "chio.channel.funding-acknowledgement.v1",
+      "artifactKind": "channel_funding_acknowledgement",
+      "introducedBy": "micro-escrow-channels-v1",
+      "schemaFile": "spec/schemas/chio-economy/channel-funding-acknowledgement.v1.json"
+    },
+    {
+      "schema": "chio.channel.funding-evidence.v1",
+      "artifactKind": "channel_funding_evidence",
+      "introducedBy": "micro-escrow-channels-v1",
+      "schemaFile": "spec/schemas/chio-economy/channel-funding-evidence.v1.json"
+    },
+    {
+      "schema": "chio.channel.open-intent.v1",
+      "artifactKind": "channel_open_intent",
+      "introducedBy": "micro-escrow-channels-v1",
+      "schemaFile": "spec/schemas/chio-economy/channel-open-intent.v1.json"
+    },
+    {
+      "schema": "chio.channel.open.v1",
+      "artifactKind": "channel_open",
+      "introducedBy": "micro-escrow-channels-v1",
+      "schemaFile": "spec/schemas/chio-economy/channel-open.v1.json"
+    },
+    {
+      "schema": "chio.channel.release-authorization.v1",
+      "artifactKind": "channel_release_authorization",
+      "introducedBy": "micro-escrow-channels-v1",
+      "schemaFile": "spec/schemas/chio-economy/channel-release-authorization.v1.json"
+    },
+    {
+      "schema": "chio.channel.reservation.v1",
+      "artifactKind": "channel_reservation",
+      "introducedBy": "micro-escrow-channels-v1",
+      "schemaFile": "spec/schemas/chio-economy/channel-reservation.v1.json"
+    },
+    {
+      "schema": "chio.channel.state.v1",
+      "artifactKind": "channel_state",
+      "introducedBy": "micro-escrow-channels-v1",
+      "schemaFile": "spec/schemas/chio-economy/channel-state.v1.json"
+    },
+    {
+      "schema": "chio.channel.terminal-outcome-commitment.v1",
+      "artifactKind": "channel_terminal_outcome_commitment",
+      "introducedBy": "micro-escrow-channels-v1",
+      "schemaFile": "spec/schemas/chio-economy/channel-terminal-outcome-commitment.v1.json"
+    },
+    {
+      "schema": "chio.channel.transition-replay.v1",
+      "artifactKind": "channel_transition_replay",
+      "introducedBy": "micro-escrow-channels-v1",
+      "schemaFile": "spec/schemas/chio-economy/channel-transition-replay.v1.json"
+    },
+    {
+      "schema": "chio.agent-passport.source-manifest.v2",
+      "artifactKind": "agent_passport_source_manifest",
+      "introducedBy": "financial-credentials-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/agent-passport-source-manifest-v2.schema.json"
+    },
+    {
+      "schema": "chio.agent-passport-presentation-challenge.v2",
+      "artifactKind": "agent_passport_presentation_challenge",
+      "introducedBy": "financial-credentials-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/passport-presentation-challenge-v2.schema.json"
+    },
+    {
+      "schema": "chio.fincred.credit-scorecard.v1",
+      "artifactKind": "financial_credit_scorecard",
+      "introducedBy": "financial-credentials-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-credit-scorecard.schema.json"
+    },
+    {
+      "schema": "chio.fincred.exposure-history.v1",
+      "artifactKind": "financial_exposure_history",
+      "introducedBy": "financial-credentials-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-exposure-history.schema.json"
+    },
+    {
+      "schema": "chio.fincred.loss-history.v1",
+      "artifactKind": "financial_loss_history",
+      "introducedBy": "financial-credentials-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-loss-history.schema.json"
+    },
+    {
+      "schema": "chio.fincred.premium-history.v1",
+      "artifactKind": "financial_premium_history",
+      "introducedBy": "financial-credentials-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-premium-history.schema.json"
+    },
+    {
+      "schema": "chio.fincred.settlement-reliability.v1",
+      "artifactKind": "financial_settlement_reliability",
+      "introducedBy": "financial-credentials-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-settlement-reliability.schema.json"
+    },
+    {
+      "schema": "chio.fincred.source-member.v1",
+      "artifactKind": "financial_source_member",
+      "introducedBy": "financial-credentials-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-source-member.schema.json"
+    },
+    {
+      "schema": "chio.fincred.source-checkpoint.v1",
+      "artifactKind": "financial_source_checkpoint",
+      "introducedBy": "financial-credentials-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-source-checkpoint.schema.json"
+    },
+    {
+      "schema": "chio.fincred.source-completeness-attestation.v1",
+      "artifactKind": "financial_source_completeness_attestation",
+      "introducedBy": "financial-credentials-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/financial-source-completeness-attestation.schema.json"
+    },
+    {
+      "schema": "chio.agent-passport.v2",
+      "artifactKind": "agent_passport_v2",
+      "introducedBy": "financial-credentials-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/agent-passport-v2.schema.json"
+    },
+    {
+      "schema": "chio.agent-passport.presentation.v2",
+      "artifactKind": "presented_agent_passport_v2",
+      "introducedBy": "financial-credentials-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/presented-agent-passport-v2.schema.json"
+    },
+    {
+      "schema": "chio.fiscal.charter.v1",
+      "artifactKind": "fiscal_charter",
+      "introducedBy": "fiscal-constitutions-v1",
+      "schemaFile": "spec/schemas/chio-fiscal/v1/charter.schema.json"
+    },
+    {
+      "schema": "chio.fiscal.schedule.v1",
+      "artifactKind": "fiscal_schedule",
+      "introducedBy": "fiscal-constitutions-v1",
+      "schemaFile": "spec/schemas/chio-fiscal/v1/schedule.schema.json"
+    },
+    {
+      "schema": "chio.fiscal.proposal.v1",
+      "artifactKind": "fiscal_proposal",
+      "introducedBy": "fiscal-constitutions-v1",
+      "schemaFile": "spec/schemas/chio-fiscal/v1/proposal.schema.json"
+    },
+    {
+      "schema": "chio.fiscal.proposal-admission.v1",
+      "artifactKind": "fiscal_proposal_admission",
+      "introducedBy": "fiscal-constitutions-v1",
+      "schemaFile": "spec/schemas/chio-fiscal/v1/proposal-admission.schema.json"
+    },
+    {
+      "schema": "chio.fiscal.approval.v1",
+      "artifactKind": "fiscal_approval",
+      "introducedBy": "fiscal-constitutions-v1",
+      "schemaFile": "spec/schemas/chio-fiscal/v1/approval.schema.json"
+    },
+    {
+      "schema": "chio.fiscal.activation.v1",
+      "artifactKind": "fiscal_activation",
+      "introducedBy": "fiscal-constitutions-v1",
+      "schemaFile": "spec/schemas/chio-fiscal/v1/activation.schema.json"
+    },
+    {
+      "schema": "chio.fiscal.consumer-readiness.v1",
+      "artifactKind": "fiscal_consumer_readiness",
+      "introducedBy": "fiscal-constitutions-v1",
+      "schemaFile": "spec/schemas/chio-fiscal/v1/consumer-readiness.schema.json"
+    },
+    {
+      "schema": "chio.fiscal.continuity-checkpoint.v1",
+      "artifactKind": "fiscal_continuity_checkpoint",
+      "introducedBy": "fiscal-constitutions-v1",
+      "schemaFile": "spec/schemas/chio-fiscal/v1/continuity-checkpoint.schema.json"
     }
   ]
 }

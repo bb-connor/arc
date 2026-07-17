@@ -1393,7 +1393,7 @@ pub(crate) fn finalizing_outcome_command(
 mod release;
 pub use release::*;
 
-#[cfg(feature = "admission-test-support")]
+#[cfg(any(test, feature = "admission-test-support"))]
 pub mod test_support;
 
 #[cfg(test)]

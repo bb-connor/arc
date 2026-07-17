@@ -1090,6 +1090,55 @@ impl EconomicStateBatchV1 {
     }
 
     fn validate_operation_binding(&self) -> Result<(), EconomicContinuityError> {
+        if self.operation_id.is_none() {
+            let mut owners = self
+                .effect_slots
+                .iter()
+                .map(|slot| slot.operation_id.as_str())
+                .collect::<Vec<_>>();
+            owners.sort_unstable();
+            owners.dedup();
+            if owners.is_empty() {
+                if self.transitions.iter().any(|transition| {
+                    transition.next_head.operation_id.is_some()
+                        || transition.prepared_effect.is_some()
+                }) || !self.request_replays.is_empty()
+                {
+                    return Err(EconomicContinuityError::BindingMismatch(
+                        "batch_operation_id",
+                    ));
+                }
+                return Ok(());
+            }
+            if owners.len() < 2
+                || self.effect_slots.iter().any(|slot| {
+                    slot.state != EconomicEffectStateV1::Ready || slot.terminal.is_some()
+                })
+                || self
+                    .transitions
+                    .iter()
+                    .any(|transition| transition.next_head.terminal_result.is_some())
+                || self.transitions.iter().any(|transition| {
+                    transition
+                        .next_head
+                        .operation_id
+                        .as_deref()
+                        .is_some_and(|operation_id| owners.binary_search(&operation_id).is_err())
+                        || transition.prepared_effect.as_ref().is_some_and(|effect| {
+                            owners.binary_search(&effect.operation_id.as_str()).is_err()
+                        })
+                })
+                || self
+                    .request_replays
+                    .iter()
+                    .any(|replay| owners.binary_search(&replay.operation_id.as_str()).is_err())
+            {
+                return Err(EconomicContinuityError::BindingMismatch(
+                    "batch_operation_id",
+                ));
+            }
+            return Ok(());
+        }
         for transition in &self.transitions {
             if let Some(operation_id) = transition.next_head.operation_id.as_deref() {
                 if self.operation_id.as_deref() != Some(operation_id) {

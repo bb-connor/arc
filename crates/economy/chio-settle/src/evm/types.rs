@@ -12,14 +12,20 @@ pub struct PreparedEvmCall {
     pub gas_limit: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PreparedErc20Approval {
     pub owner_address: String,
     pub token_address: String,
     pub spender_address: String,
     pub amount_minor_units: u128,
-    pub call: PreparedEvmCall,
+    pub(super) call: PreparedEvmCall,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PreparedRootPublication {
+    pub(super) call: PreparedEvmCall,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,14 +44,14 @@ pub struct EscrowDispatchRequest {
     pub note: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PreparedEscrowCreate {
     pub expected_escrow_id: String,
     pub capability_commitment: String,
     pub settlement_amount_minor_units: u128,
     pub dispatch: Web3SettlementDispatchArtifact,
-    pub call: PreparedEvmCall,
+    pub(super) call: PreparedEvmCall,
 }
 
 impl PreparedEscrowCreate {
@@ -73,7 +79,7 @@ pub enum EscrowExecutionAmount {
     Partial(MonetaryAmount),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PreparedMerkleRelease {
     pub escrow_id: String,
@@ -84,7 +90,7 @@ pub struct PreparedMerkleRelease {
     pub partial: bool,
     pub settlement_amount_minor_units: u128,
     pub observed_amount: MonetaryAmount,
-    pub call: PreparedEvmCall,
+    pub(super) call: PreparedEvmCall,
 }
 
 impl PreparedMerkleRelease {
@@ -102,6 +108,35 @@ impl PreparedMerkleRelease {
             operator_identity,
             settlement_amount: self.observed_amount.clone(),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PreparedAuthorizedChannelMerkleReleaseV1 {
+    pub(super) release: PreparedMerkleRelease,
+    pub(super) authorization: crate::channel::ChannelReleaseAuthorizationBindingV1,
+    pub(super) authorization_digest: String,
+}
+
+impl PreparedAuthorizedChannelMerkleReleaseV1 {
+    #[must_use]
+    pub const fn authorization(&self) -> &crate::channel::ChannelReleaseAuthorizationBindingV1 {
+        &self.authorization
+    }
+
+    #[must_use]
+    pub fn authorization_digest(&self) -> &str {
+        &self.authorization_digest
+    }
+
+    #[must_use]
+    pub fn publication_root(&self) -> &str {
+        &self.release.merkle_root
+    }
+
+    pub fn canonical_call(&self) -> Result<Vec<u8>, SettlementError> {
+        canonical_json_bytes(&self.release.call)
+            .map_err(|error| SettlementError::Serialization(error.to_string()))
     }
 }
 
@@ -176,7 +211,7 @@ impl From<DualSignRegistryEvidenceBinding>
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PreparedDualSignRelease {
     pub escrow_id: String,
@@ -189,7 +224,7 @@ pub struct PreparedDualSignRelease {
     pub settlement_amount_minor_units: u128,
     pub observed_amount: MonetaryAmount,
     pub signature: EvmSignature,
-    pub call: PreparedEvmCall,
+    pub(super) call: PreparedEvmCall,
 }
 
 impl PreparedDualSignRelease {
@@ -210,12 +245,12 @@ impl PreparedDualSignRelease {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PreparedEscrowRefund {
     pub escrow_id: String,
     pub chain_id: String,
-    pub call: PreparedEvmCall,
+    pub(super) call: PreparedEvmCall,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -225,7 +260,7 @@ pub struct BondLockRequest {
     pub bond: SignedCreditBond,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PreparedBondLock {
     pub vault_id: String,
@@ -234,10 +269,10 @@ pub struct PreparedBondLock {
     pub operator_key_hash: String,
     pub collateral_minor_units: u128,
     pub reserve_requirement_minor_units: u128,
-    pub call: PreparedEvmCall,
+    pub(super) call: PreparedEvmCall,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PreparedBondRelease {
     pub vault_id: String,
@@ -245,10 +280,10 @@ pub struct PreparedBondRelease {
     pub operator_key_hash: String,
     pub evidence_hash: String,
     pub merkle_root: String,
-    pub call: PreparedEvmCall,
+    pub(super) call: PreparedEvmCall,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PreparedBondImpair {
     pub vault_id: String,
@@ -257,16 +292,83 @@ pub struct PreparedBondImpair {
     pub evidence_hash: String,
     pub merkle_root: String,
     pub slash_amount_minor_units: u128,
-    pub call: PreparedEvmCall,
+    pub(super) call: PreparedEvmCall,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PreparedBondExpiry {
     pub vault_id: String,
     pub chain_id: String,
-    pub call: PreparedEvmCall,
+    pub(super) call: PreparedEvmCall,
 }
+
+mod sealed {
+    use super::PreparedEvmCall;
+
+    pub trait Sealed {
+        fn call(&self) -> &PreparedEvmCall;
+    }
+}
+
+pub trait PreparedEvmSubmission: sealed::Sealed {}
+
+pub(super) fn prepared_submission_call<T: PreparedEvmSubmission + ?Sized>(
+    prepared: &T,
+) -> &PreparedEvmCall {
+    sealed::Sealed::call(prepared)
+}
+
+macro_rules! prepared_evm_call_access {
+    ($($type:ty),+ $(,)?) => {
+        $(
+            impl $type {
+                #[must_use]
+                pub const fn call(&self) -> &PreparedEvmCall {
+                    &self.call
+                }
+            }
+
+        )+
+    };
+}
+
+macro_rules! prepared_evm_submission {
+    ($($type:ty),+ $(,)?) => {
+        $(
+
+            impl sealed::Sealed for $type {
+                fn call(&self) -> &PreparedEvmCall {
+                    &self.call
+                }
+            }
+
+            impl PreparedEvmSubmission for $type {}
+        )+
+    };
+}
+
+prepared_evm_call_access!(
+    PreparedErc20Approval,
+    PreparedRootPublication,
+    PreparedEscrowCreate,
+    PreparedMerkleRelease,
+    PreparedDualSignRelease,
+    PreparedEscrowRefund,
+    PreparedBondLock,
+    PreparedBondRelease,
+    PreparedBondImpair,
+    PreparedBondExpiry,
+);
+
+prepared_evm_submission!(
+    PreparedErc20Approval,
+    PreparedEscrowCreate,
+    PreparedBondLock,
+    PreparedBondRelease,
+    PreparedBondImpair,
+    PreparedBondExpiry,
+);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]

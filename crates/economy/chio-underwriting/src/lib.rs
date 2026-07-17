@@ -34,7 +34,8 @@ pub use decision::{
 };
 pub use marketplace_limits::{
     compute_marketplace_credit_limit, MarketplaceCreditLimitDecision,
-    MarketplaceCreditLimitRequest, MarketplaceLimitTier, MARKETPLACE_TIER_LIMIT_UNITS,
+    MarketplaceCreditLimitRequest, MarketplaceLimitTier, MARKETPLACE_TIER_LIMIT_CURRENCY,
+    MARKETPLACE_TIER_LIMIT_UNITS,
 };
 pub use premium::{
     price_premium, risk_multiplier, LookbackWindow, PremiumDeclineReason, PremiumInputs,

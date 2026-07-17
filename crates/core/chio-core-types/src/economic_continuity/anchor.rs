@@ -32,6 +32,7 @@ pub enum EconomicStateAnchorError {
     AdmissionHandoffRejected,
     EffectDispatchRejected(&'static str),
     EffectCancellationRejected(&'static str),
+    CompletedEffectRejected(&'static str),
     TargetStatusRejected,
     IdempotentRecoveryRejected,
     Missing,
@@ -105,6 +106,12 @@ impl fmt::Display for EconomicStateAnchorError {
                 write!(
                     formatter,
                     "economic effect cancellation was rejected: {reason}"
+                )
+            }
+            Self::CompletedEffectRejected(reason) => {
+                write!(
+                    formatter,
+                    "completed economic effect was rejected: {reason}"
                 )
             }
             Self::TargetStatusRejected => write!(formatter, "economic target status was rejected"),
@@ -766,6 +773,18 @@ pub fn verify_economic_effect_dispatch_advance(
     let current_slot = economic_effect_slot_from_head(current_head)?;
     let next_slot = economic_effect_slot_from_head(&transition.next_head)?;
     current_slot.validate_successor(&next_slot)?;
+    let target_head = advance
+        .current
+        .view
+        .head(&next_slot.resource_key)
+        .ok_or_else(|| {
+            EconomicStateAnchorError::CurrentHeadMissing(next_slot.resource_key.clone())
+        })?;
+    if target_head.digest()?.as_str() != next_slot.resource_head_digest.as_str() {
+        return Err(EconomicStateAnchorError::EffectDispatchRejected(
+            "effect slot target resource head changed",
+        ));
+    }
     if current_slot.state != EconomicEffectStateV1::Ready
         || next_slot.state != EconomicEffectStateV1::DispatchCommitted
         || transition.next_head.lifecycle_state != "dispatch_committed"
@@ -1017,6 +1036,11 @@ pub fn verify_economic_effect_dispatch_commit(
     commit.verify(pins)?;
     let transition = &advance.batch().transitions[0];
     let expected_head_digest = transition.next_head.digest()?;
+    let target_head_digest = committed
+        .view
+        .head(&advance.slot.resource_key)
+        .map(EconomicResourceHeadV1::digest)
+        .transpose()?;
     if committed.view.checkpoint_sequence != advance.batch().checkpoint_sequence
         || committed.view.checkpoint_digest != advance.batch().checkpoint_digest
         || committed
@@ -1026,6 +1050,7 @@ pub fn verify_economic_effect_dispatch_commit(
             .transpose()?
             .as_deref()
             != Some(expected_head_digest.as_str())
+        || target_head_digest.as_deref() != Some(advance.slot.resource_head_digest.as_str())
         || commit.previous_checkpoint_digest
             != advance
                 .batch()
@@ -1084,6 +1109,78 @@ pub fn verify_economic_target_status(
     Ok(VerifiedEconomicTargetStatus {
         next_slot,
         evidence_digest: evidence_digest.to_string(),
+    })
+}
+
+#[derive(Debug, Clone)]
+pub struct VerifiedEconomicCompletedEffect {
+    slot: EconomicEffectSlotV1,
+    checkpoint_digest: String,
+    effect_head_digest: String,
+    observed_at: u64,
+}
+
+impl VerifiedEconomicCompletedEffect {
+    pub fn slot(&self) -> &EconomicEffectSlotV1 {
+        &self.slot
+    }
+
+    pub fn checkpoint_digest(&self) -> &str {
+        &self.checkpoint_digest
+    }
+
+    pub fn effect_head_digest(&self) -> &str {
+        &self.effect_head_digest
+    }
+
+    pub const fn observed_at(&self) -> u64 {
+        self.observed_at
+    }
+}
+
+pub fn verify_economic_completed_effect(
+    view: &VerifiedEconomicStateView,
+    expected: &EconomicEffectSlotV1,
+) -> Result<VerifiedEconomicCompletedEffect, EconomicStateAnchorError> {
+    expected.validate()?;
+    let terminal_result = match (&expected.state, expected.terminal.as_ref()) {
+        (
+            EconomicEffectStateV1::Completed,
+            Some(EconomicEffectTerminalV1::Completed {
+                result_id,
+                result_digest,
+                result,
+            }),
+        ) => EconomicTerminalResultV1 {
+            result_id: result_id.clone(),
+            result_digest: result_digest.clone(),
+            result: result.clone(),
+        },
+        _ => {
+            return Err(EconomicStateAnchorError::CompletedEffectRejected(
+                "expected slot is not completed",
+            ))
+        }
+    };
+    let key = expected.resource_head_key();
+    let head = view
+        .view
+        .head(&key)
+        .ok_or_else(|| EconomicStateAnchorError::CurrentHeadMissing(key.clone()))?;
+    let anchored = economic_effect_slot_from_head(head)?;
+    if anchored != *expected
+        || head.lifecycle_state != "completed"
+        || head.terminal_result.as_ref() != Some(&terminal_result)
+    {
+        return Err(EconomicStateAnchorError::CompletedEffectRejected(
+            "anchored head does not contain the exact completed slot",
+        ));
+    }
+    Ok(VerifiedEconomicCompletedEffect {
+        slot: anchored,
+        checkpoint_digest: view.view.checkpoint_digest.clone(),
+        effect_head_digest: head.digest()?,
+        observed_at: view.view.observed_at,
     })
 }
 

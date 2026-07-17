@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use super::registry::frost_action_registration;
 use super::types::{
-    validate_digest, validate_identifier, validate_nonzero, FrostAuthorizationDomain,
+    validate_digest, validate_identifier, validate_positive_safe_integer, validate_safe_integer,
+    FrostAuthorizationDomain,
 };
 
 pub const CHIO_FROST_ROSTER_SCHEMA: &str = "chio.frost.roster.v1";
@@ -166,7 +167,7 @@ impl FrostRosterV1 {
         roster_digest(&self.roster_digest, "roster_digest")?;
         roster_identifier(&self.authority_scope, "authority_scope")?;
         roster_identifier(&self.scope_id, "scope_id")?;
-        roster_nonzero(self.key_epoch, "key_epoch")?;
+        roster_positive_safe_integer(self.key_epoch, "key_epoch")?;
         if self.threshold == 0 || self.threshold > self.participant_count {
             return Err(FrostRosterError::InvalidField {
                 field: "threshold",
@@ -213,6 +214,8 @@ impl FrostRosterV1 {
                 });
             }
         }
+        roster_safe_integer(self.valid_from, "valid_from")?;
+        roster_safe_integer(self.valid_until, "valid_until")?;
         if self.valid_from >= self.valid_until {
             return Err(FrostRosterError::InvalidField {
                 field: "valid_until",
@@ -407,7 +410,7 @@ impl FrostEpochCheckpointV1 {
         roster_identifier(&self.anchor_id, "anchor_id")?;
         roster_digest(&self.checkpoint_digest, "checkpoint_digest")?;
         roster_identifier(&self.scope_id, "scope_id")?;
-        roster_nonzero(self.checkpoint_sequence, "checkpoint_sequence")?;
+        roster_positive_safe_integer(self.checkpoint_sequence, "checkpoint_sequence")?;
         match (self.checkpoint_sequence, self.predecessor_digest.as_deref()) {
             (1, None) => {}
             (1, Some(_)) => {
@@ -426,7 +429,7 @@ impl FrostEpochCheckpointV1 {
         }
         roster_digest(&self.active_roster_id, "active_roster_id")?;
         roster_digest(&self.active_roster_digest, "active_roster_digest")?;
-        roster_nonzero(self.key_epoch, "key_epoch")?;
+        roster_positive_safe_integer(self.key_epoch, "key_epoch")?;
         roster_digest(&self.group_public_key_digest, "group_public_key_digest")?;
         match (
             self.key_epoch,
@@ -447,8 +450,8 @@ impl FrostEpochCheckpointV1 {
                 });
             }
         }
-        roster_nonzero(self.activation_fence, "activation_fence")?;
-        roster_nonzero(self.clock_high_water, "clock_high_water")?;
+        roster_positive_safe_integer(self.activation_fence, "activation_fence")?;
+        roster_positive_safe_integer(self.clock_high_water, "clock_high_water")?;
         roster_identifier(&self.anchor_key_id, "anchor_key_id")?;
         validate_fixed_hex(&self.anchor_signature, 128, "anchor_signature")?;
         if self.recompute_checkpoint_digest()? != self.checkpoint_digest {
@@ -601,9 +604,16 @@ fn roster_digest(value: &str, field: &'static str) -> Result<(), FrostRosterErro
     })
 }
 
-fn roster_nonzero(value: u64, field: &'static str) -> Result<(), FrostRosterError> {
-    validate_nonzero(value, field).map_err(|_| FrostRosterError::InvalidField {
+fn roster_positive_safe_integer(value: u64, field: &'static str) -> Result<(), FrostRosterError> {
+    validate_positive_safe_integer(value, field).map_err(|_| FrostRosterError::InvalidField {
         field,
-        detail: "must be non-zero",
+        detail: "must be a positive I-JSON safe integer",
+    })
+}
+
+fn roster_safe_integer(value: u64, field: &'static str) -> Result<(), FrostRosterError> {
+    validate_safe_integer(value, field).map_err(|_| FrostRosterError::InvalidField {
+        field,
+        detail: "must be an I-JSON safe integer",
     })
 }

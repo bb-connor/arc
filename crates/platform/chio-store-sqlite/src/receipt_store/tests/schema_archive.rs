@@ -1,5 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use chio_kernel::ReceiptStore;
+
 fn unique_archive_path() -> std::path::PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -47,5 +49,93 @@ fn archive_schema_is_stamped_and_rejects_older_binaries() -> Result<(), Box<dyn 
 
     drop(archived);
     let _ = std::fs::remove_file(archive);
+    Ok(())
+}
+
+#[test]
+fn archive_schema_migrates_and_verifies_cost_projection() -> Result<(), Box<dyn std::error::Error>>
+{
+    use crate::receipt_store::evidence_retention::create_archive_schema;
+
+    let archive = unique_archive_path();
+    let store = crate::SqliteReceiptStore::open(&archive)?;
+    store.append_chio_receipt(&super::support::sample_financial_receipt(
+        "archive-cost-migration",
+        u64::MAX,
+    )?)?;
+    drop(store);
+
+    let archived = rusqlite::Connection::open(&archive)?;
+    crate::receipt_store::support::drop_transparency_projection_guards(&archived)?;
+    archived.execute_batch(
+        "DROP INDEX idx_chio_tool_receipts_cost;\
+         DROP INDEX idx_chio_tool_receipts_cost_global;\
+         ALTER TABLE chio_tool_receipts DROP COLUMN cost_charged_be;\
+         ALTER TABLE chio_tool_receipts DROP COLUMN cost_currency;",
+    )?;
+    crate::stamp_schema_version(&archived, "receipt", 2)?;
+    drop(archived);
+
+    let escaped_archive = archive
+        .to_str()
+        .ok_or("archive path invalid")?
+        .replace('\'', "''");
+    let mut connection = rusqlite::Connection::open_in_memory()?;
+    connection.execute_batch(&format!("ATTACH DATABASE '{escaped_archive}' AS archive"))?;
+    create_archive_schema(&mut connection)?;
+    let projection = connection.query_row(
+        "SELECT cost_currency, cost_charged_be FROM archive.chio_tool_receipts",
+        [],
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?)),
+    )?;
+    assert_eq!(
+        projection,
+        ("USD".to_string(), u64::MAX.to_be_bytes().to_vec())
+    );
+    connection.execute_batch("DETACH DATABASE archive")?;
+
+    let _ = std::fs::remove_file(archive);
+    Ok(())
+}
+
+#[test]
+fn current_archive_schema_rejects_substituted_cost_indexes(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::receipt_store::evidence_retention::create_archive_schema;
+
+    for (name, columns) in [
+        (
+            "idx_chio_tool_receipts_cost",
+            "tenant_id, cost_currency, seq, cost_charged_be",
+        ),
+        (
+            "idx_chio_tool_receipts_cost_global",
+            "cost_currency, seq, cost_charged_be",
+        ),
+    ] {
+        let archive = unique_archive_path();
+        drop(crate::SqliteReceiptStore::open(&archive)?);
+
+        let archived = rusqlite::Connection::open(&archive)?;
+        crate::receipt_store::support::drop_transparency_projection_guards(&archived)?;
+        archived.execute_batch(&format!(
+            "DROP INDEX {name}; CREATE INDEX {name} ON chio_tool_receipts({columns});"
+        ))?;
+        drop(archived);
+
+        let escaped_archive = archive
+            .to_str()
+            .ok_or("archive path invalid")?
+            .replace('\'', "''");
+        let mut connection = rusqlite::Connection::open_in_memory()?;
+        connection.execute_batch(&format!("ATTACH DATABASE '{escaped_archive}' AS archive"))?;
+        let Err(error) = create_archive_schema(&mut connection) else {
+            return Err("archive cost projection schema unexpectedly passed".into());
+        };
+        assert!(error.to_string().contains("cost projection schema"));
+
+        drop(connection);
+        let _ = std::fs::remove_file(archive);
+    }
     Ok(())
 }

@@ -687,6 +687,7 @@ mod tests {
             state: EconomicEffectStateV1::Ready,
             terminal: None,
         };
+        slot.resource_head_digest = resource_head(slot.resource_key.clone())?.digest()?;
         slot.slot_id = slot.recompute_slot_id()?;
         Ok(slot)
     }
@@ -733,10 +734,11 @@ mod tests {
         chio_core::economic_continuity::VerifiedEconomicStateView,
     )> {
         let ready = ready_effect_slot()?;
+        let target_head = resource_head(ready.resource_key.clone())?;
         let ready_head = effect_head(&ready, 1, None)?;
         let ready_head_digest = ready_head.digest()?;
         let current = chio_core::economic_continuity::verify_economic_state_view(
-            signed_view(vec![ready_head], Vec::new())?,
+            signed_view(vec![target_head.clone(), ready_head], Vec::new())?,
             &pins(),
         )?;
         let mut dispatched = ready;
@@ -782,7 +784,7 @@ mod tests {
             signed_view_at(
                 2,
                 advance.batch().checkpoint_digest.clone(),
-                vec![dispatched_head],
+                vec![target_head, dispatched_head],
                 Vec::new(),
             )?,
             &pins(),

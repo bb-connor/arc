@@ -38,6 +38,15 @@ pub(super) const I_JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 pub type AdmissionIdentifier = BoundedAdmissionText<MAX_ADMISSION_IDENTIFIER_BYTES>;
 pub type AdmissionErrorDetail = BoundedAdmissionText<MAX_ADMISSION_ERROR_BYTES>;
 
+pub fn expected_dispatch_committed_version(
+    kind: AdmissionOperationKind,
+    requirements: AdmissionParticipantRequirements,
+    prepared_version: u64,
+) -> Result<u64, AdmissionOperationError> {
+    requirements.validate_for_kind(kind)?;
+    state::dispatch_committed_version_from_prepared(kind, requirements, prepared_version)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum AdmissionOperationError {
     #[error("{field} must not be empty")]
@@ -284,6 +293,8 @@ pub enum AdmissionAttachment {
     OutcomeEligibilityDigest(AdmissionDigest),
     PaymentParticipantId(AdmissionIdentifier),
     ToolOutcomeId(AdmissionDigest),
+    ChannelReservationProposalDigest(AdmissionDigest),
+    ChannelReservationDigest(AdmissionDigest),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -297,6 +308,8 @@ pub(crate) enum AdmissionAttachmentKind {
     OutcomeEligibility,
     PaymentParticipant,
     ToolOutcome,
+    ChannelReservationProposal,
+    ChannelReservation,
 }
 
 impl AdmissionAttachment {
@@ -313,6 +326,10 @@ impl AdmissionAttachment {
             Self::OutcomeEligibilityDigest(_) => AdmissionAttachmentKind::OutcomeEligibility,
             Self::PaymentParticipantId(_) => AdmissionAttachmentKind::PaymentParticipant,
             Self::ToolOutcomeId(_) => AdmissionAttachmentKind::ToolOutcome,
+            Self::ChannelReservationProposalDigest(_) => {
+                AdmissionAttachmentKind::ChannelReservationProposal
+            }
+            Self::ChannelReservationDigest(_) => AdmissionAttachmentKind::ChannelReservation,
         }
     }
 
@@ -331,6 +348,8 @@ impl AdmissionAttachment {
             Self::OutcomeEligibilityDigest(_) => "outcome_eligibility_digest",
             Self::PaymentParticipantId(_) => "payment_participant_id",
             Self::ToolOutcomeId(_) => "tool_outcome_id",
+            Self::ChannelReservationProposalDigest(_) => "channel_reservation_proposal_digest",
+            Self::ChannelReservationDigest(_) => "channel_reservation_digest",
         }
     }
 }
@@ -347,6 +366,8 @@ impl AdmissionAttachmentKind {
             Self::OutcomeEligibility => 6,
             Self::PaymentParticipant => 7,
             Self::ToolOutcome => 8,
+            Self::ChannelReservationProposal => 9,
+            Self::ChannelReservation => 10,
         }
     }
 }
@@ -382,7 +403,7 @@ impl AdmissionOperationAttachmentsV1 {
     }
 
     fn validate(&self) -> Result<(), AdmissionOperationError> {
-        if self.0.len() > 9
+        if self.0.len() > 11
             || self
                 .0
                 .windows(2)
@@ -495,6 +516,29 @@ impl AdmissionOperationV1 {
             last_error: None,
             terminal_replay: None,
         })
+    }
+
+    pub fn with_initial_channel_reservation_proposal_digest(
+        mut self,
+        proposal_digest: AdmissionDigest,
+    ) -> Result<Self, AdmissionOperationError> {
+        self.validate()?;
+        if self.state != AdmissionOperationState::Prepared
+            || self.version != 1
+            || !self.binding.participant_requirements().channel
+            || !self.attachments.0.is_empty()
+        {
+            return Err(AdmissionOperationError::ForbiddenAttachment {
+                field: "channel_reservation_proposal_digest",
+            });
+        }
+        self.attachments
+            .0
+            .push(AdmissionAttachment::ChannelReservationProposalDigest(
+                proposal_digest,
+            ));
+        self.validate()?;
+        Ok(self)
     }
 
     /// Decode and validate a persisted operation value.
@@ -618,6 +662,22 @@ impl AdmissionOperationV1 {
     pub fn budget_hold_id(&self) -> Option<&AdmissionIdentifier> {
         match self.attachment(AdmissionAttachmentKind::BudgetHold) {
             Some(AdmissionAttachment::BudgetHoldId(hold_id)) => Some(hold_id),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn channel_reservation_proposal_digest(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::ChannelReservationProposal) {
+            Some(AdmissionAttachment::ChannelReservationProposalDigest(digest)) => Some(digest),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn channel_reservation_digest(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::ChannelReservation) {
+            Some(AdmissionAttachment::ChannelReservationDigest(digest)) => Some(digest),
             _ => None,
         }
     }

@@ -111,6 +111,32 @@ fn receipt_flush_rejects_zero_timeout() {
 }
 
 #[test]
+fn receipt_list_cost_bounds_require_currency() {
+    assert!(parse_cli([
+        "chio",
+        "receipt",
+        "list",
+        "--min-cost",
+        "18446744073709551615",
+        "--admin-all",
+    ])
+    .is_err());
+    assert!(parse_cli([
+        "chio",
+        "receipt",
+        "list",
+        "--min-cost",
+        "18446744073709551615",
+        "--max-cost",
+        "18446744073709551615",
+        "--cost-currency",
+        "USD",
+        "--admin-all",
+    ])
+    .is_ok());
+}
+
+#[test]
 fn receipt_checkpoint_create_subcommand_parses() {
     let cli = parse_cli([
         "chio",

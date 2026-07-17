@@ -55,5 +55,6 @@ pub use verify::{
     ExpectedFrostAuthorization, FrostAnchoredAuthorizationSlot, FrostAuthorizationSlotAnchor,
     FrostAuthorizationSlotCheckpointV1, FrostAuthorizationSlotState, FrostAuthorizationV1,
     FrostVerificationError, HistoricalFrostEvidence, VerifiedFrostAuthorization,
-    CHIO_FROST_AUTHORIZATION_SCHEMA, CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
+    VerifiedHistoricalCompletedFrostAuthorization, CHIO_FROST_AUTHORIZATION_SCHEMA,
+    CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
 };

@@ -163,7 +163,10 @@ P2.
   an anchor-unavailable or restored-old database never serves fallback.
 - WS10 phases: 1 pure contracts and schemas; 2 a full-`u64` order-preserving
   derived cost key, authenticated tenant sequence/time projections, index, and
-  read-only spend event stream; 3 exact-window burn-rate/anomaly reports, signed
+  currency-bound read-only spend event stream; current-schema opens use a
+  fixed-size schema/index/guard manifest, full row reconciliation is limited to
+  migration and explicit audit, and page/count share one reader snapshot; 3
+  exact-window burn-rate/anomaly reports, signed
   anomaly/decision-policy lifecycle, external governance anchor, coordinated
   policy-input-v2 and strict underwriting decision-v2 chain; 4 tenant-admin,
   ordered, leased durable

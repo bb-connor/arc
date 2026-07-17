@@ -7,6 +7,7 @@ use chio_federation::frost::{
 };
 
 use super::*;
+use crate::clearing::finalization::verify_historical_clearing_round_finalization;
 
 pub const CLEARING_LIFECYCLE_REPLAY_FORMAT: &str = "chio.clearing.lifecycle-replay.v1";
 pub const CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND: &str = "chio.clearing.lifecycle-replay.v1";
@@ -1043,9 +1044,8 @@ fn verify_finalization_replay(
         frost_trust,
     )
     .map_err(|_| ClearingError::AuthorityVerification)?;
-    let completed_at = replay.completed_slot.checkpoint.clock_high_water;
-    let clearing_trust = pins.clearing_trust(completed_at)?;
-    let finalization = verify_clearing_round_finalization(
+    let clearing_trust = pins.clearing_trust(frost.completed_at())?;
+    let finalization = verify_historical_clearing_round_finalization(
         source_round_head,
         &acceptances,
         &replay.signed_finalization,

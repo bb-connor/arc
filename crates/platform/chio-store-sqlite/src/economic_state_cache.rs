@@ -2,16 +2,25 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::economic_continuity::{
-    verify_economic_state_batch_commit, EconomicContinuityError, EconomicResourceHeadV1,
-    EconomicResourceKeyV1, EconomicStateAnchorError, EconomicStateAnchorPins,
-    EconomicStateAnchorViewV1, EconomicStateBatchV1, VerifiedEconomicStateBatchAdvance,
-    VerifiedEconomicStateView, MAX_ECONOMIC_BATCH_BYTES,
+    economic_effect_slot_from_head, verify_economic_completed_effect,
+    verify_economic_state_batch_commit, EconomicAdmissionHandoffStateV1, EconomicContentV1,
+    EconomicContinuityError, EconomicEffectSlotV1, EconomicEffectStateV1, EconomicEffectTerminalV1,
+    EconomicResourceHeadV1, EconomicResourceKeyV1, EconomicStateAnchorError,
+    EconomicStateAnchorPins, EconomicStateAnchorViewV1, EconomicStateBatchV1,
+    EconomicTerminalResultV1, VerifiedEconomicStateBatchAdvance, VerifiedEconomicStateView,
+    MAX_ECONOMIC_BATCH_BYTES,
 };
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_credit::clearing::CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND;
 use chio_kernel::admission_operation::{
-    AdmissionOperationState, AdmissionOperationV1, AdmissionRecoveryLease,
-    PersistedAdmissionOperationV1,
+    AdmissionOperationState, AdmissionOperationV1, AdmissionProjectionRecordKind,
+    AdmissionRecoveryLease, PersistedAdmissionOperationV1, SignedAdmissionTerminalProjectionV1,
+    VerifiedAdmissionTerminalProjectionV1,
+};
+use chio_kernel::ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND;
+use chio_settle::channel::{
+    CHANNEL_ESCROW_RESERVATION_RESOURCE_FAMILY, CHANNEL_LIFECYCLE_RESOURCE_FAMILY,
+    CHANNEL_SERVICE_DISPATCH_EFFECT_KIND, CHANNEL_TRANSITION_REPLAY_FORMAT,
 };
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction, TransactionBehavior};
 use serde::de::DeserializeOwned;
@@ -22,6 +31,7 @@ use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 mod persistence;
 pub(crate) use persistence::verify_cache_sql_invariants;
 use persistence::*;
+pub(crate) use persistence::{append_stage_commit, load_stage_tx, update_stage};
 
 const ECONOMIC_STATE_CACHE_SCHEMA_KEY: &str = "economic_state_cache";
 pub(crate) const ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION: i32 = 3;
@@ -35,6 +45,7 @@ const MAX_DESCRIPTOR_KEY_BYTES: usize = 2_048;
 const MAX_TRUSTED_UNIX_MS: u64 = (1_u64 << 53) - 1;
 const GENESIS_STAGE_COMMIT_DIGEST: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
+const ADMISSION_TERMINAL_EFFECT_RESULT_SCHEMA: &str = "chio.admission.terminal-effect-result.v1";
 
 const ECONOMIC_STATE_CACHE_SCHEMA: &str = include_str!("economic_state_cache.sql");
 const ECONOMIC_STATE_CACHE_DESCRIPTOR_MIGRATION: &str = r#"
@@ -128,6 +139,8 @@ pub struct EconomicOperationStageBinding {
     coordinator_lease_id: String,
     recovery_claimant_id: String,
     recovery_expires_at_unix_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    not_after_unix_ms: Option<u64>,
     store_fence: StoreMutationFence,
 }
 
@@ -137,6 +150,28 @@ pub struct EconomicStateStageDescriptor {
     key: String,
     digest: String,
     canonical_json: Vec<u8>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AdmissionTerminalEffectRecordCommitment {
+    kind: AdmissionProjectionRecordKind,
+    record_id: String,
+    record_digest: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AdmissionTerminalEffectCommitment {
+    schema: &'static str,
+    descriptor_digest: String,
+    operation_id: String,
+    request_id: String,
+    source_operation_digest: String,
+    terminal_operation_digest: String,
+    terminal_state: AdmissionOperationState,
+    projection_digest: String,
+    records: Vec<AdmissionTerminalEffectRecordCommitment>,
 }
 
 impl EconomicStateStageDescriptor {
@@ -216,6 +251,48 @@ impl EconomicStateStageDescriptor {
 }
 
 impl EconomicOperationStageBinding {
+    fn validate(&self) -> Result<(), EconomicStateCacheError> {
+        if self.operation_id.is_empty()
+            || self.coordinator_lease_id.is_empty()
+            || self.recovery_claimant_id.is_empty()
+            || self.store_fence.store_uuid.is_empty()
+            || self.store_fence.lease_id.is_empty()
+        {
+            return Err(invariant("economic operation binding identity is invalid"));
+        }
+        if self.operation_version == 0 || self.operation_version > MAX_TRUSTED_UNIX_MS {
+            return Err(invariant(
+                "economic operation binding operation_version is invalid",
+            ));
+        }
+        if self.coordinator_lease_epoch == 0 || self.coordinator_lease_epoch > MAX_TRUSTED_UNIX_MS {
+            return Err(invariant(
+                "economic operation binding coordinator_lease_epoch is invalid",
+            ));
+        }
+        if self.recovery_expires_at_unix_ms == 0
+            || self.recovery_expires_at_unix_ms > MAX_TRUSTED_UNIX_MS
+        {
+            return Err(invariant(
+                "economic operation binding recovery_expires_at_unix_ms is invalid",
+            ));
+        }
+        if self
+            .not_after_unix_ms
+            .is_some_and(|value| value == 0 || value > MAX_TRUSTED_UNIX_MS)
+        {
+            return Err(invariant(
+                "economic operation binding not_after_unix_ms is invalid",
+            ));
+        }
+        if self.store_fence.owner_epoch == 0 || self.store_fence.owner_epoch > MAX_TRUSTED_UNIX_MS {
+            return Err(invariant(
+                "economic operation binding store fence is invalid",
+            ));
+        }
+        Ok(())
+    }
+
     #[must_use]
     pub fn operation_id(&self) -> &str {
         &self.operation_id
@@ -237,6 +314,11 @@ impl EconomicOperationStageBinding {
     }
 
     #[must_use]
+    pub fn coordinator_lease_id(&self) -> &str {
+        &self.coordinator_lease_id
+    }
+
+    #[must_use]
     pub fn recovery_claimant_id(&self) -> &str {
         &self.recovery_claimant_id
     }
@@ -244,6 +326,11 @@ impl EconomicOperationStageBinding {
     #[must_use]
     pub const fn recovery_expires_at_unix_ms(&self) -> u64 {
         self.recovery_expires_at_unix_ms
+    }
+
+    #[must_use]
+    pub const fn not_after_unix_ms(&self) -> Option<u64> {
+        self.not_after_unix_ms
     }
 
     #[must_use]
@@ -256,6 +343,7 @@ impl EconomicOperationStageBinding {
 pub struct EconomicOperationStageContext<'a> {
     operation: &'a AdmissionOperationV1,
     recovery_lease: &'a AdmissionRecoveryLease,
+    not_after_unix_ms: Option<u64>,
 }
 
 pub(crate) struct EconomicStageAdmissionCheckpoint<'a> {
@@ -280,7 +368,27 @@ impl<'a> EconomicOperationStageContext<'a> {
         Self {
             operation,
             recovery_lease,
+            not_after_unix_ms: None,
         }
+    }
+
+    pub fn with_not_after_unix_ms(
+        mut self,
+        not_after_unix_ms: u64,
+    ) -> Result<Self, EconomicStateCacheError> {
+        validate_trusted_time(not_after_unix_ms)?;
+        self.not_after_unix_ms = Some(not_after_unix_ms);
+        Ok(self)
+    }
+
+    #[must_use]
+    pub const fn operation(&self) -> &'a AdmissionOperationV1 {
+        self.operation
+    }
+
+    #[must_use]
+    pub const fn recovery_lease(&self) -> &'a AdmissionRecoveryLease {
+        self.recovery_lease
     }
 }
 
@@ -321,6 +429,13 @@ impl EconomicStateStageRecord {
     }
 
     #[must_use]
+    pub fn not_after_unix_ms(&self) -> Option<u64> {
+        self.operation_binding
+            .as_ref()
+            .and_then(EconomicOperationStageBinding::not_after_unix_ms)
+    }
+
+    #[must_use]
     pub fn descriptor(&self) -> Option<&EconomicStateStageDescriptor> {
         self.descriptor.as_ref()
     }
@@ -339,6 +454,462 @@ impl EconomicStateStageRecord {
     pub fn version(&self) -> u64 {
         self.version
     }
+}
+
+pub fn admission_terminal_projection_effect_result(
+    envelope: &SignedAdmissionTerminalProjectionV1,
+) -> Result<EconomicEffectTerminalV1, EconomicStateCacheError> {
+    let verified = envelope
+        .verify()
+        .map_err(|_| EconomicStateCacheError::Conflict)?;
+    let descriptor = admission_terminal_projection_descriptor(envelope, &verified)?;
+    terminal_projection_effect_result(&descriptor, &verified)
+}
+
+fn admission_terminal_projection_descriptor(
+    envelope: &SignedAdmissionTerminalProjectionV1,
+    verified: &VerifiedAdmissionTerminalProjectionV1,
+) -> Result<EconomicStateStageDescriptor, EconomicStateCacheError> {
+    EconomicStateStageDescriptor::new(
+        ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND,
+        verified
+            .source_operation()
+            .binding()
+            .operation_id()
+            .as_str(),
+        envelope,
+    )
+}
+
+fn terminal_projection_effect_result(
+    descriptor: &EconomicStateStageDescriptor,
+    verified: &VerifiedAdmissionTerminalProjectionV1,
+) -> Result<EconomicEffectTerminalV1, EconomicStateCacheError> {
+    let source = verified.source_operation();
+    let terminal = verified.terminal_operation();
+    let projection_digest = terminal
+        .terminal_replay()
+        .ok_or(EconomicStateCacheError::Conflict)?
+        .projection_digest()
+        .as_str()
+        .to_owned();
+    let source_operation_digest =
+        sha256_hex(&canonical_json_bytes(&source.to_persisted()).map_err(canonical_error)?);
+    let terminal_operation_digest =
+        sha256_hex(&canonical_json_bytes(&terminal.to_persisted()).map_err(canonical_error)?);
+    let commitment = AdmissionTerminalEffectCommitment {
+        schema: ADMISSION_TERMINAL_EFFECT_RESULT_SCHEMA,
+        descriptor_digest: descriptor.digest().to_owned(),
+        operation_id: source.binding().operation_id().as_str().to_owned(),
+        request_id: source.replay_key().request_id.as_str().to_owned(),
+        source_operation_digest,
+        terminal_operation_digest,
+        terminal_state: terminal.state(),
+        projection_digest: projection_digest.clone(),
+        records: verified
+            .records()
+            .iter()
+            .map(|record| AdmissionTerminalEffectRecordCommitment {
+                kind: record.kind(),
+                record_id: record.record_id().as_str().to_owned(),
+                record_digest: record.record_digest().as_str().to_owned(),
+            })
+            .collect(),
+    };
+    let result = EconomicContentV1::Inline {
+        value: serde_json::to_value(commitment).map_err(canonical_error)?,
+    };
+    Ok(EconomicEffectTerminalV1::Completed {
+        result_id: projection_digest,
+        result_digest: result.digest()?,
+        result,
+    })
+}
+
+fn qualify_generic_terminal_projection_effect_slot(
+    base_view: &EconomicStateAnchorViewV1,
+    batch: &EconomicStateBatchV1,
+    descriptor: &EconomicStateStageDescriptor,
+    verified: &VerifiedAdmissionTerminalProjectionV1,
+) -> Result<EconomicEffectSlotV1, EconomicStateCacheError> {
+    if batch.transitions.len() != 1
+        || !batch.effect_slots.is_empty()
+        || !batch.request_replays.is_empty()
+        || batch.transitions[0].prepared_effect.is_some()
+    {
+        return Err(EconomicStateCacheError::Conflict);
+    }
+    let transition = &batch.transitions[0];
+    if transition.resource_key.resource_family != "effect_slot" {
+        return Err(EconomicStateCacheError::Conflict);
+    }
+    let current_head = base_view
+        .head(&transition.resource_key)
+        .ok_or(EconomicStateCacheError::Conflict)?;
+    let current_slot = economic_effect_slot_from_head(current_head)
+        .map_err(|_| EconomicStateCacheError::Conflict)?;
+    let completed_slot = economic_effect_slot_from_head(&transition.next_head)
+        .map_err(|_| EconomicStateCacheError::Conflict)?;
+    current_slot
+        .validate_successor(&completed_slot)
+        .map_err(|_| EconomicStateCacheError::Conflict)?;
+    let source = verified.source_operation();
+    let binding = source.binding();
+    let dispatch_commit = source
+        .dispatch_commit()
+        .ok_or(EconomicStateCacheError::Conflict)?;
+    let expected_terminal = terminal_projection_effect_result(descriptor, verified)?;
+    let expected_result = match &expected_terminal {
+        EconomicEffectTerminalV1::Completed {
+            result_id,
+            result_digest,
+            result,
+        } => EconomicTerminalResultV1 {
+            result_id: result_id.clone(),
+            result_digest: result_digest.clone(),
+            result: result.clone(),
+        },
+        EconomicEffectTerminalV1::NoEffect { .. } => return Err(EconomicStateCacheError::Conflict),
+    };
+    if current_slot.state != EconomicEffectStateV1::DispatchCommitted
+        && current_slot.state != EconomicEffectStateV1::Unknown
+        || completed_slot.state != EconomicEffectStateV1::Completed
+        || completed_slot.terminal.as_ref() != Some(&expected_terminal)
+        || completed_slot.operation_id != binding.operation_id().as_str()
+        || completed_slot.request.request_namespace_digest
+            != binding.request_namespace_digest().as_str()
+        || completed_slot.request.request_id != binding.request_id().as_str()
+        || completed_slot.request.request_binding_digest != binding.request_binding_hash().as_str()
+        || completed_slot.parameters_digest != binding.action_parameter_hash().as_str()
+        || completed_slot.admission_handoff.state
+            != EconomicAdmissionHandoffStateV1::DispatchCommitted
+        || completed_slot.admission_handoff.operation_version != dispatch_commit.committed_version
+        || completed_slot.admission_handoff.lifecycle_fence
+            != dispatch_commit.coordinator_lease_epoch
+        || completed_slot.admission_handoff.store_fence != dispatch_commit.store_fence
+        || !current_fence_serves_historical(
+            &dispatch_commit.store_fence,
+            &verified.context().store_fence,
+        )
+        || batch.operation_id.as_deref() != Some(binding.operation_id().as_str())
+        || transition.next_head.lifecycle_state != "completed"
+        || transition.next_head.terminal_result.as_ref() != Some(&expected_result)
+    {
+        return Err(EconomicStateCacheError::Conflict);
+    }
+    Ok(completed_slot)
+}
+
+fn qualify_terminal_projection_advance(
+    advance: &VerifiedEconomicStateBatchAdvance,
+    descriptor: &EconomicStateStageDescriptor,
+    verified: &VerifiedAdmissionTerminalProjectionV1,
+) -> Result<EconomicEffectSlotV1, EconomicStateCacheError> {
+    match verified.channel_terminal() {
+        Some(channel) => channel
+            .qualify_anchored_advance(advance)
+            .cloned()
+            .map_err(|_| EconomicStateCacheError::Conflict),
+        None => qualify_generic_terminal_projection_effect_slot(
+            advance.current().view(),
+            advance.batch(),
+            descriptor,
+            verified,
+        ),
+    }
+}
+
+fn qualify_retained_terminal_projection_advance(
+    base_view: &EconomicStateAnchorViewV1,
+    batch: &EconomicStateBatchV1,
+    descriptor: &EconomicStateStageDescriptor,
+    verified: &VerifiedAdmissionTerminalProjectionV1,
+) -> Result<EconomicEffectSlotV1, EconomicStateCacheError> {
+    match verified.channel_terminal() {
+        Some(channel) => channel
+            .qualify_retained_anchored_advance(base_view, batch)
+            .cloned()
+            .map_err(|_| EconomicStateCacheError::Conflict),
+        None => {
+            qualify_generic_terminal_projection_effect_slot(base_view, batch, descriptor, verified)
+        }
+    }
+}
+
+fn committed_view_matches_batch(
+    committed: &EconomicStateAnchorViewV1,
+    batch: &EconomicStateBatchV1,
+) -> bool {
+    batch
+        .transitions
+        .iter()
+        .all(|transition| committed.head(&transition.resource_key) == Some(&transition.next_head))
+}
+
+fn batch_contains_channel_content(batch: &EconomicStateBatchV1) -> bool {
+    batch.transitions.iter().any(|transition| {
+        matches!(
+            transition.resource_key.resource_family.as_str(),
+            CHANNEL_LIFECYCLE_RESOURCE_FAMILY | CHANNEL_ESCROW_RESERVATION_RESOURCE_FAMILY
+        )
+    }) || batch
+        .effect_slots
+        .iter()
+        .any(|effect| effect.effect_kind == CHANNEL_SERVICE_DISPATCH_EFFECT_KIND)
+}
+
+fn is_protected_channel_stage(record: &EconomicStateStageRecord) -> bool {
+    record
+        .descriptor
+        .as_ref()
+        .is_some_and(|descriptor| descriptor.kind == CHANNEL_TRANSITION_REPLAY_FORMAT)
+        || batch_contains_channel_content(&record.batch)
+}
+
+fn validate_stage_options(
+    batch: &EconomicStateBatchV1,
+    options: &EconomicStageOptions<'_>,
+) -> Result<(), EconomicStateCacheError> {
+    if let Some(descriptor) = &options.descriptor {
+        descriptor.validate()?;
+        let reserved = matches!(
+            descriptor.kind(),
+            CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND
+                | ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND
+                | CHANNEL_TRANSITION_REPLAY_FORMAT
+        );
+        if reserved != (options.consumer_descriptor_kind == Some(descriptor.kind()))
+            || options
+                .consumer_descriptor_kind
+                .is_some_and(|kind| kind != descriptor.kind())
+        {
+            return Err(EconomicStateCacheError::Conflict);
+        }
+    } else if options.consumer_descriptor_kind.is_some() {
+        return Err(EconomicStateCacheError::Conflict);
+    }
+    let channel_content = batch_contains_channel_content(batch);
+    let channel_consumer = matches!(
+        options.consumer_descriptor_kind,
+        Some(CHANNEL_TRANSITION_REPLAY_FORMAT | ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND)
+    );
+    let reservation_consumer =
+        options.consumer_descriptor_kind == Some(CHANNEL_TRANSITION_REPLAY_FORMAT);
+    if channel_content && !channel_consumer || !channel_content && reservation_consumer {
+        return Err(EconomicStateCacheError::Conflict);
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn stage_channel_batch_in_transaction(
+    transaction: &Transaction<'_>,
+    advance: &VerifiedEconomicStateBatchAdvance,
+    operation: EconomicOperationStageContext<'_>,
+    descriptor: EconomicStateStageDescriptor,
+    active_fence: &StoreMutationFence,
+    trusted_now_unix_ms: u64,
+    serving_owner: &SqliteServingOwner,
+) -> Result<EconomicStateStageRecord, EconomicStateCacheError> {
+    validate_trusted_time(trusted_now_unix_ms)?;
+    let options = EconomicStageOptions {
+        operation: Some(operation),
+        descriptor: Some(descriptor),
+        admission_checkpoint: None,
+        consumer_descriptor_kind: Some(CHANNEL_TRANSITION_REPLAY_FORMAT),
+    };
+    validate_stage_options(advance.batch(), &options)?;
+    stage_batch_in_transaction(
+        transaction,
+        advance,
+        options,
+        active_fence,
+        trusted_now_unix_ms,
+        serving_owner,
+    )
+}
+
+pub(crate) fn record_channel_anchor_advanced_in_transaction(
+    transaction: &Transaction<'_>,
+    advance: &VerifiedEconomicStateBatchAdvance,
+    committed: &VerifiedEconomicStateView,
+    trusted_now_unix_ms: u64,
+    serving_owner: &SqliteServingOwner,
+) -> Result<EconomicStateStageRecord, EconomicStateCacheError> {
+    validate_trusted_time(trusted_now_unix_ms)?;
+    if !committed_view_matches_batch(committed.view(), advance.batch()) {
+        return Err(EconomicStateCacheError::Conflict);
+    }
+    let committed_bytes = canonical_bounded(committed.view(), MAX_VIEW_BYTES, "committed view")?;
+    let mut record = load_stage_tx(transaction, &advance.batch().batch_id)?
+        .ok_or(EconomicStateCacheError::NotFound)?;
+    if record.base_view != *advance.current().view()
+        || record.batch != *advance.batch()
+        || record
+            .descriptor
+            .as_ref()
+            .is_none_or(|descriptor| descriptor.kind != CHANNEL_TRANSITION_REPLAY_FORMAT)
+        || !is_protected_channel_stage(&record)
+    {
+        return Err(EconomicStateCacheError::Conflict);
+    }
+    if matches!(
+        record.status,
+        EconomicStateStageStatus::EconomicAnchorAdvanced | EconomicStateStageStatus::DbFinalized
+    ) {
+        return if record.committed_view.as_ref() == Some(committed.view()) {
+            Ok(record)
+        } else {
+            Err(EconomicStateCacheError::Conflict)
+        };
+    }
+    require_transition(
+        record.status,
+        EconomicStateStageStatus::EconomicAnchorAdvanced,
+    )?;
+    record.status = EconomicStateStageStatus::EconomicAnchorAdvanced;
+    record.committed_view = Some(committed.view().clone());
+    record.version = next_version(record.version)?;
+    record.updated_at_unix_ms = monotonic_time(&record, trusted_now_unix_ms)?;
+    record.snapshot_digest = stage_snapshot_digest(&record, &[])?;
+    update_stage(
+        transaction,
+        &record,
+        Some(committed_bytes),
+        None,
+        EconomicStateStageStatus::DbStaged,
+    )?;
+    append_stage_commit(
+        transaction,
+        &record,
+        "channel_anchor_advanced",
+        serving_owner,
+    )?;
+    Ok(record)
+}
+
+fn stage_batch_in_transaction(
+    transaction: &Transaction<'_>,
+    advance: &VerifiedEconomicStateBatchAdvance,
+    options: EconomicStageOptions<'_>,
+    active_fence: &StoreMutationFence,
+    trusted_now_unix_ms: u64,
+    serving_owner: &SqliteServingOwner,
+) -> Result<EconomicStateStageRecord, EconomicStateCacheError> {
+    let EconomicStageOptions {
+        operation,
+        descriptor,
+        admission_checkpoint,
+        consumer_descriptor_kind: _,
+    } = options;
+    if let Some(existing) = load_stage_tx(transaction, &advance.batch().batch_id)? {
+        if existing.base_view != *advance.current().view() || existing.batch != *advance.batch() {
+            return Err(EconomicStateCacheError::Conflict);
+        }
+        let qualified = qualify_operation_binding(
+            transaction,
+            advance.batch(),
+            operation,
+            active_fence,
+            trusted_now_unix_ms,
+        )?;
+        if qualified != existing.operation_binding || descriptor != existing.descriptor {
+            return Err(EconomicStateCacheError::Conflict);
+        }
+        return Ok(existing);
+    }
+    if let Some(descriptor) = &descriptor {
+        let retained_batch_id = transaction
+            .query_row(
+                r#"
+                SELECT batch_id FROM economic_state_stages
+                WHERE descriptor_kind = ?1 AND descriptor_key = ?2
+                "#,
+                params![descriptor.kind(), descriptor.key()],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(sqlite_error)?;
+        if retained_batch_id.is_some() {
+            return Err(EconomicStateCacheError::Conflict);
+        }
+    }
+    if let Some(checkpoint) = admission_checkpoint {
+        verify_stage_admission_checkpoint(
+            transaction,
+            &checkpoint,
+            active_fence,
+            trusted_now_unix_ms,
+        )?;
+    }
+    let operation_binding = qualify_operation_binding(
+        transaction,
+        advance.batch(),
+        operation,
+        active_fence,
+        trusted_now_unix_ms,
+    )?;
+    let operation_binding_bytes = operation_binding
+        .as_ref()
+        .map(canonical_json_bytes)
+        .transpose()
+        .map_err(canonical_error)?;
+    let mut record = EconomicStateStageRecord {
+        base_view: advance.current().view().clone(),
+        batch: advance.batch().clone(),
+        committed_view: None,
+        operation_binding,
+        descriptor,
+        status: EconomicStateStageStatus::DbStaged,
+        reason: None,
+        version: 1,
+        created_at_unix_ms: trusted_now_unix_ms,
+        updated_at_unix_ms: trusted_now_unix_ms,
+        snapshot_digest: String::new(),
+    };
+    record.snapshot_digest = stage_snapshot_digest(&record, &[])?;
+    let base_view_bytes = canonical_bounded(advance.current().view(), MAX_VIEW_BYTES, "base view")?;
+    let batch_bytes = advance.batch().canonical_bytes()?;
+    transaction
+        .execute(
+            r#"
+            INSERT INTO economic_state_stages (
+                batch_id, checkpoint_sequence, checkpoint_digest,
+                base_view_json, batch_json, committed_view_json,
+                operation_binding_json, descriptor_kind, descriptor_key,
+                descriptor_digest, descriptor_json, status, reason,
+                stage_version, snapshot_digest, created_at_unix_ms,
+                updated_at_unix_ms
+            ) VALUES (
+                ?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8, ?9, ?10,
+                ?11, NULL, 1, ?12, ?13, ?13
+            )
+            "#,
+            params![
+                &record.batch.batch_id,
+                sqlite_i64(record.batch.checkpoint_sequence, "checkpoint_sequence")?,
+                &record.batch.checkpoint_digest,
+                base_view_bytes,
+                batch_bytes,
+                operation_binding_bytes,
+                record.descriptor.as_ref().map(|value| value.kind.as_str()),
+                record.descriptor.as_ref().map(|value| value.key.as_str()),
+                record
+                    .descriptor
+                    .as_ref()
+                    .map(|value| value.digest.as_str()),
+                record
+                    .descriptor
+                    .as_ref()
+                    .map(|value| value.canonical_json.as_slice()),
+                record.status.as_str(),
+                &record.snapshot_digest,
+                sqlite_i64(trusted_now_unix_ms, "trusted_now_unix_ms")?,
+            ],
+        )
+        .map_err(sqlite_error)?;
+    append_stage_commit(transaction, &record, "stage_batch", serving_owner)?;
+    Ok(record)
 }
 
 #[derive(Clone)]
@@ -446,6 +1017,50 @@ impl SqliteEconomicStateCache {
         )
     }
 
+    pub fn stage_admission_terminal_projection(
+        &self,
+        advance: &VerifiedEconomicStateBatchAdvance,
+        operation: EconomicOperationStageContext<'_>,
+        envelope: &SignedAdmissionTerminalProjectionV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<EconomicStateStageRecord, EconomicStateCacheError> {
+        validate_trusted_time(trusted_now_unix_ms)?;
+        let verified = envelope
+            .verify()
+            .map_err(|_| EconomicStateCacheError::Conflict)?;
+        let descriptor = admission_terminal_projection_descriptor(envelope, &verified)?;
+        let context = verified.context();
+        let source = verified.source_operation();
+        let lease = operation.recovery_lease;
+        let expected_claimant = format!("kernel:{}", verified.signer_key().to_hex());
+        if operation.operation != source
+            || context.operation_id != *source.binding().operation_id()
+            || context.request_id != source.replay_key().request_id
+            || context.expected_operation_version != source.version()
+            || context.coordinator_lease_id != *lease.coordinator_lease_id()
+            || context.coordinator_lease_epoch != lease.coordinator_lease_epoch()
+            || context.store_fence != *lease.store_fence()
+            || lease.claimant_id().as_str() != expected_claimant
+            || context.trusted_time_unix_ms > trusted_now_unix_ms
+            || context.trusted_time_unix_ms >= lease.expires_at_unix_ms()
+        {
+            return Err(EconomicStateCacheError::Conflict);
+        }
+        qualify_terminal_projection_advance(advance, &descriptor, &verified)?;
+        self.stage_batch_inner(
+            advance,
+            EconomicStageOptions {
+                operation: Some(operation),
+                descriptor: Some(descriptor),
+                admission_checkpoint: None,
+                consumer_descriptor_kind: Some(ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND),
+            },
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
     pub(crate) fn stage_clearing_lifecycle_batch(
         &self,
         advance: &VerifiedEconomicStateBatchAdvance,
@@ -474,138 +1089,18 @@ impl SqliteEconomicStateCache {
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<EconomicStateStageRecord, EconomicStateCacheError> {
-        let EconomicStageOptions {
-            operation,
-            descriptor,
-            admission_checkpoint,
-            consumer_descriptor_kind,
-        } = options;
         validate_trusted_time(trusted_now_unix_ms)?;
-        if let Some(descriptor) = &descriptor {
-            descriptor.validate()?;
-            let reserved = descriptor.kind() == CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND;
-            if reserved
-                != (consumer_descriptor_kind == Some(CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND))
-                || consumer_descriptor_kind.is_some_and(|kind| kind != descriptor.kind())
-            {
-                return Err(EconomicStateCacheError::Conflict);
-            }
-        }
-        let base_view_bytes =
-            canonical_bounded(advance.current().view(), MAX_VIEW_BYTES, "base view")?;
-        let batch_bytes = advance.batch().canonical_bytes()?;
+        validate_stage_options(advance.batch(), &options)?;
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, active_fence)?;
-        if let Some(existing) = load_stage_tx(&transaction, &advance.batch().batch_id)? {
-            if existing.base_view != *advance.current().view() || existing.batch != *advance.batch()
-            {
-                return Err(EconomicStateCacheError::Conflict);
-            }
-            let qualified = qualify_operation_binding(
-                &transaction,
-                advance.batch(),
-                operation,
-                active_fence,
-                trusted_now_unix_ms,
-            )?;
-            if qualified != existing.operation_binding {
-                return Err(EconomicStateCacheError::Conflict);
-            }
-            if descriptor != existing.descriptor {
-                return Err(EconomicStateCacheError::Conflict);
-            }
-            transaction.commit().map_err(sqlite_error)?;
-            return Ok(existing);
-        }
-        if let Some(descriptor) = &descriptor {
-            let retained_batch_id = transaction
-                .query_row(
-                    r#"
-                    SELECT batch_id FROM economic_state_stages
-                    WHERE descriptor_kind = ?1 AND descriptor_key = ?2
-                    "#,
-                    params![descriptor.kind(), descriptor.key()],
-                    |row| row.get::<_, String>(0),
-                )
-                .optional()
-                .map_err(sqlite_error)?;
-            if retained_batch_id.is_some() {
-                return Err(EconomicStateCacheError::Conflict);
-            }
-        }
-        if let Some(checkpoint) = admission_checkpoint {
-            verify_stage_admission_checkpoint(
-                &transaction,
-                &checkpoint,
-                active_fence,
-                trusted_now_unix_ms,
-            )?;
-        }
-        let operation_binding = qualify_operation_binding(
+        let record = stage_batch_in_transaction(
             &transaction,
-            advance.batch(),
-            operation,
+            advance,
+            options,
             active_fence,
             trusted_now_unix_ms,
+            &self.serving_owner,
         )?;
-        let operation_binding_bytes = operation_binding
-            .as_ref()
-            .map(canonical_json_bytes)
-            .transpose()
-            .map_err(canonical_error)?;
-        let mut record = EconomicStateStageRecord {
-            base_view: advance.current().view().clone(),
-            batch: advance.batch().clone(),
-            committed_view: None,
-            operation_binding,
-            descriptor,
-            status: EconomicStateStageStatus::DbStaged,
-            reason: None,
-            version: 1,
-            created_at_unix_ms: trusted_now_unix_ms,
-            updated_at_unix_ms: trusted_now_unix_ms,
-            snapshot_digest: String::new(),
-        };
-        record.snapshot_digest = stage_snapshot_digest(&record, &[])?;
-        transaction
-            .execute(
-                r#"
-                INSERT INTO economic_state_stages (
-                    batch_id, checkpoint_sequence, checkpoint_digest,
-                    base_view_json, batch_json, committed_view_json,
-                    operation_binding_json, descriptor_kind, descriptor_key,
-                    descriptor_digest, descriptor_json, status, reason,
-                    stage_version, snapshot_digest, created_at_unix_ms,
-                    updated_at_unix_ms
-                ) VALUES (
-                    ?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8, ?9, ?10,
-                    ?11, NULL, 1, ?12, ?13, ?13
-                )
-                "#,
-                params![
-                    &record.batch.batch_id,
-                    sqlite_i64(record.batch.checkpoint_sequence, "checkpoint_sequence")?,
-                    &record.batch.checkpoint_digest,
-                    base_view_bytes,
-                    batch_bytes,
-                    operation_binding_bytes,
-                    record.descriptor.as_ref().map(|value| value.kind.as_str()),
-                    record.descriptor.as_ref().map(|value| value.key.as_str()),
-                    record
-                        .descriptor
-                        .as_ref()
-                        .map(|value| value.digest.as_str()),
-                    record
-                        .descriptor
-                        .as_ref()
-                        .map(|value| value.canonical_json.as_slice()),
-                    record.status.as_str(),
-                    &record.snapshot_digest,
-                    sqlite_i64(trusted_now_unix_ms, "trusted_now_unix_ms")?,
-                ],
-            )
-            .map_err(sqlite_error)?;
-        append_stage_commit(&transaction, &record, "stage_batch", &self.serving_owner)?;
         self.commit_write(transaction)?;
         self.sync_after_write(&connection)?;
         Ok(record)
@@ -621,6 +1116,35 @@ impl SqliteEconomicStateCache {
     ) -> Result<EconomicStateStageRecord, EconomicStateCacheError> {
         validate_trusted_time(trusted_now_unix_ms)?;
         verify_economic_state_batch_commit(advance, committed, pins)?;
+        if let Some(descriptor) = self
+            .load_stage(&advance.batch().batch_id)?
+            .and_then(|stage| stage.descriptor().cloned())
+            .filter(|descriptor| descriptor.kind() == ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND)
+        {
+            let envelope = descriptor.decode::<SignedAdmissionTerminalProjectionV1>()?;
+            let verified = envelope
+                .verify()
+                .map_err(|_| EconomicStateCacheError::Conflict)?;
+            let completed = qualify_terminal_projection_advance(advance, &descriptor, &verified)?;
+            if !committed_view_matches_batch(committed.view(), advance.batch()) {
+                return Err(EconomicStateCacheError::Conflict);
+            }
+            verify_economic_completed_effect(committed, &completed)?;
+        }
+        if self
+            .load_stage(&advance.batch().batch_id)?
+            .is_some_and(|stage| {
+                stage
+                    .descriptor()
+                    .is_some_and(|descriptor| descriptor.kind() == CHANNEL_TRANSITION_REPLAY_FORMAT)
+                    || (batch_contains_channel_content(stage.batch())
+                        && stage.descriptor().is_none_or(|descriptor| {
+                            descriptor.kind() != ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND
+                        }))
+            })
+        {
+            return Err(EconomicStateCacheError::Conflict);
+        }
         let committed_bytes =
             canonical_bounded(committed.view(), MAX_VIEW_BYTES, "committed view")?;
         let mut connection = self.connection()?;
@@ -678,139 +1202,20 @@ impl SqliteEconomicStateCache {
         validate_trusted_time(trusted_now_unix_ms)?;
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, active_fence)?;
-        let mut record =
-            load_stage_tx(&transaction, batch_id)?.ok_or(EconomicStateCacheError::NotFound)?;
-        if record.status == EconomicStateStageStatus::DbFinalized {
-            transaction.commit().map_err(sqlite_error)?;
-            return Ok(record);
+        if load_stage_tx(&transaction, batch_id)?.is_some_and(|record| {
+            is_protected_channel_stage(&record)
+                || record.descriptor.as_ref().is_some_and(|descriptor| {
+                    descriptor.kind == ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND
+                })
+        }) {
+            return Err(EconomicStateCacheError::Conflict);
         }
-        require_transition(record.status, EconomicStateStageStatus::DbFinalized)?;
-        let committed = record
-            .committed_view
-            .as_ref()
-            .ok_or_else(|| invariant("anchor-advanced stage omitted its committed view"))?;
-        let mut head_digests = Vec::with_capacity(record.batch.transitions.len());
-        for transition in &record.batch.transitions {
-            let head = committed
-                .heads
-                .iter()
-                .find(|head| head.resource_key == transition.resource_key)
-                .ok_or_else(|| invariant("committed view omitted a staged resource head"))?;
-            if head != &transition.next_head {
-                return Err(invariant("committed resource head changed before finalize"));
-            }
-            let key_bytes = canonical_json_bytes(&head.resource_key).map_err(canonical_error)?;
-            let key_digest = sha256_hex(&key_bytes);
-            let head_bytes = canonical_json_bytes(head).map_err(canonical_error)?;
-            let head_digest = head.digest()?;
-            head_digests.push((key_digest.clone(), head_digest.clone()));
-            transaction
-                .execute(
-                    r#"
-                    INSERT INTO economic_state_stage_heads (
-                        batch_id, resource_key_digest, resource_key_json,
-                        head_digest, head_json
-                    ) VALUES (?1, ?2, ?3, ?4, ?5)
-                    "#,
-                    params![batch_id, &key_digest, &key_bytes, &head_digest, &head_bytes],
-                )
-                .map_err(sqlite_error)?;
-            let checkpoint_sequence =
-                sqlite_i64(record.batch.checkpoint_sequence, "checkpoint_sequence")?;
-            let current = transaction
-                .query_row(
-                    r#"
-                    SELECT resource_key_json, head_digest, head_json,
-                           checkpoint_sequence, checkpoint_digest, source_batch_id
-                    FROM economic_state_heads WHERE resource_key_digest = ?1
-                    "#,
-                    [&key_digest],
-                    |row| {
-                        Ok((
-                            row.get::<_, Vec<u8>>(0)?,
-                            row.get::<_, String>(1)?,
-                            row.get::<_, Vec<u8>>(2)?,
-                            row.get::<_, i64>(3)?,
-                            row.get::<_, String>(4)?,
-                            row.get::<_, String>(5)?,
-                        ))
-                    },
-                )
-                .optional()
-                .map_err(sqlite_error)?;
-            let publish = match current {
-                Some((
-                    current_key,
-                    current_head_digest,
-                    current_head,
-                    current_sequence,
-                    current_checkpoint,
-                    current_batch,
-                )) if current_sequence == checkpoint_sequence => {
-                    if current_key != key_bytes
-                        || current_head_digest != head_digest
-                        || current_head != head_bytes
-                        || current_checkpoint != record.batch.checkpoint_digest
-                        || current_batch != batch_id
-                    {
-                        return Err(invariant(
-                            "equal economic checkpoint has conflicting cached state",
-                        ));
-                    }
-                    false
-                }
-                Some((_, _, _, current_sequence, _, _))
-                    if current_sequence > checkpoint_sequence =>
-                {
-                    false
-                }
-                _ => true,
-            };
-            if publish {
-                transaction
-                    .execute(
-                        r#"
-                    INSERT INTO economic_state_heads (
-                        resource_key_digest, resource_key_json, head_digest,
-                        head_json, checkpoint_sequence, checkpoint_digest,
-                        source_batch_id
-                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-                    ON CONFLICT(resource_key_digest) DO UPDATE SET
-                        resource_key_json = excluded.resource_key_json,
-                        head_digest = excluded.head_digest,
-                        head_json = excluded.head_json,
-                        checkpoint_sequence = excluded.checkpoint_sequence,
-                        checkpoint_digest = excluded.checkpoint_digest,
-                        source_batch_id = excluded.source_batch_id
-                    WHERE economic_state_heads.checkpoint_sequence
-                        < excluded.checkpoint_sequence
-                    "#,
-                        params![
-                            &key_digest,
-                            &key_bytes,
-                            &head_digest,
-                            &head_bytes,
-                            checkpoint_sequence,
-                            &record.batch.checkpoint_digest,
-                            batch_id,
-                        ],
-                    )
-                    .map_err(sqlite_error)?;
-            }
-        }
-        head_digests.sort();
-        record.status = EconomicStateStageStatus::DbFinalized;
-        record.version = next_version(record.version)?;
-        record.updated_at_unix_ms = monotonic_time(&record, trusted_now_unix_ms)?;
-        record.snapshot_digest = stage_snapshot_digest(&record, &head_digests)?;
-        update_stage(
+        let record = finalize_stage_in_transaction(
             &transaction,
-            &record,
-            None,
-            None,
-            EconomicStateStageStatus::EconomicAnchorAdvanced,
+            batch_id,
+            &self.serving_owner,
+            trusted_now_unix_ms,
         )?;
-        append_stage_commit(&transaction, &record, "finalize_stage", &self.serving_owner)?;
         self.commit_write(transaction)?;
         self.sync_after_write(&connection)?;
         Ok(record)
@@ -863,6 +1268,13 @@ impl SqliteEconomicStateCache {
         let transaction = self.begin_write(&mut connection, active_fence)?;
         let mut record =
             load_stage_tx(&transaction, batch_id)?.ok_or(EconomicStateCacheError::NotFound)?;
+        if is_protected_channel_stage(&record)
+            || record.descriptor.as_ref().is_some_and(|descriptor| {
+                descriptor.kind == ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND
+            })
+        {
+            return Err(EconomicStateCacheError::Conflict);
+        }
         if record.status == target && record.reason.as_deref() == Some(reason) {
             transaction.commit().map_err(sqlite_error)?;
             return Ok(record);
@@ -1032,6 +1444,248 @@ impl SqliteEconomicStateCache {
     }
 }
 
+pub(crate) fn load_anchored_terminal_projection_in_transaction(
+    transaction: &Transaction<'_>,
+    batch_id: &str,
+    active_fence: &StoreMutationFence,
+    require_anchored: bool,
+) -> Result<
+    (
+        VerifiedAdmissionTerminalProjectionV1,
+        EconomicOperationStageBinding,
+    ),
+    EconomicStateCacheError,
+> {
+    validate_digest(batch_id, "batch_id")?;
+    verify_cache_sql_invariants(transaction)?;
+    let record = load_stage_tx(transaction, batch_id)?.ok_or(EconomicStateCacheError::NotFound)?;
+    if matches!(
+        record.status,
+        EconomicStateStageStatus::Discarded | EconomicStateStageStatus::Quarantined
+    ) || require_anchored
+        && !matches!(
+            record.status,
+            EconomicStateStageStatus::EconomicAnchorAdvanced
+                | EconomicStateStageStatus::DbFinalized
+        )
+    {
+        return Err(EconomicStateCacheError::Conflict);
+    }
+    let descriptor = record
+        .descriptor
+        .as_ref()
+        .ok_or(EconomicStateCacheError::Conflict)?;
+    let envelope = descriptor.decode::<SignedAdmissionTerminalProjectionV1>()?;
+    let verified = envelope
+        .verify()
+        .map_err(|_| EconomicStateCacheError::Conflict)?;
+    let context = verified.context();
+    let source = verified.source_operation();
+    let operation_id = source.binding().operation_id().as_str();
+    let binding = record
+        .operation_binding
+        .as_ref()
+        .ok_or(EconomicStateCacheError::Conflict)?;
+    qualify_retained_terminal_projection_advance(
+        &record.base_view,
+        &record.batch,
+        descriptor,
+        &verified,
+    )?;
+    let committed_head_matches = match record.committed_view.as_ref() {
+        Some(committed) => committed_view_matches_batch(committed, &record.batch),
+        None => record.status == EconomicStateStageStatus::DbStaged,
+    };
+    let expected_claimant = format!("kernel:{}", verified.signer_key().to_hex());
+    if descriptor.kind != ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND
+        || descriptor.key != operation_id
+        || record.batch.operation_id.as_deref() != Some(operation_id)
+        || binding.operation_id != operation_id
+        || binding.operation_state != source.state()
+        || binding.operation_version != source.version()
+        || binding.coordinator_lease_epoch != source.coordinator_lease_epoch()
+        || binding.coordinator_lease_id != context.coordinator_lease_id.as_str()
+        || binding.recovery_claimant_id != expected_claimant
+        || binding.recovery_expires_at_unix_ms <= context.trusted_time_unix_ms
+        || !current_fence_serves_historical(&binding.store_fence, active_fence)
+        || context.store_fence != binding.store_fence
+        || context.trusted_time_unix_ms > record.created_at_unix_ms
+        || !committed_head_matches
+    {
+        return Err(EconomicStateCacheError::Conflict);
+    }
+    Ok((verified, binding.clone()))
+}
+
+pub(crate) fn has_reserved_terminal_stage(
+    transaction: &Transaction<'_>,
+    operation_id: &str,
+) -> Result<bool, EconomicStateCacheError> {
+    transaction
+        .query_row(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM economic_state_stages
+                WHERE descriptor_kind = ?1
+                  AND descriptor_key = ?2
+            )
+            "#,
+            params![ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND, operation_id],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)
+}
+
+fn current_fence_serves_historical(
+    historical: &StoreMutationFence,
+    current: &StoreMutationFence,
+) -> bool {
+    historical.store_uuid == current.store_uuid
+        && (historical == current || current.owner_epoch > historical.owner_epoch)
+}
+
+pub(crate) fn finalize_stage_in_transaction(
+    transaction: &Transaction<'_>,
+    batch_id: &str,
+    serving_owner: &SqliteServingOwner,
+    trusted_now_unix_ms: u64,
+) -> Result<EconomicStateStageRecord, EconomicStateCacheError> {
+    validate_digest(batch_id, "batch_id")?;
+    validate_trusted_time(trusted_now_unix_ms)?;
+    verify_cache_sql_invariants(transaction)?;
+    let mut record =
+        load_stage_tx(transaction, batch_id)?.ok_or(EconomicStateCacheError::NotFound)?;
+    if record.status == EconomicStateStageStatus::DbFinalized {
+        return Ok(record);
+    }
+    require_transition(record.status, EconomicStateStageStatus::DbFinalized)?;
+    let committed = record
+        .committed_view
+        .as_ref()
+        .ok_or_else(|| invariant("anchor-advanced stage omitted its committed view"))?;
+    let mut head_digests = Vec::with_capacity(record.batch.transitions.len());
+    for transition in &record.batch.transitions {
+        let head = committed
+            .heads
+            .iter()
+            .find(|head| head.resource_key == transition.resource_key)
+            .ok_or_else(|| invariant("committed view omitted a staged resource head"))?;
+        if head != &transition.next_head {
+            return Err(invariant("committed resource head changed before finalize"));
+        }
+        let key_bytes = canonical_json_bytes(&head.resource_key).map_err(canonical_error)?;
+        let key_digest = sha256_hex(&key_bytes);
+        let head_bytes = canonical_json_bytes(head).map_err(canonical_error)?;
+        let head_digest = head.digest()?;
+        head_digests.push((key_digest.clone(), head_digest.clone()));
+        transaction
+            .execute(
+                r#"
+                INSERT INTO economic_state_stage_heads (
+                    batch_id, resource_key_digest, resource_key_json,
+                    head_digest, head_json
+                ) VALUES (?1, ?2, ?3, ?4, ?5)
+                "#,
+                params![batch_id, &key_digest, &key_bytes, &head_digest, &head_bytes],
+            )
+            .map_err(sqlite_error)?;
+        let checkpoint_sequence =
+            sqlite_i64(record.batch.checkpoint_sequence, "checkpoint_sequence")?;
+        let current = transaction
+            .query_row(
+                r#"
+                SELECT resource_key_json, head_digest, head_json,
+                       checkpoint_sequence, checkpoint_digest, source_batch_id
+                FROM economic_state_heads WHERE resource_key_digest = ?1
+                "#,
+                [&key_digest],
+                |row| {
+                    Ok((
+                        row.get::<_, Vec<u8>>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, Vec<u8>>(2)?,
+                        row.get::<_, i64>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, String>(5)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(sqlite_error)?;
+        let publish = match current {
+            Some((
+                current_key,
+                current_head_digest,
+                current_head,
+                current_sequence,
+                current_checkpoint,
+                current_batch,
+            )) if current_sequence == checkpoint_sequence => {
+                if current_key != key_bytes
+                    || current_head_digest != head_digest
+                    || current_head != head_bytes
+                    || current_checkpoint != record.batch.checkpoint_digest
+                    || current_batch != batch_id
+                {
+                    return Err(invariant(
+                        "equal economic checkpoint has conflicting cached state",
+                    ));
+                }
+                false
+            }
+            Some((_, _, _, current_sequence, _, _)) if current_sequence > checkpoint_sequence => {
+                false
+            }
+            _ => true,
+        };
+        if publish {
+            transaction
+                .execute(
+                    r#"
+                INSERT INTO economic_state_heads (
+                    resource_key_digest, resource_key_json, head_digest,
+                    head_json, checkpoint_sequence, checkpoint_digest,
+                    source_batch_id
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                ON CONFLICT(resource_key_digest) DO UPDATE SET
+                    resource_key_json = excluded.resource_key_json,
+                    head_digest = excluded.head_digest,
+                    head_json = excluded.head_json,
+                    checkpoint_sequence = excluded.checkpoint_sequence,
+                    checkpoint_digest = excluded.checkpoint_digest,
+                    source_batch_id = excluded.source_batch_id
+                WHERE economic_state_heads.checkpoint_sequence
+                    < excluded.checkpoint_sequence
+                "#,
+                    params![
+                        &key_digest,
+                        &key_bytes,
+                        &head_digest,
+                        &head_bytes,
+                        checkpoint_sequence,
+                        &record.batch.checkpoint_digest,
+                        batch_id,
+                    ],
+                )
+                .map_err(sqlite_error)?;
+        }
+    }
+    head_digests.sort();
+    record.status = EconomicStateStageStatus::DbFinalized;
+    record.version = next_version(record.version)?;
+    record.updated_at_unix_ms = monotonic_time(&record, trusted_now_unix_ms)?;
+    record.snapshot_digest = stage_snapshot_digest(&record, &head_digests)?;
+    update_stage(
+        transaction,
+        &record,
+        None,
+        None,
+        EconomicStateStageStatus::EconomicAnchorAdvanced,
+    )?;
+    append_stage_commit(transaction, &record, "finalize_stage", serving_owner)?;
+    Ok(record)
+}
+
 pub(crate) fn initialize_economic_state_cache_schema(
     connection: &mut Connection,
 ) -> Result<(), EconomicStateCacheError> {
@@ -1108,6 +1762,9 @@ fn qualify_operation_binding(
         || lease.coordinator_lease_epoch() != operation.coordinator_lease_epoch()
         || lease.store_fence() != active_fence
         || trusted_now_unix_ms >= lease.expires_at_unix_ms()
+        || context
+            .not_after_unix_ms
+            .is_some_and(|not_after| trusted_now_unix_ms >= not_after)
     {
         return Err(EconomicStateCacheError::Fenced);
     }
@@ -1156,7 +1813,7 @@ fn qualify_operation_binding(
     if stored != *operation || !exact_claim {
         return Err(EconomicStateCacheError::Fenced);
     }
-    Ok(Some(EconomicOperationStageBinding {
+    let binding = EconomicOperationStageBinding {
         operation_id: operation.binding().operation_id().as_str().to_owned(),
         operation_state: operation.state(),
         operation_version: operation.version(),
@@ -1164,8 +1821,11 @@ fn qualify_operation_binding(
         coordinator_lease_id: lease.coordinator_lease_id().as_str().to_owned(),
         recovery_claimant_id: lease.claimant_id().as_str().to_owned(),
         recovery_expires_at_unix_ms: lease.expires_at_unix_ms(),
+        not_after_unix_ms: context.not_after_unix_ms,
         store_fence: active_fence.clone(),
-    }))
+    };
+    binding.validate()?;
+    Ok(Some(binding))
 }
 
 fn validate_descriptor_text(

@@ -1,15 +1,31 @@
+use chio_core::capability::scope::MonetaryAmount;
 use chio_core::crypto::PublicKey;
+use chio_core::economic_continuity::{
+    EconomicAdmissionHandoffStateV1, EconomicContentV1, EconomicEffectSlotV1,
+    EconomicResourceKeyV1, EconomicStateAnchorViewV1, EconomicStateBatchV1,
+    VerifiedEconomicStateBatchAdvance,
+};
 use chio_core::receipt::{body::ChioReceipt, decision::Decision};
+use chio_settle::channel::{
+    derive_channel_receipt_authority_digest, ChannelEscrowReservationViewV1,
+    ChannelLifecycleViewV1, SignedChannelReservationV1, SignedChannelStateV1,
+    VerifiedChannelTerminalAdvanceV1, CHANNEL_ESCROW_RESERVATION_RESOURCE_FAMILY,
+};
 
 use crate::receipt_store::{AuthorizationReceiptConsumption, PendingSettlementObservation};
 use crate::tool_outcome::{
-    ToolOutcomeTerminalEvidenceV1, VerifiedPreDispatchNoEffect, VerifiedTransportNotAccepted,
+    SettlementDispositionV1, ToolOutcomeTerminalEvidenceV1, VerifiedPreDispatchNoEffect,
+    VerifiedTransportNotAccepted,
 };
 
 use super::*;
 
 mod participant_evidence;
 pub use participant_evidence::*;
+mod channel_terminal;
+pub use channel_terminal::*;
+mod channel_terminal_authority;
+pub use channel_terminal_authority::*;
 mod economic_cancellation;
 pub use economic_cancellation::*;
 mod pre_dispatch_compensation;
@@ -113,9 +129,9 @@ impl VerifiedAdmissionReceipt {
         )
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "admission-test-support"))]
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn from_kernel_verified_for_test(
+    pub fn from_kernel_verified_for_test(
         receipt: ChioReceipt,
         expected_kernel_public_key: &PublicKey,
         expected_decision: &Decision,
@@ -193,7 +209,7 @@ impl VerifiedAdmissionReceipt {
         &self.0
     }
 
-    fn validate_against(
+    pub(crate) fn validate_against(
         &self,
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
@@ -222,6 +238,7 @@ pub struct AdmissionProjectionCapabilities {
     pub outcome_eligibility: bool,
     pub observation_attempt_zero: bool,
     pub obligation: bool,
+    pub channel_terminal: bool,
     pub economic_mutation_terminal: bool,
 }
 
@@ -263,7 +280,11 @@ impl AdmissionProjectionCapabilities {
                     !requirements.observation_attempt_zero || self.observation_attempt_zero,
                     "observation_attempt_zero",
                 )?;
-                require(!requirements.obligation || self.obligation, "obligation")
+                require(!requirements.obligation || self.obligation, "obligation")?;
+                require(
+                    !requirements.channel || self.channel_terminal,
+                    "channel_terminal",
+                )
             }
             AdmissionTerminalProjection::CompensatedBeforeDispatch { evidence, .. }
             | AdmissionTerminalProjection::NotAcceptedAfterDispatchCommit { evidence, .. } => {
@@ -296,6 +317,7 @@ pub enum AdmissionProjectionRecordKind {
     OutcomeEligibility,
     ObservationAttemptZero,
     Obligation,
+    ChannelTerminal,
     ReleaseProof,
     EconomicMutationResult,
     MutationAudit,
@@ -313,6 +335,7 @@ impl AdmissionProjectionRecordKind {
             Self::OutcomeEligibility => "outcome_eligibility",
             Self::ObservationAttemptZero => "observation_attempt_zero",
             Self::Obligation => "obligation",
+            Self::ChannelTerminal => "channel_terminal",
             Self::ReleaseProof => "release_proof",
             Self::EconomicMutationResult => "economic_mutation_result",
             Self::MutationAudit => "mutation_audit",
@@ -507,7 +530,7 @@ impl AdmissionProjectionContext {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AdmissionExactProjectionBindingV1 {
     operation_id: AdmissionOperationId,
     request_id: AdmissionIdentifier,
@@ -544,7 +567,7 @@ impl AdmissionExactProjectionBindingV1 {
         })
     }
 
-    fn validate_against(
+    pub(in crate::admission_operation) fn validate_against(
         &self,
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
@@ -566,6 +589,36 @@ impl AdmissionExactProjectionBindingV1 {
             return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
         }
         Ok(())
+    }
+
+    #[must_use]
+    pub const fn operation_id(&self) -> &AdmissionOperationId {
+        &self.operation_id
+    }
+
+    #[must_use]
+    pub const fn request_id(&self) -> &AdmissionIdentifier {
+        &self.request_id
+    }
+
+    #[must_use]
+    pub const fn request_binding_hash(&self) -> &AdmissionDigest {
+        &self.request_binding_hash
+    }
+
+    #[must_use]
+    pub const fn source_operation_version(&self) -> u64 {
+        self.source_operation_version
+    }
+
+    #[must_use]
+    pub const fn projected_operation_version(&self) -> u64 {
+        self.projected_operation_version
+    }
+
+    #[must_use]
+    pub const fn store_fence(&self) -> &StoreMutationFence {
+        &self.store_fence
     }
 }
 
@@ -943,7 +996,6 @@ pub struct ObservationAttemptZero {
 }
 
 impl ObservationAttemptZero {
-    #[allow(dead_code)]
     pub(crate) fn from_verified(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
@@ -971,6 +1023,17 @@ impl ObservationAttemptZero {
             outcome_id,
             outcome_version,
         })
+    }
+
+    #[cfg(feature = "admission-test-support")]
+    pub fn from_verified_for_test(
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+        receipt: &VerifiedAdmissionReceipt,
+        outcome_id: AdmissionDigest,
+        outcome_version: u64,
+    ) -> Result<Self, AdmissionOperationError> {
+        Self::from_verified(operation, context, receipt, outcome_id, outcome_version)
     }
 
     pub(super) fn validate_against(
@@ -1019,17 +1082,27 @@ pub struct AdmissionCompletedProjection {
     pub eligibility: Option<OutcomeEligibilityFinalization>,
     pub observer_work: Option<ObservationAttemptZero>,
     pub obligation: Option<ObligationProjection>,
+    pub channel_terminal: Option<VerifiedChannelTerminalProjectionV1>,
 }
 
 pub(super) fn validate_completed_participant_presence(
     requirements: AdmissionParticipantRequirements,
     completed: &AdmissionCompletedProjection,
 ) -> Result<(), AdmissionOperationError> {
+    let obligation_required = if requirements.channel {
+        completed
+            .channel_terminal
+            .as_ref()
+            .is_some_and(|channel| channel.actual_charge().units > 0)
+    } else {
+        requirements.obligation
+    };
     if completed.payment_evidence.is_some() != requirements.payment
         || completed.authorization.is_some() != requirements.authorization_consumption
         || completed.eligibility.is_some() != requirements.outcome_eligibility
         || completed.observer_work.is_some() != requirements.observation_attempt_zero
-        || completed.obligation.is_some() != requirements.obligation
+        || completed.channel_terminal.is_some() != requirements.channel
+        || completed.obligation.is_some() != obligation_required
     {
         return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
     }
@@ -1198,6 +1271,14 @@ impl AdmissionTerminalProjection {
         }
     }
 
+    #[must_use]
+    pub const fn requires_anchored_economic_commit(&self) -> bool {
+        matches!(
+            self,
+            Self::Completed(projection) if projection.channel_terminal.is_some()
+        )
+    }
+
     pub fn canonical_projection(
         &self,
     ) -> Result<CanonicalAdmissionTerminalProjection, AdmissionOperationError> {
@@ -1318,6 +1399,13 @@ impl AdmissionTerminalProjection {
                         AdmissionProjectionRecordKind::Obligation,
                         operation_record_id()?,
                         obligation,
+                    )?);
+                }
+                if let Some(channel) = &completed.channel_terminal {
+                    records.push(canonical_projection_record(
+                        AdmissionProjectionRecordKind::ChannelTerminal,
+                        channel.record_id().clone(),
+                        channel,
                     )?);
                 }
             }
@@ -1538,6 +1626,19 @@ impl AdmissionOperationV1 {
                         outcome_version,
                     )?;
                 }
+                if let Some(channel) = &completed.channel_terminal {
+                    let tool_outcome = completed
+                        .tool_outcome
+                        .as_ref()
+                        .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+                    channel.validate_against(
+                        self,
+                        context,
+                        &completed.receipt,
+                        tool_outcome,
+                        completed.obligation.as_ref(),
+                    )?;
+                }
                 completed.receipt.validate_against(
                     self,
                     context,
@@ -1715,3 +1816,7 @@ pub(super) fn validate_terminal_replay(
         Err(AdmissionOperationError::TerminalReplayMismatch)
     }
 }
+
+#[cfg(test)]
+#[path = "projection/channel_terminal_tests.rs"]
+mod channel_terminal_projection_tests;

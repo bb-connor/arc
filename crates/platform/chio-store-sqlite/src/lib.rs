@@ -32,6 +32,8 @@ pub mod authority;
 pub mod batch_approval_store;
 pub mod budget_store;
 pub mod capability_lineage;
+pub mod channel_lifecycle_store;
+pub mod channel_release_publisher_store;
 pub mod clearing_lifecycle_store;
 pub mod dead_letters;
 pub mod economic_state_cache;
@@ -184,16 +186,25 @@ fn sqlite_uri_filesystem_path(text: &str) -> PathBuf {
     PathBuf::from(filesystem)
 }
 
-pub use admission_operation_store::SqliteAdmissionOperationStore;
+pub use admission_operation_store::{DurableObligationV1, SqliteAdmissionOperationStore};
 pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use batch_approval_store::SqliteBatchApprovalStore;
 pub use budget_store::{BudgetStoreSnapshot, SqliteBudgetStore};
+pub use channel_lifecycle_store::{
+    ChannelLifecycleStoreError, ChannelPreparedAdmissionRecordV1, ChannelPreparedBeginResult,
+    ChannelReservationDispositionV1, ChannelReservationStageRecordV1, SqliteChannelLifecycleStore,
+};
+pub use channel_release_publisher_store::{
+    ChannelReleasePublicationRecordV1, ChannelReleasePublicationStatusV1,
+    ChannelReleasePublisherError, ChannelReleaseSubmissionOutcomeV1,
+    SqliteChannelReleasePublisherStore, VerifiedChannelReleasePublicationV1,
+};
 pub use clearing_lifecycle_store::{ClearingLifecycleStoreError, SqliteClearingLifecycleStore};
 pub use economic_state_cache::{
-    EconomicOperationStageBinding, EconomicOperationStageContext, EconomicStateCacheError,
-    EconomicStateStageDescriptor, EconomicStateStageRecord, EconomicStateStageStatus,
-    SqliteEconomicStateCache,
+    admission_terminal_projection_effect_result, EconomicOperationStageBinding,
+    EconomicOperationStageContext, EconomicStateCacheError, EconomicStateStageDescriptor,
+    EconomicStateStageRecord, EconomicStateStageStatus, SqliteEconomicStateCache,
 };
 pub use encrypted_blob::{
     decrypt_blob, encrypt_blob, BlobHandle, BlobStoreError, DecryptError, EncryptError,
@@ -335,6 +346,60 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
         limit: usize,
     ) -> Result<Vec<chio_core::receipt::body::ChioReceipt>, chio_kernel::ReceiptStoreError> {
         self.list_terminal_receipts_after(after_receipt_id, limit)
+    }
+}
+
+impl chio_kernel::receipt_store::AnchoredAdmissionProjectionStore
+    for admission_operation_store::SqliteAdmissionOperationStore
+{
+    fn stage_anchored_terminal_projection(
+        &self,
+        advance: &chio_core::economic_continuity::VerifiedEconomicStateBatchAdvance,
+        recovery_lease: &chio_kernel::admission_operation::AdmissionRecoveryLease,
+        envelope: &chio_kernel::admission_operation::SignedAdmissionTerminalProjectionV1,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), chio_kernel::ReceiptStoreError> {
+        admission_operation_store::SqliteAdmissionOperationStore::stage_anchored_terminal_projection(
+            self,
+            advance,
+            recovery_lease,
+            envelope,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map_err(admission_operation_store::receipt_projection_error)
+    }
+
+    fn qualify_anchored_terminal_projection(
+        &self,
+        batch_id: &str,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), chio_kernel::ReceiptStoreError> {
+        admission_operation_store::SqliteAdmissionOperationStore::qualify_anchored_terminal_projection(
+            self,
+            batch_id,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map_err(admission_operation_store::receipt_projection_error)
+    }
+
+    fn commit_anchored_terminal_projection(
+        &self,
+        batch_id: &str,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<chio_kernel::admission_operation::AdmissionTerminal, chio_kernel::ReceiptStoreError>
+    {
+        admission_operation_store::SqliteAdmissionOperationStore::commit_anchored_terminal_projection(
+            self,
+            batch_id,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map_err(admission_operation_store::receipt_projection_error)
     }
 }
 pub use settle_attempts::{SqliteSettlementOutcomeStore, SETTLE_ATTEMPTS_MIGRATION};

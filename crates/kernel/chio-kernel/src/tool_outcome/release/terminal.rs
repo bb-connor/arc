@@ -1,6 +1,16 @@
 //! Closed terminal outcome/evaluation projection evidence.
 
 use super::*;
+use crate::admission_operation::VerifiedAdmissionReceipt;
+use crate::Keypair;
+use chio_core::canonical::canonical_json_bytes;
+use chio_core::crypto::sha256_hex;
+use chio_core::economic_continuity::{EconomicContentV1, EconomicTerminalResultV1};
+use chio_settle::channel::{
+    verify_channel_terminal_outcome_commitment, ChannelTerminalOutcomeCommitmentBodyV1,
+    SignedChannelTerminalOutcomeCommitmentV1, VerifiedAdmittedChannelReservationV1,
+    CHANNEL_TERMINAL_OUTCOME_COMMITMENT_SCHEMA,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ToolOutcomeTerminalEvidenceV1 {
@@ -30,7 +40,16 @@ pub struct ToolOutcomeTerminalEvidenceV1 {
 }
 
 impl ToolOutcomeTerminalEvidenceV1 {
-    #[allow(dead_code)]
+    #[cfg(feature = "admission-test-support")]
+    pub fn from_records_for_test(
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+        outcome: &ToolOutcomeRecordV1,
+        evaluation: &PostReturnEvaluationRecordV1,
+    ) -> Result<Self, ToolOutcomeError> {
+        Self::from_records(operation, context, outcome, evaluation)
+    }
+
     pub(crate) fn from_records(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
@@ -162,16 +181,94 @@ impl ToolOutcomeTerminalEvidenceV1 {
     pub(crate) fn resolved_output_digest(&self) -> &AdmissionDigest {
         &self.resolved_output_digest
     }
+
+    pub(crate) const fn settlement_disposition(&self) -> &SettlementDispositionV1 {
+        &self.settlement_disposition
+    }
 }
 
-mod durable_outcome_authority_sealed {
-    pub trait Sealed {}
+#[cfg(feature = "admission-test-support")]
+pub fn sign_channel_terminal_outcome_commitment_for_test(
+    operation: &AdmissionOperationV1,
+    reservation: &VerifiedAdmittedChannelReservationV1,
+    receipt: &VerifiedAdmissionReceipt,
+    tool_outcome: &ToolOutcomeTerminalEvidenceV1,
+    context: &AdmissionProjectionContext,
+    kernel_keypair: &Keypair,
+) -> Result<SignedChannelTerminalOutcomeCommitmentV1, ToolOutcomeError> {
+    sign_channel_terminal_outcome_commitment(
+        operation,
+        reservation,
+        receipt,
+        tool_outcome,
+        context,
+        kernel_keypair,
+    )
 }
 
-#[allow(dead_code)]
-pub(crate) trait QualifiedDurableOutcomeAuthority:
-    durable_outcome_authority_sealed::Sealed + Send + Sync
-{
+pub(crate) fn sign_channel_terminal_outcome_commitment(
+    operation: &AdmissionOperationV1,
+    reservation: &VerifiedAdmittedChannelReservationV1,
+    receipt: &VerifiedAdmissionReceipt,
+    tool_outcome: &ToolOutcomeTerminalEvidenceV1,
+    context: &AdmissionProjectionContext,
+    kernel_keypair: &Keypair,
+) -> Result<SignedChannelTerminalOutcomeCommitmentV1, ToolOutcomeError> {
+    let mismatch = || ToolOutcomeError::Binding("channel_terminal_outcome_commitment");
+    tool_outcome.validate_against(operation, context)?;
+    receipt
+        .validate_against(
+            operation,
+            context,
+            AdmissionOperationState::Completed,
+            crate::admission_operation::AdmissionCompensationStatus::NotCompensated,
+            Some((tool_outcome.outcome_id(), tool_outcome.outcome_version())),
+        )
+        .map_err(|_| mismatch())?;
+    if reservation.artifact().body.operation_id != operation.binding().operation_id().as_str() {
+        return Err(mismatch());
+    }
+    let result = EconomicContentV1::Inline {
+        value: serde_json::to_value(tool_outcome)
+            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
+    };
+    let terminal_result = EconomicTerminalResultV1 {
+        result_id: tool_outcome.outcome_id.as_str().to_owned(),
+        result_digest: result.digest().map_err(|_| mismatch())?,
+        result,
+    };
+    let receipt_digest = sha256_hex(
+        &canonical_json_bytes(receipt.receipt())
+            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
+    );
+    let body = ChannelTerminalOutcomeCommitmentBodyV1 {
+        schema: CHANNEL_TERMINAL_OUTCOME_COMMITMENT_SCHEMA.to_owned(),
+        operation_id: reservation.artifact().body.operation_id.clone(),
+        reservation_id: reservation.artifact().body.reservation_id.clone(),
+        reservation_digest: reservation.artifact().digest().map_err(|_| mismatch())?,
+        receipt_id: receipt.receipt().id.clone(),
+        receipt_digest,
+        terminal_result,
+        outcome_recorded_at_unix_ms: tool_outcome.outcome_recorded_at_unix_ms,
+        terminalized_at_unix_ms: context.trusted_time_unix_ms,
+    };
+    let kernel_signature = kernel_keypair.sign(&body.signing_bytes().map_err(|_| mismatch())?);
+    let signed = SignedChannelTerminalOutcomeCommitmentV1 {
+        body,
+        kernel_key: kernel_keypair.public_key(),
+        kernel_signature,
+    };
+    verify_channel_terminal_outcome_commitment(
+        &signed,
+        &kernel_keypair.public_key(),
+        reservation,
+        receipt.receipt(),
+    )
+    .map_err(|_| mismatch())?;
+    Ok(signed)
+}
+
+pub(crate) trait QualifiedDurableOutcomeAuthority: Send + Sync {
     fn verify_terminal_outcome(
         &self,
         operation: &AdmissionOperationV1,

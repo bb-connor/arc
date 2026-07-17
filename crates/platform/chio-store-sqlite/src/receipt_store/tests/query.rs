@@ -1,5 +1,71 @@
 use super::super::*;
 use super::support::*;
+use chio_kernel::ReceiptStore;
+
+#[test]
+fn bounded_cost_page_and_count_queries_use_scope_appropriate_indexes() {
+    let path = unique_db_path("chio-receipts-cost-query-plan");
+    let store = SqliteReceiptStore::open(&path).test_unwrap();
+    let query = ReceiptQuery {
+        min_cost: Some(100),
+        max_cost: Some(200),
+        cost_currency: Some("USD".to_string()),
+        tenant_filter: Some("tenant-a".to_string()),
+        read_context: Some(chio_kernel::ReceiptReadContext::admin_service()),
+        ..ReceiptQuery::default()
+    };
+    let min_cost = 100_u64.to_be_bytes();
+    let max_cost = 200_u64.to_be_bytes();
+    let connection = store.connection().test_unwrap();
+
+    for (tenant_fragment, tenant, expected_index) in [
+        (
+            "(r.tenant_id = ?12)",
+            Some("tenant-a"),
+            "idx_chio_tool_receipts_cost",
+        ),
+        ("(?12 IS NULL)", None, "idx_chio_tool_receipts_cost_global"),
+    ] {
+        let (data_sql, count_sql) =
+            crate::receipt_store::evidence_retention::receipt_query_sql(&query, tenant_fragment)
+                .test_unwrap();
+        for sql in [data_sql, count_sql] {
+            let plan = connection
+                .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+                .test_unwrap()
+                .query_map(
+                    rusqlite::params![
+                        None::<String>,
+                        None::<String>,
+                        None::<String>,
+                        None::<String>,
+                        None::<i64>,
+                        None::<i64>,
+                        min_cost.as_slice(),
+                        max_cost.as_slice(),
+                        None::<String>,
+                        None::<i64>,
+                        50_i64,
+                        tenant,
+                        "USD",
+                    ],
+                    |row| row.get::<_, String>(3),
+                )
+                .test_unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .test_unwrap()
+                .join("\n");
+            assert!(
+                plan.split_whitespace().any(|token| token == expected_index),
+                "unexpected query plan: {plan}"
+            );
+        }
+    }
+
+    drop(connection);
+    drop(store);
+    let _ = fs::remove_file(path);
+}
 
 #[test]
 fn sqlite_receipt_store_lists_filtered_receipts() {

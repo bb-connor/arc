@@ -12,7 +12,7 @@
 use std::sync::Arc;
 
 use chio_core::crypto::PublicKey;
-use chio_core::receipt::body::ChioReceipt;
+use chio_core::receipt::{body::ChioReceipt, economics::ChannelReceiptMetadataV1};
 use chio_settle::{
     SettlementFailureClass, SettlementFailureCode, SettlementFailureReason, SettlementHook,
     SettlementHookError, SettlementObservation, SettlementOutcome, SettlementSkipReason,
@@ -118,6 +118,38 @@ pub fn build_observation(
             "receipt signer is not trusted",
         );
     }
+    let metadata = receipt.metadata.as_ref();
+    let channelized = if let Some(channel_value) = metadata.and_then(|value| value.get("channel")) {
+        match serde_json::from_value::<ChannelReceiptMetadataV1>(channel_value.clone()) {
+            Ok(channel) if channel.is_valid() => true,
+            Ok(_) | Err(_) => {
+                return permanent(
+                    SettlementFailureCode::InvalidObservation,
+                    "channel metadata is malformed",
+                );
+            }
+        }
+    } else {
+        false
+    };
+    if channelized {
+        if !receipt.is_allowed() && !receipt.is_denied() {
+            return permanent(
+                SettlementFailureCode::InvalidObservation,
+                "receipt does not contain an authorized terminal decision",
+            );
+        }
+        if receipt.financial_metadata().is_none() {
+            return permanent(
+                SettlementFailureCode::MalformedFinancialMetadata,
+                "channel financial metadata is malformed",
+            );
+        }
+        return permanent(
+            SettlementFailureCode::InvalidObservation,
+            "channel settlement handler is not configured",
+        );
+    }
     if receipt.is_denied() {
         return SettlementObservationBuild::Skipped(SettlementSkipReason::Denied);
     }
@@ -128,7 +160,7 @@ pub fn build_observation(
         );
     }
 
-    let Some(metadata) = receipt.metadata.as_ref() else {
+    let Some(metadata) = metadata else {
         return SettlementObservationBuild::Skipped(SettlementSkipReason::NoEconomicIntent);
     };
     let Some(financial_value) = metadata.get("financial") else {
@@ -236,7 +268,8 @@ mod tests {
     use chio_core::capability::scope::MonetaryAmount;
     use chio_core::crypto::Keypair;
     use chio_core::receipt::{
-        body::ChioReceiptBody, decision::Decision, decision::ToolCallAction, kinds::TrustLevel,
+        body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
+        economics::CHIO_CHANNEL_RECEIPT_METADATA_SCHEMA, kinds::TrustLevel,
         metadata::GuardEvidence,
     };
 
@@ -280,6 +313,18 @@ mod tests {
             bbs_projection_version: None,
         };
         ChioReceipt::sign(body, &kp).expect("test receipt signs")
+    }
+
+    fn channel_metadata() -> serde_json::Value {
+        serde_json::json!({
+            "schema": CHIO_CHANNEL_RECEIPT_METADATA_SCHEMA,
+            "channelId": "a".repeat(64),
+            "openDigest": "b".repeat(64),
+            "reservationId": "c".repeat(64),
+            "reservationDigest": "d".repeat(64),
+            "sequence": 1,
+            "settlementMode": "channelized",
+        })
     }
 
     struct AcceptingHook;
@@ -368,6 +413,131 @@ mod tests {
         assert!(matches!(
             build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
             SettlementObservationBuild::Skipped(SettlementSkipReason::NoEconomicIntent)
+        ));
+    }
+
+    #[test]
+    fn build_observation_rejects_channelized_receipts_with_malformed_financial_metadata() {
+        let receipt = sign_with(
+            serde_json::json!({
+                "channel": channel_metadata(),
+                "financial": "invalid"
+            }),
+            Decision::Allow,
+        );
+        assert!(matches!(
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+            SettlementObservationBuild::Permanent(ref reason)
+                if reason.code() == SettlementFailureCode::MalformedFinancialMetadata
+        ));
+    }
+
+    #[test]
+    fn build_observation_rejects_channelized_receipts_without_financial_metadata() {
+        let receipt = sign_with(
+            serde_json::json!({"channel": channel_metadata()}),
+            Decision::Allow,
+        );
+        assert!(matches!(
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+            SettlementObservationBuild::Permanent(ref reason)
+                if reason.code() == SettlementFailureCode::MalformedFinancialMetadata
+        ));
+    }
+
+    #[test]
+    fn build_observation_rejects_denied_channelized_receipts_without_a_channel_handler() {
+        let receipt = sign_with(
+            serde_json::json!({
+                "channel": channel_metadata(),
+                "financial": {
+                    "grant_index": 0,
+                    "cost_charged": 0,
+                    "currency": "USD",
+                    "budget_remaining": 1000,
+                    "budget_total": 1000,
+                    "delegation_depth": 0,
+                    "root_budget_holder": "payer",
+                    "settlement_status": "not_applicable"
+                }
+            }),
+            Decision::Deny {
+                reason: "denied".to_owned(),
+                guard: "G".to_owned(),
+            },
+        );
+        assert!(matches!(
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+            SettlementObservationBuild::Permanent(ref reason)
+                if reason.code() == SettlementFailureCode::InvalidObservation
+        ));
+    }
+
+    #[test]
+    fn build_observation_rejects_channelized_receipts_without_a_channel_handler() {
+        let receipt = sign_with(
+            serde_json::json!({
+                "channel": channel_metadata(),
+                "financial": {
+                    "grant_index": 0,
+                    "cost_charged": 250,
+                    "currency": "USD",
+                    "budget_remaining": 750,
+                    "budget_total": 1000,
+                    "delegation_depth": 0,
+                    "root_budget_holder": "payer",
+                    "settlement_status": "pending"
+                }
+            }),
+            Decision::Allow,
+        );
+        assert!(matches!(
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+            SettlementObservationBuild::Permanent(ref reason)
+                if reason.code() == SettlementFailureCode::InvalidObservation
+        ));
+    }
+
+    #[test]
+    fn build_observation_rejects_malformed_channel_metadata() {
+        let receipt = sign_with(
+            serde_json::json!({
+                "channel": {"schema": CHIO_CHANNEL_RECEIPT_METADATA_SCHEMA},
+                "financial": {"cost_charged": 250, "currency": "USD"}
+            }),
+            Decision::Allow,
+        );
+        assert!(matches!(
+            build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+            SettlementObservationBuild::Permanent(ref reason)
+                if reason.code() == SettlementFailureCode::InvalidObservation
+        ));
+    }
+
+    #[test]
+    fn build_observation_validates_integrity_and_trust_before_channel_skip() {
+        let mut invalid_signature = sign_with(
+            serde_json::json!({"channel": channel_metadata()}),
+            Decision::Allow,
+        );
+        invalid_signature.tool_name = "tampered".to_string();
+        assert!(matches!(
+            build_observation(
+                &invalid_signature,
+                std::slice::from_ref(&invalid_signature.kernel_key)
+            ),
+            SettlementObservationBuild::Permanent(ref reason)
+                if reason.code() == SettlementFailureCode::InvalidReceiptSignature
+        ));
+
+        let untrusted = sign_with(
+            serde_json::json!({"channel": channel_metadata()}),
+            Decision::Allow,
+        );
+        assert!(matches!(
+            build_observation(&untrusted, &[]),
+            SettlementObservationBuild::Permanent(ref reason)
+                if reason.code() == SettlementFailureCode::UntrustedReceiptSigner
         ));
     }
 

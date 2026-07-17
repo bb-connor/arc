@@ -7,6 +7,7 @@ use super::registry::frost_action_registration;
 pub const CHIO_FROST_AUTHORIZATION_BODY_SCHEMA: &str = "chio.frost.authorization-body.v1";
 pub const CHIO_FROST_AUTHORIZATION_SIGNING_PREFIX: &[u8] = b"CHIO-FROST-AUTHORIZATION-V1\0";
 const CHIO_FROST_AUTHORIZATION_ID_PREFIX: &[u8] = b"chio.frost.authorization.id.v1\0";
+const IJSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FrostAuthorizationDomain {
@@ -162,9 +163,11 @@ impl FrostAuthorizationBodyV1 {
         validate_identifier(&self.resource_id, "resource_id")?;
         validate_digest(&self.action_digest, "action_digest")?;
         validate_digest(&self.roster_digest, "roster_digest")?;
-        validate_nonzero(self.resource_version, "resource_version")?;
-        validate_nonzero(self.resource_fence, "resource_fence")?;
-        validate_nonzero(self.key_epoch, "key_epoch")?;
+        validate_positive_safe_integer(self.resource_version, "resource_version")?;
+        validate_positive_safe_integer(self.resource_fence, "resource_fence")?;
+        validate_positive_safe_integer(self.key_epoch, "key_epoch")?;
+        validate_safe_integer(self.issued_at, "issued_at")?;
+        validate_safe_integer(self.expires_at, "expires_at")?;
         if self.issued_at >= self.expires_at {
             return Err(FrostAuthorizationError::InvalidField {
                 field: "expires_at",
@@ -284,14 +287,27 @@ pub(super) fn validate_digest(
     Ok(())
 }
 
-pub(super) fn validate_nonzero(
+pub(super) fn validate_positive_safe_integer(
     value: u64,
     field: &'static str,
 ) -> Result<(), FrostAuthorizationError> {
-    if value == 0 {
+    if value == 0 || value > IJSON_MAX_SAFE_INTEGER {
         return Err(FrostAuthorizationError::InvalidField {
             field,
-            detail: "must be non-zero",
+            detail: "must be a positive I-JSON safe integer",
+        });
+    }
+    Ok(())
+}
+
+pub(super) fn validate_safe_integer(
+    value: u64,
+    field: &'static str,
+) -> Result<(), FrostAuthorizationError> {
+    if value > IJSON_MAX_SAFE_INTEGER {
+        return Err(FrostAuthorizationError::InvalidField {
+            field,
+            detail: "must be an I-JSON safe integer",
         });
     }
     Ok(())
@@ -306,6 +322,21 @@ pub(super) fn validate_positive_base_units(
         return Err(FrostAuthorizationError::InvalidField {
             field,
             detail: "must be a canonical positive base-unit integer",
+        });
+    }
+    Ok(())
+}
+
+pub(super) fn validate_base_units(
+    value: &str,
+    field: &'static str,
+) -> Result<(), FrostAuthorizationError> {
+    validate_identifier(value, field)?;
+    if value.len() > 1 && value.starts_with('0') || !value.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return Err(FrostAuthorizationError::InvalidField {
+            field,
+            detail: "must be a canonical base-unit integer",
         });
     }
     Ok(())

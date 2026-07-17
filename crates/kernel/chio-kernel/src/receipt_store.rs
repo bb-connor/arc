@@ -919,6 +919,9 @@ pub enum AdmissionPaymentJournalError {
     Invariant(String),
 }
 
+pub const ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND: &str =
+    "chio.admission.terminal-projection.v1";
+
 pub trait QualifiedAdmissionProjectionStore:
     ReceiptStore + crate::admission_operation::QualifiedAdmissionOperationStore
 {
@@ -962,6 +965,31 @@ pub trait QualifiedAdmissionProjectionStore:
         after_receipt_id: Option<&str>,
         limit: usize,
     ) -> Result<Vec<ChioReceipt>, ReceiptStoreError>;
+}
+
+pub trait AnchoredAdmissionProjectionStore: QualifiedAdmissionProjectionStore {
+    fn stage_anchored_terminal_projection(
+        &self,
+        advance: &chio_core::economic_continuity::VerifiedEconomicStateBatchAdvance,
+        recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
+        envelope: &crate::admission_operation::SignedAdmissionTerminalProjectionV1,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), ReceiptStoreError>;
+
+    fn qualify_anchored_terminal_projection(
+        &self,
+        batch_id: &str,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), ReceiptStoreError>;
+
+    fn commit_anchored_terminal_projection(
+        &self,
+        batch_id: &str,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<crate::admission_operation::AdmissionTerminal, ReceiptStoreError>;
 }
 
 #[cfg(test)]

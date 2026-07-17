@@ -471,15 +471,19 @@ fn prepared_effect_batches_require_explicit_admission_verification(
     Ok(())
 }
 
-fn dispatch_advance() -> Result<
+fn dispatch_batch_advance(
+    target_head: Option<EconomicResourceHeadV1>,
+    resource_head_digest: String,
+) -> Result<
     (
-        VerifiedEconomicEffectDispatchAdvance,
+        VerifiedEconomicStateBatchAdvance,
         EconomicEffectSlotV1,
         EconomicResourceHeadV1,
     ),
     Box<dyn core::error::Error>,
 > {
-    let ready = ready_effect_slot()?;
+    let mut ready = ready_effect_slot()?;
+    ready.resource_head_digest = resource_head_digest;
     let ready_content = inline_content(serde_json::to_value(&ready)?);
     let ready_head = EconomicResourceHeadV1 {
         schema: CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA.to_string(),
@@ -500,11 +504,15 @@ fn dispatch_advance() -> Result<
         predecessor_digest: None,
     };
     let ready_head_digest = ready_head.digest()?;
+    let mut current_heads = vec![ready_head];
+    if let Some(target_head) = target_head {
+        current_heads.push(target_head);
+    }
     let current_view = verify_economic_state_view(
         signed_view(
             1,
             digest("checkpoint-1"),
-            vec![ready_head],
+            current_heads,
             Vec::new(),
             Vec::new(),
             Vec::new(),
@@ -547,19 +555,57 @@ fn dispatch_advance() -> Result<
         &pins(),
         &DirectTransitionVerifier,
     )?;
+    Ok((advance, dispatched, dispatched_head))
+}
+
+fn dispatch_advance() -> Result<
+    (
+        VerifiedEconomicEffectDispatchAdvance,
+        EconomicEffectSlotV1,
+        EconomicResourceHeadV1,
+        EconomicResourceHeadV1,
+    ),
+    Box<dyn core::error::Error>,
+> {
+    let target_head = head(resource_key("round-1"), 1, 1, None)?;
+    let (advance, dispatched, dispatched_head) =
+        dispatch_batch_advance(Some(target_head.clone()), target_head.digest()?)?;
     let dispatch = verify_economic_effect_dispatch_advance(advance, &MatchingAdmissionHandoff)?;
-    Ok((dispatch, dispatched, dispatched_head))
+    Ok((dispatch, dispatched, dispatched_head, target_head))
+}
+
+#[test]
+fn effect_dispatch_requires_the_exact_current_target_resource_head(
+) -> Result<(), Box<dyn core::error::Error>> {
+    let target_key = resource_key("round-1");
+    let expected_target = head(target_key.clone(), 1, 1, None)?;
+    let expected_digest = expected_target.digest()?;
+    let (missing, _, _) = dispatch_batch_advance(None, expected_digest.clone())?;
+    assert!(matches!(
+        verify_economic_effect_dispatch_advance(missing, &MatchingAdmissionHandoff),
+        Err(EconomicStateAnchorError::CurrentHeadMissing(key)) if key == target_key
+    ));
+
+    let substituted_target = head(target_key, 1, 2, None)?;
+    let (substituted, _, _) = dispatch_batch_advance(Some(substituted_target), expected_digest)?;
+    assert!(matches!(
+        verify_economic_effect_dispatch_advance(substituted, &MatchingAdmissionHandoff),
+        Err(EconomicStateAnchorError::EffectDispatchRejected(
+            "effect slot target resource head changed"
+        ))
+    ));
+    Ok(())
 }
 
 #[test]
 fn only_signed_cas_commit_mints_effect_dispatch_authority(
 ) -> Result<(), Box<dyn core::error::Error>> {
-    let (advance, dispatched, dispatched_head) = dispatch_advance()?;
+    let (advance, dispatched, dispatched_head, target_head) = dispatch_advance()?;
     let committed_view = verify_economic_state_view(
         signed_view(
             2,
             advance.batch().checkpoint_digest.clone(),
-            vec![dispatched_head],
+            vec![dispatched_head, target_head],
             Vec::new(),
             Vec::new(),
             Vec::new(),
@@ -579,12 +625,12 @@ fn only_signed_cas_commit_mints_effect_dispatch_authority(
         verify_economic_effect_dispatch_commit(advance, &committed_view, commit, &pins())?;
     assert_eq!(authority.slot(), &dispatched);
 
-    let (forged_advance, _, forged_head) = dispatch_advance()?;
+    let (forged_advance, _, forged_head, forged_target_head) = dispatch_advance()?;
     let forged_view = verify_economic_state_view(
         signed_view(
             2,
             forged_advance.batch().checkpoint_digest.clone(),
-            vec![forged_head],
+            vec![forged_head, forged_target_head],
             Vec::new(),
             Vec::new(),
             Vec::new(),
@@ -604,6 +650,50 @@ fn only_signed_cas_commit_mints_effect_dispatch_authority(
         verify_economic_effect_dispatch_commit(forged_advance, &forged_view, forged, &pins(),)
             .is_err()
     );
+    Ok(())
+}
+
+#[test]
+fn dispatch_commit_retains_the_exact_target_resource_head(
+) -> Result<(), Box<dyn core::error::Error>> {
+    for replacement in [None, Some(2_u64)] {
+        let (advance, _, dispatched_head, target_head) = dispatch_advance()?;
+        let mut committed_heads = vec![dispatched_head];
+        if let Some(resource_version) = replacement {
+            committed_heads.push(head(
+                target_head.resource_key,
+                target_head.head_version,
+                resource_version,
+                target_head.predecessor_digest,
+            )?);
+        }
+        let committed_view = verify_economic_state_view(
+            signed_view(
+                2,
+                advance.batch().checkpoint_digest.clone(),
+                committed_heads,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            )?,
+            &pins(),
+        )?;
+        let commit = EconomicEffectDispatchCommitV1::sign(
+            &advance,
+            &committed_view,
+            digest("cas-nonce"),
+            502,
+            "anchor-key-1",
+            1,
+            &anchor_keypair(),
+        )?;
+        assert!(matches!(
+            verify_economic_effect_dispatch_commit(advance, &committed_view, commit, &pins(),),
+            Err(EconomicStateAnchorError::EffectDispatchRejected(
+                "signed CAS commit does not match the effect advance"
+            ))
+        ));
+    }
     Ok(())
 }
 
@@ -811,12 +901,12 @@ fn anchor_view_and_dispatch_commit_wire_schemas_match_signed_values(
     let view_json = serde_json::to_value(&view)?;
     assert!(view_validator.is_valid(&view_json));
 
-    let (advance, _, dispatched_head) = dispatch_advance()?;
+    let (advance, _, dispatched_head, target_head) = dispatch_advance()?;
     let committed_view = verify_economic_state_view(
         signed_view(
             2,
             advance.batch().checkpoint_digest.clone(),
-            vec![dispatched_head],
+            vec![dispatched_head, target_head],
             Vec::new(),
             Vec::new(),
             Vec::new(),
@@ -898,6 +988,75 @@ fn target_status_and_idempotent_retry_require_separate_qualification(
     assert_eq!(retry.idempotency_key(), slot.idempotency_key);
     assert_eq!(retry.slot(), &slot);
     assert!(verify_economic_idempotent_recovery(&slot, &TargetEvidenceVerifier).is_err());
+    Ok(())
+}
+
+#[test]
+fn completed_effect_authority_requires_the_exact_anchored_slot(
+) -> Result<(), Box<dyn core::error::Error>> {
+    let mut dispatched = ready_effect_slot()?;
+    dispatched.state = EconomicEffectStateV1::DispatchCommitted;
+    let completed = verify_economic_target_status(
+        &dispatched,
+        &digest("target-status"),
+        &TargetEvidenceVerifier,
+    )?
+    .next_slot()
+    .clone();
+    let terminal_result = match completed.terminal.as_ref() {
+        Some(EconomicEffectTerminalV1::Completed {
+            result_id,
+            result_digest,
+            result,
+        }) => EconomicTerminalResultV1 {
+            result_id: result_id.clone(),
+            result_digest: result_digest.clone(),
+            result: result.clone(),
+        },
+        _ => return Err("completed effect omitted its result".into()),
+    };
+    let state = inline_content(serde_json::to_value(&completed)?);
+    let head = EconomicResourceHeadV1 {
+        schema: CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA.to_string(),
+        anchor_id: completed.anchor_id.clone(),
+        namespace: completed.namespace.clone(),
+        resource_key: completed.resource_head_key(),
+        head_version: 3,
+        resource_version: 3,
+        lifecycle_fence: 3,
+        lifecycle_state: "completed".to_string(),
+        state_digest: state.digest()?,
+        state,
+        operation_id: Some(completed.operation_id.clone()),
+        effect_idempotency_key: Some(completed.idempotency_key.clone()),
+        frost: completed.frost.clone(),
+        terminal_result: Some(terminal_result),
+        trusted_clock_high_water: 502,
+        predecessor_digest: Some(digest("dispatched-head")),
+    };
+    let expected_head_digest = head.digest()?;
+    let view = verify_economic_state_view(
+        signed_view(
+            3,
+            digest("checkpoint-3"),
+            vec![head],
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+        )?,
+        &pins(),
+    )?;
+
+    let verified = verify_economic_completed_effect(&view, &completed)?;
+    assert_eq!(verified.slot(), &completed);
+    assert_eq!(verified.checkpoint_digest(), digest("checkpoint-3"));
+    assert_eq!(verified.effect_head_digest(), expected_head_digest);
+    assert_eq!(verified.observed_at(), 500);
+
+    let mut substituted = completed.clone();
+    substituted.parameters_digest = digest("substituted-parameters");
+    assert!(verify_economic_completed_effect(&view, &substituted).is_err());
+    assert!(verify_economic_completed_effect(&view, &dispatched).is_err());
     Ok(())
 }
 

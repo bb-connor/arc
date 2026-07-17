@@ -158,6 +158,7 @@ pub enum SettlementSkipReason {
     Denied,
     /// The receipt carries no authorized economic intent.
     NoEconomicIntent,
+    Channelized,
     /// The authorized invocation has no charge.
     ZeroCharge,
 }

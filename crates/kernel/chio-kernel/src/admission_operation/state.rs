@@ -7,6 +7,42 @@ pub(super) fn next_version(version: u64) -> Result<u64, AdmissionOperationError>
         .ok_or(AdmissionOperationError::VersionOverflow)
 }
 
+pub(super) fn dispatch_committed_version_from_prepared(
+    kind: AdmissionOperationKind,
+    requirements: AdmissionParticipantRequirements,
+    prepared_version: u64,
+) -> Result<u64, AdmissionOperationError> {
+    validate_positive_ijson("prepared_operation_version", prepared_version)?;
+    if !kind.uses_dispatch() {
+        return Err(AdmissionOperationError::StateKindMismatch {
+            kind,
+            state: AdmissionOperationState::DispatchCommitted,
+        });
+    }
+    let mut state = AdmissionOperationState::Prepared;
+    let mut version = prepared_version;
+    for next in [
+        AdmissionOperationState::BrokerAttemptRegistered,
+        AdmissionOperationState::BudgetAuthorized,
+        AdmissionOperationState::ApprovalReserved,
+        AdmissionOperationState::ReadyToDispatch,
+        AdmissionOperationState::CapturePending,
+        AdmissionOperationState::DispatchCommitted,
+    ] {
+        if is_legal_transition(kind, requirements, state, next) {
+            state = next;
+            version = next_version(version)?;
+        }
+    }
+    if state != AdmissionOperationState::DispatchCommitted {
+        return Err(AdmissionOperationError::StateKindMismatch {
+            kind,
+            state: AdmissionOperationState::DispatchCommitted,
+        });
+    }
+    Ok(version)
+}
+
 pub(super) fn validate_positive_ijson(
     field: &'static str,
     value: u64,
@@ -71,6 +107,8 @@ pub(super) fn attachment_supported(
         AdmissionAttachment::OutcomeEligibilityDigest(_) => requirements.outcome_eligibility,
         AdmissionAttachment::PaymentParticipantId(_) => requirements.payment,
         AdmissionAttachment::ToolOutcomeId(_) => kind == AdmissionOperationKind::ToolDispatch,
+        AdmissionAttachment::ChannelReservationProposalDigest(_)
+        | AdmissionAttachment::ChannelReservationDigest(_) => requirements.channel,
     }
 }
 
@@ -87,6 +125,13 @@ pub(super) fn attachment_allowed(
         AdmissionAttachment::ToolOutcomeId(_) => matches!(
             state,
             AdmissionOperationState::DispatchCommitted | AdmissionOperationState::Finalizing
+        ),
+        AdmissionAttachment::ChannelReservationProposalDigest(_) => {
+            state == AdmissionOperationState::Prepared
+        }
+        AdmissionAttachment::ChannelReservationDigest(_) => matches!(
+            state,
+            AdmissionOperationState::BudgetAuthorized | AdmissionOperationState::ApprovalReserved
         ),
         _ => matches!(
             state,
@@ -106,14 +151,29 @@ pub(super) fn validate_state_attachments(
 ) -> Result<(), AdmissionOperationError> {
     if let Some(attachment) = attachments.0.iter().find(|attachment| {
         !attachment_supported(kind, requirements, attachment)
-            || (matches!(attachment, AdmissionAttachment::ToolOutcomeId(_))
-                && !matches!(
+            || match attachment {
+                AdmissionAttachment::ToolOutcomeId(_) => !matches!(
                     state,
                     AdmissionOperationState::DispatchCommitted
                         | AdmissionOperationState::Finalizing
                         | AdmissionOperationState::Completed
                         | AdmissionOperationState::OutcomeUnknownAfterDispatch
-                ))
+                ),
+                AdmissionAttachment::ChannelReservationDigest(_) => !matches!(
+                    state,
+                    AdmissionOperationState::BudgetAuthorized
+                        | AdmissionOperationState::ApprovalReserved
+                        | AdmissionOperationState::ReadyToDispatch
+                        | AdmissionOperationState::CapturePending
+                        | AdmissionOperationState::DispatchCommitted
+                        | AdmissionOperationState::Finalizing
+                        | AdmissionOperationState::Completed
+                        | AdmissionOperationState::CompensatedBeforeDispatch
+                        | AdmissionOperationState::NotAcceptedAfterDispatchCommit
+                        | AdmissionOperationState::OutcomeUnknownAfterDispatch
+                ),
+                _ => false,
+            }
     }) {
         return Err(AdmissionOperationError::ForbiddenAttachment {
             field: attachment.field_name(),
@@ -217,6 +277,16 @@ pub(super) fn validate_state_attachments(
             requirements.payment && reached(AdmissionOperationState::ReadyToDispatch),
             7,
             "payment_participant_id",
+        ),
+        (
+            requirements.channel && reached(AdmissionOperationState::BrokerAttemptRegistered),
+            9,
+            "channel_reservation_proposal_digest",
+        ),
+        (
+            requirements.channel && reached(AdmissionOperationState::ReadyToDispatch),
+            10,
+            "channel_reservation_digest",
         ),
     ];
     if let Some((_, _, field)) = required

@@ -3183,9 +3183,12 @@ dependencies = [
  "arbitrary",
  "base64 0.22.1",
  "chio-core",
+ "chio-credit",
  "chio-did",
+ "chio-fincred",
  "chio-reputation",
  "chio-revocation-oracle",
+ "chio-spec-validate",
  "chio-test-support",
  "chrono",
  "dudect-bencher",
@@ -3203,7 +3206,9 @@ version = "0.1.0"
 dependencies = [
  "chio-appraisal",
  "chio-core-types",
+ "chio-did",
  "chio-federation",
+ "chio-fincred",
  "chio-spec-validate",
  "chio-underwriting",
  "frost-ed25519",
@@ -3288,7 +3293,7 @@ version = "0.1.0"
 dependencies = [
  "arbitrary",
  "bs58",
- "chio-core",
+ "chio-core-types",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3492,6 +3497,27 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "chio-fincred"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "serde",
+]
+
+[[package]]
+name = "chio-fiscal"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-listing",
+ "chio-test-support",
+ "hex",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -4007,6 +4033,7 @@ name = "chio-open-market"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-fiscal",
  "chio-governance",
  "chio-listing",
  "chio-test-support",
@@ -4389,8 +4416,10 @@ dependencies = [
  "chio-core",
  "chio-credit",
  "chio-egress-contract",
+ "chio-federation",
  "chio-kernel",
  "chio-link",
+ "chio-spec-validate",
  "chio-test-support",
  "chio-web3",
  "chio-web3-bindings",

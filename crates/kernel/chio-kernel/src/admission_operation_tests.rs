@@ -85,6 +85,16 @@ fn prepared(kind: AdmissionOperationKind) -> AdmissionOperationV1 {
     AdmissionOperationV1::prepare(binding(kind), 7).expect("test operation must prepare")
 }
 
+fn channel_requirements() -> AdmissionParticipantRequirements {
+    AdmissionParticipantRequirements {
+        broker_attempt: true,
+        budget_capture: true,
+        obligation: true,
+        channel: true,
+        ..AdmissionParticipantRequirements::NONE
+    }
+}
+
 fn provider_attempt(
     operation: &AdmissionOperationV1,
     attempt_id: &str,
@@ -146,6 +156,7 @@ fn full_projection_capabilities() -> AdmissionProjectionCapabilities {
         outcome_eligibility: true,
         observation_attempt_zero: true,
         obligation: true,
+        channel_terminal: true,
         economic_mutation_terminal: true,
     }
 }
@@ -261,10 +272,16 @@ fn transition_command(
 ) -> AdmissionOperationCommand {
     let attachments = match (operation.state, next_state) {
         (_, AdmissionOperationState::BrokerAttemptRegistered) => {
-            vec![AdmissionAttachment::BrokerAttempt(provider_attempt(
+            let mut attachments = vec![AdmissionAttachment::BrokerAttempt(provider_attempt(
                 operation,
                 "attempt-1",
-            ))]
+            ))];
+            if operation.binding.participant_requirements().channel {
+                attachments.push(AdmissionAttachment::ChannelReservationProposalDigest(
+                    digest("channel_reservation_proposal_digest", REQUEST_HASH),
+                ));
+            }
+            attachments
         }
         (_, AdmissionOperationState::BudgetAuthorized) => {
             vec![AdmissionAttachment::BudgetHoldId(identifier(
@@ -370,6 +387,12 @@ fn finalizing_tool_operation_with(
                 attachments.push(AdmissionAttachment::PaymentParticipantId(identifier(
                     "payment_participant_id",
                     "payment-1",
+                )));
+            }
+            if participant_requirements.channel {
+                attachments.push(AdmissionAttachment::ChannelReservationDigest(digest(
+                    "channel_reservation_digest",
+                    CONTENT_HASH,
                 )));
             }
             AdmissionOperationCommand::new(
@@ -626,6 +649,11 @@ fn participant_requirements_are_kind_checked_and_identity_bound() {
             obligation: true,
             ..budget_only
         },
+        channel_requirements(),
+        AdmissionParticipantRequirements {
+            observation_attempt_zero: true,
+            ..channel_requirements()
+        },
     ] {
         assert_ne!(
             make(AdmissionOperationKind::ToolDispatch, budget_only)
@@ -647,6 +675,26 @@ fn participant_requirements_are_kind_checked_and_identity_bound() {
         make(AdmissionOperationKind::GovernedActiveResponse, budget_only,),
         Err(AdmissionOperationError::InvalidParticipantRequirements)
     );
+    for requirements in [
+        AdmissionParticipantRequirements {
+            payment: true,
+            ..channel_requirements()
+        },
+        AdmissionParticipantRequirements {
+            broker_attempt: true,
+            budget_capture: true,
+            channel: true,
+            ..AdmissionParticipantRequirements::NONE
+        },
+    ] {
+        assert_eq!(
+            AdmissionRequestBindingV1::new(
+                digest("immutable_request_hash", REQUEST_HASH),
+                requirements,
+            ),
+            Err(AdmissionOperationError::InvalidParticipantRequirements)
+        );
+    }
     assert_eq!(
         make(
             AdmissionOperationKind::GovernedEconomicMutation,
@@ -657,6 +705,39 @@ fn participant_requirements_are_kind_checked_and_identity_bound() {
         ),
         Err(AdmissionOperationError::InvalidParticipantRequirements)
     );
+}
+
+#[test]
+fn absent_channel_requirement_preserves_legacy_canonical_identity(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let requirements = AdmissionParticipantRequirements {
+        broker_attempt: true,
+        budget_capture: true,
+        ..AdmissionParticipantRequirements::NONE
+    };
+    let legacy = serde_json::json!({
+        "broker_attempt": true,
+        "budget_capture": true,
+        "approval": false,
+        "execution_nonce": false,
+        "outcome_eligibility": false,
+        "payment": false,
+        "authorization_consumption": false,
+        "observation_attempt_zero": false,
+        "obligation": false
+    });
+    assert_eq!(serde_json::to_value(requirements)?, legacy);
+    let restored: AdmissionParticipantRequirements = serde_json::from_value(legacy)?;
+    assert_eq!(restored, requirements);
+
+    let original = AdmissionRequestBindingV1::new(
+        digest("immutable_request_hash", REQUEST_HASH),
+        requirements,
+    )?;
+    let restored =
+        AdmissionRequestBindingV1::new(digest("immutable_request_hash", REQUEST_HASH), restored)?;
+    assert_eq!(original, restored);
+    Ok(())
 }
 
 #[test]
@@ -761,6 +842,164 @@ fn payment_participant_is_required_before_ready_to_dispatch() {
 }
 
 #[test]
+fn channel_digests_are_phase_bound_and_required_before_dispatch(
+) -> Result<(), AdmissionOperationError> {
+    let requirements = channel_requirements();
+    let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
+        kind: AdmissionOperationKind::ToolDispatch,
+        namespace: namespace("tenant-123"),
+        request_id: identifier("request_id", "req-channel"),
+        capability_id: identifier("capability_id", "cap-channel"),
+        authorization_capability_hash: digest("authorization_hash", AUTH_HASH),
+        request_binding: AdmissionRequestBindingV1::new(
+            digest("immutable_request_hash", REQUEST_HASH),
+            requirements,
+        )?,
+        policy_hash: digest("policy_hash", POLICY_HASH),
+        effect_class: SideEffectClass::Monetary,
+    })?;
+    let prepared = AdmissionOperationV1::prepare(binding, 7)?;
+
+    let missing_proposal = AdmissionOperationCommand::new(
+        prepared.binding.operation_id.clone(),
+        prepared.version,
+        lease(&prepared, prepared.version),
+        vec![AdmissionAttachment::BrokerAttempt(provider_attempt(
+            &prepared,
+            "attempt-1",
+        ))],
+        Some(AdmissionOperationState::BrokerAttemptRegistered),
+        None,
+        None,
+    )?;
+    assert_eq!(
+        prepared.apply_command(&missing_proposal, 1_000),
+        Err(AdmissionOperationError::MissingParticipantAttachment {
+            field: "channel_reservation_proposal_digest"
+        })
+    );
+    let duplicate_proposal = AdmissionOperationCommand::new(
+        prepared.binding.operation_id.clone(),
+        prepared.version,
+        lease(&prepared, prepared.version),
+        vec![
+            AdmissionAttachment::ChannelReservationProposalDigest(digest(
+                "channel_reservation_proposal_digest",
+                REQUEST_HASH,
+            )),
+            AdmissionAttachment::ChannelReservationProposalDigest(digest(
+                "channel_reservation_proposal_digest",
+                POLICY_HASH,
+            )),
+        ],
+        None,
+        None,
+        None,
+    );
+    assert_eq!(
+        duplicate_proposal,
+        Err(AdmissionOperationError::DuplicateAttachment {
+            field: "channel_reservation_proposal_digest"
+        })
+    );
+    let early_reservation = AdmissionOperationCommand::new(
+        prepared.binding.operation_id.clone(),
+        prepared.version,
+        lease(&prepared, prepared.version),
+        vec![AdmissionAttachment::ChannelReservationDigest(digest(
+            "channel_reservation_digest",
+            CONTENT_HASH,
+        ))],
+        None,
+        None,
+        None,
+    )?;
+    assert_eq!(
+        prepared.apply_command(&early_reservation, 1_000),
+        Err(AdmissionOperationError::AttachmentPhase {
+            field: "channel_reservation_digest",
+            state: AdmissionOperationState::Prepared,
+        })
+    );
+
+    let broker = transition_command(
+        &prepared,
+        AdmissionOperationState::BrokerAttemptRegistered,
+        None,
+    );
+    let brokered = prepared.apply_command(&broker, 1_000)?.into_operation();
+    assert_eq!(
+        brokered.channel_reservation_proposal_digest(),
+        Some(&digest("channel_reservation_proposal_digest", REQUEST_HASH))
+    );
+    let mut missing_persisted_proposal = brokered.to_persisted();
+    missing_persisted_proposal
+        .attachments
+        .0
+        .retain(|attachment| {
+            !matches!(
+                attachment,
+                AdmissionAttachment::ChannelReservationProposalDigest(_)
+            )
+        });
+    assert_eq!(
+        AdmissionOperationV1::from_persisted(missing_persisted_proposal),
+        Err(AdmissionOperationError::MissingParticipantAttachment {
+            field: "channel_reservation_proposal_digest"
+        })
+    );
+
+    let budget = transition_command(&brokered, AdmissionOperationState::BudgetAuthorized, None);
+    let budgeted = brokered.apply_command(&budget, 1_000)?.into_operation();
+    let missing_reservation =
+        transition_command(&budgeted, AdmissionOperationState::ReadyToDispatch, None);
+    assert_eq!(
+        budgeted.apply_command(&missing_reservation, 1_000),
+        Err(AdmissionOperationError::MissingParticipantAttachment {
+            field: "channel_reservation_digest"
+        })
+    );
+    let ready = AdmissionOperationCommand::new(
+        budgeted.binding.operation_id.clone(),
+        budgeted.version,
+        lease(&budgeted, budgeted.version),
+        vec![AdmissionAttachment::ChannelReservationDigest(digest(
+            "channel_reservation_digest",
+            CONTENT_HASH,
+        ))],
+        Some(AdmissionOperationState::ReadyToDispatch),
+        None,
+        None,
+    )?;
+    let ready = budgeted.apply_command(&ready, 1_000)?.into_operation();
+    assert_eq!(
+        ready.channel_reservation_digest(),
+        Some(&digest("channel_reservation_digest", CONTENT_HASH))
+    );
+    let mut missing_persisted_reservation = ready.to_persisted();
+    missing_persisted_reservation
+        .attachments
+        .0
+        .retain(|attachment| {
+            !matches!(attachment, AdmissionAttachment::ChannelReservationDigest(_))
+        });
+    assert_eq!(
+        AdmissionOperationV1::from_persisted(missing_persisted_reservation),
+        Err(AdmissionOperationError::MissingParticipantAttachment {
+            field: "channel_reservation_digest"
+        })
+    );
+
+    for value in [
+        serde_json::json!({"ChannelReservationProposalDigest": "not-a-digest"}),
+        serde_json::json!({"ChannelReservationDigest": "not-a-digest"}),
+    ] {
+        assert!(serde_json::from_value::<AdmissionAttachment>(value).is_err());
+    }
+    Ok(())
+}
+
+#[test]
 fn approval_requires_the_proposal_and_verified_set_on_transition_and_restore() {
     let operation = prepared(AdmissionOperationKind::GovernedActiveResponse);
     let missing_proposal = AdmissionOperationCommand::new(
@@ -844,6 +1083,14 @@ fn governed_economic_mutations_reject_every_attachment_on_write_and_restore() {
             "payment-1",
         )),
         AdmissionAttachment::ToolOutcomeId(digest("tool_outcome_id", POLICY_HASH)),
+        AdmissionAttachment::ChannelReservationProposalDigest(digest(
+            "channel_reservation_proposal_digest",
+            REQUEST_HASH,
+        )),
+        AdmissionAttachment::ChannelReservationDigest(digest(
+            "channel_reservation_digest",
+            CONTENT_HASH,
+        )),
     ];
     for attachment in attachments {
         let operation = operation.clone();
@@ -888,6 +1135,14 @@ fn attachment_scope_is_derived_from_kind_and_participant_requirements() {
         AdmissionAttachment::PaymentParticipantId(identifier(
             "payment_participant_id",
             "payment-1",
+        )),
+        AdmissionAttachment::ChannelReservationProposalDigest(digest(
+            "channel_reservation_proposal_digest",
+            REQUEST_HASH,
+        )),
+        AdmissionAttachment::ChannelReservationDigest(digest(
+            "channel_reservation_digest",
+            CONTENT_HASH,
         )),
     ];
     for attachment in forbidden {
@@ -1080,6 +1335,60 @@ fn transition_matrix_is_exhaustive() {
             }
         }
     }
+}
+
+#[test]
+fn dispatch_commit_version_follows_the_configured_state_path() {
+    let tool = AdmissionParticipantRequirements {
+        broker_attempt: true,
+        budget_capture: true,
+        ..AdmissionParticipantRequirements::NONE
+    };
+    assert_eq!(
+        expected_dispatch_committed_version(AdmissionOperationKind::ToolDispatch, tool, 1),
+        Ok(6)
+    );
+    assert_eq!(
+        expected_dispatch_committed_version(
+            AdmissionOperationKind::ToolDispatch,
+            AdmissionParticipantRequirements {
+                approval: true,
+                ..tool
+            },
+            1,
+        ),
+        Ok(7)
+    );
+    assert_eq!(
+        expected_dispatch_committed_version(
+            AdmissionOperationKind::ToolDispatch,
+            channel_requirements(),
+            2,
+        ),
+        Ok(7)
+    );
+    assert_eq!(
+        expected_dispatch_committed_version(
+            AdmissionOperationKind::GovernedActiveResponse,
+            AdmissionParticipantRequirements {
+                approval: true,
+                ..AdmissionParticipantRequirements::NONE
+            },
+            1,
+        ),
+        Ok(4)
+    );
+    assert_eq!(
+        expected_dispatch_committed_version(
+            AdmissionOperationKind::GovernedEconomicMutation,
+            AdmissionParticipantRequirements::NONE,
+            1,
+        ),
+        Err(AdmissionOperationError::StateKindMismatch {
+            kind: AdmissionOperationKind::GovernedEconomicMutation,
+            state: AdmissionOperationState::DispatchCommitted,
+        })
+    );
 }
 
 fn expected_transition(
@@ -1398,6 +1707,7 @@ fn completed_projection_requires_exact_signed_admission_receipt_metadata() {
             eligibility: None,
             observer_work: None,
             obligation: None,
+            channel_terminal: None,
         }))
     };
     let verify = |receipt| verify_completed_receipt(&operation, &context, receipt, &kernel, None);

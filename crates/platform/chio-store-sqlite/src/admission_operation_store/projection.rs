@@ -1,3 +1,4 @@
+use super::obligation::{insert_obligation_projection, verify_obligation_projection};
 use super::*;
 
 pub(super) fn full_projection_capabilities() -> AdmissionProjectionCapabilities {
@@ -10,6 +11,7 @@ pub(super) fn full_projection_capabilities() -> AdmissionProjectionCapabilities 
         outcome_eligibility: true,
         observation_attempt_zero: true,
         obligation: true,
+        channel_terminal: true,
         economic_mutation_terminal: true,
     }
 }
@@ -51,6 +53,12 @@ pub(super) fn ensure_projection_absent(
                 WHERE operation_id = ?1
                 UNION ALL
                 SELECT 1 FROM admission_operation_observer_attempts
+                WHERE operation_id = ?1
+                UNION ALL
+                SELECT 1 FROM obligation_atoms
+                WHERE operation_id = ?1
+                UNION ALL
+                SELECT 1 FROM obligation_disposition_records
                 WHERE operation_id = ?1
             )
             "#,
@@ -135,6 +143,26 @@ pub(super) fn insert_terminal_projection(
         }
     }
 
+    let obligation_record = canonical
+        .records()
+        .iter()
+        .find(|record| record.commitment().kind() == AdmissionProjectionRecordKind::Obligation)
+        .map(CanonicalAdmissionProjectionRecord::canonical_bytes);
+    let channel_record = canonical
+        .records()
+        .iter()
+        .find(|record| record.commitment().kind() == AdmissionProjectionRecordKind::ChannelTerminal)
+        .map(CanonicalAdmissionProjectionRecord::canonical_bytes);
+    insert_obligation_projection(
+        transaction,
+        &context.operation_id,
+        obligation_record,
+        channel_record,
+        context.trusted_time_unix_ms,
+        context.trusted_time_unix_ms,
+        &context.store_fence,
+    )?;
+
     if let AdmissionTerminalProjection::Completed(completed) = projection {
         if let Some(authorization) = &completed.authorization {
             let record = require_canonical_record(
@@ -218,6 +246,8 @@ pub(super) fn insert_terminal_projection(
 pub(super) fn insert_verified_terminal_projection(
     transaction: &Transaction<'_>,
     projection: &VerifiedAdmissionTerminalProjectionV1,
+    apply_time_unix_ms: u64,
+    apply_fence: &StoreMutationFence,
 ) -> Result<(), AdmissionOperationStoreError> {
     let context = projection.context();
     let terminal_operation = projection.terminal_operation();
@@ -247,10 +277,10 @@ pub(super) fn insert_verified_terminal_projection(
                 projection.manifest_json(),
                 i64::try_from(projection.records().len())
                     .map_err(|_| invariant("terminal record count overflow"))?,
-                sqlite_i64(context.trusted_time_unix_ms, "committed_at_unix_ms")?,
-                &context.store_fence.store_uuid,
-                &context.store_fence.lease_id,
-                sqlite_i64(context.store_fence.owner_epoch, "store_owner_epoch")?,
+                sqlite_i64(apply_time_unix_ms, "committed_at_unix_ms")?,
+                &apply_fence.store_uuid,
+                &apply_fence.lease_id,
+                sqlite_i64(apply_fence.owner_epoch, "store_owner_epoch")?,
             ],
         )
         .map_err(sqlite_error)?;
@@ -283,6 +313,26 @@ pub(super) fn insert_verified_terminal_projection(
             ));
         }
     }
+
+    let obligation_record = projection
+        .records()
+        .iter()
+        .find(|record| record.kind() == AdmissionProjectionRecordKind::Obligation)
+        .map(VerifiedAdmissionTerminalProjectionRecordV1::canonical_json);
+    let channel_record = projection
+        .records()
+        .iter()
+        .find(|record| record.kind() == AdmissionProjectionRecordKind::ChannelTerminal)
+        .map(VerifiedAdmissionTerminalProjectionRecordV1::canonical_json);
+    insert_obligation_projection(
+        transaction,
+        &context.operation_id,
+        obligation_record,
+        channel_record,
+        context.trusted_time_unix_ms,
+        apply_time_unix_ms,
+        apply_fence,
+    )?;
 
     if let Some(consumption) = projection.authorization_consumption() {
         let record = require_verified_record(
@@ -345,10 +395,10 @@ pub(super) fn insert_verified_terminal_projection(
                     )?,
                     record.record_digest().as_str(),
                     record.canonical_json(),
-                    sqlite_i64(context.trusted_time_unix_ms, "observer_created_at_unix_ms")?,
-                    &context.store_fence.store_uuid,
-                    &context.store_fence.lease_id,
-                    sqlite_i64(context.store_fence.owner_epoch, "store_owner_epoch")?,
+                    sqlite_i64(apply_time_unix_ms, "observer_created_at_unix_ms")?,
+                    &apply_fence.store_uuid,
+                    &apply_fence.lease_id,
+                    sqlite_i64(apply_fence.owner_epoch, "store_owner_epoch")?,
                 ],
             )
             .map_err(sqlite_error)?;
@@ -431,6 +481,11 @@ struct StoredTerminalProjection {
     store_uuid: String,
     store_lease_id: String,
     store_owner_epoch: i64,
+}
+
+#[derive(Deserialize)]
+struct StoredTerminalProjectionBody {
+    context: AdmissionProjectionContext,
 }
 
 fn load_terminal_projection_tx(
@@ -782,7 +837,25 @@ fn verify_exact_typed_projection_rows(
             ));
         }
     }
-    Ok(())
+    let obligation_record = canonical
+        .records()
+        .iter()
+        .find(|record| record.commitment().kind() == AdmissionProjectionRecordKind::Obligation)
+        .map(CanonicalAdmissionProjectionRecord::canonical_bytes);
+    let channel_record = canonical
+        .records()
+        .iter()
+        .find(|record| record.commitment().kind() == AdmissionProjectionRecordKind::ChannelTerminal)
+        .map(CanonicalAdmissionProjectionRecord::canonical_bytes);
+    verify_obligation_projection(
+        connection,
+        &context.operation_id,
+        obligation_record,
+        channel_record,
+        context.trusted_time_unix_ms,
+        context.trusted_time_unix_ms,
+        &context.store_fence,
+    )
 }
 
 struct StoredProjectionRecord {
@@ -921,6 +994,36 @@ pub(super) fn verify_stored_terminal_projection(
     }
     verify_stored_authorization_projection(connection, operation, &records)?;
     verify_stored_observer_projection(connection, operation, &projection, &records)?;
+    let obligation_record = projection_record(&records, AdmissionProjectionRecordKind::Obligation)?
+        .map(|record| record.record_json.as_slice());
+    let channel_record =
+        projection_record(&records, AdmissionProjectionRecordKind::ChannelTerminal)?
+            .map(|record| record.record_json.as_slice());
+    let projection_body: StoredTerminalProjectionBody =
+        serde_json::from_slice(&projection.projection_json)
+            .map_err(|error| invariant(format!("terminal projection body is invalid: {error}")))?;
+    projection_body.context.validate()?;
+    if projection_body.context.operation_id != *operation.binding().operation_id() {
+        return Err(invariant(
+            "terminal projection context does not match its operation",
+        ));
+    }
+    verify_obligation_projection(
+        connection,
+        operation.binding().operation_id(),
+        obligation_record,
+        channel_record,
+        projection_body.context.trusted_time_unix_ms,
+        stored_u64(
+            projection.committed_at_unix_ms,
+            "projection_committed_at_unix_ms",
+        )?,
+        &StoreMutationFence {
+            store_uuid: projection.store_uuid.clone(),
+            lease_id: projection.store_lease_id.clone(),
+            owner_epoch: stored_u64(projection.store_owner_epoch, "projection_store_owner_epoch")?,
+        },
+    )?;
     Ok(())
 }
 
@@ -937,6 +1040,10 @@ fn projection_sidecar_count(
               + (SELECT COUNT(*) FROM admission_operation_authorization_consumptions
                  WHERE operation_id = ?1)
               + (SELECT COUNT(*) FROM admission_operation_observer_attempts
+                 WHERE operation_id = ?1)
+              + (SELECT COUNT(*) FROM obligation_atoms
+                 WHERE operation_id = ?1)
+              + (SELECT COUNT(*) FROM obligation_disposition_records
                  WHERE operation_id = ?1)
             "#,
             [operation.binding().operation_id().as_str()],

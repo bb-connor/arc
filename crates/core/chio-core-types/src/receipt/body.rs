@@ -17,7 +17,9 @@ use super::crypto_floor::{
     ensure_receipt_signature_algorithm_allowed, ReceiptCryptoFloor, ReceiptFloorVerifyError,
 };
 use super::decision::{Decision, ToolCallAction};
-use super::economics::{FinancialBudgetAuthorityReceiptMetadata, FinancialReceiptMetadata};
+use super::economics::{
+    ChannelReceiptMetadataV1, FinancialBudgetAuthorityReceiptMetadata, FinancialReceiptMetadata,
+};
 use super::kinds::{
     BoundaryClass, ObservationOutcome, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
 };
@@ -575,6 +577,11 @@ impl ChioReceipt {
     #[must_use]
     pub fn financial_metadata(&self) -> Option<FinancialReceiptMetadata> {
         self.typed_metadata("financial")
+    }
+
+    #[must_use]
+    pub fn channel_metadata(&self) -> Option<ChannelReceiptMetadataV1> {
+        self.typed_metadata("channel")
     }
 
     /// Extract typed budget-authority lineage for monetary receipts when present.

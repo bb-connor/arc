@@ -17,9 +17,9 @@ use crate::admission_operation::{
     AdmissionProjectionContext, AdmissionReceiptMetadataV1, AdmissionReceiptSchema,
     AdmissionRequestBindingV1, AdmissionTerminalProjection, AdmissionTerminalReplay,
     AuthenticatedRequestNamespace, ObservationAttemptZero, PaymentTerminalEvidence,
-    ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt, SideEffectClass,
-    StoreMutationFence, VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
-    LOCAL_SYSTEM_TENANT_ID,
+    ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt,
+    QualifiedChannelTerminalAuthority, SideEffectClass, StoreMutationFence,
+    VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY, LOCAL_SYSTEM_TENANT_ID,
 };
 use crate::budget_store::{
     BudgetAdmissionBinding, BudgetCaptureInvocationRequest, BudgetEventAuthority,
@@ -30,9 +30,10 @@ use crate::supplemental_quota::CanonicalRevocationSet;
 use crate::tool_outcome::{
     EvaluationModeV1, EvaluationPhaseV1, FrozenEvaluationStepV1, InvocationOutputV1,
     InvocationStreamLimitsV1, PostReturnEvaluationRecordV1, PostReturnEvaluationStateV1,
-    PostReturnNormalizedRequestContextV1, QualifiedToolOutcomeStore, RawInvocationOutcomeV1,
-    ResolvedToolOutcomeV1, SettlementDispositionV1, ToolOutcomeRecordV1, ToolOutcomeStoreError,
-    ToolOutcomeTerminalEvidenceV1, ToolOutcomeTransitionV1,
+    PostReturnNormalizedRequestContextV1, QualifiedDurableOutcomeAuthority,
+    QualifiedToolOutcomeStore, RawInvocationOutcomeV1, ResolvedToolOutcomeV1,
+    SettlementDispositionV1, ToolOutcomeError, ToolOutcomeRecordV1, ToolOutcomeStoreError,
+    ToolOutcomeTerminalEvidenceV1, ToolOutcomeTransitionV1, VerifiedContractualZeroCharge,
 };
 
 const RECOVERY_LEASE_DURATION_MS: u64 = 60_000;
@@ -42,6 +43,7 @@ const I_JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 pub(crate) struct DurableAdmissionRuntime {
     store: Arc<dyn QualifiedAdmissionProjectionStore>,
     outcome_store: Arc<dyn QualifiedToolOutcomeStore>,
+    channel_terminal_authority: Option<Arc<dyn QualifiedChannelTerminalAuthority>>,
     fence: StoreMutationFence,
     claimant_id: AdmissionIdentifier,
     mutation_sequencer: AdmissionMutationSequencer,
@@ -53,6 +55,10 @@ impl fmt::Debug for DurableAdmissionRuntime {
             .debug_struct("DurableAdmissionRuntime")
             .field("fence", &self.fence)
             .field("claimant_id", &self.claimant_id)
+            .field(
+                "channel_terminal_authority",
+                &self.channel_terminal_authority.is_some(),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -74,6 +80,7 @@ impl DurableAdmissionRuntime {
         Ok(Self {
             store,
             outcome_store,
+            channel_terminal_authority: None,
             mutation_sequencer: AdmissionMutationSequencer::for_fence(&fence)?,
             fence,
             claimant_id,
@@ -86,6 +93,13 @@ impl DurableAdmissionRuntime {
             .map_err(|error| KernelError::DurableAdmission(error.to_string()))
     }
 
+    pub(super) fn set_channel_terminal_authority(
+        &mut self,
+        authority: Arc<dyn QualifiedChannelTerminalAuthority>,
+    ) {
+        self.channel_terminal_authority = Some(authority);
+    }
+
     fn refresh_trusted_time(&self, requested_unix_ms: u64) -> u64 {
         requested_unix_ms.max(current_unix_timestamp_ms()).max(1)
     }
@@ -96,6 +110,45 @@ impl DurableAdmissionRuntime {
             lease_id: self.fence.lease_id.clone(),
             lease_epoch: self.fence.owner_epoch,
         }
+    }
+
+    fn qualified_terminal_records(
+        &self,
+        operation: &AdmissionOperationV1,
+    ) -> Result<(ToolOutcomeRecordV1, PostReturnEvaluationRecordV1), ToolOutcomeError> {
+        let unavailable =
+            || ToolOutcomeError::ReleaseAuthorityUnavailable("durable terminal outcome store");
+        let outcome = self
+            .outcome_store
+            .lookup_by_operation(operation.binding().operation_id())
+            .map_err(|_| unavailable())?
+            .ok_or_else(unavailable)?;
+        let evaluation = self
+            .outcome_store
+            .lookup_post_return_evaluation(operation.binding().operation_id())
+            .map_err(|_| unavailable())?
+            .ok_or_else(unavailable)?;
+        Ok((outcome, evaluation))
+    }
+}
+
+impl QualifiedDurableOutcomeAuthority for DurableAdmissionRuntime {
+    fn verify_terminal_outcome(
+        &self,
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+    ) -> Result<ToolOutcomeTerminalEvidenceV1, ToolOutcomeError> {
+        let (outcome, evaluation) = self.qualified_terminal_records(operation)?;
+        ToolOutcomeTerminalEvidenceV1::from_records(operation, context, &outcome, &evaluation)
+    }
+
+    fn verify_contractual_zero_charge(
+        &self,
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+    ) -> Result<VerifiedContractualZeroCharge, ToolOutcomeError> {
+        let (outcome, evaluation) = self.qualified_terminal_records(operation)?;
+        VerifiedContractualZeroCharge::from_records(operation, context, &outcome, &evaluation)
     }
 }
 
