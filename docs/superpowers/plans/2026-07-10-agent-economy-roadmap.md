@@ -199,24 +199,27 @@ design work before this gate, but no production integration or independently
 invented obligation type may land.
 
 - WS3: a bounded `chio_listing::outcome` artifact/evaluator pilot with
+  a typed `VerifiedOutcomeRequestV1` metered-billing extension,
   `chio.outcome.eligibility.v1`, a small deterministic JSON Pointer vocabulary,
   verdict metadata, and kernel predicate evaluation. The eligibility record and
-  its digest attach to `AdmissionOperation::Prepared` before dispatch and finalize
-  through `AdmissionTerminalProjection::Completed`. Capture/release
+  its digest attach to `AdmissionOperation::Prepared` before dispatch and
+  finalize through `AdmissionTerminalProjection::Completed`. Capture/release
   activation is not a Wave 2 exit artifact: `X402PaymentAdapter` is prepaid and
   `X402PaymentAdapter`/`AcpPaymentAdapter` capture/release is local bookkeeping.
   A real reversible rail must be implemented and pass idempotency, query,
-  binding, release, and end-to-end qualification before the output-stage payment
-  hook can activate. The provider path must independently pass durable enqueue,
-  signed acceptance, and a rollback-independent external dispatch-slot anchor
-  whose monotonic checkpoints bind the exact operation, attempt, predecessor and
-  version. It must pass external status-query, acceptance-time index, lost-ack,
-  non-executable local staging, rollback-independent invocation-blob
-  availability, external executor lease/fencing, restore-after-enqueue and
-  restore-after-effect-before-completion qualification. Only a current
+  binding, release, anchored-time capture-deadline, permanent post-ack recovery,
+  and end-to-end qualification before the output-stage payment hook can activate.
+  The provider path reuses the generic `ProviderAttemptCheckpointV1` family and
+  qualified `DispatchStatusProvider` verifier; WS3 adds no duplicate dispatch
+  checkpoint family. The path must independently pass durable enqueue, signed
+  acceptance, rollback-independent monotonic attempt continuity, external
+  status-query, acceptance-time index, lost-ack, non-executable local staging,
+  invocation-blob availability, external executor lease/fencing,
+  restore-after-enqueue and restore-after-effect-before-completion
+  qualification. Only generic `VerifiedProviderNotAccepted` over a current
   permanent external cancellation checkpoint proves nonacceptance; local queue
-  absence or a restored, behind, divergent or unavailable view freezes the hold.
-  Cancellation makes staged work permanently non-executable; an accepted,
+  absence or a restored, behind, divergent or unavailable view freezes the
+  hold. Cancellation makes staged work permanently non-executable; an accepted,
   executing or completed attempt can never cancel. Recovery may finish an
   executing attempt only from authenticated tool-side status or qualified
   same-key idempotent invocation.
@@ -225,10 +228,14 @@ invented obligation type may land.
   monotonic delivery slot before signing the acknowledgement. It must pass local
   snapshot restore, external status-query, anchor-outage and wrong
   operation/output/receiver binding qualification.
-  Capture happens only after that durable acknowledgement. Missing or ambiguous
-  acknowledgement freezes the hold; only a receiver-signed current permanent
-  external cancellation checkpoint permits release. None of the three gates
-  substitutes for another.
+  Capture happens only after that durable acknowledgement and only for `Passed`;
+  acknowledged `Failed` or deterministic `Unevaluable`, verified cancellation,
+  and durable pre-delivery contractual zero all release. Acknowledgement validity
+  is checked against its anchored accepted time and remains permanent afterward.
+  Missing or ambiguous acknowledgement enters recoverable `delivery_unknown`,
+  freezes the hold and emits no receipt; only a current anchored acknowledgement
+  or permanent cancellation resolves it. None of the three gates substitutes
+  for another.
 - WS2: direct `chio_credit::factor` CAS assignment; discount pricing over
   underwriting inputs; obligor acknowledgement; ladder class
   `factor.assignment_bind`. Venue and penalty integration are deferred.
@@ -345,13 +352,16 @@ optional internal artifacts, not an exit substitute.
 - WS2: ship fraud penalties on the existing `FraudulentListing` abuse class
   first; the dedicated `FraudulentAssignment` variant lands as a coordinated
   open-market revision in the same wave.
-- WS3: the budgeted finalize path does not run the post-invocation guard
-  pipeline today; threading that evaluation in is a named Phase task, not an
-  assumption.
+- WS3 guard integration: durable admission finalization now freezes and runs the
+  existing post-invocation guard pipeline. WS3 must extend that same durable
+  post-return record with outcome evaluation after the final guard mutation and
+  before delivery. Durable block/escalation mapping to contractual zero remains
+  implementation work; a second guard pipeline or bypass is forbidden.
 - WS3 rail and dispatch gates: artifacts, eligibility binding, and the pure
   evaluator may land first. No production outcome-priced payment path activates
-  until a real reversible rail, provider-authenticated durable acceptance backed
-  by external rollback-independent attempt continuity, and
+  until a real reversible rail with anchored-time capture-deadline and permanent
+  post-ack recovery, provider-authenticated durable acceptance backed by the
+  generic external rollback-independent attempt continuity, and
   receiver-authenticated durable delivery backed by external
   rollback-independent slot and blob continuity each pass their WS3
   crash/restore and ambiguity qualification matrices; no current in-tree adapter
