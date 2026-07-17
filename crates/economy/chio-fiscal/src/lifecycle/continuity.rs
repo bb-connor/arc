@@ -6,12 +6,17 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    fiscal_signer_key_id, FiscalDomain, FiscalError, SignedFiscalCharter, VerifiedFiscalCharter,
+    fiscal_signer_key_id, FiscalDomain, FiscalError, SignedFiscalCharter, SignedFiscalSchedule,
+    VerifiedFiscalCharter, VerifiedFiscalSchedule,
 };
 
-use super::activation::{FiscalActivationTarget, FiscalScheduleHead, VerifiedFiscalActivation};
+use super::activation::{
+    FiscalActivationTarget, FiscalScheduleHead, SignedFiscalActivation, VerifiedFiscalActivation,
+};
 use super::proposal::FiscalGenesisPolicy;
-use super::readiness::VerifiedFiscalRuntimeReadiness;
+use super::readiness::{
+    FiscalRuntimeAdapterRegistry, SignedFiscalRuntimeReadiness, VerifiedFiscalRuntimeReadiness,
+};
 use super::support::{
     all_fiscal_domains, is_digest, lifecycle_digest, require_digest, require_positive,
     require_text, signed_envelope_digest, verify_envelope, MAX_SIGNED_LIFECYCLE_BYTES,
@@ -19,6 +24,7 @@ use super::support::{
 
 pub const FISCAL_CONTINUITY_CHECKPOINT_SCHEMA: &str = "chio.fiscal.continuity-checkpoint.v1";
 pub const FISCAL_CONTINUITY_CHECKPOINT_ID_DOMAIN: &str = "chio.fiscal.continuity-checkpoint.id.v1";
+pub const FISCAL_CONTINUITY_ADVANCE_PROOF_SCHEMA: &str = "chio.fiscal.continuity-advance-proof.v1";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -547,11 +553,12 @@ pub enum FiscalContinuityChange {
         activation: Box<VerifiedFiscalActivation>,
         readiness: Box<VerifiedFiscalRuntimeReadiness>,
         domain: FiscalDomain,
-        schedule: FiscalScheduleHead,
+        schedule: Box<VerifiedFiscalSchedule>,
     },
     CharterRotation {
         activation: Box<VerifiedFiscalActivation>,
         readiness: Box<VerifiedFiscalRuntimeReadiness>,
+        predecessor_schedules: Vec<VerifiedFiscalSchedule>,
         replacement_domains: Vec<FiscalDomainState>,
     },
 }
@@ -560,7 +567,47 @@ pub enum FiscalContinuityChange {
 pub struct VerifiedFiscalContinuityAdvance {
     current: VerifiedFiscalContinuityCheckpoint,
     next: VerifiedFiscalContinuityCheckpoint,
-    activation: Option<VerifiedFiscalActivation>,
+    change: FiscalContinuityChange,
+    proof_bytes: Vec<u8>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FiscalContinuityAdvanceProof<'a> {
+    schema: &'static str,
+    current: &'a SignedFiscalContinuityCheckpoint,
+    next: &'a SignedFiscalContinuityCheckpoint,
+    change: FiscalContinuityAdvanceProofChange<'a>,
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
+enum FiscalContinuityAdvanceProofChange<'a> {
+    ClockOnly,
+    Readiness {
+        current: &'a SignedFiscalRuntimeReadiness,
+        current_runtime_registry: &'a FiscalRuntimeAdapterRegistry,
+        next: &'a SignedFiscalRuntimeReadiness,
+        next_runtime_registry: &'a FiscalRuntimeAdapterRegistry,
+    },
+    Activation {
+        activation: &'a SignedFiscalActivation,
+        readiness: &'a SignedFiscalRuntimeReadiness,
+        runtime_registry: &'a FiscalRuntimeAdapterRegistry,
+        domain: FiscalDomain,
+        schedule: &'a SignedFiscalSchedule,
+    },
+    CharterRotation {
+        activation: &'a SignedFiscalActivation,
+        readiness: &'a SignedFiscalRuntimeReadiness,
+        runtime_registry: &'a FiscalRuntimeAdapterRegistry,
+        predecessor_schedules: Vec<&'a SignedFiscalSchedule>,
+        replacement_domains: &'a [FiscalDomainState],
+    },
 }
 
 impl VerifiedFiscalContinuityAdvance {
@@ -640,7 +687,8 @@ impl VerifiedFiscalContinuityAdvance {
                 schedule,
             } => {
                 verify_activation_readiness(readiness, activation, current_body)?;
-                schedule.validate()?;
+                let schedule_head = FiscalScheduleHead::from_signed(schedule.signed())?;
+                schedule_head.validate()?;
                 let schedule_transition = activation
                     .schedule_transition
                     .as_ref()
@@ -666,9 +714,9 @@ impl VerifiedFiscalContinuityAdvance {
                     || activation.body().charter_id != current_body.pinned_charter_id
                     || activation.body().charter_digest != current_body.pinned_charter_digest
                     || !activation.admission_consumed
-                    || schedule.schedule_id.as_str() != schedule_id.as_str()
+                    || schedule_head.schedule_id.as_str() != schedule_id.as_str()
                     || schedule_transition.domain != *domain
-                    || schedule_transition.candidate != *schedule
+                    || schedule_transition.candidate != schedule_head
                     || current_state.active.as_ref() != schedule_transition.predecessor.as_ref()
                     || activation.body().activated_at < current_body.trusted_clock_high_water
                     || activation.body().activated_at > next_body.trusted_clock_high_water
@@ -683,8 +731,8 @@ impl VerifiedFiscalContinuityAdvance {
                         if state.domain == *domain {
                             FiscalDomainState::activated(
                                 *domain,
-                                schedule.clone(),
-                                schedule.clone(),
+                                schedule_head.clone(),
+                                schedule_head.clone(),
                             )
                         } else {
                             Ok(state.clone())
@@ -698,6 +746,7 @@ impl VerifiedFiscalContinuityAdvance {
             FiscalContinuityChange::CharterRotation {
                 activation,
                 readiness,
+                predecessor_schedules,
                 replacement_domains,
             } => {
                 verify_activation_readiness(readiness, activation, current_body)?;
@@ -730,6 +779,15 @@ impl VerifiedFiscalContinuityAdvance {
                     .iter()
                     .filter(|state| state.ever_activated)
                     .count();
+                let predecessor_heads = predecessor_schedules
+                    .iter()
+                    .map(|schedule| {
+                        Ok((
+                            schedule.body().domain,
+                            FiscalScheduleHead::from_signed(schedule.signed())?,
+                        ))
+                    })
+                    .collect::<Result<Vec<_>, FiscalError>>()?;
                 if successor.body().sequence != expected_charter_sequence
                     || predecessor_charter_digest != current_charter.digest()
                     || successor.body().predecessor_charter_digest.as_deref()
@@ -744,6 +802,13 @@ impl VerifiedFiscalContinuityAdvance {
                     || !activation.admission_consumed
                     || successor_schedules.len() != activated_domain_count
                     || activation.rotation_predecessors.len() != activated_domain_count
+                    || predecessor_heads.len() != activated_domain_count
+                    || predecessor_heads
+                        .iter()
+                        .zip(&activation.rotation_predecessors)
+                        .any(|((domain, head), retained)| {
+                            *domain != retained.domain || head != &retained.head
+                        })
                     || activation.body().activated_at < current_body.trusted_clock_high_water
                     || activation.body().activated_at > next_body.trusted_clock_high_water
                     || current_body.domains.iter().zip(replacement_domains).any(
@@ -767,7 +832,7 @@ impl VerifiedFiscalContinuityAdvance {
                     .iter()
                     .filter(|state| state.ever_activated)
                     .zip(successor_schedules)
-                    .zip(&activation.rotation_predecessors)
+                    .zip(&predecessor_heads)
                 {
                     let replacement_state = replacement_domains
                         .iter()
@@ -775,9 +840,9 @@ impl VerifiedFiscalContinuityAdvance {
                         .ok_or(FiscalError::InvalidLineage)?;
                     let expected_head = FiscalScheduleHead::from_signed(replacement)?;
                     if replacement.body.domain != current_state.domain
-                        || predecessor.domain != current_state.domain
-                        || (current_state.active.as_ref() != Some(&predecessor.head)
-                            && current_state.last_known_good.as_ref() != Some(&predecessor.head))
+                        || predecessor.0 != current_state.domain
+                        || (current_state.active.as_ref() != Some(&predecessor.1)
+                            && current_state.last_known_good.as_ref() != Some(&predecessor.1))
                         || replacement_state.active.as_ref() != Some(&expected_head)
                         || replacement_state.last_known_good.as_ref() != Some(&expected_head)
                     {
@@ -786,17 +851,12 @@ impl VerifiedFiscalContinuityAdvance {
                 }
             }
         }
-        let activation = match change {
-            FiscalContinuityChange::Activation { activation, .. }
-            | FiscalContinuityChange::CharterRotation { activation, .. } => {
-                Some((**activation).clone())
-            }
-            FiscalContinuityChange::ClockOnly | FiscalContinuityChange::Readiness { .. } => None,
-        };
+        let proof_bytes = canonical_advance_proof(current, &next, change)?;
         Ok(Self {
             current: current.clone(),
             next,
-            activation,
+            change: change.clone(),
+            proof_bytes,
         })
     }
 
@@ -809,6 +869,89 @@ impl VerifiedFiscalContinuityAdvance {
     pub const fn next(&self) -> &VerifiedFiscalContinuityCheckpoint {
         &self.next
     }
+
+    #[must_use]
+    pub fn canonical_proof_bytes(&self) -> &[u8] {
+        &self.proof_bytes
+    }
+
+    pub fn reverify(
+        &self,
+        policy: &FiscalGenesisPolicy,
+        charters: &FiscalCharterRegistry,
+    ) -> Result<(), FiscalError> {
+        let verified = Self::verify(
+            &self.current,
+            self.next.signed().clone(),
+            policy,
+            charters,
+            &self.change,
+        )?;
+        if verified.proof_bytes != self.proof_bytes {
+            return Err(FiscalError::InvalidField("continuity.advance_proof"));
+        }
+        Ok(())
+    }
+
+    fn activation(&self) -> Option<&VerifiedFiscalActivation> {
+        match &self.change {
+            FiscalContinuityChange::Activation { activation, .. }
+            | FiscalContinuityChange::CharterRotation { activation, .. } => Some(activation),
+            FiscalContinuityChange::ClockOnly | FiscalContinuityChange::Readiness { .. } => None,
+        }
+    }
+}
+
+fn canonical_advance_proof(
+    current: &VerifiedFiscalContinuityCheckpoint,
+    next: &VerifiedFiscalContinuityCheckpoint,
+    change: &FiscalContinuityChange,
+) -> Result<Vec<u8>, FiscalError> {
+    let change = match change {
+        FiscalContinuityChange::ClockOnly => FiscalContinuityAdvanceProofChange::ClockOnly,
+        FiscalContinuityChange::Readiness { current, next } => {
+            FiscalContinuityAdvanceProofChange::Readiness {
+                current: current.signed(),
+                current_runtime_registry: current.runtime_registry(),
+                next: next.signed(),
+                next_runtime_registry: next.runtime_registry(),
+            }
+        }
+        FiscalContinuityChange::Activation {
+            activation,
+            readiness,
+            domain,
+            schedule,
+        } => FiscalContinuityAdvanceProofChange::Activation {
+            activation: activation.signed(),
+            readiness: readiness.signed(),
+            runtime_registry: readiness.runtime_registry(),
+            domain: *domain,
+            schedule: schedule.signed(),
+        },
+        FiscalContinuityChange::CharterRotation {
+            activation,
+            readiness,
+            predecessor_schedules,
+            replacement_domains,
+        } => FiscalContinuityAdvanceProofChange::CharterRotation {
+            activation: activation.signed(),
+            readiness: readiness.signed(),
+            runtime_registry: readiness.runtime_registry(),
+            predecessor_schedules: predecessor_schedules
+                .iter()
+                .map(VerifiedFiscalSchedule::signed)
+                .collect(),
+            replacement_domains,
+        },
+    };
+    canonical_json_bytes(&FiscalContinuityAdvanceProof {
+        schema: FISCAL_CONTINUITY_ADVANCE_PROOF_SCHEMA,
+        current: current.signed(),
+        next: next.signed(),
+        change,
+    })
+    .map_err(|error| FiscalError::Canonicalization(error.to_string()))
 }
 
 fn verify_activation_readiness(
@@ -890,6 +1033,9 @@ pub fn commit_fiscal_continuity_advance(
     policy: &FiscalGenesisPolicy,
     charters: &FiscalCharterRegistry,
 ) -> Result<VerifiedFiscalContinuityCommit, FiscalStateAnchorError> {
+    advance
+        .reverify(policy, charters)
+        .map_err(|_| FiscalStateAnchorError::Divergence)?;
     let acknowledged = anchor.compare_and_swap(advance.current().digest(), &advance)?;
     verify_fiscal_continuity_acknowledgement(acknowledged, advance, policy, charters)
 }
@@ -900,6 +1046,9 @@ pub fn recover_fiscal_continuity_advance(
     policy: &FiscalGenesisPolicy,
     charters: &FiscalCharterRegistry,
 ) -> Result<VerifiedFiscalContinuityCommit, FiscalStateAnchorError> {
+    advance
+        .reverify(policy, charters)
+        .map_err(|_| FiscalStateAnchorError::Divergence)?;
     let acknowledged = anchor.read()?;
     verify_fiscal_continuity_acknowledgement(acknowledged, advance, policy, charters)
 }
@@ -918,7 +1067,8 @@ fn verify_fiscal_continuity_acknowledgement(
     let checkpoint_digest = checkpoint.digest().to_owned();
     let activation_authority =
         advance
-            .activation
+            .activation()
+            .cloned()
             .map(|activation| VerifiedFiscalActivationAuthority {
                 activation,
                 checkpoint_digest,

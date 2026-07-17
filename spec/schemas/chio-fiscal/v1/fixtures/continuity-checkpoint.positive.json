@@ -2,7 +2,7 @@
   "body": {
     "anchorId": "fiscal-anchor",
     "anchorNamespace": "fiscal-main",
-    "checkpointId": "8cf34af8c8392f5636659b29aaa4c1c9e1dd2816d228878ebd6430593d319a39",
+    "checkpointId": "2763aee9f3c7974e79cd64f19c35cca3bd4af8cd62cc2bfb4774dc384556c00f",
     "continuitySequence": 0,
     "domains": [
       {
@@ -32,12 +32,12 @@
     "pinnedCharterDigest": "a79930cdbd1c5d68208e437f8b8851dcd0f66114b5d34c25cb48a670bf2a22fa",
     "pinnedCharterId": "8e486b91278e696d27603e62e2192af0667d5417891379a354b4113be30bb375",
     "pinnedCharterSequence": 1,
-    "runtimeReadinessDigest": "44433b5b85e0c33b239de5689e3a86d753518dd3587b0e3867465e0b2f1aabcf",
+    "runtimeReadinessDigest": "5df1acf7b95203e09f06522ba5756fbacedbbf03ade8b61cba3865078384709e",
     "schema": "chio.fiscal.continuity-checkpoint.v1",
     "signerKeyEpoch": 1,
     "signerKeyId": "5c29b78f10a35a49a6231d08ee840a04bcc3a37a4f9d46df327dec56b8a9b7c9",
     "trustedClockHighWater": 55
   },
-  "signature": "1fc349b712ed202219870f914c1a1a1372dfae843a56bd9a798399a7d9230d0e77558db35bd1e018e21831ce5d8d924f188fe37439575092fd98d11e404a4f0c",
+  "signature": "cbcd18d58819195fbd6362025f543c9ef35f2f6ba4de40a6459f2cf3a2629a7e0c146b80ad3bad01e40f007543445aa620ed0d65128469ac874910fead1d830b",
   "signerKey": "1398f62c6d1a457c51ba6a4b5f3dbd2f69fca93216218dc8997e416bd17d93ca"
 }

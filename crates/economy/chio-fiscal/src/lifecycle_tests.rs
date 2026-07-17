@@ -19,6 +19,20 @@ fn digest(value: &str) -> String {
     sha256_hex(value.as_bytes())
 }
 
+fn runtime_registry(version: &str) -> TestResult<FiscalRuntimeAdapterRegistry> {
+    FiscalRuntimeAdapterRegistry::new(
+        format!("build-{version}"),
+        "chio.fiscal.runtime.v1".to_owned(),
+        (0..FISCAL_RUNTIME_ADAPTER_COUNT)
+            .rev()
+            .map(|index| {
+                FiscalRuntimeAdapter::new(format!("adapter-{index}"), format!("{version}.{index}"))
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    )
+    .map_err(Into::into)
+}
+
 fn fiscal_fixture(name: &str) -> TestResult<Value> {
     let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!(
         "../../../spec/schemas/chio-fiscal/v1/fixtures/{name}.positive.json"
@@ -268,14 +282,16 @@ fn continuity_fixture() -> TestResult<ContinuityFixture> {
         anchor_key.public_key(),
         bootstrap,
     )?;
+    let runtime_registry = runtime_registry("1")?;
     let readiness = VerifiedFiscalRuntimeReadiness::verify(
         FiscalRuntimeReadinessBuilder {
             readiness_sequence: 1,
-            runtime_registry_digest: digest("runtime registry"),
+            runtime_registry: runtime_registry.clone(),
             attested_at: 55,
         }
         .sign(&policy, &anchor_key)?,
         &policy,
+        runtime_registry,
     )?;
     let charters = FiscalCharterRegistry::new(vec![amendment.charter.signed().clone()])?;
     let genesis = VerifiedFiscalContinuityCheckpoint::verify(
@@ -320,7 +336,7 @@ fn continuity_fixture() -> TestResult<ContinuityFixture> {
             activation: Box::new(amendment.activation.clone()),
             readiness: Box::new(readiness.clone()),
             domain: FiscalDomain::TierLimits,
-            schedule: head,
+            schedule: Box::new(amendment.schedule.clone()),
         },
     )?;
     let anchor = TestAnchor {
@@ -346,6 +362,89 @@ fn continuity_fixture() -> TestResult<ContinuityFixture> {
         activated,
         authority,
     })
+}
+
+#[test]
+fn runtime_adapter_registry_is_exact_sorted_and_canonical() -> TestResult {
+    let registry = runtime_registry("registry")?;
+    assert_eq!(registry.adapters().len(), FISCAL_RUNTIME_ADAPTER_COUNT);
+    assert!(registry
+        .adapters()
+        .windows(2)
+        .all(|pair| pair[0].id < pair[1].id));
+
+    let bytes = registry.canonical_bytes()?;
+    let decoded = FiscalRuntimeAdapterRegistry::from_canonical_bytes(&bytes)?;
+    assert_eq!(decoded, registry);
+    assert_eq!(decoded.digest()?, registry.digest()?);
+
+    let mut incomplete = registry.adapters().to_vec();
+    incomplete.pop();
+    assert!(FiscalRuntimeAdapterRegistry::new(
+        registry.build_id().to_owned(),
+        registry.schema_version().to_owned(),
+        incomplete,
+    )
+    .is_err());
+
+    let duplicate = FiscalRuntimeAdapter::new("duplicate".to_owned(), "1".to_owned())?;
+    assert!(FiscalRuntimeAdapterRegistry::new(
+        "build-duplicate".to_owned(),
+        "chio.fiscal.runtime.v1".to_owned(),
+        vec![duplicate; FISCAL_RUNTIME_ADAPTER_COUNT],
+    )
+    .is_err());
+    Ok(())
+}
+
+#[test]
+fn continuity_advance_retains_reverifiable_canonical_evidence() -> TestResult {
+    let fixture = continuity_fixture()?;
+    let change = FiscalContinuityChange::Activation {
+        activation: Box::new(fixture.amendment.activation.clone()),
+        readiness: Box::new(fixture.readiness.clone()),
+        domain: FiscalDomain::TierLimits,
+        schedule: Box::new(fixture.amendment.schedule.clone()),
+    };
+    let advance = VerifiedFiscalContinuityAdvance::verify(
+        &fixture.genesis,
+        fixture.activated.signed().clone(),
+        &fixture.policy,
+        &fixture.charters,
+        &change,
+    )?;
+    advance.reverify(&fixture.policy, &fixture.charters)?;
+
+    let repeated = VerifiedFiscalContinuityAdvance::verify(
+        &fixture.genesis,
+        fixture.activated.signed().clone(),
+        &fixture.policy,
+        &fixture.charters,
+        &change,
+    )?;
+    assert_eq!(
+        advance.canonical_proof_bytes(),
+        repeated.canonical_proof_bytes()
+    );
+
+    let proof: Value = serde_json::from_slice(advance.canonical_proof_bytes())?;
+    assert_eq!(proof["schema"], FISCAL_CONTINUITY_ADVANCE_PROOF_SCHEMA);
+    assert_eq!(proof["change"]["kind"], "activation");
+    assert_eq!(
+        proof["change"]["readiness"]["body"]["readinessId"],
+        fixture.readiness.body().readiness_id
+    );
+    assert_eq!(
+        proof["change"]["schedule"]["body"]["scheduleId"],
+        fixture.amendment.schedule.body().schedule_id
+    );
+    assert_eq!(
+        proof["change"]["runtimeRegistry"]["adapters"]
+            .as_array()
+            .map(Vec::len),
+        Some(FISCAL_RUNTIME_ADAPTER_COUNT)
+    );
+    Ok(())
 }
 
 #[test]
@@ -753,14 +852,16 @@ fn continuity_rejects_marker_clock_and_sequence_rollback() -> TestResult {
         )
         .is_err());
     }
+    let next_registry = runtime_registry("2")?;
     let next_readiness = VerifiedFiscalRuntimeReadiness::verify(
         FiscalRuntimeReadinessBuilder {
             readiness_sequence: 2,
-            runtime_registry_digest: digest("runtime registry v2"),
+            runtime_registry: next_registry.clone(),
             attested_at: 70,
         }
         .sign(&fixture.policy, &fixture.anchor_key)?,
         &fixture.policy,
+        next_registry,
     )?;
     let readiness_checkpoint = FiscalContinuityCheckpointBuilder {
         continuity_sequence: 2,
@@ -852,19 +953,21 @@ fn activation_requires_the_exact_current_runtime_readiness() -> TestResult {
             activation: Box::new(fixture.amendment.activation.clone()),
             readiness: Box::new(fixture.readiness.clone()),
             domain: FiscalDomain::TierLimits,
-            schedule: head.clone(),
+            schedule: Box::new(fixture.amendment.schedule.clone()),
         },
     )
     .is_err());
 
+    let substituted_registry = runtime_registry("substituted")?;
     let substituted = VerifiedFiscalRuntimeReadiness::verify(
         FiscalRuntimeReadinessBuilder {
             readiness_sequence: 2,
-            runtime_registry_digest: digest("substituted runtime registry"),
+            runtime_registry: substituted_registry.clone(),
             attested_at: 55,
         }
         .sign(&fixture.policy, &fixture.anchor_key)?,
         &fixture.policy,
+        substituted_registry,
     )?;
     assert!(VerifiedFiscalContinuityAdvance::verify(
         &fixture.genesis,
@@ -875,19 +978,21 @@ fn activation_requires_the_exact_current_runtime_readiness() -> TestResult {
             activation: Box::new(fixture.amendment.activation.clone()),
             readiness: Box::new(substituted),
             domain: FiscalDomain::TierLimits,
-            schedule: head.clone(),
+            schedule: Box::new(fixture.amendment.schedule.clone()),
         },
     )
     .is_err());
 
+    let future_registry = runtime_registry("future")?;
     let future = VerifiedFiscalRuntimeReadiness::verify(
         FiscalRuntimeReadinessBuilder {
             readiness_sequence: 2,
-            runtime_registry_digest: digest("future runtime registry"),
+            runtime_registry: future_registry.clone(),
             attested_at: 71,
         }
         .sign(&fixture.policy, &fixture.anchor_key)?,
         &fixture.policy,
+        future_registry,
     )?;
     let future_current = build_current(future.digest().to_owned())?;
     assert!(VerifiedFiscalContinuityAdvance::verify(
@@ -899,7 +1004,7 @@ fn activation_requires_the_exact_current_runtime_readiness() -> TestResult {
             activation: Box::new(fixture.amendment.activation.clone()),
             readiness: Box::new(future),
             domain: FiscalDomain::TierLimits,
-            schedule: head,
+            schedule: Box::new(fixture.amendment.schedule.clone()),
         },
     )
     .is_err());
@@ -918,7 +1023,12 @@ fn activation_requires_the_exact_current_runtime_readiness() -> TestResult {
         mutate(&mut body);
         body.readiness_id = body.expected_id()?;
         let signed = SignedFiscalRuntimeReadiness::sign(body, &fixture.anchor_key)?;
-        assert!(VerifiedFiscalRuntimeReadiness::verify(signed, &fixture.policy).is_err());
+        assert!(VerifiedFiscalRuntimeReadiness::verify(
+            signed,
+            &fixture.policy,
+            fixture.readiness.runtime_registry().clone(),
+        )
+        .is_err());
     }
     Ok(())
 }
@@ -927,9 +1037,12 @@ fn activation_requires_the_exact_current_runtime_readiness() -> TestResult {
 fn continuity_binds_exact_schedule_domain_predecessor_and_charter_lineage() -> TestResult {
     let fixture = continuity_fixture()?;
     let exact_head = FiscalScheduleHead::from_signed(fixture.amendment.schedule.signed())?;
-    let alternate_schedule =
-        SignedFiscalSchedule::sign(fixture.amendment.schedule.body().clone(), &key(6))?;
-    let alternate_head = FiscalScheduleHead::from_signed(&alternate_schedule)?;
+    let alternate_schedule = VerifiedFiscalSchedule::verify(
+        SignedFiscalSchedule::sign(fixture.amendment.schedule.body().clone(), &key(6))?,
+        &fixture.amendment.charter,
+        None,
+    )?;
+    let alternate_head = FiscalScheduleHead::from_signed(alternate_schedule.signed())?;
     let transition = fixture.activated.body().staged_transition.clone();
 
     let alternate_next = FiscalContinuityCheckpointBuilder {
@@ -953,7 +1066,7 @@ fn continuity_binds_exact_schedule_domain_predecessor_and_charter_lineage() -> T
             activation: Box::new(fixture.amendment.activation.clone()),
             readiness: Box::new(fixture.readiness.clone()),
             domain: FiscalDomain::TierLimits,
-            schedule: alternate_head,
+            schedule: Box::new(alternate_schedule),
         },
     )
     .is_err());
@@ -985,7 +1098,7 @@ fn continuity_binds_exact_schedule_domain_predecessor_and_charter_lineage() -> T
             activation: Box::new(fixture.amendment.activation.clone()),
             readiness: Box::new(fixture.readiness.clone()),
             domain: FiscalDomain::InsurancePremiumSchedule,
-            schedule: exact_head.clone(),
+            schedule: Box::new(fixture.amendment.schedule.clone()),
         },
     )
     .is_err());
@@ -1011,7 +1124,7 @@ fn continuity_binds_exact_schedule_domain_predecessor_and_charter_lineage() -> T
             activation: Box::new(fixture.amendment.activation.clone()),
             readiness: Box::new(fixture.readiness.clone()),
             domain: FiscalDomain::TierLimits,
-            schedule: exact_head,
+            schedule: Box::new(fixture.amendment.schedule.clone()),
         },
     )
     .is_err());
@@ -1134,14 +1247,16 @@ fn resolver_enforces_lineage_currency_expiry_and_last_known_good() -> TestResult
         ),
         FiscalResolution::Denied(FiscalDenialReason::NoValidLastKnownGood)
     );
+    let wrong_registry = runtime_registry("different")?;
     let wrong_readiness = VerifiedFiscalRuntimeReadiness::verify(
         FiscalRuntimeReadinessBuilder {
             readiness_sequence: 2,
-            runtime_registry_digest: digest("different runtime registry"),
+            runtime_registry: wrong_registry.clone(),
             attested_at: 55,
         }
         .sign(&fixture.policy, &fixture.anchor_key)?,
         &fixture.policy,
+        wrong_registry,
     )?;
     assert_eq!(
         resolve_fiscal_schedule::<FiscalParams>(
@@ -1378,7 +1493,7 @@ fn external_anchor_port_reads_authentically_and_cas_advances() -> TestResult {
             activation: Box::new(fixture.amendment.activation.clone()),
             readiness: Box::new(fixture.readiness.clone()),
             domain: FiscalDomain::TierLimits,
-            schedule: head.clone(),
+            schedule: Box::new(fixture.amendment.schedule.clone()),
         },
     )?;
     let anchor = TestAnchor {
