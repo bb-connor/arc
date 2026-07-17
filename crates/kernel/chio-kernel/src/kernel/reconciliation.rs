@@ -283,7 +283,7 @@ impl ChioKernel {
             warn!(
                 nonce_id = %presented_nonce.nonce_id(),
                 hold_id = %hold.hold_id,
-                reason = %error,
+                reason = %redacted!(&error),
                 "failed to mark the reconcile nonce consumed after an irreversible settlement; \
                  the closed hold still rejects any replay"
             );
