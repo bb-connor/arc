@@ -281,56 +281,107 @@ impl ChioKernel {
         };
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(current_unix_timestamp_ms());
-        let recoverable = runtime
-            .store
-            .list_recoverable(trusted_now_unix_ms, PAGE_LIMIT)
-            .map_err(durable_store_error)?;
-        if recoverable.len() > PAGE_LIMIT {
-            return Err(KernelError::DurableAdmission(
-                "admission recovery store exceeded the requested page limit".to_owned(),
-            ));
-        }
         let mut reconciled = 0_usize;
-        for operation in recoverable {
-            if operation.state() != AdmissionOperationState::DispatchCommitted {
-                continue;
-            }
-            if runtime
-                .outcome_store
-                .lookup_by_operation(operation.binding().operation_id())
-                .map_err(durable_outcome_store_error)?
-                .is_some()
-            {
-                return Err(KernelError::DurableAdmission(
-                    "dispatch-committed admission already has a durable tool outcome".to_owned(),
-                ));
-            }
-            let lease = self.claim_admission_recovery(&operation, trusted_now_unix_ms)?;
-            let context = AdmissionProjectionContext {
-                operation_id: operation.binding().operation_id().clone(),
-                request_id: operation.binding().request_id().clone(),
-                expected_operation_version: operation.version(),
-                trusted_time_unix_ms: trusted_now_unix_ms,
-                coordinator_lease_id: lease.coordinator_lease_id().clone(),
-                coordinator_lease_epoch: lease.coordinator_lease_epoch(),
-                store_fence: runtime.fence.clone(),
-            };
-            let projection =
-                verified_outcome_unknown_after_dispatch_projection(&operation, context)?;
-            let terminal = runtime
+        loop {
+            let recoverable = runtime
                 .store
-                .commit_admission_projection(&projection)
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-            if terminal.operation_id != *operation.binding().operation_id()
-                || terminal.state != AdmissionOperationState::OutcomeUnknownAfterDispatch
-            {
+                .list_recoverable(trusted_now_unix_ms, PAGE_LIMIT)
+                .map_err(durable_store_error)?;
+            if recoverable.len() > PAGE_LIMIT {
                 return Err(KernelError::DurableAdmission(
-                    "admission recovery committed a different terminal operation".to_owned(),
+                    "admission recovery store exceeded the requested page limit".to_owned(),
                 ));
             }
-            reconciled = reconciled.checked_add(1).ok_or_else(|| {
-                KernelError::DurableAdmission("admission recovery count overflow".to_owned())
-            })?;
+            if recoverable.is_empty() {
+                break;
+            }
+            for operation in recoverable {
+                match operation.state() {
+                    AdmissionOperationState::DispatchCommitted => {
+                        if runtime
+                            .outcome_store
+                            .lookup_by_operation(operation.binding().operation_id())
+                            .map_err(durable_outcome_store_error)?
+                            .is_some()
+                        {
+                            return Err(KernelError::DurableAdmission(
+                                "dispatch-committed admission already has a durable tool outcome"
+                                    .to_owned(),
+                            ));
+                        }
+                        let lease =
+                            self.claim_admission_recovery(&operation, trusted_now_unix_ms)?;
+                        let context = AdmissionProjectionContext {
+                            operation_id: operation.binding().operation_id().clone(),
+                            request_id: operation.binding().request_id().clone(),
+                            expected_operation_version: operation.version(),
+                            trusted_time_unix_ms: trusted_now_unix_ms,
+                            coordinator_lease_id: lease.coordinator_lease_id().clone(),
+                            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+                            store_fence: runtime.fence.clone(),
+                        };
+                        let projection = verified_outcome_unknown_after_dispatch_projection(
+                            &operation, context,
+                        )?;
+                        let terminal = runtime
+                            .store
+                            .commit_admission_projection(&projection)
+                            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+                        if terminal.operation_id != *operation.binding().operation_id()
+                            || terminal.state
+                                != AdmissionOperationState::OutcomeUnknownAfterDispatch
+                        {
+                            return Err(KernelError::DurableAdmission(
+                                "admission recovery committed a different terminal operation"
+                                    .to_owned(),
+                            ));
+                        }
+                        reconciled = reconciled.checked_add(1).ok_or_else(|| {
+                            KernelError::DurableAdmission(
+                                "admission recovery count overflow".to_owned(),
+                            )
+                        })?;
+                    }
+                    AdmissionOperationState::Finalizing
+                        if operation.binding().participant_requirements().payment =>
+                    {
+                        let journal = runtime
+                            .store
+                            .load_payment_journal(
+                                operation.binding().operation_id().as_str(),
+                                &runtime.fence,
+                            )
+                            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
+                            .ok_or_else(|| {
+                                KernelError::DurableAdmission(
+                                    "finalizing admission lost its payment journal".to_owned(),
+                                )
+                            })?;
+                        let lease =
+                            self.claim_admission_recovery(&operation, trusted_now_unix_ms)?;
+                        if journal.state == crate::payment::PaymentJournalState::Settling
+                            && self
+                                .continue_durable_payment_settlement(
+                                    &operation,
+                                    runtime,
+                                    &lease,
+                                    journal,
+                                    trusted_now_unix_ms,
+                                )?
+                                .is_some()
+                        {
+                            reconciled = reconciled.checked_add(1).ok_or_else(|| {
+                                KernelError::DurableAdmission(
+                                    "admission recovery count overflow".to_owned(),
+                                )
+                            })?;
+                        }
+                    }
+                    _ => {
+                        self.claim_admission_recovery(&operation, trusted_now_unix_ms)?;
+                    }
+                }
+            }
         }
         Ok(reconciled)
     }

@@ -138,9 +138,7 @@ fn anchored_channel_view(
     checkpoint_label: &str,
 ) -> TestResult<VerifiedEconomicStateView> {
     let operation_id = lifecycle.operation_id.clone();
-    let effect_idempotency_key = operation_id
-        .as_ref()
-        .map(channel_digest);
+    let effect_idempotency_key = operation_id.as_ref().map(channel_digest);
     let channel_state = EconomicContentV1::Inline {
         value: serde_json::to_value(lifecycle)?,
     };

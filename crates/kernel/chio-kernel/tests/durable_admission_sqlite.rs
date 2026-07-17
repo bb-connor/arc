@@ -32,7 +32,9 @@ struct MutationServer {
     invocations: Arc<AtomicU64>,
 }
 
-struct ZeroCostMutationServer;
+struct ZeroCostMutationServer {
+    invocations: Arc<AtomicU64>,
+}
 
 struct PaidMutationServer {
     invocations: Arc<AtomicU64>,
@@ -49,6 +51,8 @@ struct PaymentCalls {
     captures: AtomicU64,
     releases: AtomicU64,
     refunds: AtomicU64,
+    fail_next_capture: AtomicBool,
+    fail_next_release: AtomicBool,
 }
 
 struct FailOnceOutcomeStore {
@@ -96,6 +100,7 @@ impl ToolServerConnection for ZeroCostMutationServer {
         _arguments: serde_json::Value,
         _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError> {
+        self.invocations.fetch_add(1, Ordering::SeqCst);
         Ok(serde_json::json!({"result": "no charge"}))
     }
 
@@ -190,6 +195,11 @@ impl PaymentAdapter for ReversiblePaymentAdapter {
     ) -> Result<PaymentResult, PaymentError> {
         if let Some(calls) = &self.calls {
             calls.captures.fetch_add(1, Ordering::SeqCst);
+            if calls.fail_next_capture.swap(false, Ordering::SeqCst) {
+                return Err(PaymentError::Unavailable(
+                    "injected capture interruption".to_owned(),
+                ));
+            }
         }
         Ok(PaymentResult {
             transaction_id: authorization_id.to_owned(),
@@ -205,6 +215,11 @@ impl PaymentAdapter for ReversiblePaymentAdapter {
     ) -> Result<PaymentResult, PaymentError> {
         if let Some(calls) = &self.calls {
             calls.releases.fetch_add(1, Ordering::SeqCst);
+            if calls.fail_next_release.swap(false, Ordering::SeqCst) {
+                return Err(PaymentError::Unavailable(
+                    "injected release interruption".to_owned(),
+                ));
+            }
         }
         Ok(PaymentResult {
             transaction_id: format!("release:{authorization_id}"),
@@ -602,6 +617,188 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
 }
 
 #[test]
+fn sqlite_restart_replays_a_committed_capture_intent_before_request_recovery(
+) -> Result<(), Box<dyn Error>> {
+    let temp = tempfile::tempdir()?;
+    let database = temp.path().join("authority.db");
+    let lock_root = temp.path().join("locks");
+    std::fs::create_dir(&lock_root)?;
+    SqliteAuthorityStore::provision(&database, &lock_root)?;
+    let kernel_keypair = Keypair::generate();
+    let invocations = Arc::new(AtomicU64::new(0));
+    let payment_calls = Arc::new(PaymentCalls::default());
+    payment_calls
+        .fail_next_capture
+        .store(true, Ordering::SeqCst);
+
+    let (request, operation_id) = {
+        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let fence = authority.mutation_fence();
+        let operations = Arc::new(authority.admission_operation_store());
+        let outcomes = Arc::new(authority.tool_outcome_store());
+        let budget = Arc::new(authority.budget_store());
+        let mut kernel = ChioKernel::new(kernel_config(kernel_keypair.clone()));
+        kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
+        kernel.set_budget_store_handle(budget);
+        kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
+            calls: Some(payment_calls.clone()),
+        }));
+        kernel.register_tool_server(Box::new(PaidMutationServer {
+            invocations: invocations.clone(),
+        }));
+        let agent = Keypair::generate();
+        let capability = kernel.issue_capability(&agent.public_key(), paid_scope(), 300)?;
+        let request = paid_request(&capability);
+        let error = kernel
+            .evaluate_tool_call_blocking(&request)
+            .err()
+            .ok_or_else(|| std::io::Error::other("the injected capture must fail"))?;
+        assert!(matches!(
+            error,
+            KernelError::DurableAdmission(ref reason)
+                if reason.contains("injected capture interruption")
+        ));
+        let recoverable = operations.list_recoverable(now_unix_ms()? + 120_000, 10)?;
+        assert_eq!(recoverable.len(), 1);
+        let operation = &recoverable[0];
+        assert_eq!(operation.state(), AdmissionOperationState::Finalizing);
+        let journal = operations
+            .load_payment_journal(operation.binding().operation_id().as_str(), &fence)?
+            .ok_or_else(|| std::io::Error::other("payment journal is absent"))?;
+        assert_eq!(journal.state, PaymentJournalState::Settling);
+        (request, operation.binding().operation_id().clone())
+    };
+
+    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let fence = authority.mutation_fence();
+    let operations = Arc::new(authority.admission_operation_store());
+    let outcomes = Arc::new(authority.tool_outcome_store());
+    let budget = Arc::new(authority.budget_store());
+    let mut recovered_kernel = ChioKernel::new(kernel_config(kernel_keypair));
+    recovered_kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
+    recovered_kernel.set_budget_store_handle(budget);
+    recovered_kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
+        calls: Some(payment_calls.clone()),
+    }));
+    recovered_kernel.register_tool_server(Box::new(PaidMutationServer {
+        invocations: invocations.clone(),
+    }));
+
+    assert_eq!(recovered_kernel.reconcile_recoverable_admissions()?, 1);
+    let journal = operations
+        .load_payment_journal(operation_id.as_str(), &fence)?
+        .ok_or_else(|| std::io::Error::other("recovered payment journal is absent"))?;
+    assert_eq!(journal.state, PaymentJournalState::Settled);
+    assert_eq!(journal.settle_action, Some(PaymentSettleAction::Capture));
+    assert_eq!(payment_calls.captures.load(Ordering::SeqCst), 2);
+
+    let response = recovered_kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(payment_calls.captures.load(Ordering::SeqCst), 2);
+    let completed = operations
+        .load_by_operation_id(&operation_id)?
+        .ok_or_else(|| std::io::Error::other("completed operation is absent"))?;
+    assert_eq!(completed.state(), AdmissionOperationState::Completed);
+    Ok(())
+}
+
+#[test]
+fn sqlite_restart_replays_a_committed_release_intent_before_request_recovery(
+) -> Result<(), Box<dyn Error>> {
+    let temp = tempfile::tempdir()?;
+    let database = temp.path().join("authority.db");
+    let lock_root = temp.path().join("locks");
+    std::fs::create_dir(&lock_root)?;
+    SqliteAuthorityStore::provision(&database, &lock_root)?;
+    let kernel_keypair = Keypair::generate();
+    let invocations = Arc::new(AtomicU64::new(0));
+    let payment_calls = Arc::new(PaymentCalls::default());
+    payment_calls
+        .fail_next_release
+        .store(true, Ordering::SeqCst);
+
+    let (request, operation_id) = {
+        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let fence = authority.mutation_fence();
+        let operations = Arc::new(authority.admission_operation_store());
+        let outcomes = Arc::new(authority.tool_outcome_store());
+        let budget = Arc::new(authority.budget_store());
+        let mut kernel = ChioKernel::new(kernel_config(kernel_keypair.clone()));
+        kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
+        kernel.set_budget_store_handle(budget);
+        kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
+            calls: Some(payment_calls.clone()),
+        }));
+        kernel.register_tool_server(Box::new(ZeroCostMutationServer {
+            invocations: invocations.clone(),
+        }));
+        let agent = Keypair::generate();
+        let capability = kernel.issue_capability(&agent.public_key(), zero_charge_scope(), 300)?;
+        let request = zero_charge_request(&capability);
+        let error = kernel
+            .evaluate_tool_call_blocking(&request)
+            .err()
+            .ok_or_else(|| std::io::Error::other("the injected release must fail"))?;
+        assert!(matches!(
+            error,
+            KernelError::DurableAdmission(ref reason)
+                if reason.contains("injected release interruption")
+        ));
+        let recoverable = operations.list_recoverable(now_unix_ms()? + 120_000, 10)?;
+        assert_eq!(recoverable.len(), 1);
+        let operation = &recoverable[0];
+        assert_eq!(operation.state(), AdmissionOperationState::Finalizing);
+        let journal = operations
+            .load_payment_journal(operation.binding().operation_id().as_str(), &fence)?
+            .ok_or_else(|| std::io::Error::other("payment journal is absent"))?;
+        assert_eq!(journal.state, PaymentJournalState::Settling);
+        assert_eq!(journal.settle_action, Some(PaymentSettleAction::Release));
+        assert_eq!(
+            journal
+                .release_authority
+                .as_ref()
+                .map(|authority| authority.kind),
+            Some(PaymentReleaseAuthorityKind::ContractualZeroCharge)
+        );
+        (request, operation.binding().operation_id().clone())
+    };
+
+    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let fence = authority.mutation_fence();
+    let operations = Arc::new(authority.admission_operation_store());
+    let outcomes = Arc::new(authority.tool_outcome_store());
+    let budget = Arc::new(authority.budget_store());
+    let mut recovered_kernel = ChioKernel::new(kernel_config(kernel_keypair));
+    recovered_kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
+    recovered_kernel.set_budget_store_handle(budget);
+    recovered_kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
+        calls: Some(payment_calls.clone()),
+    }));
+    recovered_kernel.register_tool_server(Box::new(ZeroCostMutationServer {
+        invocations: invocations.clone(),
+    }));
+
+    assert_eq!(recovered_kernel.reconcile_recoverable_admissions()?, 1);
+    let journal = operations
+        .load_payment_journal(operation_id.as_str(), &fence)?
+        .ok_or_else(|| std::io::Error::other("recovered payment journal is absent"))?;
+    assert_eq!(journal.state, PaymentJournalState::Settled);
+    assert_eq!(journal.settle_action, Some(PaymentSettleAction::Release));
+    assert_eq!(payment_calls.releases.load(Ordering::SeqCst), 2);
+
+    let response = recovered_kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(payment_calls.releases.load(Ordering::SeqCst), 2);
+    let completed = operations
+        .load_by_operation_id(&operation_id)?
+        .ok_or_else(|| std::io::Error::other("completed operation is absent"))?;
+    assert_eq!(completed.state(), AdmissionOperationState::Completed);
+    Ok(())
+}
+
+#[test]
 fn sqlite_durable_admission_atomically_publishes_receipt_and_terminal_outcome(
 ) -> Result<(), Box<dyn Error>> {
     let temp = tempfile::tempdir()?;
@@ -696,7 +893,9 @@ fn sqlite_durable_zero_charge_persists_release_evidence_and_reopens_cleanly(
         kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
         kernel.set_budget_store_handle(budget);
         kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter::default()));
-        kernel.register_tool_server(Box::new(ZeroCostMutationServer));
+        kernel.register_tool_server(Box::new(ZeroCostMutationServer {
+            invocations: Arc::new(AtomicU64::new(0)),
+        }));
         let agent = Keypair::generate();
         let capability = kernel.issue_capability(&agent.public_key(), zero_charge_scope(), 300)?;
         let response = kernel.evaluate_tool_call_blocking(&zero_charge_request(&capability))?;

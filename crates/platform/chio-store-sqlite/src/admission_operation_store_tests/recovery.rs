@@ -81,6 +81,53 @@ fn recovery_claims_are_bounded_fenced_and_time_monotonic() {
 }
 
 #[test]
+fn recovery_claims_advance_a_full_batch_without_hiding_later_operations() {
+    let fixture = fixture();
+    let begun_at = now_ms();
+    for index in 0..257 {
+        let request_id = format!("request-recovery-page-{index:03}");
+        let capability_id = format!("capability-recovery-page-{index:03}");
+        let operation = prepared_operation(
+            &fixture.fence,
+            AdmissionOperationKind::ToolDispatch,
+            &request_id,
+            &capability_id,
+        );
+        fixture
+            .store
+            .begin(&operation, &fixture.fence, begun_at)
+            .expect("begin paged recovery operation");
+    }
+    let trusted_now = begun_at + 1;
+    let first = fixture
+        .store
+        .list_recoverable(trusted_now, 256)
+        .expect("first recovery page");
+    assert_eq!(first.len(), 256);
+    for operation in &first {
+        fixture
+            .store
+            .claim_recovery(
+                operation.binding().operation_id(),
+                operation.version(),
+                &identifier("claimant_id", "paged-recovery-worker"),
+                trusted_now,
+                trusted_now + 1_000,
+                &fixture.fence,
+            )
+            .expect("claim first-page recovery operation");
+    }
+    let second = fixture
+        .store
+        .list_recoverable(trusted_now, 256)
+        .expect("second recovery page");
+    assert_eq!(second.len(), 1);
+    assert!(first.iter().all(|operation| {
+        operation.binding().operation_id() != second[0].binding().operation_id()
+    }));
+}
+
+#[test]
 fn recovery_claim_retry_returns_the_persisted_lease_when_expiry_changes() {
     let fixture = fixture();
     let operation = prepared_operation(
