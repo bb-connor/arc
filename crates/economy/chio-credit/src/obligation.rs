@@ -3,6 +3,10 @@ use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::sha256_hex;
 use serde::{Deserialize, Serialize};
 
+mod status;
+
+pub use status::*;
+
 pub const OBLIGATION_ATOM_SCHEMA: &str = "chio.obligation.atom.v1";
 pub const OBLIGATION_DISPOSITION_SCHEMA: &str = "chio.obligation.disposition.v1";
 pub const OBLIGATION_CLAIM_INDEX_V1: u32 = 0;
@@ -21,6 +25,18 @@ pub enum ObligationError {
     InvalidField(&'static str),
     #[error("illegal obligation disposition transition")]
     IllegalDispositionTransition,
+    #[error("assignment requires an exact supplemental authorization compare-and-swap")]
+    AssignmentRequiresCompareAndSwap,
+    #[error("obligation status proof authority verification failed")]
+    StatusProofAuthorityVerification,
+    #[error("obligation status proof is not current")]
+    StatusProofNotCurrent,
+    #[error("obligation compare-and-swap conflicted")]
+    CompareAndSwapConflict,
+    #[error("obligation assignment is missing supplemental authorization")]
+    MissingSupplementalAuthorization,
+    #[error("obligation assignment supplemental authorization does not match")]
+    SupplementalAuthorizationMismatch,
     #[error("obligation canonicalization failed: {0}")]
     Canonicalization(String),
 }
@@ -317,6 +333,9 @@ pub enum ObligationDispositionTransitionV1 {
         authority_digest: String,
     },
     Assign {
+        operation_id: String,
+        normalized_request_digest: String,
+        status_proof_digest: String,
         agreement_id: String,
         creditor_id: String,
         settlement_destination_ref: String,
@@ -351,11 +370,20 @@ impl ObligationDispositionTransitionV1 {
                 validate_digest("authority_digest", authority_digest)
             }
             Self::Assign {
+                operation_id,
+                normalized_request_digest,
+                status_proof_digest,
                 agreement_id,
                 creditor_id,
                 settlement_destination_ref,
                 authority_digest,
             } => {
+                validate_digest("assignment_operation_id", operation_id)?;
+                validate_digest(
+                    "assignment_normalized_request_digest",
+                    normalized_request_digest,
+                )?;
+                validate_digest("assignment_status_proof_digest", status_proof_digest)?;
                 validate_text("agreement_id", agreement_id)?;
                 validate_text("creditor_id", creditor_id)?;
                 validate_text("settlement_destination_ref", settlement_destination_ref)?;
@@ -437,6 +465,28 @@ impl ObligationDispositionRecordV1 {
     }
 
     pub fn advance(
+        &self,
+        atom: &ObligationAtomV1,
+        transition: ObligationDispositionTransitionV1,
+    ) -> Result<Self, ObligationError> {
+        if matches!(transition, ObligationDispositionTransitionV1::Assign { .. }) {
+            return Err(ObligationError::AssignmentRequiresCompareAndSwap);
+        }
+        self.advance_inner(atom, transition)
+    }
+
+    pub(super) fn advance_assignment(
+        &self,
+        atom: &ObligationAtomV1,
+        transition: ObligationDispositionTransitionV1,
+    ) -> Result<Self, ObligationError> {
+        if !matches!(transition, ObligationDispositionTransitionV1::Assign { .. }) {
+            return Err(ObligationError::IllegalDispositionTransition);
+        }
+        self.advance_inner(atom, transition)
+    }
+
+    fn advance_inner(
         &self,
         atom: &ObligationAtomV1,
         transition: ObligationDispositionTransitionV1,

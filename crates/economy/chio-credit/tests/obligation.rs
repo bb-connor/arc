@@ -159,7 +159,7 @@ fn obligation_disposition_is_exclusive_and_round_release_is_exact() -> TestResul
 }
 
 #[test]
-fn assignment_changes_only_the_current_creditor_binding() -> TestResult {
+fn assignment_requires_the_guarded_compare_and_swap() -> TestResult {
     let atom = atom()?;
     let produced = ObligationDispositionRecordV1::produced(&atom)?;
     let original = produced.current_creditor(&atom)?;
@@ -169,19 +169,26 @@ fn assignment_changes_only_the_current_creditor_binding() -> TestResult {
         atom.original_settlement_destination_ref()
     );
 
-    let assigned = produced.advance(
-        &atom,
-        ObligationDispositionTransitionV1::Assign {
-            agreement_id: "agreement-1".to_owned(),
-            creditor_id: "did:chio:factor".to_owned(),
-            settlement_destination_ref: "acct:factor".to_owned(),
-            authority_digest: digest("assignment-authority"),
-        },
-    )?;
-    let current = assigned.current_creditor(&atom)?;
-    assert_eq!(current.creditor_id(), "did:chio:factor");
-    assert_eq!(current.settlement_destination_ref(), "acct:factor");
-    assert!(assigned
+    assert_eq!(
+        produced.advance(
+            &atom,
+            ObligationDispositionTransitionV1::Assign {
+                operation_id: digest("assignment-operation"),
+                normalized_request_digest: digest("assignment-request"),
+                status_proof_digest: digest("assignment-status-proof"),
+                agreement_id: "agreement-1".to_owned(),
+                creditor_id: "did:chio:factor".to_owned(),
+                settlement_destination_ref: "acct:factor".to_owned(),
+                authority_digest: digest("assignment-authority"),
+            },
+        ),
+        Err(ObligationError::AssignmentRequiresCompareAndSwap)
+    );
+    assert_eq!(
+        produced.current_creditor(&atom)?.creditor_id(),
+        atom.original_creditor_id()
+    );
+    assert!(produced
         .advance(
             &atom,
             ObligationDispositionTransitionV1::ReserveClearing {
@@ -189,7 +196,28 @@ fn assignment_changes_only_the_current_creditor_binding() -> TestResult {
                 authority_digest: digest("reserve-authority"),
             },
         )
-        .is_err());
+        .is_ok());
+    Ok(())
+}
+
+#[test]
+fn deserialized_assign_transition_cannot_bypass_the_guarded_path() -> TestResult {
+    let atom = atom()?;
+    let produced = ObligationDispositionRecordV1::produced(&atom)?;
+    let transition: ObligationDispositionTransitionV1 = serde_json::from_value(json!({
+        "kind": "assign",
+        "operation_id": digest("assignment-operation"),
+        "normalized_request_digest": digest("assignment-request"),
+        "status_proof_digest": digest("assignment-status-proof"),
+        "agreement_id": "agreement-1",
+        "creditor_id": "did:chio:factor",
+        "settlement_destination_ref": "acct:factor",
+        "authority_digest": digest("assignment-authority")
+    }))?;
+    assert_eq!(
+        produced.advance(&atom, transition),
+        Err(ObligationError::AssignmentRequiresCompareAndSwap)
+    );
     Ok(())
 }
 

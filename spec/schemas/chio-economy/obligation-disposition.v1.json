@@ -90,9 +90,12 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "agreement_id", "creditor_id", "settlement_destination_ref", "authority_digest"],
+          "required": ["kind", "operation_id", "normalized_request_digest", "status_proof_digest", "agreement_id", "creditor_id", "settlement_destination_ref", "authority_digest"],
           "properties": {
             "kind": { "const": "assign" },
+            "operation_id": { "$ref": "#/$defs/digest" },
+            "normalized_request_digest": { "$ref": "#/$defs/digest" },
+            "status_proof_digest": { "$ref": "#/$defs/digest" },
             "agreement_id": { "$ref": "#/$defs/text" },
             "creditor_id": { "$ref": "#/$defs/text" },
             "settlement_destination_ref": { "$ref": "#/$defs/text" },
