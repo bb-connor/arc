@@ -3871,8 +3871,10 @@ dependencies = [
  "chio-appraisal",
  "chio-core-types",
  "chio-credit",
+ "chio-spec-validate",
  "chio-underwriting",
  "serde",
+ "serde_json",
  "thiserror 1.0.69",
 ]
 

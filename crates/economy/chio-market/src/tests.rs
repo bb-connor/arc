@@ -1432,3 +1432,414 @@ fn liability_claim_settlement_receipt_rejects_counterparty_match_in_mismatch_sta
     );
     assert!(error.contains("require at least one observed counterparty to differ"));
 }
+
+struct ParametricTestFixture {
+    bound_coverage: SignedLiabilityBoundCoverage,
+    policy_signer: crate::crypto::Keypair,
+    policy_signer_key: crate::crypto::PublicKey,
+    payout_rail: ParametricPayoutRail,
+    evaluator_authority: EvaluatorAuthorityRef,
+    pre_action_authority_digest: String,
+    policy: ParametricPolicy,
+}
+
+impl ParametricTestFixture {
+    fn context(&self) -> ParametricPolicyVerificationContext<'_> {
+        ParametricPolicyVerificationContext {
+            bound_coverage: &self.bound_coverage,
+            coverage_authority_id: "carrier-alpha",
+            coverage_authority_key: &self.bound_coverage.signer_key,
+            policy_signer_key: &self.policy_signer_key,
+            payer_id: "operator-treasury-1",
+            beneficiary_id: "subject-1",
+            funding_facility_id: "cfd-1",
+            pre_action_authority_digest: &self.pre_action_authority_digest,
+            payout_rail: &self.payout_rail,
+            evaluator_authority: &self.evaluator_authority,
+        }
+    }
+
+    fn signed_policy(&self) -> SignedParametricPolicy {
+        require_ok(
+            SignedParametricPolicy::sign(self.policy.clone(), &self.policy_signer),
+            "sign parametric policy",
+        )
+    }
+}
+
+fn digest<T: serde::Serialize>(value: &T) -> String {
+    let bytes = require_ok(
+        crate::crypto::canonical_json_bytes(value),
+        "canonicalize digest input",
+    );
+    crate::crypto::sha256_hex(&bytes)
+}
+
+fn validate_parametric_schema(name: &str, value: &impl serde::Serialize) {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../spec/schemas/chio-parametric/v1")
+        .join(name);
+    let schema = require_ok(chio_spec_validate::load_json(&path), "load schema");
+    let instance = require_ok(serde_json::to_value(value), "serialize schema instance");
+    require_ok(
+        chio_spec_validate::validate_value(
+            &path,
+            &schema,
+            &std::path::PathBuf::from("<parametric-artifact>"),
+            &instance,
+        ),
+        "validate schema instance",
+    );
+}
+
+fn sample_parametric_fixture() -> ParametricTestFixture {
+    let bound_coverage = sample_market_fixtures().bound_coverage;
+    let policy_signer = crate::crypto::Keypair::from_seed(&[42; 32]);
+    let policy_signer_key = policy_signer.public_key();
+    let payout_rail = ParametricPayoutRail {
+        kind: crate::credit::CapitalExecutionRailKind::Web3,
+        rail_id: "web3-primary".to_string(),
+        destination_account_digest: "22".repeat(32),
+    };
+    let evaluator_authority = EvaluatorAuthorityRef {
+        authority_id: "evaluator-1".to_string(),
+        key_id: "evaluator-key-1".to_string(),
+        key_epoch: 3,
+    };
+    let pre_action_authority_digest = "33".repeat(32);
+    let policy = ParametricPolicy {
+        schema: PARAMETRIC_POLICY_SCHEMA.to_string(),
+        issued_at: bound_coverage.body.bound_at + 1,
+        subject_key: "subject-1".to_string(),
+        bound_coverage_body_digest: digest(&bound_coverage.body),
+        bound_coverage_envelope_digest: digest(&bound_coverage),
+        coverage_authority_id: "carrier-alpha".to_string(),
+        payer_id: "operator-treasury-1".to_string(),
+        beneficiary_id: "subject-1".to_string(),
+        funding_facility_id: "cfd-1".to_string(),
+        pre_action_authority_digest: pre_action_authority_digest.clone(),
+        coverage_amount: bound_coverage.body.coverage_amount.clone(),
+        effective_from: bound_coverage.body.effective_from,
+        effective_until: bound_coverage.body.effective_until,
+        window_anchor: bound_coverage.body.effective_from,
+        window_seconds: 1_000,
+        max_checkpoint_lag_seconds: 120,
+        predicate: TriggerPredicate::GuardDenialRate {
+            min_events: 2,
+            threshold_bps: 5_000,
+        },
+        payout_schedule: PayoutSchedule::Fixed { amount: usd(1_000) },
+        payout_rail: payout_rail.clone(),
+        evaluator_authority: evaluator_authority.clone(),
+    };
+    ParametricTestFixture {
+        bound_coverage,
+        policy_signer,
+        policy_signer_key,
+        payout_rail,
+        evaluator_authority,
+        pre_action_authority_digest,
+        policy,
+    }
+}
+
+fn sample_evidence_range(
+    window: ParametricTriggerWindow,
+    anchor_epoch: u64,
+    signer_key_epoch: u64,
+) -> EvidenceSourceRangeV1 {
+    EvidenceSourceRangeV1 {
+        source_kind: EvidenceSourceKind::ReceiptStore,
+        source_id: "kernel-receipts".to_string(),
+        index_namespace: "subject-time-sequence-v1".to_string(),
+        subject_key: "subject-1".to_string(),
+        window,
+        sequence_range: Some(InclusiveSequenceRange {
+            first: 10,
+            last: 11,
+        }),
+        expected_count: 2,
+        source_prefix_cutoff: 11,
+        selected_member_root: "44".repeat(32),
+        anchor_epoch,
+        signer_key_epoch,
+        checkpoint_id: format!("checkpoint-{anchor_epoch}"),
+        checkpoint_root: "55".repeat(32),
+        checkpoint_at: 1_700_011_010,
+        query_index_root: "66".repeat(32),
+        range_proof_digest: "77".repeat(32),
+    }
+}
+
+#[test]
+fn parametric_policy_verification_binds_coverage_authority_and_beneficiary() {
+    let fixture = sample_parametric_fixture();
+    let verified = require_ok(
+        VerifiedParametricPolicy::verify(fixture.signed_policy(), &fixture.context()),
+        "verify parametric policy",
+    );
+    assert_eq!(verified.body(), &fixture.policy);
+
+    let mut wrong_beneficiary = fixture.policy.clone();
+    wrong_beneficiary.beneficiary_id = "attacker".to_string();
+    let signed = require_ok(
+        SignedParametricPolicy::sign(wrong_beneficiary, &fixture.policy_signer),
+        "sign beneficiary mutation",
+    );
+    assert_eq!(
+        require_err(
+            VerifiedParametricPolicy::verify(signed, &fixture.context()),
+            "beneficiary substitution",
+        ),
+        ParametricContractError::BindingMismatch("beneficiary_id")
+    );
+
+    let mut retroactive = fixture.policy.clone();
+    retroactive.issued_at = retroactive.effective_from + 1;
+    let signed = require_ok(
+        SignedParametricPolicy::sign(retroactive, &fixture.policy_signer),
+        "sign retroactive policy",
+    );
+    assert_eq!(
+        require_err(
+            VerifiedParametricPolicy::verify(signed, &fixture.context()),
+            "retroactive policy",
+        ),
+        ParametricContractError::BindingMismatch("issued_at")
+    );
+
+    let rogue_authority = crate::crypto::Keypair::from_seed(&[41; 32]).public_key();
+    let mut context = fixture.context();
+    context.coverage_authority_key = &rogue_authority;
+    assert_eq!(
+        require_err(
+            VerifiedParametricPolicy::verify(fixture.signed_policy(), &context),
+            "coverage authority substitution",
+        ),
+        ParametricContractError::UntrustedCoverageAuthority
+    );
+}
+
+#[test]
+fn parametric_artifacts_match_their_committed_schemas() {
+    let fixture = sample_parametric_fixture();
+    let signed = fixture.signed_policy();
+    let verified = require_ok(
+        VerifiedParametricPolicy::verify(signed.clone(), &fixture.context()),
+        "verify parametric policy",
+    );
+    let window = require_ok(
+        verified.body().window_at(1_700_010_500),
+        "derive policy window",
+    );
+    let corpus = EvidenceCorpusManifestV1 {
+        ranges: vec![sample_evidence_range(window.clone(), 1, 1)],
+    };
+    let identity = require_ok(
+        verified.claim_identity(&window, &corpus),
+        "derive claim identity",
+    );
+
+    validate_parametric_schema("policy.schema.json", &signed);
+    validate_parametric_schema("evidence-corpus-manifest.schema.json", &corpus);
+    validate_parametric_schema("trigger-instance-key.schema.json", &identity.key);
+}
+
+#[test]
+fn parametric_policy_verification_fails_closed_on_signer_schema_and_encoding() {
+    let fixture = sample_parametric_fixture();
+    let mut tampered = fixture.signed_policy();
+    tampered.body.max_checkpoint_lag_seconds += 1;
+    assert_eq!(
+        require_err(
+            VerifiedParametricPolicy::verify(tampered, &fixture.context()),
+            "tampered policy",
+        ),
+        ParametricContractError::InvalidSignature
+    );
+
+    let rogue_signer = crate::crypto::Keypair::from_seed(&[40; 32]);
+    let rogue_policy = require_ok(
+        SignedParametricPolicy::sign(fixture.policy.clone(), &rogue_signer),
+        "sign rogue policy",
+    );
+    assert_eq!(
+        require_err(
+            VerifiedParametricPolicy::verify(rogue_policy, &fixture.context()),
+            "rogue policy signer",
+        ),
+        ParametricContractError::UntrustedPolicySigner
+    );
+
+    let mut unknown = fixture.policy.clone();
+    unknown.schema = "chio.parametric.policy.v2".to_string();
+    let unknown = require_ok(
+        SignedParametricPolicy::sign(unknown, &fixture.policy_signer),
+        "sign unknown schema",
+    );
+    assert_eq!(
+        require_err(
+            VerifiedParametricPolicy::verify(unknown, &fixture.context()),
+            "unknown policy schema",
+        ),
+        ParametricContractError::UnknownSchema("chio.parametric.policy.v2".to_string())
+    );
+
+    let verified = require_ok(
+        VerifiedParametricPolicy::verify(fixture.signed_policy(), &fixture.context()),
+        "verify canonical policy",
+    );
+    let canonical = require_ok(verified.canonical_bytes(), "encode canonical policy");
+    let round_trip = require_ok(
+        VerifiedParametricPolicy::from_canonical_bytes(&canonical, &fixture.context()),
+        "decode canonical policy",
+    );
+    assert_eq!(round_trip.envelope_digest(), verified.envelope_digest());
+
+    let mut padded = vec![b' '];
+    padded.extend_from_slice(&canonical);
+    assert!(matches!(
+        VerifiedParametricPolicy::from_canonical_bytes(&padded, &fixture.context()),
+        Err(ParametricContractError::Canonicalization(_))
+    ));
+}
+
+#[test]
+fn parametric_claim_identity_survives_anchor_and_signer_epoch_rotation() {
+    let fixture = sample_parametric_fixture();
+    let verified = require_ok(
+        VerifiedParametricPolicy::verify(fixture.signed_policy(), &fixture.context()),
+        "verify parametric policy",
+    );
+    let window = require_ok(
+        verified.body().window_at(1_700_010_500),
+        "derive policy window",
+    );
+    let first = EvidenceCorpusManifestV1 {
+        ranges: vec![sample_evidence_range(window.clone(), 1, 7)],
+    };
+    let mut rotated_range = sample_evidence_range(window.clone(), 2, 8);
+    rotated_range.checkpoint_root = "88".repeat(32);
+    rotated_range.query_index_root = "99".repeat(32);
+    rotated_range.range_proof_digest = "aa".repeat(32);
+    let rotated = EvidenceCorpusManifestV1 {
+        ranges: vec![rotated_range],
+    };
+
+    let first_identity = require_ok(
+        verified.claim_identity(&window, &first),
+        "derive first claim identity",
+    );
+    let rotated_identity = require_ok(
+        verified.claim_identity(&window, &rotated),
+        "derive rotated claim identity",
+    );
+    assert_eq!(first_identity, rotated_identity);
+
+    let mut changed_member = rotated;
+    changed_member.ranges[0].selected_member_root = "bb".repeat(32);
+    let changed_identity = require_ok(
+        verified.claim_identity(&window, &changed_member),
+        "derive changed evidence identity",
+    );
+    assert_ne!(changed_identity.claim_id, first_identity.claim_id);
+}
+
+#[test]
+fn parametric_trigger_identity_covers_every_semantic_dimension() {
+    let fixture = sample_parametric_fixture();
+    let verified = require_ok(
+        VerifiedParametricPolicy::verify(fixture.signed_policy(), &fixture.context()),
+        "verify parametric policy",
+    );
+    let window = require_ok(
+        verified.body().window_at(1_700_010_500),
+        "derive policy window",
+    );
+    let identity = require_ok(
+        verified.claim_identity(
+            &window,
+            &EvidenceCorpusManifestV1 {
+                ranges: vec![sample_evidence_range(window.clone(), 1, 1)],
+            },
+        ),
+        "derive claim identity",
+    );
+    let baseline = identity.trigger_instance_id;
+    let mut variants = Vec::new();
+
+    let mut changed = identity.key.clone();
+    changed.parametric_policy_body_digest = "01".repeat(32);
+    variants.push(changed);
+    let mut changed = identity.key.clone();
+    changed.subject_key = "subject-2".to_string();
+    variants.push(changed);
+    let mut changed = identity.key.clone();
+    changed.window_start += 1;
+    variants.push(changed);
+    let mut changed = identity.key.clone();
+    changed.trigger_predicate_body_digest = "02".repeat(32);
+    variants.push(changed);
+    let mut changed = identity.key;
+    changed.evidence_range_digest = "03".repeat(32);
+    variants.push(changed);
+
+    for variant in variants {
+        assert_ne!(
+            require_ok(variant.trigger_instance_id(), "derive changed trigger id"),
+            baseline
+        );
+    }
+}
+
+#[test]
+fn parametric_schedule_and_corpus_validation_fail_closed() {
+    let schedule = PayoutSchedule::Linear {
+        base: usd(0),
+        per_unit_minor: u64::MAX,
+        magnitude_unit: TriggerMagnitudeUnit::Count,
+    };
+    assert_eq!(
+        schedule.evaluate(
+            &TriggerPredicate::DriftSeverity { min_critical: 1 },
+            &TriggerMagnitude::Count { value: 2 },
+            &usd(u64::MAX),
+        ),
+        Err(ParametricContractError::ScheduleOverflow)
+    );
+
+    let fixture = sample_parametric_fixture();
+    let verified = require_ok(
+        VerifiedParametricPolicy::verify(fixture.signed_policy(), &fixture.context()),
+        "verify parametric policy",
+    );
+    let window = require_ok(
+        verified.body().window_at(1_700_010_500),
+        "derive policy window",
+    );
+    let mut incomplete = sample_evidence_range(window.clone(), 1, 1);
+    incomplete.expected_count = 3;
+    assert_eq!(
+        verified.claim_identity(
+            &window,
+            &EvidenceCorpusManifestV1 {
+                ranges: vec![incomplete],
+            },
+        ),
+        Err(ParametricContractError::InvalidField(
+            "corpus.expected_count"
+        ))
+    );
+
+    let mut wrong_source = sample_evidence_range(window.clone(), 1, 1);
+    wrong_source.source_kind = EvidenceSourceKind::DriftReports;
+    assert_eq!(
+        verified.claim_identity(
+            &window,
+            &EvidenceCorpusManifestV1 {
+                ranges: vec![wrong_source],
+            },
+        ),
+        Err(ParametricContractError::InvalidField("corpus.source_kind"))
+    );
+}
