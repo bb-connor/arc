@@ -336,6 +336,24 @@ The FROST quorum substrate registers four signed artifact schemas:
 - `chio.frost.authorization-slot-checkpoint.v1`
 - `chio.frost.authorization.v1`
 
+The parametric-insurance contract registers one signed artifact schema:
+
+- `chio.parametric.policy.v1`
+
+Its registry kind is `parametric_policy`, introduced by
+`parametric-insurance-v1`, with the envelope schema at
+`spec/schemas/chio-parametric/v1/policy.schema.json`. Trigger-instance keys and
+evidence-corpus manifests are canonical policy inputs, not signed-artifact
+schemas.
+
+The receivables-factoring contract registers one signed artifact schema:
+
+- `chio.obligation.status-proof.v1`
+
+Its registry kind is `obligation_status_proof`, introduced by
+`receivables-factoring-v1`, with the envelope schema at
+`spec/schemas/chio-economy/obligation-status-proof.v1.json`.
+
 Roster, epoch-checkpoint, and authorization-slot signatures MUST verify against
 separately configured Ed25519 trust roots for their exact authority role and
 key id. Those artifacts carry key ids, never authority public keys. A verifier

@@ -332,6 +332,75 @@ fn fiscal_signed_artifact_registry_names_exact_schema_files() {
 }
 
 #[test]
+fn new_economy_signed_artifact_families_are_registered_exactly() {
+    let registry: serde_json::Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../spec/schemas/registry.json"
+    )))
+    .expect("schema registry parses");
+    let rows: Vec<(&str, &str, &str, &str)> = registry
+        .get("artifacts")
+        .and_then(serde_json::Value::as_array)
+        .expect("registry artifacts are present")
+        .iter()
+        .filter_map(|entry| {
+            let schema = entry.get("schema")?.as_str()?;
+            matches!(
+                schema,
+                "chio.obligation.status-proof.v1" | "chio.parametric.policy.v1"
+            )
+            .then(|| {
+                (
+                    schema,
+                    entry
+                        .get("artifactKind")
+                        .and_then(serde_json::Value::as_str)
+                        .expect("economy registry entry has artifactKind"),
+                    entry
+                        .get("introducedBy")
+                        .and_then(serde_json::Value::as_str)
+                        .expect("economy registry entry has introducedBy"),
+                    entry
+                        .get("schemaFile")
+                        .and_then(serde_json::Value::as_str)
+                        .expect("economy registry entry has schemaFile"),
+                )
+            })
+        })
+        .collect();
+
+    assert_eq!(
+        rows,
+        [
+            (
+                "chio.obligation.status-proof.v1",
+                "obligation_status_proof",
+                "receivables-factoring-v1",
+                "spec/schemas/chio-economy/obligation-status-proof.v1.json",
+            ),
+            (
+                "chio.parametric.policy.v1",
+                "parametric_policy",
+                "parametric-insurance-v1",
+                "spec/schemas/chio-parametric/v1/policy.schema.json",
+            ),
+        ]
+    );
+    assert!(chio_core_types::is_supported_signed_artifact_schema(
+        "chio.obligation.status-proof.v1"
+    ));
+    assert!(!chio_core_types::is_supported_signed_artifact_schema(
+        "chio.obligation.status-proof.v2"
+    ));
+    assert!(chio_core_types::is_supported_signed_artifact_schema(
+        "chio.parametric.policy.v1"
+    ));
+    assert!(!chio_core_types::is_supported_signed_artifact_schema(
+        "chio.parametric.policy.v2"
+    ));
+}
+
+#[test]
 fn known_signed_artifact_schemas_match_public_registry_or_internal_exemption() {
     let registry: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),

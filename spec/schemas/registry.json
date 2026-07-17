@@ -1650,6 +1650,18 @@
       "schemaFile": "spec/schemas/chio-economy/obligation-disposition.v1.json"
     },
     {
+      "schema": "chio.obligation.settlement-lifecycle.v1",
+      "artifactKind": "obligation_settlement_lifecycle",
+      "introducedBy": "receivables-factoring-v1",
+      "schemaFile": "spec/schemas/chio-economy/obligation-settlement-lifecycle.v1.json"
+    },
+    {
+      "schema": "chio.obligation.status-proof.v1",
+      "artifactKind": "obligation_status_proof",
+      "introducedBy": "receivables-factoring-v1",
+      "schemaFile": "spec/schemas/chio-economy/obligation-status-proof.v1.json"
+    },
+    {
       "schema": "chio.clearing.round-lifecycle.v1",
       "artifactKind": "clearing_round_lifecycle",
       "introducedBy": "ws4-clearing-v1",
@@ -1858,6 +1870,12 @@
       "artifactKind": "fiscal_continuity_checkpoint",
       "introducedBy": "fiscal-constitutions-v1",
       "schemaFile": "spec/schemas/chio-fiscal/v1/continuity-checkpoint.schema.json"
+    },
+    {
+      "schema": "chio.parametric.policy.v1",
+      "artifactKind": "parametric_policy",
+      "introducedBy": "parametric-insurance-v1",
+      "schemaFile": "spec/schemas/chio-parametric/v1/policy.schema.json"
     }
   ]
 }

@@ -89,6 +89,8 @@ pub const CHIO_FISCAL_ACTIVATION_V1_SCHEMA: &str = "chio.fiscal.activation.v1";
 pub const CHIO_FISCAL_CONSUMER_READINESS_V1_SCHEMA: &str = "chio.fiscal.consumer-readiness.v1";
 pub const CHIO_FISCAL_CONTINUITY_CHECKPOINT_V1_SCHEMA: &str =
     "chio.fiscal.continuity-checkpoint.v1";
+pub const CHIO_OBLIGATION_STATUS_PROOF_V1_SCHEMA: &str = "chio.obligation.status-proof.v1";
+pub const CHIO_PARAMETRIC_POLICY_V1_SCHEMA: &str = "chio.parametric.policy.v1";
 pub const CHIO_TRANSACTION_PASSPORT_V1_SCHEMA: &str = "chio.transaction-passport.v1";
 pub const CHIO_TRANSACTION_EVIDENCE_GRAPH_V1_SCHEMA: &str = "chio.transaction.evidence-graph.v1";
 pub const CHIO_TRANSACTION_CLAIM_SET_V1_SCHEMA: &str = "chio.transaction.claim-set.v1";
@@ -482,6 +484,14 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_FISCAL_CONTINUITY_CHECKPOINT_V1_SCHEMA,
         Some(("fiscal_continuity_checkpoint", "fiscal-constitutions-v1")),
+    ),
+    (
+        CHIO_OBLIGATION_STATUS_PROOF_V1_SCHEMA,
+        Some(("obligation_status_proof", "receivables-factoring-v1")),
+    ),
+    (
+        CHIO_PARAMETRIC_POLICY_V1_SCHEMA,
+        Some(("parametric_policy", "parametric-insurance-v1")),
     ),
     (CHIO_SESSION_ANCHOR_SCHEMA, None),
     (CHIO_REQUEST_LINEAGE_RECORD_SCHEMA, None),
