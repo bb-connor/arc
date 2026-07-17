@@ -1,4 +1,26 @@
 use super::*;
+use chio_api_protect::DEFAULT_UPSTREAM_REQUEST_TIMEOUT;
+use std::time::Duration;
+
+use crate::mcp_cli::payment_config::PaymentAdapterConfig;
+
+pub(crate) fn resolve_sidecar_payment_adapter(
+) -> Result<Option<Box<dyn chio_kernel::PaymentAdapter>>, CliError> {
+    let config = PaymentAdapterConfig::from_env().map_err(|error| {
+        CliError::cli_other_error(format!("invalid payment adapter configuration: {error}"))
+    })?;
+    match config {
+        Some(config) => {
+            config.validate().map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "invalid payment adapter configuration: {error}"
+                ))
+            })?;
+            Ok(Some(config.build_adapter()))
+        }
+        None => Ok(None),
+    }
+}
 
 fn open_cli_durable_admission_runtime(
     mode: chio_kernel::admission_operation::DurableAdmissionMode,
@@ -41,8 +63,6 @@ fn open_cli_durable_admission_runtime(
         _ => open_durable_admission_runtime(mode, admission_db_path),
     }
 }
-use chio_api_protect::DEFAULT_UPSTREAM_REQUEST_TIMEOUT;
-use std::time::Duration;
 
 pub(crate) fn cmd_run(
     policy_path: &Path,
@@ -383,12 +403,17 @@ fn durable_receipt_db_path(receipt_store: Option<&Path>) -> Option<&Path> {
     receipt_store.filter(|path| !is_in_memory_sqlite_path(path))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_api_protect(
     upstream: &str,
     spec_path: Option<&Path>,
     listen_addr: &str,
     receipt_store: Option<&Path>,
     authority_seed_path: Option<&Path>,
+    budget_db: Option<&Path>,
+    revocation_db: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
     allow_ephemeral_receipts: bool,
     upstream_timeout_secs: Option<u64>,
 ) -> Result<(), CliError> {
@@ -411,6 +436,7 @@ pub(crate) fn cmd_api_protect(
             .transpose()?
             .map(|keypair| keypair.seed_hex());
         let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
+        let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
             upstream: upstream.to_string(),
             spec_content: None,
@@ -424,13 +450,23 @@ pub(crate) fn cmd_api_protect(
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
+            control_url: control_url.map(str::to_string),
+            control_token: control_token.map(str::to_string),
+            budget_db: budget_db.map(|path| path.display().to_string()),
+            revocation_db: revocation_db.map(|path| path.display().to_string()),
+            require_nonce: false,
+            allow_advisory: false,
             upstream_request_timeout: upstream_timeout_secs
                 .map(Duration::from_secs)
                 .unwrap_or(DEFAULT_UPSTREAM_REQUEST_TIMEOUT),
         };
-        ProtectProxy::new(config).run().await.map_err(|error| {
-            CliError::transport_error(format!("failed to start chio api protect: {error}"))
-        })
+        ProtectProxy::new(config)
+            .with_payment_adapter(payment_adapter)
+            .run()
+            .await
+            .map_err(|error| {
+                CliError::transport_error(format!("failed to start chio api protect: {error}"))
+            })
     })
 }
 
@@ -450,10 +486,15 @@ paths: {}
 
 pub(crate) const CHIO_START_NO_UPSTREAM_URL: &str = "http://127.0.0.1:1";
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_start(
     listen_addr: &str,
     receipt_store: Option<&Path>,
     authority_seed_path: Option<&Path>,
+    budget_db: Option<&Path>,
+    revocation_db: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
     allow_ephemeral_receipts: bool,
     print_config: bool,
 ) -> Result<(), CliError> {
@@ -476,6 +517,7 @@ pub(crate) fn cmd_start(
             .transpose()?
             .map(|keypair| keypair.seed_hex());
         let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
+        let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
             // The chio-start shape never proxies upstream traffic; the
             // catch-all route exists only because the underlying axum
@@ -495,12 +537,19 @@ pub(crate) fn cmd_start(
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
+            control_url: control_url.map(str::to_string),
+            control_token: control_token.map(str::to_string),
+            budget_db: budget_db.map(|path| path.display().to_string()),
+            revocation_db: revocation_db.map(|path| path.display().to_string()),
+            require_nonce: false,
+            allow_advisory: false,
             // The chio-start shape never proxies upstream, so the hop ceiling is
             // moot; keep the default so the serve site's drain window is unchanged.
             upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
         };
 
         ProtectProxy::new(config)
+            .with_payment_adapter(payment_adapter)
             .run_with_observer(move |bound_addr| {
                 let base_url = format!("http://{bound_addr}");
                 println!("chio sidecar listening on {base_url}");
@@ -1248,6 +1297,23 @@ pub(crate) fn require_receipt_db_path(receipt_db_path: Option<&Path>) -> Result<
     })
 }
 
+pub(crate) fn load_roster_policy(
+    path: &Path,
+) -> Result<trust_control::RosterPolicy, CliError> {
+    let bytes = std::fs::read(path).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "failed to read roster policy file `{}`: {error}",
+            path.display()
+        ))
+    })?;
+    serde_json::from_slice(&bytes).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "failed to parse roster policy file `{}`: {error}",
+            path.display()
+        ))
+    })
+}
+
 pub(crate) fn cmd_trust_serve(
     listen: SocketAddr,
     service_token: &str,
@@ -1280,6 +1346,7 @@ pub(crate) fn cmd_trust_serve(
     certification_public_metadata_ttl_seconds: u64,
     peer_urls: &[String],
     cluster_sync_interval_ms: u64,
+    roster_policy_file: Option<&Path>,
 ) -> Result<(), CliError> {
     if service_token.trim().is_empty() {
         return Err(CliError::cli_other_error(
@@ -1300,6 +1367,7 @@ pub(crate) fn cmd_trust_serve(
         .transpose()?
         .map(|loaded| (loaded.issuance_policy, loaded.runtime_assurance_policy))
         .unwrap_or((None, None));
+    let roster_policy = roster_policy_file.map(load_roster_policy).transpose()?;
     let fiscal_runtime = match (
         fiscal_genesis_policy,
         fiscal_anchor_url,
@@ -1352,6 +1420,7 @@ pub(crate) fn cmd_trust_serve(
         certification_public_metadata_ttl_seconds,
         peer_urls: peer_urls.to_vec(),
         cluster_sync_interval: std::time::Duration::from_millis(cluster_sync_interval_ms.max(50)),
+        roster_policy,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
     })
 }

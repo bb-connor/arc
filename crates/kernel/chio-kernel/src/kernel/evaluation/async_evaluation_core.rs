@@ -1,4 +1,4 @@
-use super::evaluation_helpers::PreDispatchCleanupDeny;
+use super::evaluation_helpers::{ExecutionNonceReservingResponse, PreDispatchCleanupDeny};
 use super::*;
 use crate::budget_store::BudgetInvocationCaptureDecision;
 
@@ -9,6 +9,7 @@ impl ChioKernel {
         session_filesystem_roots: Option<&[String]>,
         extra_metadata: Option<serde_json::Value>,
         session_id: Option<&SessionId>,
+        preflight_disposition: PreflightHoldDisposition,
     ) -> Result<ToolCallResponse, KernelError> {
         // Resolve tenant_id from the session's enterprise identity context
         // (if any) and install it for the remainder of this evaluation so
@@ -305,16 +306,22 @@ impl ChioKernel {
             }
         }
 
-        if let Err(e) = self.ensure_registered_tool_target(request) {
-            let msg = e.to_string();
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool target not registered");
-            return self.build_deny_response_with_metadata(
-                request,
-                &msg,
-                now,
-                None,
-                extra_metadata.clone(),
-            );
+        let reserving_preflight = matches!(
+            preflight_disposition,
+            PreflightHoldDisposition::ReserveForCaller
+        ) && self.execution_nonce_preflight_required(request);
+        if !reserving_preflight {
+            if let Err(e) = self.ensure_registered_tool_target(request) {
+                let msg = e.to_string();
+                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool target not registered");
+                return self.build_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    None,
+                    extra_metadata.clone(),
+                );
+            }
         }
 
         self.reconcile_durable_admission_startup()?;
@@ -746,18 +753,81 @@ impl ChioKernel {
 
         if self.execution_nonce_preflight_required(request) {
             return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_execution_nonce_preflight_allow_response_after_cleanup(
-                    request,
-                    now,
-                    matched_grant_index,
-                    cap,
-                    &budget_mutation,
-                    durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
-                    extra_metadata,
-                    budget_lease_acquired,
-                )
+                match preflight_disposition {
+                    PreflightHoldDisposition::ReverseForRetry => self
+                        .build_execution_nonce_preflight_allow_response_after_cleanup(
+                            request,
+                            now,
+                            matched_grant_index,
+                            cap,
+                            &budget_mutation,
+                            durable_admission
+                                .as_ref()
+                                .map(DurableToolAdmission::operation),
+                            extra_metadata,
+                            budget_lease_acquired,
+                        ),
+                    PreflightHoldDisposition::ReserveForCaller => {
+                        let settled_prepayment = match self.ensure_reserved_mustprepay_prepaid(
+                            request,
+                            budget_mutation.charge_result(),
+                            durable_admission.as_ref(),
+                            now_unix_ms,
+                            verified_governed_payee_binding.as_ref(),
+                        ) {
+                            Ok(prepayment) => prepayment,
+                            Err(error) => {
+                                let reason = error.to_string();
+                                warn!(
+                                    request_id = %request.request_id,
+                                    reason = %redacted!(&reason),
+                                    "reserve-for-caller prepayment gate denied"
+                                );
+                                return self.build_pre_dispatch_cleanup_deny_response(
+                                    PreDispatchCleanupDeny {
+                                        request,
+                                        reason: &reason,
+                                        timestamp: now,
+                                        matched_grant_index,
+                                        cap,
+                                        budget_mutation: &budget_mutation,
+                                        payment_authorization: None,
+                                        durable_operation: durable_admission
+                                            .as_ref()
+                                            .map(DurableToolAdmission::operation),
+                                        runtime_admission_metadata: extra_metadata,
+                                        verified_payee_binding: verified_governed_payee_binding
+                                            .as_ref(),
+                                        budget_lease_acquired,
+                                    },
+                                );
+                            }
+                        };
+                        let reserved_payment_reference = settled_prepayment
+                            .as_ref()
+                            .and_then(|prepayment| prepayment.payment_reference.clone());
+                        let response = self.build_execution_nonce_authorization_reserving_response(
+                            ExecutionNonceReservingResponse {
+                                request,
+                                timestamp: now,
+                                matched_grant_index,
+                                budget_mutation: &budget_mutation,
+                                runtime_admission_metadata: extra_metadata,
+                                reserved_payment_reference,
+                                budget_lease_acquired,
+                            },
+                        );
+                        if response.is_err() {
+                            if let Some(prepayment) = settled_prepayment.as_ref() {
+                                self.refund_reserved_mustprepay_prepayment(
+                                    request,
+                                    &prepayment.authorization,
+                                );
+                            }
+                        }
+                        response
+                    }
+                }
             });
         }
 

@@ -411,6 +411,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         .route(COST_ATTRIBUTION_PATH, get(handle_cost_attribution_report))
         .route(OPERATOR_REPORT_PATH, get(handle_operator_report))
         .route(
+            COMPTROLLER_SURFACE_PATH,
+            get(handle_comptroller_surface_report),
+        )
+        .route(
             RUNTIME_ATTESTATION_APPRAISAL_PATH,
             post(handle_runtime_attestation_appraisal_report),
         )

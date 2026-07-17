@@ -1866,7 +1866,69 @@ fn chio_runtime_live_parent_and_vendor_calls_expose_package_valid_receipts(
     Ok(())
 }
 
-// --- Drop-guard unwind tests ---
+#[test]
+fn drop_guard_reverse_failure_records_cleanup_fault() {
+    let mut kernel = make_kernel(make_config());
+    kernel.set_budget_store(Box::new(ReverseFailingBudgetStore::new()));
+    let agent_kp = make_keypair();
+    let cap = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-chio-runtime", "destructive_update")]),
+        300,
+    );
+    let request = make_request_with_arguments(
+        "req-drop-reverse-failure",
+        &cap,
+        "destructive_update",
+        "srv-chio-runtime",
+        serde_json::json!({"record": "vendor-ledger-7", "value": "closed"}),
+    );
+    authorize_fabricated_drop_hold(&kernel, &cap.id).unwrap();
+    let mutation = PreExecutionBudgetMutation::Charge(make_fabricated_drop_charge());
+
+    drop(PostAdmissionDropGuard::new(
+        &kernel,
+        &request,
+        &cap,
+        Some(0),
+        &mutation,
+        None,
+        PostAdmissionReceiptContext {
+            extra_metadata: None,
+            pre_invocation_guard_evidence: Vec::new(),
+            verified_payee_binding: None,
+        },
+        false,
+    ));
+
+    let receipt_log = kernel.receipt_log();
+    assert_eq!(receipt_log.len(), 1, "drop guard must emit exactly one cancellation receipt");
+    let receipt = receipt_log.get(0).unwrap();
+    assert!(receipt.is_cancelled(), "drop guard receipt must be a cancellation");
+    let metadata = receipt
+        .metadata
+        .as_ref()
+        .expect("cancellation receipt must carry metadata");
+    assert_eq!(
+        metadata["chio_runtime"]["pre_dispatch_cleanup_failed"],
+        true,
+        "reverse failure must be visible as a pre-dispatch cleanup fault"
+    );
+    assert!(
+        metadata["chio_runtime"]["pre_dispatch_cleanup_faults"]
+            .as_array()
+            .is_some_and(|faults| faults.iter().any(|fault| {
+                fault["step"] == "monetary_unwind"
+                    && fault["hold_ids"]
+                        .as_array()
+                        .is_some_and(|ids| ids.iter().any(|id| id == "hold-drop-guard-tests"))
+            })),
+        "cleanup fault receipt must identify the failed monetary hold"
+    );
+}
+
+// --- RFC-0002 drop-guard unwind tests ---
 
 fn make_fabricated_drop_charge() -> BudgetChargeResult {
     BudgetChargeResult {

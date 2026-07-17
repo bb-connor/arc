@@ -13,13 +13,13 @@ use chio_kernel::budget_store::{
     BudgetCommitMetadata, BudgetCumulativeApprovalAccountKey, BudgetCumulativeApprovalAccountUsage,
     BudgetCumulativeApprovalAuthorizationDecision, BudgetCumulativeApprovalMutation,
     BudgetCumulativeApprovalRequest, BudgetCumulativeApprovalState, BudgetCumulativeApprovalUsage,
-    BudgetEventAuthority, BudgetGuaranteeLevel, BudgetHoldMutationDecision,
-    BudgetInvocationCaptureDecision, BudgetInvocationQuota, BudgetInvocationQuotaMutation,
-    BudgetInvocationQuotaUsage, BudgetInvocationState, BudgetMonetaryState, BudgetMutationKind,
-    BudgetMutationRecord, BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldDecision,
-    BudgetReconcileHoldRequest, BudgetReleaseHoldDecision, BudgetReleaseHoldRequest,
-    BudgetReverseHoldDecision, BudgetReverseHoldRequest, DeniedBudgetHold,
-    RevocationCommitMetadata,
+    BudgetEventAuthority, BudgetGuaranteeLevel, BudgetHoldDispositionView,
+    BudgetHoldMutationDecision, BudgetHoldSnapshot, BudgetInvocationCaptureDecision,
+    BudgetInvocationQuota, BudgetInvocationQuotaMutation, BudgetInvocationQuotaUsage,
+    BudgetInvocationState, BudgetMonetaryState, BudgetMutationKind, BudgetMutationRecord,
+    BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
+    BudgetReleaseHoldDecision, BudgetReleaseHoldRequest, BudgetReverseHoldDecision,
+    BudgetReverseHoldRequest, DeniedBudgetHold, ReservedHoldEnvelope, RevocationCommitMetadata,
 };
 use chio_kernel::payment::{
     PaymentJournalRecord, PaymentJournalState, PaymentJournalTransition, PaymentRailMode,
@@ -41,6 +41,7 @@ mod payment_journal;
 pub(crate) use payment_journal::{
     advance_payment_journal, insert_payment_journal, load_payment_journal,
 };
+mod reaper;
 mod replication;
 mod rows;
 mod schema;
@@ -48,6 +49,7 @@ mod snapshot;
 mod store;
 mod trait_impl;
 
+pub use reaper::ReapSummary;
 pub use snapshot::BudgetStoreSnapshot;
 pub(crate) use store::BUDGET_STORE_SUPPORTED_SCHEMA_VERSION;
 

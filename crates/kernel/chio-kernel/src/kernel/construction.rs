@@ -309,6 +309,8 @@ impl ChioKernel {
             settlement_observer: None,
             revocation_view: None,
             budget_registry: Mutex::new(chio_kernel_core::InMemoryBudgetRegistry::new()),
+            reserved_sibling_shares: Mutex::new(HashMap::new()),
+            restart_reserved_hold_gate: Mutex::new(kernel_struct::RestartReservedHoldGate::Clear),
             rss_shed: Arc::new(AtomicBool::new(false)),
             rss_sampler: None,
             receipt_writer_watchdog: std::sync::Arc::new(
@@ -1610,6 +1612,16 @@ impl ChioKernel {
         cap: &CapabilityToken,
         receipt: &ChioReceipt,
     ) -> Result<Option<Box<crate::execution_nonce::SignedExecutionNonce>>, KernelError> {
+        self.mint_execution_nonce_for_allow_reserving(request, cap, receipt, None)
+    }
+
+    pub(crate) fn mint_execution_nonce_for_allow_reserving(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        receipt: &ChioReceipt,
+        reserved_hold_id: Option<&str>,
+    ) -> Result<Option<Box<crate::execution_nonce::SignedExecutionNonce>>, KernelError> {
         if request.execution_nonce.is_some() {
             return Ok(None);
         }
@@ -1625,9 +1637,12 @@ impl ChioKernel {
             tool_name: request.tool_name.clone(),
             parameter_hash: receipt.action.parameter_hash.clone(),
         };
-        let signed = crate::execution_nonce::mint_execution_nonce(
+        let reserving_request_id = reserved_hold_id.map(|_| request.request_id.clone());
+        let signed = crate::execution_nonce::mint_execution_nonce_with_reservation(
             &self.config.keypair,
             binding,
+            reserved_hold_id.map(str::to_string),
+            reserving_request_id,
             config,
             now,
         )?;

@@ -185,6 +185,10 @@ impl SqliteBudgetStore {
         ensure_budget_seq_column(connection)?;
         ensure_split_budget_cost_columns(connection)?;
         ensure_budget_hold_authority_columns(connection)?;
+        ensure_budget_hold_reserved_until_column(connection)?;
+        ensure_budget_hold_reserved_currency_column(connection)?;
+        ensure_budget_hold_reserved_payment_reference_column(connection)?;
+        ensure_budget_hold_reserved_envelope_columns(connection)?;
         ensure_budget_mutation_event_authority_columns(connection)?;
         ensure_budget_mutation_event_seq_column(connection)?;
         initialize_budget_replication_seq(connection)?;

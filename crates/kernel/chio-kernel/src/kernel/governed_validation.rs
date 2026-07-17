@@ -606,9 +606,9 @@ impl ChioKernel {
                 "metered billing quote expires_at must be after issued_at".to_string(),
             ));
         }
-        if quote.expires_at.is_some() && !quote.is_valid_at(now) {
+        if !quote.is_valid_at(now) {
             return Err(KernelError::GovernedTransactionDenied(
-                "metered billing quote is missing or expired".to_string(),
+                "metered billing quote is not valid at the current time".to_string(),
             ));
         }
         if metered.max_billed_units == Some(0) {
@@ -644,6 +644,19 @@ impl ChioKernel {
         }
 
         Ok(())
+    }
+
+    fn mustprepay_prepaid_units(
+        intent: &chio_core::capability::governance::GovernedTransactionIntent,
+    ) -> Option<u64> {
+        intent
+            .metered_billing
+            .as_ref()
+            .filter(|metered| {
+                metered.settlement_mode
+                    == chio_core::capability::governance::MeteredSettlementMode::MustPrepay
+            })
+            .map(|metered| metered.quote.quoted_cost.units)
     }
 
     fn validate_governed_call_chain_context(
@@ -1366,6 +1379,12 @@ impl ChioKernel {
                 .map(|amount| amount.currency.as_str())
         });
         Self::validate_metered_billing_context(intent, charge_currency, now)?;
+        if Self::mustprepay_prepaid_units(intent).is_some() && self.payment_adapter.is_none() {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed intent mandates prepayment (settlement_mode=MustPrepay) but no payment adapter is configured"
+                    .to_string(),
+            ));
+        }
 
         if let (Some(intent_amount), Some((cost_units, currency))) =
             (intent.max_amount.as_ref(), projected_cost)
@@ -1383,10 +1402,24 @@ impl ChioKernel {
             }
         }
 
-        let requested_units = projected_cost
+        let mustprepay_prepaid_units = Self::mustprepay_prepaid_units(intent);
+        if let (Some(intent_amount), Some(prepaid_units)) =
+            (intent.max_amount.as_ref(), mustprepay_prepaid_units)
+        {
+            if intent_amount.units < prepaid_units {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed intent amount is lower than the MustPrepay quoted cost".to_string(),
+                ));
+            }
+        }
+
+        let base_units = projected_cost
             .map(|(cost_units, _)| cost_units)
-            .or_else(|| intent.max_amount.as_ref().map(|amount| amount.units))
-            .unwrap_or(0);
+            .or_else(|| intent.max_amount.as_ref().map(|amount| amount.units));
+        let requested_units = match (base_units, mustprepay_prepaid_units) {
+            (Some(base), Some(prepaid)) => base.max(prepaid),
+            (base, prepaid) => base.or(prepaid).unwrap_or(0),
+        };
         let economy_value_requires_payee =
             projected_cost.is_some_and(|(cost_units, _)| cost_units > 0) && commerce.is_some();
         if economy_value_requires_payee

@@ -422,22 +422,26 @@ impl ChioKernel {
         charge_result: Option<&BudgetChargeResult>,
         payment_authorization: Option<&PaymentAuthorization>,
     ) -> Result<Option<BudgetReverseHoldDecision>, KernelError> {
-        let Some(charge) = charge_result else {
-            return Ok(None);
-        };
-
         if let Some(authorization) = payment_authorization {
             let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
                 KernelError::Internal(
                     "payment authorization present without configured adapter".to_string(),
                 )
             })?;
+            let refund_amount = ChioKernel::mustprepay_quoted_amount(request).or_else(|| {
+                charge_result.map(|charge| (charge.cost_charged, charge.currency.clone()))
+            });
             let (unwind_result, expected_status) = if authorization.state.is_final() {
+                let (amount_units, currency) = refund_amount.ok_or_else(|| {
+                    KernelError::Internal(
+                        "final payment authorization omitted a refundable amount".to_string(),
+                    )
+                })?;
                 (
                     adapter.refund(
                         &authorization.authorization_id,
-                        charge.cost_charged,
-                        &charge.currency,
+                        amount_units,
+                        &currency,
                         &request.request_id,
                     ),
                     RailSettlementStatus::Refunded,
@@ -462,6 +466,10 @@ impl ChioKernel {
                 }
             }
         }
+
+        let Some(charge) = charge_result else {
+            return Ok(None);
+        };
 
         if charge.invocation_capture.is_some() {
             Ok(Some(self.cancel_captured_monetary_before_dispatch(

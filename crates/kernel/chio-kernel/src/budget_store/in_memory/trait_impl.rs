@@ -611,4 +611,239 @@ impl BudgetStore for InMemoryBudgetStore {
         inner.capture_budget_hold(&request)?;
         self.recorded_mutation_decision(&inner, request.event_id.as_deref())
     }
+
+    fn reap_orphaned_holds(
+        &self,
+        realized_by_hold: &HashMap<String, u64>,
+    ) -> Result<(usize, usize), BudgetStoreError> {
+        let hold_ids = {
+            let inner = self.lock_inner()?;
+            inner
+                .holds
+                .iter()
+                .filter(|(_, hold)| hold_is_open(hold))
+                .map(|(hold_id, _)| hold_id.clone())
+                .collect::<Vec<_>>()
+        };
+        let mut reconciled = 0;
+        let mut reversed = 0;
+        for hold_id in hold_ids {
+            let hold = self.get_budget_hold(&hold_id)?.ok_or_else(|| {
+                BudgetStoreError::Invariant(format!("budget hold `{hold_id}` disappeared"))
+            })?;
+            if let Some(realized) = realized_by_hold.get(&hold_id) {
+                self.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+                    capability_id: hold.capability_id.clone(),
+                    grant_index: hold.grant_index,
+                    hold_id: hold_id.clone(),
+                    event_id: format!("{hold_id}:reap-capture-invocation"),
+                    trusted_time: None,
+                    authority: hold.authority.clone(),
+                })?;
+                if hold.remaining_exposure_units > 0 {
+                    self.reconcile_budget_hold(BudgetReconcileHoldRequest {
+                        capability_id: hold.capability_id,
+                        grant_index: hold.grant_index,
+                        exposed_cost_units: hold.remaining_exposure_units,
+                        realized_spend_units: (*realized).min(hold.remaining_exposure_units),
+                        hold_id: Some(hold_id.clone()),
+                        event_id: Some(format!("{hold_id}:reap-reconcile")),
+                        authority: hold.authority,
+                    })?;
+                }
+                reconciled += 1;
+            } else {
+                self.reverse_budget_hold(BudgetReverseHoldRequest {
+                    capability_id: hold.capability_id,
+                    grant_index: hold.grant_index,
+                    reversed_exposure_units: hold.remaining_exposure_units,
+                    hold_id: Some(hold_id.clone()),
+                    event_id: Some(format!("{hold_id}:reap-reverse")),
+                    authority: hold.authority,
+                    expected_cumulative_approval_state: None,
+                })?;
+                reversed += 1;
+            }
+        }
+        Ok((reconciled, reversed))
+    }
+
+    fn count_open_holds(&self) -> Result<usize, BudgetStoreError> {
+        Ok(self
+            .lock_inner()?
+            .holds
+            .values()
+            .filter(|hold| hold_is_open(hold))
+            .count())
+    }
+
+    fn list_open_delegated_reserved_hold_ids(
+        &self,
+    ) -> Result<Option<Vec<String>>, BudgetStoreError> {
+        Ok(Some(
+            self.lock_inner()?
+                .holds
+                .iter()
+                .filter(|(_, hold)| {
+                    hold_is_open(hold)
+                        && hold.reserved_until.is_some()
+                        && hold.reserved_envelope.delegation_depth > 0
+                })
+                .map(|(hold_id, _)| hold_id.clone())
+                .collect(),
+        ))
+    }
+
+    fn request_id_has_reserved_hold(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<bool>, BudgetStoreError> {
+        let prefix = format!("budget-hold:{request_id}:");
+        let nonce_prefix = format!("nonce-preflight-budget-hold:{request_id}:");
+        Ok(Some(self.lock_inner()?.holds.keys().any(|hold_id| {
+            hold_id.starts_with(&prefix) || hold_id.starts_with(&nonce_prefix)
+        })))
+    }
+
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
+        Ok(self.lock_inner()?.holds.get(hold_id).map(|hold| {
+            let disposition = if hold_is_open(hold) {
+                BudgetHoldDispositionView::Open
+            } else if hold.monetary_state == BudgetMonetaryState::Reconciled
+                || (hold.monetary_state == BudgetMonetaryState::None
+                    && hold.invocation_state == BudgetInvocationState::Captured)
+            {
+                BudgetHoldDispositionView::Reconciled
+            } else if hold.monetary_state == BudgetMonetaryState::Released {
+                BudgetHoldDispositionView::Released
+            } else {
+                BudgetHoldDispositionView::Reversed
+            };
+            BudgetHoldSnapshot {
+                hold_id: hold_id.to_string(),
+                capability_id: hold.capability_id.clone(),
+                grant_index: hold.grant_index,
+                authorized_exposure_units: hold.authorized_exposure_units,
+                remaining_exposure_units: hold.remaining_exposure_units,
+                disposition,
+                reserved_until: hold.reserved_until,
+                reserved_currency: hold.reserved_currency.clone(),
+                reserved_payment_reference: hold.reserved_payment_reference.clone(),
+                reserved_budget_total: hold.reserved_envelope.budget_total,
+                reserved_delegation_depth: Some(hold.reserved_envelope.delegation_depth),
+                reserved_root_budget_holder: Some(
+                    hold.reserved_envelope.root_budget_holder.clone(),
+                ),
+                authority: hold.authority.clone(),
+            }
+        }))
+    }
+
+    fn mark_hold_reserved(
+        &self,
+        hold_id: &str,
+        reserved_until_unix_secs: i64,
+        currency: &str,
+        payment_reference: Option<&str>,
+        envelope: &ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        let mut inner = self.lock_inner()?;
+        let hold = inner.holds.get_mut(hold_id).ok_or_else(|| {
+            BudgetStoreError::Invariant(format!("budget hold `{hold_id}` not found"))
+        })?;
+        if !hold_is_open(hold) {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` is not open"
+            )));
+        }
+        hold.reserved_until = Some(reserved_until_unix_secs);
+        hold.reserved_currency = Some(currency.to_string());
+        hold.reserved_payment_reference = payment_reference.map(str::to_string);
+        hold.reserved_envelope = envelope.clone();
+        Ok(())
+    }
+
+    fn reserve_invocation_hold(
+        &self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+        envelope: &ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        let mut inner = self.lock_inner()?;
+        let hold = inner.holds.get_mut(hold_id).ok_or_else(|| {
+            BudgetStoreError::Invariant(format!("budget hold `{hold_id}` not found"))
+        })?;
+        if hold.capability_id != capability_id
+            || hold.grant_index != grant_index
+            || hold.authorized_exposure_units != 0
+            || !hold_is_open(hold)
+        {
+            return Err(BudgetStoreError::Invariant(format!(
+                "budget hold `{hold_id}` is not an open invocation authorization"
+            )));
+        }
+        hold.reserved_until = Some(reserved_until_unix_secs);
+        hold.reserved_currency = None;
+        hold.reserved_payment_reference = None;
+        hold.reserved_envelope = envelope.clone();
+        Ok(())
+    }
+
+    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
+        let hold_ids = {
+            let inner = self.lock_inner()?;
+            inner
+                .holds
+                .iter()
+                .filter(|(_, hold)| {
+                    hold_is_open(hold)
+                        && hold
+                            .reserved_until
+                            .is_some_and(|until| until <= now_unix_secs)
+                })
+                .map(|(hold_id, _)| hold_id.clone())
+                .collect::<Vec<_>>()
+        };
+        for hold_id in &hold_ids {
+            let hold = self.get_budget_hold(hold_id)?.ok_or_else(|| {
+                BudgetStoreError::Invariant(format!("budget hold `{hold_id}` disappeared"))
+            })?;
+            self.capture_invocation_reservations(BudgetCaptureInvocationRequest {
+                capability_id: hold.capability_id.clone(),
+                grant_index: hold.grant_index,
+                hold_id: hold_id.clone(),
+                event_id: format!("{hold_id}:ttl-reap-capture-invocation"),
+                trusted_time: None,
+                authority: hold.authority.clone(),
+            })?;
+            if hold.remaining_exposure_units > 0 {
+                self.reconcile_budget_hold(BudgetReconcileHoldRequest {
+                    capability_id: hold.capability_id,
+                    grant_index: hold.grant_index,
+                    exposed_cost_units: hold.remaining_exposure_units,
+                    realized_spend_units: hold.remaining_exposure_units,
+                    hold_id: Some(hold_id.clone()),
+                    event_id: Some(format!("{hold_id}:ttl-reap-settle")),
+                    authority: hold.authority,
+                })?;
+            }
+        }
+        Ok(hold_ids.len())
+    }
+}
+
+fn hold_is_open(hold: &BudgetHoldState) -> bool {
+    match hold.monetary_state {
+        BudgetMonetaryState::Exposed => true,
+        BudgetMonetaryState::None => hold.invocation_state == BudgetInvocationState::Authorized,
+        BudgetMonetaryState::Released
+        | BudgetMonetaryState::Reconciled
+        | BudgetMonetaryState::Captured
+        | BudgetMonetaryState::Reversed => false,
+    }
 }

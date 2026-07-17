@@ -12,12 +12,13 @@ use super::{
     BudgetCumulativeApprovalAccountKey, BudgetCumulativeApprovalAccountUsage,
     BudgetCumulativeApprovalAuthorizationDecision, BudgetCumulativeApprovalMutation,
     BudgetCumulativeApprovalRequest, BudgetCumulativeApprovalState, BudgetCumulativeApprovalUsage,
-    BudgetEventAuthority, BudgetHoldMutationDecision, BudgetInvocationCaptureDecision,
-    BudgetInvocationQuota, BudgetInvocationQuotaMutation, BudgetInvocationQuotaUsage,
-    BudgetInvocationState, BudgetMonetaryState, BudgetMutationKind, BudgetMutationRecord,
-    BudgetQuotaKey, BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
-    BudgetReleaseHoldDecision, BudgetReleaseHoldRequest, BudgetReverseHoldDecision,
-    BudgetReverseHoldRequest, BudgetStore, BudgetStoreError, BudgetUsageRecord, DeniedBudgetHold,
+    BudgetEventAuthority, BudgetHoldDispositionView, BudgetHoldMutationDecision,
+    BudgetHoldSnapshot, BudgetInvocationCaptureDecision, BudgetInvocationQuota,
+    BudgetInvocationQuotaMutation, BudgetInvocationQuotaUsage, BudgetInvocationState,
+    BudgetMonetaryState, BudgetMutationKind, BudgetMutationRecord, BudgetQuotaKey,
+    BudgetReconcileHoldDecision, BudgetReconcileHoldRequest, BudgetReleaseHoldDecision,
+    BudgetReleaseHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest, BudgetStore,
+    BudgetStoreError, BudgetUsageRecord, DeniedBudgetHold, ReservedHoldEnvelope,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +35,10 @@ struct BudgetHoldState {
     cumulative_approval: Option<BudgetCumulativeApprovalHoldState>,
     monetary_state: BudgetMonetaryState,
     authority: Option<BudgetEventAuthority>,
+    reserved_until: Option<i64>,
+    reserved_currency: Option<String>,
+    reserved_payment_reference: Option<String>,
+    reserved_envelope: ReservedHoldEnvelope,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

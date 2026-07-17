@@ -562,6 +562,57 @@ pub type BudgetReverseHoldDecision = BudgetHoldMutationDecision;
 pub type BudgetReconcileHoldDecision = BudgetHoldMutationDecision;
 pub type BudgetCaptureHoldDecision = BudgetHoldMutationDecision;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BudgetHoldDispositionView {
+    Open,
+    Released,
+    Reversed,
+    Reconciled,
+    Expired,
+}
+
+impl BudgetHoldDispositionView {
+    #[must_use]
+    pub fn is_open(self) -> bool {
+        matches!(self, Self::Open)
+    }
+
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Open => "open",
+            Self::Released => "released",
+            Self::Reversed => "reversed",
+            Self::Reconciled => "reconciled",
+            Self::Expired => "expired",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ReservedHoldEnvelope {
+    pub budget_total: Option<u64>,
+    pub delegation_depth: u32,
+    pub root_budget_holder: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BudgetHoldSnapshot {
+    pub hold_id: String,
+    pub capability_id: String,
+    pub grant_index: usize,
+    pub authorized_exposure_units: u64,
+    pub remaining_exposure_units: u64,
+    pub disposition: BudgetHoldDispositionView,
+    pub reserved_until: Option<i64>,
+    pub reserved_currency: Option<String>,
+    pub reserved_payment_reference: Option<String>,
+    pub reserved_budget_total: Option<u64>,
+    pub reserved_delegation_depth: Option<u32>,
+    pub reserved_root_budget_holder: Option<String>,
+    pub authority: Option<BudgetEventAuthority>,
+}
+
 pub trait BudgetStore: Send + Sync {
     fn try_increment(
         &self,
@@ -1002,6 +1053,81 @@ pub trait BudgetStore: Send + Sync {
         Err(BudgetStoreError::Invariant(
             "budget store does not support a distinct monetary capture transition".to_string(),
         ))
+    }
+
+    fn reap_orphaned_holds(
+        &self,
+        realized_by_hold: &std::collections::HashMap<String, u64>,
+    ) -> Result<(usize, usize), BudgetStoreError> {
+        let _ = realized_by_hold;
+        Ok((0, 0))
+    }
+
+    fn count_open_holds(&self) -> Result<usize, BudgetStoreError> {
+        Ok(0)
+    }
+
+    fn list_open_delegated_reserved_hold_ids(
+        &self,
+    ) -> Result<Option<Vec<String>>, BudgetStoreError> {
+        Ok(None)
+    }
+
+    fn request_id_has_reserved_hold(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<bool>, BudgetStoreError> {
+        let _ = request_id;
+        Ok(None)
+    }
+
+    fn get_budget_hold(
+        &self,
+        hold_id: &str,
+    ) -> Result<Option<BudgetHoldSnapshot>, BudgetStoreError> {
+        let _ = hold_id;
+        Ok(None)
+    }
+
+    fn mark_hold_reserved(
+        &self,
+        hold_id: &str,
+        reserved_until_unix_secs: i64,
+        currency: &str,
+        payment_reference: Option<&str>,
+        envelope: &ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        let _ = (
+            hold_id,
+            reserved_until_unix_secs,
+            currency,
+            payment_reference,
+            envelope,
+        );
+        Ok(())
+    }
+
+    fn reserve_invocation_hold(
+        &self,
+        hold_id: &str,
+        capability_id: &str,
+        grant_index: usize,
+        reserved_until_unix_secs: i64,
+        envelope: &ReservedHoldEnvelope,
+    ) -> Result<(), BudgetStoreError> {
+        let _ = (
+            hold_id,
+            capability_id,
+            grant_index,
+            reserved_until_unix_secs,
+            envelope,
+        );
+        Ok(())
+    }
+
+    fn reap_expired_reserved_holds(&self, now_unix_secs: i64) -> Result<usize, BudgetStoreError> {
+        let _ = now_unix_secs;
+        Ok(0)
     }
 }
 

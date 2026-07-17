@@ -1,6 +1,12 @@
 use super::*;
 use crate::admission_operation::AdmissionOperationV1;
 use crate::budget_store::BudgetReverseHoldDecision;
+use crate::kernel::responses::ReservedHoldStamp;
+
+const EXECUTION_NONCE_PREFLIGHT_RETRY_REASON: &str =
+    "execution nonce preflight requires retry with presented nonce";
+const EXECUTION_NONCE_AUTHORIZATION_RESERVED_REASON: &str =
+    "pre-execution authorization reserved; present the minted execution nonce to the tool server";
 
 pub(super) struct PreDispatchCleanupDeny<'a> {
     pub(super) request: &'a ToolCallRequest,
@@ -18,6 +24,16 @@ pub(super) struct PreDispatchCleanupDeny<'a> {
     /// one: the reference-counted release frees the shared edge only when the
     /// last holder releases, so an overlapping evaluation that still holds it
     /// keeps its share and an oversubscribing sibling stays denied.
+    pub(super) budget_lease_acquired: bool,
+}
+
+pub(super) struct ExecutionNonceReservingResponse<'a> {
+    pub(super) request: &'a ToolCallRequest,
+    pub(super) timestamp: u64,
+    pub(super) matched_grant_index: usize,
+    pub(super) budget_mutation: &'a PreExecutionBudgetMutation,
+    pub(super) runtime_admission_metadata: Option<serde_json::Value>,
+    pub(super) reserved_payment_reference: Option<String>,
     pub(super) budget_lease_acquired: bool,
 }
 
@@ -122,7 +138,7 @@ impl ChioKernel {
         let metadata = match budget_mutation.charge_result() {
             Some(charge) => self.merge_budget_receipt_metadata(
                 runtime_metadata,
-                self.budget_execution_receipt_metadata(charge, None),
+                self.budget_execution_receipt_metadata(charge, None, None),
             ),
             None => runtime_metadata,
         };
@@ -199,6 +215,7 @@ impl ChioKernel {
                 self.budget_execution_receipt_metadata(
                     charge,
                     Some(("cancelled_before_dispatch", &cancellation)),
+                    None,
                 ),
             ),
             verified_payee_binding,
@@ -244,7 +261,7 @@ impl ChioKernel {
                         ),
                     Some(charge) => self.merge_budget_receipt_metadata(
                         runtime_admission_metadata,
-                        self.budget_execution_receipt_metadata(charge, None),
+                        self.budget_execution_receipt_metadata(charge, None, None),
                     ),
                     None => runtime_admission_metadata,
                 };
@@ -317,7 +334,11 @@ impl ChioKernel {
                     denial.cap,
                     self.merge_budget_receipt_metadata(
                         runtime_admission_metadata,
-                        self.budget_execution_receipt_metadata(charge, Some(("reversed", reverse))),
+                        self.budget_execution_receipt_metadata(
+                            charge,
+                            Some(("reversed", reverse)),
+                            None,
+                        ),
                     ),
                     denial.verified_payee_binding,
                 );
@@ -499,6 +520,7 @@ impl ChioKernel {
                     self.budget_execution_receipt_metadata(
                         charge,
                         Some(("cancelled_before_dispatch", &cancellation)),
+                        None,
                     ),
                 ),
                 payment_release_metadata,
@@ -546,7 +568,7 @@ impl ChioKernel {
                 );
                 let budget_metadata = budget_mutation
                     .durable_hold_result()
-                    .map(|charge| self.budget_execution_receipt_metadata(charge, None));
+                    .map(|charge| self.budget_execution_receipt_metadata(charge, None, None));
                 let metadata = merge_metadata_objects(
                     merge_metadata_objects(runtime_admission_metadata, budget_metadata),
                     Some(serde_json::json!({
@@ -585,9 +607,11 @@ impl ChioKernel {
             }
         };
         let budget_metadata = match (budget_mutation.durable_hold_result(), reverse.as_ref()) {
-            (Some(charge), Some(reverse)) => {
-                Some(self.budget_execution_receipt_metadata(charge, Some(("reversed", reverse))))
-            }
+            (Some(charge), Some(reverse)) => Some(self.budget_execution_receipt_metadata(
+                charge,
+                Some(("reversed", reverse)),
+                None,
+            )),
             _ => None,
         };
         let preflight_metadata = Some(serde_json::json!({
@@ -622,6 +646,87 @@ impl ChioKernel {
             timestamp,
             Some(matched_grant_index),
             metadata,
+            EXECUTION_NONCE_PREFLIGHT_RETRY_REASON,
+            None,
+        )
+    }
+
+    pub(super) fn build_execution_nonce_authorization_reserving_response(
+        &self,
+        reserving: ExecutionNonceReservingResponse<'_>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let ExecutionNonceReservingResponse {
+            request,
+            timestamp,
+            matched_grant_index,
+            budget_mutation,
+            runtime_admission_metadata,
+            reserved_payment_reference,
+            budget_lease_acquired,
+        } = reserving;
+        let (runtime_admission_metadata, runtime_release_confirmed) = self
+            .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                runtime_admission_metadata,
+            );
+        if !runtime_release_confirmed {
+            return self.build_deny_response_with_metadata(
+                request,
+                "execution nonce authorization cleanup could not be confirmed",
+                timestamp,
+                Some(matched_grant_index),
+                runtime_admission_metadata,
+            );
+        }
+
+        if matches!(budget_mutation, PreExecutionBudgetMutation::None) && budget_lease_acquired {
+            self.release_admitted_capability_budget(&request.capability)
+                .map_err(KernelError::DelegationInvalid)?;
+        }
+
+        let budget_metadata = budget_mutation
+            .durable_hold_result()
+            .map(|charge| self.budget_execution_receipt_metadata(charge, None, None));
+        let metadata = merge_metadata_objects(
+            merge_metadata_objects(runtime_admission_metadata, budget_metadata),
+            Some(serde_json::json!({
+                "execution_nonce": {
+                    "stage": "authorization",
+                    "tool_dispatched": false,
+                    "hold_disposition": "reserved"
+                }
+            })),
+        );
+
+        let reserved_hold = match budget_mutation {
+            PreExecutionBudgetMutation::Charge(charge) => Some(ReservedHoldStamp::Monetary {
+                charge,
+                payment_reference: reserved_payment_reference,
+            }),
+            PreExecutionBudgetMutation::InvocationHold(charge) => {
+                Some(ReservedHoldStamp::Monetary {
+                    charge,
+                    payment_reference: reserved_payment_reference,
+                })
+            }
+            PreExecutionBudgetMutation::Invocation { grant_index } => {
+                Some(ReservedHoldStamp::Invocation {
+                    hold_id: format!(
+                        "budget-hold:{}:{}:{}",
+                        request.request_id, request.capability.id, grant_index
+                    ),
+                    grant_index: *grant_index,
+                })
+            }
+            PreExecutionBudgetMutation::None => None,
+        };
+
+        self.build_execution_nonce_preflight_allow_response_with_metadata(
+            request,
+            timestamp,
+            Some(matched_grant_index),
+            metadata,
+            EXECUTION_NONCE_AUTHORIZATION_RESERVED_REASON,
+            reserved_hold,
         )
     }
 }

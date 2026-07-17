@@ -6,7 +6,7 @@
 
 use chio_log_redact::redacted;
 
-use self::responses::FinalizeToolOutputCostContext;
+use self::responses::{AllowResponseNonce, FinalizeToolOutputCostContext};
 use super::*;
 use crate::admission_operation::{
     AdmissionAttachment, AdmissionDigest, AdmissionIdentifier, AdmissionOperationState,
@@ -21,6 +21,11 @@ use crate::budget_store::{
     BudgetInvocationQuota, BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldDecision,
     BudgetReconcileHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest,
 };
+
+pub(crate) struct ReservedPrepayment {
+    pub(crate) authorization: PaymentAuthorization,
+    pub(crate) payment_reference: Option<String>,
+}
 
 impl ChioKernel {
     /// Issue a new capability for an agent.
@@ -395,6 +400,7 @@ impl ChioKernel {
     /// oversubscribing sibling bypass the parent cap.
     pub(crate) fn admit_capability_budget(&self, cap: &CapabilityToken) -> Result<bool, String> {
         if let Some(parent_link) = cap.delegation_chain.last() {
+            self.enforce_restart_reserved_hold_gate()?;
             use chio_kernel_core::BudgetRegistry;
             let proposed_share = cap
                 .budget_share_bps
@@ -449,6 +455,140 @@ impl ChioKernel {
         }
 
         Ok(())
+    }
+
+    fn lock_reserved_sibling_shares(
+        &self,
+    ) -> std::sync::MutexGuard<'_, HashMap<String, ReservedSiblingShare>> {
+        match self.reserved_sibling_shares.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+
+    pub(crate) fn tracked_reserved_sibling_hold_ids(&self) -> Vec<String> {
+        self.lock_reserved_sibling_shares()
+            .keys()
+            .cloned()
+            .collect()
+    }
+
+    pub(crate) fn record_reserved_sibling_share(&self, hold_id: &str, cap: &CapabilityToken) {
+        let Some(parent_link) = cap.delegation_chain.last() else {
+            return;
+        };
+        let share_bps = cap
+            .budget_share_bps
+            .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS);
+        self.lock_reserved_sibling_shares().insert(
+            hold_id.to_string(),
+            ReservedSiblingShare {
+                parent_token_id: parent_link.capability_id.clone(),
+                child_token_id: cap.id.clone(),
+                share_bps,
+            },
+        );
+    }
+
+    pub(crate) fn release_reserved_sibling_share_for_hold(&self, hold_id: &str) {
+        let Some(entry) = self.lock_reserved_sibling_shares().remove(hold_id) else {
+            return;
+        };
+        use chio_kernel_core::BudgetRegistry;
+        let mut budgets = match self.budget_registry.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Err(error) = budgets.release_child(
+            &entry.parent_token_id,
+            &entry.child_token_id,
+            entry.share_bps,
+        ) {
+            warn!(
+                hold_id = %hold_id,
+                reason = %redacted!(&error),
+                "failed to release reserved sibling share for a closed hold"
+            );
+        }
+    }
+
+    fn lock_restart_reserved_hold_gate(
+        &self,
+    ) -> std::sync::MutexGuard<'_, RestartReservedHoldGate> {
+        match self.restart_reserved_hold_gate.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+
+    pub fn arm_restart_reserved_hold_gate(&self) -> Result<(), KernelError> {
+        let gate = match self
+            .with_budget_store(|store| Ok(store.list_open_delegated_reserved_hold_ids()?))?
+        {
+            Some(hold_ids) => {
+                let pending: std::collections::HashSet<String> = hold_ids.into_iter().collect();
+                if pending.is_empty() {
+                    RestartReservedHoldGate::Clear
+                } else {
+                    RestartReservedHoldGate::PendingHolds(pending)
+                }
+            }
+            None => {
+                let open = self.with_budget_store(|store| Ok(store.count_open_holds()?))?;
+                if open == 0 {
+                    RestartReservedHoldGate::Clear
+                } else {
+                    RestartReservedHoldGate::PendingOpaqueCount
+                }
+            }
+        };
+        *self.lock_restart_reserved_hold_gate() = gate;
+        Ok(())
+    }
+
+    fn enforce_restart_reserved_hold_gate(&self) -> Result<(), String> {
+        let mut gate = self.lock_restart_reserved_hold_gate();
+        match &*gate {
+            RestartReservedHoldGate::Clear => Ok(()),
+            RestartReservedHoldGate::PendingHolds(pending) => {
+                let mut still_open = std::collections::HashSet::new();
+                for hold_id in pending {
+                    let open = self
+                        .with_budget_store(|store| {
+                            Ok(store
+                                .get_budget_hold(hold_id)?
+                                .is_some_and(|hold| hold.disposition.is_open()))
+                        })
+                        .map_err(|error| error.to_string())?;
+                    if open {
+                        still_open.insert(hold_id.clone());
+                    }
+                }
+                if still_open.is_empty() {
+                    *gate = RestartReservedHoldGate::Clear;
+                    Ok(())
+                } else {
+                    let count = still_open.len();
+                    *gate = RestartReservedHoldGate::PendingHolds(still_open);
+                    Err(format!(
+                        "delegated reserved holds from a prior process remain open ({count})"
+                    ))
+                }
+            }
+            RestartReservedHoldGate::PendingOpaqueCount => {
+                let open = self
+                    .with_budget_store(|store| Ok(store.count_open_holds()?))
+                    .map_err(|error| error.to_string())?;
+                if open == 0 {
+                    *gate = RestartReservedHoldGate::Clear;
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "open budget holds from a prior process remain ({open}) and cannot be enumerated"
+                    ))
+                }
+            }
+        }
     }
 
     /// Run the portable pure-compute verdict path provided by
@@ -787,6 +927,7 @@ impl ChioKernel {
         &self,
         charge: &BudgetChargeResult,
         terminal_event: Option<(&str, &BudgetHoldMutationDecision)>,
+        execution_nonce_id: Option<&str>,
     ) -> serde_json::Value {
         let mut budget_authority = serde_json::Map::new();
         budget_authority.insert(
@@ -890,6 +1031,19 @@ impl ChioKernel {
             budget_authority.insert("terminal".to_string(), serde_json::Value::Object(terminal));
         }
 
+        if let Some(nonce_id) = execution_nonce_id {
+            budget_authority.insert(
+                "execution_nonce_id".to_string(),
+                serde_json::json!(nonce_id),
+            );
+            budget_authority.insert(
+                "mediated_spend".to_string(),
+                serde_json::json!({
+                    "profile": chio_core_types::receipt::authoritative_spend::MEDIATED_SPEND_PROFILE
+                }),
+            );
+        }
+
         serde_json::json!({ "budget_authority": budget_authority })
     }
 
@@ -911,7 +1065,7 @@ impl ChioKernel {
         match budget_mutation.charge_result() {
             Some(charge) => self.merge_budget_receipt_metadata(
                 retained,
-                self.budget_execution_receipt_metadata(charge, None),
+                self.budget_execution_receipt_metadata(charge, None, None),
             ),
             None => retained,
         }
@@ -927,7 +1081,7 @@ impl ChioKernel {
         let Some(charge) = budget_mutation.charge_result() else {
             return retained;
         };
-        let mut budget_metadata = self.budget_execution_receipt_metadata(charge, None);
+        let mut budget_metadata = self.budget_execution_receipt_metadata(charge, None, None);
         if let Some(budget_authority) = budget_metadata
             .get_mut("budget_authority")
             .and_then(serde_json::Value::as_object_mut)
@@ -949,7 +1103,7 @@ impl ChioKernel {
         charge: &BudgetChargeResult,
         runtime_metadata: Option<serde_json::Value>,
     ) -> Option<serde_json::Value> {
-        let mut budget_metadata = self.budget_execution_receipt_metadata(charge, None);
+        let mut budget_metadata = self.budget_execution_receipt_metadata(charge, None, None);
         if let Some(budget_authority) = budget_metadata
             .get_mut("budget_authority")
             .and_then(serde_json::Value::as_object_mut)
@@ -980,7 +1134,7 @@ impl ChioKernel {
         charge: &BudgetChargeResult,
         runtime_metadata: Option<serde_json::Value>,
     ) -> Option<serde_json::Value> {
-        let mut budget_metadata = self.budget_execution_receipt_metadata(charge, None);
+        let mut budget_metadata = self.budget_execution_receipt_metadata(charge, None, None);
         if let Some(capture) = budget_metadata
             .get_mut("budget_authority")
             .and_then(serde_json::Value::as_object_mut)
@@ -1746,6 +1900,85 @@ impl ChioKernel {
         })
     }
 
+    pub(crate) fn tool_server_measures_realized_cost(&self, server_id: &str) -> bool {
+        self.tool_servers
+            .get(server_id)
+            .is_none_or(|server| server.measures_realized_cost())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn finalize_unmeasured_cost_provisional_allow(
+        &self,
+        request: &ToolCallRequest,
+        output: ToolServerOutput,
+        elapsed: Duration,
+        timestamp: u64,
+        charge: BudgetChargeResult,
+        extra_metadata: Option<serde_json::Value>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let cap = &request.capability;
+        let reverse = if charge.invocation_capture.is_some() {
+            self.cancel_captured_monetary_before_dispatch(&cap.id, &charge)?
+        } else {
+            self.reverse_budget_charge(&cap.id, &charge)?
+        };
+        let financial = FinancialReceiptMetadata {
+            grant_index: charge.grant_index as u32,
+            cost_charged: 0,
+            currency: charge.currency.clone(),
+            budget_remaining: charge
+                .budget_total
+                .saturating_sub(reverse.committed_cost_units_after),
+            budget_total: charge.budget_total,
+            delegation_depth: cap.delegation_chain.len() as u32,
+            root_budget_holder: cap.issuer.to_hex(),
+            payment_reference: None,
+            settlement_status: SettlementStatus::Pending,
+            cost_breakdown: None,
+            oracle_evidence: None,
+            attempted_cost: None,
+        };
+        let limited_output = self.apply_stream_limits(output, elapsed)?;
+        let tool_call_output = match &limited_output {
+            ToolServerOutput::Value(value) => ToolCallOutput::Value(value.clone()),
+            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream))
+            | ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, .. }) => {
+                ToolCallOutput::Stream(stream.clone())
+            }
+        };
+        let budget_metadata =
+            self.budget_execution_receipt_metadata(&charge, Some(("reversed", &reverse)), None);
+        let metadata = merge_metadata_objects(
+            Some(serde_json::json!({ "financial": financial })),
+            self.merge_budget_receipt_metadata(extra_metadata, budget_metadata),
+        );
+
+        match limited_output {
+            ToolServerOutput::Value(_)
+            | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => self
+                .build_allow_response_with_metadata_and_payee_binding(
+                    request,
+                    tool_call_output,
+                    timestamp,
+                    Some(charge.grant_index),
+                    metadata,
+                    verified_payee_binding,
+                    AllowResponseNonce::Suppressed,
+                ),
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
+                .build_incomplete_response_with_output_metadata_and_payee_binding(
+                    request,
+                    Some(tool_call_output),
+                    &reason,
+                    timestamp,
+                    Some(charge.grant_index),
+                    self.mark_runtime_admission_reservations_retained_fail_closed(metadata),
+                    verified_payee_binding,
+                ),
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn finalize_budgeted_tool_output_with_cost_and_metadata(
         &self,
@@ -1765,6 +1998,86 @@ impl ChioKernel {
             cap,
         } = cost_context;
         let Some(charge) = charge_result else {
+            if let Some(authorization) = payment_authorization.as_ref() {
+                let (quoted_units, quoted_currency) = Self::mustprepay_quoted_amount(request)
+                    .ok_or_else(|| {
+                        KernelError::GovernedTransactionDenied(
+                            "payment authorization omitted its MustPrepay quote".to_string(),
+                        )
+                    })?;
+                let settlement = if authorization.state.is_final() {
+                    ReceiptSettlement::from_authorization(authorization)
+                } else {
+                    let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
+                        KernelError::Internal(
+                            "payment authorization present without configured adapter".to_string(),
+                        )
+                    })?;
+                    let result = match adapter.capture(
+                        &authorization.authorization_id,
+                        quoted_units,
+                        &quoted_currency,
+                        &request.request_id,
+                    ) {
+                        Ok(result) => result,
+                        Err(error) => {
+                            let _ = adapter
+                                .release(&authorization.authorization_id, &request.request_id);
+                            return self.build_deny_response_with_metadata(
+                                request,
+                                &format!(
+                                    "MustPrepay authorization could not be settled after execution: {error}"
+                                ),
+                                timestamp,
+                                Some(matched_grant_index),
+                                extra_metadata,
+                            );
+                        }
+                    };
+                    if result.settlement_status != crate::payment::RailSettlementStatus::Settled {
+                        let _ =
+                            adapter.release(&authorization.authorization_id, &request.request_id);
+                    }
+                    ReceiptSettlement::from_payment_result(&result)
+                };
+                if settlement.settlement_status != SettlementStatus::Settled {
+                    return self.build_deny_response_with_metadata(
+                        request,
+                        "MustPrepay authorization could not be settled after execution",
+                        timestamp,
+                        Some(matched_grant_index),
+                        extra_metadata,
+                    );
+                }
+                let (payment_reference, settlement_status) = settlement.into_receipt_parts();
+                let financial = FinancialReceiptMetadata {
+                    grant_index: matched_grant_index as u32,
+                    cost_charged: quoted_units,
+                    currency: quoted_currency,
+                    budget_remaining: 0,
+                    budget_total: quoted_units,
+                    delegation_depth: cap.delegation_chain.len() as u32,
+                    root_budget_holder: cap.issuer.to_hex(),
+                    payment_reference,
+                    settlement_status,
+                    cost_breakdown: None,
+                    oracle_evidence: None,
+                    attempted_cost: None,
+                };
+                let metadata = merge_metadata_objects(
+                    extra_metadata,
+                    Some(serde_json::json!({ "financial": financial })),
+                );
+                return self.finalize_tool_output_with_metadata_and_payee_binding(
+                    request,
+                    output,
+                    elapsed,
+                    timestamp,
+                    matched_grant_index,
+                    metadata,
+                    verified_payee_binding,
+                );
+            }
             return self.finalize_tool_output_with_metadata_and_payee_binding(
                 request,
                 output,
@@ -1775,6 +2088,20 @@ impl ChioKernel {
                 verified_payee_binding,
             );
         };
+
+        if payment_authorization.is_none()
+            && !self.tool_server_measures_realized_cost(&request.server_id)
+        {
+            return self.finalize_unmeasured_cost_provisional_allow(
+                request,
+                output,
+                elapsed,
+                timestamp,
+                charge,
+                extra_metadata,
+                verified_payee_binding,
+            );
+        }
 
         let reported_cost_ref = reported_cost.as_ref();
         let mut oracle_evidence = None;
@@ -1968,26 +2295,82 @@ impl ChioKernel {
             }
         };
 
-        let budget_metadata =
-            self.budget_execution_receipt_metadata(&charge, Some(("reconciled", &reconcile)));
-        let merged_extra_metadata =
-            self.merge_budget_receipt_metadata(extra_metadata, budget_metadata);
+        let preminted_execution_nonce = if request.execution_nonce.is_none() {
+            if let Some(nonce_config) = self.execution_nonce_config.as_ref() {
+                let action = ToolCallAction::from_parameters(request.arguments.clone()).map_err(
+                    |error| {
+                        KernelError::ReceiptSigningFailed(format!(
+                            "failed to hash parameters for nonce binding: {error}"
+                        ))
+                    },
+                )?;
+                let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
+                let binding = crate::execution_nonce::NonceBinding {
+                    subject_id: cap.subject.to_hex(),
+                    request_id: request.request_id.clone(),
+                    capability_id: cap.id.clone(),
+                    tool_server: request.server_id.clone(),
+                    tool_name: request.tool_name.clone(),
+                    parameter_hash: action.parameter_hash,
+                };
+                Some(Box::new(crate::execution_nonce::mint_execution_nonce(
+                    &self.config.keypair,
+                    binding,
+                    nonce_config,
+                    now,
+                )?))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
-        let merged_extra_metadata = merge_metadata_objects(financial_json, merged_extra_metadata);
 
         match limited_output {
             ToolServerOutput::Value(_)
-            | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => self
-                .build_allow_response_with_metadata_and_payee_binding(
+            | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => {
+                let budget_metadata = self.budget_execution_receipt_metadata(
+                    &charge,
+                    Some(("reconciled", &reconcile)),
+                    preminted_execution_nonce
+                        .as_deref()
+                        .map(|nonce| nonce.nonce_id())
+                        .or_else(|| {
+                            request
+                                .execution_nonce
+                                .as_ref()
+                                .map(|nonce| nonce.nonce_id())
+                        }),
+                );
+                let merged_extra_metadata = merge_metadata_objects(
+                    financial_json,
+                    self.merge_budget_receipt_metadata(extra_metadata, budget_metadata),
+                );
+                self.build_allow_response_with_metadata_and_payee_binding(
                     request,
                     tool_call_output,
                     timestamp,
                     Some(charge.grant_index),
-                    merged_extra_metadata.clone(),
+                    merged_extra_metadata,
                     verified_payee_binding,
-                ),
-            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
-                .build_incomplete_response_with_output_metadata_and_payee_binding(
+                    match preminted_execution_nonce {
+                        Some(nonce) => AllowResponseNonce::Preminted(nonce),
+                        None => AllowResponseNonce::MintForAllow,
+                    },
+                )
+            }
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => {
+                let budget_metadata = self.budget_execution_receipt_metadata(
+                    &charge,
+                    Some(("reconciled", &reconcile)),
+                    None,
+                );
+                let merged_extra_metadata = merge_metadata_objects(
+                    financial_json,
+                    self.merge_budget_receipt_metadata(extra_metadata, budget_metadata),
+                );
+                self.build_incomplete_response_with_output_metadata_and_payee_binding(
                     request,
                     Some(tool_call_output),
                     &reason,
@@ -2002,7 +2385,8 @@ impl ChioKernel {
                         merged_extra_metadata,
                     ),
                     verified_payee_binding,
-                ),
+                )
+            }
         }
     }
 
@@ -2091,13 +2475,25 @@ impl ChioKernel {
         trusted_now_unix_ms: u64,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<Option<PaymentAuthorization>, PaymentError> {
-        let Some(charge) = charge_result else {
+        let (amount_units, currency) = if let Some(amount) = Self::mustprepay_quoted_amount(request)
+        {
+            amount
+        } else if let Some(charge) = charge_result {
+            (charge.cost_charged, charge.currency.clone())
+        } else {
             return Ok(None);
         };
         let Some(adapter) = self.payment_adapter.as_ref() else {
+            if Self::is_governed_mustprepay_request(request) {
+                return Err(PaymentError::RailError(
+                    "MustPrepay intent reached payment authorization without a configured adapter"
+                        .to_string(),
+                ));
+            }
             return Ok(None);
         };
         let durable_journal = durable_admission
+            .filter(|_| charge_result.is_some())
             .map(|admission| {
                 self.load_durable_payment_journal(admission)
                     .map_err(|error| PaymentError::RailError(error.to_string()))
@@ -2181,7 +2577,7 @@ impl ChioKernel {
                     })
             })
             .transpose()?;
-        let commerce = if charge.cost_charged == 0 {
+        let commerce = if amount_units == 0 {
             None
         } else if let Some(commerce) = request
             .governed_intent
@@ -2239,8 +2635,8 @@ impl ChioKernel {
         );
 
         let authorization = adapter.authorize(&PaymentAuthorizeRequest {
-            amount_units: charge.cost_charged,
-            currency: charge.currency.clone(),
+            amount_units,
+            currency,
             payer: request.agent_id.clone(),
             payee,
             reference: durable_journal.as_ref().map_or_else(
@@ -2283,5 +2679,129 @@ impl ChioKernel {
             }
         }
         Ok(Some(authorization))
+    }
+
+    pub(crate) fn mustprepay_quoted_amount(request: &ToolCallRequest) -> Option<(u64, String)> {
+        request
+            .governed_intent
+            .as_ref()
+            .and_then(|intent| intent.metered_billing.as_ref())
+            .filter(|metered| {
+                metered.settlement_mode
+                    == chio_core::capability::governance::MeteredSettlementMode::MustPrepay
+            })
+            .map(|metered| {
+                (
+                    metered.quote.quoted_cost.units,
+                    metered.quote.quoted_cost.currency.clone(),
+                )
+            })
+    }
+
+    pub(crate) fn is_governed_mustprepay_request(request: &ToolCallRequest) -> bool {
+        Self::mustprepay_quoted_amount(request).is_some()
+    }
+
+    pub(crate) fn ensure_reserved_mustprepay_prepaid(
+        &self,
+        request: &ToolCallRequest,
+        charge_result: Option<&BudgetChargeResult>,
+        durable_admission: Option<&DurableToolAdmission>,
+        trusted_now_unix_ms: u64,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+    ) -> Result<Option<ReservedPrepayment>, KernelError> {
+        if !Self::is_governed_mustprepay_request(request) {
+            return Ok(None);
+        }
+        let authorization = self
+            .authorize_payment_if_needed(
+                request,
+                charge_result,
+                durable_admission,
+                trusted_now_unix_ms,
+                verified_payee_binding,
+            )
+            .map_err(|error| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "MustPrepay prepayment authorization failed before reserving an execution nonce: {error}"
+                ))
+            })?
+            .ok_or_else(|| {
+                KernelError::GovernedTransactionDenied(
+                    "MustPrepay reservation omitted its payment authorization".to_string(),
+                )
+            })?;
+
+        if authorization.state.is_final() {
+            return Ok(Some(ReservedPrepayment {
+                payment_reference: Some(authorization.authorization_id.clone()),
+                authorization,
+            }));
+        }
+
+        let (amount_units, currency) =
+            Self::mustprepay_quoted_amount(request).ok_or_else(|| {
+                KernelError::GovernedTransactionDenied(
+                    "MustPrepay reservation omitted its quoted amount".to_string(),
+                )
+            })?;
+        let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "MustPrepay reservation omitted its payment adapter".to_string(),
+            )
+        })?;
+        let result = match adapter.capture(
+            &authorization.authorization_id,
+            amount_units,
+            &currency,
+            &request.request_id,
+        ) {
+            Ok(result) => result,
+            Err(error) => {
+                let _ = adapter.release(&authorization.authorization_id, &request.request_id);
+                return Err(KernelError::GovernedTransactionDenied(format!(
+                    "MustPrepay prepayment capture failed before reserving an execution nonce: {error}"
+                )));
+            }
+        };
+        if result.settlement_status != crate::payment::RailSettlementStatus::Settled {
+            let _ = adapter.release(&authorization.authorization_id, &request.request_id);
+            return Err(KernelError::GovernedTransactionDenied(
+                "MustPrepay prepayment capture was not confirmed settled".to_string(),
+            ));
+        }
+        Ok(Some(ReservedPrepayment {
+            authorization: PaymentAuthorization {
+                state: crate::payment::PaymentAuthorizationState::PrepaidFinal,
+                ..authorization
+            },
+            payment_reference: Some(result.transaction_id),
+        }))
+    }
+
+    pub(crate) fn refund_reserved_mustprepay_prepayment(
+        &self,
+        request: &ToolCallRequest,
+        prepayment: &PaymentAuthorization,
+    ) {
+        let Some((amount_units, currency)) = Self::mustprepay_quoted_amount(request) else {
+            return;
+        };
+        let Some(adapter) = self.payment_adapter.as_ref() else {
+            return;
+        };
+        if let Err(error) = adapter.refund(
+            &prepayment.authorization_id,
+            amount_units,
+            &currency,
+            &request.request_id,
+        ) {
+            warn!(
+                request_id = %request.request_id,
+                authorization_id = %prepayment.authorization_id,
+                reason = %redacted!(&error),
+                "failed to refund captured MustPrepay prepayment after reservation failure"
+            );
+        }
     }
 }

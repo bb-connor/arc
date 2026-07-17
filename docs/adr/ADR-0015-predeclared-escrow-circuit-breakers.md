@@ -1,6 +1,6 @@
 # ADR-0015: Predeclared Settlement Outcomes and Admitted Operational Pause
 
-- Status: Proposed
+- Status: Accepted for follow-up B (Rust roster + decision-rule constraints); follow-up A (Solidity impairBondDetailed allowlist) and follow-up C remain deferred
 - Decision owner: economy and settlement lane
 - Related invariant: invariant 10 (no discretionary repricing or self-dealing;
   circuit-breaker effects are declared honestly)
@@ -280,6 +280,21 @@ structural rather than partly trusted.
   predeclared decision rule (or circuit-breaker condition id) it applied. Keep the
   existing fixed outcome set and amount envelope. No new discretionary override
   lane is introduced.
+
+### Follow-up B enforcement (accepted)
+
+Follow-up B is accepted for the Rust value path. `LiabilityClaimAdjudicationArtifact`
+gains two optional, signature-safe fields: `decision_rule_ref` (the predeclared
+decision rule or circuit-breaker condition id applied) and `roster_anchor_ref`
+(the id/hash of the signed roster artifact the adjudicator was checked against).
+A new `validate_against_roster` policy gate enforces roster membership, an allowed
+decision-rule set, and that the recorded `roster_anchor_ref` equals the anchor of
+the roster actually applied. Every value-path constructor (adjudication, payout
+instruction, settlement instruction) is a fail-closed choke point that MUST call
+this gate; a CI check enforces that no liability value-path artifact is constructed
+without it. Follow-up A stays deferred: `ChioBondVault` is immutable with no admin
+or upgrade lane (D1), so the on-chain allowlist requires a new deployment.
+
 - **C. Guard the adjacent admin surfaces.** Document and, where feasible,
   constrain `ChioIdentityRegistry` operator deactivation and `ChioPriceResolver`
   price administration so neither can be used to indirectly force or mis-value a

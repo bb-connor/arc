@@ -100,6 +100,7 @@ use chio_kernel::budget_store::{
     BudgetReconcileHoldRequest, BudgetReleaseHoldRequest, BudgetReverseHoldRequest,
     DeniedBudgetHold, RevocationCommitMetadata,
 };
+use chio_kernel::operator_report::ComptrollerSurfaceReport;
 use chio_kernel::supplemental_quota::CanonicalRevocationSet;
 use chio_kernel::{
     build_generic_governance_case_artifact, build_generic_governance_charter_artifact,

@@ -1206,6 +1206,81 @@ fn monetary_server_not_reporting_cost_charges_max_cost_per_invocation() {
 }
 
 #[test]
+fn unmeasured_cost_is_provisional_and_emits_no_nonce() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(UnmeasuredCostServer {
+        id: "gate-srv".to_string(),
+    }));
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 50, "USD")));
+    let nonce_config = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: false,
+    };
+    kernel.set_execution_nonce_store(
+        nonce_config.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
+    );
+    let cap = kernel
+        .issue_capability(
+            &agent_kp.public_key(),
+            make_scope(vec![
+                make_monetary_grant("gate-srv", "compute", 100, 1000, "USD"),
+                make_monetary_grant("cost-srv", "compute", 100, 1000, "USD"),
+            ]),
+            3600,
+        )
+        .unwrap();
+    let request = |request_id: &str, server_id: &str| ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: cap.clone(),
+        tool_name: "compute".to_string(),
+        server_id: server_id.to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    };
+
+    let provisional = kernel
+        .evaluate_tool_call_blocking(&request("req-unmeasured", "gate-srv"))
+        .unwrap();
+    assert_eq!(provisional.verdict, Verdict::Allow);
+    assert!(provisional.execution_nonce.is_none());
+    let metadata = provisional.receipt.metadata.as_ref().unwrap();
+    assert_eq!(metadata["financial"]["cost_charged"], 0);
+    assert_eq!(metadata["financial"]["settlement_status"], "pending");
+    assert_eq!(
+        metadata["budget_authority"]["terminal"]["disposition"],
+        "reversed"
+    );
+    assert_eq!(
+        kernel
+            .budget_store
+            .get_usage(&cap.id, 0)
+            .unwrap()
+            .unwrap()
+            .committed_cost_units()
+            .unwrap(),
+        0
+    );
+
+    let measured = kernel
+        .evaluate_tool_call_blocking(&request("req-measured", "cost-srv"))
+        .unwrap();
+    assert_eq!(measured.verdict, Verdict::Allow);
+    assert!(measured.execution_nonce.is_some());
+}
+
+#[test]
 fn captured_monetary_invocation_only_explicit_predispatch_cancel_can_release(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let store = InMemoryBudgetStore::new();
