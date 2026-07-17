@@ -1598,6 +1598,43 @@ fn governed_mustprepay_with_charge_funds_the_quoted_cost_not_the_hold() {
     );
 }
 
+// Regression: a no-ceiling MustPrepay grant is non-monetary, so admission writes
+// no HoldPlaced journal row and reaches payment authorization with `charge_result:
+// None`. With the dispatch-intent payment journal ACTIVE (the enum default, not the
+// Off that every other monetary test forces), advancing HoldPlaced -> Authorized
+// would fail closed against the missing predecessor row and deny a prepayment that
+// the rail may already have captured, releasing (not refunding) a settled capture:
+// money loss. The authorization must succeed journal-free.
+#[test]
+fn no_ceiling_mustprepay_authorizes_with_the_payment_journal_active() {
+    let mut config = make_monetary_config();
+    config.dispatch_intent_journal = crate::DispatchIntentJournalMode::SideEffecting;
+    let mut kernel = make_kernel(config);
+    kernel
+        .set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()))
+        .expect("install payment adapter");
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 5, "USD")));
+
+    let agent_kp = Keypair::generate();
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 10, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let intent = make_mustprepay_intent("intent-no-ceiling", "cost-srv", "compute", 100, "USD");
+    let request = mustprepay_tool_call("req-no-ceiling", &cap, &agent_kp, intent, &kernel);
+
+    // `None` models the no-ceiling admission outcome: no monetary charge, hence no
+    // HoldPlaced row. This must not deny; the prepayment is journal-free by design.
+    let authorization = kernel
+        .authorize_payment_if_needed(&request, None)
+        .expect("a no-ceiling MustPrepay must authorize with the journal active, not deny")
+        .expect("a no-ceiling MustPrepay must authorize a prepayment");
+    assert!(
+        !authorization.settled,
+        "the sim adapter holds the prepayment unsettled (prepaid, no broadcast)"
+    );
+}
+
 // A non-MustPrepay request with a provisional budget charge and no MustPrepay
 // quote still authorizes the charged amount: the quote-first reorder must not
 // disturb the metered charge path.

@@ -1394,7 +1394,14 @@ impl ChioKernel {
                 attempted_cost: None,
             };
             let payment_meta = serde_json::json!({ "financial": financial_meta });
-            let metadata = merge_metadata_objects(Some(payment_meta), extra_metadata);
+            // The kernel-built `financial` block is authoritative and must win over
+            // any `financial` keys carried in caller/route `extra_metadata`, so the
+            // settled-prepayment status that `require_earned_mediated_trust_level`
+            // reads at the sign site reflects the real settlement and can never be
+            // forged by a caller-supplied override. Pass it as the winning (second)
+            // argument, matching the reconciled-hold path (see
+            // `merge_budget_receipt_metadata`).
+            let metadata = merge_metadata_objects(extra_metadata, Some(payment_meta));
             return self.finalize_tool_output_with_metadata(
                 request,
                 output,
@@ -1899,31 +1906,44 @@ impl ChioKernel {
             governed,
             commerce,
         })?;
-        // Persist the rail authorization id BEFORE returning, so a crash
-        // after authorize leaves a recoverable Authorized row. If the
-        // advance cannot commit, undo the rail hold we just placed and fail
-        // closed; the HoldPlaced row still records the attempt for boot
-        // reconciliation.
-        if let Err(error) = self.advance_payment_journal_if_active(
-            &request.request_id,
-            crate::payment::PaymentJournalState::HoldPlaced,
-            crate::payment::PaymentJournalState::Authorized,
-            Some(&authorization.authorization_id),
-            None,
-            None,
-        ) {
-            if let Err(release_error) =
-                adapter.release(&authorization.authorization_id, &request.request_id)
-            {
-                warn!(
-                    request_id = %request.request_id,
-                    reason = %redacted!(&release_error),
-                    "rail release after failed journal advance also failed"
-                );
+        // Advance the journal HoldPlaced -> Authorized only when a monetary charge
+        // actually wrote a HoldPlaced row. A no-ceiling MustPrepay grant is not
+        // monetary (no per-invocation or total ceiling), so admission takes the
+        // non-monetary branch and writes NO HoldPlaced row; its prepayment is
+        // journal-free by design and settles through the no-ceiling settle path.
+        // Advancing unconditionally would fail closed against the missing
+        // predecessor row and deny a just-captured prepayment, releasing (not
+        // refunding) an already-settled capture, i.e. money loss. A present
+        // `charge_result` is exactly the has-monetary case whose HoldPlaced row
+        // exists whenever the journal is active; when the journal is off the advance
+        // is a no-op regardless.
+        if charge_result.is_some() {
+            // Persist the rail authorization id BEFORE returning, so a crash
+            // after authorize leaves a recoverable Authorized row. If the
+            // advance cannot commit, undo the rail hold we just placed and fail
+            // closed; the HoldPlaced row still records the attempt for boot
+            // reconciliation.
+            if let Err(error) = self.advance_payment_journal_if_active(
+                &request.request_id,
+                crate::payment::PaymentJournalState::HoldPlaced,
+                crate::payment::PaymentJournalState::Authorized,
+                Some(&authorization.authorization_id),
+                None,
+                None,
+            ) {
+                if let Err(release_error) =
+                    adapter.release(&authorization.authorization_id, &request.request_id)
+                {
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %redacted!(&release_error),
+                        "rail release after failed journal advance also failed"
+                    );
+                }
+                return Err(PaymentError::Unavailable(format!(
+                    "payment journal advance to authorized failed: {error}"
+                )));
             }
-            return Err(PaymentError::Unavailable(format!(
-                "payment journal advance to authorized failed: {error}"
-            )));
         }
         Ok(Some(authorization))
     }

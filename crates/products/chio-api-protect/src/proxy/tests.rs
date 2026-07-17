@@ -1958,10 +1958,14 @@ async fn sidecar_validate_capability_honors_a_durable_only_revocation() {
 async fn sidecar_evaluate_tool_call_honors_a_durable_only_revocation() {
     let receipt_db = temp_receipt_db_path();
 
-    let replica_b = test_state_with_receipt_db(
+    // Replica B serves the advisory route, which is off by default; opt it in so
+    // this exercises the advisory path's durable-revocation consultation rather
+    // than the disabled-advisory 409.
+    let replica_b = make_test_state(
         Vec::new(),
         "http://127.0.0.1:1".to_string(),
         Some(&receipt_db),
+        true,
     );
     let replica_a = test_state_with_receipt_db(
         Vec::new(),

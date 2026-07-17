@@ -38,9 +38,11 @@ pub(crate) fn require_earned_mediated_trust_level(
     // present, the cost must be earned by that hold's `reconciled` terminal above,
     // not two free-form financial strings, so the carve-out is gated on the
     // absence of the hold context to keep this sign-site a structural proof. The
-    // `financial` block is kernel-constructed and never merged from caller-supplied
-    // metadata on any Mediated-signing path. Still fail closed when neither a
-    // reconciled hold nor a settled no-ceiling prepayment backs the cost.
+    // `financial` block is kernel-constructed, and on every Mediated-signing path
+    // it is the winning side of the metadata merge, so caller- or route-supplied
+    // `extra_metadata` cannot override the `settlement_status`/`payment_reference`
+    // this carve-out reads. Still fail closed when neither a reconciled hold nor a
+    // settled no-ceiling prepayment backs the cost.
     let settled_prepayment = metadata.get("budget_authority").is_none()
         && metadata.get("financial").is_some_and(|financial| {
             financial

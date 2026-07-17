@@ -179,11 +179,15 @@ pub(crate) fn build_mediation_kernel(
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-        // The default journal mode keeps the durable payment journal in force
-        // for governed MustPrepay prepayments (recorded through the budget
-        // store); this kernel never dispatches tools, so it writes no dispatch
-        // intents.
-        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::SideEffecting,
+        // The dispatch-intent payment journal is off on this reserve-only kernel.
+        // Its money-path durability is the reserved-hold TTL reaper plus settle
+        // by reconcile-by-nonce, not the in-process HoldPlaced -> Authorized ->
+        // Settled journal that the dispatching kernels (`chio mcp serve`, `chio
+        // run`) use: this kernel reserves a hold and mints a nonce but never
+        // dispatches or settles in-process, so it never writes the HoldPlaced row
+        // an Authorized advance would require. A MustPrepay prepayment is still
+        // authorized through the adapter before a nonce is minted.
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.set_budget_store_handle(budget_store);
     let nonce_cfg = ExecutionNonceConfig {
@@ -276,32 +280,6 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     execution_nonce: Option<SignedExecutionNonce>,
 }
 
-/// Return the first revoked capability id found on the presented capability or
-/// anywhere in its delegation chain, or `None` when neither the leaf nor any
-/// ancestor is revoked.
-///
-/// A revocation severs the whole delegated subtree: revoking a root or
-/// intermediate capability must reject every descendant that carries it in its
-/// `delegation_chain`, not only the exact token that was revoked. The presented
-/// leaf id is checked first, then each ancestor recorded on the chain, matching
-/// the kernel's own `check_revocation` walk. The mediation kernel's revocation
-/// store starts empty, so this sidecar-side walk over `state.revoked_capability_ids`
-/// is the authority; checking only the leaf id would let a delegated child of a
-/// revoked ancestor keep earning mediated reservations until expiry.
-fn revoked_id_in_capability_chain<'a>(
-    capability: &'a CapabilityToken,
-    revoked_capability_ids: &HashSet<String>,
-) -> Option<&'a str> {
-    if revoked_capability_ids.contains(&capability.id) {
-        return Some(capability.id.as_str());
-    }
-    capability
-        .delegation_chain
-        .iter()
-        .map(|link| link.capability_id.as_str())
-        .find(|capability_id| revoked_capability_ids.contains(*capability_id))
-}
-
 pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
@@ -374,17 +352,35 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
              and forfeit budget",
         );
     }
-    // Fail-closed: a capability released via `/v1/capabilities/release` (or an
-    // operator revocation) is recorded in the sidecar revocation set. Reject the
-    // presented capability when its own id OR any ancestor in its delegation
-    // chain is revoked, so a delegated child of a revoked root cannot keep
-    // earning mediated reservations until expiry. Walk the chain, not just the
-    // leaf id, because the mediation kernel's revocation store starts empty and
-    // cannot match a revoked ancestor on its own.
-    let revoked = {
-        let revoked_capability_ids = state.revoked_capability_ids.lock().await;
-        revoked_id_in_capability_chain(&parsed.capability, &revoked_capability_ids).is_some()
-    };
+    // Fail-closed: reject the presented capability when its own id OR any ancestor
+    // in its delegation chain is revoked, so a delegated child of a revoked root
+    // cannot keep earning mediated reservations until expiry. `capability_is_revoked`
+    // consults the in-memory release set first (no I/O for a known-revoked id) and
+    // then the durable revocation store, failing closed if that store cannot be
+    // read, so a revocation a sibling replica or `chio trust revoke --revocation-db`
+    // recorded after this process booted is honored here exactly as it is on the
+    // proxy and validate paths. The kernel's own revocation store starts empty, so
+    // this sidecar-side walk is the authority.
+    //
+    // Bound the chain before the per-ancestor durable walk: the capability
+    // signature is not verified until the kernel below, so cap the ancestors
+    // consulted to keep an unverified, caller-supplied token from forcing one
+    // durable store read per fabricated ancestor. A legitimate chain never
+    // approaches this bound (the kernel caps delegation depth far under it) and a
+    // longer one is rejected by the kernel regardless.
+    const MAX_MEDIATED_DELEGATION_CHAIN: usize = 32;
+    if parsed.capability.delegation_chain.len() > MAX_MEDIATED_DELEGATION_CHAIN {
+        return sidecar_bad_request("capability delegation chain is too long").into_response();
+    }
+    let mut revoked = state.capability_is_revoked(&parsed.capability.id).await;
+    if !revoked {
+        for ancestor in &parsed.capability.delegation_chain {
+            if state.capability_is_revoked(&ancestor.capability_id).await {
+                revoked = true;
+                break;
+            }
+        }
+    }
     if revoked {
         return (
             StatusCode::FORBIDDEN,
@@ -872,6 +868,7 @@ mod tests {
             receipt_store,
             hold_capable,
             None,
+            None,
         )
     }
 
@@ -879,6 +876,7 @@ mod tests {
     /// for the shared mediation kernel. A configured adapter lets an approved
     /// governed `MustPrepay` request authorize (the quote is prepaid before a
     /// reserved nonce is minted); `None` keeps it denied fail-closed.
+    #[allow(clippy::too_many_arguments)]
     fn mediated_test_state_core(
         signer: Keypair,
         budget: Arc<dyn BudgetStore>,
@@ -887,6 +885,7 @@ mod tests {
         receipt_store: Option<SqliteReceiptStore>,
         hold_capable: bool,
         payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
+        revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>>,
     ) -> Arc<ProxyState> {
         let approval_store: Arc<dyn ApprovalStore> = Arc::new(InMemoryApprovalStore::new());
         let signer_public_key = signer.public_key();
@@ -933,7 +932,7 @@ mod tests {
                 receipts: Vec::new(),
             }),
             receipt_store: receipt_store.map(Mutex::new),
-            revocation_store: None,
+            revocation_store,
             revoked_capability_ids: Mutex::new(std::collections::HashSet::new()),
             trusted_capability_issuers,
             trusted_receipt_signers,
@@ -1565,74 +1564,59 @@ mod tests {
         assert!(usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0);
     }
 
-    #[test]
-    fn revoked_id_in_capability_chain_walks_leaf_and_every_ancestor() {
-        use chio_core_types::capability::attenuation::{DelegationLink, DelegationLinkBody};
-        let issuer = Keypair::generate();
-        let root_kp = Keypair::generate();
-        let mid_kp = Keypair::generate();
-        let leaf_kp = Keypair::generate();
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .test_unwrap()
-            .as_secs();
-        let sign_link = |capability_id: &str, delegator: &Keypair, delegatee: &Keypair| {
-            DelegationLink::sign(
-                DelegationLinkBody {
-                    capability_id: capability_id.to_string(),
-                    delegator: delegator.public_key(),
-                    delegatee: delegatee.public_key(),
-                    attenuations: vec![],
-                    timestamp: now,
-                    scope_hash: None,
-                },
-                delegator,
-            )
-            .test_unwrap()
-        };
-        let root_link = sign_link("cap-root", &root_kp, &mid_kp);
-        let mid_link = sign_link("cap-mid", &mid_kp, &leaf_kp);
-        let cap = CapabilityToken::sign(
-            CapabilityTokenBody {
-                id: "cap-leaf".to_string(),
-                issuer: issuer.public_key(),
-                subject: leaf_kp.public_key(),
-                scope: ChioScope::default(),
-                issued_at: now,
-                expires_at: now + 3600,
-                delegation_chain: vec![root_link, mid_link],
-            },
-            &issuer,
-        )
-        .test_unwrap();
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mediated_route_honors_a_durable_only_revocation() {
+        // A revocation a sibling replica (or `chio trust revoke --revocation-db`)
+        // records after this process boots lives in the shared durable store but
+        // never in this process's in-memory release set, which is loaded once at
+        // boot. The mediated money path must still reject it fail-closed, matching
+        // the proxy and validate paths, or a revoked capability keeps reserving
+        // budget and minting execution nonces until it expires.
+        let signer = Keypair::generate();
+        let root = Keypair::generate();
+        let agent = Keypair::generate();
+        let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
+        let child =
+            delegated_child_capability(&signer, &root, &agent, "cap-root", "cost-srv", "compute");
+        let child_id = child.id.clone();
 
-        let set = |ids: &[&str]| {
-            ids.iter()
-                .map(|id| id.to_string())
-                .collect::<HashSet<String>>()
-        };
+        // Revoke the presented leaf id in the DURABLE store only.
+        let durable: Arc<dyn chio_kernel::RevocationStore> =
+            Arc::new(chio_kernel::InMemoryRevocationStore::new());
+        chio_kernel::RevocationStore::revoke(durable.as_ref(), &child_id).test_unwrap();
 
-        // No revoked id on the chain: the presented child admits.
-        assert_eq!(revoked_id_in_capability_chain(&cap, &set(&[])), None);
-        assert_eq!(
-            revoked_id_in_capability_chain(&cap, &set(&["cap-unrelated"])),
-            None
+        let state = mediated_test_state_core(
+            signer,
+            Arc::clone(&budget),
+            Vec::new(),
+            Some(MEDIATED_CONTROL_TOKEN.to_string()),
+            None,
+            true,
+            None,
+            Some(Arc::clone(&durable)),
         );
-        // Leaf revoked: existing behavior is preserved.
-        assert_eq!(
-            revoked_id_in_capability_chain(&cap, &set(&["cap-leaf"])),
-            Some("cap-leaf")
+        assert!(
+            !state
+                .revoked_capability_ids
+                .lock()
+                .await
+                .contains(&child_id),
+            "the in-memory release set must not carry the durable-only revocation"
         );
-        // Root ancestor revoked: the delegated child is severed.
-        assert_eq!(
-            revoked_id_in_capability_chain(&cap, &set(&["cap-root"])),
-            Some("cap-root")
-        );
-        // Intermediate ancestor revoked: also severed.
-        assert_eq!(
-            revoked_id_in_capability_chain(&cap, &set(&["cap-mid"])),
-            Some("cap-mid")
-        );
+
+        let body = serde_json::json!({
+            "capability": child,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "parameters": { "invoice": "inv-1" }
+        });
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(json["error"], "chio_capability_revoked");
+
+        // The revoked capability never reserved a hold.
+        let usage = budget.get_usage(&child_id, 0).unwrap();
+        assert!(usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0);
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1802,6 +1786,7 @@ mod tests {
             None,
             true,
             Some(Box::new(chio_kernel::SimPaymentAdapter::new())),
+            None,
         );
 
         let request_id = "req-mustprepay-adapter";
@@ -2805,6 +2790,7 @@ mod tests {
             Some(failing_receipt_store()),
             true,
             Some(Box::new(adapter)),
+            None,
         );
 
         let request_id = "req-mustprepay-persist-fail";
