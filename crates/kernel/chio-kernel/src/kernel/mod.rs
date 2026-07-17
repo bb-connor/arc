@@ -145,6 +145,77 @@ pub(crate) struct ValidatedGovernedCallChainProof {
 pub(crate) struct ValidatedGovernedAdmission {
     call_chain_proof: Option<ValidatedGovernedCallChainProof>,
     verified_runtime_attestation: Option<VerifiedRuntimeAttestationRecord>,
+    verified_payee_binding: Option<VerifiedGovernedPayeeBinding>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct VerifiedGovernedPayeeBinding {
+    beneficiary_id: String,
+    settlement_destination_ref: String,
+    payee_binding_digest: String,
+    economic_intent_digest: String,
+    pre_action_authority_digest: String,
+}
+
+impl VerifiedGovernedPayeeBinding {
+    pub(in crate::kernel) fn new(
+        beneficiary_id: String,
+        settlement_destination_ref: String,
+        economic_intent_digest: String,
+        pre_action_authority_digest: String,
+    ) -> Result<Self, chio_credit::obligation::ObligationError> {
+        let payee_binding_digest = chio_credit::obligation::derive_obligation_payee_binding_digest(
+            &beneficiary_id,
+            &settlement_destination_ref,
+        )?;
+        Ok(Self {
+            beneficiary_id,
+            settlement_destination_ref,
+            payee_binding_digest,
+            economic_intent_digest,
+            pre_action_authority_digest,
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(
+        beneficiary_id: &str,
+        settlement_destination_ref: &str,
+        economic_intent_digest: &str,
+        pre_action_authority_digest: &str,
+    ) -> Result<Self, chio_credit::obligation::ObligationError> {
+        Self::new(
+            beneficiary_id.to_owned(),
+            settlement_destination_ref.to_owned(),
+            economic_intent_digest.to_owned(),
+            pre_action_authority_digest.to_owned(),
+        )
+    }
+
+    #[must_use]
+    pub(crate) fn beneficiary_id(&self) -> &str {
+        &self.beneficiary_id
+    }
+
+    #[must_use]
+    pub(crate) fn settlement_destination_ref(&self) -> &str {
+        &self.settlement_destination_ref
+    }
+
+    #[must_use]
+    pub(crate) fn payee_binding_digest(&self) -> &str {
+        &self.payee_binding_digest
+    }
+
+    #[must_use]
+    pub(crate) fn economic_intent_digest(&self) -> &str {
+        &self.economic_intent_digest
+    }
+
+    #[must_use]
+    pub(crate) fn pre_action_authority_digest(&self) -> &str {
+        &self.pre_action_authority_digest
+    }
 }
 
 #[derive(Debug, Clone)]

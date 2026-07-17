@@ -104,6 +104,27 @@
         }
       ]
     },
+    "payoutMode": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "const": "automatic" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "windowSeconds"],
+          "properties": {
+            "kind": { "const": "contestable" },
+            "windowSeconds": { "$ref": "#/$defs/positiveInteger" }
+          }
+        }
+      ]
+    },
     "payoutRail": {
       "type": "object",
       "additionalProperties": false,
@@ -148,6 +169,7 @@
         "maxCheckpointLagSeconds",
         "predicate",
         "payoutSchedule",
+        "payoutMode",
         "payoutRail",
         "evaluatorAuthority"
       ],
@@ -170,6 +192,7 @@
         "maxCheckpointLagSeconds": { "$ref": "#/$defs/positiveInteger" },
         "predicate": { "$ref": "#/$defs/triggerPredicate" },
         "payoutSchedule": { "$ref": "#/$defs/payoutSchedule" },
+        "payoutMode": { "$ref": "#/$defs/payoutMode" },
         "payoutRail": { "$ref": "#/$defs/payoutRail" },
         "evaluatorAuthority": { "$ref": "#/$defs/evaluatorAuthority" }
       }

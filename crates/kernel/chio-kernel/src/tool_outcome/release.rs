@@ -50,7 +50,8 @@ pub enum ReleaseEvidenceArtifactKindV1 {
     VerifierPolicy,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ImmutableReleaseArtifactV1 {
     pub(super) kind: ReleaseEvidenceArtifactKindV1,
     pub(super) evidence_id: AdmissionIdentifier,
@@ -94,7 +95,7 @@ impl ImmutableReleaseArtifactV1 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct VerifierPolicyArtifactV1 {
     policy: Value,
@@ -644,7 +645,8 @@ impl PreDispatchParticipantManifestV1 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct PreDispatchNoEffectSnapshotV1 {
     operation_id: AdmissionOperationId,
     operation_version: u64,
@@ -659,12 +661,41 @@ struct PreDispatchNoEffectSnapshotV1 {
     artifacts: Vec<ImmutableReleaseArtifactV1>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct VerifiedPreDispatchNoEffect {
     snapshot: Box<PreDispatchNoEffectSnapshotV1>,
 }
 
+#[derive(Deserialize)]
+#[serde(remote = "VerifiedPreDispatchNoEffect", deny_unknown_fields)]
+struct PreDispatchNoEffectWireV1 {
+    snapshot: Box<PreDispatchNoEffectSnapshotV1>,
+}
+
+#[derive(Deserialize)]
+struct UntrustedPreDispatchNoEffectWireV1(
+    #[serde(with = "PreDispatchNoEffectWireV1")] VerifiedPreDispatchNoEffect,
+);
+
 impl VerifiedPreDispatchNoEffect {
+    pub(crate) fn from_canonical_record_verified(
+        bytes: &[u8],
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+    ) -> Result<Self, ToolOutcomeError> {
+        let UntrustedPreDispatchNoEffectWireV1(proof) = serde_json::from_slice(bytes)
+            .map_err(|_| ToolOutcomeError::Invalid("predispatch.release_proof"))?;
+        let canonical = canonical_json_bytes(&proof)
+            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
+        if canonical != bytes {
+            return Err(ToolOutcomeError::Binding(
+                "predispatch.release_proof_canonical",
+            ));
+        }
+        proof.validate_against(operation, context)?;
+        Ok(proof)
+    }
+
     pub(crate) fn from_qualified_operation_snapshot(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
@@ -951,7 +982,55 @@ pub struct VerifiedTransportNotAccepted {
     artifacts: Vec<ImmutableReleaseArtifactV1>,
 }
 
+#[derive(Deserialize)]
+#[serde(remote = "VerifiedTransportNotAccepted", deny_unknown_fields)]
+struct TransportNotAcceptedWireV1 {
+    operation_id: AdmissionOperationId,
+    operation_version: u64,
+    request_id: AdmissionIdentifier,
+    request_binding_hash: AdmissionDigest,
+    dispatch_operation_version: u64,
+    dispatch_fence: u64,
+    projection_coordinator_lease_id: AdmissionIdentifier,
+    projection_coordinator_lease_epoch: u64,
+    projection_store_fence: StoreMutationFence,
+    transport_attempt_id: AdmissionIdentifier,
+    transport_identity: AdmissionIdentifier,
+    transport_key_epoch: u64,
+    signed_status_digest: AdmissionDigest,
+    qualification_digest: AdmissionDigest,
+    cancellation_fence: u64,
+    verified_at_unix_ms: u64,
+    verifier_identity: AdmissionIdentifier,
+    monotonic_checkpoint_digest: AdmissionDigest,
+    verifier_policy_digest: AdmissionDigest,
+    artifacts: Vec<ImmutableReleaseArtifactV1>,
+}
+
+#[derive(Deserialize)]
+struct UntrustedTransportNotAcceptedWireV1(
+    #[serde(with = "TransportNotAcceptedWireV1")] VerifiedTransportNotAccepted,
+);
+
 impl VerifiedTransportNotAccepted {
+    pub(crate) fn from_canonical_record_verified(
+        bytes: &[u8],
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+    ) -> Result<Self, ToolOutcomeError> {
+        let UntrustedTransportNotAcceptedWireV1(proof) = serde_json::from_slice(bytes)
+            .map_err(|_| ToolOutcomeError::Invalid("transport_not_accepted.release_proof"))?;
+        let canonical = canonical_json_bytes(&proof)
+            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
+        if canonical != bytes {
+            return Err(ToolOutcomeError::Binding(
+                "transport_not_accepted.release_proof_canonical",
+            ));
+        }
+        proof.validate_against(operation, context)?;
+        Ok(proof)
+    }
+
     pub(crate) fn from_verified_economic_effect(
         cancellation: &VerifiedEconomicEffectNotDispatched,
         operation: &AdmissionOperationV1,

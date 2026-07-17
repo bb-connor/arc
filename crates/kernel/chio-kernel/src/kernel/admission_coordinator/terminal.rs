@@ -15,6 +15,7 @@ pub(crate) struct DurableToolReturnInput<'a> {
     pub(crate) elapsed: Duration,
     pub(crate) extra_receipt_metadata: Option<serde_json::Value>,
     pub(crate) pre_invocation_guard_evidence: &'a [chio_core::receipt::metadata::GuardEvidence],
+    pub(crate) verified_payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
     pub(crate) trusted_now_unix_ms: u64,
 }
 
@@ -129,6 +130,7 @@ impl ChioKernel {
             elapsed,
             extra_receipt_metadata,
             pre_invocation_guard_evidence,
+            verified_payee_binding,
             trusted_now_unix_ms,
         } = input;
         let runtime = self.durable_runtime()?;
@@ -190,11 +192,12 @@ impl ChioKernel {
             })?;
         let stream_limits = self.durable_stream_limits()?;
         let receipt_timestamp = trusted_now_unix_ms / 1_000;
-        let request_metadata = request_receipt_metadata(
+        let request_metadata = request_receipt_metadata_with_payee_binding(
             request,
             self.attestation_trust_policy.as_ref(),
             receipt_timestamp,
             extra_receipt_metadata.as_ref(),
+            verified_payee_binding,
         )?;
         let memory_read_metadata = match crate::memory_provenance::classify_memory_action(
             &request.tool_name,

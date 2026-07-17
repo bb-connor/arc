@@ -597,6 +597,9 @@ pub struct GovernedPaymentContext {
 #[serde(rename_all = "camelCase")]
 pub struct CommercePaymentContext {
     pub seller: String,
+    pub settlement_destination_ref: String,
+    pub payee_binding_digest: String,
+    pub pre_action_authority_digest: String,
     pub shared_payment_token_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_amount: Option<MonetaryAmount>,
@@ -1557,6 +1560,9 @@ mod tests {
                 }),
                 commerce: Some(CommercePaymentContext {
                     seller: "merchant.example".to_string(),
+                    settlement_destination_ref: "acct:merchant-primary".to_string(),
+                    payee_binding_digest: "payee-binding-acp-1".to_string(),
+                    pre_action_authority_digest: "approval-digest-acp-1".to_string(),
                     shared_payment_token_id: "spt_live_123".to_string(),
                     max_amount: Some(MonetaryAmount {
                         units: 5000,
@@ -1571,6 +1577,9 @@ mod tests {
         assert!(request.contains("Authorization: Bearer acp-secret"));
         assert!(request.contains("\"commerce\":{"));
         assert!(request.contains("\"seller\":\"merchant.example\""));
+        assert!(request.contains("\"settlementDestinationRef\":\"acct:merchant-primary\""));
+        assert!(request.contains("\"payeeBindingDigest\":\"payee-binding-acp-1\""));
+        assert!(request.contains("\"preActionAuthorityDigest\":\"approval-digest-acp-1\""));
         assert!(request.contains("\"sharedPaymentTokenId\":\"spt_live_123\""));
         assert!(request.contains("\"maxAmount\":{"));
         assert!(request.contains("\"units\":5000"));

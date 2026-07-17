@@ -1,4 +1,9 @@
 use super::*;
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use chio_credit::obligation::{
+    derive_obligation_payee_binding_digest, ObligationAtomInputV1, ObligationAtomV1,
+    ObligationCreditElectionV1,
+};
 
 #[test]
 fn completed_projection_cannot_omit_required_atomic_sidecars() {
@@ -8,6 +13,7 @@ fn completed_projection_cannot_omit_required_atomic_sidecars() {
         authorization_consumption: true,
         observation_attempt_zero: true,
         obligation: true,
+        credit_exposure: true,
         ..AdmissionParticipantRequirements::NONE
     };
     let operation = finalizing_tool_operation_with(requirements);
@@ -153,6 +159,13 @@ fn completed_projection_cannot_omit_required_atomic_sidecars() {
             },
             "obligation",
         ),
+        (
+            AdmissionProjectionCapabilities {
+                credit_exposure_terminal: false,
+                ..full_projection_capabilities()
+            },
+            "credit_exposure_terminal",
+        ),
     ] {
         assert_eq!(
             operation.apply_terminal_projection(&projection, &capabilities),
@@ -162,6 +175,179 @@ fn completed_projection_cannot_omit_required_atomic_sidecars() {
     full_projection_capabilities()
         .validate_for(&operation, &projection)
         .expect("store capabilities cover every immutable participant requirement");
+}
+
+#[test]
+fn economic_obligation_projection_requires_exact_signed_payee_authority() {
+    let requirements = AdmissionParticipantRequirements {
+        broker_attempt: true,
+        budget_capture: true,
+        obligation: true,
+        ..AdmissionParticipantRequirements::NONE
+    };
+    let operation = finalizing_tool_operation_with(requirements);
+    let context = projection_context(&operation);
+    let outcome_id = digest("outcome_id", POLICY_HASH);
+    let outcome_version = 3;
+    let kernel = Keypair::generate();
+    let payee_binding_digest =
+        derive_obligation_payee_binding_digest("creditor-1", "acct:creditor-1")
+            .expect("payee binding must derive");
+    let payee_binding = crate::kernel::VerifiedGovernedPayeeBinding::for_test(
+        "creditor-1",
+        "acct:creditor-1",
+        REQUEST_HASH,
+        AUTH_HASH,
+    )
+    .expect("verified payee binding fixture must derive");
+    let signed_receipt = |approval_artifact_digest: Option<&str>| {
+        let mut admission = receipt_metadata(
+            &operation,
+            &context,
+            AdmissionOperationState::Completed,
+            AdmissionCompensationStatus::NotCompensated,
+        );
+        admission.tool_outcome_id = Some(outcome_id.clone());
+        admission.tool_outcome_version = Some(outcome_version);
+        let mut body = signed_projection_receipt(&operation, Some(admission), &kernel).body();
+        let metadata = body
+            .metadata
+            .as_mut()
+            .and_then(serde_json::Value::as_object_mut)
+            .expect("receipt metadata must be an object");
+        metadata.insert(
+            "financial".to_owned(),
+            serde_json::json!({
+                "grant_index": 0,
+                "cost_charged": 10,
+                "currency": "USD",
+                "budget_remaining": 90,
+                "budget_total": 100,
+                "delegation_depth": 0,
+                "root_budget_holder": "debtor-1",
+                "settlement_status": "pending"
+            }),
+        );
+        metadata.insert(
+            "governed_transaction".to_owned(),
+            serde_json::json!({
+                "intent_id": "intent-1",
+                "intent_hash": REQUEST_HASH,
+                "purpose": "buy result",
+                "server_id": TOOL_SERVER,
+                "tool_name": TOOL_NAME,
+                "max_amount": { "units": 10, "currency": "USD" },
+                "commerce": {
+                    "seller": "creditor-1",
+                    "shared_payment_token_id": "token-1",
+                    "settlement_destination_ref": "acct:creditor-1"
+                },
+                "approval": {
+                    "token_id": "approval-1",
+                    "approver_key": "approver-1",
+                    "approval_artifact_digest": approval_artifact_digest,
+                    "approved": true
+                },
+                "economic_authorization": {
+                    "version": "v1",
+                    "economic_intent_digest": REQUEST_HASH,
+                    "payee_binding_digest": payee_binding_digest,
+                    "pre_action_authority_digest": AUTH_HASH,
+                    "economic_mode": "external_dispatch",
+                    "payer": {
+                        "party_id": "debtor-1",
+                        "funding_source_ref": "token-1"
+                    },
+                    "merchant": {
+                        "merchant_id": "creditor-1"
+                    },
+                    "payee": {
+                        "beneficiary_id": "creditor-1",
+                        "settlement_destination_ref": "acct:creditor-1"
+                    },
+                    "rail": {
+                        "kind": "credit",
+                        "asset": "USD"
+                    },
+                    "amount_bounds": {
+                        "approved_max": { "units": 10, "currency": "USD" },
+                        "settlement_cap": { "units": 10, "currency": "USD" }
+                    },
+                    "budget": {
+                        "grant_index": 0,
+                        "cost_charged": 10,
+                        "currency": "USD",
+                        "budget_remaining": 90,
+                        "budget_total": 100,
+                        "delegation_depth": 0,
+                        "root_budget_holder": "debtor-1"
+                    },
+                    "settlement": { "settlement_status": "pending" }
+                }
+            }),
+        );
+        let receipt = ChioReceipt::sign(body, &kernel).expect("economic receipt must sign");
+        verify_completed_receipt(
+            &operation,
+            &context,
+            receipt,
+            &kernel,
+            Some((&outcome_id, outcome_version)),
+        )
+        .expect("economic receipt must qualify")
+    };
+    let atom_for = |receipt: &VerifiedAdmissionReceipt| {
+        let source_receipt_digest = chio_core::sha256_hex(
+            &chio_core::canonical::canonical_json_bytes(receipt.receipt())
+                .expect("receipt must canonicalize"),
+        );
+        ObligationAtomV1::new(ObligationAtomInputV1 {
+            economic_intent_digest: REQUEST_HASH.to_owned(),
+            source_receipt_id: receipt.receipt().id.clone(),
+            source_receipt_digest,
+            debtor_id: "debtor-1".to_owned(),
+            original_creditor_id: "creditor-1".to_owned(),
+            original_settlement_destination_ref: "acct:creditor-1".to_owned(),
+            payee_binding_digest: payee_binding_digest.clone(),
+            amount: MonetaryAmount {
+                units: 10,
+                currency: "USD".to_owned(),
+            },
+            credit_election: ObligationCreditElectionV1::NotCredit,
+            pre_action_authority_digest: AUTH_HASH.to_owned(),
+            created_at_unix_ms: context.trusted_time_unix_ms,
+            due_at_unix_ms: context.trusted_time_unix_ms + 1_000,
+        })
+        .expect("obligation atom must derive")
+    };
+
+    let receipt = signed_receipt(Some(AUTH_HASH));
+    ObligationProjection::from_verified_economic_receipt(
+        &operation,
+        &context,
+        &receipt,
+        &payee_binding,
+        atom_for(&receipt),
+        outcome_id.clone(),
+        outcome_version,
+    )
+    .expect("exact signed economic authority must qualify");
+
+    for approval_artifact_digest in [None, Some(POLICY_HASH)] {
+        let receipt = signed_receipt(approval_artifact_digest);
+        assert_eq!(
+            ObligationProjection::from_verified_economic_receipt(
+                &operation,
+                &context,
+                &receipt,
+                &payee_binding,
+                atom_for(&receipt),
+                outcome_id.clone(),
+                outcome_version,
+            ),
+            Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+        );
+    }
 }
 
 #[test]
@@ -654,6 +840,80 @@ fn signed_terminal_projection_envelope_rejects_canonical_body_tampering() {
         tampered.verify(),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     ));
+}
+
+#[test]
+fn resigned_compensation_envelope_rejects_semantically_tampered_release_proof(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let operation = prepared(AdmissionOperationKind::ToolDispatch);
+    let projection =
+        verified_pre_dispatch_compensation_projection(&operation, projection_context(&operation))?;
+    let kernel = Keypair::generate();
+    let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
+        &operation,
+        &projection,
+        &full_projection_capabilities(),
+        &kernel,
+    )?;
+    envelope.verify()?;
+
+    let mut encoded = serde_json::to_value(envelope)?;
+    let record = encoded["body"]["records"]
+        .as_array_mut()
+        .and_then(|records| {
+            records.iter_mut().find(|record| {
+                record.get("kind").and_then(serde_json::Value::as_str) == Some("release_proof")
+            })
+        })
+        .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+    let proof_bytes = STANDARD.decode(
+        record["canonical_json"]
+            .as_str()
+            .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?,
+    )?;
+    let mut proof: serde_json::Value = serde_json::from_slice(&proof_bytes)?;
+    let operation_version = proof
+        .pointer("/snapshot/operation_version")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+    proof["snapshot"]["operation_version"] = serde_json::Value::from(operation_version + 1);
+    let proof_bytes = canonical_json_bytes(&proof)?;
+    let proof_digest = chio_core::crypto::sha256_hex(&proof_bytes);
+    record["canonical_json"] = serde_json::Value::String(STANDARD.encode(&proof_bytes));
+    record["record_digest"] = serde_json::Value::String(proof_digest.clone());
+
+    let manifest_bytes = STANDARD.decode(
+        encoded["body"]["manifest_json"]
+            .as_str()
+            .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?,
+    )?;
+    let mut manifest: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
+    let manifest_record = manifest["records"]
+        .as_array_mut()
+        .and_then(|records| {
+            records.iter_mut().find(|record| {
+                record.get("kind").and_then(serde_json::Value::as_str) == Some("release_proof")
+            })
+        })
+        .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+    manifest_record["record_digest"] = serde_json::Value::String(proof_digest);
+    let manifest_bytes = canonical_json_bytes(&manifest)?;
+    encoded["body"]["manifest_json"] = serde_json::Value::String(STANDARD.encode(&manifest_bytes));
+    let replay_digest = encoded
+        .pointer_mut("/body/terminal_operation/terminal_replay/incident/projection_digest")
+        .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+    *replay_digest = serde_json::Value::String(chio_core::crypto::sha256_hex(&manifest_bytes));
+
+    let canonical_body = canonical_json_bytes(&encoded["body"])?;
+    let mut preimage = b"chio.signed-admission-terminal-projection.v1\0".to_vec();
+    preimage.extend_from_slice(&canonical_body);
+    encoded["signature"] = serde_json::to_value(kernel.sign(&preimage))?;
+    let tampered: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(encoded)?;
+    assert_eq!(
+        tampered.verify(),
+        Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+    );
+    Ok(())
 }
 
 #[test]

@@ -8,7 +8,7 @@ use super::{read_u64, sqlite_u64, SqliteServingOwnerError};
 
 pub(crate) const GLOBAL_GENESIS_DIGEST: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
-const CURRENT_PROJECTION_KINDS: &str = "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication'";
+const CURRENT_PROJECTION_KINDS: &str = "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set'";
 
 const GLOBAL_COMMIT_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS authority_global_commit_meta (
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS authority_global_commits (
     commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     projection_kind TEXT NOT NULL CHECK (
-        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication')
+        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set')
     ),
     projection_key TEXT NOT NULL,
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence >= 0),
@@ -171,6 +171,18 @@ struct VersionedProjectionReference<'a> {
     tables: Vec<TableSnapshot>,
 }
 
+#[derive(Serialize)]
+struct FactorAssignmentAuthoritySetReference {
+    format: &'static str,
+    generation: u64,
+    active_set_digest: String,
+    previous_active_set_digest: Option<String>,
+    activated_at_unix_ms: u64,
+    store_uuid: String,
+    store_lease_id: String,
+    store_owner_epoch: u64,
+}
+
 type SchemaCatalogEntry = (String, String, String, Option<String>);
 
 pub(crate) fn initialize_global_commit_schema(
@@ -187,6 +199,7 @@ pub(crate) fn initialize_global_commit_schema(
             return Ok(());
         }
         let supported_legacy = [
+            pre_factor_assignment_global_commit_schema(),
             pre_channel_release_global_commit_schema(),
             pre_economic_global_commit_schema(),
             pre_payment_global_commit_schema(),
@@ -207,6 +220,13 @@ pub(crate) fn initialize_global_commit_schema(
         connection.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
     }
     verify_global_commit_schema(connection)
+}
+
+fn pre_factor_assignment_global_commit_schema() -> String {
+    GLOBAL_COMMIT_SCHEMA.replace(
+        CURRENT_PROJECTION_KINDS,
+        "'baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication'",
+    )
 }
 
 pub(crate) fn verify_global_commit_schema(
@@ -824,8 +844,61 @@ fn projection_reference_digest(
         "channel_release_publication" => {
             channel_release_projection_reference_digest(connection, key, sequence)
         }
+        "factor_assignment_authority_set" => {
+            factor_assignment_authority_set_reference_digest(connection, key, sequence)
+        }
         _ => Err(invalid("unknown global authority projection kind")),
     }
+}
+
+fn factor_assignment_authority_set_reference_digest(
+    connection: &Connection,
+    key: &str,
+    generation: u64,
+) -> Result<String, SqliteServingOwnerError> {
+    if key != "active" {
+        return Err(invalid(
+            "factor assignment authority set projection key is invalid",
+        ));
+    }
+    let row = connection
+        .query_row(
+            r#"
+            SELECT generation, active_set_digest, previous_active_set_digest,
+                   activated_at_unix_ms, store_uuid, store_lease_id, store_owner_epoch
+            FROM factor_assignment_authority_sets
+            WHERE generation = ?1
+            "#,
+            [sqlite_u64(generation, "factor authority set generation")?],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, i64>(6)?,
+                ))
+            },
+        )
+        .optional()?
+        .ok_or_else(|| invalid("factor assignment authority set projection is absent"))?;
+    if read_u64(row.0, "factor authority set generation")? != generation {
+        return Err(invalid(
+            "factor assignment authority set generation does not match its projection",
+        ));
+    }
+    digest(&FactorAssignmentAuthoritySetReference {
+        format: "chio.sqlite-authority-factor-assignment-authority-set-reference.v1",
+        generation,
+        active_set_digest: row.1,
+        previous_active_set_digest: row.2,
+        activated_at_unix_ms: read_u64(row.3, "factor authority set activation time")?,
+        store_uuid: row.4,
+        store_lease_id: row.5,
+        store_owner_epoch: read_u64(row.6, "factor authority set owner epoch")?,
+    })
 }
 
 fn verify_projection_reference(
@@ -1184,31 +1257,42 @@ fn verify_live_baseline_projection(connection: &Connection) -> Result<(), Sqlite
     if committed == baseline_projection_digest(connection)? {
         return Ok(());
     }
-    if channel_release_projection_is_empty(connection)?
+    let factor_assignment_empty = factor_assignment_projection_is_empty(connection)?;
+    if factor_assignment_empty
+        && committed == pre_factor_assignment_baseline_projection_digest(connection)?
+    {
+        return Ok(());
+    }
+    if factor_assignment_empty
+        && channel_release_projection_is_empty(connection)?
         && committed == pre_channel_release_baseline_projection_digest(connection)?
     {
         return Ok(());
     }
-    if channel_release_projection_is_empty(connection)?
+    if factor_assignment_empty
+        && channel_release_projection_is_empty(connection)?
         && channel_projection_is_empty(connection)?
         && committed == pre_channel_baseline_projection_digest(connection)?
     {
         return Ok(());
     }
-    if channel_release_projection_is_empty(connection)?
+    if factor_assignment_empty
+        && channel_release_projection_is_empty(connection)?
         && payment_projection_is_empty(connection)?
         && committed == pre_payment_baseline_projection_digest(connection)?
     {
         return Ok(());
     }
-    if channel_release_projection_is_empty(connection)?
+    if factor_assignment_empty
+        && channel_release_projection_is_empty(connection)?
         && channel_projection_is_empty(connection)?
         && payment_projection_is_empty(connection)?
         && committed == pre_channel_pre_payment_baseline_projection_digest(connection)?
     {
         return Ok(());
     }
-    if channel_release_projection_is_empty(connection)?
+    if factor_assignment_empty
+        && channel_release_projection_is_empty(connection)?
         && payment_projection_is_empty(connection)?
         && frost_projection_is_empty(connection)?
         && channel_projection_is_empty(connection)?
@@ -1221,12 +1305,21 @@ fn verify_live_baseline_projection(connection: &Connection) -> Result<(), Sqlite
     ))
 }
 
+fn pre_factor_assignment_baseline_projection_digest(
+    connection: &Connection,
+) -> Result<String, SqliteServingOwnerError> {
+    baseline_projection_digest_for_tables(
+        connection,
+        without_factor_assignment_tables(table_names(connection, false)?),
+    )
+}
+
 fn pre_channel_baseline_projection_digest(
     connection: &Connection,
 ) -> Result<String, SqliteServingOwnerError> {
     baseline_projection_digest_for_tables(
         connection,
-        table_names(connection, false)?
+        without_factor_assignment_tables(table_names(connection, false)?)
             .into_iter()
             .filter(|table| {
                 !table.starts_with("channel_") && !table.starts_with("chio_channel_release_")
@@ -1240,7 +1333,7 @@ fn pre_channel_release_baseline_projection_digest(
 ) -> Result<String, SqliteServingOwnerError> {
     baseline_projection_digest_for_tables(
         connection,
-        table_names(connection, false)?
+        without_factor_assignment_tables(table_names(connection, false)?)
             .into_iter()
             .filter(|table| !table.starts_with("chio_channel_release_"))
             .collect(),
@@ -1252,7 +1345,9 @@ fn pre_payment_baseline_projection_digest(
 ) -> Result<String, SqliteServingOwnerError> {
     baseline_projection_digest_for_tables(
         connection,
-        without_channel_release_tables(authority_table_names(connection, true, false)?),
+        without_factor_assignment_tables(without_channel_release_tables(authority_table_names(
+            connection, true, false,
+        )?)),
     )
 }
 
@@ -1261,7 +1356,7 @@ fn pre_channel_pre_payment_baseline_projection_digest(
 ) -> Result<String, SqliteServingOwnerError> {
     baseline_projection_digest_for_tables(
         connection,
-        authority_table_names(connection, true, false)?
+        without_factor_assignment_tables(authority_table_names(connection, true, false)?)
             .into_iter()
             .filter(|table| {
                 !table.starts_with("channel_") && !table.starts_with("chio_channel_release_")
@@ -1334,6 +1429,12 @@ fn channel_projection_is_empty(connection: &Connection) -> Result<bool, SqliteSe
     projection_is_empty(connection, "channel_")
 }
 
+fn factor_assignment_projection_is_empty(
+    connection: &Connection,
+) -> Result<bool, SqliteServingOwnerError> {
+    projection_is_empty(connection, "factor_assignment_")
+}
+
 fn projection_is_empty(
     connection: &Connection,
     table_prefix: &str,
@@ -1358,6 +1459,13 @@ fn without_channel_release_tables(tables: Vec<String>) -> Vec<String> {
     tables
         .into_iter()
         .filter(|table| !table.starts_with("chio_channel_release_"))
+        .collect()
+}
+
+fn without_factor_assignment_tables(tables: Vec<String>) -> Vec<String> {
+    tables
+        .into_iter()
+        .filter(|table| !table.starts_with("factor_assignment_"))
         .collect()
 }
 
@@ -1422,6 +1530,26 @@ fn verify_global_projection_coverage(
                       AND global.projection_key = local.batch_id
                       AND global.projection_sequence = local.stage_version
                 ) <> 1
+            )
+            OR EXISTS(
+                SELECT 1 FROM factor_assignment_authority_sets AS local
+                WHERE (
+                    SELECT COUNT(*) FROM authority_global_commits AS global
+                    WHERE global.projection_kind = 'factor_assignment_authority_set'
+                      AND global.projection_key = 'active'
+                      AND global.projection_sequence = local.generation
+                ) <> 1
+            )
+            OR EXISTS(
+                SELECT 1 FROM authority_global_commits AS global
+                WHERE global.projection_kind = 'factor_assignment_authority_set'
+                  AND (
+                      global.projection_key <> 'active'
+                      OR NOT EXISTS(
+                          SELECT 1 FROM factor_assignment_authority_sets AS local
+                          WHERE local.generation = global.projection_sequence
+                      )
+                  )
             )
             OR EXISTS(
                 SELECT 1 FROM authority_global_commits AS global
@@ -1524,6 +1652,7 @@ fn authority_table_names(
               OR name GLOB 'budget_*'
               OR name GLOB 'channel_*'
               OR name GLOB 'chio_channel_release_*'
+              OR name GLOB 'factor_assignment_*'
               OR (?1 AND name GLOB 'frost_*')
               OR (?2 AND name GLOB 'payment_*')
           )
@@ -1709,6 +1838,103 @@ mod tests {
         Ok(connection)
     }
 
+    fn factor_projection_fixture() -> Result<Connection, rusqlite::Error> {
+        let connection = Connection::open_in_memory()?;
+        connection.execute_batch(
+            r#"
+            CREATE TABLE admission_operation_commits (
+                operation_id TEXT NOT NULL,
+                commit_sequence INTEGER NOT NULL
+            );
+            CREATE TABLE budget_mutation_events (
+                event_id TEXT NOT NULL,
+                event_seq INTEGER NOT NULL
+            );
+            CREATE TABLE admission_authority_commits (
+                kind TEXT NOT NULL,
+                capability_id TEXT NOT NULL,
+                commit_index INTEGER NOT NULL
+            );
+            CREATE TABLE frost_projection_commits (
+                projection_key TEXT NOT NULL,
+                projection_sequence INTEGER NOT NULL
+            );
+            CREATE TABLE payment_journal (
+                operation_id TEXT NOT NULL,
+                journal_version INTEGER NOT NULL
+            );
+            CREATE TABLE economic_state_stage_commits (
+                batch_id TEXT NOT NULL,
+                stage_version INTEGER NOT NULL
+            );
+            CREATE TABLE chio_channel_release_publications (
+                channel_id TEXT NOT NULL,
+                record_version INTEGER NOT NULL
+            );
+            CREATE TABLE factor_assignment_authority_sets (
+                generation INTEGER NOT NULL PRIMARY KEY,
+                active_set_digest TEXT NOT NULL,
+                previous_active_set_digest TEXT,
+                activated_at_unix_ms INTEGER NOT NULL,
+                store_uuid TEXT NOT NULL,
+                store_lease_id TEXT NOT NULL,
+                store_owner_epoch INTEGER NOT NULL
+            );
+            CREATE TABLE authority_global_commits (
+                projection_kind TEXT NOT NULL,
+                projection_key TEXT NOT NULL,
+                projection_sequence INTEGER NOT NULL
+            );
+            INSERT INTO factor_assignment_authority_sets (
+                generation, active_set_digest, previous_active_set_digest,
+                activated_at_unix_ms, store_uuid, store_lease_id, store_owner_epoch
+            ) VALUES (
+                1,
+                'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                NULL,
+                1000,
+                'store-1',
+                'lease-1',
+                1
+            );
+            "#,
+        )?;
+        Ok(connection)
+    }
+
+    fn factor_commit(reference_digest: String) -> CommitRow {
+        CommitRow {
+            sequence: 2,
+            mutation_kind: "factor_assignment_authority_set".to_string(),
+            projection_kind: "factor_assignment_authority_set".to_string(),
+            projection_key: "active".to_string(),
+            projection_sequence: 1,
+            projection_reference_digest: reference_digest,
+            authority_projection_digest: GLOBAL_GENESIS_DIGEST.to_string(),
+            previous_chain_digest: GLOBAL_GENESIS_DIGEST.to_string(),
+            chain_digest: GLOBAL_GENESIS_DIGEST.to_string(),
+            store_uuid: "store-1".to_string(),
+            store_lease_id: Some("lease-1".to_string()),
+            store_owner_epoch: 1,
+        }
+    }
+
+    fn insert_factor_global_commit(
+        connection: &Connection,
+        key: &str,
+        generation: i64,
+    ) -> Result<(), rusqlite::Error> {
+        connection.execute(
+            r#"
+            INSERT INTO authority_global_commits (
+                projection_kind, projection_key, projection_sequence
+            ) VALUES ('factor_assignment_authority_set', ?1, ?2)
+            "#,
+            params![key, generation],
+        )?;
+        Ok(())
+    }
+
     #[test]
     fn authority_snapshot_includes_payment_projection() -> Result<(), Box<dyn std::error::Error>> {
         let connection = projection_fixture()?;
@@ -1758,6 +1984,82 @@ mod tests {
         )?;
 
         assert!(!projection_is_empty(&connection, "channel_")?);
+        Ok(())
+    }
+
+    #[test]
+    fn pre_factor_assignment_compatibility_requires_empty_projection(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let connection = Connection::open_in_memory()?;
+        connection.execute(
+            "CREATE TABLE factor_assignment_authority_sets (generation INTEGER PRIMARY KEY)",
+            [],
+        )?;
+
+        assert!(factor_assignment_projection_is_empty(&connection)?);
+        assert_ne!(
+            baseline_projection_digest(&connection)?,
+            pre_factor_assignment_baseline_projection_digest(&connection)?
+        );
+
+        connection.execute(
+            "INSERT INTO factor_assignment_authority_sets (generation) VALUES (1)",
+            [],
+        )?;
+
+        assert!(!factor_assignment_projection_is_empty(&connection)?);
+        Ok(())
+    }
+
+    #[test]
+    fn factor_assignment_authority_reference_is_exact() -> Result<(), Box<dyn std::error::Error>> {
+        let connection = factor_projection_fixture()?;
+        let reference = projection_reference_digest(
+            &connection,
+            "factor_assignment_authority_set",
+            "active",
+            1,
+        )?;
+        assert_eq!(
+            reference,
+            "65555c1ac79c44d41687384af06f00a441f0a1fd738d1415e74bdf136651f429"
+        );
+        let commit = factor_commit(reference);
+
+        assert!(verify_projection_reference(&connection, &commit).is_ok());
+
+        connection.execute(
+            r#"
+            UPDATE factor_assignment_authority_sets
+            SET active_set_digest =
+                'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+            WHERE generation = 1
+            "#,
+            [],
+        )?;
+
+        assert!(verify_projection_reference(&connection, &commit).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn factor_assignment_authority_coverage_is_exact_and_closed(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let connection = factor_projection_fixture()?;
+        assert!(verify_global_projection_coverage(&connection).is_err());
+
+        for (key, generation, exact) in [
+            ("active", 1, true),
+            ("retained", 1, false),
+            ("active", 2, false),
+        ] {
+            let connection = factor_projection_fixture()?;
+            insert_factor_global_commit(&connection, key, generation)?;
+            assert_eq!(
+                verify_global_projection_coverage(&connection).is_ok(),
+                exact
+            );
+        }
         Ok(())
     }
 

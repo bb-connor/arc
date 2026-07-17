@@ -1574,6 +1574,7 @@ fn chio_post_admission_drop_guard_retains_non_monetary_runtime_reservations(
         PostAdmissionReceiptContext {
             extra_metadata: Some(metadata),
             pre_invocation_guard_evidence: Vec::new(),
+            verified_payee_binding: None,
         },
         true,
     );
@@ -1957,6 +1958,7 @@ fn drop_pre_dispatch_releases_reservations_no_receipt() -> Result<(), Box<dyn st
         PostAdmissionReceiptContext {
             extra_metadata: Some(metadata),
             pre_invocation_guard_evidence: Vec::new(),
+            verified_payee_binding: None,
         },
         true,
     ));
@@ -2035,6 +2037,7 @@ fn drop_pre_dispatch_monetary_unwinds_without_receipt() -> Result<(), Box<dyn st
         PostAdmissionReceiptContext {
             extra_metadata: Some(metadata),
             pre_invocation_guard_evidence: Vec::new(),
+            verified_payee_binding: None,
         },
         true,
     ));
@@ -2097,6 +2100,7 @@ fn drop_pre_dispatch_reverses_invocation_budget() -> Result<(), Box<dyn std::err
         PostAdmissionReceiptContext {
             extra_metadata: None,
             pre_invocation_guard_evidence: Vec::new(),
+            verified_payee_binding: None,
         },
         true,
     ));
@@ -2153,6 +2157,7 @@ fn drop_pre_dispatch_releases_admitted_child_budget() -> Result<(), Box<dyn std:
         PostAdmissionReceiptContext {
             extra_metadata: None,
             pre_invocation_guard_evidence: Vec::new(),
+            verified_payee_binding: None,
         },
         // Genuinely-new admission (child_a inserted above): the drop MUST
         // release it, so child_b can admit. Verifies no under-release leak.
@@ -2229,6 +2234,7 @@ fn drop_pre_dispatch_overlapping_readmit_keeps_sibling_denied(
         PostAdmissionReceiptContext {
             extra_metadata: None,
             pre_invocation_guard_evidence: Vec::new(),
+            verified_payee_binding: None,
         },
         true,
     ));
@@ -2299,6 +2305,7 @@ fn drop_pre_dispatch_records_receipt_on_cleanup_fault() -> Result<(), Box<dyn st
         PostAdmissionReceiptContext {
             extra_metadata: Some(metadata),
             pre_invocation_guard_evidence: Vec::new(),
+            verified_payee_binding: None,
         },
         true,
     ));
@@ -4040,6 +4047,7 @@ fn drop_pre_dispatch_cleanup_fault_receipt_includes_monetary_hold_id(
         PostAdmissionReceiptContext {
             extra_metadata: None,
             pre_invocation_guard_evidence: Vec::new(),
+            verified_payee_binding: None,
         },
         true,
     ));

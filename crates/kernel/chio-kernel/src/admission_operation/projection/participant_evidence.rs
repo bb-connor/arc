@@ -1,12 +1,13 @@
 use chio_core::capability::scope::MonetaryAmount;
 pub use chio_credit::obligation::ObligationDispositionV1;
-#[cfg(test)]
+#[cfg(any(test, feature = "admission-test-support"))]
 use chio_credit::obligation::{ObligationAtomInputV1, ObligationCreditElectionV1};
 use chio_credit::obligation::{
     ObligationAtomV1, ObligationDispositionRecordV1, ObligationDispositionTransitionV1,
 };
 
 use super::*;
+use crate::kernel::VerifiedGovernedPayeeBinding;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct VerifiedTerminalParticipantSourceV1 {
@@ -183,6 +184,106 @@ pub struct ObligationProjection {
 }
 
 impl ObligationProjection {
+    #[allow(dead_code)]
+    pub(crate) fn from_verified_economic_receipt(
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+        receipt: &VerifiedAdmissionReceipt,
+        payee_binding: &VerifiedGovernedPayeeBinding,
+        atom: ObligationAtomV1,
+        outcome_id: AdmissionDigest,
+        outcome_version: u64,
+    ) -> Result<Self, AdmissionOperationError> {
+        Self::from_verified_economic_receipt_inner(
+            operation,
+            context,
+            receipt,
+            Some(payee_binding),
+            atom,
+            outcome_id,
+            outcome_version,
+        )
+    }
+
+    #[cfg(any(test, feature = "admission-test-support"))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_credit_source_verified(
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+        receipt: &VerifiedAdmissionReceipt,
+        atom: ObligationAtomV1,
+        outcome_id: AdmissionDigest,
+        outcome_version: u64,
+    ) -> Result<Self, AdmissionOperationError> {
+        if !matches!(
+            atom.credit_election(),
+            ObligationCreditElectionV1::CreditFacility { .. }
+        ) {
+            return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
+        }
+        Self::from_verified_economic_receipt_inner(
+            operation,
+            context,
+            receipt,
+            None,
+            atom,
+            outcome_id,
+            outcome_version,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn from_verified_economic_receipt_inner(
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+        receipt: &VerifiedAdmissionReceipt,
+        payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+        atom: ObligationAtomV1,
+        outcome_id: AdmissionDigest,
+        outcome_version: u64,
+    ) -> Result<Self, AdmissionOperationError> {
+        let mismatch = || AdmissionOperationError::TerminalProjectionBindingMismatch;
+        let requirements = operation.binding().participant_requirements();
+        if !requirements.obligation || requirements.channel {
+            return Err(mismatch());
+        }
+        validate_economic_receipt_obligation(&atom, receipt.receipt(), payee_binding)?;
+        validate_obligation_terms(
+            atom.amount(),
+            atom.due_at_unix_ms(),
+            atom.created_at_unix_ms(),
+        )?;
+        let source_authority_digest = AdmissionDigest::try_new(
+            "obligation_source_authority_digest",
+            atom.pre_action_authority_digest().to_owned(),
+        )?;
+        let obligation_id =
+            AdmissionIdentifier::try_new("obligation_id", atom.obligation_id().to_owned())?;
+        let obligation_atom_digest = AdmissionDigest::try_new(
+            "obligation_atom_digest",
+            atom.digest().map_err(|_| mismatch())?,
+        )?;
+        let disposition_record =
+            ObligationDispositionRecordV1::produced(&atom).map_err(|_| mismatch())?;
+        let projection = Self {
+            source: VerifiedTerminalParticipantSourceV1::from_source_verified(
+                operation,
+                context,
+                receipt,
+                source_authority_digest,
+                obligation_id,
+                obligation_atom_digest,
+                atom.created_at_unix_ms(),
+                outcome_id.clone(),
+                outcome_version,
+            )?,
+            atom,
+            disposition_record,
+        };
+        projection.validate_against(operation, context, receipt, &outcome_id, outcome_version)?;
+        Ok(projection)
+    }
+
     pub(crate) fn from_verified_channel_advance(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
@@ -264,9 +365,9 @@ impl ObligationProjection {
         Ok(Some(projection))
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "admission-test-support"))]
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn from_source_verified(
+    pub fn from_source_verified(
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
         receipt: &VerifiedAdmissionReceipt,
@@ -295,7 +396,11 @@ impl ObligationProjection {
                 "settlement:{}",
                 original_creditor_id.as_str()
             ),
-            payee_binding_digest: source_authority_digest.as_str().to_owned(),
+            payee_binding_digest: chio_credit::obligation::derive_obligation_payee_binding_digest(
+                original_creditor_id.as_str(),
+                &format!("settlement:{}", original_creditor_id.as_str()),
+            )
+            .map_err(|_| mismatch())?,
             amount,
             credit_election: ObligationCreditElectionV1::NotCredit,
             pre_action_authority_digest: source_authority_digest.as_str().to_owned(),
@@ -365,6 +470,11 @@ impl ObligationProjection {
         {
             return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
         }
+        if receipt.receipt().channel_metadata().is_none()
+            && receipt.receipt().governed_transaction_metadata().is_some()
+        {
+            validate_economic_receipt_obligation(&self.atom, receipt.receipt(), None)?;
+        }
         self.source
             .validate_against(operation, context, receipt, outcome_id, outcome_version)
     }
@@ -394,6 +504,70 @@ impl ObligationProjection {
     pub(in crate::admission_operation) const fn disposition(&self) -> &ObligationDispositionV1 {
         self.disposition_record.disposition()
     }
+}
+
+fn validate_economic_receipt_obligation(
+    atom: &ObligationAtomV1,
+    receipt: &ChioReceipt,
+    payee_binding: Option<&VerifiedGovernedPayeeBinding>,
+) -> Result<(), AdmissionOperationError> {
+    let mismatch = || AdmissionOperationError::TerminalProjectionBindingMismatch;
+    atom.validate().map_err(|_| mismatch())?;
+    let governed = receipt
+        .governed_transaction_metadata()
+        .ok_or_else(mismatch)?;
+    let commerce = governed.commerce.as_ref().ok_or_else(mismatch)?;
+    let approval = governed.approval.as_ref().ok_or_else(mismatch)?;
+    let economic = governed
+        .economic_authorization
+        .as_ref()
+        .ok_or_else(mismatch)?;
+    let financial = receipt.financial_metadata().ok_or_else(mismatch)?;
+    let receipt_digest = receipt_digest(receipt)?;
+    let payee_binding_digest = chio_credit::obligation::derive_obligation_payee_binding_digest(
+        &economic.payee.beneficiary_id,
+        &economic.payee.settlement_destination_ref,
+    )
+    .map_err(|_| mismatch())?;
+    if !receipt.is_allowed()
+        || !approval.approved
+        || approval.approval_artifact_digest.as_deref() != Some(atom.pre_action_authority_digest())
+        || financial.cost_charged == 0
+        || economic.budget.cost_charged != financial.cost_charged
+        || economic.budget.currency != financial.currency
+        || economic.settlement.settlement_status != financial.settlement_status
+        || economic.economic_intent_digest.as_deref() != Some(governed.intent_hash.as_str())
+        || economic.payee_binding_digest.as_deref() != Some(atom.payee_binding_digest())
+        || payee_binding_digest != atom.payee_binding_digest()
+        || economic.pre_action_authority_digest.as_deref()
+            != Some(atom.pre_action_authority_digest())
+        || commerce.seller != economic.payee.beneficiary_id
+        || commerce.settlement_destination_ref.as_deref()
+            != Some(economic.payee.settlement_destination_ref.as_str())
+        || economic.merchant.merchant_id != commerce.seller
+        || atom.economic_intent_digest() != governed.intent_hash
+        || atom.source_receipt_id() != receipt.id
+        || atom.source_receipt_digest() != receipt_digest.as_str()
+        || atom.debtor_id() != economic.payer.party_id
+        || atom.original_creditor_id() != economic.payee.beneficiary_id
+        || atom.original_settlement_destination_ref() != economic.payee.settlement_destination_ref
+        || atom.amount().units != financial.cost_charged
+        || atom.amount().currency != financial.currency
+    {
+        return Err(mismatch());
+    }
+    if let Some(payee_binding) = payee_binding {
+        if payee_binding.economic_intent_digest() != governed.intent_hash
+            || payee_binding.beneficiary_id() != economic.payee.beneficiary_id
+            || payee_binding.settlement_destination_ref()
+                != economic.payee.settlement_destination_ref
+            || payee_binding.payee_binding_digest() != atom.payee_binding_digest()
+            || payee_binding.pre_action_authority_digest() != atom.pre_action_authority_digest()
+        {
+            return Err(mismatch());
+        }
+    }
+    Ok(())
 }
 
 fn validate_obligation_terms(

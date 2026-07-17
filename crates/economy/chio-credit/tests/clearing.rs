@@ -48,8 +48,9 @@ use chio_credit::clearing::{
     CLEARING_SETTLEMENT_RECONCILIATION_SCHEMA,
 };
 use chio_credit::obligation::{
-    ObligationAtomInputV1, ObligationAtomV1, ObligationCreditElectionV1,
-    ObligationDispositionRecordV1, ObligationDispositionTransitionV1, ObligationDispositionV1,
+    derive_obligation_payee_binding_digest, ObligationAtomInputV1, ObligationAtomV1,
+    ObligationCreditElectionV1, ObligationDispositionRecordV1, ObligationDispositionTransitionV1,
+    ObligationDispositionV1,
 };
 use chio_federation::frost::{
     frost_action_registration, frost_authorization_session_id, frost_authorization_slot_id,
@@ -362,7 +363,10 @@ fn reserved_obligation(
         debtor_id: debtor_id.to_owned(),
         original_creditor_id: creditor_id.to_owned(),
         original_settlement_destination_ref: format!("acct:{creditor_id}"),
-        payee_binding_digest: digest(&format!("payee-{sequence}")),
+        payee_binding_digest: derive_obligation_payee_binding_digest(
+            creditor_id,
+            &format!("acct:{creditor_id}"),
+        )?,
         amount: MonetaryAmount {
             currency: currency.to_owned(),
             units,

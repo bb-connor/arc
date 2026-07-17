@@ -20,6 +20,7 @@ use super::decision::{Decision, ToolCallAction};
 use super::economics::{
     ChannelReceiptMetadataV1, FinancialBudgetAuthorityReceiptMetadata, FinancialReceiptMetadata,
 };
+use super::governance::GovernedTransactionReceiptMetadata;
 use super::kinds::{
     BoundaryClass, ObservationOutcome, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
 };
@@ -577,6 +578,11 @@ impl ChioReceipt {
     #[must_use]
     pub fn financial_metadata(&self) -> Option<FinancialReceiptMetadata> {
         self.typed_metadata("financial")
+    }
+
+    #[must_use]
+    pub fn governed_transaction_metadata(&self) -> Option<GovernedTransactionReceiptMetadata> {
+        self.typed_metadata("governed_transaction")
     }
 
     #[must_use]

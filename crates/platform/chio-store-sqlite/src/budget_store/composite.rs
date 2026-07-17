@@ -19,6 +19,8 @@ pub(crate) struct AdmissionAuthorizationBinding<'a> {
     pub(crate) operation: &'a chio_kernel::admission_operation::AdmissionOperationV1,
     pub(crate) recovery_lease: &'a chio_kernel::admission_operation::AdmissionRecoveryLease,
     pub(crate) payment_journal: Option<&'a PaymentJournalRecord>,
+    pub(crate) credit_exposure:
+        Option<&'a chio_credit::obligation::CreditExposureReservationRequest>,
     pub(crate) trusted_now_unix_ms: u64,
 }
 
@@ -553,6 +555,11 @@ impl SqliteBudgetStore {
             .binding()
             .participant_requirements()
             .payment;
+        let requires_credit_exposure = binding
+            .operation
+            .binding()
+            .participant_requirements()
+            .credit_exposure;
         let owner = self.serving_owner.as_deref().ok_or_else(|| {
             BudgetStoreError::Invariant(
                 "combined authorization requires a serving owner".to_owned(),
@@ -561,6 +568,12 @@ impl SqliteBudgetStore {
         if requires_payment != binding.payment_journal.is_some() {
             return Err(BudgetStoreError::Invariant(
                 "combined authorization payment participant does not match operation requirements"
+                    .to_owned(),
+            ));
+        }
+        if requires_credit_exposure != binding.credit_exposure.is_some() {
+            return Err(BudgetStoreError::Invariant(
+                "combined authorization credit exposure participant does not match operation requirements"
                     .to_owned(),
             ));
         }
@@ -613,6 +626,125 @@ impl SqliteBudgetStore {
                 }
             }
         }
+        let credit_exposure_reservation = binding
+            .credit_exposure
+            .map(|credit_exposure| {
+                credit_exposure.validate().map_err(|error| {
+                    BudgetStoreError::Invariant(format!(
+                        "credit exposure reservation request is invalid: {error}"
+                    ))
+                })?;
+                let bind = credit_exposure.credit_facility_bind.body();
+                if credit_exposure.operation_id != operation_id
+                    || credit_exposure.request_id
+                        != binding.operation.binding().request_id().as_str()
+                    || credit_exposure.authorities.capability_id()
+                        != binding.operation.binding().capability_id().as_str()
+                    || credit_exposure.amount.units != request.requested_exposure_units
+                {
+                    return Err(BudgetStoreError::Invariant(
+                        "credit exposure reservation does not match the combined authorization"
+                            .to_owned(),
+                    ));
+                }
+                credit_exposure
+                    .authorities
+                    .ensure_current_at(binding.trusted_now_unix_ms / 1_000)
+                    .map_err(|error| {
+                        BudgetStoreError::Invariant(format!(
+                            "credit exposure authority is not current: {error}"
+                        ))
+                    })?;
+                credit_exposure
+                    .credit_facility_bind
+                    .ensure_current_at(binding.trusted_now_unix_ms)
+                    .map_err(|error| {
+                        BudgetStoreError::Invariant(format!(
+                            "credit facility bind is not current: {error}"
+                        ))
+                    })?;
+                let account_version =
+                    bind.expected_exposure_version()
+                        .checked_add(1)
+                        .ok_or_else(|| {
+                            BudgetStoreError::Invariant(
+                                "credit exposure account version overflowed".to_owned(),
+                            )
+                        })?;
+                let resource_fence =
+                    bind.expected_exposure_fence()
+                        .checked_add(1)
+                        .ok_or_else(|| {
+                            BudgetStoreError::Invariant(
+                                "credit exposure resource fence overflowed".to_owned(),
+                            )
+                        })?;
+                chio_credit::obligation::CreditExposureReservationRecordV1::prepare_reserved(
+                    credit_exposure,
+                    account_version,
+                    resource_fence,
+                )
+                .map_err(|error| {
+                    BudgetStoreError::Invariant(format!(
+                        "credit exposure reservation could not be prepared: {error}"
+                    ))
+                })
+            })
+            .transpose()?;
+        if let Some(reservation) = credit_exposure_reservation.as_ref() {
+            if insert_journal {
+                if crate::admission_operation_store::load_credit_exposure_reservation_tx(
+                    transaction,
+                    operation_id,
+                )
+                .map_err(|error| map_credit_exposure_error(error, owner.fence.owner_epoch))?
+                .is_some()
+                {
+                    return Err(BudgetStoreError::Invariant(
+                        "fresh combined authorization found an existing credit exposure reservation"
+                            .to_owned(),
+                    ));
+                }
+            } else {
+                let stored = crate::admission_operation_store::load_credit_exposure_reservation_tx(
+                    transaction,
+                    operation_id,
+                )
+                .map_err(|error| map_credit_exposure_error(error, owner.fence.owner_epoch))?
+                .ok_or_else(|| {
+                    BudgetStoreError::Invariant(
+                        "combined authorization replay lost its credit exposure reservation"
+                            .to_owned(),
+                    )
+                })?;
+                stored.validate().map_err(|error| {
+                    BudgetStoreError::Invariant(format!(
+                        "combined authorization replay has an invalid credit exposure reservation: {error}"
+                    ))
+                })?;
+                let expected_state = match binding.operation.state() {
+                    chio_kernel::admission_operation::AdmissionOperationState::Completed => {
+                        chio_credit::obligation::CreditExposureReservationStateV1::Committed
+                    }
+                    chio_kernel::admission_operation::AdmissionOperationState::CompensatedBeforeDispatch => {
+                        chio_credit::obligation::CreditExposureReservationStateV1::ReleasedBeforeDispatch
+                    }
+                    chio_kernel::admission_operation::AdmissionOperationState::NotAcceptedAfterDispatchCommit
+                    | chio_kernel::admission_operation::AdmissionOperationState::OutcomeUnknownAfterDispatch => {
+                        chio_credit::obligation::CreditExposureReservationStateV1::OutcomeUnknown
+                    }
+                    _ => chio_credit::obligation::CreditExposureReservationStateV1::Reserved,
+                };
+                if stored.reservation_digest() != reservation.reservation_digest()
+                    || stored.state() != expected_state
+                {
+                    return Err(BudgetStoreError::Invariant(
+                        "combined authorization replay conflicts with its credit exposure reservation"
+                            .to_owned(),
+                    ));
+                }
+            }
+        }
         let commit_index = authorization_commit_index(decision)?;
         let participant_digest = transaction.query_row(
             r#"
@@ -642,6 +774,9 @@ impl SqliteBudgetStore {
                     recovery_lease: binding.recovery_lease,
                     hold_id,
                     payment_required: requires_payment,
+                    credit_exposure_reservation_digest: credit_exposure_reservation
+                        .as_ref()
+                        .map(chio_credit::obligation::CreditExposureReservationRecordV1::reservation_digest),
                     participant_digest: &participant_digest,
                     trusted_now_unix_ms: binding.trusted_now_unix_ms,
                 },
@@ -652,10 +787,13 @@ impl SqliteBudgetStore {
                 binding.operation,
                 hold_id,
                 requires_payment,
+                credit_exposure_reservation.as_ref().map(
+                    chio_credit::obligation::CreditExposureReservationRecordV1::reservation_digest,
+                ),
                 &participant_digest,
             )
         };
-        operation.map(Some).map_err(|error| match error {
+        let operation = operation.map_err(|error| match error {
             chio_kernel::admission_operation::AdmissionOperationStoreError::Fenced => {
                 BudgetStoreError::Fenced {
                     expected_epoch: owner.fence.owner_epoch,
@@ -666,7 +804,46 @@ impl SqliteBudgetStore {
                 detail,
             ) => BudgetStoreError::OutcomeUnknown(detail),
             error => BudgetStoreError::Invariant(error.to_string()),
-        })
+        })?;
+        let expected_credit_digest = credit_exposure_reservation
+            .as_ref()
+            .map(chio_credit::obligation::CreditExposureReservationRecordV1::reservation_digest);
+        if operation
+            .credit_exposure_reservation_digest()
+            .map(chio_kernel::admission_operation::AdmissionDigest::as_str)
+            != expected_credit_digest
+        {
+            return Err(BudgetStoreError::Invariant(
+                "combined authorization lost its credit exposure reservation".to_owned(),
+            ));
+        }
+        if insert_journal {
+            if let Some(reservation) = credit_exposure_reservation.as_ref() {
+                crate::admission_operation_store::reserve_credit_exposure_tx(
+                    transaction,
+                    reservation,
+                    &owner.fence,
+                    binding.trusted_now_unix_ms,
+                )
+                .map_err(|error| map_credit_exposure_error(error, owner.fence.owner_epoch))?;
+            }
+        }
+        let stored_operation = crate::admission_operation_store::load_operation_for_participant_tx(
+            transaction,
+            binding.operation.binding().operation_id(),
+        )
+        .map_err(|error| map_credit_exposure_error(error, owner.fence.owner_epoch))?
+        .ok_or_else(|| {
+            BudgetStoreError::Invariant(
+                "combined authorization lost its admission operation".to_owned(),
+            )
+        })?;
+        if stored_operation != operation {
+            return Err(BudgetStoreError::Invariant(
+                "combined authorization admission operation was not durably advanced".to_owned(),
+            ));
+        }
+        Ok(Some(operation))
     }
 
     fn authorization_decision_from_event(
@@ -805,4 +982,22 @@ fn authorization_commit_index(
             "combined admission authorization omitted its durable sequence".to_owned(),
         )
     })
+}
+
+fn map_credit_exposure_error(
+    error: chio_kernel::admission_operation::AdmissionOperationStoreError,
+    expected_epoch: u64,
+) -> BudgetStoreError {
+    match error {
+        chio_kernel::admission_operation::AdmissionOperationStoreError::Fenced => {
+            BudgetStoreError::Fenced {
+                expected_epoch,
+                actual_epoch: None,
+            }
+        }
+        chio_kernel::admission_operation::AdmissionOperationStoreError::OutcomeUnknown(detail) => {
+            BudgetStoreError::OutcomeUnknown(detail)
+        }
+        error => BudgetStoreError::Invariant(error.to_string()),
+    }
 }

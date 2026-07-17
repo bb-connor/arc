@@ -346,13 +346,76 @@ Its registry kind is `parametric_policy`, introduced by
 evidence-corpus manifests are canonical policy inputs, not signed-artifact
 schemas.
 
-The receivables-factoring contract registers one signed artifact schema:
+The credit-admission contract registers one signed artifact schema:
+
+- `chio.credit.facility-bind.v1`
+
+Its registry kind is `credit_facility_bind`, introduced by
+`credit-admission-v1`, with the envelope schema at
+`spec/schemas/chio-economy/credit-facility-bind.v1.json`. The configured
+facility authority, debtor, and original creditor sign the same canonical body.
+That body binds the admission operation and request, economic intent, facility
+artifact and authority set, exposure version and fence, parties and payee,
+tool scope, amount and effective ceiling, due date, nonce, and validity window.
+An admission verifier MUST reject every unknown facility-bind version before
+signature verification and MUST NOT mint credit without the matching online
+authoritative exposure reservation.
+
+The receivables-factoring contract registers six signed artifact schemas:
 
 - `chio.obligation.status-proof.v1`
+- `chio.credit.iou-envelope.v2`
+- `chio.factor.assignment-bind-authorization.v1`
+- `chio.factor.assignment-agreement.v1`
+- `chio.factor.assignment-acknowledgement.v1`
+- `chio.factor.assignment-not-applied.v1`
 
-Its registry kind is `obligation_status_proof`, introduced by
-`receivables-factoring-v1`, with the envelope schema at
-`spec/schemas/chio-economy/obligation-status-proof.v1.json`.
+Their registry kinds are `obligation_status_proof`, `credit_iou_envelope`,
+`factor_assignment_bind_authorization`, `factor_assignment_agreement`,
+`factor_assignment_acknowledgement`, and `factor_assignment_not_applied`, all
+introduced by `receivables-factoring-v1`. Their envelope schemas are published
+under `spec/schemas/chio-economy/`.
+
+The v2 IOU envelope embeds the exact signed facility bind. Its
+`creditAuthorityDigest` MUST equal the SHA-256 digest of the canonical embedded
+bind and MUST match the credit authority digest in the source receipt and
+obligation atom. A receipt, audit log, anchor, or partition lease does not
+replace the facility signatures or the authoritative exposure compare-and-swap.
+
+The following factoring schemas are unsigned canonical projections:
+
+- `chio.factor.normalized-assignment-request.v1`
+- `chio.factor.receivable-claim.v1`
+- `chio.factor.assignment-offer.v1`
+- `chio.factor.discount-quote.v1`
+
+They become evidence only through an exact digest bound by the signed artifacts
+above. They are not independently authenticated and MUST NOT be accepted as a
+substitute for the status proof, IOU envelope, bilateral agreement, bind
+authorization, or terminal result.
+
+The six signed schema IDs above are exhaustive for this contract version. A
+receivables verifier MUST reject every unknown schema version before signature
+verification, including an older IOU envelope or a future factoring version,
+and MUST NOT downgrade, reinterpret, or fall back to a known version.
+
+Verified-outcome pricing registers nine independently signed artifact schemas:
+
+- `chio.outcome.predicate.v1`
+- `chio.outcome.pricing.v1`
+- `chio.outcome.sla.v1`
+- `chio.outcome.eligibility.v1`
+- `chio.outcome.delivery-checkpoint.v1`
+- `chio.outcome.delivery-acknowledgement.v1`
+- `chio.outcome.delivery-nonacceptance.v1`
+- `chio.outcome.output-provenance.v1`
+- `chio.outcome.contractual-zero.v1`
+
+Their registry kinds use the `outcome_` prefix and are introduced by
+`verified-outcome-pricing-v1`. Their envelope schemas are published under
+`spec/schemas/chio-outcome/v1/`. `chio.outcome.request.v1` and
+`chio.outcome.verdict.v1` are unsigned projections and are not signed-artifact
+schemas.
 
 Roster, epoch-checkpoint, and authorization-slot signatures MUST verify against
 separately configured Ed25519 trust roots for their exact authority role and

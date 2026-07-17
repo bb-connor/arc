@@ -28,6 +28,8 @@ mod channel_terminal_authority;
 pub use channel_terminal_authority::*;
 mod economic_cancellation;
 pub use economic_cancellation::*;
+mod factor_assignment;
+pub use factor_assignment::*;
 mod pre_dispatch_compensation;
 pub use pre_dispatch_compensation::*;
 mod outcome_unknown;
@@ -241,6 +243,7 @@ pub struct AdmissionProjectionCapabilities {
     pub observation_attempt_zero: bool,
     pub obligation: bool,
     pub channel_terminal: bool,
+    pub credit_exposure_terminal: bool,
     pub economic_mutation_terminal: bool,
 }
 
@@ -259,6 +262,10 @@ impl AdmissionProjectionCapabilities {
             }
         };
         require(self.operation_terminal, "operation_terminal")?;
+        require(
+            !requirements.credit_exposure || self.credit_exposure_terminal,
+            "credit_exposure_terminal",
+        )?;
         match projection {
             AdmissionTerminalProjection::Completed(_) => {
                 require(
@@ -1822,3 +1829,7 @@ pub(super) fn validate_terminal_replay(
 #[cfg(test)]
 #[path = "projection/channel_terminal_tests.rs"]
 mod channel_terminal_projection_tests;
+
+#[cfg(test)]
+#[path = "projection/factor_assignment_tests.rs"]
+mod factor_assignment_projection_tests;

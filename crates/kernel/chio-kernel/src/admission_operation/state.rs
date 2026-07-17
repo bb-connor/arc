@@ -92,14 +92,15 @@ pub(super) fn attachment_supported(
     requirements: AdmissionParticipantRequirements,
     attachment: &AdmissionAttachment,
 ) -> bool {
-    if kind == AdmissionOperationKind::GovernedEconomicMutation {
-        return false;
-    }
     match attachment {
         AdmissionAttachment::ThresholdProposalHash(_) => requirements.approval,
-        AdmissionAttachment::SupplementalAuthorizationDigest(_) => {
-            kind == AdmissionOperationKind::ToolDispatch
-        }
+        AdmissionAttachment::SupplementalAuthorizationDigest(_) => match kind {
+            AdmissionOperationKind::ToolDispatch => true,
+            AdmissionOperationKind::GovernedEconomicMutation => {
+                requirements.supplemental_authorization
+            }
+            AdmissionOperationKind::GovernedActiveResponse => false,
+        },
         AdmissionAttachment::BrokerAttempt(_) => requirements.broker_attempt,
         AdmissionAttachment::BudgetHoldId(_) => requirements.budget_capture,
         AdmissionAttachment::ApprovalSetHash(_) => requirements.approval,
@@ -109,6 +110,9 @@ pub(super) fn attachment_supported(
         AdmissionAttachment::ToolOutcomeId(_) => kind == AdmissionOperationKind::ToolDispatch,
         AdmissionAttachment::ChannelReservationProposalDigest(_)
         | AdmissionAttachment::ChannelReservationDigest(_) => requirements.channel,
+        AdmissionAttachment::CreditExposureReservationDigest(_) => {
+            kind == AdmissionOperationKind::ToolDispatch && requirements.credit_exposure
+        }
     }
 }
 
@@ -122,6 +126,11 @@ pub(super) fn attachment_allowed(
         return false;
     }
     match attachment {
+        AdmissionAttachment::SupplementalAuthorizationDigest(_)
+            if kind == AdmissionOperationKind::GovernedEconomicMutation =>
+        {
+            state == AdmissionOperationState::Prepared
+        }
         AdmissionAttachment::ToolOutcomeId(_) => matches!(
             state,
             AdmissionOperationState::DispatchCommitted | AdmissionOperationState::Finalizing
@@ -133,6 +142,9 @@ pub(super) fn attachment_allowed(
             state,
             AdmissionOperationState::BudgetAuthorized | AdmissionOperationState::ApprovalReserved
         ),
+        AdmissionAttachment::CreditExposureReservationDigest(_) => {
+            state == AdmissionOperationState::BrokerAttemptRegistered
+        }
         _ => matches!(
             state,
             AdmissionOperationState::Prepared
@@ -172,6 +184,19 @@ pub(super) fn validate_state_attachments(
                         | AdmissionOperationState::NotAcceptedAfterDispatchCommit
                         | AdmissionOperationState::OutcomeUnknownAfterDispatch
                 ),
+                AdmissionAttachment::CreditExposureReservationDigest(_) => !matches!(
+                    state,
+                    AdmissionOperationState::BudgetAuthorized
+                        | AdmissionOperationState::ApprovalReserved
+                        | AdmissionOperationState::ReadyToDispatch
+                        | AdmissionOperationState::CapturePending
+                        | AdmissionOperationState::DispatchCommitted
+                        | AdmissionOperationState::Finalizing
+                        | AdmissionOperationState::Completed
+                        | AdmissionOperationState::CompensatedBeforeDispatch
+                        | AdmissionOperationState::NotAcceptedAfterDispatchCommit
+                        | AdmissionOperationState::OutcomeUnknownAfterDispatch
+                ),
                 _ => false,
             }
     }) {
@@ -188,6 +213,21 @@ pub(super) fn validate_state_attachments(
     {
         return Err(AdmissionOperationError::MissingParticipantAttachment {
             field: "tool_outcome_id",
+        });
+    }
+    if kind == AdmissionOperationKind::GovernedEconomicMutation
+        && requirements.supplemental_authorization
+        && matches!(
+            state,
+            AdmissionOperationState::MutationReady
+                | AdmissionOperationState::MutationSubmitted
+                | AdmissionOperationState::EconomicMutationApplied
+                | AdmissionOperationState::EconomicMutationNotApplied
+        )
+        && !attachments.has_slot(AdmissionAttachmentKind::SupplementalAuthorization.slot())
+    {
+        return Err(AdmissionOperationError::MissingParticipantAttachment {
+            field: "supplemental_authorization_digest",
         });
     }
     let reached = |milestone| match milestone {
@@ -287,6 +327,11 @@ pub(super) fn validate_state_attachments(
             requirements.channel && reached(AdmissionOperationState::ReadyToDispatch),
             10,
             "channel_reservation_digest",
+        ),
+        (
+            requirements.credit_exposure && reached(AdmissionOperationState::BudgetAuthorized),
+            11,
+            "credit_exposure_reservation_digest",
         ),
     ];
     if let Some((_, _, field)) = required

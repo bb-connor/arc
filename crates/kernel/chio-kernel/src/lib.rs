@@ -320,6 +320,7 @@ pub use chio_core::underwriting::{
     UNDERWRITING_POLICY_INPUT_SCHEMA, UNDERWRITING_RISK_TAXONOMY_VERSION,
     UNDERWRITING_SIMULATION_REPORT_SCHEMA,
 };
+pub use chio_credit::obligation::CreditExposureReservationRequest;
 pub use compliance_score::{
     compliance_factor_breakdown, compliance_score, ComplianceFactor, ComplianceFactorBreakdown,
     ComplianceScore, ComplianceScoreConfig, ComplianceScoreInputs, COMPLIANCE_SCORE_MAX,

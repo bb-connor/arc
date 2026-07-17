@@ -5,17 +5,22 @@ use chio_core::canonical::canonical_json_bytes;
 use chio_core::economic_continuity::VerifiedEconomicStateBatchAdvance;
 use chio_core::receipt::{body::ChioReceipt, lineage::ChildRequestReceipt};
 use chio_core::{sha256_hex, StoreMutationFence};
-use chio_credit::obligation::{ObligationAtomV1, ObligationDispositionRecordV1};
+#[cfg(test)]
+use chio_credit::obligation::CreditExposureReservationRequest;
+use chio_credit::obligation::{
+    CreditExposureReservationRecordV1, ObligationAtomV1, ObligationDispositionRecordV1,
+    ObligationSettlementLifecycleV1,
+};
 use chio_kernel::admission_operation::{
     AdmissionAttachment, AdmissionBeginResult, AdmissionCaptureError, AdmissionCommandResult,
     AdmissionDigest, AdmissionIdentifier, AdmissionOperationCommand, AdmissionOperationError,
-    AdmissionOperationId, AdmissionOperationState, AdmissionOperationStore,
+    AdmissionOperationId, AdmissionOperationKind, AdmissionOperationState, AdmissionOperationStore,
     AdmissionOperationStoreError, AdmissionOperationV1, AdmissionProjectionCapabilities,
     AdmissionProjectionContext, AdmissionProjectionManifestV1, AdmissionProjectionRecordKind,
     AdmissionRecoveryLease, AdmissionReplayClassification, AdmissionReplayKey, AdmissionTerminal,
     AdmissionTerminalProjection, AdmissionTerminalReplay, CanonicalAdmissionProjectionRecord,
     CanonicalAdmissionTerminalProjection, PersistedAdmissionOperationV1,
-    QualifiedAdmissionOperationStore, SignedAdmissionTerminalProjectionV1,
+    QualifiedAdmissionOperationStore, SideEffectClass, SignedAdmissionTerminalProjectionV1,
     UntrustedAdmissionRecoveryClaim, VerifiedAdmissionTerminalProjectionRecordV1,
     VerifiedAdmissionTerminalProjectionV1,
 };
@@ -35,7 +40,9 @@ use serde::{Deserialize, Serialize};
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 
 mod commit_chain;
+mod credit_exposure;
 mod errors;
+mod factor_assignment;
 mod obligation;
 mod participant;
 mod projection;
@@ -48,7 +55,18 @@ pub(crate) use commit_chain::{
     verify_admission_commit_chain, verify_admission_commit_suffix, AdmissionCommitHead,
     GENESIS_CHAIN_DIGEST,
 };
+pub use credit_exposure::CreditExposureAccountSnapshot;
+pub(crate) use credit_exposure::{
+    apply_credit_exposure_terminal_tx, load_credit_exposure_reservation_tx,
+    reserve_credit_exposure_tx,
+};
 use errors::*;
+pub use factor_assignment::{
+    DurableFactorAssignmentResultV1, FactorAssignmentAuthorityRegistryV1,
+    FactorAssignmentAuthoritySetHeadV1, FactorAssignmentCommitV1,
+    FactorAssignmentSigningAuthorityV1, FactorAssignmentVerificationAuthorityV1,
+    SqliteFactorAssignmentStore, StoredFactorAssignmentResultV1,
+};
 use obligation::load_durable_obligation;
 pub(crate) use participant::{
     advance_budget_authorization_tx, advance_budget_capture_tx, advance_tool_outcome_tx,
@@ -74,7 +92,7 @@ pub(crate) use schema::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 5;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 7;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
@@ -104,6 +122,11 @@ pub struct SqliteAdmissionOperationStore {
 pub struct DurableObligationV1 {
     atom: ObligationAtomV1,
     disposition: ObligationDispositionRecordV1,
+    settlement_lifecycle: ObligationSettlementLifecycleV1,
+    head_sequence: u64,
+    head_digest: String,
+    snapshot_version: u64,
+    resource_fence: u64,
 }
 
 impl DurableObligationV1 {
@@ -115,6 +138,31 @@ impl DurableObligationV1 {
     #[must_use]
     pub const fn disposition(&self) -> &ObligationDispositionRecordV1 {
         &self.disposition
+    }
+
+    #[must_use]
+    pub const fn settlement_lifecycle(&self) -> &ObligationSettlementLifecycleV1 {
+        &self.settlement_lifecycle
+    }
+
+    #[must_use]
+    pub const fn head_sequence(&self) -> u64 {
+        self.head_sequence
+    }
+
+    #[must_use]
+    pub fn head_digest(&self) -> &str {
+        &self.head_digest
+    }
+
+    #[must_use]
+    pub const fn snapshot_version(&self) -> u64 {
+        self.snapshot_version
+    }
+
+    #[must_use]
+    pub const fn resource_fence(&self) -> u64 {
+        self.resource_fence
     }
 }
 
@@ -195,6 +243,84 @@ impl SqliteAdmissionOperationStore {
         load_durable_obligation(&transaction, obligation_id)
     }
 
+    #[cfg(test)]
+    pub(crate) fn provision_credit_exposure_account(
+        &self,
+        request: &CreditExposureReservationRequest,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<CreditExposureAccountSnapshot, AdmissionOperationStoreError> {
+        if active_fence != &self.serving_owner.fence {
+            return Err(AdmissionOperationStoreError::Fenced);
+        }
+        request
+            .validate()
+            .map_err(|error| invariant(error.to_string()))?;
+        request
+            .authorities
+            .ensure_current_at(trusted_now_unix_ms / 1_000)
+            .map_err(|error| invariant(error.to_string()))?;
+        request
+            .credit_facility_bind
+            .ensure_current_at(trusted_now_unix_ms)
+            .map_err(|error| invariant(error.to_string()))?;
+        let bind = request.credit_facility_bind.body();
+        let reservation = CreditExposureReservationRecordV1::prepare_reserved(
+            request,
+            bind.expected_exposure_version()
+                .checked_add(1)
+                .ok_or_else(|| invariant("credit exposure account version overflowed"))?,
+            bind.expected_exposure_fence()
+                .checked_add(1)
+                .ok_or_else(|| invariant("credit exposure resource fence overflowed"))?,
+        )
+        .map_err(|error| invariant(error.to_string()))?;
+        let mut connection = self.connection()?;
+        let transaction = self.begin_write(&mut connection, Some(active_fence))?;
+        let snapshot = credit_exposure::initialize_credit_exposure_account_tx(
+            &transaction,
+            &reservation,
+            0,
+            0,
+            active_fence,
+            trusted_now_unix_ms,
+        )?;
+        self.commit_write(transaction)?;
+        self.sync_after_write(&connection)?;
+        Ok(snapshot)
+    }
+
+    pub fn load_credit_exposure_account(
+        &self,
+        debtor_id: &str,
+        scope_digest: &str,
+        currency: &str,
+    ) -> Result<Option<CreditExposureAccountSnapshot>, AdmissionOperationStoreError> {
+        AdmissionIdentifier::try_new("credit_exposure_debtor_id", debtor_id.to_owned())?;
+        AdmissionDigest::try_new("credit_exposure_scope_digest", scope_digest.to_owned())?;
+        if currency.len() != 3 || !currency.bytes().all(|byte| byte.is_ascii_uppercase()) {
+            return Err(invariant("credit exposure currency is invalid"));
+        }
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        credit_exposure::load_credit_exposure_account_tx(
+            &transaction,
+            debtor_id,
+            scope_digest,
+            currency,
+        )
+    }
+
+    pub fn load_credit_exposure_reservation(
+        &self,
+        operation_id: &str,
+    ) -> Result<Option<CreditExposureReservationRecordV1>, AdmissionOperationStoreError> {
+        AdmissionDigest::try_new("credit_exposure_operation_id", operation_id.to_owned())?;
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        load_credit_exposure_reservation_tx(&transaction, operation_id)
+    }
+
     pub fn capture_invocation_and_commit_dispatch(
         &self,
         operation: &AdmissionOperationV1,
@@ -241,6 +367,7 @@ impl SqliteAdmissionOperationStore {
         recovery_lease: &AdmissionRecoveryLease,
         request: BudgetAuthorizeHoldRequest,
         payment_journal: Option<PaymentJournalRecord>,
+        credit_exposure: Option<chio_credit::obligation::CreditExposureReservationRequest>,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<(BudgetAuthorizeHoldDecision, AdmissionOperationV1), AdmissionCaptureError> {
@@ -259,6 +386,7 @@ impl SqliteAdmissionOperationStore {
                     operation,
                     recovery_lease,
                     payment_journal: payment_journal.as_ref(),
+                    credit_exposure: credit_exposure.as_ref(),
                     trusted_now_unix_ms,
                 },
             )
@@ -450,18 +578,47 @@ impl SqliteAdmissionOperationStore {
                 "channel terminal projection requires an advanced economic anchor",
             ));
         }
+        projection.context().validate()?;
+        let mut connection = self.connection()?;
+        let transaction =
+            self.begin_write(&mut connection, Some(&projection.context().store_fence))?;
+        let (terminal, changed) =
+            self.commit_terminal_projection_in_transaction(&transaction, projection)?;
+        self.commit_write(transaction)?;
+        if changed {
+            self.sync_after_write(&connection)?;
+        }
+        Ok(terminal)
+    }
+
+    pub(super) fn commit_terminal_projection_in_transaction(
+        &self,
+        transaction: &Transaction<'_>,
+        projection: &AdmissionTerminalProjection,
+    ) -> Result<(AdmissionTerminal, bool), AdmissionOperationStoreError> {
+        let stored = load_by_operation_id_tx(transaction, &projection.context().operation_id)?
+            .ok_or(AdmissionOperationStoreError::NotFound)?;
+        self.commit_terminal_projection_from_source_in_transaction(transaction, projection, &stored)
+    }
+
+    fn commit_terminal_projection_from_source_in_transaction(
+        &self,
+        transaction: &Transaction<'_>,
+        projection: &AdmissionTerminalProjection,
+        stored: &StoredOperation,
+    ) -> Result<(AdmissionTerminal, bool), AdmissionOperationStoreError> {
+        if projection.requires_anchored_economic_commit() {
+            return Err(invariant(
+                "channel terminal projection requires an advanced economic anchor",
+            ));
+        }
         let canonical = projection.canonical_projection()?;
         validate_canonical_projection_size(&canonical)?;
         let context = projection.context();
         context.validate()?;
-
-        let mut connection = self.connection()?;
-        let transaction = self.begin_write(&mut connection, Some(&context.store_fence))?;
-        verify_trusted_time(&transaction, context.trusted_time_unix_ms)?;
-        let stored = load_by_operation_id_tx(&transaction, &context.operation_id)?
-            .ok_or(AdmissionOperationStoreError::NotFound)?;
+        verify_trusted_time(transaction, context.trusted_time_unix_ms)?;
         verify_payment_terminal_source(
-            &transaction,
+            transaction,
             &stored.operation,
             context,
             projected_terminal_state(projection),
@@ -473,15 +630,20 @@ impl SqliteAdmissionOperationStore {
 
         if stored.operation.state().is_terminal() {
             let terminal = verify_exact_terminal_replay(
-                &transaction,
+                transaction,
                 &stored.operation,
                 projection,
                 &canonical,
             )?;
-            transaction.commit().map_err(sqlite_error)?;
-            return Ok(terminal);
+            apply_credit_exposure_terminal_tx(
+                transaction,
+                &stored.operation,
+                canonical.projection_digest(),
+                &context.store_fence,
+                context.trusted_time_unix_ms,
+            )?;
+            return Ok((terminal, false));
         }
-        ensure_no_reserved_terminal_stage(&transaction, &context.operation_id)?;
         if context.request_id != stored.operation.replay_key().request_id
             || context.expected_operation_version != stored.operation.version()
             || context.coordinator_lease_epoch != stored.operation.coordinator_lease_epoch()
@@ -500,15 +662,13 @@ impl SqliteAdmissionOperationStore {
             return Err(AdmissionOperationStoreError::Fenced);
         }
         verify_stored_recovery_claim(
-            &transaction,
+            transaction,
             &self.serving_owner,
             &stored,
             recovery_claim,
             context.trusted_time_unix_ms,
             &context.store_fence,
         )?;
-        ensure_projection_absent(&transaction, &context.operation_id)?;
-
         let capabilities = full_projection_capabilities();
         let updated = stored
             .operation
@@ -545,9 +705,16 @@ impl SqliteAdmissionOperationStore {
         if changed != 1 {
             return Err(AdmissionOperationStoreError::Fenced);
         }
-        insert_terminal_projection(&transaction, projection, &canonical, &updated)?;
+        insert_terminal_projection(transaction, projection, &canonical, &updated)?;
+        apply_credit_exposure_terminal_tx(
+            transaction,
+            &updated,
+            canonical.projection_digest(),
+            &context.store_fence,
+            context.trusted_time_unix_ms,
+        )?;
         append_operation_commit(
-            &transaction,
+            transaction,
             &updated,
             &encoded,
             Some(recovery_claim),
@@ -555,9 +722,7 @@ impl SqliteAdmissionOperationStore {
             &self.serving_owner,
             context.trusted_time_unix_ms,
         )?;
-        self.commit_write(transaction)?;
-        self.sync_after_write(&connection)?;
-        terminal_from_operation(&updated)
+        terminal_from_operation(&updated).map(|terminal| (terminal, true))
     }
 
     pub fn commit_signed_terminal_projection(
@@ -596,6 +761,7 @@ fn verify_stored_recovery_claim(
         || stored.operation.version() != claim.claimed_version()
         || stored.operation.coordinator_lease_epoch() != claim.coordinator_lease_epoch()
         || claim.store_fence() != current_store_fence
+        || current_store_fence != &owner.fence
     {
         return Err(AdmissionOperationStoreError::Fenced);
     }

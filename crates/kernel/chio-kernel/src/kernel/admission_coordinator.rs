@@ -201,6 +201,7 @@ struct ImmutableToolAdmissionRequest<'a> {
     agent_id: &'a str,
     arguments: &'a serde_json::Value,
     governed_intent: &'a Option<chio_core::capability::governance::GovernedTransactionIntent>,
+    approval_token: &'a Option<chio_core::capability::governance::GovernedApprovalToken>,
     model_metadata: &'a Option<chio_core::capability::scope::ModelMetadata>,
     federated_origin_kernel_id: &'a Option<String>,
     matching_grants: Vec<ImmutableMatchingGrant<'a>>,
@@ -454,6 +455,7 @@ impl ChioKernel {
             agent_id: &request.agent_id,
             arguments: &request.arguments,
             governed_intent: &request.governed_intent,
+            approval_token: &request.approval_token,
             model_metadata: &request.model_metadata,
             federated_origin_kernel_id: &request.federated_origin_kernel_id,
             matching_grants: matching_grants
@@ -713,6 +715,7 @@ impl ChioKernel {
                 &recovery_lease,
                 request,
                 payment_journal,
+                None,
                 &runtime.fence,
                 trusted_now_unix_ms,
             )

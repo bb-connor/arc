@@ -12,6 +12,7 @@ use chio_settle::channel::derive_channel_receipt_authority_digest;
 use serde::{Deserialize, Serialize};
 
 use crate::receipt_store::{AuthorizationReceiptConsumption, PendingSettlementObservation};
+use crate::tool_outcome::{VerifiedPreDispatchNoEffect, VerifiedTransportNotAccepted};
 
 use super::*;
 
@@ -100,6 +101,7 @@ pub struct VerifiedAdmissionTerminalProjectionV1 {
     manifest_json: Vec<u8>,
     records: Vec<VerifiedAdmissionTerminalProjectionRecordV1>,
     channel_terminal: Option<VerifiedChannelTerminalProjectionV1>,
+    pre_dispatch_release_proof: Option<VerifiedPreDispatchNoEffect>,
     authorization_consumption: Option<AuthorizationReceiptConsumption>,
     observer: Option<AdmissionTerminalObserverProjectionV1>,
 }
@@ -234,6 +236,12 @@ impl SignedAdmissionTerminalProjectionV1 {
         )?;
         let channel_terminal =
             validate_channel_terminal_record(&records, &source_operation, &self.body.context)?;
+        let pre_dispatch_release_proof = validate_release_proof_record(
+            &records,
+            &source_operation,
+            terminal_operation.state(),
+            &self.body.context,
+        )?;
         validate_sidecars(
             &records,
             self.body.authorization_consumption.as_ref(),
@@ -248,6 +256,7 @@ impl SignedAdmissionTerminalProjectionV1 {
             manifest_json,
             records,
             channel_terminal,
+            pre_dispatch_release_proof,
             authorization_consumption: self.body.authorization_consumption.clone(),
             observer: self.body.observer.clone(),
         })
@@ -258,6 +267,11 @@ impl VerifiedAdmissionTerminalProjectionV1 {
     #[must_use]
     pub const fn signer_key(&self) -> &PublicKey {
         &self.signer_key
+    }
+
+    #[must_use]
+    pub const fn pre_dispatch_release_proof(&self) -> Option<&VerifiedPreDispatchNoEffect> {
+        self.pre_dispatch_release_proof.as_ref()
     }
 
     #[must_use]
@@ -554,6 +568,45 @@ fn validate_record_set_shape(
         return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
     }
     Ok(())
+}
+
+fn validate_release_proof_record(
+    records: &[VerifiedAdmissionTerminalProjectionRecordV1],
+    source: &AdmissionOperationV1,
+    terminal_state: AdmissionOperationState,
+    context: &AdmissionProjectionContext,
+) -> Result<Option<VerifiedPreDispatchNoEffect>, AdmissionOperationError> {
+    let record = records
+        .iter()
+        .find(|record| record.kind == AdmissionProjectionRecordKind::ReleaseProof);
+    match (terminal_state, record) {
+        (AdmissionOperationState::CompensatedBeforeDispatch, Some(record)) => {
+            VerifiedPreDispatchNoEffect::from_canonical_record_verified(
+                record.canonical_json(),
+                source,
+                context,
+            )
+            .map(Some)
+            .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)
+        }
+        (AdmissionOperationState::NotAcceptedAfterDispatchCommit, Some(record)) => {
+            VerifiedTransportNotAccepted::from_canonical_record_verified(
+                record.canonical_json(),
+                source,
+                context,
+            )
+            .map(|_| None)
+            .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)
+        }
+        (
+            AdmissionOperationState::Completed
+            | AdmissionOperationState::OutcomeUnknownAfterDispatch
+            | AdmissionOperationState::EconomicMutationApplied
+            | AdmissionOperationState::EconomicMutationNotApplied,
+            None,
+        ) => Ok(None),
+        _ => Err(AdmissionOperationError::TerminalProjectionBindingMismatch),
+    }
 }
 
 fn channel_terminal_charge(

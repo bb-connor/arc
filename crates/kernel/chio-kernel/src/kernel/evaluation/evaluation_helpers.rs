@@ -9,6 +9,7 @@ pub(super) struct PreDispatchCleanupDeny<'a> {
     pub(super) budget_mutation: &'a PreExecutionBudgetMutation,
     pub(super) payment_authorization: Option<&'a PaymentAuthorization>,
     pub(super) runtime_admission_metadata: Option<serde_json::Value>,
+    pub(super) verified_payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
     /// Whether THIS evaluation acquired a sibling-sum child-budget holder lease
     /// (the `admit_capability_budget` return). Only then may cleanup release
     /// one: the reference-counted release frees the shared edge only when the
@@ -83,6 +84,7 @@ impl ChioKernel {
         budget_mutation: &PreExecutionBudgetMutation,
         runtime_admission_metadata: Option<serde_json::Value>,
         budget_lease_acquired: bool,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
         let (runtime_metadata, _) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
@@ -98,12 +100,13 @@ impl ChioKernel {
             ),
             None => runtime_metadata,
         };
-        self.build_deny_response_with_metadata(
+        self.build_deny_response_with_metadata_and_payee_binding(
             request,
             reason,
             timestamp,
             Some(matched_grant_index),
             metadata,
+            verified_payee_binding,
         )
     }
 
@@ -117,6 +120,7 @@ impl ChioKernel {
         budget_mutation: &PreExecutionBudgetMutation,
         runtime_admission_metadata: Option<serde_json::Value>,
         budget_lease_acquired: bool,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
         let (runtime_metadata, _) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
@@ -139,16 +143,17 @@ impl ChioKernel {
                     reason = %redacted!(&internal_reason),
                     "captured budget cancellation could not be confirmed"
                 );
-                return self.build_deny_response_with_metadata(
+                return self.build_deny_response_with_metadata_and_payee_binding(
                     request,
                     "captured budget cancellation could not be confirmed",
                     timestamp,
                     Some(charge.grant_index),
                     self.ambiguous_cancellation_receipt_metadata(charge, runtime_metadata),
+                    verified_payee_binding,
                 );
             }
         };
-        self.build_pre_execution_monetary_deny_response_with_metadata(
+        self.build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
             request,
             reason,
             timestamp,
@@ -162,6 +167,7 @@ impl ChioKernel {
                     Some(("cancelled_before_dispatch", &cancellation)),
                 ),
             ),
+            verified_payee_binding,
         )
     }
 
@@ -247,12 +253,13 @@ impl ChioKernel {
                     ),
                     None => metadata,
                 };
-                return self.build_deny_response_with_metadata(
+                return self.build_deny_response_with_metadata_and_payee_binding(
                     denial.request,
                     "pre-dispatch cleanup could not be confirmed",
                     denial.timestamp,
                     Some(denial.matched_grant_index),
                     metadata,
+                    denial.verified_payee_binding,
                 );
             }
         };
@@ -260,26 +267,29 @@ impl ChioKernel {
         if let (Some(charge), Some(reverse)) =
             (denial.budget_mutation.charge_result(), reverse.as_ref())
         {
-            return self.build_pre_execution_monetary_deny_response_with_metadata(
-                denial.request,
-                denial.reason,
-                denial.timestamp,
-                charge,
-                reverse.committed_cost_units_after,
-                denial.cap,
-                self.merge_budget_receipt_metadata(
-                    runtime_admission_metadata,
-                    self.budget_execution_receipt_metadata(charge, Some(("reversed", reverse))),
-                ),
-            );
+            return self
+                .build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
+                    denial.request,
+                    denial.reason,
+                    denial.timestamp,
+                    charge,
+                    reverse.committed_cost_units_after,
+                    denial.cap,
+                    self.merge_budget_receipt_metadata(
+                        runtime_admission_metadata,
+                        self.budget_execution_receipt_metadata(charge, Some(("reversed", reverse))),
+                    ),
+                    denial.verified_payee_binding,
+                );
         }
 
-        self.build_deny_response_with_metadata(
+        self.build_deny_response_with_metadata_and_payee_binding(
             denial.request,
             denial.reason,
             denial.timestamp,
             Some(denial.matched_grant_index),
             runtime_admission_metadata,
+            denial.verified_payee_binding,
         )
     }
 
@@ -368,12 +378,13 @@ impl ChioKernel {
                                 }
                             })),
                         );
-                        return self.build_deny_response_with_metadata(
+                        return self.build_deny_response_with_metadata_and_payee_binding(
                             denial.request,
                             "payment release could not be confirmed after execution nonce denial",
                             denial.timestamp,
                             Some(denial.matched_grant_index),
                             metadata,
+                            denial.verified_payee_binding,
                         );
                     }
                     Err(error) => {
@@ -396,12 +407,13 @@ impl ChioKernel {
                                 }
                             })),
                         );
-                        return self.build_deny_response_with_metadata(
+                        return self.build_deny_response_with_metadata_and_payee_binding(
                             denial.request,
                             "payment release could not be confirmed after execution nonce denial",
                             denial.timestamp,
                             Some(denial.matched_grant_index),
                             metadata,
+                            denial.verified_payee_binding,
                         );
                     }
                 }
@@ -423,17 +435,18 @@ impl ChioKernel {
                     self.ambiguous_cancellation_receipt_metadata(charge, runtime_metadata),
                     payment_release_metadata,
                 );
-                return self.build_deny_response_with_metadata(
+                return self.build_deny_response_with_metadata_and_payee_binding(
                     denial.request,
                     "captured budget cancellation could not be confirmed after execution nonce denial",
                     denial.timestamp,
                     Some(charge.grant_index),
                     metadata,
+                    denial.verified_payee_binding,
                 );
             }
         };
 
-        self.build_pre_execution_monetary_deny_response_with_metadata(
+        self.build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
             denial.request,
             denial.reason,
             denial.timestamp,
@@ -450,6 +463,7 @@ impl ChioKernel {
                 ),
                 payment_release_metadata,
             ),
+            denial.verified_payee_binding,
         )
     }
 

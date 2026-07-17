@@ -305,6 +305,14 @@ pub struct EconomicLiabilityReceiptMetadata {
 #[serde(rename_all = "snake_case")]
 pub struct EconomicAuthorizationReceiptMetadata {
     pub version: EconomicAuthorizationReceiptMetadataVersion,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub economic_intent_digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payee_binding_digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pre_action_authority_digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credit_authority_digest: Option<String>,
     pub economic_mode: EconomicAuthorizationMode,
     pub payer: EconomicPayerReceiptMetadata,
     pub merchant: EconomicMerchantReceiptMetadata,

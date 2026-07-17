@@ -12,6 +12,7 @@ pub(super) fn full_projection_capabilities() -> AdmissionProjectionCapabilities 
         observation_attempt_zero: true,
         obligation: true,
         channel_terminal: true,
+        credit_exposure_terminal: true,
         economic_mutation_terminal: true,
     }
 }
@@ -908,7 +909,9 @@ pub(super) fn verify_stored_terminal_projection(
                 "nonterminal admission operation has terminal projection rows",
             ));
         }
-        return Ok(());
+        return super::credit_exposure::verify_credit_exposure_operation_state(
+            connection, operation, None,
+        );
     }
     let projection = projection
         .ok_or_else(|| invariant("terminal admission operation lacks its projection row"))?;
@@ -1026,7 +1029,11 @@ pub(super) fn verify_stored_terminal_projection(
             owner_epoch: stored_u64(projection.store_owner_epoch, "projection_store_owner_epoch")?,
         },
     )?;
-    Ok(())
+    super::credit_exposure::verify_credit_exposure_operation_state(
+        connection,
+        operation,
+        Some(&projection_digest),
+    )
 }
 
 fn projection_sidecar_count(

@@ -301,6 +301,7 @@ fn receipt_lineage_verification_backfills_from_governed_call_chain_metadata() {
                     approval: Some(GovernedApprovalReceiptMetadata {
                         token_id: "approval-lineage".to_string(),
                         approver_key: issuer_hex.clone(),
+                        approval_artifact_digest: None,
                         approved: true,
                     }),
                     runtime_assurance: None,

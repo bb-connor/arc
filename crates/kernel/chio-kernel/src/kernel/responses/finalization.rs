@@ -15,7 +15,8 @@ pub(crate) struct PostInvocationHandling {
 }
 
 impl ChioKernel {
-    pub(crate) fn finalize_tool_output_with_metadata(
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn finalize_tool_output_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
         output: ToolServerOutput,
@@ -23,6 +24,7 @@ impl ChioKernel {
         timestamp: u64,
         matched_grant_index: usize,
         extra_metadata: Option<serde_json::Value>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
         let output = self.apply_stream_limits(output, elapsed)?;
         let post_invocation = self.apply_post_invocation_pipeline(
@@ -34,7 +36,7 @@ impl ChioKernel {
         let _post_invocation_evidence_scope =
             scope_post_invocation_guard_evidence(post_invocation.evidence);
         if let Some(reason) = post_invocation.blocked_reason.as_deref() {
-            return self.build_deny_response_with_metadata(
+            return self.build_deny_response_with_metadata_and_payee_binding(
                 request,
                 reason,
                 timestamp,
@@ -48,27 +50,31 @@ impl ChioKernel {
                 self.mark_runtime_admission_reservations_retained_fail_closed(
                     post_invocation.extra_metadata,
                 ),
+                verified_payee_binding,
             );
         }
 
         match post_invocation.output {
-            ToolServerOutput::Value(value) => self.build_allow_response_with_metadata(
-                request,
-                ToolCallOutput::Value(value),
-                timestamp,
-                Some(matched_grant_index),
-                post_invocation.extra_metadata,
-            ),
+            ToolServerOutput::Value(value) => self
+                .build_allow_response_with_metadata_and_payee_binding(
+                    request,
+                    ToolCallOutput::Value(value),
+                    timestamp,
+                    Some(matched_grant_index),
+                    post_invocation.extra_metadata,
+                    verified_payee_binding,
+                ),
             ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => self
-                .build_allow_response_with_metadata(
+                .build_allow_response_with_metadata_and_payee_binding(
                     request,
                     ToolCallOutput::Stream(stream),
                     timestamp,
                     Some(matched_grant_index),
                     post_invocation.extra_metadata,
+                    verified_payee_binding,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => self
-                .build_incomplete_response_with_output_and_metadata(
+                .build_incomplete_response_with_output_metadata_and_payee_binding(
                     request,
                     Some(ToolCallOutput::Stream(stream)),
                     &reason,
@@ -82,6 +88,7 @@ impl ChioKernel {
                     self.mark_runtime_admission_reservations_retained_fail_closed(
                         post_invocation.extra_metadata,
                     ),
+                    verified_payee_binding,
                 ),
         }
     }

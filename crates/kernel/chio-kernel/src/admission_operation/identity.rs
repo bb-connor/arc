@@ -216,6 +216,10 @@ pub struct AdmissionParticipantRequirements {
     pub obligation: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub channel: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub credit_exposure: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub supplemental_authorization: bool,
 }
 
 impl AdmissionParticipantRequirements {
@@ -230,11 +234,15 @@ impl AdmissionParticipantRequirements {
         observation_attempt_zero: false,
         obligation: false,
         channel: false,
+        credit_exposure: false,
+        supplemental_authorization: false,
     };
 
     fn validate(self) -> Result<(), AdmissionOperationError> {
         if (self.broker_attempt || self.payment || self.channel) && !self.budget_capture
             || self.channel && (self.payment || !self.obligation)
+            || self.credit_exposure
+                && (!self.budget_capture || !self.obligation || self.payment || self.channel)
         {
             return Err(AdmissionOperationError::InvalidParticipantRequirements);
         }
@@ -247,14 +255,23 @@ impl AdmissionParticipantRequirements {
     ) -> Result<(), AdmissionOperationError> {
         self.validate()?;
         let kind_valid = match kind {
-            AdmissionOperationKind::ToolDispatch => self.budget_capture && self.broker_attempt,
+            AdmissionOperationKind::ToolDispatch => {
+                self.budget_capture && self.broker_attempt && !self.supplemental_authorization
+            }
             AdmissionOperationKind::GovernedActiveResponse => {
                 self == (Self {
                     approval: true,
                     ..Self::NONE
                 })
             }
-            AdmissionOperationKind::GovernedEconomicMutation => self == Self::NONE,
+            AdmissionOperationKind::GovernedEconomicMutation => {
+                self == Self::NONE
+                    || self
+                        == (Self {
+                            supplemental_authorization: true,
+                            ..Self::NONE
+                        })
+            }
         };
         if kind_valid {
             Ok(())

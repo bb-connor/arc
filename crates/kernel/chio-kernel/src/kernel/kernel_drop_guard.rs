@@ -6,7 +6,7 @@ use crate::{CapabilityToken, ChildRequestReceipt, PaymentAuthorization, ToolCall
 
 use super::{
     current_unix_timestamp, merge_metadata_objects, scope_pre_invocation_guard_evidence,
-    ChioKernel, KernelError, PreExecutionBudgetMutation,
+    ChioKernel, KernelError, PreExecutionBudgetMutation, VerifiedGovernedPayeeBinding,
 };
 
 const POST_ADMISSION_DROP_REASON: &str = "tool evaluation future dropped after admission";
@@ -16,6 +16,7 @@ const PRE_DISPATCH_CLEANUP_FAULT_REASON: &str =
 pub(crate) struct PostAdmissionReceiptContext {
     pub(crate) extra_metadata: Option<serde_json::Value>,
     pub(crate) pre_invocation_guard_evidence: Vec<GuardEvidence>,
+    pub(crate) verified_payee_binding: Option<VerifiedGovernedPayeeBinding>,
 }
 
 /// A single pre-dispatch cleanup step that failed. Collected so a signed fault
@@ -340,13 +341,17 @@ impl<'a> PostAdmissionDropGuard<'a> {
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             self.receipt_context.pre_invocation_guard_evidence.clone(),
         );
-        if let Err(error) = self.kernel.build_cancelled_response_with_metadata(
-            self.request,
-            PRE_DISPATCH_CLEANUP_FAULT_REASON,
-            current_unix_timestamp(),
-            self.matched_grant_index,
-            metadata,
-        ) {
+        if let Err(error) = self
+            .kernel
+            .build_cancelled_response_with_metadata_and_payee_binding(
+                self.request,
+                PRE_DISPATCH_CLEANUP_FAULT_REASON,
+                current_unix_timestamp(),
+                self.matched_grant_index,
+                metadata,
+                self.receipt_context.verified_payee_binding.as_ref(),
+            )
+        {
             warn!(
                 request_id = %self.request.request_id,
                 reason = %redacted!(&error),
@@ -397,13 +402,17 @@ impl Drop for PostAdmissionDropGuard<'_> {
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             self.receipt_context.pre_invocation_guard_evidence.clone(),
         );
-        if let Err(error) = self.kernel.build_cancelled_response_with_metadata(
-            self.request,
-            POST_ADMISSION_DROP_REASON,
-            current_unix_timestamp(),
-            self.matched_grant_index,
-            receipt_metadata,
-        ) {
+        if let Err(error) = self
+            .kernel
+            .build_cancelled_response_with_metadata_and_payee_binding(
+                self.request,
+                POST_ADMISSION_DROP_REASON,
+                current_unix_timestamp(),
+                self.matched_grant_index,
+                receipt_metadata,
+                self.receipt_context.verified_payee_binding.as_ref(),
+            )
+        {
             warn!(
                 request_id = %self.request.request_id,
                 reason = %redacted!(&error),

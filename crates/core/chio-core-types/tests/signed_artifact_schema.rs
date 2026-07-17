@@ -332,7 +332,7 @@ fn fiscal_signed_artifact_registry_names_exact_schema_files() {
 }
 
 #[test]
-fn new_economy_signed_artifact_families_are_registered_exactly() {
+fn new_economy_artifact_families_are_registered_exactly() {
     let registry: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../../spec/schemas/registry.json"
@@ -347,7 +347,18 @@ fn new_economy_signed_artifact_families_are_registered_exactly() {
             let schema = entry.get("schema")?.as_str()?;
             matches!(
                 schema,
-                "chio.obligation.status-proof.v1" | "chio.parametric.policy.v1"
+                "chio.obligation.status-proof.v1"
+                    | "chio.credit.facility-bind.v1"
+                    | "chio.credit.iou-envelope.v2"
+                    | "chio.factor.normalized-assignment-request.v1"
+                    | "chio.factor.receivable-claim.v1"
+                    | "chio.factor.assignment-offer.v1"
+                    | "chio.factor.discount-quote.v1"
+                    | "chio.factor.assignment-bind-authorization.v1"
+                    | "chio.factor.assignment-agreement.v1"
+                    | "chio.factor.assignment-acknowledgement.v1"
+                    | "chio.factor.assignment-not-applied.v1"
+                    | "chio.parametric.policy.v1"
             )
             .then(|| {
                 (
@@ -379,6 +390,66 @@ fn new_economy_signed_artifact_families_are_registered_exactly() {
                 "spec/schemas/chio-economy/obligation-status-proof.v1.json",
             ),
             (
+                "chio.credit.facility-bind.v1",
+                "credit_facility_bind",
+                "credit-admission-v1",
+                "spec/schemas/chio-economy/credit-facility-bind.v1.json",
+            ),
+            (
+                "chio.credit.iou-envelope.v2",
+                "credit_iou_envelope",
+                "receivables-factoring-v1",
+                "spec/schemas/chio-economy/credit-iou-envelope.v2.json",
+            ),
+            (
+                "chio.factor.normalized-assignment-request.v1",
+                "factor_normalized_assignment_request",
+                "receivables-factoring-v1",
+                "spec/schemas/chio-economy/factor-normalized-assignment-request.v1.json",
+            ),
+            (
+                "chio.factor.receivable-claim.v1",
+                "factor_receivable_claim",
+                "receivables-factoring-v1",
+                "spec/schemas/chio-economy/factor-receivable-claim.v1.json",
+            ),
+            (
+                "chio.factor.assignment-offer.v1",
+                "factor_assignment_offer",
+                "receivables-factoring-v1",
+                "spec/schemas/chio-economy/factor-assignment-offer.v1.json",
+            ),
+            (
+                "chio.factor.discount-quote.v1",
+                "factor_discount_quote",
+                "receivables-factoring-v1",
+                "spec/schemas/chio-economy/factor-discount-quote.v1.json",
+            ),
+            (
+                "chio.factor.assignment-bind-authorization.v1",
+                "factor_assignment_bind_authorization",
+                "receivables-factoring-v1",
+                "spec/schemas/chio-economy/factor-assignment-bind-authorization.v1.json",
+            ),
+            (
+                "chio.factor.assignment-agreement.v1",
+                "factor_assignment_agreement",
+                "receivables-factoring-v1",
+                "spec/schemas/chio-economy/factor-assignment-agreement.v1.json",
+            ),
+            (
+                "chio.factor.assignment-acknowledgement.v1",
+                "factor_assignment_acknowledgement",
+                "receivables-factoring-v1",
+                "spec/schemas/chio-economy/factor-assignment-acknowledgement.v1.json",
+            ),
+            (
+                "chio.factor.assignment-not-applied.v1",
+                "factor_assignment_not_applied",
+                "receivables-factoring-v1",
+                "spec/schemas/chio-economy/factor-assignment-not-applied.v1.json",
+            ),
+            (
                 "chio.parametric.policy.v1",
                 "parametric_policy",
                 "parametric-insurance-v1",
@@ -393,11 +464,165 @@ fn new_economy_signed_artifact_families_are_registered_exactly() {
         "chio.obligation.status-proof.v2"
     ));
     assert!(chio_core_types::is_supported_signed_artifact_schema(
+        "chio.credit.facility-bind.v1"
+    ));
+    assert!(!chio_core_types::is_supported_signed_artifact_schema(
+        "chio.credit.facility-bind.v2"
+    ));
+    assert!(chio_core_types::is_supported_signed_artifact_schema(
+        "chio.credit.iou-envelope.v2"
+    ));
+    assert!(!chio_core_types::is_supported_signed_artifact_schema(
+        "chio.credit.iou-envelope.v3"
+    ));
+    for schema in [
+        "chio.factor.normalized-assignment-request.v1",
+        "chio.factor.receivable-claim.v1",
+        "chio.factor.assignment-offer.v1",
+        "chio.factor.discount-quote.v1",
+    ] {
+        assert!(!chio_core_types::is_supported_signed_artifact_schema(
+            schema
+        ));
+    }
+    assert!(chio_core_types::is_supported_signed_artifact_schema(
+        "chio.factor.assignment-bind-authorization.v1"
+    ));
+    assert!(!chio_core_types::is_supported_signed_artifact_schema(
+        "chio.factor.assignment-bind-authorization.v2"
+    ));
+    assert!(chio_core_types::is_supported_signed_artifact_schema(
+        "chio.factor.assignment-agreement.v1"
+    ));
+    assert!(!chio_core_types::is_supported_signed_artifact_schema(
+        "chio.factor.assignment-agreement.v2"
+    ));
+    assert!(chio_core_types::is_supported_signed_artifact_schema(
+        "chio.factor.assignment-acknowledgement.v1"
+    ));
+    assert!(!chio_core_types::is_supported_signed_artifact_schema(
+        "chio.factor.assignment-acknowledgement.v2"
+    ));
+    assert!(chio_core_types::is_supported_signed_artifact_schema(
+        "chio.factor.assignment-not-applied.v1"
+    ));
+    assert!(!chio_core_types::is_supported_signed_artifact_schema(
+        "chio.factor.assignment-not-applied.v2"
+    ));
+    assert!(chio_core_types::is_supported_signed_artifact_schema(
         "chio.parametric.policy.v1"
     ));
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
         "chio.parametric.policy.v2"
     ));
+}
+
+#[test]
+fn outcome_signed_artifact_schemas_are_registered_exactly() {
+    let registry: serde_json::Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../spec/schemas/registry.json"
+    )))
+    .expect("schema registry parses");
+    let rows: Vec<(&str, &str, &str, &str)> = registry
+        .get("artifacts")
+        .and_then(serde_json::Value::as_array)
+        .expect("registry artifacts are present")
+        .iter()
+        .filter_map(|entry| {
+            let schema = entry.get("schema")?.as_str()?;
+            schema.starts_with("chio.outcome.").then(|| {
+                (
+                    schema,
+                    entry
+                        .get("artifactKind")
+                        .and_then(serde_json::Value::as_str)
+                        .expect("outcome registry entry has artifactKind"),
+                    entry
+                        .get("introducedBy")
+                        .and_then(serde_json::Value::as_str)
+                        .expect("outcome registry entry has introducedBy"),
+                    entry
+                        .get("schemaFile")
+                        .and_then(serde_json::Value::as_str)
+                        .expect("outcome registry entry has schemaFile"),
+                )
+            })
+        })
+        .collect();
+    let expected = [
+        (
+            chio_core_types::CHIO_OUTCOME_PREDICATE_V1_SCHEMA,
+            "outcome_predicate",
+            "verified-outcome-pricing-v1",
+            "spec/schemas/chio-outcome/v1/predicate.schema.json",
+        ),
+        (
+            chio_core_types::CHIO_OUTCOME_PRICING_V1_SCHEMA,
+            "outcome_pricing",
+            "verified-outcome-pricing-v1",
+            "spec/schemas/chio-outcome/v1/pricing.schema.json",
+        ),
+        (
+            chio_core_types::CHIO_OUTCOME_SLA_V1_SCHEMA,
+            "outcome_sla",
+            "verified-outcome-pricing-v1",
+            "spec/schemas/chio-outcome/v1/sla.schema.json",
+        ),
+        (
+            chio_core_types::CHIO_OUTCOME_ELIGIBILITY_V1_SCHEMA,
+            "outcome_eligibility",
+            "verified-outcome-pricing-v1",
+            "spec/schemas/chio-outcome/v1/eligibility.schema.json",
+        ),
+        (
+            chio_core_types::CHIO_OUTCOME_DELIVERY_CHECKPOINT_V1_SCHEMA,
+            "outcome_delivery_checkpoint",
+            "verified-outcome-pricing-v1",
+            "spec/schemas/chio-outcome/v1/delivery-checkpoint.schema.json",
+        ),
+        (
+            chio_core_types::CHIO_OUTCOME_DELIVERY_ACKNOWLEDGEMENT_V1_SCHEMA,
+            "outcome_delivery_acknowledgement",
+            "verified-outcome-pricing-v1",
+            "spec/schemas/chio-outcome/v1/delivery-acknowledgement.schema.json",
+        ),
+        (
+            chio_core_types::CHIO_OUTCOME_DELIVERY_NONACCEPTANCE_V1_SCHEMA,
+            "outcome_delivery_nonacceptance",
+            "verified-outcome-pricing-v1",
+            "spec/schemas/chio-outcome/v1/delivery-nonacceptance.schema.json",
+        ),
+        (
+            chio_core_types::CHIO_OUTCOME_OUTPUT_PROVENANCE_V1_SCHEMA,
+            "outcome_output_provenance",
+            "verified-outcome-pricing-v1",
+            "spec/schemas/chio-outcome/v1/output-provenance.schema.json",
+        ),
+        (
+            chio_core_types::CHIO_OUTCOME_CONTRACTUAL_ZERO_V1_SCHEMA,
+            "outcome_contractual_zero",
+            "verified-outcome-pricing-v1",
+            "spec/schemas/chio-outcome/v1/contractual-zero.schema.json",
+        ),
+    ];
+
+    assert_eq!(rows, expected);
+    for (schema, ..) in expected {
+        assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
+        let unsupported = format!(
+            "{}.v2",
+            schema.strip_suffix(".v1").expect("v1 schema suffix")
+        );
+        assert!(!chio_core_types::is_supported_signed_artifact_schema(
+            &unsupported
+        ));
+    }
+    for schema in ["chio.outcome.request.v1", "chio.outcome.verdict.v1"] {
+        assert!(!chio_core_types::is_supported_signed_artifact_schema(
+            schema
+        ));
+    }
 }
 
 #[test]

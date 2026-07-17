@@ -711,6 +711,7 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
         recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
         request: crate::budget_store::BudgetAuthorizeHoldRequest,
         payment_journal: Option<crate::payment::PaymentJournalRecord>,
+        credit_exposure: Option<chio_credit::obligation::CreditExposureReservationRequest>,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<
@@ -722,12 +723,34 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
         request.validate().map_err(|error| {
             crate::receipt_store::AdmissionBudgetAuthorizationError::Invariant(error.to_string())
         })?;
-        if operation.binding().participant_requirements().payment != payment_journal.is_some() {
+        if operation.binding().participant_requirements().payment != payment_journal.is_some()
+            || operation
+                .binding()
+                .participant_requirements()
+                .credit_exposure
+                != credit_exposure.is_some()
+        {
             return Err(
                 crate::receipt_store::AdmissionBudgetAuthorizationError::Invariant(
-                    "test payment participant mismatch".to_owned(),
+                    "test monetary participant mismatch".to_owned(),
                 ),
             );
+        }
+        if let Some(credit_exposure) = credit_exposure.as_ref() {
+            credit_exposure.validate().map_err(|error| {
+                crate::receipt_store::AdmissionBudgetAuthorizationError::Invariant(
+                    error.to_string(),
+                )
+            })?;
+            if credit_exposure.operation_id != operation.binding().operation_id().as_str()
+                || credit_exposure.request_id != operation.replay_key().request_id.as_str()
+            {
+                return Err(
+                    crate::receipt_store::AdmissionBudgetAuthorizationError::Invariant(
+                        "test credit exposure participant mismatch".to_owned(),
+                    ),
+                );
+            }
         }
         if let Some(journal) = payment_journal.as_ref() {
             journal.validate().map_err(|error| {

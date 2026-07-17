@@ -2,9 +2,9 @@ use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::sha256_hex;
 use chio_credit::obligation::{
-    ObligationAtomInputV1, ObligationAtomV1, ObligationCreditElectionV1,
-    ObligationDispositionRecordV1, ObligationDispositionTransitionV1, ObligationDispositionV1,
-    ObligationError, OBLIGATION_CLAIM_INDEX_V1,
+    derive_obligation_payee_binding_digest, ObligationAtomInputV1, ObligationAtomV1,
+    ObligationCreditElectionV1, ObligationDispositionRecordV1, ObligationDispositionTransitionV1,
+    ObligationDispositionV1, ObligationError, OBLIGATION_CLAIM_INDEX_V1,
 };
 use serde_json::json;
 
@@ -22,7 +22,10 @@ fn atom_with(intent: &str, creditor_id: &str) -> Result<ObligationAtomV1, Obliga
         debtor_id: "did:chio:buyer".to_owned(),
         original_creditor_id: creditor_id.to_owned(),
         original_settlement_destination_ref: "acct:provider-a".to_owned(),
-        payee_binding_digest: digest("payee-binding"),
+        payee_binding_digest: derive_obligation_payee_binding_digest(
+            creditor_id,
+            "acct:provider-a",
+        )?,
         amount: MonetaryAmount {
             currency: "USD".to_owned(),
             units: 125,
@@ -67,6 +70,53 @@ fn conflicting_atom_payload_keeps_identity_but_changes_digest() -> TestResult {
     assert_eq!(first.obligation_id(), different_payee.obligation_id());
     assert_ne!(first.digest()?, different_payee.digest()?);
     Ok(())
+}
+
+#[test]
+fn payee_binding_digest_commits_exact_beneficiary_and_destination() -> TestResult {
+    let digest =
+        derive_obligation_payee_binding_digest("did:chio:provider-a", "acct:provider-primary")?;
+    let canonical = canonical_json_bytes(&json!({
+        "beneficiaryId": "did:chio:provider-a",
+        "settlementDestinationRef": "acct:provider-primary"
+    }))?;
+    let mut preimage = b"chio.obligation.payee-binding.digest.v1\0".to_vec();
+    preimage.extend_from_slice(&canonical);
+
+    assert_eq!(digest, sha256_hex(&preimage));
+    assert_ne!(
+        digest,
+        derive_obligation_payee_binding_digest("did:chio:provider-b", "acct:provider-primary")?
+    );
+    assert_ne!(
+        digest,
+        derive_obligation_payee_binding_digest("did:chio:provider-a", "acct:provider-substituted")?
+    );
+    Ok(())
+}
+
+#[test]
+fn obligation_atom_rejects_substituted_payee_binding_digest() {
+    let error = ObligationAtomV1::new(ObligationAtomInputV1 {
+        economic_intent_digest: digest("intent-substituted-payee"),
+        source_receipt_id: "receipt-substituted-payee".to_owned(),
+        source_receipt_digest: digest("receipt-substituted-payee"),
+        debtor_id: "did:chio:buyer".to_owned(),
+        original_creditor_id: "did:chio:provider-a".to_owned(),
+        original_settlement_destination_ref: "acct:provider-a".to_owned(),
+        payee_binding_digest: digest("unrelated-payee-binding"),
+        amount: MonetaryAmount {
+            currency: "USD".to_owned(),
+            units: 125,
+        },
+        credit_election: ObligationCreditElectionV1::NotCredit,
+        pre_action_authority_digest: digest("economic-authority"),
+        created_at_unix_ms: 100,
+        due_at_unix_ms: 200,
+    })
+    .expect_err("an arbitrary payee binding digest must fail closed");
+
+    assert_eq!(error, ObligationError::InvalidField("payee_binding_digest"));
 }
 
 #[test]
@@ -217,6 +267,33 @@ fn deserialized_assign_transition_cannot_bypass_the_guarded_path() -> TestResult
     assert_eq!(
         produced.advance(&atom, transition),
         Err(ObligationError::AssignmentRequiresCompareAndSwap)
+    );
+    Ok(())
+}
+
+#[test]
+fn persisted_successor_validation_requires_the_exact_transition() -> TestResult {
+    let atom = atom()?;
+    let produced = ObligationDispositionRecordV1::produced(&atom)?;
+    let reserved = produced.advance(
+        &atom,
+        ObligationDispositionTransitionV1::ReserveClearing {
+            round_id: "round-1".to_owned(),
+            authority_digest: digest("reserve-authority"),
+        },
+    )?;
+    produced.validate_successor(&atom, &reserved)?;
+
+    let mut changed = serde_json::to_value(&reserved)?;
+    changed["lastTransition"]["round_id"] = json!("round-2");
+    let changed: ObligationDispositionRecordV1 = serde_json::from_value(changed)?;
+    assert_eq!(
+        produced.validate_successor(&atom, &changed),
+        Err(ObligationError::InvalidField("disposition_transition"))
+    );
+    assert_eq!(
+        reserved.validate_successor(&atom, &reserved),
+        Err(ObligationError::InvalidField("disposition_successor"))
     );
     Ok(())
 }

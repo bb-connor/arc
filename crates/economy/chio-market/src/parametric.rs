@@ -12,6 +12,12 @@ use crate::{
     LIABILITY_BOUND_COVERAGE_ARTIFACT_SCHEMA,
 };
 
+mod claim;
+mod evidence;
+
+pub use claim::*;
+pub use evidence::*;
+
 pub const PARAMETRIC_POLICY_SCHEMA: &str = "chio.parametric.policy.v1";
 pub const TRIGGER_INSTANCE_ID_DOMAIN: &str = "chio.parametric.trigger-instance.v1";
 pub const PARAMETRIC_CLAIM_ID_DOMAIN: &str = "chio.parametric.claim.id.v1";
@@ -31,6 +37,18 @@ pub enum ParametricContractError {
     InvalidSignature,
     #[error("parametric policy signer is not trusted")]
     UntrustedPolicySigner,
+    #[error("parametric evidence source is not trusted")]
+    UntrustedEvidenceSource,
+    #[error("parametric evidence signer is not trusted")]
+    UntrustedEvidenceSigner,
+    #[error("parametric evidence anchor epoch is stale")]
+    StaleEvidenceAnchorEpoch,
+    #[error("parametric evidence signer epoch is stale")]
+    StaleEvidenceSignerEpoch,
+    #[error("parametric evidence range proof is invalid")]
+    InvalidEvidenceRangeProof,
+    #[error("parametric evidence range boundaries are incomplete")]
+    IncompleteEvidenceBoundaries,
     #[error("bound coverage authority is not trusted")]
     UntrustedCoverageAuthority,
     #[error("parametric policy binding mismatch: {0}")]
@@ -164,6 +182,30 @@ pub enum PayoutSchedule {
         per_unit_minor: u64,
         magnitude_unit: TriggerMagnitudeUnit,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(
+    tag = "kind",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub enum ParametricPayoutMode {
+    Automatic,
+    Contestable { window_seconds: u64 },
+}
+
+impl ParametricPayoutMode {
+    fn validate(&self) -> Result<(), ParametricContractError> {
+        match self {
+            Self::Automatic => Ok(()),
+            Self::Contestable { window_seconds } if *window_seconds > 0 => Ok(()),
+            Self::Contestable { .. } => Err(ParametricContractError::InvalidField(
+                "payout_mode.window_seconds",
+            )),
+        }
+    }
 }
 
 impl PayoutSchedule {
@@ -301,6 +343,7 @@ pub struct ParametricPolicy {
     pub max_checkpoint_lag_seconds: u64,
     pub predicate: TriggerPredicate,
     pub payout_schedule: PayoutSchedule,
+    pub payout_mode: ParametricPayoutMode,
     pub payout_rail: ParametricPayoutRail,
     pub evaluator_authority: EvaluatorAuthorityRef,
 }
@@ -354,6 +397,7 @@ impl ParametricPolicy {
         self.predicate.validate()?;
         self.payout_schedule
             .validate_for(&self.predicate, &self.coverage_amount)?;
+        self.payout_mode.validate()?;
         self.payout_rail.validate()?;
         self.evaluator_authority.validate()
     }
@@ -479,18 +523,30 @@ impl VerifiedParametricPolicy {
             .map_err(|error| ParametricContractError::Canonicalization(error.to_string()))
     }
 
-    pub fn claim_identity(
+    pub fn verify_evidence_corpus(
         &self,
-        window: &ParametricTriggerWindow,
-        corpus: &EvidenceCorpusManifestV1,
-    ) -> Result<ParametricClaimIdentity, ParametricContractError> {
-        self.signed.body.validate_window(window)?;
-        let evidence_range_digest = corpus.semantic_digest(
+        window: ParametricTriggerWindow,
+        proof: EvidenceCorpusProofV1,
+        registry: &TrustedEvidenceSourceRegistry,
+    ) -> Result<VerifiedEvidenceCorpusV1, ParametricContractError> {
+        self.signed.body.validate_window(&window)?;
+        VerifiedEvidenceCorpusV1::verify(
+            self.body_digest.clone(),
             &self.signed.body.predicate,
             &self.signed.body.subject_key,
             window,
             self.signed.body.max_checkpoint_lag_seconds,
-        )?;
+            proof,
+            registry,
+        )
+    }
+
+    pub fn claim_identity(
+        &self,
+        corpus: &VerifiedEvidenceCorpusV1,
+    ) -> Result<ParametricClaimIdentity, ParametricContractError> {
+        corpus.ensure_policy(&self.body_digest)?;
+        self.signed.body.validate_window(corpus.window())?;
         let key = TriggerInstanceKeyV1 {
             parametric_policy_body_digest: self.body_digest.clone(),
             bound_coverage_body_digest: self.signed.body.bound_coverage_body_digest.clone(),
@@ -499,9 +555,9 @@ impl VerifiedParametricPolicy {
                 TRIGGER_PREDICATE_DIGEST_DOMAIN,
                 &self.signed.body.predicate,
             )?,
-            window_start: window.start_at,
-            window_end: window.end_at,
-            evidence_range_digest,
+            window_start: corpus.window().start_at,
+            window_end: corpus.window().end_at,
+            evidence_range_digest: corpus.evidence_range_digest().to_owned(),
         };
         let trigger_instance_id = key.trigger_instance_id()?;
         let claim_id = parametric_claim_id(&trigger_instance_id)?;
@@ -510,6 +566,23 @@ impl VerifiedParametricPolicy {
             trigger_instance_id,
             claim_id,
         })
+    }
+
+    pub fn evaluate_trigger(
+        &self,
+        corpus: &VerifiedEvidenceCorpusV1,
+    ) -> Result<VerifiedTriggerVerdictV1, ParametricContractError> {
+        corpus.ensure_policy(&self.body_digest)?;
+        match corpus.evaluate(&self.signed.body.predicate)? {
+            Some(magnitude) => Ok(VerifiedTriggerVerdictV1::Fired(
+                VerifiedFiredTriggerV1::new(
+                    self.body_digest.clone(),
+                    self.claim_identity(corpus)?,
+                    magnitude,
+                ),
+            )),
+            None => Ok(VerifiedTriggerVerdictV1::NotFired),
+        }
     }
 
     #[must_use]
@@ -684,6 +757,7 @@ impl EvidenceCorpusManifestV1 {
                 expected_count: range.expected_count,
                 source_prefix_cutoff: range.source_prefix_cutoff,
                 selected_member_root: &range.selected_member_root,
+                anchor_epoch: range.anchor_epoch,
             });
         }
         identities.sort_unstable_by(|left, right| {
@@ -709,6 +783,7 @@ struct SemanticEvidenceRange<'a> {
     expected_count: u64,
     source_prefix_cutoff: u64,
     selected_member_root: &'a str,
+    anchor_epoch: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -754,11 +829,26 @@ impl TriggerInstanceKeyV1 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ParametricClaimIdentity {
     pub key: TriggerInstanceKeyV1,
     pub trigger_instance_id: String,
     pub claim_id: String,
+}
+
+impl ParametricClaimIdentity {
+    pub fn validate(&self) -> Result<(), ParametricContractError> {
+        self.key.validate()?;
+        require_binding(
+            self.trigger_instance_id == self.key.trigger_instance_id()?,
+            "claim_identity.trigger_instance_id",
+        )?;
+        require_binding(
+            self.claim_id == parametric_claim_id(&self.trigger_instance_id)?,
+            "claim_identity.claim_id",
+        )
+    }
 }
 
 #[derive(Serialize)]

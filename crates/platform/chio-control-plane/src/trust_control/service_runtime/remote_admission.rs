@@ -585,9 +585,16 @@ impl QualifiedAdmissionProjectionStore for RemoteAdmissionAuthority {
         recovery_lease: &AdmissionRecoveryLease,
         request: BudgetAuthorizeHoldRequest,
         payment_journal: Option<chio_kernel::payment::PaymentJournalRecord>,
+        credit_exposure: Option<chio_kernel::CreditExposureReservationRequest>,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError> {
+        if credit_exposure.is_some() {
+            return Err(AdmissionBudgetAuthorizationError::Unavailable(
+                "remote admission authority does not support credit exposure reservation"
+                    .to_owned(),
+            ));
+        }
         let authority = request.authority.as_ref().ok_or_else(|| {
             AdmissionBudgetAuthorizationError::Invariant(
                 "remote combined authorization omitted its authority".to_owned(),

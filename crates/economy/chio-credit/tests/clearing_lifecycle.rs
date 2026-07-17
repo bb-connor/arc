@@ -29,8 +29,9 @@ use chio_credit::clearing::{
     CLEARING_SETTLEMENT_INTENT_SCHEMA, CLEARING_SETTLEMENT_RECONCILIATION_SCHEMA,
 };
 use chio_credit::obligation::{
-    ObligationAtomInputV1, ObligationAtomV1, ObligationCreditElectionV1,
-    ObligationDispositionRecordV1, ObligationDispositionTransitionV1, ObligationDispositionV1,
+    derive_obligation_payee_binding_digest, ObligationAtomInputV1, ObligationAtomV1,
+    ObligationCreditElectionV1, ObligationDispositionRecordV1, ObligationDispositionTransitionV1,
+    ObligationDispositionV1,
 };
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -78,7 +79,10 @@ fn reserved_obligation(
         debtor_id: format!("debtor-{sequence}"),
         original_creditor_id: format!("creditor-{sequence}"),
         original_settlement_destination_ref: format!("acct:creditor-{sequence}"),
-        payee_binding_digest: digest(&format!("payee-{sequence}")),
+        payee_binding_digest: derive_obligation_payee_binding_digest(
+            &format!("creditor-{sequence}"),
+            &format!("acct:creditor-{sequence}"),
+        )?,
         amount: MonetaryAmount {
             currency: "USD".to_owned(),
             units: sequence * 100,

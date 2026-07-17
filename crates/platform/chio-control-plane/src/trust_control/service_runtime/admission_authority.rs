@@ -535,6 +535,7 @@ fn handle_action(
                     &lease,
                     budget_request,
                     request.payment_journal,
+                    None,
                     &request.active_fence,
                     request.trusted_now_unix_ms,
                 )

@@ -95,6 +95,23 @@ fn channel_requirements() -> AdmissionParticipantRequirements {
     }
 }
 
+fn credit_exposure_requirements() -> AdmissionParticipantRequirements {
+    AdmissionParticipantRequirements {
+        broker_attempt: true,
+        budget_capture: true,
+        obligation: true,
+        credit_exposure: true,
+        ..AdmissionParticipantRequirements::NONE
+    }
+}
+
+fn supplemental_authorization_requirements() -> AdmissionParticipantRequirements {
+    AdmissionParticipantRequirements {
+        supplemental_authorization: true,
+        ..AdmissionParticipantRequirements::NONE
+    }
+}
+
 fn provider_attempt(
     operation: &AdmissionOperationV1,
     attempt_id: &str,
@@ -157,6 +174,7 @@ fn full_projection_capabilities() -> AdmissionProjectionCapabilities {
         observation_attempt_zero: true,
         obligation: true,
         channel_terminal: true,
+        credit_exposure_terminal: true,
         economic_mutation_terminal: true,
     }
 }
@@ -284,10 +302,16 @@ fn transition_command(
             attachments
         }
         (_, AdmissionOperationState::BudgetAuthorized) => {
-            vec![AdmissionAttachment::BudgetHoldId(identifier(
+            let mut attachments = vec![AdmissionAttachment::BudgetHoldId(identifier(
                 "budget_hold_id",
                 "hold-1",
-            ))]
+            ))];
+            if operation.binding.participant_requirements().credit_exposure {
+                attachments.push(AdmissionAttachment::CreditExposureReservationDigest(
+                    digest("credit_exposure_reservation_digest", AUTH_HASH),
+                ));
+            }
+            attachments
         }
         (_, AdmissionOperationState::ApprovalReserved) => {
             vec![
@@ -636,6 +660,41 @@ fn participant_requirements_are_kind_checked_and_identity_bound() {
             .expect("payment-backed tool dispatch must be valid")
             .operation_id,
     );
+    assert_ne!(
+        make(
+            AdmissionOperationKind::GovernedEconomicMutation,
+            AdmissionParticipantRequirements::NONE,
+        )
+        .expect("generic economic mutation must be valid")
+        .operation_id,
+        make(
+            AdmissionOperationKind::GovernedEconomicMutation,
+            supplemental_authorization_requirements(),
+        )
+        .expect("authorized economic mutation must be valid")
+        .operation_id,
+    );
+    assert_eq!(
+        make(
+            AdmissionOperationKind::ToolDispatch,
+            AdmissionParticipantRequirements {
+                supplemental_authorization: true,
+                ..budget_only
+            },
+        ),
+        Err(AdmissionOperationError::InvalidParticipantRequirements)
+    );
+    assert_eq!(
+        make(
+            AdmissionOperationKind::GovernedActiveResponse,
+            AdmissionParticipantRequirements {
+                approval: true,
+                supplemental_authorization: true,
+                ..AdmissionParticipantRequirements::NONE
+            },
+        ),
+        Err(AdmissionOperationError::InvalidParticipantRequirements)
+    );
     for requirements in [
         AdmissionParticipantRequirements {
             authorization_consumption: true,
@@ -649,6 +708,7 @@ fn participant_requirements_are_kind_checked_and_identity_bound() {
             obligation: true,
             ..budget_only
         },
+        credit_exposure_requirements(),
         channel_requirements(),
         AdmissionParticipantRequirements {
             observation_attempt_zero: true,
@@ -675,6 +735,15 @@ fn participant_requirements_are_kind_checked_and_identity_bound() {
         make(AdmissionOperationKind::GovernedActiveResponse, budget_only,),
         Err(AdmissionOperationError::InvalidParticipantRequirements)
     );
+    for kind in [
+        AdmissionOperationKind::GovernedActiveResponse,
+        AdmissionOperationKind::GovernedEconomicMutation,
+    ] {
+        assert_eq!(
+            make(kind, credit_exposure_requirements()),
+            Err(AdmissionOperationError::InvalidParticipantRequirements)
+        );
+    }
     for requirements in [
         AdmissionParticipantRequirements {
             payment: true,
@@ -685,6 +754,25 @@ fn participant_requirements_are_kind_checked_and_identity_bound() {
             budget_capture: true,
             channel: true,
             ..AdmissionParticipantRequirements::NONE
+        },
+        AdmissionParticipantRequirements {
+            obligation: true,
+            credit_exposure: true,
+            ..AdmissionParticipantRequirements::NONE
+        },
+        AdmissionParticipantRequirements {
+            broker_attempt: true,
+            budget_capture: true,
+            credit_exposure: true,
+            ..AdmissionParticipantRequirements::NONE
+        },
+        AdmissionParticipantRequirements {
+            payment: true,
+            ..credit_exposure_requirements()
+        },
+        AdmissionParticipantRequirements {
+            channel: true,
+            ..credit_exposure_requirements()
         },
     ] {
         assert_eq!(
@@ -708,7 +796,7 @@ fn participant_requirements_are_kind_checked_and_identity_bound() {
 }
 
 #[test]
-fn absent_channel_requirement_preserves_legacy_canonical_identity(
+fn absent_optional_requirements_preserve_legacy_canonical_identity(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let requirements = AdmissionParticipantRequirements {
         broker_attempt: true,
@@ -729,6 +817,8 @@ fn absent_channel_requirement_preserves_legacy_canonical_identity(
     assert_eq!(serde_json::to_value(requirements)?, legacy);
     let restored: AdmissionParticipantRequirements = serde_json::from_value(legacy)?;
     assert_eq!(restored, requirements);
+    assert!(!restored.credit_exposure);
+    assert!(!restored.supplemental_authorization);
 
     let original = AdmissionRequestBindingV1::new(
         digest("immutable_request_hash", REQUEST_HASH),
@@ -1000,6 +1090,153 @@ fn channel_digests_are_phase_bound_and_required_before_dispatch(
 }
 
 #[test]
+fn credit_exposure_reservation_is_bound_to_budget_authorization_and_preserved(
+) -> Result<(), AdmissionOperationError> {
+    let requirements = credit_exposure_requirements();
+    let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
+        kind: AdmissionOperationKind::ToolDispatch,
+        namespace: namespace("tenant-123"),
+        request_id: identifier("request_id", "req-credit-exposure"),
+        capability_id: identifier("capability_id", "cap-credit-exposure"),
+        authorization_capability_hash: digest("authorization_hash", AUTH_HASH),
+        request_binding: AdmissionRequestBindingV1::new(
+            digest("immutable_request_hash", REQUEST_HASH),
+            requirements,
+        )?,
+        policy_hash: digest("policy_hash", POLICY_HASH),
+        effect_class: SideEffectClass::Monetary,
+    })?;
+    let prepared = AdmissionOperationV1::prepare(binding, 7)?;
+    let reservation = digest("credit_exposure_reservation_digest", AUTH_HASH);
+    let attachment = AdmissionAttachment::CreditExposureReservationDigest(reservation.clone());
+
+    let early = AdmissionOperationCommand::new(
+        prepared.binding.operation_id.clone(),
+        prepared.version,
+        lease(&prepared, prepared.version),
+        vec![attachment.clone()],
+        None,
+        None,
+        None,
+    )?;
+    assert_eq!(
+        prepared.apply_command(&early, 1_000),
+        Err(AdmissionOperationError::AttachmentPhase {
+            field: "credit_exposure_reservation_digest",
+            state: AdmissionOperationState::Prepared,
+        })
+    );
+
+    let brokered = prepared
+        .apply_command(
+            &transition_command(
+                &prepared,
+                AdmissionOperationState::BrokerAttemptRegistered,
+                None,
+            ),
+            1_000,
+        )?
+        .into_operation();
+    let attach_only = AdmissionOperationCommand::new(
+        brokered.binding.operation_id.clone(),
+        brokered.version,
+        lease(&brokered, brokered.version),
+        vec![attachment.clone()],
+        None,
+        None,
+        None,
+    )?;
+    assert_eq!(
+        brokered.apply_command(&attach_only, 1_000),
+        Err(AdmissionOperationError::ForbiddenAttachment {
+            field: "credit_exposure_reservation_digest",
+        })
+    );
+
+    let missing = AdmissionOperationCommand::new(
+        brokered.binding.operation_id.clone(),
+        brokered.version,
+        lease(&brokered, brokered.version),
+        vec![AdmissionAttachment::BudgetHoldId(identifier(
+            "budget_hold_id",
+            "hold-1",
+        ))],
+        Some(AdmissionOperationState::BudgetAuthorized),
+        None,
+        None,
+    )?;
+    assert_eq!(
+        brokered.apply_command(&missing, 1_000),
+        Err(AdmissionOperationError::MissingParticipantAttachment {
+            field: "credit_exposure_reservation_digest",
+        })
+    );
+
+    let mut operation = brokered
+        .apply_command(
+            &transition_command(&brokered, AdmissionOperationState::BudgetAuthorized, None),
+            1_000,
+        )?
+        .into_operation();
+    assert_eq!(
+        operation.credit_exposure_reservation_digest(),
+        Some(&reservation)
+    );
+    let mut missing_persisted = operation.to_persisted();
+    missing_persisted.attachments.0.retain(|value| {
+        !matches!(
+            value,
+            AdmissionAttachment::CreditExposureReservationDigest(_)
+        )
+    });
+    assert_eq!(
+        AdmissionOperationV1::from_persisted(missing_persisted),
+        Err(AdmissionOperationError::MissingParticipantAttachment {
+            field: "credit_exposure_reservation_digest",
+        })
+    );
+
+    for state in [
+        AdmissionOperationState::ReadyToDispatch,
+        AdmissionOperationState::CapturePending,
+        AdmissionOperationState::DispatchCommitted,
+        AdmissionOperationState::Finalizing,
+    ] {
+        operation = operation
+            .apply_command(&transition_command(&operation, state, None), 1_000)?
+            .into_operation();
+        assert_eq!(
+            operation.credit_exposure_reservation_digest(),
+            Some(&reservation)
+        );
+        assert_eq!(
+            AdmissionOperationV1::from_persisted(operation.to_persisted())?
+                .credit_exposure_reservation_digest(),
+            Some(&reservation)
+        );
+    }
+
+    let replacement = AdmissionOperationCommand::new(
+        operation.binding.operation_id.clone(),
+        operation.version,
+        lease(&operation, operation.version),
+        vec![AdmissionAttachment::CreditExposureReservationDigest(
+            digest("credit_exposure_reservation_digest", CONTENT_HASH),
+        )],
+        None,
+        None,
+        None,
+    )?;
+    assert_eq!(
+        operation.apply_command(&replacement, 1_000),
+        Err(AdmissionOperationError::AttachmentConflict {
+            field: "credit_exposure_reservation_digest",
+        })
+    );
+    Ok(())
+}
+
+#[test]
 fn approval_requires_the_proposal_and_verified_set_on_transition_and_restore() {
     let operation = prepared(AdmissionOperationKind::GovernedActiveResponse);
     let missing_proposal = AdmissionOperationCommand::new(
@@ -1062,7 +1299,7 @@ fn approval_requires_the_proposal_and_verified_set_on_transition_and_restore() {
 }
 
 #[test]
-fn governed_economic_mutations_reject_every_attachment_on_write_and_restore() {
+fn governed_economic_mutations_reject_unrequired_attachments_on_write_and_restore() {
     let operation = prepared(AdmissionOperationKind::GovernedEconomicMutation);
     let attachments = vec![
         AdmissionAttachment::ThresholdProposalHash(digest("threshold_hash", POLICY_HASH)),
@@ -1117,6 +1354,188 @@ fn governed_economic_mutations_reject_every_attachment_on_write_and_restore() {
             AdmissionOperationV1::from_persisted(persisted),
             Err(AdmissionOperationError::ForbiddenAttachment { field }),
             "restore path accepted {field}"
+        );
+    }
+}
+
+#[test]
+fn governed_economic_mutation_authorization_is_cas_attached_before_advancing() {
+    let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
+        kind: AdmissionOperationKind::GovernedEconomicMutation,
+        namespace: namespace("tenant-123"),
+        request_id: identifier("request_id", "req-authorized-mutation"),
+        capability_id: identifier("capability_id", "cap-authorized-mutation"),
+        authorization_capability_hash: digest("authorization_hash", AUTH_HASH),
+        request_binding: AdmissionRequestBindingV1::new(
+            digest("immutable_request_hash", REQUEST_HASH),
+            supplemental_authorization_requirements(),
+        )
+        .expect("authorization requirement must bind"),
+        policy_hash: digest("policy_hash", POLICY_HASH),
+        effect_class: SideEffectClass::Monetary,
+    })
+    .expect("authorized mutation binding must be valid");
+    let operation = AdmissionOperationV1::prepare(binding, 7)
+        .expect("authorized mutation operation must prepare");
+    let authorization = digest("supplemental_authorization_digest", POLICY_HASH);
+    let attachment = AdmissionAttachment::SupplementalAuthorizationDigest(authorization.clone());
+    assert_eq!(operation.supplemental_authorization_digest(), None);
+
+    let attach = AdmissionOperationCommand::new(
+        operation.binding.operation_id.clone(),
+        operation.version,
+        lease(&operation, operation.version),
+        vec![attachment.clone()],
+        None,
+        None,
+        None,
+    )
+    .expect("authorization attachment command must be valid");
+    let attached = operation
+        .apply_command(&attach, 1_000)
+        .expect("authorization attachment must apply")
+        .into_operation();
+    assert_eq!(attached.state(), AdmissionOperationState::Prepared);
+    assert_eq!(
+        attached.supplemental_authorization_digest(),
+        Some(&authorization)
+    );
+
+    let restored = AdmissionOperationV1::from_persisted(attached.to_persisted())
+        .expect("persisted authorization attachment must restore");
+    assert_eq!(
+        restored.supplemental_authorization_digest(),
+        Some(&authorization)
+    );
+
+    let replay = AdmissionOperationCommand::new(
+        restored.binding.operation_id.clone(),
+        restored.version,
+        lease(&restored, restored.version),
+        vec![attachment],
+        None,
+        None,
+        None,
+    )
+    .expect("authorization replay command must be valid");
+    assert!(matches!(
+        restored
+            .apply_command(&replay, 1_000)
+            .expect("matching authorization must replay"),
+        AdmissionCommandResult::Idempotent(_)
+    ));
+
+    let replacement = AdmissionOperationCommand::new(
+        restored.binding.operation_id.clone(),
+        restored.version,
+        lease(&restored, restored.version),
+        vec![AdmissionAttachment::SupplementalAuthorizationDigest(
+            digest("supplemental_authorization_digest", CONTENT_HASH),
+        )],
+        None,
+        None,
+        None,
+    )
+    .expect("authorization replacement command must be valid");
+    assert_eq!(
+        restored.apply_command(&replacement, 1_000),
+        Err(AdmissionOperationError::AttachmentConflict {
+            field: "supplemental_authorization_digest"
+        })
+    );
+
+    let ready = restored
+        .apply_command(
+            &transition_command(&restored, AdmissionOperationState::MutationReady, None),
+            1_000,
+        )
+        .expect("authorized mutation must become ready")
+        .into_operation();
+    let submitted = ready
+        .apply_command(
+            &transition_command(&ready, AdmissionOperationState::MutationSubmitted, None),
+            1_000,
+        )
+        .expect("authorized mutation must become submitted")
+        .into_operation();
+    assert_eq!(
+        submitted.supplemental_authorization_digest(),
+        Some(&authorization)
+    );
+    assert_eq!(
+        AdmissionOperationV1::from_persisted(submitted.to_persisted())
+            .expect("submitted authorization attachment must restore")
+            .supplemental_authorization_digest(),
+        Some(&authorization)
+    );
+
+    assert_eq!(
+        operation.apply_command(
+            &transition_command(&operation, AdmissionOperationState::MutationReady, None),
+            1_000,
+        ),
+        Err(AdmissionOperationError::MissingParticipantAttachment {
+            field: "supplemental_authorization_digest",
+        })
+    );
+
+    let attachments = AdmissionOperationAttachmentsV1(vec![
+        AdmissionAttachment::SupplementalAuthorizationDigest(authorization),
+    ]);
+    for state in [
+        AdmissionOperationState::Prepared,
+        AdmissionOperationState::MutationReady,
+        AdmissionOperationState::MutationSubmitted,
+        AdmissionOperationState::EconomicMutationApplied,
+        AdmissionOperationState::EconomicMutationNotApplied,
+    ] {
+        assert_eq!(
+            validate_state_attachments(
+                AdmissionOperationKind::GovernedEconomicMutation,
+                supplemental_authorization_requirements(),
+                state,
+                &attachments,
+            ),
+            Ok(()),
+            "authorization attachment was rejected in {state:?}"
+        );
+    }
+    assert_eq!(
+        validate_state_attachments(
+            AdmissionOperationKind::GovernedEconomicMutation,
+            supplemental_authorization_requirements(),
+            AdmissionOperationState::EconomicMutationNotApplied,
+            &AdmissionOperationAttachmentsV1::default(),
+        ),
+        Err(AdmissionOperationError::MissingParticipantAttachment {
+            field: "supplemental_authorization_digest",
+        })
+    );
+    let mut restored_without_authorization = operation.to_persisted();
+    restored_without_authorization.state = AdmissionOperationState::EconomicMutationNotApplied;
+    restored_without_authorization.dispatch_state = AdmissionDispatchState::NotApplicable;
+    restored_without_authorization.version = 2;
+    assert_eq!(
+        AdmissionOperationV1::from_persisted(restored_without_authorization),
+        Err(AdmissionOperationError::MissingParticipantAttachment {
+            field: "supplemental_authorization_digest",
+        })
+    );
+    for state in [
+        AdmissionOperationState::MutationReady,
+        AdmissionOperationState::MutationSubmitted,
+        AdmissionOperationState::EconomicMutationApplied,
+    ] {
+        assert_eq!(
+            validate_state_attachments(
+                AdmissionOperationKind::GovernedEconomicMutation,
+                supplemental_authorization_requirements(),
+                state,
+                &AdmissionOperationAttachmentsV1::default(),
+            ),
+            Err(AdmissionOperationError::MissingParticipantAttachment {
+                field: "supplemental_authorization_digest",
+            })
         );
     }
 }

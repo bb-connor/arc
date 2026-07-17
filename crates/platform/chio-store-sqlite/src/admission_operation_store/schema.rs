@@ -16,6 +16,9 @@ pub(crate) fn initialize_admission_operation_schema(
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
+    if obligation_disposition_references_terminal_projection(&transaction)? {
+        migrate_obligation_lifecycle_foundation(&transaction)?;
+    }
     if on_disk == 2 {
         migrate_admission_commit_participant_digest(&transaction)?;
     }
@@ -39,6 +42,84 @@ pub(crate) fn initialize_admission_operation_schema(
     .map_err(|error| invariant(error.to_string()))?;
     verify_admission_operation_invariants(&transaction)?;
     transaction.commit().map_err(sqlite_error)
+}
+
+fn obligation_disposition_references_terminal_projection(
+    transaction: &Transaction<'_>,
+) -> Result<bool, AdmissionOperationStoreError> {
+    transaction
+        .query_row(
+            r#"
+            SELECT EXISTS(
+                SELECT 1
+                FROM pragma_foreign_key_list('obligation_disposition_records')
+                WHERE "table" = 'admission_operation_terminal_projections'
+            )
+            "#,
+            [],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)
+}
+
+fn migrate_obligation_lifecycle_foundation(
+    transaction: &Transaction<'_>,
+) -> Result<(), AdmissionOperationStoreError> {
+    let obligation_count: i64 = transaction
+        .query_row("SELECT COUNT(*) FROM obligation_atoms", [], |row| {
+            row.get(0)
+        })
+        .map_err(sqlite_error)?;
+    if obligation_count != 0 {
+        return Err(invariant(
+            "populated admission schema v5 requires offline authoritative settlement reconciliation",
+        ));
+    }
+    transaction
+        .execute_batch(
+            r#"
+            DROP TRIGGER obligation_disposition_records_exact_lease;
+            DROP TRIGGER obligation_disposition_records_immutable;
+            DROP TRIGGER obligation_disposition_records_no_delete;
+            DROP INDEX obligation_disposition_records_operation;
+            ALTER TABLE obligation_disposition_records
+                RENAME TO obligation_disposition_records_v5;
+            "#,
+        )
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(ADMISSION_OPERATION_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(
+            r#"
+            DROP TRIGGER obligation_settlement_lifecycle_records_exact_lease;
+            DROP TRIGGER obligation_heads_exact_lease_insert;
+            DROP TRIGGER obligation_heads_exact_lease_update;
+            DROP TRIGGER obligation_disposition_records_exact_lease;
+            INSERT INTO obligation_disposition_records (
+                obligation_id, version, lifecycle_fence, atom_digest,
+                disposition_digest, operation_id, record_json, committed_at_unix_ms,
+                store_uuid, store_lease_id, store_owner_epoch
+            )
+            SELECT obligation_id, version, lifecycle_fence, atom_digest,
+                   disposition_digest, operation_id, record_json, committed_at_unix_ms,
+                   store_uuid, store_lease_id, store_owner_epoch
+            FROM obligation_disposition_records_v5
+            ORDER BY obligation_id, version;
+            "#,
+        )
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(
+            r#"
+            DROP TABLE obligation_disposition_records_v5;
+            "#,
+        )
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(ADMISSION_OPERATION_SCHEMA)
+        .map_err(sqlite_error)
 }
 
 fn migrate_terminal_record_kinds(
@@ -379,7 +460,9 @@ pub(crate) fn verify_admission_operation_invariants(
         verify_latest_commit(connection, &stored)?;
         verify_stored_terminal_projection(connection, &stored)?;
     }
-    Ok(())
+    drop(rows);
+    drop(statement);
+    super::credit_exposure::verify_credit_exposure_account_invariants(connection)
 }
 
 pub(crate) fn verify_trusted_time(
@@ -498,6 +581,8 @@ fn admission_operation_schema_catalog(
                OR tbl_name GLOB 'admission_operation*'
                OR name GLOB 'obligation_*'
                OR tbl_name GLOB 'obligation_*'
+               OR name GLOB 'credit_exposure_*'
+               OR tbl_name GLOB 'credit_exposure_*'
             ORDER BY type, name, tbl_name
             "#,
         )

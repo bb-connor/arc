@@ -606,6 +606,7 @@ fn economic_receipt_projection_report_joins_signed_envelope_with_reconciliation_
                     approval: Some(GovernedApprovalReceiptMetadata {
                         token_id: "approval-economic-1".to_string(),
                         approver_key: subject_hex.clone(),
+                        approval_artifact_digest: None,
                         approved: true,
                     }),
                     runtime_assurance: None,
@@ -613,6 +614,10 @@ fn economic_receipt_projection_report_joins_signed_envelope_with_reconciliation_
                     autonomy: None,
                     economic_authorization: Some(EconomicAuthorizationReceiptMetadata {
                         version: EconomicAuthorizationReceiptMetadataVersion::V1,
+                        economic_intent_digest: None,
+                        payee_binding_digest: None,
+                        pre_action_authority_digest: None,
+                        credit_authority_digest: None,
                         economic_mode: EconomicAuthorizationMode::MeteredHoldCapture,
                         payer: EconomicPayerReceiptMetadata {
                             party_id: "agent-economic".to_string(),
@@ -866,6 +871,10 @@ fn economic_completion_flow_report_bundles_receipts_underwriting_and_credit_arti
                     autonomy: None,
                     economic_authorization: Some(EconomicAuthorizationReceiptMetadata {
                         version: EconomicAuthorizationReceiptMetadataVersion::V1,
+                        economic_intent_digest: None,
+                        payee_binding_digest: None,
+                        pre_action_authority_digest: None,
+                        credit_authority_digest: None,
                         economic_mode: EconomicAuthorizationMode::MeteredHoldCapture,
                         payer: EconomicPayerReceiptMetadata {
                             party_id: subject_key.to_string(),
@@ -1302,6 +1311,7 @@ fn receipt_store_authorization_context_report_does_not_mark_asserted_call_chain_
                     approval: Some(GovernedApprovalReceiptMetadata {
                         token_id: "approval-auth-asserted".to_string(),
                         approver_key: issuer_hex.clone(),
+                        approval_artifact_digest: None,
                         approved: true,
                     }),
                     runtime_assurance: None,

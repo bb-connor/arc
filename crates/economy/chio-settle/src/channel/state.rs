@@ -5,7 +5,9 @@ use chio_core::receipt::body::ChioReceipt;
 use chio_core::receipt::economics::{
     ChannelSettlementModeV1, SettlementStatus, CHIO_CHANNEL_RECEIPT_METADATA_SCHEMA,
 };
-use chio_credit::obligation::{ObligationAtomV1, ObligationCreditElectionV1};
+use chio_credit::obligation::{
+    derive_obligation_payee_binding_digest, ObligationAtomV1, ObligationCreditElectionV1,
+};
 use serde::{Deserialize, Serialize};
 
 use super::validation::{
@@ -327,10 +329,8 @@ pub fn derive_channel_payee_binding_digest(
         "channel_payee_destination",
         settlement_destination_ref,
     )?;
-    digest(
-        b"chio.channel.payee-binding.digest.v1\0",
-        &(payee_id, settlement_destination_ref),
-    )
+    derive_obligation_payee_binding_digest(payee_id, settlement_destination_ref)
+        .map_err(|_| ChannelError::AuthorityVerification)
 }
 
 pub fn verify_channel_receipt_binding(

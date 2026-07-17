@@ -120,6 +120,15 @@ impl SqliteAdmissionOperationStore {
 
         if stored.operation.state().is_terminal() {
             let terminal = verify_exact_signed_terminal_replay(transaction, &stored, verified)?;
+            let manifest =
+                AdmissionProjectionManifestV1::from_canonical_bytes(verified.manifest_json())?;
+            apply_credit_exposure_terminal_tx(
+                transaction,
+                &stored.operation,
+                &manifest.projection_digest()?,
+                &context.store_fence,
+                apply_time_unix_ms,
+            )?;
             if let Some(channel) = verified.channel_terminal() {
                 crate::channel_lifecycle_store::verify_consumed_channel_terminal_projection_tx(
                     transaction,
@@ -199,6 +208,15 @@ impl SqliteAdmissionOperationStore {
             verified,
             apply_time_unix_ms,
             &self.serving_owner.fence,
+        )?;
+        let manifest =
+            AdmissionProjectionManifestV1::from_canonical_bytes(verified.manifest_json())?;
+        apply_credit_exposure_terminal_tx(
+            transaction,
+            updated,
+            &manifest.projection_digest()?,
+            &self.serving_owner.fence,
+            apply_time_unix_ms,
         )?;
         if let Some(channel) = verified.channel_terminal() {
             crate::channel_lifecycle_store::consume_channel_terminal_projection_tx(
@@ -730,6 +748,7 @@ pub(crate) struct BudgetAuthorizationAdvance<'a> {
     pub(crate) recovery_lease: &'a AdmissionRecoveryLease,
     pub(crate) hold_id: &'a str,
     pub(crate) payment_required: bool,
+    pub(crate) credit_exposure_reservation_digest: Option<&'a str>,
     pub(crate) participant_digest: &'a str,
     pub(crate) trusted_now_unix_ms: u64,
 }
@@ -744,6 +763,7 @@ pub(crate) fn advance_budget_authorization_tx(
         recovery_lease,
         hold_id,
         payment_required,
+        credit_exposure_reservation_digest,
         participant_digest,
         trusted_now_unix_ms,
     } = advance;
@@ -756,6 +776,7 @@ pub(crate) fn advance_budget_authorization_tx(
     if expected.state() != required_state
         || !requirements.budget_capture
         || requirements.payment != payment_required
+        || requirements.credit_exposure != credit_exposure_reservation_digest.is_some()
     {
         return Err(invariant(
             "combined budget authorization does not match operation requirements",
@@ -769,6 +790,14 @@ pub(crate) fn advance_budget_authorization_tx(
             AdmissionIdentifier::try_new(
                 "payment_participant_id",
                 expected.binding().operation_id().as_str(),
+            )?,
+        ));
+    }
+    if let Some(reservation_digest) = credit_exposure_reservation_digest {
+        attachments.push(AdmissionAttachment::CreditExposureReservationDigest(
+            AdmissionDigest::try_new(
+                "credit_exposure_reservation_digest",
+                reservation_digest.to_owned(),
             )?,
         ));
     }
@@ -800,6 +829,7 @@ pub(crate) fn verify_budget_authorization_replay_tx(
     operation: &AdmissionOperationV1,
     hold_id: &str,
     payment_required: bool,
+    credit_exposure_reservation_digest: Option<&str>,
     participant_digest: &str,
 ) -> Result<AdmissionOperationV1, AdmissionOperationStoreError> {
     let requirements = operation.binding().participant_requirements();
@@ -813,9 +843,14 @@ pub(crate) fn verify_budget_authorization_replay_tx(
             | AdmissionOperationState::Completed
     ) || !requirements.budget_capture
         || requirements.payment != payment_required
+        || requirements.credit_exposure != credit_exposure_reservation_digest.is_some()
         || operation
             .budget_hold_id()
             .is_none_or(|bound| bound.as_str() != hold_id)
+        || operation
+            .credit_exposure_reservation_digest()
+            .map(AdmissionDigest::as_str)
+            != credit_exposure_reservation_digest
     {
         return Err(invariant(
             "combined budget authorization replay does not match operation requirements",

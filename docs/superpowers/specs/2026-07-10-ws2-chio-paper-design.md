@@ -166,8 +166,10 @@ most one can receive an acknowledgement.
 
 ### Artifacts
 
-Every artifact is RFC 8785 canonical JSON with a versioned schema identifier and
-a signature over the canonical body.
+Every artifact is RFC 8785 canonical JSON with a versioned schema identifier.
+Signed artifacts carry signatures over their canonical bodies. Unsigned
+projections are admitted only when their exact canonical digests are bound by
+verified signed artifacts.
 
 - `chio.obligation.status-proof.v1` is owned by
   `chio_credit::obligation`, not by the factoring module. Its canonical body

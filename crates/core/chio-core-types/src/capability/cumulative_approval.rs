@@ -72,6 +72,7 @@ pub struct CumulativeApprovalDelegationMarker {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedCumulativeApprovalConstraint {
+    pub grant_index: usize,
     pub authority_id: PublicKey,
     pub owner_id: String,
     pub approval_budget_id: String,
@@ -566,7 +567,7 @@ fn delegation_marker_is_subset(
 
 fn project_verified(token: &CapabilityToken) -> Result<Vec<VerifiedCumulativeApprovalConstraint>> {
     let mut verified = Vec::new();
-    for grant in &token.scope.grants {
+    for (grant_index, grant) in token.scope.grants.iter().enumerate() {
         let direct_grant_hash = root_grant_hash(grant)?;
         for constraint in &grant.constraints {
             if let Constraint::RequireCumulativeApprovalAbove {
@@ -613,6 +614,7 @@ fn project_verified(token: &CapabilityToken) -> Result<Vec<VerifiedCumulativeApp
                     )
                 };
                 verified.push(VerifiedCumulativeApprovalConstraint {
+                    grant_index,
                     authority_id,
                     owner_id,
                     approval_budget_id: approval_budget_id.clone(),

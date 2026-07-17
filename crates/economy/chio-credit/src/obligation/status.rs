@@ -3,6 +3,8 @@ use chio_core_types::crypto::{sha256_hex, Keypair, PublicKey};
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
 use serde::{Deserialize, Serialize};
 
+use crate::factor::{NormalizedAssignmentRequestV1, VerifiedAssignmentAuthorizationSetV1};
+
 use super::{
     domain_digest, validate_digest, validate_text, validate_time, ObligationAtomV1,
     ObligationDispositionRecordV1, ObligationDispositionTransitionV1, ObligationDispositionV1,
@@ -19,6 +21,8 @@ const SETTLEMENT_LIFECYCLE_DIGEST_DOMAIN: &[u8] =
     b"chio.obligation.settlement-lifecycle.digest.v1\0";
 const STATUS_PROOF_ID_DOMAIN: &[u8] = b"chio.obligation.status-proof.id.v1\0";
 const STATUS_PROOF_BODY_DIGEST_DOMAIN: &[u8] = b"chio.obligation.status-proof.body.v1\0";
+const STATUS_PROOF_TRUST_CONFIGURATION_DOMAIN: &[u8] =
+    b"chio.obligation.status-proof-trust.configuration.v1\0";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -168,6 +172,21 @@ impl ObligationSettlementLifecycleV1 {
         };
         next.validate_against(atom)?;
         Ok(next)
+    }
+
+    pub fn validate_successor(
+        &self,
+        atom: &ObligationAtomV1,
+        successor: &Self,
+    ) -> Result<(), ObligationError> {
+        self.validate_against(atom)?;
+        successor.validate_against(atom)?;
+        let expected = self.advance(atom, successor.last_transition.clone())?;
+        if &expected == successor {
+            Ok(())
+        } else {
+            Err(ObligationError::InvalidField("settlement_successor"))
+        }
     }
 
     pub fn validate_against(&self, atom: &ObligationAtomV1) -> Result<(), ObligationError> {
@@ -328,7 +347,8 @@ impl ObligationStatusProofBodyV1 {
         validate_time("expires_at_unix_ms", context.expires_at_unix_ms)?;
         validate_text("status_authority_id", context.authority_id)?;
         validate_time("status_authority_key_epoch", context.authority_key_epoch)?;
-        if context.expires_at_unix_ms <= context.issued_at_unix_ms
+        if context.issued_at_unix_ms < context.atom.created_at_unix_ms()
+            || context.expires_at_unix_ms <= context.issued_at_unix_ms
             || context.expires_at_unix_ms > context.atom.due_at_unix_ms()
         {
             return Err(ObligationError::InvalidField("status_proof_window"));
@@ -450,6 +470,26 @@ impl ObligationStatusProofBodyV1 {
     }
 
     #[must_use]
+    pub fn obligation_id(&self) -> &str {
+        &self.obligation_id
+    }
+
+    #[must_use]
+    pub fn obligation_atom_digest(&self) -> &str {
+        &self.obligation_atom_digest
+    }
+
+    #[must_use]
+    pub fn current_creditor_id(&self) -> &str {
+        &self.current_creditor_id
+    }
+
+    #[must_use]
+    pub fn current_settlement_destination_ref(&self) -> &str {
+        &self.current_settlement_destination_ref
+    }
+
+    #[must_use]
     pub const fn disposition(&self) -> &ObligationDispositionV1 {
         &self.disposition
     }
@@ -460,8 +500,68 @@ impl ObligationStatusProofBodyV1 {
     }
 
     #[must_use]
+    pub fn disposition_digest(&self) -> &str {
+        &self.disposition_digest
+    }
+
+    #[must_use]
+    pub const fn disposition_version(&self) -> u64 {
+        self.disposition_version
+    }
+
+    #[must_use]
+    pub const fn disposition_lifecycle_fence(&self) -> u64 {
+        self.disposition_lifecycle_fence
+    }
+
+    #[must_use]
+    pub fn settlement_lifecycle_digest(&self) -> &str {
+        &self.settlement_lifecycle_digest
+    }
+
+    #[must_use]
+    pub const fn settlement_lifecycle_version(&self) -> u64 {
+        self.settlement_lifecycle_version
+    }
+
+    #[must_use]
+    pub const fn settlement_lifecycle_fence(&self) -> u64 {
+        self.settlement_lifecycle_fence
+    }
+
+    #[must_use]
+    pub const fn snapshot_version(&self) -> u64 {
+        self.snapshot_version
+    }
+
+    #[must_use]
+    pub const fn resource_fence(&self) -> u64 {
+        self.resource_fence
+    }
+
+    #[must_use]
+    pub const fn due_at_unix_ms(&self) -> u64 {
+        self.due_at_unix_ms
+    }
+
+    #[must_use]
+    pub const fn issued_at_unix_ms(&self) -> u64 {
+        self.issued_at_unix_ms
+    }
+
+    #[must_use]
     pub const fn expires_at_unix_ms(&self) -> u64 {
         self.expires_at_unix_ms
+    }
+
+    #[must_use]
+    pub fn authority_id(&self) -> &str {
+        &self.authority_id
+    }
+
+    #[must_use]
+    pub const fn authority_key_epoch(&self) -> u64 {
+        self.authority_key_epoch
     }
 }
 
@@ -507,12 +607,22 @@ impl SignedObligationStatusProofV1 {
     }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StatusProofTrustConfigurationPreimageV1<'a> {
+    authority_id: &'a str,
+    authority_key: String,
+    authority_key_epoch: u64,
+    max_proof_lifetime_ms: u64,
+}
+
 #[derive(Debug, Clone)]
 pub struct ObligationStatusProofTrustV1 {
     authority_id: String,
     authority_key: PublicKey,
     authority_key_epoch: u64,
     max_proof_lifetime_ms: u64,
+    configuration_digest: String,
 }
 
 impl ObligationStatusProofTrustV1 {
@@ -525,12 +635,47 @@ impl ObligationStatusProofTrustV1 {
         validate_text("trusted_status_authority_id", &authority_id)?;
         validate_time("trusted_status_authority_key_epoch", authority_key_epoch)?;
         validate_time("max_status_proof_lifetime_ms", max_proof_lifetime_ms)?;
+        let configuration_digest = domain_digest(
+            STATUS_PROOF_TRUST_CONFIGURATION_DOMAIN,
+            &StatusProofTrustConfigurationPreimageV1 {
+                authority_id: &authority_id,
+                authority_key: authority_key.to_hex(),
+                authority_key_epoch,
+                max_proof_lifetime_ms,
+            },
+        )?;
         Ok(Self {
             authority_id,
             authority_key,
             authority_key_epoch,
             max_proof_lifetime_ms,
+            configuration_digest,
         })
+    }
+
+    #[must_use]
+    pub fn authority_id(&self) -> &str {
+        &self.authority_id
+    }
+
+    #[must_use]
+    pub const fn authority_key_epoch(&self) -> u64 {
+        self.authority_key_epoch
+    }
+
+    #[must_use]
+    pub const fn authority_key(&self) -> &PublicKey {
+        &self.authority_key
+    }
+
+    #[must_use]
+    pub const fn max_proof_lifetime_ms(&self) -> u64 {
+        self.max_proof_lifetime_ms
+    }
+
+    #[must_use]
+    pub fn configuration_digest(&self) -> &str {
+        &self.configuration_digest
     }
 }
 
@@ -539,6 +684,8 @@ pub struct VerifiedObligationStatusProofV1 {
     signed: SignedObligationStatusProofV1,
     body_digest: String,
     envelope_digest: String,
+    canonical_bytes: Vec<u8>,
+    trust_configuration_digest: String,
 }
 
 impl VerifiedObligationStatusProofV1 {
@@ -555,6 +702,21 @@ impl VerifiedObligationStatusProofV1 {
     #[must_use]
     pub fn envelope_digest(&self) -> &str {
         &self.envelope_digest
+    }
+
+    #[must_use]
+    pub fn canonical_bytes(&self) -> &[u8] {
+        &self.canonical_bytes
+    }
+
+    #[must_use]
+    pub fn trust_configuration_digest(&self) -> &str {
+        &self.trust_configuration_digest
+    }
+
+    #[must_use]
+    pub const fn signer_key(&self) -> &PublicKey {
+        &self.signed.0.signer_key
     }
 
     fn ensure_current(&self, trusted_now_unix_ms: u64) -> Result<(), ObligationError> {
@@ -579,9 +741,10 @@ pub struct ObligationStatusProofVerificationContextV1<'a> {
 }
 
 pub fn verify_obligation_status_proof(
-    signed: SignedObligationStatusProofV1,
+    canonical_envelope: &[u8],
     context: &ObligationStatusProofVerificationContextV1<'_>,
 ) -> Result<VerifiedObligationStatusProofV1, ObligationError> {
+    let signed = SignedObligationStatusProofV1::from_canonical_bytes(canonical_envelope)?;
     signed.body().validate()?;
     if signed.0.signer_key != context.trust.authority_key
         || signed.body().authority_id != context.trust.authority_id
@@ -618,6 +781,8 @@ pub fn verify_obligation_status_proof(
     let verified = VerifiedObligationStatusProofV1 {
         body_digest: domain_digest(STATUS_PROOF_BODY_DIGEST_DOMAIN, signed.body())?,
         envelope_digest: signed.digest()?,
+        canonical_bytes: canonical_envelope.to_vec(),
+        trust_configuration_digest: context.trust.configuration_digest().to_owned(),
         signed,
     };
     verified.ensure_current(context.trusted_now_unix_ms)?;
@@ -664,8 +829,16 @@ impl ObligationAssignmentOperationSnapshotV1 {
         Ok(operation)
     }
 
-    pub fn attach_supplemental_authorization(&self, digest: &str) -> Result<Self, ObligationError> {
-        validate_digest("supplemental_authorization_digest", digest)?;
+    pub fn attach_supplemental_authorization(
+        &self,
+        authorization: &VerifiedAssignmentAuthorizationSetV1,
+    ) -> Result<Self, ObligationError> {
+        if authorization.body().operation_id() != self.operation_id
+            || authorization.body().normalized_request_digest() != self.normalized_request_digest
+        {
+            return Err(ObligationError::SupplementalAuthorizationMismatch);
+        }
+        let digest = authorization.digest();
         match self.supplemental_authorization_digest.as_deref() {
             Some(attached) if attached != digest => {
                 Err(ObligationError::SupplementalAuthorizationMismatch)
@@ -737,14 +910,25 @@ pub struct ObligationAssignmentCasInputV1 {
 pub struct ObligationAssignmentCasV1 {
     operation: ObligationAssignmentOperationSnapshotV1,
     input: ObligationAssignmentCasInputV1,
+    authorization: VerifiedAssignmentAuthorizationSetV1,
 }
 
 impl ObligationAssignmentCasV1 {
     pub fn new(
         operation: ObligationAssignmentOperationSnapshotV1,
         input: ObligationAssignmentCasInputV1,
+        authorization: VerifiedAssignmentAuthorizationSetV1,
+        request: &NormalizedAssignmentRequestV1,
     ) -> Result<Self, ObligationError> {
         operation.validate()?;
+        request
+            .validate()
+            .map_err(|_| ObligationError::CompareAndSwapConflict)?;
+        authorization
+            .agreement()
+            .body()
+            .validate_against_request(request)
+            .map_err(|_| ObligationError::CompareAndSwapConflict)?;
         if input.schema != OBLIGATION_ASSIGNMENT_CAS_SCHEMA {
             return Err(ObligationError::InvalidField("assignment_cas_schema"));
         }
@@ -770,17 +954,45 @@ impl ObligationAssignmentCasV1 {
         )?;
         if operation.operation_id != input.operation_id
             || operation.normalized_request_digest != input.normalized_request_digest
+            || request
+                .digest()
+                .map_err(|_| ObligationError::CompareAndSwapConflict)?
+                != input.normalized_request_digest
+            || request.expected_disposition_version() != operation.expected_disposition_version
+            || request.expected_disposition_lifecycle_fence()
+                != operation.expected_disposition_lifecycle_fence
+            || request.expected_settlement_lifecycle_version()
+                != operation.expected_settlement_lifecycle_version
+            || request.expected_settlement_lifecycle_fence()
+                != operation.expected_settlement_lifecycle_fence
+            || authorization.body().operation_id() != input.operation_id
+            || authorization.body().normalized_request_digest() != input.normalized_request_digest
+            || authorization.body().buyer_id() != input.buyer_id
+            || authorization.body().agreement_id() != input.agreement_id
+            || authorization.body().buyer_settlement_destination_ref()
+                != input.buyer_settlement_destination_ref
+            || authorization.body().effective_at_unix_ms() != input.effective_at_unix_ms
+            || request.buyer_id() != input.buyer_id
+            || request.buyer_settlement_destination_ref() != input.buyer_settlement_destination_ref
+            || request.effective_at_unix_ms() != input.effective_at_unix_ms
         {
             return Err(ObligationError::CompareAndSwapConflict);
         }
         match operation.supplemental_authorization_digest.as_deref() {
             None => return Err(ObligationError::MissingSupplementalAuthorization),
-            Some(attached) if attached != input.supplemental_authorization_digest => {
+            Some(attached)
+                if attached != input.supplemental_authorization_digest
+                    || attached != authorization.digest() =>
+            {
                 return Err(ObligationError::SupplementalAuthorizationMismatch);
             }
             Some(_) => {}
         }
-        Ok(Self { operation, input })
+        Ok(Self {
+            operation,
+            input,
+            authorization,
+        })
     }
 }
 
@@ -796,49 +1008,21 @@ impl ObligationDispositionRecordV1 {
         self.validate_against(atom)?;
         let operation = &assignment.operation;
         let input = &assignment.input;
-        if let ObligationDispositionV1::Assigned {
-            agreement_id,
-            creditor_id,
-            settlement_destination_ref,
-        } = self.disposition()
-        {
-            let exact_replay = input.status_proof_digest == status_proof.envelope_digest
-                && status_proof.body().obligation_id == atom.obligation_id()
-                && status_proof.body().obligation_atom_digest == atom.digest()?
-                && agreement_id == &input.agreement_id
-                && creditor_id == &input.buyer_id
-                && settlement_destination_ref == &input.buyer_settlement_destination_ref
-                && self.version
-                    == operation
-                        .expected_disposition_version
-                        .checked_add(1)
-                        .ok_or(ObligationError::CompareAndSwapConflict)?
-                && self.lifecycle_fence
-                    == operation
-                        .expected_disposition_lifecycle_fence
-                        .checked_add(1)
-                        .ok_or(ObligationError::CompareAndSwapConflict)?
-                && matches!(
-                    self.last_transition(),
-                    ObligationDispositionTransitionV1::Assign {
-                        operation_id,
-                        normalized_request_digest,
-                        status_proof_digest,
-                        authority_digest,
-                        ..
-                    } if operation_id == &input.operation_id
-                        && normalized_request_digest == &input.normalized_request_digest
-                        && status_proof_digest == &input.status_proof_digest
-                        && authority_digest == &input.supplemental_authorization_digest
-                );
-            return if exact_replay {
-                Ok(self.clone())
-            } else {
-                Err(ObligationError::CompareAndSwapConflict)
-            };
+        if matches!(self.disposition(), ObligationDispositionV1::Assigned { .. }) {
+            return Err(ObligationError::CompareAndSwapConflict);
         }
         settlement_lifecycle.validate_against(atom)?;
         status_proof.ensure_current(trusted_now_unix_ms)?;
+        assignment
+            .authorization
+            .ensure_current(trusted_now_unix_ms)
+            .map_err(|_| ObligationError::SupplementalAuthorizationMismatch)?;
+        if assignment.authorization.body().obligation_atom_digest() != atom.digest()?
+            || assignment.authorization.body().seller_id() != atom.original_creditor_id()
+            || assignment.authorization.body().buyer_id() != input.buyer_id
+        {
+            return Err(ObligationError::SupplementalAuthorizationMismatch);
+        }
         if input.status_proof_digest != status_proof.envelope_digest
             || status_proof.body().obligation_id != atom.obligation_id()
             || status_proof.body().obligation_atom_digest != atom.digest()?
@@ -852,6 +1036,8 @@ impl ObligationDispositionRecordV1 {
             || settlement_lifecycle.lifecycle_fence()
                 != operation.expected_settlement_lifecycle_fence
             || status_proof.body().settlement_state != *settlement_lifecycle.state()
+            || status_proof.body().settlement_lifecycle_digest
+                != settlement_lifecycle.digest(atom)?
             || input.effective_at_unix_ms < status_proof.body().issued_at_unix_ms
             || input.effective_at_unix_ms >= status_proof.body().expires_at_unix_ms
             || input.effective_at_unix_ms >= atom.due_at_unix_ms()

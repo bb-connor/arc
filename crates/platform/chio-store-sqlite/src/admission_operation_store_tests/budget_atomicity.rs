@@ -124,6 +124,7 @@ fn combined_budget_authorization_payment_journal_and_operation_commit_are_atomic
             &authorization_lease,
             request.clone(),
             Some(journal.clone()),
+            None,
             &fixture.fence,
             begun_at + 4,
         )
@@ -168,6 +169,7 @@ fn combined_budget_authorization_payment_journal_and_operation_commit_are_atomic
             &authorization_lease,
             request.clone(),
             Some(journal.clone()),
+            None,
             &fixture.fence,
             begun_at + 4,
         )
@@ -192,6 +194,7 @@ fn combined_budget_authorization_payment_journal_and_operation_commit_are_atomic
             &authorization_lease,
             request.clone(),
             Some(journal.clone()),
+            None,
             &fixture.fence,
             begun_at + 4,
         )
@@ -210,6 +213,7 @@ fn combined_budget_authorization_payment_journal_and_operation_commit_are_atomic
             &resumed_lease,
             request.clone(),
             Some(journal.clone()),
+            None,
             &fixture.fence,
             begun_at + 6,
         )
@@ -238,6 +242,7 @@ fn combined_budget_authorization_payment_journal_and_operation_commit_are_atomic
             &resumed_lease,
             request,
             Some(journal.clone()),
+            None,
             &fixture.fence,
             begun_at + 8,
         )

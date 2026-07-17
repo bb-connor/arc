@@ -905,6 +905,7 @@ fn governed_transaction_intent_binding_hash_changes_with_payload() {
         commerce: Some(GovernedCommerceContext {
             seller: "merchant.example".to_string(),
             shared_payment_token_id: "spt_123".to_string(),
+            settlement_destination_ref: Some("acct:merchant-primary".to_string()),
         }),
         metered_billing: Some(MeteredBillingContext {
             settlement_mode: MeteredSettlementMode::AllowThenSettle,
@@ -921,6 +922,7 @@ fn governed_transaction_intent_binding_hash_changes_with_payload() {
                 expires_at: Some(1300),
             },
             max_billed_units: Some(20),
+            verified_outcome: None,
         }),
         runtime_attestation: Some(RuntimeAttestationEvidence {
             schema: "chio.runtime-attestation.v1".to_string(),
@@ -956,6 +958,17 @@ fn governed_transaction_intent_binding_hash_changes_with_payload() {
     assert_ne!(
         base.binding_hash().unwrap(),
         changed.binding_hash().unwrap()
+    );
+
+    let mut changed_destination = base.clone();
+    changed_destination
+        .commerce
+        .as_mut()
+        .expect("commerce present")
+        .settlement_destination_ref = Some("acct:merchant-substituted".to_string());
+    assert_ne!(
+        base.binding_hash().unwrap(),
+        changed_destination.binding_hash().unwrap()
     );
 }
 
@@ -996,11 +1009,15 @@ fn governed_approval_token_signature_roundtrip() {
     };
 
     let token = GovernedApprovalToken::sign(body, &approver).unwrap();
+    let artifact_digest = token.artifact_digest().unwrap();
+    let mut changed_token = token.clone();
+    changed_token.request_id = "req-2".to_string();
 
     assert!(token.verify_signature().unwrap());
     assert!(token.is_valid_at(1500));
     assert!(!token.is_valid_at(2000));
     assert_eq!(token.subject, subject.public_key());
+    assert_ne!(artifact_digest, changed_token.artifact_digest().unwrap());
 }
 
 #[test]

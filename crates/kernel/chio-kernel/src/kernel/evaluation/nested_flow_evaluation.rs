@@ -352,6 +352,9 @@ impl ChioKernel {
                     .as_ref()
                     .and_then(|admission| admission.verified_runtime_attestation.clone()),
             );
+        let verified_governed_payee_binding = validated_governed_admission
+            .as_ref()
+            .and_then(|admission| admission.verified_payee_binding.clone());
         // A receipt-store read error while resolving the parent call-chain
         // receipt fails closed, but check_and_increment_budget above already
         // consumed the pre-execution budget (invocation count / monetary hold).
@@ -542,6 +545,7 @@ impl ChioKernel {
                             budget_mutation: &budget_mutation,
                             payment_authorization: None,
                             runtime_admission_metadata,
+                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             // Admission failed: this evaluation acquired no
                             // lease, so there is nothing for cleanup to release.
                             budget_lease_acquired: false,
@@ -578,6 +582,7 @@ impl ChioKernel {
                     budget_mutation: &budget_mutation,
                     payment_authorization: None,
                     runtime_admission_metadata,
+                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
                 })
             });
@@ -599,6 +604,7 @@ impl ChioKernel {
                             budget_mutation: &budget_mutation,
                             payment_authorization: None,
                             runtime_admission_metadata,
+                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
                         })
                     },
@@ -632,6 +638,7 @@ impl ChioKernel {
                     budget_mutation: &budget_mutation,
                     payment_authorization: None,
                     runtime_admission_metadata,
+                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     budget_lease_acquired,
                 })
             });
@@ -672,6 +679,7 @@ impl ChioKernel {
                                 &budget_mutation,
                                 runtime_admission_metadata,
                                 budget_lease_acquired,
+                                verified_governed_payee_binding.as_ref(),
                             )
                         },
                     );
@@ -708,6 +716,7 @@ impl ChioKernel {
             budget_mutation.charge_result(),
             durable_admission.as_ref(),
             now_unix_ms,
+            verified_governed_payee_binding.as_ref(),
         ) {
             Ok(authorization) => authorization,
             Err(error) => {
@@ -735,6 +744,7 @@ impl ChioKernel {
                                 &budget_mutation,
                                 runtime_admission_metadata,
                                 budget_lease_acquired,
+                                verified_governed_payee_binding.as_ref(),
                             )
                         },
                     );
@@ -759,12 +769,13 @@ impl ChioKernel {
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
-                        self.build_deny_response_with_metadata(
+                        self.build_deny_response_with_metadata_and_payee_binding(
                             request,
                             denial_reason,
                             now,
                             Some(matched_grant_index),
                             metadata,
+                            verified_governed_payee_binding.as_ref(),
                         )
                     },
                 );
@@ -787,6 +798,7 @@ impl ChioKernel {
                             budget_mutation: &budget_mutation,
                             payment_authorization: payment_authorization.as_ref(),
                             runtime_admission_metadata,
+                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
                             budget_lease_acquired,
                         })
                     },
@@ -811,7 +823,7 @@ impl ChioKernel {
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
-                        self.build_deny_response_with_metadata(
+                        self.build_deny_response_with_metadata_and_payee_binding(
                             request,
                             &reason,
                             now,
@@ -821,6 +833,7 @@ impl ChioKernel {
                                 payment_authorization.as_ref(),
                                 runtime_admission_metadata,
                             ),
+                            verified_governed_payee_binding.as_ref(),
                         )
                     },
                 );
@@ -838,6 +851,7 @@ impl ChioKernel {
             PostAdmissionReceiptContext {
                 extra_metadata: runtime_admission_metadata.clone(),
                 pre_invocation_guard_evidence: pre_invocation_guard_evidence.clone(),
+                verified_payee_binding: verified_governed_payee_binding.clone(),
             },
             budget_lease_acquired,
         );
@@ -924,12 +938,13 @@ impl ChioKernel {
                 );
                 let receipt_result =
                     self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                        self.build_cancelled_response_with_metadata(
+                        self.build_cancelled_response_with_metadata_and_payee_binding(
                             request,
                             "tool server requested URL elicitation after dispatch entry",
                             now,
                             Some(matched_grant_index),
                             metadata,
+                            verified_governed_payee_binding.as_ref(),
                         )
                     });
                 if let Err(receipt_error) = receipt_result {
@@ -962,7 +977,7 @@ impl ChioKernel {
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
-                        self.build_cancelled_response_with_metadata(
+                        self.build_cancelled_response_with_metadata_and_payee_binding(
                             request,
                             &reason,
                             now,
@@ -972,6 +987,7 @@ impl ChioKernel {
                                 payment_authorization.as_ref(),
                                 runtime_admission_metadata.clone(),
                             ),
+                            verified_governed_payee_binding.as_ref(),
                         )
                     },
                 );
@@ -989,7 +1005,7 @@ impl ChioKernel {
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
-                        self.build_cancelled_response_with_metadata(
+                        self.build_cancelled_response_with_metadata_and_payee_binding(
                             request,
                             &reason,
                             now,
@@ -999,6 +1015,7 @@ impl ChioKernel {
                                 payment_authorization.as_ref(),
                                 runtime_admission_metadata.clone(),
                             ),
+                            verified_governed_payee_binding.as_ref(),
                         )
                     },
                 );
@@ -1012,7 +1029,7 @@ impl ChioKernel {
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
-                        self.build_incomplete_response_with_output_and_metadata(
+                        self.build_incomplete_response_with_output_metadata_and_payee_binding(
                             request,
                             None,
                             &reason,
@@ -1023,6 +1040,7 @@ impl ChioKernel {
                                 payment_authorization.as_ref(),
                                 runtime_admission_metadata.clone(),
                             ),
+                            verified_governed_payee_binding.as_ref(),
                         )
                     },
                 );
@@ -1040,12 +1058,13 @@ impl ChioKernel {
                             payment_authorization.as_ref(),
                             runtime_admission_metadata.clone(),
                         );
-                        self.build_deny_response_with_metadata(
+                        self.build_deny_response_with_metadata_and_payee_binding(
                             request,
                             &msg,
                             now,
                             Some(matched_grant_index),
                             deny_metadata,
+                            verified_governed_payee_binding.as_ref(),
                         )
                     },
                 );
@@ -1064,6 +1083,7 @@ impl ChioKernel {
                     elapsed: tool_elapsed,
                     extra_receipt_metadata: runtime_admission_metadata.clone(),
                     pre_invocation_guard_evidence: &pre_invocation_guard_evidence,
+                    verified_payee_binding: verified_governed_payee_binding.as_ref(),
                     trusted_now_unix_ms: recorded_at_unix_ms,
                 },
             ) {
@@ -1099,6 +1119,7 @@ impl ChioKernel {
                     cap,
                 },
                 runtime_admission_metadata,
+                verified_governed_payee_binding.as_ref(),
             )
         })
     }

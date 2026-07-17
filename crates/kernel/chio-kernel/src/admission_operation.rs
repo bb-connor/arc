@@ -295,6 +295,7 @@ pub enum AdmissionAttachment {
     ToolOutcomeId(AdmissionDigest),
     ChannelReservationProposalDigest(AdmissionDigest),
     ChannelReservationDigest(AdmissionDigest),
+    CreditExposureReservationDigest(AdmissionDigest),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -310,6 +311,7 @@ pub(crate) enum AdmissionAttachmentKind {
     ToolOutcome,
     ChannelReservationProposal,
     ChannelReservation,
+    CreditExposureReservation,
 }
 
 impl AdmissionAttachment {
@@ -330,6 +332,9 @@ impl AdmissionAttachment {
                 AdmissionAttachmentKind::ChannelReservationProposal
             }
             Self::ChannelReservationDigest(_) => AdmissionAttachmentKind::ChannelReservation,
+            Self::CreditExposureReservationDigest(_) => {
+                AdmissionAttachmentKind::CreditExposureReservation
+            }
         }
     }
 
@@ -350,6 +355,7 @@ impl AdmissionAttachment {
             Self::ToolOutcomeId(_) => "tool_outcome_id",
             Self::ChannelReservationProposalDigest(_) => "channel_reservation_proposal_digest",
             Self::ChannelReservationDigest(_) => "channel_reservation_digest",
+            Self::CreditExposureReservationDigest(_) => "credit_exposure_reservation_digest",
         }
     }
 }
@@ -368,6 +374,7 @@ impl AdmissionAttachmentKind {
             Self::ToolOutcome => 8,
             Self::ChannelReservationProposal => 9,
             Self::ChannelReservation => 10,
+            Self::CreditExposureReservation => 11,
         }
     }
 }
@@ -403,7 +410,7 @@ impl AdmissionOperationAttachmentsV1 {
     }
 
     fn validate(&self) -> Result<(), AdmissionOperationError> {
-        if self.0.len() > 11
+        if self.0.len() > 12
             || self
                 .0
                 .windows(2)
@@ -639,6 +646,14 @@ impl AdmissionOperationV1 {
         self.attachments.tool_outcome_id()
     }
 
+    #[must_use]
+    pub fn supplemental_authorization_digest(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::SupplementalAuthorization) {
+            Some(AdmissionAttachment::SupplementalAuthorizationDigest(digest)) => Some(digest),
+            _ => None,
+        }
+    }
+
     #[allow(dead_code)]
     pub(crate) fn has_attachment(&self, kind: AdmissionAttachmentKind) -> bool {
         self.attachments.has_slot(kind.slot())
@@ -678,6 +693,14 @@ impl AdmissionOperationV1 {
     pub fn channel_reservation_digest(&self) -> Option<&AdmissionDigest> {
         match self.attachment(AdmissionAttachmentKind::ChannelReservation) {
             Some(AdmissionAttachment::ChannelReservationDigest(digest)) => Some(digest),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn credit_exposure_reservation_digest(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::CreditExposureReservation) {
+            Some(AdmissionAttachment::CreditExposureReservationDigest(digest)) => Some(digest),
             _ => None,
         }
     }

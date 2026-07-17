@@ -1396,6 +1396,7 @@ impl ChioKernel {
         matched_grant_index: usize,
         cost_context: FinalizeToolOutputCostContext<'_>,
         extra_metadata: Option<serde_json::Value>,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
         let FinalizeToolOutputCostContext {
             charge_result,
@@ -1404,13 +1405,14 @@ impl ChioKernel {
             cap,
         } = cost_context;
         let Some(charge) = charge_result else {
-            return self.finalize_tool_output_with_metadata(
+            return self.finalize_tool_output_with_metadata_and_payee_binding(
                 request,
                 output,
                 elapsed,
                 timestamp,
                 matched_grant_index,
                 extra_metadata,
+                verified_payee_binding,
             );
         };
 
@@ -1616,15 +1618,16 @@ impl ChioKernel {
         match limited_output {
             ToolServerOutput::Value(_)
             | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => self
-                .build_allow_response_with_metadata(
+                .build_allow_response_with_metadata_and_payee_binding(
                     request,
                     tool_call_output,
                     timestamp,
                     Some(charge.grant_index),
                     merged_extra_metadata.clone(),
+                    verified_payee_binding,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
-                .build_incomplete_response_with_output_and_metadata(
+                .build_incomplete_response_with_output_metadata_and_payee_binding(
                     request,
                     Some(tool_call_output),
                     &reason,
@@ -1638,6 +1641,7 @@ impl ChioKernel {
                     self.mark_runtime_admission_reservations_retained_fail_closed(
                         merged_extra_metadata,
                     ),
+                    verified_payee_binding,
                 ),
         }
     }
@@ -1725,6 +1729,7 @@ impl ChioKernel {
         charge_result: Option<&BudgetChargeResult>,
         durable_admission: Option<&DurableToolAdmission>,
         trusted_now_unix_ms: u64,
+        verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<Option<PaymentAuthorization>, PaymentError> {
         let Some(charge) = charge_result else {
             return Ok(None);
@@ -1810,22 +1815,70 @@ impl ChioKernel {
                     })
             })
             .transpose()?;
-        let commerce = request.governed_intent.as_ref().and_then(|intent| {
-            intent
-                .commerce
+        let commerce = if charge.cost_charged == 0 {
+            None
+        } else if let Some(commerce) = request
+            .governed_intent
+            .as_ref()
+            .and_then(|intent| intent.commerce.as_ref())
+        {
+            let binding = verified_payee_binding.ok_or_else(|| {
+                PaymentError::RailError(
+                    "governed commerce payment omitted verified payee binding".to_owned(),
+                )
+            })?;
+            let approval_artifact_digest = request
+                .approval_token
                 .as_ref()
-                .map(|commerce| CommercePaymentContext {
-                    seller: commerce.seller.clone(),
-                    shared_payment_token_id: commerce.shared_payment_token_id.clone(),
-                    max_amount: intent.max_amount.clone(),
-                })
-        });
+                .ok_or_else(|| {
+                    PaymentError::RailError(
+                        "governed commerce payment omitted verified approval".to_owned(),
+                    )
+                })?
+                .artifact_digest()
+                .map_err(|error| PaymentError::RailError(error.to_string()))?;
+            let intent_hash = governed
+                .as_ref()
+                .map(|context| context.intent_hash.as_str());
+            if binding.beneficiary_id() != commerce.seller
+                || commerce.settlement_destination_ref.as_deref()
+                    != Some(binding.settlement_destination_ref())
+                || intent_hash != Some(binding.economic_intent_digest())
+                || binding.pre_action_authority_digest() != approval_artifact_digest.as_str()
+            {
+                return Err(PaymentError::RailError(
+                    "governed commerce payment does not match verified payee binding".to_owned(),
+                ));
+            }
+            Some(CommercePaymentContext {
+                seller: binding.beneficiary_id().to_owned(),
+                settlement_destination_ref: binding.settlement_destination_ref().to_owned(),
+                payee_binding_digest: binding.payee_binding_digest().to_owned(),
+                pre_action_authority_digest: binding.pre_action_authority_digest().to_owned(),
+                shared_payment_token_id: commerce.shared_payment_token_id.clone(),
+                max_amount: request
+                    .governed_intent
+                    .as_ref()
+                    .and_then(|intent| intent.max_amount.clone()),
+            })
+        } else {
+            if verified_payee_binding.is_some() {
+                return Err(PaymentError::RailError(
+                    "verified payee binding has no governed commerce context".to_owned(),
+                ));
+            }
+            None
+        };
+        let payee = verified_payee_binding.map_or_else(
+            || request.server_id.clone(),
+            |binding| binding.beneficiary_id().to_owned(),
+        );
 
         let authorization = adapter.authorize(&PaymentAuthorizeRequest {
             amount_units: charge.cost_charged,
             currency: charge.currency.clone(),
             payer: request.agent_id.clone(),
-            payee: request.server_id.clone(),
+            payee,
             reference: durable_journal.as_ref().map_or_else(
                 || request.request_id.clone(),
                 |journal| journal.operation_id.clone(),

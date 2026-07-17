@@ -1389,6 +1389,7 @@ fn capabilities() -> AdmissionProjectionCapabilities {
         observation_attempt_zero: true,
         obligation: true,
         channel_terminal: true,
+        credit_exposure_terminal: true,
         economic_mutation_terminal: true,
     }
 }
@@ -1928,8 +1929,7 @@ fn channel_receipt_rejects_every_substituted_obligation_binding() -> TestResult<
 }
 
 #[test]
-fn channel_terminal_constructor_rejects_receipt_tool_outcome_and_effect_substitution(
-) -> TestResult<()> {
+fn channel_terminal_constructor_rejects_receipt_and_tool_outcome_substitution() -> TestResult<()> {
     let fixture = build_fixture(7, "constructor-substitution")?;
     let alternate_receipt = build_advance_fixture(
         7,
@@ -1937,7 +1937,8 @@ fn channel_terminal_constructor_rejects_receipt_tool_outcome_and_effect_substitu
         "alternate",
         serde_json::json!({ "result": "ok" }),
         None,
-    )?;
+    )
+    .map_err(|error| std::io::Error::other(format!("alternate receipt: {error}")))?;
     assert!(VerifiedChannelTerminalProjectionV1::from_verified(
         &fixture.base.operation,
         &fixture.base.context,
@@ -1953,7 +1954,8 @@ fn channel_terminal_constructor_rejects_receipt_tool_outcome_and_effect_substitu
         "outcome",
         serde_json::json!({ "result": "substituted" }),
         None,
-    )?;
+    )
+    .map_err(|error| std::io::Error::other(format!("alternate outcome: {error}")))?;
     assert!(VerifiedChannelTerminalProjectionV1::from_verified(
         &fixture.base.operation,
         &fixture.base.context,
@@ -1963,20 +1965,21 @@ fn channel_terminal_constructor_rejects_receipt_tool_outcome_and_effect_substitu
     )
     .is_err());
 
-    let alternate_effect = build_advance_fixture(
+    Ok(())
+}
+
+#[test]
+fn channel_authority_rejects_terminal_effect_substitution() -> TestResult<()> {
+    let result = build_advance_fixture(
         7,
         "constructor-substitution",
         "primary",
         serde_json::json!({ "result": "ok" }),
         Some(serde_json::json!({ "outcome": "substituted" })),
-    )?;
-    assert!(VerifiedChannelTerminalProjectionV1::from_verified(
-        &fixture.base.operation,
-        &fixture.base.context,
-        &fixture.base.receipt,
-        &fixture.base.tool_outcome,
-        &alternate_effect.advance,
-    )
-    .is_err());
+    );
+    assert_eq!(
+        result.err().map(|error| error.to_string()).as_deref(),
+        Some("channel authority verification failed")
+    );
     Ok(())
 }

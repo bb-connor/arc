@@ -476,8 +476,50 @@ fn cumulative_approval_identical_budget_fields_on_distinct_grants_have_distinct_
     let verified = verify_cumulative_approval_constraints(&root, &[issuer.public_key()], None)?;
 
     assert_eq!(verified.len(), 2);
+    assert_eq!(verified[0].grant_index, 0);
+    assert_eq!(verified[1].grant_index, 1);
     assert_ne!(verified[0].root_grant_hash, verified[1].root_grant_hash);
     assert_ne!(verified[0].owner_id, verified[1].owner_id);
+    Ok(())
+}
+
+#[test]
+fn cumulative_approval_projection_preserves_sparse_grant_indices() -> TestResult {
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let mut grants = two_grant_scope().grants;
+    grants[1].constraints = vec![cumulative_constraint_for("budget-2", 8, 80)];
+    let mut gap = grants[0].clone();
+    gap.server_id = "gap-a".to_string();
+    gap.constraints.clear();
+    grants.insert(0, gap.clone());
+    gap.server_id = "gap-b".to_string();
+    grants.insert(2, gap);
+    let token = CapabilityToken::sign_cumulative_approval_family_root(
+        token_body(
+            "cap-sparse-grants",
+            &issuer.public_key(),
+            &subject.public_key(),
+            ChioScope {
+                grants,
+                ..ChioScope::default()
+            },
+        ),
+        &issuer,
+    )?;
+
+    let verified = verify_cumulative_approval_constraints(&token, &[issuer.public_key()], None)?;
+    let projected = verified
+        .iter()
+        .map(|constraint| {
+            (
+                constraint.approval_budget_id.as_str(),
+                constraint.grant_index,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(projected, vec![("budget-1", 1), ("budget-2", 3)]);
     Ok(())
 }
 

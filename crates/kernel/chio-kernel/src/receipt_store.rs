@@ -947,6 +947,7 @@ pub trait QualifiedAdmissionProjectionStore:
         recovery_lease: &crate::admission_operation::AdmissionRecoveryLease,
         request: crate::budget_store::BudgetAuthorizeHoldRequest,
         payment_journal: Option<crate::payment::PaymentJournalRecord>,
+        credit_exposure: Option<chio_credit::obligation::CreditExposureReservationRequest>,
         active_fence: &crate::admission_operation::StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<AdmissionBudgetAuthorization, AdmissionBudgetAuthorizationError>;

@@ -1,7 +1,17 @@
 use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{sha256_hex, Keypair};
+use chio_credit::factor::{
+    verify_assignment_agreement, verify_assignment_bind_authorization, AssignmentAgreementBodyV1,
+    AssignmentAgreementTrustV1, AssignmentAgreementVerificationV1,
+    AssignmentBindAuthorizationBodyV1, AssignmentBindAuthorizationInputV1,
+    AssignmentBindAuthorizationTrustV1, AssignmentBindAuthorizationVerificationV1,
+    AssignmentOfferV1, NormalizedAssignmentRequestInputV1, NormalizedAssignmentRequestV1,
+    ReceivableClaimInputV1, ReceivableClaimV1, SignedAssignmentAgreementV1,
+    SignedAssignmentBindAuthorizationV1, VerifiedAssignmentAuthorizationSetV1,
+};
 use chio_credit::obligation::{
-    verify_obligation_status_proof, ObligationAssignmentCasInputV1, ObligationAssignmentCasV1,
+    derive_obligation_payee_binding_digest, verify_obligation_status_proof,
+    ObligationAssignmentCasInputV1, ObligationAssignmentCasV1,
     ObligationAssignmentOperationSnapshotV1, ObligationAtomInputV1, ObligationAtomV1,
     ObligationCreditElectionV1, ObligationDispositionRecordV1, ObligationDispositionTransitionV1,
     ObligationDispositionV1, ObligationError, ObligationSettlementLifecycleV1,
@@ -61,7 +71,10 @@ fn fixture() -> Result<Fixture, ObligationError> {
         debtor_id: "did:chio:debtor".to_owned(),
         original_creditor_id: "did:chio:seller".to_owned(),
         original_settlement_destination_ref: "acct:seller".to_owned(),
-        payee_binding_digest: digest("status-payee"),
+        payee_binding_digest: derive_obligation_payee_binding_digest(
+            "did:chio:seller",
+            "acct:seller",
+        )?,
         amount: MonetaryAmount {
             units: 500,
             currency: "USD".to_owned(),
@@ -126,8 +139,9 @@ fn verify_status(
     lifecycle: &ObligationSettlementLifecycleV1,
     trusted_now_unix_ms: u64,
 ) -> Result<VerifiedObligationStatusProofV1, ObligationError> {
+    let canonical = signed.canonical_bytes()?;
     verify_obligation_status_proof(
-        signed,
+        &canonical,
         &ObligationStatusProofVerificationContextV1 {
             atom: &fixture.atom,
             disposition,
@@ -177,6 +191,133 @@ fn assignment_input(
     }
 }
 
+fn assignment_authorization(
+    fixture: &Fixture,
+    operation_id: &str,
+    agreement_id: &str,
+    action_nonce: &str,
+    disposition: &ObligationDispositionRecordV1,
+    lifecycle: &ObligationSettlementLifecycleV1,
+    authorization_expires_at_unix_ms: u64,
+) -> Result<
+    (
+        NormalizedAssignmentRequestV1,
+        VerifiedAssignmentAuthorizationSetV1,
+    ),
+    Box<dyn std::error::Error>,
+> {
+    let claim = ReceivableClaimV1::new(ReceivableClaimInputV1 {
+        obligation_id: fixture.atom.obligation_id().to_owned(),
+        obligation_atom_digest: fixture.atom.digest()?,
+        seller_id: fixture.atom.original_creditor_id().to_owned(),
+        receipt_id: fixture.atom.source_receipt_id().to_owned(),
+        receipt_digest: fixture.atom.source_receipt_digest().to_owned(),
+        iou_id: "iou-status-fixture".to_owned(),
+        iou_digest: digest("iou-status-fixture"),
+        payee_binding_digest: fixture.atom.payee_binding_digest().to_owned(),
+        status_proof_digest: digest("status-proof-fixture"),
+        face_value: fixture.atom.amount().clone(),
+        due_at_unix_ms: fixture.atom.due_at_unix_ms(),
+        built_at_unix_ms: fixture.atom.created_at_unix_ms(),
+    })?;
+    let offer = AssignmentOfferV1::new(&claim, 0, 200, 5_000)?;
+    let request = NormalizedAssignmentRequestV1::new(NormalizedAssignmentRequestInputV1 {
+        obligation_id: fixture.atom.obligation_id().to_owned(),
+        obligation_atom_digest: fixture.atom.digest()?,
+        claim_digest: claim.digest()?,
+        offer_digest: offer.digest()?,
+        seller_id: fixture.atom.original_creditor_id().to_owned(),
+        buyer_id: "did:chio:factor".to_owned(),
+        buyer_settlement_destination_ref: "acct:factor".to_owned(),
+        agreed_price: offer.minimum_price().clone(),
+        agreed_discount_bps: offer.asking_discount_bps(),
+        expected_disposition_version: disposition.version(),
+        expected_disposition_lifecycle_fence: disposition.lifecycle_fence(),
+        expected_settlement_lifecycle_version: lifecycle.version(),
+        expected_settlement_lifecycle_fence: lifecycle.lifecycle_fence(),
+        action_nonce: action_nonce.to_owned(),
+        effective_at_unix_ms: 1_050,
+        due_at_unix_ms: fixture.atom.due_at_unix_ms(),
+        expires_at_unix_ms: 1_500,
+    })?;
+    let normalized_request_digest = request.digest()?;
+    let signed = SignedAssignmentBindAuthorizationV1::sign(
+        AssignmentBindAuthorizationBodyV1::new(AssignmentBindAuthorizationInputV1 {
+            operation_id: operation_id.to_owned(),
+            normalized_request_digest: normalized_request_digest.clone(),
+            obligation_atom_digest: fixture.atom.digest()?,
+            seller_id: fixture.atom.original_creditor_id().to_owned(),
+            buyer_id: "did:chio:factor".to_owned(),
+            agreement_id: agreement_id.to_owned(),
+            buyer_settlement_destination_ref: "acct:factor".to_owned(),
+            effective_at_unix_ms: 1_050,
+            action_nonce: action_nonce.to_owned(),
+            issued_at_unix_ms: ISSUED_AT,
+            expires_at_unix_ms: authorization_expires_at_unix_ms,
+            authority_id: "assignment-authority".to_owned(),
+            authority_key_epoch: 5,
+        })?,
+        &fixture.signer,
+    )?;
+    let trust = AssignmentBindAuthorizationTrustV1::new(
+        "assignment-authority".to_owned(),
+        fixture.signer.public_key(),
+        5,
+        200,
+    )?;
+    let signed_bytes = signed.canonical_bytes()?;
+    let verified_bind = verify_assignment_bind_authorization(
+        &signed_bytes,
+        &AssignmentBindAuthorizationVerificationV1 {
+            operation_id,
+            normalized_request_digest: &normalized_request_digest,
+            obligation_atom_digest: &fixture.atom.digest()?,
+            seller_id: fixture.atom.original_creditor_id(),
+            buyer_id: "did:chio:factor",
+            agreement_id,
+            buyer_settlement_destination_ref: "acct:factor",
+            effective_at_unix_ms: 1_050,
+            action_nonce,
+            trust: &trust,
+            trusted_now_unix_ms: 1_050,
+        },
+    )?;
+    let agreement_body = AssignmentAgreementBodyV1::new(
+        agreement_id.to_owned(),
+        operation_id.to_owned(),
+        &request,
+        &claim,
+        &offer,
+        &verified_bind,
+    )?;
+    let seller = Keypair::from_seed(&[91; 32]);
+    let buyer = Keypair::from_seed(&[92; 32]);
+    let signed_agreement =
+        SignedAssignmentAgreementV1::sign(agreement_body, 11, &seller, 12, &buyer)?;
+    let agreement_bytes = signed_agreement.canonical_bytes()?;
+    let agreement_trust = AssignmentAgreementTrustV1::new(
+        fixture.atom.original_creditor_id().to_owned(),
+        seller.public_key(),
+        11,
+        "did:chio:factor".to_owned(),
+        buyer.public_key(),
+        12,
+    )?;
+    let verified_agreement = verify_assignment_agreement(
+        &agreement_bytes,
+        &AssignmentAgreementVerificationV1 {
+            operation_id,
+            normalized_request_digest: &normalized_request_digest,
+            assignment_authority_digest: verified_bind.envelope_digest(),
+            trust: &agreement_trust,
+        },
+    )?;
+    Ok((
+        request,
+        VerifiedAssignmentAuthorizationSetV1::new(verified_bind, verified_agreement)?,
+    ))
+}
+
 #[test]
 fn settlement_lifecycle_and_status_proof_are_canonical_and_exact() -> TestResult {
     let fixture = fixture()?;
@@ -203,9 +344,35 @@ fn settlement_lifecycle_and_status_proof_are_canonical_and_exact() -> TestResult
         &fixture.lifecycle,
         1_050,
     )?;
+    let identical_trust = ObligationStatusProofTrustV1::new(
+        "obligor-disposition-authority".to_owned(),
+        fixture.signer.public_key(),
+        3,
+        200,
+    )?;
+    let different_trust = ObligationStatusProofTrustV1::new(
+        "obligor-disposition-authority".to_owned(),
+        fixture.signer.public_key(),
+        3,
+        201,
+    )?;
+    assert_eq!(
+        fixture.trust.configuration_digest(),
+        identical_trust.configuration_digest()
+    );
+    assert_ne!(
+        fixture.trust.configuration_digest(),
+        different_trust.configuration_digest()
+    );
+    assert_eq!(
+        verified.trust_configuration_digest(),
+        fixture.trust.configuration_digest()
+    );
     assert_eq!(verified.body().proof_id().len(), 64);
     assert_eq!(verified.body_digest().len(), 64);
     assert_eq!(verified.envelope_digest().len(), 64);
+    assert_eq!(verified.signer_key(), &fixture.signer.public_key());
+    assert_eq!(verified.canonical_bytes(), canonical);
     assert_eq!(
         serde_json::to_value(verified.body())?
             .get("schema")
@@ -225,6 +392,15 @@ fn settlement_lifecycle_and_status_proof_are_canonical_and_exact() -> TestResult
         settled.state(),
         ObligationSettlementStateV1::Settled { .. }
     ));
+    fixture
+        .lifecycle
+        .validate_successor(&fixture.atom, &settled)?;
+    assert_eq!(
+        fixture
+            .lifecycle
+            .validate_successor(&fixture.atom, &fixture.lifecycle),
+        Err(ObligationError::IllegalDispositionTransition)
+    );
     assert_eq!(
         require_error(settled.advance(
             &fixture.atom,
@@ -242,6 +418,42 @@ fn settlement_lifecycle_and_status_proof_are_canonical_and_exact() -> TestResult
         SignedObligationStatusProofV1::from_canonical_bytes(&noncanonical),
         Err(ObligationError::Canonicalization(_))
     ));
+    assert!(matches!(
+        verify_obligation_status_proof(
+            &noncanonical,
+            &ObligationStatusProofVerificationContextV1 {
+                atom: &fixture.atom,
+                disposition: &fixture.disposition,
+                settlement_lifecycle: &fixture.lifecycle,
+                snapshot_version: SNAPSHOT_VERSION,
+                resource_fence: RESOURCE_FENCE,
+                trust: &fixture.trust,
+                trusted_now_unix_ms: 1_050,
+            },
+        ),
+        Err(ObligationError::Canonicalization(_))
+    ));
+    Ok(())
+}
+
+#[test]
+fn status_proof_rejects_issue_before_atom_creation() -> TestResult {
+    let fixture = fixture()?;
+    assert_eq!(
+        require_error(signed_status(
+            &fixture,
+            &StatusIssue {
+                disposition: &fixture.disposition,
+                lifecycle: &fixture.lifecycle,
+                issued_at_unix_ms: fixture.atom.created_at_unix_ms() - 1,
+                expires_at_unix_ms: EXPIRES_AT,
+                authority_id: "obligor-disposition-authority",
+                authority_key_epoch: 3,
+                signer: &fixture.signer,
+            },
+        )),
+        ObligationError::InvalidField("status_proof_window")
+    );
     Ok(())
 }
 
@@ -451,8 +663,17 @@ fn assignment_cas_requires_exact_authorization_and_has_one_winner() -> TestResul
         1_050,
     )?;
     let operation_id = digest("assignment-operation-1");
-    let request_digest = digest("assignment-request-1");
-    let authorization_digest = digest("assignment-authorization-1");
+    let (request, authorization) = assignment_authorization(
+        &fixture,
+        &operation_id,
+        "agreement-1",
+        "assignment-nonce-1",
+        &fixture.disposition,
+        &fixture.lifecycle,
+        EXPIRES_AT,
+    )?;
+    let request_digest = request.digest()?;
+    let authorization_digest = authorization.digest().to_owned();
     let operation = ObligationAssignmentOperationSnapshotV1::new(
         operation_id.clone(),
         request_digest.clone(),
@@ -472,17 +693,44 @@ fn assignment_cas_requires_exact_authorization_and_has_one_winner() -> TestResul
         require_error(ObligationAssignmentCasV1::new(
             operation.clone(),
             input.clone(),
+            authorization.clone(),
+            &request,
         )),
         ObligationError::MissingSupplementalAuthorization
     );
-    let attached = operation.attach_supplemental_authorization(&authorization_digest)?;
+    let attached = operation.attach_supplemental_authorization(&authorization)?;
+    let (replacement_request, replacement) = assignment_authorization(
+        &fixture,
+        &operation_id,
+        "agreement-1",
+        "assignment-nonce-1",
+        &fixture.disposition,
+        &fixture.lifecycle,
+        EXPIRES_AT - 1,
+    )?;
+    assert_eq!(replacement_request.digest()?, request_digest);
     assert_eq!(
-        require_error(
-            attached.attach_supplemental_authorization(&digest("replacement-authorization"))
-        ),
+        require_error(attached.attach_supplemental_authorization(&replacement)),
         ObligationError::SupplementalAuthorizationMismatch
     );
-    let assignment = ObligationAssignmentCasV1::new(attached, input)?;
+    let mut changed_agreement = input.clone();
+    changed_agreement.agreement_id = "replacement-agreement".to_owned();
+    let mut changed_destination = input.clone();
+    changed_destination.buyer_settlement_destination_ref = "acct:replacement".to_owned();
+    let mut changed_effective_at = input.clone();
+    changed_effective_at.effective_at_unix_ms += 1;
+    for changed in [changed_agreement, changed_destination, changed_effective_at] {
+        assert_eq!(
+            require_error(ObligationAssignmentCasV1::new(
+                attached.clone(),
+                changed,
+                authorization.clone(),
+                &request,
+            )),
+            ObligationError::CompareAndSwapConflict
+        );
+    }
+    let assignment = ObligationAssignmentCasV1::new(attached, input, authorization, &request)?;
     let assigned = fixture.disposition.compare_and_swap_assignment(
         &fixture.atom,
         &fixture.lifecycle,
@@ -499,19 +747,28 @@ fn assignment_cas_requires_exact_authorization_and_has_one_winner() -> TestResul
         }
     );
     assert_eq!(
-        assigned.compare_and_swap_assignment(
+        require_error(assigned.compare_and_swap_assignment(
             &fixture.atom,
             &fixture.lifecycle,
             &verified,
             &assignment,
             2_000,
-        )?,
-        assigned
+        )),
+        ObligationError::CompareAndSwapConflict
     );
 
     let competing_operation_id = digest("assignment-operation-2");
-    let competing_request = digest("assignment-request-2");
-    let competing_authorization = digest("assignment-authorization-2");
+    let (competing_request_body, competing_authorization) = assignment_authorization(
+        &fixture,
+        &competing_operation_id,
+        "agreement-2",
+        "assignment-nonce-2",
+        &fixture.disposition,
+        &fixture.lifecycle,
+        EXPIRES_AT,
+    )?;
+    let competing_request = competing_request_body.digest()?;
+    let competing_authorization_digest = competing_authorization.digest().to_owned();
     let competing_operation = ObligationAssignmentOperationSnapshotV1::new(
         competing_operation_id.clone(),
         competing_request.clone(),
@@ -526,10 +783,12 @@ fn assignment_cas_requires_exact_authorization_and_has_one_winner() -> TestResul
         assignment_input(
             competing_operation_id,
             competing_request,
-            competing_authorization,
+            competing_authorization_digest,
             verified.envelope_digest().to_owned(),
             "agreement-2",
         ),
+        competing_authorization,
+        &competing_request_body,
     )?;
     assert_eq!(
         require_error(assigned.compare_and_swap_assignment(
@@ -554,9 +813,18 @@ fn assignment_cas_rejects_stale_disposition_and_nonpending_settlement() -> TestR
         &fixture.lifecycle,
         1_050,
     )?;
-    let authorization = digest("stale-authorization");
     let operation_id = digest("stale-operation");
-    let request_digest = digest("stale-request");
+    let (request, authorization) = assignment_authorization(
+        &fixture,
+        &operation_id,
+        "agreement-stale",
+        "stale-nonce",
+        &fixture.disposition,
+        &fixture.lifecycle,
+        EXPIRES_AT,
+    )?;
+    let request_digest = request.digest()?;
+    let authorization_digest = authorization.digest().to_owned();
     let operation = ObligationAssignmentOperationSnapshotV1::new(
         operation_id.clone(),
         request_digest.clone(),
@@ -569,23 +837,18 @@ fn assignment_cas_rejects_stale_disposition_and_nonpending_settlement() -> TestR
     let mut stale_value = serde_json::to_value(&operation)?;
     stale_value["expectedDispositionVersion"] = serde_json::json!(2);
     let stale: ObligationAssignmentOperationSnapshotV1 = serde_json::from_value(stale_value)?;
-    let stale_assignment = ObligationAssignmentCasV1::new(
-        stale,
-        assignment_input(
-            operation_id,
-            request_digest,
-            authorization,
-            verified.envelope_digest().to_owned(),
-            "agreement-stale",
-        ),
-    )?;
     assert_eq!(
-        require_error(fixture.disposition.compare_and_swap_assignment(
-            &fixture.atom,
-            &fixture.lifecycle,
-            &verified,
-            &stale_assignment,
-            1_050,
+        require_error(ObligationAssignmentCasV1::new(
+            stale,
+            assignment_input(
+                operation_id,
+                request_digest,
+                authorization_digest,
+                verified.envelope_digest().to_owned(),
+                "agreement-stale",
+            ),
+            authorization,
+            &request,
         )),
         ObligationError::CompareAndSwapConflict
     );
@@ -618,8 +881,17 @@ fn assignment_cas_rejects_stale_disposition_and_nonpending_settlement() -> TestR
         1_050,
     )?;
     let settled_operation_id = digest("settled-operation");
-    let settled_request = digest("settled-request");
-    let settled_authorization = digest("settled-authorization");
+    let (settled_request_body, settled_authorization) = assignment_authorization(
+        &fixture,
+        &settled_operation_id,
+        "agreement-settled",
+        "settled-nonce",
+        &fixture.disposition,
+        &settled,
+        EXPIRES_AT,
+    )?;
+    let settled_request = settled_request_body.digest()?;
+    let settled_authorization_digest = settled_authorization.digest().to_owned();
     let settled_operation = ObligationAssignmentOperationSnapshotV1::new(
         settled_operation_id.clone(),
         settled_request.clone(),
@@ -634,10 +906,12 @@ fn assignment_cas_rejects_stale_disposition_and_nonpending_settlement() -> TestR
         assignment_input(
             settled_operation_id,
             settled_request,
-            settled_authorization,
+            settled_authorization_digest,
             settled_verified.envelope_digest().to_owned(),
             "agreement-settled",
         ),
+        settled_authorization,
+        &settled_request_body,
     )?;
     assert_eq!(
         require_error(fixture.disposition.compare_and_swap_assignment(

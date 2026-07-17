@@ -186,7 +186,9 @@ fn sqlite_uri_filesystem_path(text: &str) -> PathBuf {
     PathBuf::from(filesystem)
 }
 
-pub use admission_operation_store::{DurableObligationV1, SqliteAdmissionOperationStore};
+pub use admission_operation_store::{
+    CreditExposureAccountSnapshot, DurableObligationV1, SqliteAdmissionOperationStore,
+};
 pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use batch_approval_store::SqliteBatchApprovalStore;
@@ -277,6 +279,7 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
         recovery_lease: &chio_kernel::admission_operation::AdmissionRecoveryLease,
         request: chio_kernel::budget_store::BudgetAuthorizeHoldRequest,
         payment_journal: Option<chio_kernel::payment::PaymentJournalRecord>,
+        credit_exposure: Option<chio_kernel::CreditExposureReservationRequest>,
         active_fence: &chio_kernel::admission_operation::StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<
@@ -289,6 +292,7 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
             recovery_lease,
             request,
             payment_journal,
+            credit_exposure,
             active_fence,
             trusted_now_unix_ms,
         )
@@ -346,6 +350,23 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
         limit: usize,
     ) -> Result<Vec<chio_core::receipt::body::ChioReceipt>, chio_kernel::ReceiptStoreError> {
         self.list_terminal_receipts_after(after_receipt_id, limit)
+    }
+}
+
+impl chio_credit::obligation::CreditAdmissionStore
+    for admission_operation_store::SqliteAdmissionOperationStore
+{
+    fn lookup_record_by_operation(
+        &self,
+        operation_id: &str,
+    ) -> Result<
+        Option<chio_credit::obligation::CreditExposureReservationRecordV1>,
+        chio_credit::obligation::CreditAdmissionError,
+    > {
+        self.load_credit_exposure_reservation(operation_id)
+            .map_err(|error| {
+                chio_credit::obligation::CreditAdmissionError::Store(error.to_string())
+            })
     }
 }
 

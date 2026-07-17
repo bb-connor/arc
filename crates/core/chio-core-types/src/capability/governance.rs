@@ -18,6 +18,8 @@ use crate::signer_binding::{
 use super::runtime_attestation::{RuntimeAssuranceTier, RuntimeAttestationEvidence};
 use super::scope::MonetaryAmount;
 
+const GOVERNED_APPROVAL_TOKEN_DIGEST_DOMAIN: &[u8] = b"chio.governed-approval-token.digest.v1\0";
+
 /// Explicit governed autonomy tier requested for one economically sensitive action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -89,6 +91,68 @@ impl MeteredBillingQuote {
     }
 }
 
+pub const VERIFIED_OUTCOME_REQUEST_SCHEMA: &str = "chio.outcome.request.v1";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VerifiedOutcomeRequestV1 {
+    pub schema: String,
+    pub listing_id: String,
+    pub listing_digest: String,
+    pub provider_binding_digest: String,
+    pub pricing_id: String,
+    pub pricing_digest: String,
+    pub predicate_id: String,
+    pub predicate_digest: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sla_digest: Option<String>,
+    pub receiver_binding_digest: String,
+}
+
+impl VerifiedOutcomeRequestV1 {
+    pub fn validate(&self) -> Result<()> {
+        if self.schema != VERIFIED_OUTCOME_REQUEST_SCHEMA
+            || self.listing_id.is_empty()
+            || self.listing_id.trim() != self.listing_id
+            || self.listing_id.chars().count() > 2_048
+            || self.listing_id.chars().any(char::is_control)
+        {
+            return Err(Error::CanonicalJson(
+                "invalid verified outcome request identity".into(),
+            ));
+        }
+        let digests = [
+            self.listing_digest.as_str(),
+            self.provider_binding_digest.as_str(),
+            self.pricing_id.as_str(),
+            self.pricing_digest.as_str(),
+            self.predicate_id.as_str(),
+            self.predicate_digest.as_str(),
+            self.receiver_binding_digest.as_str(),
+        ];
+        if digests
+            .into_iter()
+            .chain(self.sla_digest.as_deref())
+            .any(|value| {
+                value.len() != 64
+                    || !value
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            })
+        {
+            return Err(Error::CanonicalJson(
+                "invalid verified outcome request digest".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn digest(&self) -> Result<String> {
+        self.validate()?;
+        canonical_json_bytes(self).map(|bytes| sha256_hex(&bytes))
+    }
+}
+
 /// Generic metered-billing context attached to a governed request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -100,6 +164,8 @@ pub struct MeteredBillingContext {
     /// Optional explicit upper bound on billable units for the request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_billed_units: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verified_outcome: Option<VerifiedOutcomeRequestV1>,
 }
 
 /// Delegated call-chain context bound into a governed request.
@@ -768,6 +834,8 @@ pub struct GovernedCommerceContext {
     pub seller: String,
     /// Shared payment token or equivalent external commerce approval reference.
     pub shared_payment_token_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settlement_destination_ref: Option<String>,
 }
 
 /// Decision encoded by a governed approval token.
@@ -880,6 +948,15 @@ impl GovernedApprovalToken {
     pub fn verify_signature(&self) -> Result<bool> {
         let body = self.body();
         self.approver.verify_canonical(&body, &self.signature)
+    }
+
+    pub fn artifact_digest(&self) -> Result<String> {
+        let canonical = canonical_json_bytes(self)?;
+        let mut preimage =
+            Vec::with_capacity(GOVERNED_APPROVAL_TOKEN_DIGEST_DOMAIN.len() + canonical.len());
+        preimage.extend_from_slice(GOVERNED_APPROVAL_TOKEN_DIGEST_DOMAIN);
+        preimage.extend_from_slice(&canonical);
+        Ok(sha256_hex(&preimage))
     }
 
     /// Verify the signature AND enforce the approval-token validity window in

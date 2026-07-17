@@ -9,6 +9,11 @@ use chio_appraisal::VerifiedRuntimeAttestationRecord;
 
 use super::*;
 
+#[path = "governed_validation/verified_outcome.rs"]
+mod verified_outcome;
+
+use verified_outcome::validate_verified_outcome_request;
+
 impl ChioKernel {
     fn governed_requirements(
         grant: &ToolGrant,
@@ -332,6 +337,7 @@ impl ChioKernel {
                     .to_string(),
             ));
         }
+        validate_verified_outcome_request(metered)?;
         if let Some(intent_amount) = intent.max_amount.as_ref() {
             if intent_amount.currency != quote.quoted_cost.currency {
                 return Err(KernelError::GovernedTransactionDenied(
@@ -1001,6 +1007,20 @@ impl ChioKernel {
                     "governed commerce approval requires an explicit max_amount bound".to_string(),
                 ));
             }
+            if commerce
+                .settlement_destination_ref
+                .as_deref()
+                .is_some_and(|destination| {
+                    destination.is_empty()
+                        || destination.trim() != destination
+                        || destination.chars().count() > 2_048
+                        || destination.chars().any(char::is_control)
+                })
+            {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed commerce settlement destination is invalid".to_string(),
+                ));
+            }
         }
 
         if let Some(required_seller) = required_seller.as_deref() {
@@ -1052,9 +1072,21 @@ impl ChioKernel {
             .map(|charge| charge.cost_charged)
             .or_else(|| intent.max_amount.as_ref().map(|amount| amount.units))
             .unwrap_or(0);
+        let economy_value_requires_payee =
+            charge_result.is_some_and(|charge| charge.cost_charged > 0) && commerce.is_some();
+        if economy_value_requires_payee
+            && commerce
+                .and_then(|commerce| commerce.settlement_destination_ref.as_ref())
+                .is_none()
+        {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed economy value requires an explicit settlement destination".to_string(),
+            ));
+        }
         let approval_required = approval_threshold_units
             .map(|threshold_units| requested_units >= threshold_units)
-            .unwrap_or(false);
+            .unwrap_or(false)
+            || economy_value_requires_payee;
 
         if let Some(approval_token) = request.approval_token.as_ref() {
             self.validate_governed_approval_token(request, cap, &intent_hash, approval_token, now)?;
@@ -1065,9 +1097,40 @@ impl ChioKernel {
             )));
         }
 
+        let verified_payee_binding = match (
+            economy_value_requires_payee,
+            commerce,
+            request.approval_token.as_ref(),
+        ) {
+            (true, Some(commerce), Some(approval_token)) => {
+                let settlement_destination_ref = commerce
+                    .settlement_destination_ref
+                    .as_ref()
+                    .ok_or_else(|| {
+                        KernelError::GovernedTransactionDenied(
+                            "governed economy value requires an explicit settlement destination"
+                                .to_string(),
+                        )
+                    })?;
+                Some(
+                    VerifiedGovernedPayeeBinding::new(
+                        commerce.seller.clone(),
+                        settlement_destination_ref.clone(),
+                        intent_hash,
+                        approval_token.artifact_digest().map_err(|error| {
+                            KernelError::GovernedTransactionDenied(error.to_string())
+                        })?,
+                    )
+                    .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?,
+                )
+            }
+            _ => None,
+        };
+
         Ok(Some(ValidatedGovernedAdmission {
             call_chain_proof: validated_upstream_call_chain_proof,
             verified_runtime_attestation,
+            verified_payee_binding,
         }))
     }
 

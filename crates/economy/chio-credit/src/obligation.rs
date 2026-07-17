@@ -3,8 +3,12 @@ use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::sha256_hex;
 use serde::{Deserialize, Serialize};
 
+mod credit_admission;
+mod credit_facility_bind;
 mod status;
 
+pub use credit_admission::*;
+pub use credit_facility_bind::*;
 pub use status::*;
 
 pub const OBLIGATION_ATOM_SCHEMA: &str = "chio.obligation.atom.v1";
@@ -13,11 +17,37 @@ pub const OBLIGATION_CLAIM_INDEX_V1: u32 = 0;
 
 const OBLIGATION_ID_DOMAIN: &str = "chio.obligation.id.v1";
 const OBLIGATION_ATOM_DIGEST_DOMAIN: &[u8] = b"chio.obligation.atom.digest.v1\0";
+const OBLIGATION_PAYEE_BINDING_DIGEST_DOMAIN: &[u8] = b"chio.obligation.payee-binding.digest.v1\0";
 const OBLIGATION_DISPOSITION_DIGEST_DOMAIN: &[u8] = b"chio.obligation.disposition.digest.v1\0";
 const OBLIGATION_TRANSITION_DIGEST_DOMAIN: &[u8] =
     b"chio.obligation.disposition-transition.digest.v1\0";
-const MAX_TEXT_BYTES: usize = 2_048;
+const MAX_TEXT_CHARS: usize = 2_048;
 const I_JSON_MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ObligationPayeeBindingDigestBodyV1<'a> {
+    beneficiary_id: &'a str,
+    settlement_destination_ref: &'a str,
+}
+
+pub fn derive_obligation_payee_binding_digest(
+    beneficiary_id: &str,
+    settlement_destination_ref: &str,
+) -> Result<String, ObligationError> {
+    validate_text("payee_beneficiary_id", beneficiary_id)?;
+    validate_text(
+        "payee_settlement_destination_ref",
+        settlement_destination_ref,
+    )?;
+    domain_digest(
+        OBLIGATION_PAYEE_BINDING_DIGEST_DOMAIN,
+        &ObligationPayeeBindingDigestBodyV1 {
+            beneficiary_id,
+            settlement_destination_ref,
+        },
+    )
+}
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ObligationError {
@@ -144,6 +174,13 @@ impl ObligationAtomV1 {
             &self.original_settlement_destination_ref,
         )?;
         validate_digest("payee_binding_digest", &self.payee_binding_digest)?;
+        if derive_obligation_payee_binding_digest(
+            &self.original_creditor_id,
+            &self.original_settlement_destination_ref,
+        )? != self.payee_binding_digest
+        {
+            return Err(ObligationError::InvalidField("payee_binding_digest"));
+        }
         validate_money(&self.amount)?;
         self.credit_election.validate()?;
         validate_digest(
@@ -475,6 +512,27 @@ impl ObligationDispositionRecordV1 {
         self.advance_inner(atom, transition)
     }
 
+    pub fn validate_successor(
+        &self,
+        atom: &ObligationAtomV1,
+        successor: &Self,
+    ) -> Result<(), ObligationError> {
+        self.validate_against(atom)?;
+        successor.validate_against(atom)?;
+        let expected = match self.advance_inner(atom, successor.last_transition.clone()) {
+            Ok(expected) => expected,
+            Err(ObligationError::IllegalDispositionTransition) => {
+                return Err(ObligationError::InvalidField("disposition_successor"));
+            }
+            Err(error) => return Err(error),
+        };
+        if &expected == successor {
+            Ok(())
+        } else {
+            Err(ObligationError::InvalidField("disposition_successor"))
+        }
+    }
+
     pub(super) fn advance_assignment(
         &self,
         atom: &ObligationAtomV1,
@@ -746,7 +804,7 @@ fn domain_digest<T: Serialize>(domain: &[u8], value: &T) -> Result<String, Oblig
 fn validate_text(field: &'static str, value: &str) -> Result<(), ObligationError> {
     if value.is_empty()
         || value.trim() != value
-        || value.len() > MAX_TEXT_BYTES
+        || value.chars().count() > MAX_TEXT_CHARS
         || value.chars().any(char::is_control)
     {
         Err(ObligationError::InvalidField(field))

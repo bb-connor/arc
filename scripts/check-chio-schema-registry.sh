@@ -8,6 +8,7 @@ python3 - "$REGISTRY" <<'PY'
 import json
 import hashlib
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -21,7 +22,8 @@ manifest_paths = []
 
 def is_schema_inventory_path(path):
     return path.endswith(".schema.json") or (
-        path.startswith("spec/schemas/chio-economy/") and path.endswith(".v1.json")
+        path.startswith("spec/schemas/chio-economy/")
+        and re.search(r"\.v[1-9][0-9]*\.json\Z", path) is not None
     )
 
 manifest_text = manifest_path.read_text(encoding="utf-8")

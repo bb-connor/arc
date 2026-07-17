@@ -593,6 +593,7 @@ struct GovernedAcpIntentFixture<'a> {
     purpose: &'a str,
     seller: &'a str,
     shared_payment_token_id: &'a str,
+    settlement_destination_ref: Option<&'a str>,
     units: u64,
     currency: &'a str,
 }
@@ -610,6 +611,7 @@ fn make_governed_acp_intent(fixture: GovernedAcpIntentFixture<'_>) -> GovernedTr
         commerce: Some(chio_core::capability::governance::GovernedCommerceContext {
             seller: fixture.seller.to_string(),
             shared_payment_token_id: fixture.shared_payment_token_id.to_string(),
+            settlement_destination_ref: fixture.settlement_destination_ref.map(str::to_string),
         }),
         metered_billing: None,
         runtime_attestation: None,
@@ -798,6 +800,7 @@ fn make_metered_billing_context(
             expires_at: Some(now + 300),
         },
         max_billed_units: Some(units + 4),
+        verified_outcome: None,
     }
 }
 

@@ -128,6 +128,7 @@ fn durable_monetary_lifecycle_uses_the_qualified_projection_store() {
             mutation.charge_result(),
             Some(&admission),
             now + 1,
+            None,
         )
         .expect("durable payment authorization")
         .expect("payment authorization");
@@ -149,6 +150,7 @@ fn durable_monetary_lifecycle_uses_the_qualified_projection_store() {
             mutation.charge_result(),
             Some(&admission),
             now + 2,
+            None,
         )
         .expect("replay durable payment authorization")
         .expect("replayed payment authorization");

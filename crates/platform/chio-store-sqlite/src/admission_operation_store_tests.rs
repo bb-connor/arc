@@ -48,6 +48,12 @@ use super::*;
 mod anchored_terminal;
 #[path = "admission_operation_store_tests/budget_atomicity.rs"]
 mod budget_atomicity;
+#[path = "admission_operation_store_tests/credit_authorization.rs"]
+mod credit_authorization;
+#[path = "admission_operation_store_tests/credit_exposure.rs"]
+mod credit_exposure;
+#[path = "admission_operation_store_tests/factor_assignment.rs"]
+mod factor_assignment;
 #[path = "admission_operation_store_tests/integrity.rs"]
 mod integrity;
 #[path = "admission_operation_store_tests/obligation.rs"]

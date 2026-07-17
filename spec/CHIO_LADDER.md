@@ -708,12 +708,18 @@ and [../crates/economy/chio-settle/src/lib.rs](../crates/economy/chio-settle/src
       "evidence_required": ["trust_activation", "workflow_receipt", "anchor_epoch"],
       "co_sign": "bilateral_required",
       "consistency_model": "totally-ordered",
-      "consistency_anchor": "chio-anchor",
-      "partition_fallback": {
-        "lease_kind": "narrow_destructive",
-        "blast_radius_cap": { "unit": "amount_minor", "max": 10000 },
-        "ttl_secs": 300
-      }
+      "consistency_anchor": "chio-anchor"
+    },
+    {
+      "id": "factor.assignment_bind",
+      "title": "Receivable assignment binding",
+      "mode": "receipt_backed",
+      "destructive": true,
+      "cross_org_visibility": "federated",
+      "evidence_required": ["trust_activation", "workflow_receipt"],
+      "co_sign": "bilateral_required",
+      "consistency_model": "totally-ordered",
+      "consistency_anchor": "hash-chain"
     },
     {
       "id": "market.liability_auto_bind",
@@ -792,6 +798,23 @@ and [../crates/economy/chio-settle/src/lib.rs](../crates/economy/chio-settle/src
   ]
 }
 ```
+
+For `credit.facility_bind`, `bilateral_required` means signatures from the
+debtor and original creditor over the exact credit admission terms. The
+configured facility authority signs the same body, including the operation and
+request, facility authority evidence, exposure version and fence, scope, payee,
+amount and effective ceiling, nonce, due date, and validity window. Completion
+requires the matching online authoritative exposure compare-and-swap. Receipts,
+audit chains, anchoring, and leases never substitute for that compare-and-swap,
+and this action class has no partition fallback.
+
+For `factor.assignment_bind`, `bilateral_required` means signatures from the
+seller and buyer over the exact assignment agreement. The `hash-chain` anchor
+is the authoritative obligor's obligation-head version and resource-fence
+chain. Completion additionally requires a fresh signed status proof and the
+signed acknowledgement produced by the online obligor compare-and-swap. The
+audit chain and optional anchoring never substitute for that compare-and-swap,
+and this action class has no partition fallback.
 
 Workflow composition in the Chio verifier uses two verifier-owned
 classes layered over this profile:
