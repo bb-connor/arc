@@ -9,17 +9,18 @@ pub(crate) use terminal::DurableToolReturnInput;
 
 use super::*;
 use crate::admission_operation::{
-    AdmissionAttachment, AdmissionBeginResult, AdmissionCompensationStatus,
-    AdmissionCompletedProjection, AdmissionDigest, AdmissionDispatchState, AdmissionIdentifier,
-    AdmissionMutationGuard, AdmissionMutationSequencer, AdmissionOperationBindingInputV1,
-    AdmissionOperationBindingV1, AdmissionOperationCommand, AdmissionOperationKind,
-    AdmissionOperationState, AdmissionOperationV1, AdmissionParticipantRequirements,
-    AdmissionProjectionContext, AdmissionReceiptMetadataV1, AdmissionReceiptSchema,
-    AdmissionRequestBindingV1, AdmissionTerminalProjection, AdmissionTerminalReplay,
-    AuthenticatedRequestNamespace, ObservationAttemptZero, PaymentTerminalEvidence,
-    ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt,
-    QualifiedChannelTerminalAuthority, SideEffectClass, StoreMutationFence,
-    VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY, LOCAL_SYSTEM_TENANT_ID,
+    verified_outcome_unknown_after_dispatch_projection, AdmissionAttachment, AdmissionBeginResult,
+    AdmissionCompensationStatus, AdmissionCompletedProjection, AdmissionDigest,
+    AdmissionDispatchState, AdmissionIdentifier, AdmissionMutationGuard,
+    AdmissionMutationSequencer, AdmissionOperationBindingInputV1, AdmissionOperationBindingV1,
+    AdmissionOperationCommand, AdmissionOperationKind, AdmissionOperationState,
+    AdmissionOperationV1, AdmissionParticipantRequirements, AdmissionProjectionContext,
+    AdmissionReceiptMetadataV1, AdmissionReceiptSchema, AdmissionRequestBindingV1,
+    AdmissionTerminalProjection, AdmissionTerminalReplay, AuthenticatedRequestNamespace,
+    ObservationAttemptZero, PaymentTerminalEvidence, ProviderAttemptBindingV1,
+    QualifiedAdmissionOperationStoreExt, QualifiedChannelTerminalAuthority, SideEffectClass,
+    StoreMutationFence, VerifiedAdmissionReceipt, ADMISSION_RECEIPT_METADATA_KEY,
+    LOCAL_SYSTEM_TENANT_ID,
 };
 use crate::budget_store::{
     BudgetAdmissionBinding, BudgetCaptureInvocationRequest, BudgetEventAuthority,
@@ -270,6 +271,68 @@ impl ChioKernel {
             })?;
             after_receipt_id = page.last().map(|receipt| receipt.id.clone());
         }
+    }
+
+    pub fn reconcile_recoverable_admissions(&self) -> Result<usize, KernelError> {
+        const PAGE_LIMIT: usize = 256;
+
+        let Some(runtime) = self.durable_admission_runtime.as_ref() else {
+            return Ok(0);
+        };
+        let _mutation_guard = runtime.lock_mutations()?;
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(current_unix_timestamp_ms());
+        let recoverable = runtime
+            .store
+            .list_recoverable(trusted_now_unix_ms, PAGE_LIMIT)
+            .map_err(durable_store_error)?;
+        if recoverable.len() > PAGE_LIMIT {
+            return Err(KernelError::DurableAdmission(
+                "admission recovery store exceeded the requested page limit".to_owned(),
+            ));
+        }
+        let mut reconciled = 0_usize;
+        for operation in recoverable {
+            if operation.state() != AdmissionOperationState::DispatchCommitted {
+                continue;
+            }
+            if runtime
+                .outcome_store
+                .lookup_by_operation(operation.binding().operation_id())
+                .map_err(durable_outcome_store_error)?
+                .is_some()
+            {
+                return Err(KernelError::DurableAdmission(
+                    "dispatch-committed admission already has a durable tool outcome".to_owned(),
+                ));
+            }
+            let lease = self.claim_admission_recovery(&operation, trusted_now_unix_ms)?;
+            let context = AdmissionProjectionContext {
+                operation_id: operation.binding().operation_id().clone(),
+                request_id: operation.binding().request_id().clone(),
+                expected_operation_version: operation.version(),
+                trusted_time_unix_ms: trusted_now_unix_ms,
+                coordinator_lease_id: lease.coordinator_lease_id().clone(),
+                coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+                store_fence: runtime.fence.clone(),
+            };
+            let projection =
+                verified_outcome_unknown_after_dispatch_projection(&operation, context)?;
+            let terminal = runtime
+                .store
+                .commit_admission_projection(&projection)
+                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            if terminal.operation_id != *operation.binding().operation_id()
+                || terminal.state != AdmissionOperationState::OutcomeUnknownAfterDispatch
+            {
+                return Err(KernelError::DurableAdmission(
+                    "admission recovery committed a different terminal operation".to_owned(),
+                ));
+            }
+            reconciled = reconciled.checked_add(1).ok_or_else(|| {
+                KernelError::DurableAdmission("admission recovery count overflow".to_owned())
+            })?;
+        }
+        Ok(reconciled)
     }
 
     pub(crate) fn begin_durable_tool_admission(

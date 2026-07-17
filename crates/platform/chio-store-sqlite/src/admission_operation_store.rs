@@ -63,7 +63,7 @@ use participant::{
 };
 use projection::{
     ensure_projection_absent, full_projection_capabilities, insert_terminal_projection,
-    insert_verified_terminal_projection, terminal_from_operation,
+    insert_verified_terminal_projection, projected_terminal_state, terminal_from_operation,
     validate_canonical_projection_size, verify_exact_signed_terminal_replay,
     verify_exact_terminal_replay, verify_stored_terminal_projection,
 };
@@ -464,6 +464,7 @@ impl SqliteAdmissionOperationStore {
             &transaction,
             &stored.operation,
             context,
+            projected_terminal_state(projection),
             canonical.records().iter().filter_map(|record| {
                 (record.commitment().kind() == AdmissionProjectionRecordKind::PaymentTerminal)
                     .then_some(record.canonical_bytes())

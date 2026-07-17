@@ -642,7 +642,9 @@ pub(super) fn verify_exact_signed_terminal_replay(
     terminal_from_operation(&stored_operation.operation)
 }
 
-fn projected_terminal_state(projection: &AdmissionTerminalProjection) -> AdmissionOperationState {
+pub(super) fn projected_terminal_state(
+    projection: &AdmissionTerminalProjection,
+) -> AdmissionOperationState {
     match projection {
         AdmissionTerminalProjection::Completed(_) => AdmissionOperationState::Completed,
         AdmissionTerminalProjection::CompensatedBeforeDispatch { .. } => {

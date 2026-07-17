@@ -30,6 +30,8 @@ mod economic_cancellation;
 pub use economic_cancellation::*;
 mod pre_dispatch_compensation;
 pub use pre_dispatch_compensation::*;
+mod outcome_unknown;
+pub use outcome_unknown::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AdmissionReceiptSchema {

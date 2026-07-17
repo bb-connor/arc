@@ -1,6 +1,7 @@
 use std::error::Error;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::capability::{
@@ -10,18 +11,22 @@ use chio_core::capability::{
 use chio_core::crypto::{sha256_hex, Keypair};
 use chio_kernel::admission_operation::{
     AdmissionOperationState, AdmissionOperationStore, AdmissionReceiptMetadataV1,
-    ADMISSION_RECEIPT_METADATA_KEY,
+    AdmissionRecoveryLease, StoreMutationFence, ADMISSION_RECEIPT_METADATA_KEY,
 };
-use chio_kernel::tool_outcome::ToolOutcomeStore;
+use chio_kernel::tool_outcome::{
+    CanonicalInvocationBlobV1, CanonicalResolvedOutputBlobV1, PostReturnEvaluationRecordV1,
+    QualifiedToolOutcomeStore, RawInvocationOutcomeV1, ToolOutcomeInsertResultV1,
+    ToolOutcomeRecordV1, ToolOutcomeStore, ToolOutcomeStoreError,
+};
 use chio_kernel::{
-    ChioKernel, KernelConfig, KernelError, NestedFlowBridge, PaymentAdapter, PaymentAuthorization,
-    PaymentAuthorizationState, PaymentAuthorizeRequest, PaymentError, PaymentJournalState,
-    PaymentRailMode, PaymentReleaseAuthorityKind, PaymentResult, PaymentSettleAction,
-    RailSettlementStatus, ReceiptStore, ToolCallRequest, ToolInvocationCost, ToolServerConnection,
-    Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    BudgetStore, ChioKernel, KernelConfig, KernelError, NestedFlowBridge, PaymentAdapter,
+    PaymentAuthorization, PaymentAuthorizationState, PaymentAuthorizeRequest, PaymentError,
+    PaymentJournalState, PaymentRailMode, PaymentReleaseAuthorityKind, PaymentResult,
+    PaymentSettleAction, RailSettlementStatus, ReceiptStore, ToolCallRequest, ToolInvocationCost,
+    ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
-use chio_store_sqlite::SqliteAuthorityStore;
+use chio_store_sqlite::{SqliteAuthorityStore, SqliteToolOutcomeStore};
 
 struct MutationServer {
     invocations: Arc<AtomicU64>,
@@ -29,7 +34,27 @@ struct MutationServer {
 
 struct ZeroCostMutationServer;
 
-struct ReversiblePaymentAdapter;
+struct PaidMutationServer {
+    invocations: Arc<AtomicU64>,
+}
+
+#[derive(Default)]
+struct ReversiblePaymentAdapter {
+    calls: Option<Arc<PaymentCalls>>,
+}
+
+#[derive(Default)]
+struct PaymentCalls {
+    authorizations: AtomicU64,
+    captures: AtomicU64,
+    releases: AtomicU64,
+    refunds: AtomicU64,
+}
+
+struct FailOnceOutcomeStore {
+    inner: SqliteToolOutcomeStore,
+    fail_record: AtomicBool,
+}
 
 #[async_trait::async_trait]
 impl ToolServerConnection for MutationServer {
@@ -92,6 +117,47 @@ impl ToolServerConnection for ZeroCostMutationServer {
     }
 }
 
+#[async_trait::async_trait]
+impl ToolServerConnection for PaidMutationServer {
+    fn server_id(&self) -> &str {
+        "sqlite-durable-paid-server"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["mutate".to_owned()]
+    }
+
+    async fn invoke(
+        &self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        self.invocations.fetch_add(1, Ordering::SeqCst);
+        Ok(serde_json::json!({
+            "tool": tool_name,
+            "echo": arguments,
+        }))
+    }
+
+    async fn invoke_with_cost(
+        &self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
+        let output = self.invoke(tool_name, arguments, bridge).await?;
+        Ok((
+            output,
+            Some(ToolInvocationCost {
+                units: 5,
+                currency: "USD".to_owned(),
+                breakdown: None,
+            }),
+        ))
+    }
+}
+
 impl PaymentAdapter for ReversiblePaymentAdapter {
     fn rail_id(&self) -> &'static str {
         "sqlite-test-reversible"
@@ -105,6 +171,9 @@ impl PaymentAdapter for ReversiblePaymentAdapter {
         &self,
         request: &PaymentAuthorizeRequest,
     ) -> Result<PaymentAuthorization, PaymentError> {
+        if let Some(calls) = &self.calls {
+            calls.authorizations.fetch_add(1, Ordering::SeqCst);
+        }
         Ok(PaymentAuthorization {
             authorization_id: format!("authorization:{}", request.reference),
             state: PaymentAuthorizationState::Held,
@@ -119,6 +188,9 @@ impl PaymentAdapter for ReversiblePaymentAdapter {
         _currency: &str,
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
+        if let Some(calls) = &self.calls {
+            calls.captures.fetch_add(1, Ordering::SeqCst);
+        }
         Ok(PaymentResult {
             transaction_id: authorization_id.to_owned(),
             settlement_status: RailSettlementStatus::Settled,
@@ -131,6 +203,9 @@ impl PaymentAdapter for ReversiblePaymentAdapter {
         authorization_id: &str,
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
+        if let Some(calls) = &self.calls {
+            calls.releases.fetch_add(1, Ordering::SeqCst);
+        }
         Ok(PaymentResult {
             transaction_id: format!("release:{authorization_id}"),
             settlement_status: RailSettlementStatus::Released,
@@ -145,6 +220,9 @@ impl PaymentAdapter for ReversiblePaymentAdapter {
         _currency: &str,
         _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
+        if let Some(calls) = &self.calls {
+            calls.refunds.fetch_add(1, Ordering::SeqCst);
+        }
         Ok(PaymentResult {
             transaction_id: transaction_id.to_owned(),
             settlement_status: RailSettlementStatus::Refunded,
@@ -152,6 +230,121 @@ impl PaymentAdapter for ReversiblePaymentAdapter {
         })
     }
 }
+
+impl ToolOutcomeStore for FailOnceOutcomeStore {
+    fn record_tool_returned(
+        &self,
+        operation: &chio_kernel::admission_operation::AdmissionOperationV1,
+        recovery_lease: &AdmissionRecoveryLease,
+        blob: &CanonicalInvocationBlobV1,
+        record: &ToolOutcomeRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<ToolOutcomeInsertResultV1, ToolOutcomeStoreError> {
+        if self.fail_record.swap(false, Ordering::SeqCst) {
+            return Err(ToolOutcomeStoreError::Unavailable(
+                "injected tool outcome write failure".to_owned(),
+            ));
+        }
+        self.inner.record_tool_returned(
+            operation,
+            recovery_lease,
+            blob,
+            record,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn lookup_by_operation(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+    ) -> Result<Option<ToolOutcomeRecordV1>, ToolOutcomeStoreError> {
+        self.inner.lookup_by_operation(operation_id)
+    }
+
+    fn load_raw_invocation_by_operation(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+    ) -> Result<Option<RawInvocationOutcomeV1>, ToolOutcomeStoreError> {
+        self.inner.load_raw_invocation_by_operation(operation_id)
+    }
+
+    fn lookup_post_return_evaluation(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+    ) -> Result<Option<PostReturnEvaluationRecordV1>, ToolOutcomeStoreError> {
+        self.inner.lookup_post_return_evaluation(operation_id)
+    }
+
+    fn begin_post_return_evaluation(
+        &self,
+        recovery_lease: &AdmissionRecoveryLease,
+        record: &PostReturnEvaluationRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeStoreError> {
+        self.inner.begin_post_return_evaluation(
+            recovery_lease,
+            record,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn stage_post_return_evaluation(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+        expected_version: u64,
+        recovery_lease: &AdmissionRecoveryLease,
+        next: &PostReturnEvaluationRecordV1,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<PostReturnEvaluationRecordV1, ToolOutcomeStoreError> {
+        self.inner.stage_post_return_evaluation(
+            operation_id,
+            expected_version,
+            recovery_lease,
+            next,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn finalize_post_return(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+        expected_evaluation_version: u64,
+        recovery_lease: &AdmissionRecoveryLease,
+        terminal_evaluation: &PostReturnEvaluationRecordV1,
+        expected_outcome_version: u64,
+        terminal_outcome: &ToolOutcomeRecordV1,
+        resolved_output: Option<&CanonicalResolvedOutputBlobV1>,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(PostReturnEvaluationRecordV1, ToolOutcomeRecordV1), ToolOutcomeStoreError> {
+        self.inner.finalize_post_return(
+            operation_id,
+            expected_evaluation_version,
+            recovery_lease,
+            terminal_evaluation,
+            expected_outcome_version,
+            terminal_outcome,
+            resolved_output,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+    }
+
+    fn load_resolved_output_by_operation(
+        &self,
+        operation_id: &chio_kernel::admission_operation::AdmissionOperationId,
+    ) -> Result<Option<CanonicalResolvedOutputBlobV1>, ToolOutcomeStoreError> {
+        self.inner.load_resolved_output_by_operation(operation_id)
+    }
+}
+
+impl QualifiedToolOutcomeStore for FailOnceOutcomeStore {}
 
 fn kernel_config(keypair: Keypair) -> KernelConfig {
     KernelConfig {
@@ -212,6 +405,28 @@ fn zero_charge_scope() -> ChioScope {
     }
 }
 
+fn paid_scope() -> ChioScope {
+    ChioScope {
+        grants: vec![ToolGrant {
+            server_id: "sqlite-durable-paid-server".to_owned(),
+            tool_name: "mutate".to_owned(),
+            operations: vec![Operation::Invoke],
+            constraints: Vec::new(),
+            max_invocations: None,
+            max_cost_per_invocation: Some(MonetaryAmount {
+                units: 10,
+                currency: "USD".to_owned(),
+            }),
+            max_total_cost: Some(MonetaryAmount {
+                units: 100,
+                currency: "USD".to_owned(),
+            }),
+            dpop_required: None,
+        }],
+        ..ChioScope::default()
+    }
+}
+
 fn request(capability: &CapabilityToken) -> ToolCallRequest {
     ToolCallRequest {
         request_id: "sqlite-durable-terminal".to_owned(),
@@ -244,6 +459,146 @@ fn zero_charge_request(capability: &CapabilityToken) -> ToolCallRequest {
         model_metadata: None,
         federated_origin_kernel_id: None,
     }
+}
+
+fn paid_request(capability: &CapabilityToken) -> ToolCallRequest {
+    ToolCallRequest {
+        request_id: "sqlite-durable-unknown-outcome".to_owned(),
+        capability: capability.clone(),
+        tool_name: "mutate".to_owned(),
+        server_id: "sqlite-durable-paid-server".to_owned(),
+        agent_id: capability.subject.to_hex(),
+        arguments: serde_json::json!({"record": "ledger-unknown", "value": "committed"}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    }
+}
+
+fn now_unix_ms() -> Result<u64, Box<dyn Error>> {
+    Ok(u64::try_from(
+        SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis(),
+    )?)
+}
+
+#[test]
+fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
+) -> Result<(), Box<dyn Error>> {
+    let temp = tempfile::tempdir()?;
+    let database = temp.path().join("authority.db");
+    let lock_root = temp.path().join("locks");
+    std::fs::create_dir(&lock_root)?;
+    SqliteAuthorityStore::provision(&database, &lock_root)?;
+    let kernel_keypair = Keypair::generate();
+    let invocations = Arc::new(AtomicU64::new(0));
+    let payment_calls = Arc::new(PaymentCalls::default());
+
+    let (operation_id, capability_id, usage_before) = {
+        let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+        let fence = authority.mutation_fence();
+        let operations = Arc::new(authority.admission_operation_store());
+        let outcomes = authority.tool_outcome_store();
+        let budget = Arc::new(authority.budget_store());
+        let mut kernel = ChioKernel::new(kernel_config(kernel_keypair.clone()));
+        kernel.set_durable_admission_store(
+            operations.clone(),
+            Arc::new(FailOnceOutcomeStore {
+                inner: outcomes,
+                fail_record: AtomicBool::new(true),
+            }),
+            fence.clone(),
+        )?;
+        kernel.set_budget_store_handle(budget.clone());
+        kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
+            calls: Some(payment_calls.clone()),
+        }));
+        kernel.register_tool_server(Box::new(PaidMutationServer {
+            invocations: invocations.clone(),
+        }));
+        let agent = Keypair::generate();
+        let capability = kernel.issue_capability(&agent.public_key(), paid_scope(), 300)?;
+        let request = paid_request(&capability);
+        let error = kernel
+            .evaluate_tool_call_blocking(&request)
+            .err()
+            .ok_or_else(|| std::io::Error::other("the injected outcome write must fail"))?;
+        assert!(matches!(
+            error,
+            KernelError::DurableAdmission(ref reason)
+                if reason.contains("injected tool outcome write failure")
+        ));
+        let recoverable = operations.list_recoverable(now_unix_ms()? + 120_000, 10)?;
+        assert_eq!(recoverable.len(), 1);
+        let operation = &recoverable[0];
+        assert_eq!(
+            operation.state(),
+            AdmissionOperationState::DispatchCommitted
+        );
+        let journal = operations
+            .load_payment_journal(operation.binding().operation_id().as_str(), &fence)?
+            .ok_or_else(|| std::io::Error::other("payment journal is absent"))?;
+        assert_eq!(journal.state, PaymentJournalState::Authorized);
+        let usage = budget
+            .get_usage(&capability.id, 0)?
+            .ok_or_else(|| std::io::Error::other("budget usage is absent"))?;
+        assert_eq!(usage.total_cost_exposed, 10);
+        (
+            operation.binding().operation_id().clone(),
+            capability.id,
+            usage,
+        )
+    };
+
+    let authority = SqliteAuthorityStore::open_serving(&database, &lock_root)?;
+    let fence = authority.mutation_fence();
+    let operations = Arc::new(authority.admission_operation_store());
+    let outcomes = Arc::new(authority.tool_outcome_store());
+    let budget = Arc::new(authority.budget_store());
+    let mut recovered_kernel = ChioKernel::new(kernel_config(kernel_keypair));
+    recovered_kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
+    recovered_kernel.set_budget_store_handle(budget.clone());
+    recovered_kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
+        calls: Some(payment_calls.clone()),
+    }));
+    recovered_kernel.register_tool_server(Box::new(PaidMutationServer {
+        invocations: invocations.clone(),
+    }));
+
+    assert_eq!(recovered_kernel.reconcile_recoverable_admissions()?, 1);
+    assert_eq!(recovered_kernel.reconcile_recoverable_admissions()?, 0);
+    let retained = operations
+        .load_by_operation_id(&operation_id)?
+        .ok_or_else(|| std::io::Error::other("recovered operation is absent"))?;
+    assert_eq!(
+        retained.state(),
+        AdmissionOperationState::OutcomeUnknownAfterDispatch
+    );
+    let replay = retained
+        .terminal_replay()
+        .ok_or_else(|| std::io::Error::other("incident replay is absent"))?;
+    let stored_replay = operations
+        .load_terminal_replay(&retained.replay_key())?
+        .ok_or_else(|| std::io::Error::other("stored incident replay is absent"))?;
+    assert_eq!(&stored_replay, replay);
+    let journal = operations
+        .load_payment_journal(operation_id.as_str(), &fence)?
+        .ok_or_else(|| std::io::Error::other("recovered payment journal is absent"))?;
+    assert_eq!(journal.state, PaymentJournalState::Authorized);
+    assert_eq!(
+        budget
+            .get_usage(&capability_id, 0)?
+            .ok_or_else(|| std::io::Error::other("recovered budget usage is absent"))?,
+        usage_before
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(payment_calls.authorizations.load(Ordering::SeqCst), 1);
+    assert_eq!(payment_calls.captures.load(Ordering::SeqCst), 0);
+    assert_eq!(payment_calls.releases.load(Ordering::SeqCst), 0);
+    assert_eq!(payment_calls.refunds.load(Ordering::SeqCst), 0);
+    Ok(())
 }
 
 #[test]
@@ -340,7 +695,7 @@ fn sqlite_durable_zero_charge_persists_release_evidence_and_reopens_cleanly(
         let mut kernel = ChioKernel::new(kernel_config(kernel_keypair));
         kernel.set_durable_admission_store(operations.clone(), outcomes, fence.clone())?;
         kernel.set_budget_store_handle(budget);
-        kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter));
+        kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter::default()));
         kernel.register_tool_server(Box::new(ZeroCostMutationServer));
         let agent = Keypair::generate();
         let capability = kernel.issue_capability(&agent.public_key(), zero_charge_scope(), 300)?;

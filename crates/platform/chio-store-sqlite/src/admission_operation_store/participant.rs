@@ -111,6 +111,7 @@ impl SqliteAdmissionOperationStore {
             transaction,
             &stored.operation,
             context,
+            verified.terminal_operation().state(),
             verified.records().iter().filter_map(|record| {
                 (record.kind() == AdmissionProjectionRecordKind::PaymentTerminal)
                     .then_some(record.canonical_json())
@@ -253,6 +254,7 @@ fn verify_anchored_terminal_authority(
         transaction,
         &stored.operation,
         context,
+        verified.terminal_operation().state(),
         verified.records().iter().filter_map(|record| {
             (record.kind() == AdmissionProjectionRecordKind::PaymentTerminal)
                 .then_some(record.canonical_json())
@@ -500,10 +502,43 @@ pub(super) fn verify_payment_terminal_source<'a>(
     transaction: &Transaction<'_>,
     operation: &AdmissionOperationV1,
     context: &chio_kernel::admission_operation::AdmissionProjectionContext,
+    terminal_state: AdmissionOperationState,
     records: impl Iterator<Item = &'a [u8]>,
 ) -> Result<(), AdmissionOperationStoreError> {
     let records = records.collect::<Vec<_>>();
     let requires_payment = operation.binding().participant_requirements().payment;
+    if terminal_state == AdmissionOperationState::OutcomeUnknownAfterDispatch {
+        if !records.is_empty() {
+            return Err(AdmissionOperationError::TerminalProjectionBindingMismatch.into());
+        }
+        if !requires_payment {
+            return Ok(());
+        }
+        let journal = crate::budget_store::load_payment_journal(
+            transaction,
+            operation.binding().operation_id().as_str(),
+        )
+        .map_err(|error| AdmissionOperationStoreError::Invariant(error.to_string()))?
+        .ok_or_else(|| {
+            AdmissionOperationStoreError::Invariant(
+                "unknown payment outcome lost its authorization journal".to_owned(),
+            )
+        })?;
+        journal
+            .validate()
+            .map_err(|error| AdmissionOperationStoreError::Invariant(error.to_string()))?;
+        if journal.state != chio_kernel::payment::PaymentJournalState::Authorized
+            || journal.settle_action.is_some()
+            || journal.settle_amount_units.is_some()
+            || journal.release_authority.is_some()
+            || journal.transaction_id.is_some()
+        {
+            return Err(AdmissionOperationStoreError::Invariant(
+                "unknown payment outcome must retain an unmoved authorization".to_owned(),
+            ));
+        }
+        return Ok(());
+    }
     if records.len() != usize::from(requires_payment) {
         return Err(AdmissionOperationError::TerminalProjectionBindingMismatch.into());
     }

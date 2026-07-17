@@ -140,7 +140,7 @@ fn anchored_channel_view(
     let operation_id = lifecycle.operation_id.clone();
     let effect_idempotency_key = operation_id
         .as_ref()
-        .map(|operation_id| channel_digest(operation_id));
+        .map(channel_digest);
     let channel_state = EconomicContentV1::Inline {
         value: serde_json::to_value(lifecycle)?,
     };
