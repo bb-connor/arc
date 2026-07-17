@@ -4,8 +4,9 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::budget_store::{
+    AuthorizedBudgetHold, BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
     BudgetEventAuthority, BudgetHoldDispositionView, BudgetHoldSnapshot, BudgetMutationKind,
-    BudgetMutationRecord, ReservedHoldEnvelope,
+    BudgetMutationRecord, DeniedBudgetHold, ReservedHoldEnvelope,
 };
 use chio_kernel::{BudgetStore, BudgetStoreError, BudgetUsageRecord};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};

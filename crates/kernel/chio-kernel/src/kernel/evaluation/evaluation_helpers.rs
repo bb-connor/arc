@@ -78,11 +78,11 @@ impl ChioKernel {
     /// FAILS. The URL-elicitation arm returns `Err(UrlElicitationsRequired)` to
     /// propagate the elicitation payload and so records NO terminal receipt; a
     /// failed reservation release would therefore leave the stuck lease on NO
-    /// append-only entry (round-9 finding). When
+    /// append-only entry. When
     /// `release_runtime_admission_reservations_for_pre_dispatch_denial` folds a
     /// `reservation_release_failed` marker into the returned metadata, record a
     /// signed cancellation/fault receipt naming the stuck lease id(s) and the
-    /// failure reason (the round-8 pre-dispatch fault-receipt shape) so an
+    /// failure reason (the standard pre-dispatch fault-receipt shape) so an
     /// operator can locate the possibly-stuck reservation. Best-effort: a
     /// receipt-recording failure is logged with an `audit_fault` field. The
     /// caller still returns `Err(UrlElicitationsRequired)`, preserving the
@@ -109,7 +109,7 @@ impl ChioKernel {
         }
         // The `released` metadata already carries the stuck lease's reserved
         // ids and the `reservation_release_failure_reason`; fold in an explicit
-        // cleanup-fault entry (step + reason + hold_ids) mirroring the round-8
+        // cleanup-fault entry (step + reason + hold_ids) mirroring the standard
         // pre-dispatch fault-receipt shape so the stuck lease is queryable.
         let reason = runtime
             .and_then(|runtime| runtime.get("reservation_release_failure_reason"))
@@ -204,7 +204,30 @@ impl ChioKernel {
         }
     }
 
+    /// Unwind all pre-dispatch state and record the signed deny receipt for
+    /// an evaluation whose tool provably did not run. Every caller owns
+    /// either a pre-dispatch denial or a dispatch error that precedes any
+    /// tool side effect, so on an error exit here (a failed cleanup step or
+    /// a failed deny-receipt append) the evaluation returns without a
+    /// terminal receipt and the journaled dispatch intent must not survive:
+    /// an open row for a call that never executed would dead-letter at the
+    /// next boot as a false orphan. The clear is bounded, open-state
+    /// guarded, and a no-op both for denials reached before the intent write
+    /// (no handle registered) and for a deny receipt that already consumed
+    /// the intent (the consume unregisters the handle).
     pub(super) fn build_pre_dispatch_cleanup_deny_response(
+        &self,
+        denial: PreDispatchCleanupDeny<'_>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let request = denial.request;
+        let result = self.pre_dispatch_cleanup_deny_response(denial);
+        if result.is_err() {
+            self.clear_dispatch_intent_for_non_dispatch_exit(request);
+        }
+        result
+    }
+
+    fn pre_dispatch_cleanup_deny_response(
         &self,
         denial: PreDispatchCleanupDeny<'_>,
     ) -> Result<ToolCallResponse, KernelError> {

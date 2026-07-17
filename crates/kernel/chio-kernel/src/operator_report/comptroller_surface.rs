@@ -49,10 +49,11 @@ pub struct ComptrollerSurfaceReport {
     pub settlement_reconciliation: SettlementReconciliationSummary,
     pub budget_utilization: BudgetUtilizationSummary,
     pub source_refs: ComptrollerSurfaceSourceRefs,
-    /// Reserved for future execution-nonce linkage; omitted until a v2 schema revision to avoid a governance-gated schema bump.
+    /// Reserved for future execution-nonce linkage; omitted until a later schema
+    /// revision to avoid a governance-gated schema bump.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_nonce_ref: Option<String>,
-    /// Reserved for future hold linkage; omitted until a v2 schema revision.
+    /// Reserved for future hold linkage; omitted until a later schema revision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hold_ref: Option<String>,
 }

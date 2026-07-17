@@ -108,6 +108,24 @@ impl SqliteReceiptStore {
                     is_current INTEGER NOT NULL DEFAULT 1,
                     raw_json TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS chio_dispatch_intents (
+                    request_id            TEXT NOT NULL,
+                    capability_id         TEXT NOT NULL,
+                    tool_server           TEXT NOT NULL,
+                    tool_name             TEXT NOT NULL,
+                    parameter_hash        TEXT NOT NULL,
+                    side_effect_class     TEXT NOT NULL,
+                    monetary              INTEGER NOT NULL,
+                    rail                  TEXT,
+                    rail_authorization_id TEXT,
+                    tenant_id             TEXT,
+                    created_at_unix_ms    INTEGER NOT NULL,
+                    state                 TEXT NOT NULL DEFAULT 'open',
+                    resolution_detail     TEXT
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_chio_dispatch_intents_tenant_request
+                    ON chio_dispatch_intents(COALESCE(tenant_id, ''), request_id);
                 "#,
         )?;
         Ok(Self {
@@ -441,6 +459,168 @@ impl ReceiptStore for SqliteReceiptStore {
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         self.append_chio_receipt_returning_seq(receipt)?;
         Ok(())
+    }
+
+    fn supports_durable_dispatch_intent_journal(&self) -> bool {
+        // The test double writes to a WAL file on disk, so its journal rows
+        // survive a crash like the production store's.
+        true
+    }
+
+    fn record_dispatch_intent(
+        &self,
+        intent: &crate::receipt_store::DispatchIntentRecord,
+    ) -> Result<(), ReceiptStoreError> {
+        let class = match intent.side_effect_class {
+            crate::receipt_store::SideEffectClass::ReadOnly => "read_only",
+            crate::receipt_store::SideEffectClass::SideEffecting => "side_effecting",
+            crate::receipt_store::SideEffectClass::Monetary => "monetary",
+        };
+        let changed = self.connection()?.execute(
+            r#"
+                INSERT INTO chio_dispatch_intents (
+                    request_id, capability_id, tool_server, tool_name,
+                    parameter_hash, side_effect_class, monetary, rail,
+                    rail_authorization_id, tenant_id, created_at_unix_ms, state
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'open')
+                ON CONFLICT(COALESCE(tenant_id, ''), request_id) DO NOTHING
+                "#,
+            params![
+                intent.request_id,
+                intent.capability_id,
+                intent.tool_server,
+                intent.tool_name,
+                intent.parameter_hash,
+                class,
+                i64::from(intent.monetary),
+                intent.rail.as_deref(),
+                intent.rail_authorization_id.as_deref(),
+                intent.tenant_id.as_deref(),
+                intent.created_at_unix_ms as i64,
+            ],
+        )?;
+        if changed == 0 {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "dispatch intent for request `{}` already exists in its tenant scope",
+                intent.request_id
+            )));
+        }
+        Ok(())
+    }
+
+    fn append_chio_receipt_consuming_intent(
+        &self,
+        receipt: &ChioReceipt,
+        key: &crate::receipt_store::DispatchIntentKey,
+    ) -> Result<Option<u64>, ReceiptStoreError> {
+        if receipt.action.parameter_hash != key.parameter_hash {
+            return Err(ReceiptStoreError::Conflict(
+                "dispatch intent key parameter_hash does not match appended receipt".to_string(),
+            ));
+        }
+        if receipt.tenant_id.as_deref() != key.tenant_id.as_deref() {
+            return Err(ReceiptStoreError::Conflict(
+                "dispatch intent key tenant id does not match appended receipt".to_string(),
+            ));
+        }
+        let raw_json = serde_json::to_string(receipt)?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
+        // Delete-guarded consume, matching the real store: a missing or
+        // mismatched intent row aborts the whole transaction, so the receipt
+        // never persists without consuming exactly the journaled intent.
+        let deleted = tx.execute(
+            "DELETE FROM chio_dispatch_intents \
+             WHERE request_id = ?1 AND parameter_hash = ?2 \
+               AND ((tenant_id IS NULL AND ?3 IS NULL) OR tenant_id = ?3)",
+            params![key.request_id, key.parameter_hash, key.tenant_id.as_deref()],
+        )?;
+        if deleted == 0 {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "dispatch intent for request `{}` not found with matching parameter_hash; \
+                 refusing to commit the receipt",
+                key.request_id
+            )));
+        }
+        let rows = tx.execute(
+            r#"
+                INSERT INTO chio_tool_receipts (
+                    receipt_id,
+                    timestamp,
+                    capability_id,
+                    raw_json
+                ) VALUES (?1, ?2, ?3, ?4)
+                ON CONFLICT(receipt_id) DO NOTHING
+                "#,
+            params![
+                receipt.id,
+                receipt.timestamp as i64,
+                receipt.capability_id,
+                raw_json,
+            ],
+        )?;
+        let seq = (rows > 0).then(|| tx.last_insert_rowid().max(0) as u64);
+        tx.commit()?;
+        Ok(seq)
+    }
+
+    fn attach_dispatch_intent_rail_ref(
+        &self,
+        request_id: &str,
+        tenant_id: Option<&str>,
+        rail_authorization_id: &str,
+    ) -> Result<(), ReceiptStoreError> {
+        let changed = self.connection()?.execute(
+            "UPDATE chio_dispatch_intents SET rail_authorization_id = ?3 \
+             WHERE request_id = ?1 \
+               AND ((tenant_id IS NULL AND ?2 IS NULL) OR tenant_id = ?2) \
+               AND state = 'open'",
+            params![request_id, tenant_id, rail_authorization_id],
+        )?;
+        if changed == 0 {
+            return Err(ReceiptStoreError::NotFound(format!(
+                "open dispatch intent for request `{request_id}` not found for rail-ref attach"
+            )));
+        }
+        Ok(())
+    }
+
+    fn clear_dispatch_intent(
+        &self,
+        key: &crate::receipt_store::DispatchIntentKey,
+    ) -> Result<(), ReceiptStoreError> {
+        let changed = self.connection()?.execute(
+            "DELETE FROM chio_dispatch_intents \
+             WHERE request_id = ?1 AND parameter_hash = ?2 \
+               AND ((tenant_id IS NULL AND ?3 IS NULL) OR tenant_id = ?3) \
+               AND state = 'open'",
+            params![key.request_id, key.parameter_hash, key.tenant_id.as_deref()],
+        )?;
+        if changed == 0 {
+            return Err(ReceiptStoreError::NotFound(format!(
+                "open dispatch intent for request `{}` not found with matching parameter_hash",
+                key.request_id
+            )));
+        }
+        Ok(())
+    }
+
+    fn open_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
+        let count: i64 = self.connection()?.query_row(
+            "SELECT COUNT(*) FROM chio_dispatch_intents WHERE state = 'open'",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(count.max(0) as u64)
+    }
+
+    fn dead_letter_dispatch_intent_count(&self) -> Result<u64, ReceiptStoreError> {
+        let count: i64 = self.connection()?.query_row(
+            "SELECT COUNT(*) FROM chio_dispatch_intents WHERE state = 'dead_letter'",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(count.max(0) as u64)
     }
 
     fn supports_kernel_signed_checkpoints(&self) -> bool {
@@ -886,9 +1066,12 @@ fn make_config() -> KernelConfig {
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
         memory_budget: crate::MemoryBudgetConfig::defaults(),
+        deadlines: crate::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: crate::DispatchIntentJournalMode::Off,
     }
 }
 
@@ -1906,6 +2089,122 @@ impl ReceiptStore for AppendOnlyReceiptStore {
         &self,
         _receipt: &ChildRequestReceipt,
     ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+}
+
+/// A store that reports retention support but, like the real prefix-watermark
+/// store, cannot honor a tenant-scoped policy (it inherits the default
+/// `supports_tenant_scoped_retention` = false). Used to prove the attach path
+/// rejects a tenant-scoped retention config before spawning the worker.
+#[derive(Default)]
+struct RetentionCapableReceiptStore;
+
+impl ReceiptStore for RetentionCapableReceiptStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn supports_retention(&self) -> bool {
+        true
+    }
+}
+
+/// A receipt store whose supervised commit writer has died. Appends would still
+/// nominally succeed, but the writer flag reports serving-closed, so the kernel
+/// pre-dispatch gate must fail closed before any tool executes.
+struct DeadWriterReceiptStore;
+
+impl ReceiptStore for DeadWriterReceiptStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn writer_serving_closed(&self) -> bool {
+        true
+    }
+}
+
+/// A receipt store whose supervised commit writer is serving-closed AND whose
+/// appends now fail, modelling a real poisoned-head or dead-writer store rather
+/// than one that still silently accepts writes. The pre-dispatch gate must deny
+/// before any tool executes, and the fail-closed deny it builds must not be
+/// masked into an error by attempting to persist itself through the same closed
+/// writer.
+struct RejectingDeadWriterReceiptStore;
+
+impl ReceiptStore for RejectingDeadWriterReceiptStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Pool(
+            "receipt append rejected by a serving-closed commit writer".to_string(),
+        ))
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Err(ReceiptStoreError::Pool(
+            "child receipt append rejected by a serving-closed commit writer".to_string(),
+        ))
+    }
+
+    fn writer_serving_closed(&self) -> bool {
+        true
+    }
+}
+
+/// A commit writer that is always serving closed and, once armed, fails every
+/// capability-lineage write like a poisoned writer. It records whether the
+/// lineage write was attempted so a test can prove the pre-dispatch gate denies
+/// BEFORE any writer-backed metadata write runs. Arming is deferred so capability
+/// issuance during test setup (which also records lineage) still succeeds.
+struct SnapshotTrackingDeadWriterStore {
+    snapshot_attempted: std::sync::Arc<AtomicBool>,
+    fail_snapshots: std::sync::Arc<AtomicBool>,
+}
+
+impl ReceiptStore for SnapshotTrackingDeadWriterStore {
+    fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn writer_serving_closed(&self) -> bool {
+        true
+    }
+
+    fn record_capability_snapshot(
+        &self,
+        _token: &CapabilityToken,
+        _parent_capability_id: Option<&str>,
+    ) -> Result<(), ReceiptStoreError> {
+        if self.fail_snapshots.load(Ordering::SeqCst) {
+            self.snapshot_attempted.store(true, Ordering::SeqCst);
+            return Err(ReceiptStoreError::Pool(
+                "capability lineage write rejected by a dead receipt writer".to_string(),
+            ));
+        }
         Ok(())
     }
 }

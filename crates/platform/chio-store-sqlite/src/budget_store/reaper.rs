@@ -251,6 +251,7 @@ impl SqliteBudgetStore {
                             HoldDisposition::Released => BudgetHoldDispositionView::Released,
                             HoldDisposition::Reversed => BudgetHoldDispositionView::Reversed,
                             HoldDisposition::Reconciled => BudgetHoldDispositionView::Reconciled,
+                            HoldDisposition::Expired => BudgetHoldDispositionView::Expired,
                         })
                         .ok_or_else(|| {
                             rusqlite::Error::FromSqlConversionFailure(
@@ -415,6 +416,7 @@ mod tests {
                 hold_id: Some(hold_id.to_string()),
                 event_id: Some(format!("{hold_id}:authorize")),
                 authority,
+                payment_journal: None,
             })
             .unwrap();
         assert!(matches!(

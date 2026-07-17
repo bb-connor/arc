@@ -18,6 +18,8 @@ pub(crate) fn dispatch_api(
                 spec,
                 listen,
                 receipt_store,
+                allow_ephemeral_receipts,
+                upstream_timeout_secs,
             } => cmd_api_protect(
                 &upstream,
                 spec.as_deref(),
@@ -28,6 +30,8 @@ pub(crate) fn dispatch_api(
                 revocation_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
+                allow_ephemeral_receipts,
+                upstream_timeout_secs,
             ),
     }
 }

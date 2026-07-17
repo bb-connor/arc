@@ -186,8 +186,8 @@ async fn default_budget_admits_large_async_receipts_above_one_mib() {
         assert!(
             DEFAULT_MAX_SIGNING_CONTENT_BYTES > 1024 * 1024,
             "default budget must exceed the old 1 MiB hard-reject"
-        )
-    };
+        );
+    }
 
     let keypair = Keypair::from_seed(&KERNEL_SEED);
     let handle = SigningTaskHandle::spawn(keypair.clone());

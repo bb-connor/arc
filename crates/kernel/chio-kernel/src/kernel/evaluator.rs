@@ -8,10 +8,10 @@
 //! intentionally enter the synchronous bridge.
 //!
 //! Futures dropped after budget admission are handled by the post-admission
-//! drop guard (RFC-0002): a cancellation receipt is recorded whenever
-//! dispatch was in flight and runtime-admission reservations get an explicit
-//! fail-closed disposition. Hard process death mid-dispatch remains the
-//! charter of the dispatch-intent journal (RFC-0003).
+//! drop guard: a cancellation receipt is recorded whenever dispatch was in
+//! flight and runtime-admission reservations get an explicit fail-closed
+//! disposition. Hard process death mid-dispatch remains the charter of the
+//! dispatch-intent journal.
 
 use crate::kernel::ChioKernel;
 use crate::{
@@ -73,10 +73,10 @@ pub trait ToolEvaluator: Send + Sync {
     /// Dispatch the validated request to the appropriate tool server.
     ///
     /// The default body routes through
-    /// [`ChioKernel::dispatch_tool_call_with_cost`], which uses this
-    /// dispatch order: try streaming first, use `invoke_with_cost`
-    /// only for monetary grants, and report `None` cost for non-monetary
-    /// grants.
+    /// [`ChioKernel::dispatch_tool_call_with_cost`], which enforces the
+    /// configured dispatch budget and uses this dispatch order: try streaming
+    /// first, use `invoke_with_cost` only for monetary grants, and report `None`
+    /// cost for non-monetary grants.
     async fn dispatch(
         &self,
         kernel: &ChioKernel,

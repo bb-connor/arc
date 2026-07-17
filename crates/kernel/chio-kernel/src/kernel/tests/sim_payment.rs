@@ -108,7 +108,7 @@ fn expect_financial_meta(response: &ToolCallResponse) -> &serde_json::Value {
 #[test]
 fn sim_adapter_settles_governed_mustprepay_onto_receipt() {
     let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
-    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new())).expect("install payment adapter");
 
     let intent =
         make_mustprepay_intent("intent-sim-settle", "cost-srv", "compute", 100, "USD");
@@ -159,7 +159,7 @@ fn governed_mustprepay_without_adapter_is_denied_end_to_end() {
 #[test]
 fn sim_adapter_zero_cost_releases_cleanly() {
     let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(0);
-    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new())).expect("install payment adapter");
 
     let intent =
         make_mustprepay_intent("intent-sim-zero", "cost-srv", "compute", 100, "USD");
@@ -200,7 +200,7 @@ async fn sim_adapter_abort_unwinds_authorization() {
     let payment = TrackingPaymentAdapter::new();
 
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
     kernel.register_tool_server(Box::new(PendingMonetaryServer {
         id: "cost-srv".to_string(),
         started: std::sync::Arc::clone(&started),
@@ -297,7 +297,7 @@ fn make_no_ceiling_mustprepay_grant() -> ToolGrant {
 #[test]
 fn mustprepay_no_budget_charge_authorizes_payment_and_stamps_receipt() {
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new())).expect("install payment adapter");
     // Server reports a cost; the grant has no monetary ceiling so charge_result is None.
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
 
@@ -341,7 +341,7 @@ fn mustprepay_no_budget_charge_authorizes_payment_and_stamps_receipt() {
 fn mustprepay_no_budget_charge_captures_unsettled_authorization() {
     let payment = TrackingPaymentAdapter::new();
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
 
     let agent_kp = Keypair::generate();
@@ -392,7 +392,7 @@ fn mustprepay_no_budget_charge_captures_unsettled_authorization() {
 #[test]
 fn mustprepay_no_budget_charge_receipt_financial_deserializes_with_quote() {
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new())).expect("install payment adapter");
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
 
     let agent_kp = Keypair::generate();
@@ -434,7 +434,7 @@ fn mustprepay_no_budget_charge_receipt_financial_deserializes_with_quote() {
 fn mustprepay_no_budget_charge_uncapturable_authorization_denies() {
     let payment = UncapturablePaymentAdapter::default();
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
 
     let agent_kp = Keypair::generate();
@@ -473,7 +473,7 @@ fn mustprepay_no_budget_charge_uncapturable_authorization_denies() {
 fn mustprepay_no_budget_charge_releases_hold_on_aborted_dispatch() {
     let payment = TrackingPaymentAdapter::new();
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
     kernel.register_tool_server(Box::new(FailingMonetaryServer {
         id: "cost-srv".to_string(),
     }));
@@ -536,7 +536,7 @@ fn make_no_ceiling_mustprepay_intent_over_threshold(
 #[test]
 fn governed_mustprepay_quote_above_threshold_requires_approval() {
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new())).expect("install payment adapter");
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
 
     let agent_kp = Keypair::generate();
@@ -621,7 +621,7 @@ fn mustprepay_request_without_token(
 #[test]
 fn governed_mustprepay_with_charge_gates_on_quote_not_charge() {
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new())).expect("install payment adapter");
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 5, "USD")));
 
     let agent_kp = Keypair::generate();
@@ -667,7 +667,7 @@ fn governed_mustprepay_with_charge_gates_on_quote_not_charge() {
 #[test]
 fn governed_mustprepay_with_charge_below_threshold_passes_without_token() {
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new()));
+    kernel.set_payment_adapter(Box::new(crate::payment::SimPaymentAdapter::new())).expect("install payment adapter");
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 5, "USD")));
 
     let agent_kp = Keypair::generate();
@@ -828,7 +828,7 @@ impl PaymentAdapter for SettledAtAuthorizeTrackingAdapter {
 fn settled_no_charge_mustprepay_abort_refunds_prepaid_quote() {
     let payment = SettledAtAuthorizeTrackingAdapter::default();
     let mut kernel = make_kernel(make_monetary_config());
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
     kernel.register_tool_server(Box::new(FailingMonetaryServer {
         id: "cost-srv".to_string(),
     }));
@@ -882,7 +882,7 @@ fn settled_no_charge_mustprepay_abort_refunds_prepaid_quote() {
 fn reserving_authorization_denies_governed_mustprepay_without_settled_prepayment() {
     let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
     let payment = UncapturablePaymentAdapter::default();
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
     install_strict_nonce_store(&mut kernel);
 
     let intent = make_mustprepay_intent("intent-reserve-deny", "cost-srv", "compute", 100, "USD");
@@ -926,7 +926,7 @@ fn reserving_authorization_denies_governed_mustprepay_without_settled_prepayment
 fn reserving_authorization_admits_governed_mustprepay_with_settled_prepayment() {
     let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
     let payment = TrackingPaymentAdapter::new();
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
     install_strict_nonce_store(&mut kernel);
 
     let intent = make_mustprepay_intent("intent-reserve-allow", "cost-srv", "compute", 100, "USD");
@@ -980,7 +980,7 @@ fn reserving_mustprepay_stamp_failure_refunds_captured_prepayment() {
     let mut kernel = make_kernel(make_monetary_config());
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let payment = TrackingPaymentAdapter::new();
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
     let fail_mark = std::sync::Arc::new(AtomicBool::new(true));
     kernel.set_budget_store(Box::new(StampFailingBudgetStore {
         inner: InMemoryBudgetStore::new(),
@@ -1090,7 +1090,7 @@ fn reserving_authorization_leaves_non_mustprepay_path_unchanged() {
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let payment = TrackingPaymentAdapter::new();
-    kernel.set_payment_adapter(Box::new(payment.clone()));
+    kernel.set_payment_adapter(Box::new(payment.clone())).expect("install payment adapter");
     install_strict_nonce_store(&mut kernel);
 
     let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
@@ -1199,7 +1199,7 @@ impl PaymentAdapter for DistinctCapturePaymentAdapter {
 #[test]
 fn reconcile_stamps_mustprepay_prepayment_rail_reference() {
     let MustPrepayFixture { mut kernel, cap, agent_kp } = build_mustprepay_fixture(75);
-    kernel.set_payment_adapter(Box::new(DistinctCapturePaymentAdapter));
+    kernel.set_payment_adapter(Box::new(DistinctCapturePaymentAdapter)).expect("install payment adapter");
     install_strict_nonce_store(&mut kernel);
 
     let intent = make_mustprepay_intent("intent-reserve-recon", "cost-srv", "compute", 100, "USD");
@@ -1336,6 +1336,7 @@ fn authorize_provisional_hold(
                     hold_id: Some("hold-provisional".to_string()),
                     event_id: Some("hold-provisional:authorize".to_string()),
                     authority: None,
+                    payment_journal: None,
                 })?;
             assert!(
                 matches!(
@@ -1366,7 +1367,7 @@ fn aborted_settled_mustprepay_charge_refunds_the_quoted_amount(
     let refunded_amount = adapter.refunded_amount.clone();
     let refunded_currency = adapter.refunded_currency.clone();
     let refund_calls = adapter.refund_calls.clone();
-    kernel.set_payment_adapter(Box::new(adapter));
+    kernel.set_payment_adapter(Box::new(adapter)).expect("install payment adapter");
 
     let agent_kp = Keypair::generate();
     let grant = make_governed_monetary_grant("cost-srv", "compute", 10, 1000, "USD", 50);
@@ -1423,7 +1424,7 @@ fn aborted_settled_non_mustprepay_charge_refunds_the_charged_amount(
     let refunded_amount = adapter.refunded_amount.clone();
     let refunded_currency = adapter.refunded_currency.clone();
     let refund_calls = adapter.refund_calls.clone();
-    kernel.set_payment_adapter(Box::new(adapter));
+    kernel.set_payment_adapter(Box::new(adapter)).expect("install payment adapter");
 
     let agent_kp = Keypair::generate();
     let grant = make_governed_monetary_grant("cost-srv", "compute", 10, 1000, "USD", 50);
@@ -1488,7 +1489,7 @@ fn aborted_unsettled_mustprepay_charge_releases_not_refunds(
     let adapter = AmountRecordingPaymentAdapter::default();
     let refund_calls = adapter.refund_calls.clone();
     let release_calls = adapter.release_calls.clone();
-    kernel.set_payment_adapter(Box::new(adapter));
+    kernel.set_payment_adapter(Box::new(adapter)).expect("install payment adapter");
 
     let agent_kp = Keypair::generate();
     let grant = make_governed_monetary_grant("cost-srv", "compute", 10, 1000, "USD", 50);
@@ -1562,7 +1563,7 @@ fn governed_mustprepay_with_charge_funds_the_quoted_cost_not_the_hold() {
     let adapter = AmountRecordingPaymentAdapter::default();
     let authorized_amount = adapter.authorized_amount.clone();
     let authorized_currency = adapter.authorized_currency.clone();
-    kernel.set_payment_adapter(Box::new(adapter));
+    kernel.set_payment_adapter(Box::new(adapter)).expect("install payment adapter");
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 5, "USD")));
 
     let agent_kp = Keypair::generate();
@@ -1606,7 +1607,7 @@ fn non_mustprepay_charge_authorizes_the_charged_amount() {
     let adapter = AmountRecordingPaymentAdapter::default();
     let authorized_amount = adapter.authorized_amount.clone();
     let authorized_currency = adapter.authorized_currency.clone();
-    kernel.set_payment_adapter(Box::new(adapter));
+    kernel.set_payment_adapter(Box::new(adapter)).expect("install payment adapter");
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 5, "USD")));
 
     let agent_kp = Keypair::generate();

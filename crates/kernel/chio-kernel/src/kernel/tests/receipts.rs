@@ -1,4 +1,180 @@
 #[test]
+fn dead_commit_writer_denies_before_the_tool_executes() {
+    let mut kernel = make_kernel(make_config());
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-a",
+        vec!["read_file"],
+        std::sync::Arc::clone(&invocations),
+    )));
+    kernel
+        .set_receipt_store(Box::new(DeadWriterReceiptStore))
+        .unwrap();
+
+    let agent_kp = make_keypair();
+    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+    let request = make_request("req-dead-writer", &cap, "read_file", "srv-a");
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    // The pre-dispatch gate reads the writer flag and fails closed: an authorized
+    // call is denied because durable persistence can no longer be trusted.
+    assert_eq!(response.verdict, Verdict::Deny);
+    let reason = response.reason.unwrap_or_default();
+    assert!(
+        reason.contains("commit writer is not serving"),
+        "expected a receipt-persistence-degraded deny, got: {reason}"
+    );
+    // The load-bearing property: the tool never ran, so no evidence-less side
+    // effect occurred.
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        0,
+        "a degraded commit writer must deny before the tool executes"
+    );
+}
+
+#[test]
+fn serving_closed_store_deny_is_not_masked_by_its_own_receipt_append() {
+    let mut kernel = make_kernel(make_config());
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-a",
+        vec!["read_file"],
+        std::sync::Arc::clone(&invocations),
+    )));
+    // A serving-closed store whose appends actually fail, like a real
+    // poisoned-head or dead writer (the earlier double still accepts appends).
+    kernel
+        .set_receipt_store(Box::new(RejectingDeadWriterReceiptStore))
+        .unwrap();
+
+    let agent_kp = make_keypair();
+    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+    let request = make_request("req-rejecting-writer", &cap, "read_file", "srv-a");
+
+    // The pre-dispatch gate denies because the writer is serving-closed. Building
+    // that deny must NOT try to persist the deny receipt through the same closed
+    // store: that append would fail and surface a 500 instead of the clean signed
+    // Deny verdict. The verdict is what callers must see.
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    let reason = response.reason.unwrap_or_default();
+    assert!(
+        reason.contains("commit writer is not serving"),
+        "expected a receipt-persistence-degraded deny, got: {reason}"
+    );
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        0,
+        "a serving-closed writer must deny before the tool executes"
+    );
+}
+
+#[test]
+fn serving_closed_store_denies_before_an_early_capability_rejection() {
+    let mut kernel = make_kernel(make_config());
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-a",
+        vec!["read_file"],
+        std::sync::Arc::clone(&invocations),
+    )));
+    kernel
+        .set_receipt_store(Box::new(RejectingDeadWriterReceiptStore))
+        .unwrap();
+
+    // An untrusted-issuer capability is rejected by the very first pre-dispatch
+    // check, ahead of the persistence gate. That early rejection records its deny
+    // receipt through the receipt writer, and against a serving-closed store the
+    // append fails and would surface an opaque error (or a 500) instead of a
+    // signed verdict. The writer-health gate must run FIRST so the caller always
+    // sees the clean fail-closed persistence Deny.
+    let rogue_kp = make_keypair();
+    let agent_kp = make_keypair();
+    let body = CapabilityTokenBody {
+        id: "cap-rogue-serving-closed".to_string(),
+        issuer: rogue_kp.public_key(),
+        subject: agent_kp.public_key(),
+        scope: make_scope(vec![make_grant("srv-a", "read_file")]),
+        issued_at: current_unix_timestamp(),
+        expires_at: current_unix_timestamp() + 300,
+        delegation_chain: vec![],
+    };
+    let cap = CapabilityToken::sign(body, &rogue_kp).unwrap();
+    let request = make_request("req-rogue-serving-closed", &cap, "read_file", "srv-a");
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    let reason = response.reason.unwrap_or_default();
+    assert!(
+        reason.contains("commit writer is not serving"),
+        "expected a receipt-persistence-degraded deny, got: {reason}"
+    );
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        0,
+        "a serving-closed writer must deny before the tool executes"
+    );
+}
+
+#[test]
+fn dead_commit_writer_denies_before_the_capability_lineage_write() {
+    let mut kernel = make_kernel(make_config());
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-a",
+        vec!["read_file"],
+        std::sync::Arc::clone(&invocations),
+    )));
+    let snapshot_attempted = std::sync::Arc::new(AtomicBool::new(false));
+    let fail_snapshots = std::sync::Arc::new(AtomicBool::new(false));
+    kernel
+        .set_receipt_store(Box::new(SnapshotTrackingDeadWriterStore {
+            snapshot_attempted: std::sync::Arc::clone(&snapshot_attempted),
+            fail_snapshots: std::sync::Arc::clone(&fail_snapshots),
+        }))
+        .unwrap();
+
+    let agent_kp = make_keypair();
+    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+    let request = make_request("req-dead-writer-lineage", &cap, "read_file", "srv-a");
+
+    // Arm the writer only after issuance: from here a lineage write fails like a
+    // poisoned writer, so the evaluation below is what must be gated.
+    fail_snapshots.store(true, Ordering::SeqCst);
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+
+    // The writer-readiness gate must run BEFORE the capability-lineage write. A
+    // serving-closed writer must produce the clean fail-closed persistence deny
+    // rather than first attempting a metadata write through the dead writer and
+    // surfacing that write's error (or a 500) instead.
+    assert_eq!(response.verdict, Verdict::Deny);
+    let reason = response.reason.unwrap_or_default();
+    assert!(
+        reason.contains("commit writer is not serving"),
+        "expected a receipt-persistence-degraded deny, got: {reason}"
+    );
+    // The load-bearing property: no writer-backed metadata write is attempted
+    // once the gate has denied, so nothing is pushed through the dead writer.
+    assert!(
+        !snapshot_attempted.load(Ordering::SeqCst),
+        "the capability lineage write must not be attempted after the writer gate denies"
+    );
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        0,
+        "a degraded commit writer must deny before the tool executes"
+    );
+}
+
+#[test]
 fn kernel_persists_tool_receipts_to_sqlite_store() {
     let path = unique_receipt_db_path("chio-kernel-tool-receipts");
     let mut kernel = make_kernel(make_config());
@@ -39,6 +215,70 @@ fn kernel_persists_tool_receipts_to_sqlite_store() {
 
     drop(connection);
     let _ = std::fs::remove_file(path);
+}
+
+/// Configured retention is a storage/compliance control. Attaching a store
+/// that cannot rotate (the default `rotate_receipts` stub) while
+/// `retention_config` is set must fail closed: otherwise the kernel would serve
+/// traffic while the background worker only logs "not supported" every interval
+/// and never archives anything.
+#[test]
+fn attach_rejects_configured_retention_on_unsupported_store() {
+    let mut config = make_config();
+    config.retention_config = Some(crate::RetentionConfig::default());
+    let mut kernel = make_kernel(config);
+    let error = kernel
+        .set_receipt_store(Box::new(AppendOnlyReceiptStore))
+        .expect_err("attach must reject a retention-configured store that cannot rotate");
+    assert!(
+        matches!(&error, KernelError::Internal(message) if message.contains("does not support retention")),
+        "unexpected error: {error:?}"
+    );
+}
+
+/// A tenant-scoped retention policy cannot be honored by a prefix-watermark
+/// store: rotation archives a contiguous checkpointed prefix of the whole log,
+/// not one tenant's rows, so `rotate_receipts` fails closed. Attaching a store
+/// that supports retention but not tenant scope under such a policy must fail
+/// closed at attach time, not spawn a worker that logs "unsupported" every
+/// interval while the kernel serves traffic the policy can never cover.
+#[test]
+fn attach_rejects_tenant_scoped_retention() {
+    let mut config = make_config();
+    config.retention_config = Some(crate::RetentionConfig {
+        tenant_id: Some("tenant-a".to_string()),
+        ..crate::RetentionConfig::default()
+    });
+    let mut kernel = make_kernel(config);
+    let error = kernel
+        .set_receipt_store(Box::new(RetentionCapableReceiptStore))
+        .expect_err("attach must reject a tenant-scoped retention policy the store cannot honor");
+    assert!(
+        matches!(&error, KernelError::Internal(message) if message.contains("tenant-scoped retention")),
+        "unexpected error: {error:?}"
+    );
+}
+
+/// Prefix retention only ever archives receipts covered by a kernel checkpoint,
+/// so it depends on automatic checkpointing being enabled. Attaching a
+/// retention-configured store while `checkpoint_batch_size == 0` installs no
+/// background signer, so the checkpoint chain never advances past 0 and the
+/// retention worker could never archive anything: the store would silently
+/// retain every receipt forever. The attach must fail closed rather than serve
+/// under a retention policy that can never advance its watermark.
+#[test]
+fn attach_rejects_retention_when_checkpointing_disabled() {
+    let mut config = make_config();
+    config.checkpoint_batch_size = 0;
+    config.retention_config = Some(crate::RetentionConfig::default());
+    let mut kernel = make_kernel(config);
+    let error = kernel
+        .set_receipt_store(Box::new(RetentionCapableReceiptStore))
+        .expect_err("attach must reject retention when automatic checkpointing is disabled");
+    assert!(
+        matches!(&error, KernelError::Internal(message) if message.contains("automatic checkpointing is disabled")),
+        "unexpected error: {error:?}"
+    );
 }
 
 #[test]

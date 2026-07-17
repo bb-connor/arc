@@ -368,9 +368,11 @@ fn canonicalize_nonce_key_component(value: &str) -> String {
 /// Process-local single-use EIP-3009 nonce store.
 ///
 /// Backed by `Mutex<Eip3009NonceMap>`. Suitable for tests and
-/// single-process deployments. Durable deployments back the
-/// [`Eip3009NonceStore`] trait with the SQLite store wired by default in
-/// the revocation/nonce-store durability lane (see issue dependencies).
+/// single-process deployments; replay state is lost on restart. Durable
+/// deployments back the [`Eip3009NonceStore`] trait with
+/// `chio_store_sqlite::SqliteEip3009NonceStore`, which persists nonces
+/// across restarts and cannot wedge at capacity (its caller drives
+/// `gc_expired` explicitly).
 pub struct InMemoryEip3009NonceStore {
     inner: Mutex<Eip3009NonceMap>,
     max_entries: usize,
@@ -624,6 +626,15 @@ pub fn prepare_transfer_with_authorization(
         canonical_contract,
         hex::encode(nonce.as_slice())
     );
+    // Caller-driven GC: pruning stays out of the record path by contract,
+    // so this now-bearing verify path sweeps expired entries when the store
+    // nears capacity, using the same clock it already validated the
+    // authorization window against.
+    if let Ok(len) = nonce_store.len() {
+        if len >= (DEFAULT_MAX_EIP3009_NONCE_ENTRIES / 8) * 7 {
+            let _ = nonce_store.gc_expired(now_unix_seconds);
+        }
+    }
     match nonce_store.record_if_fresh(
         &canonical_from,
         &canonical_nonce,
@@ -1784,7 +1795,7 @@ mod tests {
     #[test]
     fn validate_offchain_settlement_receipt_rejects_wrong_schema() {
         let mut receipt = sample_offchain_receipt();
-        receipt.schema = "chio.settle.offchain_receipt.v2".to_string();
+        receipt.schema = "chio.settle.offchain_receipt.v9".to_string();
         let error = validate_offchain_settlement_receipt(&receipt)
             .test_expect_err("wrong schema version must fail");
         assert!(

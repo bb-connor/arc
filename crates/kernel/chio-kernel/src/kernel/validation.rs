@@ -67,6 +67,16 @@ impl ChioKernel {
         Ok(())
     }
 
+    /// Whether a capability id is present in the installed revocation store.
+    ///
+    /// Callers that authorize a token minted outside the kernel (an HTTP
+    /// authority projecting a presented capability, for example) use this to
+    /// check the caller's token against revocations, since the kernel's own
+    /// revocation check runs against the internal capability it evaluates.
+    pub fn is_capability_revoked(&self, capability_id: &str) -> Result<bool, KernelError> {
+        self.with_revocation_store(|store| Ok(store.is_revoked(capability_id)?))
+    }
+
     /// Read-only access to the receipt log.
     pub fn receipt_log(&self) -> ReceiptLog {
         match self.receipt_log.lock() {
@@ -350,7 +360,12 @@ impl ChioKernel {
                 .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS);
             let mut budgets = match self.budget_registry.lock() {
                 Ok(guard) => guard,
-                Err(poisoned) => poisoned.into_inner(),
+                Err(_poisoned) => {
+                    // Fail closed on a poisoned monetary lock: a half-mutated
+                    // budget registry must never admit a child on a lucky recovery.
+                    self.record_tcb_lock_poison("budget_registry");
+                    return Err("budget registry lock poisoned; failing closed".to_string());
+                }
             };
             budgets
                 .try_admit_child(
@@ -378,7 +393,10 @@ impl ChioKernel {
                 .unwrap_or(chio_kernel_core::MAX_BUDGET_SHARE_BPS);
             let mut budgets = match self.budget_registry.lock() {
                 Ok(guard) => guard,
-                Err(poisoned) => poisoned.into_inner(),
+                Err(_poisoned) => {
+                    self.record_tcb_lock_poison("budget_registry");
+                    return Err("budget registry lock poisoned; failing closed".to_string());
+                }
             };
             budgets
                 .release_child(
@@ -621,7 +639,18 @@ impl ChioKernel {
         let trust_resolver = self.capability_trust_root_resolver_snapshot();
         let mut budgets = match self.budget_registry.lock() {
             Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
+            Err(_poisoned) => {
+                // The monetary lock is poisoned: a panic left the registry in an
+                // unknown state. Deny fail-closed and trip the degraded flag so
+                // later evaluations are denied at the pre-dispatch gate too.
+                self.record_tcb_lock_poison("budget_registry");
+                return chio_kernel_core::EvaluationVerdict {
+                    verdict: chio_kernel_core::Verdict::Deny,
+                    reason: Some("budget registry lock poisoned; denying fail-closed".to_string()),
+                    matched_grant_index: None,
+                    verified: None,
+                };
+            }
         };
         chio_kernel_core::evaluate_with_full_floor(
             chio_kernel_core::EvaluateInput {
@@ -647,7 +676,12 @@ impl ChioKernel {
         use chio_kernel_core::BudgetRegistry;
         let mut budgets = match self.budget_registry.lock() {
             Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
+            Err(poisoned) => {
+                // Recovering the guard keeps setup working, but tripping the flag
+                // means the next evaluation is denied at the pre-dispatch gate.
+                self.record_tcb_lock_poison("budget_registry");
+                poisoned.into_inner()
+            }
         };
         budgets.register_parent(parent_token_id, parent_share_bps)
     }
@@ -656,7 +690,10 @@ impl ChioKernel {
         use chio_kernel_core::BudgetRegistry;
         let mut budgets = match self.budget_registry.lock() {
             Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
+            Err(poisoned) => {
+                self.record_tcb_lock_poison("budget_registry");
+                poisoned.into_inner()
+            }
         };
         budgets.evict_parent(parent_token_id);
     }
@@ -1021,6 +1058,46 @@ impl ChioKernel {
                 let authorize_event_id = format!("{budget_hold_id}:authorize");
                 let authority = self.local_budget_event_authority();
 
+                // The recoverable money record commits in the SAME
+                // transaction as the hold write, before the rail is touched:
+                // a crash in any later window resolves through the journal
+                // instead of leaving moved funds with no trace.
+                let payment_journal = self.payment_journal_active().then(|| {
+                    let now_ms = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|elapsed| elapsed.as_millis().min(u64::MAX as u128) as u64)
+                        .unwrap_or(0);
+                    let rail = self
+                        .payment_adapter
+                        .as_ref()
+                        .map(|adapter| adapter.rail_id().to_string())
+                        .unwrap_or_default();
+                    // Resolved exactly as the terminal receipt and the
+                    // dispatch intent resolve it (request-scoped entry
+                    // first, thread-local scope otherwise), so a recovered
+                    // charge's reconciliation receipt is never dropped from
+                    // the owning tenant's receipt view.
+                    let tenant_id = self
+                        .receipt_tenant_id_for_request(Some(request_id))
+                        .unwrap_or_else(current_scoped_receipt_tenant_id);
+                    crate::payment::PaymentJournalRecord {
+                        request_id: request_id.to_string(),
+                        capability_id: cap.id.clone(),
+                        grant_index: matching.index as u32,
+                        hold_id: Some(budget_hold_id.clone()),
+                        rail,
+                        authorization_id: None,
+                        transaction_id: None,
+                        amount_units: cost_units,
+                        settle_action: None,
+                        settle_amount_units: None,
+                        currency: currency.clone(),
+                        state: crate::payment::PaymentJournalState::HoldPlaced,
+                        created_at_unix_ms: now_ms,
+                        tenant_id,
+                    }
+                });
+
                 let decision = self.with_budget_store(|store| {
                     Ok(store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
                         capability_id: cap.id.clone(),
@@ -1032,6 +1109,7 @@ impl ChioKernel {
                         hold_id: Some(budget_hold_id.clone()),
                         event_id: Some(authorize_event_id),
                         authority: Some(authority.clone()),
+                        payment_journal: payment_journal.clone(),
                     })?)
                 })?;
                 match decision {
@@ -1431,7 +1509,29 @@ impl ChioKernel {
                         "payment authorization present without configured adapter".to_string(),
                     )
                 })?;
-                Some(if actual_cost == 0 {
+                // Commit the terminal settle action BEFORE any money can
+                // move, so a crash inside the rail call replays the exact
+                // recorded operation instead of guessing.
+                let settle = if actual_cost == 0 {
+                    crate::payment::PaymentSettleIntent {
+                        action: crate::payment::PaymentSettleAction::Release,
+                        amount_units: None,
+                    }
+                } else {
+                    crate::payment::PaymentSettleIntent {
+                        action: crate::payment::PaymentSettleAction::Capture,
+                        amount_units: Some(actual_cost),
+                    }
+                };
+                self.advance_payment_journal_if_active(
+                    &request.request_id,
+                    crate::payment::PaymentJournalState::Authorized,
+                    crate::payment::PaymentJournalState::Settling,
+                    None,
+                    None,
+                    Some(settle),
+                )?;
+                let result = if actual_cost == 0 {
                     adapter.release(&authorization.authorization_id, &request.request_id)
                 } else {
                     adapter.capture(
@@ -1440,7 +1540,18 @@ impl ChioKernel {
                         &charge.currency,
                         &request.request_id,
                     )
-                })
+                };
+                if let Ok(payment) = result.as_ref() {
+                    self.advance_payment_journal_if_active(
+                        &request.request_id,
+                        crate::payment::PaymentJournalState::Settling,
+                        crate::payment::PaymentJournalState::Settled,
+                        None,
+                        Some(&payment.transaction_id),
+                        None,
+                    )?;
+                }
+                Some(result)
             }
         } else {
             None
@@ -1779,17 +1890,42 @@ impl ChioKernel {
                 })
         });
 
-        adapter
-            .authorize(&PaymentAuthorizeRequest {
-                amount_units,
-                currency,
-                payer: request.agent_id.clone(),
-                payee: request.server_id.clone(),
-                reference: request.request_id.clone(),
-                governed,
-                commerce,
-            })
-            .map(Some)
+        let authorization = adapter.authorize(&PaymentAuthorizeRequest {
+            amount_units,
+            currency,
+            payer: request.agent_id.clone(),
+            payee: request.server_id.clone(),
+            reference: request.request_id.clone(),
+            governed,
+            commerce,
+        })?;
+        // Persist the rail authorization id BEFORE returning, so a crash
+        // after authorize leaves a recoverable Authorized row. If the
+        // advance cannot commit, undo the rail hold we just placed and fail
+        // closed; the HoldPlaced row still records the attempt for boot
+        // reconciliation.
+        if let Err(error) = self.advance_payment_journal_if_active(
+            &request.request_id,
+            crate::payment::PaymentJournalState::HoldPlaced,
+            crate::payment::PaymentJournalState::Authorized,
+            Some(&authorization.authorization_id),
+            None,
+            None,
+        ) {
+            if let Err(release_error) =
+                adapter.release(&authorization.authorization_id, &request.request_id)
+            {
+                warn!(
+                    request_id = %request.request_id,
+                    reason = %redacted!(&release_error),
+                    "rail release after failed journal advance also failed"
+                );
+            }
+            return Err(PaymentError::Unavailable(format!(
+                "payment journal advance to authorized failed: {error}"
+            )));
+        }
+        Ok(Some(authorization))
     }
 
     /// Prepaid quote amount for a MustPrepay intent, if one applies.

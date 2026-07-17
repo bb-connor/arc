@@ -88,7 +88,7 @@ fn wrong_schema_const_is_rejected() {
     let schema = schema_value();
     let validator = jsonschema::validator_for(&schema).test_expect("compile schema");
     let mut instance = serde_json::to_value(sample()).test_expect("serialize sample");
-    instance["schema"] = serde_json::json!("chio.comptroller.surface-report.v2");
+    instance["schema"] = serde_json::json!("chio.comptroller.surface-report.v9");
     assert!(
         !validator.is_valid(&instance),
         "wrong schema const must be rejected"

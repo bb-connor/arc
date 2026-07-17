@@ -4,6 +4,10 @@ mod background_checkpoints;
 mod bootstrap;
 #[path = "tests/checkpoint.rs"]
 mod checkpoint;
+#[path = "tests/dispatch_intent.rs"]
+mod dispatch_intent;
+#[path = "tests/dispatch_intent_property.rs"]
+mod dispatch_intent_property;
 #[path = "tests/errors.rs"]
 mod errors;
 #[path = "tests/head_property.rs"]
@@ -16,6 +20,8 @@ mod liability;
 mod lineage;
 #[path = "tests/query.rs"]
 mod query;
+#[path = "tests/retention.rs"]
+mod retention;
 #[path = "tests/scale_proof.rs"]
 mod scale_proof;
 #[path = "tests/single_writer.rs"]

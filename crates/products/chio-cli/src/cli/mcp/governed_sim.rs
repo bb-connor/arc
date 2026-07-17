@@ -112,15 +112,24 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
     });
     kernel.register_tool_server(Box::new(SimFlatCostServer));
 
     match args.payment_adapter.as_str() {
         "sim" => {
-            kernel.set_payment_adapter(PaymentAdapterConfig::Sim.build_adapter());
+            kernel
+                .set_payment_adapter(PaymentAdapterConfig::Sim.build_adapter())
+                .map_err(|error| {
+                    CliError::cli_other_error(format!(
+                        "failed to install payment adapter: {error}"
+                    ))
+                })?;
         }
         "none" => {}
         other => {

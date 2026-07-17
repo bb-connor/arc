@@ -171,9 +171,19 @@ pub(crate) fn build_mediation_kernel(
         max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
         require_web3_evidence: false,
         allow_ephemeral_receipt_log: true,
+        // Revocation is enforced sidecar-side over the durable revoked set (the
+        // revoked-ancestor walk below); this kernel's internal store is
+        // intentionally empty, so its durability gate must not deny mediation.
+        allow_ephemeral_revocation_store: true,
         checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        // The default journal mode keeps the durable payment journal in force
+        // for governed MustPrepay prepayments (recorded through the budget
+        // store); this kernel never dispatches tools, so it writes no dispatch
+        // intents.
+        dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::SideEffecting,
     });
     kernel.set_budget_store_handle(budget_store);
     let nonce_cfg = ExecutionNonceConfig {
@@ -201,7 +211,13 @@ pub(crate) fn build_mediation_kernel(
     // reserve-for-caller path mints a nonce. Absent an adapter the gate denies
     // MustPrepay fail-closed, so only a configured adapter enables prepayment.
     if let Some(payment_adapter) = payment_adapter {
-        kernel.set_payment_adapter(payment_adapter);
+        kernel
+            .set_payment_adapter(payment_adapter)
+            .map_err(|error| {
+                ProtectError::Config(format!(
+                    "failed to install payment adapter on the mediation kernel: {error}"
+                ))
+            })?;
     }
     for server in tool_servers {
         kernel.register_tool_server(server);
@@ -879,7 +895,7 @@ mod tests {
             trusted_capability_issuers.push(signer_public_key.clone());
         }
         let trusted_receipt_signers = vec![signer_public_key];
-        let evaluator = RequestEvaluator::new_with_approval_store(
+        let evaluator = RequestEvaluator::new_ephemeral_with_approval_store(
             Vec::new(),
             signer.clone(),
             "test-policy".to_string(),
@@ -917,6 +933,7 @@ mod tests {
                 receipts: Vec::new(),
             }),
             receipt_store: receipt_store.map(Mutex::new),
+            revocation_store: None,
             revoked_capability_ids: Mutex::new(std::collections::HashSet::new()),
             trusted_capability_issuers,
             trusted_receipt_signers,
@@ -929,6 +946,8 @@ mod tests {
             )),
             reaper_handle: Mutex::new(None),
             allow_advisory: false,
+            receipt_backend: "ephemeral",
+            revocation_backend: "ephemeral",
         })
     }
 
@@ -2439,6 +2458,7 @@ mod tests {
             spec_path: None,
             listen_addr: "127.0.0.1:0".to_string(),
             receipt_db: None,
+            allow_ephemeral_receipts: true,
             sidecar_control_token: None,
             signer_seed_hex: None,
             trusted_capability_issuers: Vec::new(),
@@ -2448,6 +2468,7 @@ mod tests {
             revocation_db: None,
             require_nonce: false,
             allow_advisory: false,
+            upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
         };
         let configured = build_budget_store(&config)
             .unwrap()
@@ -2997,6 +3018,7 @@ mod tests {
             spec_path: None,
             listen_addr: "127.0.0.1:0".to_string(),
             receipt_db: None,
+            allow_ephemeral_receipts: true,
             sidecar_control_token: None,
             signer_seed_hex: None,
             trusted_capability_issuers: Vec::new(),
@@ -3006,6 +3028,7 @@ mod tests {
             revocation_db: None,
             require_nonce: false,
             allow_advisory: false,
+            upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
         };
         let configured = build_budget_store(&config).unwrap();
         let configured = configured.expect("local sqlite budget store must be built");
@@ -3027,6 +3050,7 @@ mod tests {
             spec_path: None,
             listen_addr: "127.0.0.1:0".to_string(),
             receipt_db: None,
+            allow_ephemeral_receipts: true,
             sidecar_control_token: None,
             signer_seed_hex: None,
             trusted_capability_issuers: Vec::new(),
@@ -3036,6 +3060,7 @@ mod tests {
             revocation_db: None,
             require_nonce: false,
             allow_advisory: false,
+            upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
         };
         let configured = build_budget_store(&config).unwrap();
         let configured = configured.expect("remote budget store must be built");
@@ -3060,6 +3085,7 @@ mod tests {
             spec_path: None,
             listen_addr: "127.0.0.1:0".to_string(),
             receipt_db: None,
+            allow_ephemeral_receipts: true,
             sidecar_control_token: None,
             signer_seed_hex: None,
             trusted_capability_issuers: Vec::new(),
@@ -3069,6 +3095,7 @@ mod tests {
             revocation_db: None,
             require_nonce: false,
             allow_advisory: false,
+            upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
         };
         let configured = build_budget_store(&config).unwrap();
         let configured = configured.expect("a budget store must be built when both are configured");
@@ -3092,6 +3119,7 @@ mod tests {
             spec_path: None,
             listen_addr: "127.0.0.1:0".to_string(),
             receipt_db: None,
+            allow_ephemeral_receipts: true,
             sidecar_control_token: None,
             signer_seed_hex: None,
             trusted_capability_issuers: Vec::new(),
@@ -3101,6 +3129,7 @@ mod tests {
             revocation_db,
             require_nonce: false,
             allow_advisory: false,
+            upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
         }
     }
 

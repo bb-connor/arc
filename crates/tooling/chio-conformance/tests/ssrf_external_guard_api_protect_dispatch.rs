@@ -9,7 +9,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use chio_api_protect::{ProtectConfig, ProtectProxy};
+use chio_api_protect::{ProtectConfig, ProtectProxy, DEFAULT_UPSTREAM_REQUEST_TIMEOUT};
 use chio_external_guards::external::bedrock::{BedrockGuardrailConfig, BedrockGuardrailGuard};
 use chio_external_guards::external::{ExternalGuard, GuardCallContext};
 use tiny_http::{Header, Response, Server};
@@ -193,6 +193,10 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_link_local() {
         spec_path: None,
         listen_addr: proxy_addr.to_string(),
         receipt_db: None,
+        // This SSRF guard test exercises the proxy without a durable store; opt
+        // into ephemeral receipts explicitly so the durable-by-default boot gate
+        // does not refuse to start.
+        allow_ephemeral_receipts: true,
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
@@ -202,6 +206,7 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_link_local() {
         revocation_db: None,
         require_nonce: false,
         allow_advisory: false,
+        upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
     let proxy_task = tokio::spawn(async move { ProtectProxy::new(config).run().await });
     let client = reqwest::Client::builder()
@@ -249,6 +254,10 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_loopback_authority() {
         spec_path: None,
         listen_addr: proxy_addr.to_string(),
         receipt_db: None,
+        // This SSRF guard test exercises the proxy without a durable store; opt
+        // into ephemeral receipts explicitly so the durable-by-default boot gate
+        // does not refuse to start.
+        allow_ephemeral_receipts: true,
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
@@ -258,6 +267,7 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_loopback_authority() {
         revocation_db: None,
         require_nonce: false,
         allow_advisory: false,
+        upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
     let proxy_task = tokio::spawn(async move { ProtectProxy::new(config).run().await });
     let client = reqwest::Client::builder()
@@ -309,6 +319,10 @@ async fn api_protect_upstream_proxy_rejects_oversized_response() {
         spec_path: None,
         listen_addr: proxy_addr.to_string(),
         receipt_db: None,
+        // This SSRF guard test exercises the proxy without a durable store; opt
+        // into ephemeral receipts explicitly so the durable-by-default boot gate
+        // does not refuse to start.
+        allow_ephemeral_receipts: true,
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
@@ -318,6 +332,7 @@ async fn api_protect_upstream_proxy_rejects_oversized_response() {
         revocation_db: None,
         require_nonce: false,
         allow_advisory: false,
+        upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
     let proxy_task = tokio::spawn(async move { ProtectProxy::new(config).run().await });
     let client = reqwest::Client::builder()

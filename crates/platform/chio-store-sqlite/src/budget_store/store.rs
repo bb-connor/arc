@@ -4,14 +4,33 @@ use super::*;
 /// origin `authority_id`, and origin `lease_epoch`.
 pub type BudgetEventWitness = (u64, Option<String>, Option<u64>);
 
+/// Budget-store schema revision. Bump on every schema-affecting change.
+const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 0;
+/// Stable key under which this store records its schema revision in the shared
+/// keyed metadata table, distinct from any co-located store's key.
+const BUDGET_STORE_SCHEMA_KEY: &str = "budget";
+/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
+/// budget database rather than reject it as foreign.
+const BUDGET_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &["capability_grant_budgets"];
+
 impl SqliteBudgetStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, BudgetStoreError> {
         let path = path.as_ref();
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+        // Resolve any `file:` URI to its on-disk parent before creating it, so a
+        // URI-configured store creates the real backing directory rather than a
+        // bogus scheme-prefixed one.
+        if let Some(parent) = crate::sqlite_parent_dir_to_create(path) {
+            fs::create_dir_all(&parent)?;
         }
 
         let mut connection = Connection::open(path)?;
+        crate::check_schema_version(
+            &connection,
+            BUDGET_STORE_SCHEMA_KEY,
+            BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
+            BUDGET_STORE_LEGACY_ANCHOR_TABLES,
+        )
+        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
         connection.execute_batch(
             r#"
             PRAGMA journal_mode = WAL;
@@ -54,6 +73,27 @@ impl SqliteBudgetStore {
 
             CREATE INDEX IF NOT EXISTS idx_budget_authorization_holds_capability
                 ON budget_authorization_holds(capability_id, grant_index);
+
+            CREATE TABLE IF NOT EXISTS payment_journal (
+                request_id          TEXT PRIMARY KEY,
+                capability_id       TEXT NOT NULL,
+                grant_index         INTEGER NOT NULL,
+                hold_id             TEXT,
+                rail                TEXT NOT NULL,
+                authorization_id    TEXT,
+                transaction_id      TEXT,
+                amount_units        INTEGER NOT NULL,
+                settle_action       TEXT,
+                settle_amount_units INTEGER,
+                currency            TEXT NOT NULL,
+                state               TEXT NOT NULL,
+                created_at          INTEGER NOT NULL,
+                updated_at          INTEGER NOT NULL,
+                tenant_id           TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_payment_journal_state
+                ON payment_journal(state);
 
             CREATE TABLE IF NOT EXISTS budget_mutation_events (
                 event_id TEXT PRIMARY KEY,
@@ -150,6 +190,12 @@ impl SqliteBudgetStore {
         ensure_budget_mutation_event_authority_columns(&connection)?;
         ensure_budget_mutation_event_seq_column(&connection)?;
         initialize_budget_replication_seq(&mut connection)?;
+        crate::stamp_schema_version(
+            &connection,
+            BUDGET_STORE_SCHEMA_KEY,
+            BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
+        )
+        .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -1410,6 +1456,21 @@ impl SqliteBudgetStore {
                     authorized_exposure_units,
                     0,
                     HoldDisposition::Reconciled,
+                    record.authority.as_ref(),
+                )
+            }
+            BudgetMutationKind::ExpireHold => {
+                let authorized_exposure_units = Self::load_hold(transaction, hold_id)?
+                    .map(|hold| hold.authorized_exposure_units)
+                    .unwrap_or(record.exposure_units);
+                Self::upsert_hold(
+                    transaction,
+                    hold_id,
+                    &record.capability_id,
+                    record.grant_index as usize,
+                    authorized_exposure_units,
+                    0,
+                    HoldDisposition::Expired,
                     record.authority.as_ref(),
                 )
             }

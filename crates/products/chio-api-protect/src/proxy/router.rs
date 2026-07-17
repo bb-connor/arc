@@ -33,6 +33,10 @@ pub(crate) fn build_app(state: Arc<ProxyState>) -> Router {
     Router::new()
         .route("/chio/evaluate", post(sidecar_evaluate_handler))
         .route("/chio/verify", post(sidecar_verify_handler))
+        // Liveness is process-only; readiness is dependency-aware. Splitting them
+        // lets a liveness probe keep a healthy process alive through a dependency
+        // blip while a readiness probe pulls it from rotation when it can only deny.
+        .route("/chio/live", get(sidecar_liveness_handler))
         .route("/chio/health", get(sidecar_health_handler))
         .merge(approval_routes)
         .route("/v1/capabilities/mint", post(sidecar_mint_handler))
@@ -386,10 +390,11 @@ pub(crate) async fn find_revoked_capability_id(
 ) -> Option<String> {
     let capability_id = presented_capability_id(raw_capability)
         .or_else(|| capability_id_hint.map(ToOwned::to_owned))?;
-    let revoked_capability_ids = state.revoked_capability_ids.lock().await;
-    revoked_capability_ids
-        .contains(&capability_id)
-        .then_some(capability_id)
+    if state.capability_is_revoked(&capability_id).await {
+        Some(capability_id)
+    } else {
+        None
+    }
 }
 
 pub(crate) async fn revoked_proxy_response(

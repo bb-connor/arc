@@ -517,7 +517,7 @@ mod tests {
         {
             obj.insert(
                 "profile".to_string(),
-                serde_json::json!("chio.mediated_spend.v2"),
+                serde_json::json!("chio.mediated_spend.v9"),
             );
         }
         let receipt = ChioReceipt::sign(receipt.body(), &kp).unwrap();
