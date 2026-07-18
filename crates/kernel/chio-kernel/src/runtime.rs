@@ -337,6 +337,15 @@ pub trait ToolServerConnection: Send + Sync {
     /// List the tool names available on this server.
     fn tool_names(&self) -> Vec<String>;
 
+    /// Return whether the registered tool is explicitly declared read-only.
+    ///
+    /// The conservative default keeps unannotated tools side-effecting for
+    /// durable admission. Implementations should return `true` only from
+    /// authenticated manifest metadata owned by the registered connection.
+    fn tool_is_read_only(&self, _tool_name: &str) -> bool {
+        false
+    }
+
     /// Invoke a tool on this server. The kernel has already validated the
     /// capability and run guards before calling this.
     async fn invoke(

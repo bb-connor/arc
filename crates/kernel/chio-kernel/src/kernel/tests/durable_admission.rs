@@ -51,6 +51,64 @@ fn durable_admission_runtime_defaults_closed_and_off_requires_explicit_unsafe_ep
     );
 }
 
+#[test]
+fn side_effecting_mode_exempts_only_explicitly_read_only_tools() {
+    struct ReadOnlyServer;
+
+    #[async_trait::async_trait]
+    impl ToolServerConnection for ReadOnlyServer {
+        fn server_id(&self) -> &str {
+            "read-only-server"
+        }
+
+        fn tool_names(&self) -> Vec<String> {
+            vec!["lookup".to_owned()]
+        }
+
+        fn tool_is_read_only(&self, tool_name: &str) -> bool {
+            tool_name == "lookup"
+        }
+
+        async fn invoke(
+            &self,
+            _tool_name: &str,
+            _arguments: serde_json::Value,
+            _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+        ) -> Result<serde_json::Value, KernelError> {
+            Ok(serde_json::json!({"found": true}))
+        }
+    }
+
+    let mut kernel = make_kernel(make_config());
+    kernel.register_tool_server(Box::new(ReadOnlyServer));
+    let agent = make_keypair();
+    let capability = make_capability(
+        &kernel,
+        &agent,
+        make_scope(vec![make_grant("read-only-server", "lookup")]),
+        300,
+    );
+    let request = make_request(
+        "durable-read-only-classification",
+        &capability,
+        "lookup",
+        "read-only-server",
+    );
+    let matching = resolve_required_matching_grants(
+        &capability,
+        &request.tool_name,
+        &request.server_id,
+        &request.arguments,
+        request.model_metadata.as_ref(),
+    )
+    .expect("matching read-only grant");
+
+    assert!(kernel
+        .begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
+        .expect("read-only classification")
+        .is_none());
+}
+
 #[derive(Default)]
 struct TestAdmissionState {
     operation: Option<AdmissionOperationV1>,

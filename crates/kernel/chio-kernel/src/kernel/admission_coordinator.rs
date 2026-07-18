@@ -404,6 +404,12 @@ impl ChioKernel {
                 || matching.grant.max_total_cost.is_some()
         }) {
             SideEffectClass::Monetary
+        } else if self
+            .tool_servers
+            .get(&request.server_id)
+            .is_some_and(|server| server.tool_is_read_only(&request.tool_name))
+        {
+            SideEffectClass::ReadOnly
         } else {
             SideEffectClass::SideEffecting
         };
