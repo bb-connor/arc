@@ -152,6 +152,13 @@ pub(crate) struct ValidatedGovernedAdmission {
 pub(crate) struct VerifiedApprovalReservation {
     threshold_proposal_hash: String,
     approval_set_hash: String,
+    threshold_replay: Option<ThresholdApprovalReplayReservationV1>,
+}
+
+#[derive(Debug)]
+struct VerifiedThresholdApprovalSet {
+    body: chio_core::capability::governance::VerifiedApprovalSetBody,
+    replay: ThresholdApprovalReplayReservationV1,
 }
 
 pub(crate) struct GovernedValidationContext<'a> {

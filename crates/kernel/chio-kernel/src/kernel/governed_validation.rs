@@ -301,7 +301,7 @@ impl ChioKernel {
         cap: &CapabilityToken,
         intent_hash: &str,
         now: u64,
-    ) -> Result<chio_core::capability::governance::VerifiedApprovalSetBody, KernelError> {
+    ) -> Result<VerifiedThresholdApprovalSet, KernelError> {
         use std::collections::HashSet;
 
         const MAX_APPROVAL_TOKENS: usize = 32;
@@ -478,27 +478,16 @@ impl ChioKernel {
             proposal,
         )
         .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-        let approval_set_hash = verified
-            .approval_set_hash()
-            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
-        let replay_store = self.approval_replay_store.as_ref().ok_or_else(|| {
-            KernelError::GovernedTransactionDenied(
-                "approval replay store not configured; denying as fail-closed".to_string(),
-            )
-        })?;
-        let is_fresh = replay_store
-            .check_and_insert(&proposal_body.proposal_id, &approval_set_hash)
-            .map_err(|_| {
-                KernelError::GovernedTransactionDenied(
-                    "approval replay store unavailable; denying as fail-closed".to_string(),
-                )
-            })?;
-        if !is_fresh {
-            return Err(KernelError::GovernedTransactionDenied(
-                "threshold approval set has already been consumed".to_string(),
-            ));
-        }
-        Ok(verified)
+        let replay = ThresholdApprovalReplayReservationV1::new(
+            proposal.clone(),
+            request.approval_tokens.clone(),
+            verified.clone(),
+        )
+        .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+        Ok(VerifiedThresholdApprovalSet {
+            body: verified,
+            replay,
+        })
     }
 
     fn validate_metered_billing_context(
@@ -1346,18 +1335,21 @@ impl ChioKernel {
                 Some(VerifiedApprovalReservation {
                     threshold_proposal_hash: digest.clone(),
                     approval_set_hash: digest,
+                    threshold_replay: None,
                 }),
             )
         } else if !request.approval_tokens.is_empty() {
             let verified = self.validate_threshold_approval_set(request, cap, &intent_hash, now)?;
             let digest = verified
+                .body
                 .approval_set_hash()
                 .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
             (
                 Some(digest.clone()),
                 Some(VerifiedApprovalReservation {
-                    threshold_proposal_hash: verified.threshold_proposal_hash.clone(),
+                    threshold_proposal_hash: verified.body.threshold_proposal_hash.clone(),
                     approval_set_hash: digest,
+                    threshold_replay: Some(verified.replay),
                 }),
             )
         } else {

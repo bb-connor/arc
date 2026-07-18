@@ -62,6 +62,8 @@ mod obligation;
 mod recovery;
 #[path = "admission_operation_store_tests/schema.rs"]
 mod schema;
+#[path = "admission_operation_store_tests/threshold_approval.rs"]
+mod threshold_approval;
 use crate::{
     admission_terminal_projection_effect_result, EconomicStateCacheError, EconomicStateStageStatus,
     SqliteAuthorityStore, SqliteServingOwnerError,

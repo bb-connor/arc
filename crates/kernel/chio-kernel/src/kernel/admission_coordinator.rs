@@ -825,15 +825,53 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        admission.operation = self.apply_admission_command(
-            admission.operation.clone(),
-            vec![
-                AdmissionAttachment::ThresholdProposalHash(proposal_hash),
-                AdmissionAttachment::ApprovalSetHash(approval_set_hash),
-            ],
-            AdmissionOperationState::ApprovalReserved,
-            trusted_now_unix_ms,
-        )?;
+        let attachments = vec![
+            AdmissionAttachment::ThresholdProposalHash(proposal_hash),
+            AdmissionAttachment::ApprovalSetHash(approval_set_hash),
+        ];
+        admission.operation = if let Some(replay) = verified.threshold_replay.as_ref() {
+            let expires_at_unix_ms = trusted_now_unix_ms
+                .checked_add(RECOVERY_LEASE_DURATION_MS)
+                .ok_or_else(|| {
+                    KernelError::DurableAdmission("recovery lease expiration overflowed".to_owned())
+                })?;
+            let lease = runtime
+                .store
+                .claim_recovery(
+                    admission.operation.binding().operation_id(),
+                    admission.operation.version(),
+                    &runtime.claimant_id,
+                    trusted_now_unix_ms,
+                    expires_at_unix_ms,
+                    &runtime.fence,
+                )
+                .map_err(durable_store_error)?;
+            let command = AdmissionOperationCommand::new(
+                admission.operation.binding().operation_id().clone(),
+                admission.operation.version(),
+                lease,
+                attachments,
+                Some(AdmissionOperationState::ApprovalReserved),
+                None,
+                None,
+            )?;
+            runtime
+                .store
+                .reserve_threshold_approval_and_commit_admission(
+                    &command,
+                    replay,
+                    trusted_now_unix_ms,
+                )
+                .map(|result| result.into_operation())
+                .map_err(durable_store_error)?
+        } else {
+            self.apply_admission_command(
+                admission.operation.clone(),
+                attachments,
+                AdmissionOperationState::ApprovalReserved,
+                trusted_now_unix_ms,
+            )?
+        };
         Ok(())
     }
 

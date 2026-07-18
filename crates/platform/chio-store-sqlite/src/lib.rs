@@ -344,6 +344,23 @@ impl chio_kernel::QualifiedAdmissionProjectionStore
         })
     }
 
+    fn reserve_threshold_approval_and_commit_admission(
+        &self,
+        command: &chio_kernel::admission_operation::AdmissionOperationCommand,
+        reservation: &chio_kernel::ThresholdApprovalReplayReservationV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        chio_kernel::admission_operation::AdmissionCommandResult,
+        chio_kernel::admission_operation::AdmissionOperationStoreError,
+    > {
+        admission_operation_store::SqliteAdmissionOperationStore::reserve_threshold_approval_and_commit_admission(
+            self,
+            command,
+            reservation,
+            trusted_now_unix_ms,
+        )
+    }
+
     fn list_admission_receipts_after(
         &self,
         after_receipt_id: Option<&str>,

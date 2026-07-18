@@ -198,8 +198,8 @@ fn threshold_approval_set_is_policy_bound_and_order_independent() {
     let verified = kernel
         .validate_threshold_approval_set(&request, &cap, &intent_hash, now)
         .unwrap();
-    assert_eq!(verified.threshold, 2);
-    assert_eq!(verified.token_digests.len(), 2);
+    assert_eq!(verified.body.threshold, 2);
+    assert_eq!(verified.body.token_digests.len(), 2);
 
     let mut insufficient = request.clone();
     insufficient.approval_tokens.pop();

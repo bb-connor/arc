@@ -213,6 +213,133 @@ BEGIN
     SELECT RAISE(ABORT, 'terminal admission operation cannot be recovery-claimed');
 END;
 
+CREATE TABLE IF NOT EXISTS threshold_approval_proposals (
+    proposal_id TEXT NOT NULL PRIMARY KEY CHECK (length(proposal_id) BETWEEN 1 AND 512),
+    operation_id TEXT NOT NULL UNIQUE,
+    request_id TEXT NOT NULL CHECK (length(request_id) BETWEEN 1 AND 512),
+    governed_intent_hash TEXT NOT NULL CHECK (
+        length(governed_intent_hash) = 64
+        AND governed_intent_hash NOT GLOB '*[^0-9a-f]*'
+    ),
+    subject_fingerprint TEXT NOT NULL CHECK (subject_fingerprint <> ''),
+    authorizing_capability_digest TEXT NOT NULL CHECK (
+        length(authorizing_capability_digest) = 64
+        AND authorizing_capability_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    policy_hash TEXT NOT NULL CHECK (
+        length(policy_hash) = 64 AND policy_hash NOT GLOB '*[^0-9a-f]*'
+    ),
+    threshold INTEGER NOT NULL CHECK (threshold > 0),
+    eligible_set_digest TEXT NOT NULL CHECK (
+        length(eligible_set_digest) = 64
+        AND eligible_set_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    proposal_created_at INTEGER NOT NULL CHECK (proposal_created_at >= 0),
+    proposal_deadline INTEGER NOT NULL CHECK (proposal_deadline > proposal_created_at),
+    proposal_hash TEXT NOT NULL UNIQUE CHECK (
+        length(proposal_hash) = 64 AND proposal_hash NOT GLOB '*[^0-9a-f]*'
+    ),
+    approval_set_hash TEXT NOT NULL UNIQUE CHECK (
+        length(approval_set_hash) = 64
+        AND approval_set_hash NOT GLOB '*[^0-9a-f]*'
+    ),
+    proposal_json BLOB NOT NULL CHECK (length(proposal_json) BETWEEN 1 AND 262144),
+    state TEXT NOT NULL CHECK (state IN ('reserved', 'committed', 'cancelled')),
+    reserved_at_unix_ms INTEGER NOT NULL CHECK (reserved_at_unix_ms > 0),
+    updated_at_unix_ms INTEGER NOT NULL CHECK (updated_at_unix_ms >= reserved_at_unix_ms),
+    FOREIGN KEY (operation_id) REFERENCES admission_operations(operation_id)
+);
+
+CREATE TABLE IF NOT EXISTS threshold_approval_tokens (
+    token_id TEXT NOT NULL PRIMARY KEY CHECK (length(token_id) BETWEEN 1 AND 512),
+    proposal_id TEXT NOT NULL,
+    approver_fingerprint TEXT NOT NULL CHECK (approver_fingerprint <> ''),
+    canonical_token_digest TEXT NOT NULL UNIQUE CHECK (
+        length(canonical_token_digest) = 64
+        AND canonical_token_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    token_json BLOB NOT NULL CHECK (length(token_json) BETWEEN 1 AND 262144),
+    UNIQUE (proposal_id, approver_fingerprint),
+    UNIQUE (proposal_id, canonical_token_digest),
+    FOREIGN KEY (proposal_id) REFERENCES threshold_approval_proposals(proposal_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS threshold_approval_proposals_immutable
+BEFORE UPDATE ON threshold_approval_proposals
+WHEN NEW.proposal_id <> OLD.proposal_id
+     OR NEW.operation_id <> OLD.operation_id
+     OR NEW.request_id <> OLD.request_id
+     OR NEW.governed_intent_hash <> OLD.governed_intent_hash
+     OR NEW.subject_fingerprint <> OLD.subject_fingerprint
+     OR NEW.authorizing_capability_digest <> OLD.authorizing_capability_digest
+     OR NEW.policy_hash <> OLD.policy_hash
+     OR NEW.threshold <> OLD.threshold
+     OR NEW.eligible_set_digest <> OLD.eligible_set_digest
+     OR NEW.proposal_created_at <> OLD.proposal_created_at
+     OR NEW.proposal_deadline <> OLD.proposal_deadline
+     OR NEW.proposal_hash <> OLD.proposal_hash
+     OR NEW.approval_set_hash <> OLD.approval_set_hash
+     OR NEW.proposal_json <> OLD.proposal_json
+     OR NEW.reserved_at_unix_ms <> OLD.reserved_at_unix_ms
+BEGIN
+    SELECT RAISE(ABORT, 'threshold approval proposal is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS threshold_approval_proposals_terminal
+BEFORE UPDATE OF state ON threshold_approval_proposals
+WHEN OLD.state IN ('committed', 'cancelled') AND NEW.state <> OLD.state
+BEGIN
+    SELECT RAISE(ABORT, 'terminal threshold approval proposal is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS threshold_approval_proposals_lifecycle
+BEFORE UPDATE ON threshold_approval_proposals
+WHEN NEW.updated_at_unix_ms < OLD.updated_at_unix_ms
+     OR (NEW.state = OLD.state AND NEW.updated_at_unix_ms <> OLD.updated_at_unix_ms)
+     OR (OLD.state = 'reserved' AND NEW.state NOT IN ('reserved', 'committed', 'cancelled'))
+BEGIN
+    SELECT RAISE(ABORT, 'invalid threshold approval proposal lifecycle');
+END;
+
+CREATE TRIGGER IF NOT EXISTS threshold_approval_proposals_no_delete
+BEFORE DELETE ON threshold_approval_proposals
+BEGIN
+    SELECT RAISE(ABORT, 'threshold approval proposal is a replay tombstone');
+END;
+
+CREATE TRIGGER IF NOT EXISTS threshold_approval_tokens_immutable
+BEFORE UPDATE ON threshold_approval_tokens
+BEGIN
+    SELECT RAISE(ABORT, 'threshold approval token is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS threshold_approval_tokens_no_delete
+BEFORE DELETE ON threshold_approval_tokens
+BEGIN
+    SELECT RAISE(ABORT, 'threshold approval token is a replay tombstone');
+END;
+
+CREATE TRIGGER IF NOT EXISTS admission_operations_commit_threshold_approval
+AFTER UPDATE OF state ON admission_operations
+WHEN NEW.state IN (
+    'dispatch_committed', 'finalizing', 'completed',
+    'not_accepted_after_dispatch_commit', 'outcome_unknown_after_dispatch'
+)
+BEGIN
+    UPDATE threshold_approval_proposals
+    SET state = 'committed', updated_at_unix_ms = NEW.updated_at_unix_ms
+    WHERE operation_id = NEW.operation_id AND state = 'reserved';
+END;
+
+CREATE TRIGGER IF NOT EXISTS admission_operations_cancel_threshold_approval
+AFTER UPDATE OF state ON admission_operations
+WHEN NEW.state = 'compensated_before_dispatch'
+BEGIN
+    UPDATE threshold_approval_proposals
+    SET state = 'cancelled', updated_at_unix_ms = NEW.updated_at_unix_ms
+    WHERE operation_id = NEW.operation_id AND state = 'reserved';
+END;
+
 CREATE TABLE IF NOT EXISTS admission_operation_terminal_projections (
     operation_id TEXT NOT NULL PRIMARY KEY,
     source_operation_version INTEGER NOT NULL CHECK (source_operation_version > 0),

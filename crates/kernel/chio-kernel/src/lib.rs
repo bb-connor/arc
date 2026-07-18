@@ -435,7 +435,7 @@ pub use receipt_store::{
     ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore, ReceiptStoreError,
     ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
     ReceiptWriterLiveness, RetentionConfig, StoredChildReceipt, StoredToolReceipt,
-    ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND,
+    ThresholdApprovalReplayReservationV1, ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND,
 };
 pub use revocation_runtime::{InMemoryRevocationStore, RevocationObservation, RevocationStore};
 pub use revocation_store::{RevocationRecord, RevocationStoreError};

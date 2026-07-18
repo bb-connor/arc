@@ -922,6 +922,142 @@ pub enum AdmissionPaymentJournalError {
 pub const ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND: &str =
     "chio.admission.terminal-projection.v1";
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThresholdApprovalReplayReservationV1 {
+    proposal: chio_core::capability::governance::ThresholdApprovalProposal,
+    tokens: Vec<chio_core::capability::governance::GovernedApprovalToken>,
+    verified_set: chio_core::capability::governance::VerifiedApprovalSetBody,
+}
+
+impl ThresholdApprovalReplayReservationV1 {
+    pub fn new(
+        proposal: chio_core::capability::governance::ThresholdApprovalProposal,
+        mut tokens: Vec<chio_core::capability::governance::GovernedApprovalToken>,
+        verified_set: chio_core::capability::governance::VerifiedApprovalSetBody,
+    ) -> Result<Self, crate::admission_operation::AdmissionOperationStoreError> {
+        use std::collections::HashSet;
+
+        if tokens.is_empty() || tokens.len() > 32 {
+            return Err(
+                crate::admission_operation::AdmissionOperationStoreError::Invariant(
+                    "threshold approval replay reservation must contain between 1 and 32 tokens"
+                        .to_owned(),
+                ),
+            );
+        }
+        if !proposal.verify_signature().map_err(|error| {
+            crate::admission_operation::AdmissionOperationStoreError::Invariant(error.to_string())
+        })? {
+            return Err(
+                crate::admission_operation::AdmissionOperationStoreError::Invariant(
+                    "threshold approval replay proposal signature is invalid".to_owned(),
+                ),
+            );
+        }
+        let proposal_hash = proposal.artifact_digest().map_err(|error| {
+            crate::admission_operation::AdmissionOperationStoreError::Invariant(error.to_string())
+        })?;
+        let mut token_ids = HashSet::new();
+        let mut approvers = HashSet::new();
+        let mut tokens_with_digests = Vec::with_capacity(tokens.len());
+        for token in tokens.drain(..) {
+            if token.id.is_empty()
+                || token.id.trim() != token.id
+                || token.threshold_proposal_hash.as_deref() != Some(proposal_hash.as_str())
+                || token.request_id != proposal.body.request_id
+                || token.governed_intent_hash != proposal.body.governed_intent_hash
+                || token.subject != proposal.body.subject
+                || token.decision
+                    != chio_core::capability::governance::GovernedApprovalDecision::Approved
+                || token.issued_at < proposal.body.proposal_created_at
+                || token.issued_at >= proposal.body.proposal_deadline
+                || token.expires_at > proposal.body.proposal_deadline
+                || !token_ids.insert(token.id.clone())
+                || !approvers.insert(token.approver.to_hex())
+            {
+                return Err(
+                    crate::admission_operation::AdmissionOperationStoreError::Invariant(
+                        "threshold approval replay tokens do not form a distinct proposal set"
+                            .to_owned(),
+                    ),
+                );
+            }
+            if !token.verify_signature().map_err(|error| {
+                crate::admission_operation::AdmissionOperationStoreError::Invariant(
+                    error.to_string(),
+                )
+            })? {
+                return Err(
+                    crate::admission_operation::AdmissionOperationStoreError::Invariant(
+                        "threshold approval replay token signature is invalid".to_owned(),
+                    ),
+                );
+            }
+            let digest = token.artifact_digest().map_err(|error| {
+                crate::admission_operation::AdmissionOperationStoreError::Invariant(
+                    error.to_string(),
+                )
+            })?;
+            tokens_with_digests.push((digest, token));
+        }
+        tokens_with_digests.sort_by(|left, right| left.0.cmp(&right.0));
+        if tokens_with_digests
+            .windows(2)
+            .any(|pair| pair[0].0 == pair[1].0)
+            || tokens_with_digests
+                .iter()
+                .map(|(digest, _)| digest)
+                .ne(verified_set.token_digests.iter())
+        {
+            return Err(
+                crate::admission_operation::AdmissionOperationStoreError::Invariant(
+                    "threshold approval replay token digests do not match the verified set"
+                        .to_owned(),
+                ),
+            );
+        }
+        let reconstructed = chio_core::capability::governance::VerifiedApprovalSetBody::new(
+            verified_set.token_digests.clone(),
+            &proposal,
+        )
+        .map_err(|error| {
+            crate::admission_operation::AdmissionOperationStoreError::Invariant(error.to_string())
+        })?;
+        if reconstructed != verified_set {
+            return Err(
+                crate::admission_operation::AdmissionOperationStoreError::Invariant(
+                    "threshold approval replay set does not match its signed proposal".to_owned(),
+                ),
+            );
+        }
+        Ok(Self {
+            proposal,
+            tokens: tokens_with_digests
+                .into_iter()
+                .map(|(_, token)| token)
+                .collect(),
+            verified_set,
+        })
+    }
+
+    #[must_use]
+    pub const fn proposal(&self) -> &chio_core::capability::governance::ThresholdApprovalProposal {
+        &self.proposal
+    }
+
+    #[must_use]
+    pub fn tokens(&self) -> &[chio_core::capability::governance::GovernedApprovalToken] {
+        &self.tokens
+    }
+
+    #[must_use]
+    pub const fn verified_set(
+        &self,
+    ) -> &chio_core::capability::governance::VerifiedApprovalSetBody {
+        &self.verified_set
+    }
+}
+
 pub trait QualifiedAdmissionProjectionStore:
     ReceiptStore + crate::admission_operation::QualifiedAdmissionOperationStore
 {
@@ -961,6 +1097,22 @@ pub trait QualifiedAdmissionProjectionStore:
         active_fence: &crate::admission_operation::StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<AdmissionBudgetCapture, crate::admission_operation::AdmissionCaptureError>;
+
+    fn reserve_threshold_approval_and_commit_admission(
+        &self,
+        _command: &crate::admission_operation::AdmissionOperationCommand,
+        _reservation: &ThresholdApprovalReplayReservationV1,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<
+        crate::admission_operation::AdmissionCommandResult,
+        crate::admission_operation::AdmissionOperationStoreError,
+    > {
+        Err(
+            crate::admission_operation::AdmissionOperationStoreError::Unavailable(
+                "durable threshold approval replay reservation is unsupported".to_owned(),
+            ),
+        )
+    }
 
     fn list_admission_receipts_after(
         &self,

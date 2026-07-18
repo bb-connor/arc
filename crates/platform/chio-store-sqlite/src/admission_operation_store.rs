@@ -48,6 +48,7 @@ mod participant;
 mod projection;
 mod schema;
 mod store;
+mod threshold_approval;
 
 use commit_chain::append_operation_commit;
 pub(crate) use commit_chain::{
@@ -92,10 +93,11 @@ pub(crate) use schema::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 7;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 8;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
+    "threshold_approval_proposals",
     "chio_serving_owner",
     "capability_grant_budgets",
 ];
