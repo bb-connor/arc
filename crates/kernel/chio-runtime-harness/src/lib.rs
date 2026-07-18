@@ -443,8 +443,11 @@ mod tests {
         write_executable_scenario(&fixture_scenario, &scenario)?;
 
         let error =
-            run_runtime_loopback_scenario(&scenario, &store_dir, 1_800_000_001_000, &out_dir)
-                .expect_err("runtime package drift from static fixture must fail closed");
+            match run_runtime_loopback_scenario(&scenario, &store_dir, 1_800_000_001_000, &out_dir)
+            {
+                Ok(_) => panic!("runtime package drift from static fixture must fail closed"),
+                Err(error) => error,
+            };
         assert!(
             error
                 .to_string()
@@ -510,8 +513,11 @@ mod tests {
         write_executable_scenario(&fixture_scenario, &scenario)?;
 
         let error =
-            run_runtime_loopback_scenario(&scenario, &store_dir, 1_800_000_001_000, &out_dir)
-                .expect_err("runtime package drift from static fixture must fail closed");
+            match run_runtime_loopback_scenario(&scenario, &store_dir, 1_800_000_001_000, &out_dir)
+            {
+                Ok(_) => panic!("runtime package drift from static fixture must fail closed"),
+                Err(error) => error,
+            };
         assert!(
             error
                 .to_string()
