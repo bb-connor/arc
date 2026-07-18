@@ -777,8 +777,12 @@ impl ChioKernel {
 
         let evaluation = match operation {
             SessionOperation::ToolCall(tool_call) => {
+                let request_id = parsed_tool_call_execution_nonce.as_ref().map_or_else(
+                    || context.request_id.to_string(),
+                    |nonce| nonce.nonce.bound_to.request_id.clone(),
+                );
                 let request = ToolCallRequest {
-                    request_id: context.request_id.to_string(),
+                    request_id,
                     capability: tool_call.capability.clone(),
                     tool_name: tool_call.tool_name.clone(),
                     server_id: tool_call.server_id.clone(),

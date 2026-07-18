@@ -171,7 +171,7 @@ pub(in crate::runtime) fn parse_request_model_metadata(
 pub(in crate::runtime) fn parse_request_execution_nonce(
     id: &Value,
     params: &Value,
-) -> Result<Option<Value>, Value> {
+) -> Result<Option<SignedExecutionNonce>, Value> {
     let Some(meta) = params.get("_meta") else {
         return Ok(None);
     };
@@ -189,14 +189,15 @@ pub(in crate::runtime) fn parse_request_execution_nonce(
         return Ok(None);
     };
 
-    serde_json::from_value::<SignedExecutionNonce>(execution_nonce.clone()).map_err(|_| {
-        jsonrpc_error(
-            id.clone(),
-            JSONRPC_INVALID_PARAMS,
-            "executionNonce must be a signed Chio execution nonce object",
-        )
-    })?;
-    Ok(Some(execution_nonce.clone()))
+    serde_json::from_value(execution_nonce.clone())
+        .map(Some)
+        .map_err(|_| {
+            jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "executionNonce must be a signed Chio execution nonce object",
+            )
+        })
 }
 
 pub(in crate::runtime) fn parse_request_governed_intent(

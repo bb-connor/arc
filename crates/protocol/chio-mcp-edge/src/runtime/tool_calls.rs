@@ -339,6 +339,16 @@ impl ChioMcpEdge {
         };
 
         let context = build_operation_context(id, session_id.clone(), &self.agent_id, params)?;
+        let execution_nonce = execution_nonce
+            .map(serde_json::to_value)
+            .transpose()
+            .map_err(|error| {
+                jsonrpc_error(
+                    id.clone(),
+                    JSONRPC_INVALID_REQUEST,
+                    &format!("failed to serialize execution nonce: {error}"),
+                )
+            })?;
 
         Ok((
             session_id,

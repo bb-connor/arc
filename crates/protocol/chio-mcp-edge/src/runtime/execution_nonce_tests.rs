@@ -247,7 +247,7 @@ fn tools_call_round_trips_execution_nonce_through_meta() {
             }
         }))
         .unwrap();
-    assert_eq!(allowed["result"]["isError"], false);
+    assert_eq!(allowed["result"]["isError"], false, "{allowed}");
 
     let replay = edge
         .handle_jsonrpc(json!({
