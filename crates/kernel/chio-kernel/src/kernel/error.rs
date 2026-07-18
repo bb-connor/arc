@@ -136,6 +136,9 @@ pub enum KernelError {
     #[error("invocation budget exhausted for capability {0}")]
     BudgetExhausted(CapabilityId),
 
+    #[error("captured budget replay denied for capability {0}")]
+    CapturedBudgetReplay(CapabilityId),
+
     #[error("request agent {actual} does not match capability subject {expected}")]
     SubjectMismatch { expected: String, actual: String },
 
@@ -381,6 +384,11 @@ impl KernelError {
                 "CHIO-KERNEL-BUDGET-EXHAUSTED",
                 serde_json::json!({ "capability_id": capability_id }),
                 "Increase the capability budget, wait for the budget window to reset, or lower the cost of the requested operation.",
+            ),
+            Self::CapturedBudgetReplay(capability_id) => self.report_with_context(
+                "CHIO-KERNEL-CAPTURED-BUDGET-REPLAY",
+                serde_json::json!({ "capability_id": capability_id }),
+                "Use a new request ID. A captured budget authorization cannot be reused by another dispatch.",
             ),
             Self::SubjectMismatch { expected, actual } => self.report_with_context(
                 "CHIO-KERNEL-SUBJECT-MISMATCH",

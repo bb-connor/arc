@@ -46,6 +46,7 @@ impl BudgetStore for InMemoryBudgetStore {
                 event.authority,
                 Some(event.event_seq),
                 Some(event.event_id),
+                Some(event.recorded_at),
             ),
         };
         Ok(if captured {
@@ -80,6 +81,7 @@ impl BudgetStore for InMemoryBudgetStore {
                 event.authority,
                 Some(event.event_seq),
                 Some(event.event_id),
+                Some(event.recorded_at),
             ),
         };
         Ok(if authorized {
@@ -125,6 +127,7 @@ impl BudgetStore for InMemoryBudgetStore {
                 event.authority,
                 Some(event.event_seq),
                 Some(event.event_id),
+                Some(event.recorded_at),
             ),
         };
         Ok(if cancelled {
@@ -455,6 +458,7 @@ impl BudgetStore for InMemoryBudgetStore {
                         capture.authority,
                         Some(capture.event_seq),
                         Some(capture.event_id),
+                        Some(capture.recorded_at),
                     ),
                 },
             ));
@@ -478,6 +482,7 @@ impl BudgetStore for InMemoryBudgetStore {
             event.authority.clone(),
             Some(event.event_seq),
             Some(event.event_id.clone()),
+            Some(event.recorded_at),
         );
 
         if event.authorization_outcome == Some(BudgetAuthorizationOutcome::Denied) {

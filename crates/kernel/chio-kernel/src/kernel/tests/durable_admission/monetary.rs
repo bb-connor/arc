@@ -63,10 +63,7 @@ fn durable_monetary_guard_denial_closes_unstarted_payment() {
         store.operation().state(),
         AdmissionOperationState::CompensatedBeforeDispatch
     );
-    assert_eq!(
-        store.payment_journal().map(|journal| journal.state),
-        Some(PaymentJournalState::Closed)
-    );
+    assert!(store.payment_journal().is_none());
     assert!(authorization_references
         .lock()
         .expect("authorization references")
@@ -176,14 +173,16 @@ fn durable_monetary_lifecycle_uses_the_qualified_projection_store() {
 
     let (_, mutation) = kernel
         .check_and_increment_budget(
-            &request.request_id,
+            &request,
             &capability,
             &matching,
             false,
             Some(&mut admission),
             now,
         )
-        .expect("combined budget authorization");
+        .expect("combined budget authorization")
+        .into_authorized()
+        .expect("authorized budget outcome");
 
     assert!(mutation.durable_hold_result().is_some());
     assert_eq!(admission.state(), AdmissionOperationState::BudgetAuthorized);
@@ -247,14 +246,16 @@ fn durable_monetary_lifecycle_uses_the_qualified_projection_store() {
         .expect("covered resumed admission");
     let (_, replayed_mutation) = kernel
         .check_and_increment_budget(
-            &request.request_id,
+            &request,
             &capability,
             &matching,
             false,
             Some(&mut resumed),
             now + 3,
         )
-        .expect("replay combined budget authorization");
+        .expect("replay combined budget authorization")
+        .into_authorized()
+        .expect("authorized replay outcome");
 
     assert!(replayed_mutation.durable_hold_result().is_some());
     assert_eq!(resumed.operation(), admission.operation());

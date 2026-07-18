@@ -93,7 +93,8 @@ pub(super) fn attachment_supported(
     attachment: &AdmissionAttachment,
 ) -> bool {
     match attachment {
-        AdmissionAttachment::ThresholdProposalHash(_) => requirements.approval,
+        AdmissionAttachment::ThresholdProposalHash(_)
+        | AdmissionAttachment::ThresholdProposal(_) => requirements.approval,
         AdmissionAttachment::SupplementalAuthorizationDigest(_) => match kind {
             AdmissionOperationKind::ToolDispatch => true,
             AdmissionOperationKind::GovernedEconomicMutation => {
@@ -149,6 +150,7 @@ pub(super) fn attachment_allowed(
             state,
             AdmissionOperationState::Prepared
                 | AdmissionOperationState::BrokerAttemptRegistered
+                | AdmissionOperationState::ApprovalRequired
                 | AdmissionOperationState::BudgetAuthorized
                 | AdmissionOperationState::ApprovalReserved
         ),
@@ -234,6 +236,7 @@ pub(super) fn validate_state_attachments(
         AdmissionOperationState::BrokerAttemptRegistered => matches!(
             state,
             AdmissionOperationState::BrokerAttemptRegistered
+                | AdmissionOperationState::ApprovalRequired
                 | AdmissionOperationState::BudgetAuthorized
                 | AdmissionOperationState::ApprovalReserved
                 | AdmissionOperationState::ReadyToDispatch
@@ -281,6 +284,9 @@ pub(super) fn validate_state_attachments(
                 | AdmissionOperationState::EconomicMutationApplied
         ),
     };
+    let approval_artifacts_required = requirements.approval
+        && reached(AdmissionOperationState::ApprovalReserved)
+        && (kind == AdmissionOperationKind::GovernedActiveResponse || attachments.has_slot(0));
     let required = [
         (
             requirements.broker_attempt
@@ -293,16 +299,8 @@ pub(super) fn validate_state_attachments(
             3,
             "budget_hold_id",
         ),
-        (
-            requirements.approval && reached(AdmissionOperationState::ApprovalReserved),
-            0,
-            "threshold_proposal_hash",
-        ),
-        (
-            requirements.approval && reached(AdmissionOperationState::ApprovalReserved),
-            4,
-            "approval_set_hash",
-        ),
+        (approval_artifacts_required, 0, "threshold_proposal_hash"),
+        (approval_artifacts_required, 4, "approval_set_hash"),
         (
             requirements.execution_nonce && reached(AdmissionOperationState::ReadyToDispatch),
             5,
@@ -340,6 +338,39 @@ pub(super) fn validate_state_attachments(
     {
         return Err(AdmissionOperationError::MissingParticipantAttachment { field });
     }
+    if state == AdmissionOperationState::ApprovalRequired {
+        for (slot, field) in [
+            (0, "threshold_proposal_hash"),
+            (3, "budget_hold_id"),
+            (12, "threshold_proposal"),
+        ] {
+            if !attachments.has_slot(slot) {
+                return Err(AdmissionOperationError::MissingParticipantAttachment { field });
+            }
+        }
+    }
+    if let Some(proposal) = attachments
+        .0
+        .iter()
+        .find_map(|attachment| match attachment {
+            AdmissionAttachment::ThresholdProposal(proposal) => Some(proposal),
+            _ => None,
+        })
+    {
+        let digest = proposal
+            .artifact_digest()
+            .map_err(|_| AdmissionOperationError::ThresholdProposalMismatch)?;
+        let bound = attachments
+            .0
+            .iter()
+            .find_map(|attachment| match attachment {
+                AdmissionAttachment::ThresholdProposalHash(digest) => Some(digest.as_str()),
+                _ => None,
+            });
+        if bound != Some(digest.as_str()) {
+            return Err(AdmissionOperationError::ThresholdProposalMismatch);
+        }
+    }
     Ok(())
 }
 
@@ -360,6 +391,9 @@ pub(super) fn validate_state_requirements(
     } else {
         match state {
             AdmissionOperationState::BrokerAttemptRegistered => requirements.broker_attempt,
+            AdmissionOperationState::ApprovalRequired => {
+                requirements.budget_capture && requirements.approval
+            }
             AdmissionOperationState::BudgetAuthorized | AdmissionOperationState::CapturePending => {
                 requirements.budget_capture
             }
@@ -385,6 +419,9 @@ pub(super) fn predispatch_state_enabled(
     match state {
         AdmissionOperationState::Prepared | AdmissionOperationState::ReadyToDispatch => true,
         AdmissionOperationState::BrokerAttemptRegistered => requirements.broker_attempt,
+        AdmissionOperationState::ApprovalRequired => {
+            requirements.budget_capture && requirements.approval
+        }
         AdmissionOperationState::BudgetAuthorized | AdmissionOperationState::CapturePending => {
             requirements.budget_capture
         }
@@ -417,6 +454,7 @@ pub(super) fn dispatch_state_for(
     match state {
         AdmissionOperationState::Prepared
         | AdmissionOperationState::BrokerAttemptRegistered
+        | AdmissionOperationState::ApprovalRequired
         | AdmissionOperationState::BudgetAuthorized
         | AdmissionOperationState::ApprovalReserved
         | AdmissionOperationState::ReadyToDispatch => Ok(AdmissionDispatchState::NotCommitted),
@@ -516,6 +554,17 @@ pub(super) fn is_legal_transition(
         }
         AdmissionOperationState::BudgetAuthorized => {
             requirements.budget_capture
+                && ((requirements.approval && from == AdmissionOperationState::ApprovalRequired)
+                    || from
+                        == if requirements.broker_attempt {
+                            AdmissionOperationState::BrokerAttemptRegistered
+                        } else {
+                            AdmissionOperationState::Prepared
+                        })
+        }
+        AdmissionOperationState::ApprovalRequired => {
+            requirements.budget_capture
+                && requirements.approval
                 && from
                     == if requirements.broker_attempt {
                         AdmissionOperationState::BrokerAttemptRegistered
@@ -532,7 +581,13 @@ pub(super) fn is_legal_transition(
                         AdmissionOperationState::Prepared
                     }
         }
-        AdmissionOperationState::ReadyToDispatch => from == ready_source,
+        AdmissionOperationState::ReadyToDispatch => {
+            from == ready_source
+                || (kind == AdmissionOperationKind::ToolDispatch
+                    && requirements.budget_capture
+                    && requirements.approval
+                    && from == AdmissionOperationState::BudgetAuthorized)
+        }
         AdmissionOperationState::CapturePending => {
             requirements.budget_capture && from == AdmissionOperationState::ReadyToDispatch
         }

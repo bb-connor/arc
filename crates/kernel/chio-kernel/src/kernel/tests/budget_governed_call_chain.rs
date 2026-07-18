@@ -207,14 +207,7 @@ fn governed_request_rejects_empty_metered_billing_provider() {
         .as_deref()
         .is_some_and(|reason| reason.contains("metered billing provider must not be empty")));
 
-    let usage = kernel
-
-        .budget_store
-        .get_usage(&cap.id, 0)
-        .unwrap()
-        .unwrap();
-    assert_eq!(usage.invocation_count, 0);
-    assert_eq!(usage.committed_cost_units().unwrap(), 0);
+    assert!(kernel.budget_store.get_usage(&cap.id, 0).unwrap().is_none());
 }
 
 #[test]
@@ -1368,13 +1361,9 @@ fn governed_request_rejects_empty_call_chain_chain_id() {
 }
 
 #[test]
-fn governed_call_chain_evidence_store_error_reverses_pre_execution_budget() {
-    // A receipt-store READ error while resolving the parent call-chain receipt
-    // fails closed, but check_and_increment_budget has already consumed the
-    // invocation count and monetary hold. The error must be routed through the same
-    // reversal + deny path the governed/guard denials use, never propagated raw, so
-    // a transient store failure never burns quota or holds funds for a call that
-    // never dispatches.
+fn governed_call_chain_evidence_store_error_consumes_no_budget() {
+    // A receipt-store read error while resolving the parent call-chain receipt
+    // fails closed before budget authorization and is returned as a signed deny.
     let mut kernel = make_kernel(make_monetary_config());
     // Appends fine (so the request's own receipt persists) but errors on every
     // point load; the governed call-chain evidence lookup is the first (and
@@ -1434,34 +1423,19 @@ fn governed_call_chain_evidence_store_error_reverses_pre_execution_budget() {
 
     assert_eq!(response.verdict, Verdict::Deny);
 
-    // The pre-execution budget mutation must have been reversed: neither the
-    // invocation count nor the committed monetary cost may survive a call that
-    // never dispatched.
-    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
-    assert_eq!(
-        usage.invocation_count, 0,
-        "invocation budget must be reversed on an evidence-lookup store error"
-    );
-    assert_eq!(
-        usage.committed_cost_units().unwrap(),
-        0,
-        "monetary hold must be released on an evidence-lookup store error"
-    );
+    assert!(kernel.budget_store.get_usage(&cap.id, 0).unwrap().is_none());
 }
 
 #[test]
-fn nested_governed_call_chain_evidence_store_error_reverses_pre_execution_budget() {
-    // The nested-flow admission path has the same evidence-lookup `?` as the
-    // top-level evaluate. A store read error there must reverse the pre-execution
-    // budget before denying, on the nested arm too, so a transient store failure
-    // never burns invocation quota.
+fn nested_governed_call_chain_evidence_store_error_consumes_no_budget() {
+    // The nested-flow admission path performs the evidence lookup before budget
+    // authorization, so a transient store failure never burns invocation quota.
     let mut kernel = make_kernel(make_config());
     kernel.set_receipt_store(Box::new(ErroringReceiptStore)).unwrap();
     let agent_kp = make_keypair();
     kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
 
-    // An invocation-limited grant so the budget store tracks (and can reverse)
-    // an invocation count.
+    // An invocation-limited grant proves the denial never creates usage state.
     let grant = make_invocation_limited_grant("srv-echo", "delegate", 5);
     let capability = make_capability(&kernel, &agent_kp, make_scope(vec![grant]), 300);
     let cap_id = capability.id.clone();
@@ -1557,12 +1531,11 @@ fn nested_governed_call_chain_evidence_store_error_reverses_pre_execution_budget
         response.reason
     );
 
-    let usage = kernel.budget_store.get_usage(&cap_id, 0).unwrap();
-    // The invocation reservation must have been released on the nested arm too.
-    assert!(
-        usage.as_ref().map_or(0, |usage| usage.invocation_count) == 0,
-        "nested evidence-lookup store error must reverse the invocation reservation, got {usage:?}"
-    );
+    assert!(kernel
+        .budget_store
+        .get_usage(&cap_id, 0)
+        .unwrap()
+        .is_none());
 }
 
 #[test]

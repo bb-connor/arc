@@ -355,6 +355,7 @@ impl SqliteBudgetStore {
                 .allowed
                 .and_then(|allowed| allowed.then_some(event.event_seq)),
             event_id: Some(event.event_id),
+            recorded_at_unix_seconds: u64::try_from(event.recorded_at).ok(),
         };
         if event.allowed == Some(true) {
             Ok(BudgetAuthorizeHoldDecision::Authorized(
@@ -422,6 +423,7 @@ impl SqliteBudgetStore {
                     metering_profile: self.budget_metering_profile(),
                     budget_commit_index: Some(capture.event_seq),
                     event_id: Some(capture.event_id),
+                    recorded_at_unix_seconds: u64::try_from(capture.recorded_at).ok(),
                 },
             },
         ))

@@ -146,6 +146,8 @@ pub(crate) struct ValidatedGovernedAdmission {
     call_chain_proof: Option<ValidatedGovernedCallChainProof>,
     verified_runtime_attestation: Option<VerifiedRuntimeAttestationRecord>,
     verified_payee_binding: Option<VerifiedGovernedPayeeBinding>,
+    approval_intent_hash: String,
+    approval_reservation: Option<VerifiedApprovalReservation>,
 }
 
 #[derive(Debug, Clone)]
@@ -162,12 +164,37 @@ pub(crate) struct VerifiedThresholdApprovalSet {
     pub(crate) replay: ThresholdApprovalReplayReservationV1,
 }
 
+pub(crate) enum BudgetAdmissionOutcome {
+    Authorized {
+        grant_index: usize,
+        mutation: Box<PreExecutionBudgetMutation>,
+    },
+    PendingApproval {
+        grant_index: usize,
+        proposal: Box<chio_core::capability::governance::ThresholdApprovalProposal>,
+    },
+}
+
+#[cfg(test)]
+impl BudgetAdmissionOutcome {
+    pub(crate) fn into_authorized(
+        self,
+    ) -> Result<(usize, PreExecutionBudgetMutation), KernelError> {
+        match self {
+            Self::Authorized {
+                grant_index,
+                mutation,
+            } => Ok((grant_index, *mutation)),
+            Self::PendingApproval { .. } => Err(KernelError::Internal(
+                "budget admission remained pending approval".to_owned(),
+            )),
+        }
+    }
+}
+
 pub(crate) struct GovernedValidationContext<'a> {
-    charge_result: Option<&'a BudgetChargeResult>,
     parent_context: Option<&'a OperationContext>,
     now: u64,
-    durable_admission: Option<&'a mut DurableToolAdmission>,
-    trusted_now_unix_ms: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

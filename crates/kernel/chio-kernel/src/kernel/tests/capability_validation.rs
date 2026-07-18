@@ -274,27 +274,14 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
     drop(valid_store);
     let mut valid_kernel = make_hosted_kernel();
     valid_kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&valid_path)?))?;
-    let valid_error =
-        match valid_kernel.verify_capability_full_pre_admit(&child, Some(remote_kernel_id), now) {
-            Err(error) => error,
-            Ok(()) => {
-                return Err(std::io::Error::other(
-                    "hosted cumulative evaluation escaped the enforcement fence",
-                )
-                .into());
-            }
-        };
-    assert!(valid_error.contains("cumulative approval enforcement is unavailable"));
+    valid_kernel.verify_capability_full_pre_admit(&child, Some(remote_kernel_id), now)?;
     let mut valid_request =
         make_request("req-hosted-cumulative-valid", &child, "read_file", "srv-a");
     valid_request.federated_origin_kernel_id = Some(remote_kernel_id.to_string());
     let valid_response = valid_kernel.evaluate_tool_call_blocking(&valid_request)?;
     assert_eq!(valid_response.verdict, Verdict::Deny);
     let valid_reason = valid_response.reason.as_deref().unwrap_or_default();
-    assert!(
-        valid_reason.contains("cumulative approval enforcement is unavailable"),
-        "{valid_reason}"
-    );
+    assert!(valid_reason.contains("qualified admission"), "{valid_reason}");
 
     let missing_path = unique_receipt_db_path("chio-hosted-cumulative-missing-root");
     let mut missing_kernel = make_hosted_kernel();
@@ -1174,11 +1161,11 @@ fn delegated_tool_call_without_parent_snapshot_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .unwrap_or("")
-        .contains("missing capability snapshot"));
+    let reason = response.reason.as_deref().unwrap_or("");
+    assert!(
+        reason.contains("missing signed capability root snapshot"),
+        "{reason}"
+    );
 
     let _ = std::fs::remove_file(path);
 }
@@ -1235,11 +1222,11 @@ fn delegated_tool_call_without_delegate_operation_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .unwrap_or("")
-        .contains("does not authorize delegated tool grant"));
+    let reason = response.reason.as_deref().unwrap_or("");
+    assert!(
+        reason.contains("parent capability scope does not authorize delegation"),
+        "{reason}"
+    );
 
     let _ = std::fs::remove_file(path);
 }
@@ -1306,11 +1293,11 @@ fn delegated_tool_call_with_scope_escalation_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .unwrap_or("")
-        .contains("does not authorize delegated tool grant"));
+    let reason = response.reason.as_deref().unwrap_or("");
+    assert!(
+        reason.contains("child scope is not a subset of parent scope"),
+        "{reason}"
+    );
 
     let _ = std::fs::remove_file(path);
 }
@@ -1540,11 +1527,8 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .unwrap_or("")
-        .contains("stored depth"));
+    let reason = response.reason.as_deref().unwrap_or("");
+    assert!(reason.contains("root evidence is not a direct token"), "{reason}");
 
     let _ = std::fs::remove_file(path);
 }

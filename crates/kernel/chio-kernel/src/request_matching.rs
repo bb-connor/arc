@@ -414,10 +414,10 @@ fn constraint_matches(
         Constraint::MaxArgsSize(max) => Ok(arguments.to_string().len() <= *max),
         Constraint::GovernedIntentRequired
         | Constraint::RequireApprovalAbove { .. }
+        | Constraint::RequireCumulativeApprovalAbove { .. }
         | Constraint::SellerExact(_)
         | Constraint::MinimumRuntimeAssurance(_)
         | Constraint::MinimumAutonomyTier(_) => Ok(true),
-        Constraint::RequireCumulativeApprovalAbove { .. } => Ok(false),
         Constraint::Custom(key, expected) => Ok(argument_contains_custom(arguments, key, expected)),
 
         // Constraints that require domain-specific evaluation (SQL parsing,

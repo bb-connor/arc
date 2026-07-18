@@ -112,6 +112,8 @@ pub enum AdmissionOperationError {
     },
     #[error("attachment {field} is not allowed by the immutable operation binding")]
     ForbiddenAttachment { field: &'static str },
+    #[error("stored threshold proposal does not match its bound digest")]
+    ThresholdProposalMismatch,
     #[error("provider attempt does not match the immutable admission operation")]
     ProviderAttemptBindingMismatch,
     #[error("authorization artifact digests must be bounded, sorted, and unique")]
@@ -161,6 +163,7 @@ pub enum AdmissionOperationError {
 pub enum AdmissionOperationState {
     Prepared,
     BrokerAttemptRegistered,
+    ApprovalRequired,
     BudgetAuthorized,
     ApprovalReserved,
     ReadyToDispatch,
@@ -178,9 +181,10 @@ pub enum AdmissionOperationState {
 }
 
 impl AdmissionOperationState {
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 17] = [
         Self::Prepared,
         Self::BrokerAttemptRegistered,
+        Self::ApprovalRequired,
         Self::BudgetAuthorized,
         Self::ApprovalReserved,
         Self::ReadyToDispatch,
@@ -215,6 +219,7 @@ impl AdmissionOperationState {
             self,
             Self::Prepared
                 | Self::BrokerAttemptRegistered
+                | Self::ApprovalRequired
                 | Self::BudgetAuthorized
                 | Self::ApprovalReserved
                 | Self::ReadyToDispatch
@@ -285,6 +290,7 @@ impl AdmissionDispatchCommitBindingV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AdmissionAttachment {
     ThresholdProposalHash(AdmissionDigest),
+    ThresholdProposal(Box<chio_core::capability::governance::ThresholdApprovalProposal>),
     SupplementalAuthorizationDigest(AdmissionDigest),
     BrokerAttempt(ProviderAttemptBindingV1),
     BudgetHoldId(AdmissionIdentifier),
@@ -301,6 +307,7 @@ pub enum AdmissionAttachment {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AdmissionAttachmentKind {
     ThresholdProposal,
+    ThresholdProposalBody,
     SupplementalAuthorization,
     BrokerAttempt,
     BudgetHold,
@@ -318,6 +325,7 @@ impl AdmissionAttachment {
     fn kind(&self) -> AdmissionAttachmentKind {
         match self {
             Self::ThresholdProposalHash(_) => AdmissionAttachmentKind::ThresholdProposal,
+            Self::ThresholdProposal(_) => AdmissionAttachmentKind::ThresholdProposalBody,
             Self::SupplementalAuthorizationDigest(_) => {
                 AdmissionAttachmentKind::SupplementalAuthorization
             }
@@ -345,6 +353,7 @@ impl AdmissionAttachment {
     fn field_name(&self) -> &'static str {
         match self {
             Self::ThresholdProposalHash(_) => "threshold_proposal_hash",
+            Self::ThresholdProposal(_) => "threshold_proposal",
             Self::SupplementalAuthorizationDigest(_) => "supplemental_authorization_digest",
             Self::BrokerAttempt(_) => "broker_attempt",
             Self::BudgetHoldId(_) => "budget_hold_id",
@@ -375,6 +384,7 @@ impl AdmissionAttachmentKind {
             Self::ChannelReservationProposal => 9,
             Self::ChannelReservation => 10,
             Self::CreditExposureReservation => 11,
+            Self::ThresholdProposalBody => 12,
         }
     }
 }
@@ -410,7 +420,7 @@ impl AdmissionOperationAttachmentsV1 {
     }
 
     fn validate(&self) -> Result<(), AdmissionOperationError> {
-        if self.0.len() > 12
+        if self.0.len() > 13
             || self
                 .0
                 .windows(2)
@@ -658,6 +668,16 @@ impl AdmissionOperationV1 {
     pub fn threshold_proposal_hash(&self) -> Option<&AdmissionDigest> {
         match self.attachment(AdmissionAttachmentKind::ThresholdProposal) {
             Some(AdmissionAttachment::ThresholdProposalHash(digest)) => Some(digest),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn threshold_proposal(
+        &self,
+    ) -> Option<&chio_core::capability::governance::ThresholdApprovalProposal> {
+        match self.attachment(AdmissionAttachmentKind::ThresholdProposalBody) {
+            Some(AdmissionAttachment::ThresholdProposal(proposal)) => Some(proposal.as_ref()),
             _ => None,
         }
     }

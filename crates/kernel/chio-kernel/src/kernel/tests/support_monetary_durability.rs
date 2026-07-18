@@ -1219,14 +1219,16 @@ fn predispatch_unwind_requires_confirmed_payment_release_status(
         request.model_metadata.as_ref(),
     )?;
     let (_, mutation) =
-        kernel.check_and_increment_budget(
-            &request.request_id,
+        kernel
+            .check_and_increment_budget(
+            &request,
             &capability,
             &matching,
             false,
             None,
             current_unix_timestamp_ms(),
-        )?;
+        )?
+            .into_authorized()?;
     let authorization = PaymentAuthorization {
         authorization_id: "auth-predispatch-unwind-pending".to_string(),
         state: PaymentAuthorizationState::Held,
@@ -1813,10 +1815,8 @@ fn captured_monetary_replay_cannot_fall_through_to_overlapping_unlimited_grant(
         kernel.evaluate_tool_call_blocking(&request)?.verdict,
         Verdict::Allow
     );
-    assert_eq!(
-        kernel.evaluate_tool_call_blocking(&request)?.verdict,
-        Verdict::Deny
-    );
+    let replay = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(replay.verdict, Verdict::Deny, "{:?}", replay.reason);
     assert_eq!(
         payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
         1

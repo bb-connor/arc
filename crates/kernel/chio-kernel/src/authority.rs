@@ -10,14 +10,8 @@ use crate::KernelError;
 
 const DEFAULT_CAPABILITY_ISSUANCE_CLOCK_SKEW_SECONDS: u64 = 30;
 
-/// Reject capability semantics whose production admission authority is not installed yet.
-pub fn ensure_capability_issuance_supported(scope: &ChioScope) -> Result<(), KernelError> {
-    if scope.has_cumulative_approval() {
-        return Err(KernelError::CapabilityIssuanceDenied(
-            "cumulative approval capability issuance requires atomic composite admission enforcement"
-                .to_string(),
-        ));
-    }
+/// Validate that the local authority can issue the requested scope semantics.
+pub fn ensure_capability_issuance_supported(_scope: &ChioScope) -> Result<(), KernelError> {
     Ok(())
 }
 
@@ -72,7 +66,27 @@ pub fn validate_issued_capability_response_at(
             "issued capability subject does not match the requested subject".to_string(),
         ));
     }
-    let issued_scope = chio_core::canonical_json_bytes(&capability.scope)
+    if capability.scope.has_cumulative_approval() {
+        chio_core::capability::cumulative_approval::verify_cumulative_approval_constraints(
+            capability,
+            std::slice::from_ref(current_issuer),
+            None,
+        )
+        .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
+    }
+    let mut issued_scope = capability.scope.clone();
+    for grant in &mut issued_scope.grants {
+        for constraint in &mut grant.constraints {
+            if let chio_core::capability::scope::Constraint::RequireCumulativeApprovalAbove {
+                cumulative_approval_root_binding,
+                ..
+            } = constraint
+            {
+                *cumulative_approval_root_binding = None;
+            }
+        }
+    }
+    let issued_scope = chio_core::canonical_json_bytes(&issued_scope)
         .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
     let requested_scope = chio_core::canonical_json_bytes(requested_scope)
         .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
@@ -186,8 +200,18 @@ impl CapabilityAuthority for LocalCapabilityAuthority {
             aggregate_invocation_budget: None,
         };
 
-        CapabilityToken::sign(body, &self.keypair)
-            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
+        if body.scope.has_cumulative_approval()
+            && body.scope.grants.iter().any(|grant| {
+                grant
+                    .operations
+                    .contains(&chio_core::capability::scope::Operation::Delegate)
+            })
+        {
+            CapabilityToken::sign_cumulative_approval_family_root(body, &self.keypair)
+        } else {
+            CapabilityToken::sign(body, &self.keypair)
+        }
+        .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
     }
 }
 
@@ -439,7 +463,7 @@ mod tests {
     }
 
     #[test]
-    fn issuance_response_rejects_aggregate_and_cumulative_semantics(
+    fn issuance_response_rejects_aggregate_and_accepts_cumulative_semantics(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let issuer = Keypair::generate();
         let subject = Keypair::generate().public_key();
@@ -489,6 +513,7 @@ mod tests {
             }],
             ..ChioScope::default()
         };
+        let requested_cumulative_scope = cumulative_scope.clone();
         let cumulative = CapabilityToken::sign_cumulative_approval_family_root(
             CapabilityTokenBody {
                 id: "cap-cumulative-response".to_string(),
@@ -502,21 +527,20 @@ mod tests {
             },
             &issuer,
         )?;
-        assert!(matches!(
-            validate_issued_capability_response(
-                &cumulative,
-                &subject,
-                &cumulative.scope,
-                60,
-                &issuer.public_key(),
-            ),
-            Err(KernelError::CapabilityIssuanceDenied(_))
-        ));
+        validate_issued_capability_response_at(
+            &cumulative,
+            &subject,
+            &requested_cumulative_scope,
+            60,
+            &issuer.public_key(),
+            100,
+            0,
+        )?;
         Ok(())
     }
 
     #[test]
-    fn local_authority_rejects_cumulative_approval_until_enforcement_exists() {
+    fn local_authority_issues_cumulative_approval_capabilities() {
         let authority = LocalCapabilityAuthority::new(Keypair::generate());
         let scope = ChioScope {
             grants: vec![ToolGrant {
@@ -540,10 +564,22 @@ mod tests {
             ..ChioScope::default()
         };
 
-        assert!(matches!(
-            authority.issue_capability(&Keypair::generate().public_key(), scope, 300),
-            Err(KernelError::CapabilityIssuanceDenied(_))
-        ));
+        let capability = authority
+            .issue_capability(&Keypair::generate().public_key(), scope, 300)
+            .expect("cumulative approval capability");
+        assert!(capability.scope.has_cumulative_approval());
+        assert!(capability.scope.grants[0]
+            .constraints
+            .iter()
+            .any(|constraint| {
+                matches!(
+                    constraint,
+                    Constraint::RequireCumulativeApprovalAbove {
+                        cumulative_approval_root_binding: None,
+                        ..
+                    }
+                )
+            }));
     }
 }
 

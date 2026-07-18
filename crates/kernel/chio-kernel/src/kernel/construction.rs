@@ -1081,6 +1081,10 @@ impl ChioKernel {
             chio_core::capability::features::AGGREGATE_INVOCATION_BUDGET.to_string(),
             true,
         );
+        local.features.insert(
+            chio_core::capability::features::CUMULATIVE_APPROVAL_BUDGET.to_string(),
+            true,
+        );
         Ok(local)
     }
 

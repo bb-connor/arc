@@ -166,7 +166,6 @@ impl<'a> PostAdmissionDropGuard<'a> {
     /// each step is attempted independently and failures are collected.
     fn handle_pre_dispatch_drop(&self) {
         let mut faults: Vec<PreDispatchCleanupFault> = Vec::new();
-        let mut budget_reverse = None;
 
         // 1. Monetary hold reversal (budget charge + payment release/refund).
         if self.budget_mutation.charge_result().is_some() {
@@ -176,7 +175,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
                 self.budget_mutation.charge_result(),
                 self.payment_authorization,
             ) {
-                Ok(reverse) => budget_reverse = reverse,
+                Ok(_) => {}
                 Err(error) => {
                     let reason = redacted!(&error).to_string();
                     warn!(
@@ -215,7 +214,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
                 .kernel
                 .reverse_pre_execution_budget_mutation(self.cap, self.budget_mutation)
             {
-                Ok(reverse) => budget_reverse = reverse,
+                Ok(_) => {}
                 Err(error) => {
                     let reason = redacted!(&error).to_string();
                     warn!(
@@ -299,7 +298,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
                     .kernel
                     .compensate_durable_admission_after_pre_dispatch_cleanup(
                         Some(operation),
-                        budget_reverse.as_ref(),
+                        None,
                         self.payment_authorization,
                     )
                 {

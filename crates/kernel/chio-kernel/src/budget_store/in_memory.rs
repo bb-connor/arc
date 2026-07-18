@@ -179,6 +179,7 @@ impl InMemoryBudgetStore {
                 event.authority,
                 Some(event.event_seq),
                 Some(event.event_id),
+                Some(event.recorded_at),
             ),
         })
     }

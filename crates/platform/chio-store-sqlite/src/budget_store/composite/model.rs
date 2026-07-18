@@ -1475,6 +1475,7 @@ pub(super) fn authorization_decision(
     request: BudgetAuthorizeHoldRequest,
     outcome: BudgetAuthorizationOutcome,
     event_seq: u64,
+    recorded_at: i64,
     usage: BudgetUsageRecord,
     quotas: Vec<QuotaState>,
     cumulative_state: Option<BudgetCumulativeApprovalState>,
@@ -1494,6 +1495,7 @@ pub(super) fn authorization_decision(
         metering_profile: store.budget_metering_profile(),
         budget_commit_index: Some(event_seq),
         event_id: request.event_id.clone(),
+        recorded_at_unix_seconds: u64::try_from(recorded_at).ok(),
     };
     let committed_cost_units_after = usage.committed_cost_units()?;
     let monetary_state =
@@ -1578,6 +1580,7 @@ pub(super) fn decision_from_persisted_event(
         request,
         outcome,
         event.event_seq,
+        event.recorded_at,
         BudgetUsageRecord {
             capability_id: event.capability_id.clone(),
             grant_index: event.grant_index,

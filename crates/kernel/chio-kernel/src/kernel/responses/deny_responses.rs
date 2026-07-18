@@ -42,7 +42,7 @@ impl ChioKernel {
                 grant_index: mg.index as u32,
                 cost_charged: 0,
                 currency,
-                budget_remaining: 0,
+                budget_remaining: budget_total,
                 budget_total,
                 delegation_depth,
                 root_budget_holder,
@@ -112,30 +112,6 @@ impl ChioKernel {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn build_pre_execution_monetary_deny_response_with_metadata(
-        &self,
-        request: &ToolCallRequest,
-        reason: &str,
-        timestamp: u64,
-        charge: &BudgetChargeResult,
-        committed_cost_after_release: u64,
-        cap: &CapabilityToken,
-        extra_metadata: Option<serde_json::Value>,
-    ) -> Result<ToolCallResponse, KernelError> {
-        self.build_pre_execution_monetary_deny_response_with_recording(
-            request,
-            reason,
-            timestamp,
-            charge,
-            committed_cost_after_release,
-            cap,
-            extra_metadata,
-            None,
-            ReceiptRecordMode::WithFederation,
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
@@ -157,30 +133,6 @@ impl ChioKernel {
             extra_metadata,
             verified_payee_binding,
             ReceiptRecordMode::WithFederation,
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn build_runtime_admission_pre_execution_monetary_deny_response_with_metadata(
-        &self,
-        request: &ToolCallRequest,
-        reason: &str,
-        timestamp: u64,
-        charge: &BudgetChargeResult,
-        committed_cost_after_release: u64,
-        cap: &CapabilityToken,
-        extra_metadata: Option<serde_json::Value>,
-    ) -> Result<ToolCallResponse, KernelError> {
-        self.build_pre_execution_monetary_deny_response_with_recording(
-            request,
-            reason,
-            timestamp,
-            charge,
-            committed_cost_after_release,
-            cap,
-            extra_metadata,
-            None,
-            ReceiptRecordMode::LocalOnly,
         )
     }
 

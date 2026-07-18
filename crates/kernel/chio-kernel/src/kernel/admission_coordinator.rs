@@ -163,7 +163,7 @@ impl QualifiedDurableOutcomeAuthority for DurableAdmissionRuntime {
 }
 
 pub(crate) struct DurableToolAdmission {
-    operation: AdmissionOperationV1,
+    pub(super) operation: AdmissionOperationV1,
     aggregate_quota: Option<BudgetInvocationQuota>,
     supplemental_quota: Option<KernelVerifiedSupplementalQuotaClaim>,
 }
@@ -220,10 +220,6 @@ struct ImmutableToolAdmissionRequest<'a> {
     agent_id: &'a str,
     arguments: &'a serde_json::Value,
     governed_intent: &'a Option<chio_core::capability::governance::GovernedTransactionIntent>,
-    approval_token: &'a Option<chio_core::capability::governance::GovernedApprovalToken>,
-    approval_tokens: &'a [chio_core::capability::governance::GovernedApprovalToken],
-    threshold_approval_proposal:
-        &'a Option<chio_core::capability::governance::ThresholdApprovalProposal>,
     model_metadata: &'a Option<chio_core::capability::scope::ModelMetadata>,
     federated_origin_kernel_id: &'a Option<String>,
     matching_grants: Vec<ImmutableMatchingGrant<'a>>,
@@ -233,7 +229,8 @@ struct ImmutableToolAdmissionRequest<'a> {
 #[derive(Serialize)]
 struct ImmutableActiveResponseAdmissionRequest<'a> {
     schema: &'static str,
-    request: &'a crate::governed_active_response::GovernedActiveResponseRequest,
+    governed_intent: &'a chio_core::capability::governance::GovernedTransactionIntent,
+    federated_origin_kernel_id: &'a Option<String>,
     governed_intent_hash: &'a str,
 }
 
@@ -408,6 +405,7 @@ impl ChioKernel {
                             )
                         })?;
                     }
+                    AdmissionOperationState::ApprovalRequired => {}
                     AdmissionOperationState::Finalizing => {
                         let mut admission = DurableToolAdmission {
                             operation,
@@ -543,9 +541,6 @@ impl ChioKernel {
             agent_id: &request.agent_id,
             arguments: &request.arguments,
             governed_intent: &request.governed_intent,
-            approval_token: &request.approval_token,
-            approval_tokens: &request.approval_tokens,
-            threshold_approval_proposal: &request.threshold_approval_proposal,
             model_metadata: &request.model_metadata,
             federated_origin_kernel_id: &request.federated_origin_kernel_id,
             matching_grants: matching_grants
@@ -575,10 +570,31 @@ impl ChioKernel {
                     "durable admission requires a canonical SHA-256 policy hash".to_owned(),
                 )
             })?;
+        let cumulative_matching_grant_count = matching_grants
+            .iter()
+            .filter(|matching| {
+                matching.grant.constraints.iter().any(|constraint| {
+                    matches!(
+                        constraint,
+                        Constraint::RequireCumulativeApprovalAbove { .. }
+                    )
+                })
+            })
+            .count();
+        if cumulative_matching_grant_count != 0
+            && cumulative_matching_grant_count != matching_grants.len()
+        {
+            return Err(KernelError::DurableAdmission(
+                "matching grants disagree on cumulative approval requirements".to_owned(),
+            ));
+        }
+        let matching_grant_requires_cumulative_approval = cumulative_matching_grant_count != 0;
         let requirements = AdmissionParticipantRequirements {
             broker_attempt: true,
             budget_capture: true,
-            approval: request.approval_token.is_some() || !request.approval_tokens.is_empty(),
+            approval: matching_grant_requires_cumulative_approval
+                || request.approval_token.is_some()
+                || !request.approval_tokens.is_empty(),
             payment: payment_required,
             observation_attempt_zero: observer_required,
             ..AdmissionParticipantRequirements::NONE
@@ -630,6 +646,7 @@ impl ChioKernel {
                     operation.state(),
                     AdmissionOperationState::Prepared
                         | AdmissionOperationState::BrokerAttemptRegistered
+                        | AdmissionOperationState::ApprovalRequired
                         | AdmissionOperationState::BudgetAuthorized
                         | AdmissionOperationState::ApprovalReserved
                         | AdmissionOperationState::ReadyToDispatch
@@ -740,7 +757,8 @@ impl ChioKernel {
             "immutable_request_hash",
             &ImmutableActiveResponseAdmissionRequest {
                 schema: "chio.governed-active-response-admission.v1",
-                request,
+                governed_intent: &request.governed_intent,
+                federated_origin_kernel_id: &request.federated_origin_kernel_id,
                 governed_intent_hash,
             },
         )?;
@@ -1310,7 +1328,10 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
-        if admission.operation.state() == AdmissionOperationState::BudgetAuthorized {
+        if matches!(
+            admission.operation.state(),
+            AdmissionOperationState::BudgetAuthorized | AdmissionOperationState::ApprovalReserved
+        ) {
             admission.operation = self.apply_admission_command(
                 admission.operation.clone(),
                 Vec::new(),
@@ -1556,7 +1577,7 @@ impl ChioKernel {
             .map_err(durable_store_error)
     }
 
-    fn apply_admission_command(
+    pub(super) fn apply_admission_command(
         &self,
         operation: AdmissionOperationV1,
         attachments: Vec<AdmissionAttachment>,

@@ -225,7 +225,7 @@ fn monetary_denial_receipt_contains_financial_metadata() {
 }
 
 #[test]
-fn monetary_guard_denial_releases_budget_and_records_attempted_cost(
+fn monetary_guard_denial_consumes_no_budget_and_records_attempted_cost(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use std::sync::{Arc, Mutex};
 
@@ -296,11 +296,7 @@ fn monetary_guard_denial_releases_budget_and_records_attempted_cost(
     assert_eq!(denied_financial["attempted_cost"].as_u64(), Some(100));
     assert_eq!(denied_financial["budget_remaining"].as_u64(), Some(100));
     assert_eq!(denied_financial["settlement_status"], "not_applicable");
-    let denied_usage = kernel
-        .budget_store
-        .get_usage(&cap.id, 0)?
-        .ok_or_else(|| std::io::Error::other("denied monetary usage missing"))?;
-    assert_eq!(denied_usage.invocation_count, 0);
+    assert!(kernel.budget_store.get_usage(&cap.id, 0)?.is_none());
 
     let allowed_response = kernel
         .evaluate_tool_call_blocking(&request("req-allow"))

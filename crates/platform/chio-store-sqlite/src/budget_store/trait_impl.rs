@@ -121,6 +121,7 @@ impl BudgetStore for SqliteBudgetStore {
                     metering_profile: self.budget_metering_profile(),
                     budget_commit_index: Some(event_seq),
                     event_id: Some(event_id),
+                    recorded_at_unix_seconds: None,
                 },
             })
         };
@@ -333,6 +334,7 @@ impl BudgetStore for SqliteBudgetStore {
                     metering_profile: self.budget_metering_profile(),
                     budget_commit_index: Some(existing.event_seq),
                     event_id: Some(existing.event_id),
+                    recorded_at_unix_seconds: u64::try_from(existing.recorded_at).ok(),
                 },
             };
             transaction.rollback()?;
@@ -480,6 +482,7 @@ impl BudgetStore for SqliteBudgetStore {
                     metering_profile: self.budget_metering_profile(),
                     budget_commit_index: Some(event_seq),
                     event_id: Some(request.event_id),
+                    recorded_at_unix_seconds: None,
                 },
             },
         ))
@@ -1635,6 +1638,7 @@ fn recorded_sqlite_hold_mutation(
             metering_profile: store.budget_metering_profile(),
             budget_commit_index: Some(event.event_seq),
             event_id: Some(event.event_id),
+            recorded_at_unix_seconds: u64::try_from(event.recorded_at).ok(),
         },
     };
     transaction.rollback()?;

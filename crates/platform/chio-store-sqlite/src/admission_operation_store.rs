@@ -1091,6 +1091,7 @@ fn state_name(state: AdmissionOperationState) -> &'static str {
     match state {
         AdmissionOperationState::Prepared => "prepared",
         AdmissionOperationState::BrokerAttemptRegistered => "broker_attempt_registered",
+        AdmissionOperationState::ApprovalRequired => "approval_required",
         AdmissionOperationState::BudgetAuthorized => "budget_authorized",
         AdmissionOperationState::ApprovalReserved => "approval_reserved",
         AdmissionOperationState::ReadyToDispatch => "ready_to_dispatch",

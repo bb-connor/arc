@@ -550,6 +550,7 @@ fn transition_decision_from_event(
             metering_profile: store.budget_metering_profile(),
             budget_commit_index: Some(event.event_seq),
             event_id: Some(event.event_id),
+            recorded_at_unix_seconds: u64::try_from(event.recorded_at).ok(),
         },
     })
 }

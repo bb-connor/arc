@@ -1868,6 +1868,24 @@ fn expected_transition(
         .windows(2)
         .map(|edge| (edge[0], edge[1]))
         .collect::<Vec<_>>();
+    if requirements.budget_capture && requirements.approval {
+        let approval_source = if requirements.broker_attempt {
+            AdmissionOperationState::BrokerAttemptRegistered
+        } else {
+            AdmissionOperationState::Prepared
+        };
+        edges.extend([
+            (approval_source, AdmissionOperationState::ApprovalRequired),
+            (
+                AdmissionOperationState::ApprovalRequired,
+                AdmissionOperationState::BudgetAuthorized,
+            ),
+            (
+                AdmissionOperationState::BudgetAuthorized,
+                AdmissionOperationState::ReadyToDispatch,
+            ),
+        ]);
+    }
     edges.extend([
         (
             AdmissionOperationState::DispatchCommitted,

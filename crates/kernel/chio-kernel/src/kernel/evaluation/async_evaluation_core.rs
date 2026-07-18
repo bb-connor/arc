@@ -364,22 +364,169 @@ impl ChioKernel {
             );
         }
 
-        let (matched_grant_index, mut budget_mutation) = match self.check_and_increment_budget(
-            &request.request_id,
-            cap,
-            &matching_grants,
-            self.execution_nonce_preflight_required(request),
-            durable_admission.as_mut(),
-            now_unix_ms,
-        ) {
-            Ok(result) => result,
-            Err(e) => {
-                let msg = e.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "capability rejected");
-                if durable_admission.as_ref().is_some_and(|admission| {
-                    admission.state()
-                        == crate::admission_operation::AdmissionOperationState::BrokerAttemptRegistered
-                }) {
+        let mut budget_error = None;
+        let mut selected = None;
+        for matching in &matching_grants {
+            if durable_admission
+                .as_ref()
+                .is_some_and(|admission| !admission.permits_grant(matching.index))
+                || durable_admission.as_ref().is_some_and(|admission| {
+                    admission.requires_payment()
+                        && matching
+                            .grant
+                            .max_cost_per_invocation
+                            .as_ref()
+                            .is_none_or(|amount| amount.units == 0)
+                })
+            {
+                continue;
+            }
+
+            let validated_governed_admission = match self.validate_governed_transaction_pure(
+                request,
+                cap,
+                matching.grant,
+                GovernedValidationContext {
+                    parent_context: None,
+                    now,
+                },
+            ) {
+                Ok(validated) => validated,
+                Err(error) => {
+                    let msg = error.to_string();
+                    warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed transaction denied");
+                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
+                        durable_admission
+                            .as_ref()
+                            .map(DurableToolAdmission::operation),
+                        None,
+                        None,
+                    )?;
+                    return self.build_monetary_deny_response_with_metadata(
+                        request,
+                        &msg,
+                        now,
+                        &matching_grants,
+                        cap,
+                        self.merge_budget_receipt_metadata(
+                            extra_metadata.clone(),
+                            self.budget_backend_receipt_metadata()?,
+                        ),
+                    );
+                }
+            };
+            let governed_call_chain_receipt_evidence = match self
+                .governed_call_chain_receipt_evidence(
+                    request,
+                    cap,
+                    None,
+                    validated_governed_admission
+                        .as_ref()
+                        .and_then(|admission| admission.call_chain_proof.clone()),
+                ) {
+                Ok(evidence) => evidence,
+                Err(error) => {
+                    let msg = error.to_string();
+                    warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed call-chain evidence lookup failed");
+                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
+                        durable_admission
+                            .as_ref()
+                            .map(DurableToolAdmission::operation),
+                        None,
+                        None,
+                    )?;
+                    return self.build_monetary_deny_response_with_metadata(
+                        request,
+                        &msg,
+                        now,
+                        &matching_grants,
+                        cap,
+                        self.merge_budget_receipt_metadata(
+                            extra_metadata.clone(),
+                            self.budget_backend_receipt_metadata()?,
+                        ),
+                    );
+                }
+            };
+            let no_budget_mutation = PreExecutionBudgetMutation::None;
+            let mut guard_drop_guard = PostAdmissionDropGuard::new(
+                self,
+                request,
+                cap,
+                Some(matching.index),
+                &no_budget_mutation,
+                None,
+                PostAdmissionReceiptContext {
+                    extra_metadata: extra_metadata.clone(),
+                    pre_invocation_guard_evidence: Vec::new(),
+                    verified_payee_binding: validated_governed_admission
+                        .as_ref()
+                        .and_then(|admission| admission.verified_payee_binding.clone()),
+                },
+                false,
+            )
+            .with_durable_operation(
+                durable_admission
+                    .as_ref()
+                    .map(DurableToolAdmission::operation),
+            );
+            let guard_result = self
+                .run_guards_within_budget(
+                    request,
+                    &cap.scope,
+                    session_filesystem_roots,
+                    Some(matching.index),
+                )
+                .await;
+            guard_drop_guard.disarm();
+            drop(guard_drop_guard);
+            let pre_invocation_guard_evidence = match guard_result {
+                Ok(evidence) => evidence,
+                Err(error) => {
+                    let msg = error.error.to_string();
+                    warn!(request_id = %request.request_id, reason = %redacted!(&msg), "guard denied");
+                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
+                        durable_admission
+                            .as_ref()
+                            .map(DurableToolAdmission::operation),
+                        None,
+                        None,
+                    )?;
+                    let receipt_metadata = self.merge_budget_receipt_metadata(
+                        extra_metadata.clone(),
+                        self.budget_backend_receipt_metadata()?,
+                    );
+                    return self.with_pre_invocation_guard_evidence(&error.evidence, || {
+                        self.build_monetary_deny_response_with_metadata(
+                            request,
+                            &msg,
+                            now,
+                            &matching_grants,
+                            cap,
+                            receipt_metadata,
+                        )
+                    });
+                }
+            };
+            let runtime_admission = self.run_runtime_admission_hook(
+                request,
+                extra_metadata.as_ref(),
+                now,
+                now_unix_ms,
+                Some(matching.index),
+            );
+            let runtime_metadata =
+                merge_metadata_objects(extra_metadata.clone(), runtime_admission.metadata.clone());
+            if !runtime_admission.allowed {
+                let msg = runtime_admission
+                    .reason
+                    .unwrap_or_else(|| "runtime admission denied".to_string());
+                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied");
+                let (runtime_metadata, runtime_release_confirmed) = self
+                    .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                        runtime_metadata,
+                    );
+                if runtime_release_confirmed {
                     self.compensate_durable_admission_after_pre_dispatch_cleanup(
                         durable_admission
                             .as_ref()
@@ -388,83 +535,166 @@ impl ChioKernel {
                         None,
                     )?;
                 }
-                // For monetary budget exhaustion, build a denial receipt with financial metadata.
-                return self.build_monetary_deny_response_with_metadata(
-                    request,
-                    &msg,
-                    now,
-                    &matching_grants,
-                    cap,
-                    self.merge_budget_receipt_metadata(
-                        extra_metadata.clone(),
-                        self.budget_backend_receipt_metadata()?,
-                    ),
+                return self.with_pre_invocation_guard_evidence(
+                    &pre_invocation_guard_evidence,
+                    || {
+                        self.build_runtime_admission_deny_response_with_metadata(
+                            request,
+                            &msg,
+                            now,
+                            Some(matching.index),
+                            runtime_metadata,
+                        )
+                    },
                 );
             }
-        };
 
-        let matched_grant = matching_grants
-            .iter()
-            .find(|matching| matching.index == matched_grant_index)
-            .map(|matching| matching.grant)
-            .ok_or_else(|| {
-                KernelError::Internal(format!(
-                    "matched grant index {matched_grant_index} missing from candidate set"
-                ))
-            })?;
+            match self.check_and_increment_budget(
+                request,
+                cap,
+                std::slice::from_ref(matching),
+                self.execution_nonce_preflight_required(request),
+                durable_admission.as_mut(),
+                now_unix_ms,
+            ) {
+                Ok(BudgetAdmissionOutcome::Authorized {
+                    grant_index,
+                    mutation,
+                }) => {
+                    if let Err(error) = self.reserve_validated_governed_approval(
+                        request,
+                        validated_governed_admission.as_ref(),
+                        durable_admission.as_mut(),
+                        now_unix_ms,
+                    ) {
+                        let msg = error.to_string();
+                        let reverse =
+                            self.reverse_pre_execution_budget_mutation(cap, mutation.as_ref())?;
+                        let (runtime_metadata, runtime_release_confirmed) = self
+                            .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                                runtime_metadata,
+                            );
+                        if runtime_release_confirmed {
+                            self.compensate_durable_admission_after_pre_dispatch_cleanup(
+                                durable_admission
+                                    .as_ref()
+                                    .map(DurableToolAdmission::operation),
+                                reverse.as_ref(),
+                                None,
+                            )?;
+                        }
+                        return self.build_deny_response_with_metadata(
+                            request,
+                            &msg,
+                            now,
+                            Some(grant_index),
+                            runtime_metadata,
+                        );
+                    }
+                    selected = Some((
+                        grant_index,
+                        *mutation,
+                        validated_governed_admission,
+                        governed_call_chain_receipt_evidence,
+                        pre_invocation_guard_evidence,
+                        runtime_metadata,
+                    ));
+                    break;
+                }
+                Ok(BudgetAdmissionOutcome::PendingApproval {
+                    grant_index,
+                    proposal,
+                }) => {
+                    let (runtime_metadata, _) = self
+                        .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                            runtime_metadata,
+                        );
+                    return self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            self.build_pending_approval_response_with_metadata(
+                                request,
+                                &proposal,
+                                now,
+                                grant_index,
+                                runtime_metadata,
+                            )
+                        },
+                    );
+                }
+                Err(error @ KernelError::BudgetExhausted(_)) => {
+                    let _ = self.release_runtime_admission_reservations_for_pre_dispatch_denial(
+                        runtime_metadata,
+                    );
+                    budget_error = Some(error);
+                }
+                Err(error) => {
+                    let msg = error.to_string();
+                    let (runtime_metadata, _) = self
+                        .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                            runtime_metadata,
+                        );
+                    let receipt_metadata = self.merge_budget_receipt_metadata(
+                        runtime_metadata,
+                        self.budget_backend_receipt_metadata()?,
+                    );
+                    return self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            self.build_monetary_deny_response_with_metadata(
+                                request,
+                                &msg,
+                                now,
+                                &matching_grants,
+                                cap,
+                                receipt_metadata,
+                            )
+                        },
+                    );
+                }
+            }
+        }
 
-        let validated_governed_admission = match self.validate_governed_transaction(
-            request,
-            cap,
-            matched_grant,
-            GovernedValidationContext {
-                charge_result: budget_mutation.charge_result(),
-                parent_context: None,
-                now,
-                durable_admission: durable_admission.as_mut(),
-                trusted_now_unix_ms: now_unix_ms,
-            },
-        ) {
-            Ok(validated_governed_admission) => validated_governed_admission,
-            Err(error) => {
-                let msg = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed transaction denied");
-                let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
+        let Some((
+            matched_grant_index,
+            mut budget_mutation,
+            validated_governed_admission,
+            governed_call_chain_receipt_evidence,
+            pre_invocation_guard_evidence,
+            extra_metadata,
+        )) = selected
+        else {
+            let error = budget_error.unwrap_or_else(|| {
+                KernelError::DurableAdmission(
+                    "retained budget hold does not identify a matching grant".to_string(),
+                )
+            });
+            let msg = error.to_string();
+            if durable_admission.as_ref().is_some_and(|admission| {
+                admission.state()
+                    == crate::admission_operation::AdmissionOperationState::BrokerAttemptRegistered
+            }) {
                 self.compensate_durable_admission_after_pre_dispatch_cleanup(
                     durable_admission
                         .as_ref()
                         .map(DurableToolAdmission::operation),
-                    reverse.as_ref(),
+                    None,
                     None,
                 )?;
-                if let (Some(charge), Some(reverse)) =
-                    (budget_mutation.charge_result(), reverse.as_ref())
-                {
-                    return self.build_pre_execution_monetary_deny_response_with_metadata(
-                        request,
-                        &msg,
-                        now,
-                        charge,
-                        reverse.committed_cost_units_after,
-                        cap,
-                        self.merge_budget_receipt_metadata(
-                            extra_metadata.clone(),
-                            self.budget_execution_receipt_metadata(
-                                charge,
-                                Some(("reversed", reverse)),
-                            ),
-                        ),
-                    );
-                }
-                return self.build_deny_response_with_metadata(
-                    request,
-                    &msg,
-                    now,
-                    Some(matched_grant_index),
-                    extra_metadata.clone(),
-                );
             }
+            return self.build_monetary_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                &matching_grants,
+                cap,
+                self.merge_budget_receipt_metadata(
+                    extra_metadata.clone(),
+                    self.budget_backend_receipt_metadata()?,
+                ),
+            );
         };
+
         let _governed_runtime_attestation_receipt_scope =
             scope_governed_runtime_attestation_receipt_record(
                 validated_governed_admission
@@ -474,198 +704,8 @@ impl ChioKernel {
         let verified_governed_payee_binding = validated_governed_admission
             .as_ref()
             .and_then(|admission| admission.verified_payee_binding.clone());
-        // A receipt-store read error while resolving the parent call-chain
-        // receipt fails closed, but check_and_increment_budget above already
-        // consumed the pre-execution budget (invocation count / monetary hold).
-        // Route the error through the same reversal + deny path the governed and
-        // guard denial branches use so a transient store failure never burns
-        // quota or holds funds for a call that never dispatches.
-        let governed_call_chain_receipt_evidence = match self.governed_call_chain_receipt_evidence(
-            request,
-            cap,
-            None,
-            validated_governed_admission
-                .as_ref()
-                .and_then(|admission| admission.call_chain_proof.clone()),
-        ) {
-            Ok(evidence) => evidence,
-            Err(error) => {
-                let msg = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed call-chain evidence lookup failed");
-                let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
-                self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                    durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
-                    reverse.as_ref(),
-                    None,
-                )?;
-                if let (Some(charge), Some(reverse)) =
-                    (budget_mutation.charge_result(), reverse.as_ref())
-                {
-                    return self.build_pre_execution_monetary_deny_response_with_metadata(
-                        request,
-                        &msg,
-                        now,
-                        charge,
-                        reverse.committed_cost_units_after,
-                        cap,
-                        self.merge_budget_receipt_metadata(
-                            extra_metadata.clone(),
-                            self.budget_execution_receipt_metadata(
-                                charge,
-                                Some(("reversed", reverse)),
-                            ),
-                        ),
-                    );
-                }
-                return self.build_deny_response_with_metadata(
-                    request,
-                    &msg,
-                    now,
-                    Some(matched_grant_index),
-                    extra_metadata.clone(),
-                );
-            }
-        };
         let _governed_call_chain_receipt_evidence_scope =
             scope_governed_call_chain_receipt_evidence(governed_call_chain_receipt_evidence);
-
-        let mut pre_dispatch_drop_guard = PostAdmissionDropGuard::new(
-            self,
-            request,
-            cap,
-            Some(matched_grant_index),
-            &budget_mutation,
-            None,
-            PostAdmissionReceiptContext {
-                extra_metadata: extra_metadata.clone(),
-                pre_invocation_guard_evidence: Vec::new(),
-                verified_payee_binding: verified_governed_payee_binding.clone(),
-            },
-            false,
-        )
-        .with_durable_operation(
-            durable_admission
-                .as_ref()
-                .map(DurableToolAdmission::operation),
-        );
-        let guard_result = self
-            .run_guards_within_budget(
-                request,
-                &cap.scope,
-                session_filesystem_roots,
-                Some(matched_grant_index),
-            )
-            .await;
-        pre_dispatch_drop_guard.disarm();
-        drop(pre_dispatch_drop_guard);
-        let pre_invocation_guard_evidence = match guard_result {
-            Ok(evidence) => evidence,
-            Err(e) => {
-                let msg = e.error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "guard denied");
-                let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
-                self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                    durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
-                    reverse.as_ref(),
-                    None,
-                )?;
-                if let (Some(charge), Some(reverse)) =
-                    (budget_mutation.charge_result(), reverse.as_ref())
-                {
-                    return self.with_pre_invocation_guard_evidence(&e.evidence, || {
-                        self.build_pre_execution_monetary_deny_response_with_metadata(
-                            request,
-                            &msg,
-                            now,
-                            charge,
-                            reverse.committed_cost_units_after,
-                            cap,
-                            self.merge_budget_receipt_metadata(
-                                extra_metadata.clone(),
-                                self.budget_execution_receipt_metadata(
-                                    charge,
-                                    Some(("reversed", reverse)),
-                                ),
-                            ),
-                        )
-                    });
-                }
-                return self.with_pre_invocation_guard_evidence(&e.evidence, || {
-                    self.build_deny_response_with_metadata(
-                        request,
-                        &msg,
-                        now,
-                        Some(matched_grant_index),
-                        extra_metadata.clone(),
-                    )
-                });
-            }
-        };
-
-        let runtime_admission = self.run_runtime_admission_hook(
-            request,
-            extra_metadata.as_ref(),
-            now,
-            now_unix_ms,
-            Some(matched_grant_index),
-        );
-        let extra_metadata =
-            merge_metadata_objects(extra_metadata.clone(), runtime_admission.metadata.clone());
-        if !runtime_admission.allowed {
-            let msg = runtime_admission
-                .reason
-                .unwrap_or_else(|| "runtime admission denied".to_string());
-            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied");
-            let (extra_metadata, runtime_release_confirmed) =
-                self.release_runtime_admission_reservations_for_pre_dispatch_denial(extra_metadata);
-            let reverse = self.reverse_pre_execution_budget_mutation(cap, &budget_mutation)?;
-            if runtime_release_confirmed {
-                self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                    durable_admission
-                        .as_ref()
-                        .map(DurableToolAdmission::operation),
-                    reverse.as_ref(),
-                    None,
-                )?;
-            }
-            if let (Some(charge), Some(reverse)) =
-                (budget_mutation.charge_result(), reverse.as_ref())
-            {
-                return self.with_pre_invocation_guard_evidence(
-                    &pre_invocation_guard_evidence,
-                    || {
-                        self.build_runtime_admission_pre_execution_monetary_deny_response_with_metadata(
-                        request,
-                        &msg,
-                        now,
-                        charge,
-                        reverse.committed_cost_units_after,
-                        cap,
-                        self.merge_budget_receipt_metadata(
-                            extra_metadata,
-                            self.budget_execution_receipt_metadata(
-                                charge,
-                                Some(("reversed", reverse)),
-                            ),
-                        ),
-                    )
-                    },
-                );
-            }
-            return self.with_pre_invocation_guard_evidence(&pre_invocation_guard_evidence, || {
-                self.build_runtime_admission_deny_response_with_metadata(
-                    request,
-                    &msg,
-                    now,
-                    Some(matched_grant_index),
-                    extra_metadata,
-                )
-            });
-        }
 
         // Capture whether THIS evaluation acquired a sibling-sum child-budget
         // holder lease. Every successful `admit_capability_budget` against a

@@ -464,6 +464,9 @@ pub struct BudgetCommitMetadata {
     /// that cannot expose a denial event index return `None`.
     pub budget_commit_index: Option<u64>,
     pub event_id: Option<String>,
+    /// Authority-recorded creation time for the durable mutation. Composite
+    /// admission uses this stable timestamp when deriving retryable artifacts.
+    pub recorded_at_unix_seconds: Option<u64>,
 }
 
 impl BudgetCommitMetadata {
@@ -479,6 +482,7 @@ fn budget_commit_metadata<T: BudgetStore + ?Sized>(
     authority: Option<BudgetEventAuthority>,
     budget_commit_index: Option<u64>,
     event_id: Option<String>,
+    recorded_at: Option<i64>,
 ) -> BudgetCommitMetadata {
     BudgetCommitMetadata {
         authority,
@@ -487,5 +491,6 @@ fn budget_commit_metadata<T: BudgetStore + ?Sized>(
         metering_profile: store.budget_metering_profile(),
         budget_commit_index,
         event_id,
+        recorded_at_unix_seconds: recorded_at.and_then(|value| u64::try_from(value).ok()),
     }
 }

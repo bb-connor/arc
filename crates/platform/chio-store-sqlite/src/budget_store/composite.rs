@@ -506,6 +506,7 @@ impl SqliteBudgetStore {
             request.clone(),
             outcome,
             event_seq,
+            recorded_at,
             usage_after,
             quota_after,
             cumulative_state,

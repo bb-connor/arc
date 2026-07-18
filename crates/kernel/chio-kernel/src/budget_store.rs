@@ -930,6 +930,7 @@ pub trait BudgetStore: Send + Sync {
                 .then(|| usage.as_ref().map(|usage| usage.seq))
                 .flatten(),
             request.event_id,
+            None,
         );
 
         if allowed {

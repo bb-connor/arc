@@ -8,13 +8,18 @@ use chio_log_redact::redacted;
 
 use self::responses::FinalizeToolOutputCostContext;
 use super::*;
+use crate::admission_operation::{
+    AdmissionAttachment, AdmissionDigest, AdmissionIdentifier, AdmissionOperationState,
+};
 use crate::budget_store::{
+    ApprovalRequiredBudgetHold, BudgetAuthorizeCumulativeApprovalRequest,
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
     BudgetCancelCapturedBeforeDispatchRequest, BudgetCaptureInvocationRequest,
-    BudgetCapturedBeforeDispatchCancellationDecision, BudgetEventAuthority,
-    BudgetHoldMutationDecision, BudgetInvocationCaptureDecision, BudgetInvocationQuota,
-    BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
-    BudgetReverseHoldDecision, BudgetReverseHoldRequest,
+    BudgetCapturedBeforeDispatchCancellationDecision, BudgetCumulativeApprovalAccountKey,
+    BudgetCumulativeApprovalAuthorizationDecision, BudgetCumulativeApprovalRequest,
+    BudgetEventAuthority, BudgetHoldMutationDecision, BudgetInvocationCaptureDecision,
+    BudgetInvocationQuota, BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldDecision,
+    BudgetReconcileHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest,
 };
 
 impl ChioKernel {
@@ -307,9 +312,6 @@ impl ChioKernel {
         .map_err(|error| {
             chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason()
         })?;
-        if cap.scope.has_cumulative_approval() {
-            return Err("cumulative approval enforcement is unavailable".to_string());
-        }
         Ok(())
     }
 
@@ -1014,18 +1016,282 @@ impl ChioKernel {
         }
     }
 
+    fn cumulative_approval_request_for_grant(
+        &self,
+        request: &ToolCallRequest,
+        matching: &MatchingGrant<'_>,
+        admission: Option<&DurableToolAdmission>,
+        now: u64,
+    ) -> Result<Option<BudgetCumulativeApprovalRequest>, KernelError> {
+        let cumulative_constraint_count = matching
+            .grant
+            .constraints
+            .iter()
+            .filter(|constraint| {
+                matches!(
+                    constraint,
+                    Constraint::RequireCumulativeApprovalAbove { .. }
+                )
+            })
+            .count();
+        if cumulative_constraint_count == 0 {
+            return Ok(None);
+        }
+        if cumulative_constraint_count != 1 {
+            return Err(KernelError::GovernedTransactionDenied(
+                "a matching grant must contain exactly one cumulative approval constraint"
+                    .to_owned(),
+            ));
+        }
+        let admission = admission.ok_or_else(|| {
+            KernelError::DurableAdmission(
+                "cumulative approval requires a durable admission operation".to_owned(),
+            )
+        })?;
+        let peer = self
+            .capability_negotiation_for_remote(request.federated_origin_kernel_id.as_deref(), now)
+            .map_err(KernelError::GovernedTransactionDenied)?;
+        if !peer.supports(chio_core::capability::features::CUMULATIVE_APPROVAL_BUDGET) {
+            return Err(KernelError::GovernedTransactionDenied(
+                "cumulative approval budgets were not negotiated".to_owned(),
+            ));
+        }
+        let direct_root = self
+            .negotiated_capability_root(&request.capability, &peer)
+            .map_err(KernelError::GovernedTransactionDenied)?;
+        let verified =
+            chio_core::capability::cumulative_approval::verify_cumulative_approval_constraints(
+                &request.capability,
+                &self.trusted_issuer_keys(),
+                direct_root.as_ref(),
+            )
+            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+        let mut matching_constraints = verified
+            .into_iter()
+            .filter(|constraint| constraint.grant_index == matching.index);
+        let constraint = matching_constraints.next().ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "cumulative approval verification omitted the matching grant".to_owned(),
+            )
+        })?;
+        if matching_constraints.next().is_some() {
+            return Err(KernelError::GovernedTransactionDenied(
+                "cumulative approval verification produced an ambiguous grant".to_owned(),
+            ));
+        }
+        let intent = request.governed_intent.as_ref().ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "cumulative approval requires a governed transaction intent".to_owned(),
+            )
+        })?;
+        if intent.server_id != request.server_id || intent.tool_name != request.tool_name {
+            return Err(KernelError::GovernedTransactionDenied(
+                "cumulative approval intent target does not match the request".to_owned(),
+            ));
+        }
+        let requested_authorized = intent.max_amount.clone().ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "cumulative approval intent requires a maximum amount".to_owned(),
+            )
+        })?;
+        if requested_authorized.currency != constraint.threshold.currency {
+            return Err(KernelError::GovernedTransactionDenied(
+                "cumulative approval intent currency does not match the capability".to_owned(),
+            ));
+        }
+        Ok(Some(BudgetCumulativeApprovalRequest {
+            operation_id: admission.operation_id().to_owned(),
+            account_key: BudgetCumulativeApprovalAccountKey {
+                authority_id: constraint.authority_id.to_hex(),
+                owner_id: constraint.owner_id,
+                approval_budget_id: constraint.approval_budget_id,
+                approval_budget_epoch: constraint.approval_budget_epoch,
+                root_grant_hash: constraint.root_grant_hash,
+                delegation_root_id: constraint.delegation_root_id,
+                root_binding_digest: constraint.root_binding_digest,
+                currency: constraint.threshold.currency.clone(),
+            },
+            authority_threshold: constraint.authority_threshold,
+            effective_threshold: constraint.threshold,
+            requested_authorized,
+        }))
+    }
+
+    fn ensure_cumulative_approval_proposal(
+        &self,
+        request: &ToolCallRequest,
+        required: &ApprovalRequiredBudgetHold,
+        admission: &mut DurableToolAdmission,
+        trusted_now_unix_ms: u64,
+    ) -> Result<chio_core::capability::governance::ThresholdApprovalProposal, KernelError> {
+        if admission.operation.state() == AdmissionOperationState::ApprovalRequired {
+            if admission
+                .operation
+                .budget_hold_id()
+                .is_none_or(|hold_id| hold_id.as_str() != required.hold_id)
+            {
+                return Err(KernelError::DurableAdmission(
+                    "retained approval proposal changed its budget hold".to_owned(),
+                ));
+            }
+            return admission
+                .operation
+                .threshold_proposal()
+                .cloned()
+                .ok_or_else(|| {
+                    KernelError::DurableAdmission(
+                        "approval-required operation omitted its stored proposal".to_owned(),
+                    )
+                });
+        }
+        let now = trusted_now_unix_ms / 1_000;
+        let requirement = self.threshold_approval_requirement(request, now)?;
+        let intent = request.governed_intent.as_ref().ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(
+                "cumulative approval requires a governed transaction intent".to_owned(),
+            )
+        })?;
+        let intent_hash = intent
+            .binding_hash()
+            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+        let capability_digest = sha256_hex(
+            &canonical_json_bytes(&request.capability)
+                .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?,
+        );
+        let proposal_created_at = required.metadata.recorded_at_unix_seconds.ok_or_else(|| {
+            KernelError::DurableAdmission(
+                "cumulative approval authorization omitted its durable timestamp".to_owned(),
+            )
+        })?;
+        let proposal_deadline =
+            chio_core::capability::governance::ThresholdApprovalProposalBody::proposal_deadline(
+                proposal_created_at,
+                requirement.timeout_seconds,
+                request.capability.expires_at,
+                intent.governed_operation_expires_at(),
+            )
+            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+        let proposal = chio_core::capability::governance::ThresholdApprovalProposal::sign(
+            chio_core::capability::governance::ThresholdApprovalProposalBody {
+                schema: chio_core::capability::governance::THRESHOLD_APPROVAL_PROPOSAL_SCHEMA
+                    .to_owned(),
+                proposal_id: admission.operation_id().to_owned(),
+                request_id: request.request_id.clone(),
+                governed_intent_hash: intent_hash,
+                subject: request.capability.subject.clone(),
+                authorizing_capability_digest: capability_digest,
+                policy_hash: requirement.policy_hash,
+                threshold: requirement.threshold,
+                eligible_set_digest: requirement.eligible_set_digest,
+                proposal_created_at,
+                proposal_deadline,
+                policy_authority: self.config.keypair.public_key(),
+            },
+            &self.config.keypair,
+        )
+        .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+        let proposal_hash = AdmissionDigest::try_new(
+            "threshold_proposal_hash",
+            proposal
+                .artifact_digest()
+                .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?,
+        )?;
+        admission.operation = self.apply_admission_command(
+            admission.operation.clone(),
+            vec![
+                AdmissionAttachment::ThresholdProposalHash(proposal_hash),
+                AdmissionAttachment::BudgetHoldId(AdmissionIdentifier::try_new(
+                    "budget_hold_id",
+                    required.hold_id.clone(),
+                )?),
+                AdmissionAttachment::ThresholdProposal(Box::new(proposal.clone())),
+            ],
+            AdmissionOperationState::ApprovalRequired,
+            trusted_now_unix_ms,
+        )?;
+        Ok(proposal)
+    }
+
+    fn authorize_cumulative_approval(
+        &self,
+        request: &ToolCallRequest,
+        grant_index: usize,
+        required: &ApprovalRequiredBudgetHold,
+        admission: &mut DurableToolAdmission,
+        trusted_now_unix_ms: u64,
+    ) -> Result<crate::budget_store::BudgetHoldMutationDecision, KernelError> {
+        let proposal = self.ensure_cumulative_approval_proposal(
+            request,
+            required,
+            admission,
+            trusted_now_unix_ms,
+        )?;
+        if request.threshold_approval_proposal.as_ref() != Some(&proposal) {
+            return Err(KernelError::GovernedTransactionDenied(
+                "threshold approval request does not carry the stored proposal".to_owned(),
+            ));
+        }
+        let intent_hash = request
+            .governed_intent
+            .as_ref()
+            .ok_or_else(|| {
+                KernelError::GovernedTransactionDenied(
+                    "cumulative approval requires a governed transaction intent".to_owned(),
+                )
+            })?
+            .binding_hash()
+            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+        let verified = self.validate_threshold_approval_set(
+            request,
+            &request.capability,
+            &intent_hash,
+            trusted_now_unix_ms / 1_000,
+        )?;
+        let approval_set_digest = verified
+            .body
+            .approval_set_hash()
+            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+        let decision = self.with_budget_store(|store| {
+            Ok(
+                store.authorize_cumulative_approval(BudgetAuthorizeCumulativeApprovalRequest {
+                    capability_id: request.capability.id.clone(),
+                    grant_index,
+                    operation_id: admission.operation_id().to_owned(),
+                    hold_id: required.hold_id.clone(),
+                    admission_binding: required.admission_binding.clone(),
+                    approval_set_digest,
+                    event_id: format!("{}:authorize-cumulative", required.hold_id),
+                    authority: required.metadata.authority.clone(),
+                })?,
+            )
+        })?;
+        let mutation = match decision {
+            BudgetCumulativeApprovalAuthorizationDecision::Authorized(mutation)
+            | BudgetCumulativeApprovalAuthorizationDecision::AlreadyAuthorized(mutation) => {
+                mutation
+            }
+        };
+        admission.operation = self.apply_admission_command(
+            admission.operation.clone(),
+            Vec::new(),
+            AdmissionOperationState::BudgetAuthorized,
+            trusted_now_unix_ms,
+        )?;
+        Ok(mutation)
+    }
+
     /// Check and decrement the invocation budget for a capability.
     ///
     /// Returns the matched grant index and the exact pre-execution budget mutation.
     pub(crate) fn check_and_increment_budget(
         &self,
-        request_id: &str,
+        request: &ToolCallRequest,
         cap: &CapabilityToken,
         matching_grants: &[MatchingGrant<'_>],
         nonce_preflight: bool,
         mut durable_admission: Option<&mut DurableToolAdmission>,
         trusted_now_unix_ms: u64,
-    ) -> Result<(usize, PreExecutionBudgetMutation), KernelError> {
+    ) -> Result<BudgetAdmissionOutcome, KernelError> {
         let mut saw_exhausted_budget = false;
         let mut eligible_grant_seen = false;
 
@@ -1083,10 +1349,13 @@ impl ChioKernel {
                         let budget_hold_id = if nonce_preflight {
                             format!(
                                 "nonce-preflight-budget-hold:{}:{}:{}",
-                                request_id, cap.id, matching.index
+                                request.request_id, cap.id, matching.index
                             )
                         } else {
-                            format!("budget-hold:{}:{}:{}", request_id, cap.id, matching.index)
+                            format!(
+                                "budget-hold:{}:{}:{}",
+                                request.request_id, cap.id, matching.index
+                            )
                         };
                         (
                             budget_hold_id.clone(),
@@ -1129,12 +1398,19 @@ impl ChioKernel {
                         });
                     }
                 }
+                invocation_quotas.sort_by(|left, right| left.key.cmp(&right.key));
+                let cumulative_approval = self.cumulative_approval_request_for_grant(
+                    request,
+                    matching,
+                    durable_admission.as_deref(),
+                    trusted_now_unix_ms / 1_000,
+                )?;
                 let authorization_request = BudgetAuthorizeHoldRequest {
                     capability_id: cap.id.clone(),
                     grant_index: matching.index,
                     max_invocations: grant.max_invocations,
                     invocation_quotas,
-                    cumulative_approval: None,
+                    cumulative_approval,
                     admission_binding,
                     requested_exposure_units: cost_units,
                     max_cost_per_invocation: max_per,
@@ -1229,23 +1505,67 @@ impl ChioKernel {
                         } else {
                             PreExecutionBudgetMutation::InvocationHold(charge)
                         };
-                        return Ok((matching.index, mutation));
+                        return Ok(BudgetAdmissionOutcome::Authorized {
+                            grant_index: matching.index,
+                            mutation: Box::new(mutation),
+                        });
                     }
                     BudgetAuthorizeHoldDecision::Denied(_) => {
                         saw_exhausted_budget = true;
                     }
-                    BudgetAuthorizeHoldDecision::ApprovalRequired(_) => {
-                        return Err(KernelError::Internal(
-                            "cumulative approval reached the legacy monetary admission path"
-                                .to_string(),
-                        ));
+                    BudgetAuthorizeHoldDecision::ApprovalRequired(required) => {
+                        let admission = durable_admission.as_deref_mut().ok_or_else(|| {
+                            KernelError::DurableAdmission(
+                                "cumulative approval lost its durable operation".to_owned(),
+                            )
+                        })?;
+                        let proposal = self.ensure_cumulative_approval_proposal(
+                            request,
+                            &required,
+                            admission,
+                            trusted_now_unix_ms,
+                        )?;
+                        if request.approval_tokens.is_empty() {
+                            return Ok(BudgetAdmissionOutcome::PendingApproval {
+                                grant_index: matching.index,
+                                proposal: Box::new(proposal),
+                            });
+                        }
+                        let authorized = self.authorize_cumulative_approval(
+                            request,
+                            matching.index,
+                            &required,
+                            admission,
+                            trusted_now_unix_ms,
+                        )?;
+                        let charge = BudgetChargeResult {
+                            grant_index: matching.index,
+                            cost_charged: cost_units,
+                            currency,
+                            budget_total,
+                            new_committed_cost_units: authorized.committed_cost_units_after,
+                            budget_hold_id: authorized
+                                .hold_id
+                                .unwrap_or_else(|| budget_hold_id.clone()),
+                            authorize_metadata: authorized.metadata,
+                            invocation_capture: None,
+                        };
+                        let mutation = if has_monetary {
+                            PreExecutionBudgetMutation::Charge(charge)
+                        } else {
+                            PreExecutionBudgetMutation::InvocationHold(charge)
+                        };
+                        return Ok(BudgetAdmissionOutcome::Authorized {
+                            grant_index: matching.index,
+                            mutation: Box::new(mutation),
+                        });
                     }
                     BudgetAuthorizeHoldDecision::AlreadyCaptured(captured) => {
                         if !durable_admission
                             .as_deref()
                             .is_some_and(DurableToolAdmission::can_resume_captured_hold)
                         {
-                            return Err(KernelError::BudgetExhausted(cap.id.clone()));
+                            return Err(KernelError::CapturedBudgetReplay(cap.id.clone()));
                         }
                         let charge = BudgetChargeResult {
                             grant_index: matching.index,
@@ -1265,23 +1585,29 @@ impl ChioKernel {
                         } else {
                             PreExecutionBudgetMutation::InvocationHold(charge)
                         };
-                        return Ok((matching.index, mutation));
+                        return Ok(BudgetAdmissionOutcome::Authorized {
+                            grant_index: matching.index,
+                            mutation: Box::new(mutation),
+                        });
                     }
                 }
             } else {
                 if grant.max_invocations.is_none() {
-                    return Ok((matching.index, PreExecutionBudgetMutation::None));
+                    return Ok(BudgetAdmissionOutcome::Authorized {
+                        grant_index: matching.index,
+                        mutation: Box::new(PreExecutionBudgetMutation::None),
+                    });
                 }
 
                 if self.with_budget_store(|store| {
                     Ok(store.try_increment(&cap.id, matching.index, grant.max_invocations)?)
                 })? {
-                    return Ok((
-                        matching.index,
-                        PreExecutionBudgetMutation::Invocation {
+                    return Ok(BudgetAdmissionOutcome::Authorized {
+                        grant_index: matching.index,
+                        mutation: Box::new(PreExecutionBudgetMutation::Invocation {
                             grant_index: matching.index,
-                        },
-                    ));
+                        }),
+                    });
                 }
                 saw_exhausted_budget = true;
             }
@@ -1296,7 +1622,10 @@ impl ChioKernel {
         } else {
             // No matching grant had any limit -- allow with the first grant's index.
             let first_index = matching_grants.first().map(|m| m.index).unwrap_or(0);
-            Ok((first_index, PreExecutionBudgetMutation::None))
+            Ok(BudgetAdmissionOutcome::Authorized {
+                grant_index: first_index,
+                mutation: Box::new(PreExecutionBudgetMutation::None),
+            })
         }
     }
 

@@ -1884,6 +1884,7 @@ fn make_fabricated_drop_charge() -> BudgetChargeResult {
                 crate::budget_store::BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
             budget_commit_index: None,
             event_id: None,
+            recorded_at_unix_seconds: None,
         },
         invocation_capture: None,
     }
