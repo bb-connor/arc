@@ -44,6 +44,12 @@ pub struct RequestEvaluator {
     revocation_backend: &'static str,
 }
 
+pub(crate) struct DurableAdmissionStores {
+    pub(crate) store: Arc<dyn chio_kernel::QualifiedAdmissionProjectionStore>,
+    pub(crate) outcome_store: Arc<dyn chio_kernel::tool_outcome::QualifiedToolOutcomeStore>,
+    pub(crate) fence: chio_kernel::admission_operation::StoreMutationFence,
+}
+
 impl RequestEvaluator {
     /// Compatibility shim for the pre-rename constructor name. Renamed to
     /// [`RequestEvaluator::new_ephemeral`] so an embedder never gets in-memory
@@ -200,6 +206,31 @@ impl RequestEvaluator {
         revocation_store: Option<Arc<dyn RevocationStore>>,
         allow_ephemeral: bool,
     ) -> Result<Self, HttpAuthorityError> {
+        Self::new_with_durable_stores_and_admission(
+            routes,
+            keypair,
+            policy_hash,
+            approval_store,
+            trusted_capability_issuers,
+            receipt_store,
+            revocation_store,
+            None,
+            allow_ephemeral,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new_with_durable_stores_and_admission(
+        routes: Vec<RouteEntry>,
+        keypair: Keypair,
+        policy_hash: String,
+        approval_store: Arc<dyn ApprovalStore>,
+        trusted_capability_issuers: Vec<PublicKey>,
+        receipt_store: Option<Arc<dyn ReceiptStore>>,
+        revocation_store: Option<Arc<dyn RevocationStore>>,
+        durable_admission: Option<DurableAdmissionStores>,
+        allow_ephemeral: bool,
+    ) -> Result<Self, HttpAuthorityError> {
         let receipt_backend = if receipt_store.is_some() {
             BACKEND_DURABLE
         } else {
@@ -235,6 +266,13 @@ impl RequestEvaluator {
         }
         if let Some(store) = revocation_store {
             builder = builder.revocation_store(store);
+        }
+        if let Some(durable) = durable_admission {
+            builder = builder.durable_admission_stores(
+                durable.store,
+                durable.outcome_store,
+                durable.fence,
+            );
         }
         let authority = builder.build(keypair, policy_hash)?;
 
@@ -572,18 +610,40 @@ mod tests {
         let revocation_store: Arc<dyn chio_kernel::RevocationStore> = Arc::new(
             chio_store_sqlite::SqliteRevocationStore::open(dir.path().join("revocations.db"))?,
         );
-        let evaluator = RequestEvaluator::new_with_durable_stores(
+        let authority_database = dir.path().join("authority.db");
+        let authority_locks = dir.path().join("authority-locks");
+        std::fs::create_dir(&authority_locks)?;
+        chio_store_sqlite::SqliteAuthorityStore::provision(&authority_database, &authority_locks)?;
+        let authority = chio_store_sqlite::SqliteAuthorityStore::open_serving(
+            &authority_database,
+            &authority_locks,
+        )?;
+        let evaluator = RequestEvaluator::new_with_durable_stores_and_admission(
             Vec::new(),
             Keypair::generate(),
-            "test-policy".to_string(),
+            chio_core_types::sha256_hex(b"test-policy"),
             Arc::new(chio_kernel::InMemoryApprovalStore::new()),
             Vec::new(),
             Some(receipt_store),
             Some(revocation_store),
+            Some(DurableAdmissionStores {
+                store: Arc::new(authority.admission_operation_store()),
+                outcome_store: Arc::new(authority.tool_outcome_store()),
+                fence: authority.mutation_fence(),
+            }),
             false,
         )?;
         assert_eq!(evaluator.receipt_backend(), "durable");
         assert_eq!(evaluator.revocation_backend(), "durable");
+        let evaluated = evaluator.evaluate(
+            HttpMethod::Get,
+            "/pets",
+            &HashMap::new(),
+            &HashMap::new(),
+            None,
+            0,
+        )?;
+        assert!(evaluated.verdict.is_allowed());
         Ok(())
     }
 

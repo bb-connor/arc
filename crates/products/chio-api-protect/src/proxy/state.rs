@@ -3,12 +3,33 @@ use super::*;
 use chio_http_serve::{
     apply_server_hygiene, run_until_drained, ServeError, ServeHygieneConfig, ShutdownController,
 };
+use std::fs;
+use std::path::PathBuf;
 use std::time::Duration;
 
 /// Extra window the drain holds open beyond the upstream hop ceiling so a hop
 /// that trips its own deadline still has time to record its receipt before the
 /// forced drain closes the connection.
 const PROXY_DRAIN_MARGIN: Duration = Duration::from_secs(5);
+
+fn authority_sibling_paths(receipt_path: &str) -> (PathBuf, PathBuf) {
+    let base = chio_store_sqlite::sqlite_filesystem_path(receipt_path);
+    let mut lock_root = base.as_os_str().to_os_string();
+    lock_root.push(".authority-locks");
+    let lock_root = PathBuf::from(lock_root);
+    (lock_root.join("authority.db"), lock_root)
+}
+
+fn prepare_authority_lock_root(path: &std::path::Path) -> Result<(), ProtectError> {
+    fs::create_dir_all(path).map_err(|error| ProtectError::Config(error.to_string()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700))
+            .map_err(|error| ProtectError::Config(error.to_string()))?;
+    }
+    Ok(())
+}
 
 /// Drain window for the proxy serve site, derived from the configured upstream
 /// hop ceiling.
@@ -463,7 +484,25 @@ impl ProtectProxy {
                 None => Some(Arc::new(chio_kernel::InMemoryRevocationStore::new())),
             };
 
-        let evaluator = RequestEvaluator::new_with_durable_stores(
+        let durable_admission = match durable_receipt_db {
+            Some(path) => {
+                let (database, lock_root) = authority_sibling_paths(path);
+                prepare_authority_lock_root(&lock_root)?;
+                chio_store_sqlite::SqliteAuthorityStore::provision(&database, &lock_root)
+                    .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+                let authority =
+                    chio_store_sqlite::SqliteAuthorityStore::open_serving(&database, &lock_root)
+                        .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+                Some(DurableAdmissionStores {
+                    store: Arc::new(authority.admission_operation_store()),
+                    outcome_store: Arc::new(authority.tool_outcome_store()),
+                    fence: authority.mutation_fence(),
+                })
+            }
+            None => None,
+        };
+
+        let evaluator = RequestEvaluator::new_with_durable_stores_and_admission(
             routes,
             keypair.clone(),
             policy_hash,
@@ -471,6 +510,7 @@ impl ProtectProxy {
             self.config.trusted_capability_issuers.clone(),
             durable_receipt_store,
             revocation_store.clone(),
+            durable_admission,
             self.config.allow_ephemeral_receipts,
         )
         .map_err(|error| ProtectError::Config(error.to_string()))?;
@@ -607,7 +647,7 @@ fn protect_serve_error(error: ServeError) -> ProtectError {
 
 #[cfg(test)]
 mod durability_tests {
-    use super::{revocation_sibling_path, SqliteReceiptStore};
+    use super::{authority_sibling_paths, revocation_sibling_path, SqliteReceiptStore};
     use chio_test_support::prelude::*;
 
     #[test]
@@ -626,6 +666,20 @@ mod durability_tests {
         assert_eq!(
             revocation_sibling_path("file:/var/lib/chio/receipts.db?mode=rwc"),
             "file:/var/lib/chio/receipts.db.revocations?mode=rwc"
+        );
+    }
+
+    #[test]
+    fn authority_sibling_paths_resolve_the_receipt_uri_to_filesystem_paths() {
+        let (database, lock_root) =
+            authority_sibling_paths("file:/var/lib/chio/receipts.db?mode=rwc");
+        assert_eq!(
+            database,
+            std::path::Path::new("/var/lib/chio/receipts.db.authority-locks/authority.db")
+        );
+        assert_eq!(
+            lock_root,
+            std::path::Path::new("/var/lib/chio/receipts.db.authority-locks")
         );
     }
 

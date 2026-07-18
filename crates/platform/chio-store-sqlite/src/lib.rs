@@ -152,7 +152,7 @@ pub(crate) fn sqlite_parent_dir_to_create(path: &Path) -> Option<PathBuf> {
     if is_in_memory_sqlite_path(text) {
         return None;
     }
-    non_empty_parent(&sqlite_uri_filesystem_path(text))
+    non_empty_parent(&sqlite_filesystem_path(text))
 }
 
 /// The parent of `path`, unless it is empty (a bare filename with no directory
@@ -166,7 +166,8 @@ fn non_empty_parent(path: &Path) -> Option<PathBuf> {
 /// The filesystem path a rusqlite path points at, resolving a `file:` URI to
 /// its on-disk filename by stripping the scheme, any `//authority`, and the
 /// `?query`. A plain path (no `file:` scheme) is returned unchanged.
-fn sqlite_uri_filesystem_path(text: &str) -> PathBuf {
+#[must_use]
+pub fn sqlite_filesystem_path(text: &str) -> PathBuf {
     let Some(rest) = text.strip_prefix("file:") else {
         return PathBuf::from(text);
     };

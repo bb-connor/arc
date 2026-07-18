@@ -50,7 +50,7 @@ use chio_openapi::{ChioExtensions, DefaultPolicy};
 use chio_store_sqlite::SqliteApprovalStore;
 
 use crate::error::ProtectError;
-use crate::evaluator::{RequestEvaluator, RouteEntry};
+use crate::evaluator::{DurableAdmissionStores, RequestEvaluator, RouteEntry};
 use crate::spec_discovery::{default_upstream_egress_contract, discover_spec, load_spec_from_file};
 
 #[path = "proxy/approval.rs"]
