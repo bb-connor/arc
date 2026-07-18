@@ -710,7 +710,7 @@ async def _neo4j_manifest_counts() -> dict[str, int]:
             """
             MATCH (entity:ChioEntity)
             RETURN count(entity) AS entities,
-                   count { (entity)-[]-() } AS relations,
+                   sum(COUNT { (entity)-[]->() }) AS relations,
                    count(CASE WHEN entity.kind = 'test' THEN 1 END) AS tests,
                    count(CASE WHEN entity.kind = 'concept' OR entity.concept_scope = 'scoped' THEN 1 END) AS concepts
             """
@@ -718,7 +718,7 @@ async def _neo4j_manifest_counts() -> dict[str, int]:
         row = await result.single()
     return {
         "entities": int(row["entities"] or 0) if row else 0,
-        "relations": int(row["relations"] or 0) // 2 if row else 0,
+        "relations": int(row["relations"] or 0) if row else 0,
         "tests": int(row["tests"] or 0) if row else 0,
         "concepts": int(row["concepts"] or 0) if row else 0,
     }
@@ -759,6 +759,12 @@ async def manifest() -> dict[str, Any]:
         counts.update(neo4j_result)
     if isinstance(graphiti_result, Exception) or not graphiti_result:
         warnings.append("temporal memory unavailable")
+    semantic_ready = not isinstance(postgres_result, Exception) and bool(
+        os.environ.get("OPENAI_API_KEY")
+    )
+    graph_ready = not isinstance(neo4j_result, Exception)
+    if not semantic_ready:
+        warnings.append("semantic search unavailable")
     metadata = _repository_metadata()
     return {
         "schemaVersion": "chio.kb.manifest.v1",
@@ -767,10 +773,10 @@ async def manifest() -> dict[str, Any]:
         "counts": counts,
         "evaluation": _evaluation_summary(),
         "capabilities": {
-            "search": not isinstance(postgres_result, Exception),
-            "graph": not isinstance(neo4j_result, Exception),
-            "impact": not isinstance(neo4j_result, Exception),
-            "brief": not isinstance(postgres_result, Exception),
+            "search": semantic_ready,
+            "graph": graph_ready,
+            "impact": graph_ready and semantic_ready,
+            "brief": graph_ready and semantic_ready,
             "memory": not isinstance(graphiti_result, Exception) and graphiti_result,
             "signedRetrieval": False,
         },

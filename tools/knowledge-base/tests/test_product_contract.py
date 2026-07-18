@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from chio_kb import query
 
 
@@ -87,3 +89,31 @@ def test_filter_clause_supports_generated_boolean_without_string_coercion() -> N
 
     assert clause == "WHERE source_root ILIKE $1 AND is_generated = $2"
     assert values == ["%crates%", False]
+
+
+def test_manifest_does_not_advertise_semantic_tools_without_api_key(monkeypatch) -> None:
+    async def postgres_counts() -> dict[str, int]:
+        return {"files": 1, "docs": 1, "languages": 1, "crates": 1, "packages": 0}
+
+    async def graph_counts() -> dict[str, int]:
+        return {"entities": 2, "relations": 1, "tests": 0, "concepts": 0}
+
+    async def memory_ready() -> bool:
+        return False
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(query, "_postgres_manifest_counts", postgres_counts)
+    monkeypatch.setattr(query, "_neo4j_manifest_counts", graph_counts)
+    monkeypatch.setattr(query, "_graphiti_manifest_ready", memory_ready)
+
+    result = asyncio.run(query.manifest())
+
+    assert result["capabilities"] == {
+        "search": False,
+        "graph": True,
+        "impact": False,
+        "brief": False,
+        "memory": False,
+        "signedRetrieval": False,
+    }
+    assert "semantic search unavailable" in result["warnings"]
