@@ -229,7 +229,16 @@ fn execute(
     let response = kernel.evaluate_tool_call_blocking_with_metadata(
         &request(request_id, capability),
         Some(serde_json::json!({
-            "financial": { "cost_charged": 100, "currency": "USD" }
+            "financial": {
+                "grant_index": 0,
+                "cost_charged": 100,
+                "currency": "USD",
+                "budget_remaining": 900,
+                "budget_total": 1000,
+                "delegation_depth": 0,
+                "root_budget_holder": capability.subject.to_hex(),
+                "settlement_status": "pending"
+            }
         })),
     )?;
     assert_eq!(response.verdict, Verdict::Allow);
