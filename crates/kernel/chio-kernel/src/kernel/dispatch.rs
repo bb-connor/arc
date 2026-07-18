@@ -964,6 +964,7 @@ impl ChioKernel {
     /// dispatch entry point (`ToolEvaluator::dispatch`), so a custom evaluator or
     /// phase-level caller cannot bypass the deadline and hang indefinitely on a
     /// wedged tool server; it matches the budget the full evaluate path enforces.
+    #[cfg(test)]
     pub(crate) async fn dispatch_tool_call_with_cost(
         &self,
         request: &ToolCallRequest,
@@ -1011,6 +1012,7 @@ impl ChioKernel {
     /// limit). With no runtime at all it runs inline without a timeout (there is
     /// no async transport to hang on, and the timeout wrapper would panic without
     /// a timer driver).
+    #[cfg(test)]
     pub(crate) async fn dispatch_within_budget(
         &self,
         request: &ToolCallRequest,
