@@ -9,9 +9,10 @@ pub(crate) use terminal::DurableToolReturnInput;
 
 use super::*;
 use crate::admission_operation::{
-    verified_outcome_unknown_after_dispatch_projection, AdmissionAttachment, AdmissionBeginResult,
-    AdmissionCompensationStatus, AdmissionCompletedProjection, AdmissionDigest,
-    AdmissionDispatchState, AdmissionIdentifier, AdmissionMutationGuard,
+    verified_outcome_unknown_after_dispatch_projection,
+    verified_released_pre_dispatch_compensation_projection, AdmissionAttachment,
+    AdmissionBeginResult, AdmissionCompensationStatus, AdmissionCompletedProjection,
+    AdmissionDigest, AdmissionDispatchState, AdmissionIdentifier, AdmissionMutationGuard,
     AdmissionMutationSequencer, AdmissionOperationBindingInputV1, AdmissionOperationBindingV1,
     AdmissionOperationCommand, AdmissionOperationKind, AdmissionOperationState,
     AdmissionOperationV1, AdmissionParticipantRequirements, AdmissionProjectionContext,
@@ -882,6 +883,97 @@ impl ChioKernel {
             AdmissionOperationState::DispatchCommitted,
             trusted_now_unix_ms,
         )?;
+        Ok(())
+    }
+
+    pub(crate) fn compensate_durable_admission_before_dispatch(
+        &self,
+        operation: &AdmissionOperationV1,
+        verifier_policy: serde_json::Value,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), KernelError> {
+        let runtime = self.durable_runtime()?;
+        let _mutation_guard = runtime.lock_mutations()?;
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let current = runtime
+            .store
+            .load_by_operation_id(operation.binding().operation_id())
+            .map_err(durable_store_error)?
+            .ok_or_else(|| {
+                KernelError::DurableAdmission(
+                    "pre-dispatch admission disappeared during compensation".to_owned(),
+                )
+            })?;
+        if &current != operation
+            || current.state().is_terminal()
+            || current.dispatch_commit().is_some()
+        {
+            return Err(KernelError::DurableAdmission(
+                "pre-dispatch compensation operation changed".to_owned(),
+            ));
+        }
+        let lease = self.claim_admission_recovery(&current, trusted_now_unix_ms)?;
+        if current.binding().participant_requirements().payment {
+            let mut journal = runtime
+                .store
+                .load_payment_journal(current.binding().operation_id().as_str(), &runtime.fence)
+                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
+                .ok_or_else(|| {
+                    KernelError::DurableAdmission(
+                        "pre-dispatch payment journal disappeared".to_owned(),
+                    )
+                })?;
+            if journal.state == crate::payment::PaymentJournalState::HoldPlaced {
+                journal = runtime
+                    .store
+                    .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
+                        operation: &current,
+                        recovery_lease: &lease,
+                        expected: &journal,
+                        transition:
+                            &crate::payment::PaymentJournalTransition::CancelBeforeAuthorization,
+                        release_evidence: None,
+                        active_fence: &runtime.fence,
+                        trusted_now_unix_ms,
+                    })
+                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            }
+            let released = journal.state == crate::payment::PaymentJournalState::Settled
+                && journal.settle_action == Some(crate::payment::PaymentSettleAction::Release);
+            let cancelled_before_authorization = journal.state
+                == crate::payment::PaymentJournalState::Closed
+                && journal.authorization_id.is_none();
+            if !released && !cancelled_before_authorization {
+                return Err(KernelError::DurableAdmission(
+                    "pre-dispatch payment release is not durable".to_owned(),
+                ));
+            }
+        }
+        let context = AdmissionProjectionContext {
+            operation_id: current.binding().operation_id().clone(),
+            request_id: current.binding().request_id().clone(),
+            expected_operation_version: current.version(),
+            trusted_time_unix_ms: trusted_now_unix_ms,
+            coordinator_lease_id: lease.coordinator_lease_id().clone(),
+            coordinator_lease_epoch: lease.coordinator_lease_epoch(),
+            store_fence: runtime.fence.clone(),
+        };
+        let projection = verified_released_pre_dispatch_compensation_projection(
+            &current,
+            context,
+            verifier_policy,
+        )?;
+        let terminal = runtime
+            .store
+            .commit_admission_projection(&projection)
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        if terminal.operation_id != *current.binding().operation_id()
+            || terminal.state != AdmissionOperationState::CompensatedBeforeDispatch
+        {
+            return Err(KernelError::DurableAdmission(
+                "pre-dispatch compensation committed a different terminal operation".to_owned(),
+            ));
+        }
         Ok(())
     }
 

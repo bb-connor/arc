@@ -24,6 +24,34 @@ pub fn verified_pre_dispatch_compensation_projection(
     }
     let proof = VerifiedPreDispatchNoEffect::from_qualified_operation_snapshot(operation, &context)
         .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+    pre_dispatch_compensation_projection(operation, context, proof)
+}
+
+pub(crate) fn verified_released_pre_dispatch_compensation_projection(
+    operation: &AdmissionOperationV1,
+    context: AdmissionProjectionContext,
+    verifier_policy: serde_json::Value,
+) -> Result<AdmissionTerminalProjection, AdmissionOperationError> {
+    if !matches!(
+        operation.binding().kind(),
+        AdmissionOperationKind::ToolDispatch | AdmissionOperationKind::GovernedActiveResponse
+    ) {
+        return Err(AdmissionOperationError::TerminalProjectionBindingMismatch);
+    }
+    let proof = VerifiedPreDispatchNoEffect::from_qualified_released_operation_snapshot(
+        operation,
+        &context,
+        verifier_policy,
+    )
+    .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+    pre_dispatch_compensation_projection(operation, context, proof)
+}
+
+fn pre_dispatch_compensation_projection(
+    operation: &AdmissionOperationV1,
+    context: AdmissionProjectionContext,
+    proof: VerifiedPreDispatchNoEffect,
+) -> Result<AdmissionTerminalProjection, AdmissionOperationError> {
     let binding = PreDispatchCompensationReplayBinding {
         operation_id: operation.binding().operation_id(),
         operation_version: operation.version(),

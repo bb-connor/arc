@@ -205,6 +205,16 @@ impl ParticipantQueryRecordV1 {
         })
     }
 
+    fn from_qualified_release(
+        operation: &AdmissionOperationV1,
+        participant: ReleaseParticipantV1,
+        context: &AdmissionProjectionContext,
+    ) -> Result<Self, ToolOutcomeError> {
+        let mut record = Self::from_qualified_operation(operation, participant, context)?;
+        record.source_attachments = participant_attachments(operation, participant);
+        Ok(record)
+    }
+
     #[cfg(test)]
     fn for_test(
         source_record_id: AdmissionIdentifier,
@@ -384,7 +394,6 @@ impl VerifiedParticipantNoEffectV1 {
         })
     }
 
-    #[cfg(test)]
     fn released_before_dispatch(
         operation: &AdmissionOperationV1,
         participant: ReleaseParticipantV1,
@@ -703,7 +712,7 @@ impl VerifiedPreDispatchNoEffect {
     ) -> Result<Self, ToolOutcomeError> {
         validate_pre_dispatch_context(operation, context)?;
         let requirements = operation.binding().participant_requirements();
-        let participant = |kind, required| {
+        let participant = |kind: ReleaseParticipantV1, required: bool| {
             if !participant_attachments(operation, kind).is_empty() {
                 return Err(ToolOutcomeError::Binding(
                     if kind == ReleaseParticipantV1::Channel {
@@ -761,6 +770,79 @@ impl VerifiedPreDispatchNoEffect {
                 "authority": "qualified_admission_projection_store",
                 "version": 1
             }),
+        )
+    }
+
+    pub(crate) fn from_qualified_released_operation_snapshot(
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+        verifier_policy: Value,
+    ) -> Result<Self, ToolOutcomeError> {
+        validate_pre_dispatch_context(operation, context)?;
+        let requirements = operation.binding().participant_requirements();
+        let participant = |kind: ReleaseParticipantV1, required: bool| {
+            let attachments = participant_attachments(operation, kind);
+            if !required {
+                return if attachments.is_empty() {
+                    Ok(VerifiedParticipantNoEffectV1::NotRequired)
+                } else {
+                    Err(ToolOutcomeError::Binding(
+                        "predispatch.unexpected_participant",
+                    ))
+                };
+            }
+            if attachments.is_empty() {
+                return Ok(VerifiedParticipantNoEffectV1::NeverAcquired {
+                    evidence: VerifiedParticipantNoEffectEvidenceV1::from_verified_source(
+                        operation,
+                        kind,
+                        ParticipantNoEffectDispositionV1::NeverAcquired,
+                        ParticipantQueryRecordV1::from_qualified_operation(
+                            operation, kind, context,
+                        )?,
+                    )?,
+                });
+            }
+            if kind == ReleaseParticipantV1::Channel {
+                return Err(ToolOutcomeError::Binding(
+                    "predispatch.channel_cancellation_required",
+                ));
+            }
+            VerifiedParticipantNoEffectV1::released_before_dispatch(
+                operation,
+                kind,
+                ParticipantQueryRecordV1::from_qualified_release(operation, kind, context)?,
+            )
+        };
+        let participant_dispositions = PreDispatchParticipantDispositionsV1 {
+            broker: participant(ReleaseParticipantV1::Broker, requirements.broker_attempt)?,
+            budget: participant(ReleaseParticipantV1::Budget, requirements.budget_capture)?,
+            approval: participant(ReleaseParticipantV1::Approval, requirements.approval)?,
+            nonce: participant(ReleaseParticipantV1::Nonce, requirements.execution_nonce)?,
+            outcome_eligibility: participant(
+                ReleaseParticipantV1::OutcomeEligibility,
+                requirements.outcome_eligibility,
+            )?,
+            payment: participant(ReleaseParticipantV1::Payment, requirements.payment)?,
+            channel: participant(ReleaseParticipantV1::Channel, requirements.channel)?,
+            transport: VerifiedParticipantNoEffectV1::NotDispatched {
+                evidence: VerifiedParticipantNoEffectEvidenceV1::from_verified_source(
+                    operation,
+                    ReleaseParticipantV1::Transport,
+                    ParticipantNoEffectDispositionV1::NotDispatched,
+                    ParticipantQueryRecordV1::from_qualified_operation(
+                        operation,
+                        ReleaseParticipantV1::Transport,
+                        context,
+                    )?,
+                )?,
+            },
+        };
+        Self::from_verified_parts(
+            operation,
+            context,
+            participant_dispositions,
+            verifier_policy,
         )
     }
 

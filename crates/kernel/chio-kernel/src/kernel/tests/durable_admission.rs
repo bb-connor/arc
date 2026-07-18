@@ -373,6 +373,7 @@ impl ReceiptStore for TestAdmissionOperationStore {
             operation_terminal: true,
             tool_outcome: true,
             payment_terminal: true,
+            incident_terminal: true,
             ..AdmissionProjectionCapabilities::default()
         }
     }
@@ -1391,6 +1392,45 @@ fn durable_admission_fixture_with_grants(
     (kernel, request, store, invocations)
 }
 
+#[test]
+fn durable_pre_dispatch_denial_commits_terminal_compensation() {
+    struct DenyAll;
+
+    impl Guard for DenyAll {
+        fn name(&self) -> &str {
+            "durable-deny-all"
+        }
+
+        fn evaluate(&self, _context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
+            Ok(GuardDecision::deny(Vec::new()))
+        }
+    }
+
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("durable-pre-dispatch-denial");
+    kernel.add_guard(Box::new(DenyAll));
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("terminal pre-dispatch denial");
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+
+    let replay = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("terminal compensation replay");
+    assert_eq!(replay.verdict, Verdict::Deny);
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}
+
 struct VersionlessPostInvocationHook;
 
 impl crate::post_invocation::PostInvocationHook for VersionlessPostInvocationHook {
@@ -1949,7 +1989,7 @@ fn durable_redaction_recovery_uses_the_recorded_stream_limits() {
 }
 
 #[test]
-fn durable_post_invocation_identity_change_cannot_resume_finalization() {
+fn durable_post_invocation_identity_change_cannot_replace_recovered_finalization() {
     let (mut kernel, request, store, invocations) =
         durable_admission_fixture("durable-post-hook-identity-change");
     kernel.add_post_invocation_hook(Box::new(StableRedactingPostInvocationHook {
@@ -1992,7 +2032,7 @@ fn durable_post_invocation_identity_change_cannot_resume_finalization() {
         .is_some_and(|reason| reason.contains("request id conflicts")));
     assert_eq!(
         store.operation().state(),
-        AdmissionOperationState::Finalizing
+        AdmissionOperationState::Completed
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }

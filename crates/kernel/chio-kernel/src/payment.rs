@@ -75,6 +75,7 @@ impl PaymentJournalState {
                 Self::Settling,
                 Self::Settled | Self::ReconcileFailed
             ) | (_, Self::Settled, Self::Closed)
+                | (_, Self::HoldPlaced, Self::Closed)
                 | (
                     PaymentRailMode::PrepaidFinal,
                     Self::HoldPlaced,
@@ -100,6 +101,7 @@ pub enum PaymentJournalTransition {
     PrepaymentSettled {
         authorization_id: String,
     },
+    CancelBeforeAuthorization,
     BeginCapture {
         amount_units: u64,
     },
@@ -271,6 +273,14 @@ impl PaymentJournalRecord {
                 }
                 self.validate_settle_intent()?;
             }
+            PaymentJournalState::Closed if self.authorization_id.is_none() => {
+                if self.journal_version != 2 {
+                    return Err(PaymentJournalError(
+                        "pre-authorization cancellation must be journal version 2".to_owned(),
+                    ));
+                }
+                self.validate_empty_settlement("pre-authorization cancellation")?;
+            }
             PaymentJournalState::Settled | PaymentJournalState::Closed => {
                 self.require_authorization_id("terminal")?;
                 match self.rail_mode {
@@ -333,6 +343,14 @@ impl PaymentJournalRecord {
                 }
                 next.authorization_id = Some(authorization_id.clone());
                 PaymentJournalState::Settled
+            }
+            PaymentJournalTransition::CancelBeforeAuthorization => {
+                if self.state != PaymentJournalState::HoldPlaced {
+                    return Err(PaymentJournalError(
+                        "pre-authorization cancellation requires a hold_placed journal".to_owned(),
+                    ));
+                }
+                PaymentJournalState::Closed
             }
             PaymentJournalTransition::BeginCapture { amount_units } => {
                 if self.state != PaymentJournalState::Authorized {
@@ -1280,10 +1298,27 @@ mod tests {
         ));
         assert!(PaymentJournalState::HoldPlaced
             .can_advance_to(PaymentJournalState::Settled, PaymentRailMode::PrepaidFinal));
-        assert!(!PaymentJournalState::HoldPlaced
+        assert!(PaymentJournalState::HoldPlaced
             .can_advance_to(PaymentJournalState::Closed, PaymentRailMode::ReversibleHold));
         assert!(!PaymentJournalState::Authorized
             .can_advance_to(PaymentJournalState::Closed, PaymentRailMode::ReversibleHold));
+    }
+
+    #[test]
+    fn payment_journal_cancels_before_authorization_without_settlement_fields() {
+        let cancelled = hold_placed_payment_journal()
+            .apply_transition(&PaymentJournalTransition::CancelBeforeAuthorization)
+            .expect("cancel unstarted payment");
+
+        assert_eq!(cancelled.journal_version, 2);
+        assert_eq!(cancelled.state, PaymentJournalState::Closed);
+        assert!(cancelled.authorization_id.is_none());
+        assert!(cancelled.transaction_id.is_none());
+        assert!(cancelled.settle_action.is_none());
+        assert_eq!(cancelled.validate(), Ok(()));
+        assert!(cancelled
+            .apply_transition(&PaymentJournalTransition::CancelBeforeAuthorization)
+            .is_err());
     }
 
     #[test]

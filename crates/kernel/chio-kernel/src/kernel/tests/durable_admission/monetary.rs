@@ -1,6 +1,80 @@
 use super::*;
 
 #[test]
+fn durable_monetary_guard_denial_closes_unstarted_payment() {
+    struct DenyAll;
+
+    impl Guard for DenyAll {
+        fn name(&self) -> &str {
+            "durable-monetary-deny-all"
+        }
+
+        fn evaluate(&self, _context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
+            Ok(GuardDecision::deny(Vec::new()))
+        }
+    }
+
+    let mut config = make_config();
+    config.policy_hash = sha256_hex(b"durable-monetary-guard-denial-policy");
+    let mut kernel = make_kernel(config);
+    let fence = admission_test_fence();
+    let store = std::sync::Arc::new(TestAdmissionOperationStore::new(fence.clone()));
+    kernel
+        .set_durable_admission_store(store.clone(), store.clone(), fence)
+        .expect("qualified admission store");
+    kernel.set_budget_store_handle(store.budget_store());
+    let authorization_references = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    kernel.set_payment_adapter(Box::new(QualifiedDurablePaymentAdapter {
+        authorization_references: authorization_references.clone(),
+        settlement_actions: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+    }));
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
+        id: "durable-server".to_owned(),
+        tools: vec!["mutate".to_owned()],
+        invocations: invocations.clone(),
+        store: store.clone(),
+    }));
+    kernel.add_guard(Box::new(DenyAll));
+    let mut grant = make_grant("durable-server", "mutate");
+    grant.max_cost_per_invocation = Some(MonetaryAmount {
+        units: 10,
+        currency: "USD".to_owned(),
+    });
+    grant.max_total_cost = Some(MonetaryAmount {
+        units: 100,
+        currency: "USD".to_owned(),
+    });
+    let agent = make_keypair();
+    let capability = make_capability(&kernel, &agent, make_scope(vec![grant]), 300);
+    let request = make_request(
+        "durable-monetary-guard-denial",
+        &capability,
+        "mutate",
+        "durable-server",
+    );
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("terminal durable monetary guard denial");
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert_eq!(
+        store.payment_journal().map(|journal| journal.state),
+        Some(PaymentJournalState::Closed)
+    );
+    assert!(authorization_references
+        .lock()
+        .expect("authorization references")
+        .is_empty());
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}
+
+#[test]
 fn unsupported_durable_participants_fail_before_dispatch() {
     let (mut kernel, request, store, invocations) =
         durable_admission_fixture("durable-versionless-post-hook");

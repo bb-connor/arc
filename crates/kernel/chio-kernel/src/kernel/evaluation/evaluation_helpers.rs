@@ -1,4 +1,6 @@
 use super::*;
+use crate::admission_operation::AdmissionOperationV1;
+use crate::budget_store::BudgetReverseHoldDecision;
 
 pub(super) struct PreDispatchCleanupDeny<'a> {
     pub(super) request: &'a ToolCallRequest,
@@ -8,6 +10,7 @@ pub(super) struct PreDispatchCleanupDeny<'a> {
     pub(super) cap: &'a CapabilityToken,
     pub(super) budget_mutation: &'a PreExecutionBudgetMutation,
     pub(super) payment_authorization: Option<&'a PaymentAuthorization>,
+    pub(super) durable_operation: Option<&'a AdmissionOperationV1>,
     pub(super) runtime_admission_metadata: Option<serde_json::Value>,
     pub(super) verified_payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
     /// Whether THIS evaluation acquired a sibling-sum child-budget holder lease
@@ -24,6 +27,29 @@ struct CleanupReleaseOutcome {
 }
 
 impl ChioKernel {
+    pub(super) fn compensate_durable_admission_after_pre_dispatch_cleanup(
+        &self,
+        operation: Option<&AdmissionOperationV1>,
+        reverse: Option<&BudgetReverseHoldDecision>,
+        payment_authorization: Option<&PaymentAuthorization>,
+    ) -> Result<(), KernelError> {
+        let Some(operation) = operation else {
+            return Ok(());
+        };
+        self.compensate_durable_admission_before_dispatch(
+            operation,
+            serde_json::json!({
+                "authority": "kernel-confirmed-pre-dispatch-cleanup",
+                "budget_hold_id": reverse.and_then(|decision| decision.hold_id.as_deref()),
+                "budget_event_id": reverse
+                    .and_then(|decision| decision.metadata.event_id.as_deref()),
+                "payment_authorization_id": payment_authorization
+                    .map(|authorization| authorization.authorization_id.as_str())
+            }),
+            current_unix_timestamp_ms(),
+        )
+    }
+
     pub(super) fn with_pre_invocation_guard_evidence<T>(
         &self,
         evidence: &[chio_core::receipt::metadata::GuardEvidence],
@@ -118,17 +144,18 @@ impl ChioKernel {
         timestamp: u64,
         cap: &CapabilityToken,
         budget_mutation: &PreExecutionBudgetMutation,
+        durable_operation: Option<&AdmissionOperationV1>,
         runtime_admission_metadata: Option<serde_json::Value>,
         budget_lease_acquired: bool,
         verified_payee_binding: Option<&VerifiedGovernedPayeeBinding>,
     ) -> Result<ToolCallResponse, KernelError> {
-        let (runtime_metadata, _) = self
+        let (runtime_metadata, runtime_release_confirmed) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
                 runtime_admission_metadata,
             );
-        let runtime_metadata = self
-            .release_budget_lease_with_evidence(cap, budget_lease_acquired, runtime_metadata)
-            .metadata;
+        let lease_release =
+            self.release_budget_lease_with_evidence(cap, budget_lease_acquired, runtime_metadata);
+        let runtime_metadata = lease_release.metadata;
         let charge = budget_mutation.charge_result().ok_or_else(|| {
             KernelError::Internal(
                 "captured payment denial is missing its monetary budget hold".to_string(),
@@ -153,6 +180,13 @@ impl ChioKernel {
                 );
             }
         };
+        if runtime_release_confirmed && lease_release.confirmed {
+            self.compensate_durable_admission_after_pre_dispatch_cleanup(
+                durable_operation,
+                Some(&cancellation),
+                None,
+            )?;
+        }
         self.build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
             request,
             reason,
@@ -175,17 +209,16 @@ impl ChioKernel {
         &self,
         denial: PreDispatchCleanupDeny<'_>,
     ) -> Result<ToolCallResponse, KernelError> {
-        let (runtime_admission_metadata, _) = self
+        let (runtime_admission_metadata, runtime_release_confirmed) = self
             .release_runtime_admission_reservations_for_pre_dispatch_denial(
                 denial.runtime_admission_metadata,
             );
-        let runtime_admission_metadata = self
-            .release_budget_lease_with_evidence(
-                denial.cap,
-                denial.budget_lease_acquired,
-                runtime_admission_metadata,
-            )
-            .metadata;
+        let lease_release = self.release_budget_lease_with_evidence(
+            denial.cap,
+            denial.budget_lease_acquired,
+            runtime_admission_metadata,
+        );
+        let runtime_admission_metadata = lease_release.metadata;
         let reverse_result = match denial.payment_authorization {
             Some(payment_authorization) => self.unwind_pre_dispatch_monetary_invocation(
                 denial.request,
@@ -263,6 +296,13 @@ impl ChioKernel {
                 );
             }
         };
+        if runtime_release_confirmed && lease_release.confirmed {
+            self.compensate_durable_admission_after_pre_dispatch_cleanup(
+                denial.durable_operation,
+                reverse.as_ref(),
+                denial.payment_authorization,
+            )?;
+        }
 
         if let (Some(charge), Some(reverse)) =
             (denial.budget_mutation.charge_result(), reverse.as_ref())
@@ -479,6 +519,7 @@ impl ChioKernel {
         matched_grant_index: usize,
         cap: &CapabilityToken,
         budget_mutation: &PreExecutionBudgetMutation,
+        durable_operation: Option<&AdmissionOperationV1>,
         runtime_admission_metadata: Option<serde_json::Value>,
         budget_lease_acquired: bool,
     ) -> Result<ToolCallResponse, KernelError> {
@@ -569,6 +610,12 @@ impl ChioKernel {
                 metadata,
             );
         }
+
+        self.compensate_durable_admission_after_pre_dispatch_cleanup(
+            durable_operation,
+            reverse.as_ref(),
+            None,
+        )?;
 
         self.build_execution_nonce_preflight_allow_response_with_metadata(
             request,
