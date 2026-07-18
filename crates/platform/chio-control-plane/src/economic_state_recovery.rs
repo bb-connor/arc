@@ -2,13 +2,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core::economic_continuity::{
-    economic_effect_slot_from_head, verify_economic_idempotent_recovery,
+    economic_effect_slot_from_head, qualify_generic_economic_state_batch_advance,
+    verify_economic_effect_cancellation_advance, verify_economic_idempotent_recovery,
     verify_economic_state_batch_advance, verify_economic_state_batch_commit,
     verify_economic_state_view, verify_economic_target_status, EconomicAdmissionHandoffStateV1,
     EconomicAdmissionHandoffV1, EconomicAdmissionHandoffVerifier, EconomicCheckpointReadQuery,
-    EconomicEffectSlotV1, EconomicEffectStateV1, EconomicIdempotentTargetVerifier,
-    EconomicRequestKeyV1, EconomicStateAnchor, EconomicStateAnchorError, EconomicStateAnchorPins,
-    EconomicStateReadQuery, EconomicTargetStatusVerifier, EconomicTransitionProofVerifier,
+    EconomicEffectCancellationProofVerifier, EconomicEffectSlotV1, EconomicEffectStateV1,
+    EconomicIdempotentTargetVerifier, EconomicRequestKeyV1, EconomicStateAnchor,
+    EconomicStateAnchorError, EconomicStateAnchorPins, EconomicStateReadQuery,
+    EconomicTargetStatusVerifier, EconomicTransitionProofVerifier,
     VerifiedEconomicIdempotentRecovery, VerifiedEconomicStateBatchAdvance,
     VerifiedEconomicTargetStatus,
 };
@@ -151,6 +153,8 @@ pub struct EconomicStateRecovery {
     anchor: Arc<dyn EconomicStateAnchor>,
     operations: Arc<dyn AnchoredAdmissionProjectionStore>,
     transition_verifier: Arc<dyn EconomicTransitionProofVerifier>,
+    cancellation_verifier: Arc<dyn EconomicEffectCancellationProofVerifier>,
+    admission_verifier: Arc<dyn EconomicAdmissionHandoffVerifier>,
     pins: EconomicStateAnchorPins,
     active_fence: StoreMutationFence,
     claimant_id: AdmissionIdentifier,
@@ -165,6 +169,8 @@ impl EconomicStateRecovery {
         anchor: Arc<dyn EconomicStateAnchor>,
         operations: Arc<dyn AnchoredAdmissionProjectionStore>,
         transition_verifier: Arc<dyn EconomicTransitionProofVerifier>,
+        cancellation_verifier: Arc<dyn EconomicEffectCancellationProofVerifier>,
+        admission_verifier: Arc<dyn EconomicAdmissionHandoffVerifier>,
         pins: EconomicStateAnchorPins,
         active_fence: StoreMutationFence,
         claimant_id: AdmissionIdentifier,
@@ -188,6 +194,8 @@ impl EconomicStateRecovery {
             anchor,
             operations,
             transition_verifier,
+            cancellation_verifier,
+            admission_verifier,
             pins,
             active_fence,
             claimant_id,
@@ -239,6 +247,35 @@ impl EconomicStateRecovery {
             &self.pins,
             self.transition_verifier.as_ref(),
         )?;
+        let cancellation_shape = effect_cancellation_batch_shape(&advance);
+        if cancellation_shape == EffectCancellationBatchShape::Invalid {
+            return self.quarantine(
+                stage,
+                "generic economic stage contains a mixed or malformed effect cancellation",
+                trusted_now_unix_ms,
+            );
+        }
+        if cancellation_shape == EffectCancellationBatchShape::Exact && !anchored_terminal {
+            return self.quarantine(
+                stage,
+                "effect cancellation is missing anchored terminal authority",
+                trusted_now_unix_ms,
+            );
+        }
+        let cancellation = if cancellation_shape == EffectCancellationBatchShape::Exact {
+            Some(verify_economic_effect_cancellation_advance(
+                verify_economic_state_batch_advance(
+                    &current,
+                    stage.batch().clone(),
+                    &self.pins,
+                    self.transition_verifier.as_ref(),
+                )?,
+                self.cancellation_verifier.as_ref(),
+                self.admission_verifier.as_ref(),
+            )?)
+        } else {
+            None
+        };
         let query = state_query(advance.batch());
         let observed = match self.anchor.read_state(&query) {
             Ok(observed) => observed,
@@ -309,9 +346,33 @@ impl EconomicStateRecovery {
             }
         }
 
-        match self.anchor.compare_and_swap_batch(&advance) {
-            Ok(committed) => self.record_and_finalize(&advance, &committed, trusted_now_unix_ms),
-            Err(_) => self.resolve_uncertain_cas(stage, &advance, trusted_now_unix_ms),
+        if let Some(cancellation) = cancellation {
+            match self
+                .anchor
+                .compare_and_swap_effect_cancellation(cancellation)
+            {
+                Ok(committed) => {
+                    self.record_and_finalize(&advance, committed.committed(), trusted_now_unix_ms)
+                }
+                Err(_) => self.resolve_uncertain_cas(stage, &advance, trusted_now_unix_ms),
+            }
+        } else {
+            let generic = match qualify_generic_economic_state_batch_advance(&advance) {
+                Ok(generic) => generic,
+                Err(_) => {
+                    return self.quarantine(
+                        stage,
+                        "generic economic stage contains a forbidden effect transition",
+                        trusted_now_unix_ms,
+                    )
+                }
+            };
+            match self.anchor.compare_and_swap_batch(generic) {
+                Ok(committed) => {
+                    self.record_and_finalize(&advance, &committed, trusted_now_unix_ms)
+                }
+                Err(_) => self.resolve_uncertain_cas(stage, &advance, trusted_now_unix_ms),
+            }
         }
     }
 
@@ -759,7 +820,7 @@ impl EconomicAdmissionHandoffVerifier for QualifiedEconomicAdmissionHandoffVerif
         handoff: &EconomicAdmissionHandoffV1,
     ) -> Result<(), EconomicStateAnchorError> {
         handoff.validate()?;
-        if handoff.store_fence != self.active_fence {
+        if !serves_historical_fence(&handoff.store_fence, &self.active_fence) {
             return Err(EconomicStateAnchorError::AdmissionHandoffRejected);
         }
         let operation_id = AdmissionOperationId::from_persisted(operation_id.to_owned())
@@ -783,7 +844,7 @@ impl EconomicAdmissionHandoffVerifier for QualifiedEconomicAdmissionHandoffVerif
                 ) && operation.state() == AdmissionOperationState::DispatchCommitted
                     && operation.dispatch_commit().is_some_and(|commit| {
                         commit.committed_version == operation.version()
-                            && commit.store_fence == self.active_fence
+                            && commit.store_fence == handoff.store_fence
                     })
             }
             EconomicAdmissionHandoffStateV1::MutationSubmitted => {
@@ -797,6 +858,11 @@ impl EconomicAdmissionHandoffVerifier for QualifiedEconomicAdmissionHandoffVerif
             Err(EconomicStateAnchorError::AdmissionHandoffRejected)
         }
     }
+}
+
+fn serves_historical_fence(historical: &StoreMutationFence, current: &StoreMutationFence) -> bool {
+    historical.store_uuid == current.store_uuid
+        && (historical == current || current.owner_epoch > historical.owner_epoch)
 }
 
 fn state_query(
@@ -816,6 +882,49 @@ fn state_query(
                 request_id: replay.request.request_id.clone(),
             })
             .collect(),
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum EffectCancellationBatchShape {
+    None,
+    Exact,
+    Invalid,
+}
+
+fn effect_cancellation_batch_shape(
+    advance: &VerifiedEconomicStateBatchAdvance,
+) -> EffectCancellationBatchShape {
+    let batch = advance.batch();
+    let mut contains_no_effect = false;
+    for transition in &batch.transitions {
+        if transition.resource_key.resource_family != "effect_slot" {
+            continue;
+        }
+        if advance
+            .current()
+            .view()
+            .head(&transition.resource_key)
+            .is_some_and(|head| economic_effect_slot_from_head(head).is_err())
+        {
+            return EffectCancellationBatchShape::Invalid;
+        }
+        let Ok(next_slot) = economic_effect_slot_from_head(&transition.next_head) else {
+            return EffectCancellationBatchShape::Invalid;
+        };
+        contains_no_effect |= next_slot.state == EconomicEffectStateV1::NoEffect;
+    }
+    if !contains_no_effect {
+        return EffectCancellationBatchShape::None;
+    }
+    if batch.transitions.len() == 1
+        && batch.effect_slots.is_empty()
+        && batch.request_replays.is_empty()
+        && batch.transitions[0].prepared_effect.is_none()
+    {
+        EffectCancellationBatchShape::Exact
+    } else {
+        EffectCancellationBatchShape::Invalid
     }
 }
 

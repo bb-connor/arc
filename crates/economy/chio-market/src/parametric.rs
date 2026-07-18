@@ -14,9 +14,11 @@ use crate::{
 
 mod claim;
 mod evidence;
+mod lifecycle;
 
 pub use claim::*;
 pub use evidence::*;
+pub use lifecycle::*;
 
 pub const PARAMETRIC_POLICY_SCHEMA: &str = "chio.parametric.policy.v1";
 pub const TRIGGER_INSTANCE_ID_DOMAIN: &str = "chio.parametric.trigger-instance.v1";
@@ -574,13 +576,13 @@ impl VerifiedParametricPolicy {
     ) -> Result<VerifiedTriggerVerdictV1, ParametricContractError> {
         corpus.ensure_policy(&self.body_digest)?;
         match corpus.evaluate(&self.signed.body.predicate)? {
-            Some(magnitude) => Ok(VerifiedTriggerVerdictV1::Fired(
+            Some(magnitude) => Ok(VerifiedTriggerVerdictV1::Fired(Box::new(
                 VerifiedFiredTriggerV1::new(
                     self.body_digest.clone(),
                     self.claim_identity(corpus)?,
                     magnitude,
                 ),
-            )),
+            ))),
             None => Ok(VerifiedTriggerVerdictV1::NotFired),
         }
     }
@@ -755,9 +757,7 @@ impl EvidenceCorpusManifestV1 {
                 window: &range.window,
                 sequence_range: &range.sequence_range,
                 expected_count: range.expected_count,
-                source_prefix_cutoff: range.source_prefix_cutoff,
                 selected_member_root: &range.selected_member_root,
-                anchor_epoch: range.anchor_epoch,
             });
         }
         identities.sort_unstable_by(|left, right| {
@@ -781,9 +781,7 @@ struct SemanticEvidenceRange<'a> {
     window: &'a ParametricTriggerWindow,
     sequence_range: &'a Option<InclusiveSequenceRange>,
     expected_count: u64,
-    source_prefix_cutoff: u64,
     selected_member_root: &'a str,
-    anchor_epoch: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -941,6 +939,10 @@ fn verify_policy_bindings(
     require_binding(policy.payer_id == context.payer_id, "payer_id")?;
     require_binding(
         policy.beneficiary_id == context.beneficiary_id,
+        "beneficiary_id",
+    )?;
+    require_binding(
+        policy.beneficiary_id == bound_coverage_subject_key(coverage),
         "beneficiary_id",
     )?;
     require_binding(

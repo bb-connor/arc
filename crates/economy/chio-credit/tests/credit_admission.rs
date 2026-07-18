@@ -214,12 +214,12 @@ fn artifacts(fixture: &Fixture) -> Vec<ConfiguredCreditAuthorityArtifactV1> {
         ConfiguredCreditAuthorityArtifactV1::Facility {
             authority_id: FACILITY_AUTHORITY_ID.to_owned(),
             authority_epoch: 7,
-            signed: fixture.facility.clone(),
+            signed: Box::new(fixture.facility.clone()),
         },
         ConfiguredCreditAuthorityArtifactV1::Capability {
             authority_id: CAPABILITY_AUTHORITY_ID.to_owned(),
             authority_epoch: 11,
-            signed: fixture.capability.clone(),
+            signed: Box::new(fixture.capability.clone()),
         },
     ]
 }
@@ -470,7 +470,7 @@ fn configured_resolver_rejects_incomplete_conflicting_expired_and_tampered_sets(
     conflicting_artifacts.push(ConfiguredCreditAuthorityArtifactV1::Facility {
         authority_id: FACILITY_AUTHORITY_ID.to_owned(),
         authority_epoch: 7,
-        signed: conflicting,
+        signed: Box::new(conflicting),
     });
     assert!(matches!(
         ConfiguredCreditAuthorityResolverV1::new(CreditAuthorityResolverConfigurationV1 {
@@ -486,7 +486,7 @@ fn configured_resolver_rejects_incomplete_conflicting_expired_and_tampered_sets(
     tampered_artifacts[0] = ConfiguredCreditAuthorityArtifactV1::Facility {
         authority_id: FACILITY_AUTHORITY_ID.to_owned(),
         authority_epoch: 7,
-        signed: tampered,
+        signed: Box::new(tampered),
     };
     assert!(matches!(
         ConfiguredCreditAuthorityResolverV1::new(CreditAuthorityResolverConfigurationV1 {
@@ -531,7 +531,7 @@ fn resolver_uses_literal_capability_wildcards_and_wide_money_arithmetic() -> Tes
     prefix_artifacts[1] = ConfiguredCreditAuthorityArtifactV1::Capability {
         authority_id: CAPABILITY_AUTHORITY_ID.to_owned(),
         authority_epoch: 11,
-        signed: prefix_capability,
+        signed: Box::new(prefix_capability),
     };
     let prefix_resolver =
         ConfiguredCreditAuthorityResolverV1::new(CreditAuthorityResolverConfigurationV1 {
@@ -554,7 +554,7 @@ fn resolver_uses_literal_capability_wildcards_and_wide_money_arithmetic() -> Tes
     wide_artifacts[0] = ConfiguredCreditAuthorityArtifactV1::Facility {
         authority_id: FACILITY_AUTHORITY_ID.to_owned(),
         authority_epoch: 7,
-        signed: wide_facility,
+        signed: Box::new(wide_facility),
     };
     let wide = ConfiguredCreditAuthorityResolverV1::new(CreditAuthorityResolverConfigurationV1 {
         complete_sources: sources(&fixture),

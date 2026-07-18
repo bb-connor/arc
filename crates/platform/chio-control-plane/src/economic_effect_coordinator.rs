@@ -1,11 +1,10 @@
 use std::sync::Arc;
 
 use chio_core::economic_continuity::{
-    economic_effect_slot_from_head, EconomicEffectStateV1, EconomicStateAnchor,
-    EconomicStateAnchorError, VerifiedEconomicEffectCancellationAdvance,
+    economic_effect_slot_from_head, qualify_generic_economic_state_batch_advance,
+    EconomicEffectStateV1, EconomicStateAnchor, EconomicStateAnchorError,
     VerifiedEconomicEffectDispatch, VerifiedEconomicEffectDispatchAdvance,
-    VerifiedEconomicEffectNotDispatched, VerifiedEconomicStateBatchAdvance,
-    VerifiedEconomicStateView,
+    VerifiedEconomicStateBatchAdvance, VerifiedEconomicStateView,
 };
 use chio_kernel::admission_operation::{
     AdmissionMutationSequencer, AdmissionOperationError, StoreMutationFence,
@@ -35,14 +34,6 @@ impl SequencedEconomicEffectCoordinator {
     ) -> Result<VerifiedEconomicEffectDispatch, EconomicStateAnchorError> {
         let _mutation_guard = self.lock()?;
         self.anchor.compare_and_swap_effect_dispatch(advance)
-    }
-
-    pub fn cancel(
-        &self,
-        advance: VerifiedEconomicEffectCancellationAdvance,
-    ) -> Result<VerifiedEconomicEffectNotDispatched, EconomicStateAnchorError> {
-        let _mutation_guard = self.lock()?;
-        self.anchor.compare_and_swap_effect_cancellation(advance)
     }
 
     pub fn commit_unknown(
@@ -82,7 +73,8 @@ impl SequencedEconomicEffectCoordinator {
                 "unknown recovery does not match the qualified lock",
             ));
         }
-        self.anchor.compare_and_swap_batch(advance)
+        self.anchor
+            .compare_and_swap_batch(qualify_generic_economic_state_batch_advance(advance)?)
     }
 
     fn lock(
@@ -332,8 +324,9 @@ mod tests {
 
         fn compare_and_swap_batch(
             &self,
-            advance: &VerifiedEconomicStateBatchAdvance,
+            advance: chio_core::economic_continuity::QualifiedGenericEconomicStateBatchAdvance<'_>,
         ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
+            let advance = advance.advance();
             self.batch_calls.fetch_add(1, Ordering::SeqCst);
             let committed = verify_economic_state_view(self.committed.clone(), &pins())?;
             verify_economic_state_batch_commit(advance, &committed, &pins())?;

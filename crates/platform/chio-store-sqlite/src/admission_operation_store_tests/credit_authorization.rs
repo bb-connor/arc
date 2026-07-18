@@ -153,12 +153,12 @@ impl CreditAuthorityFixture {
                     ConfiguredCreditAuthorityArtifactV1::Facility {
                         authority_id: FACILITY_AUTHORITY_ID.to_owned(),
                         authority_epoch: 7,
-                        signed: facility,
+                        signed: Box::new(facility),
                     },
                     ConfiguredCreditAuthorityArtifactV1::Capability {
                         authority_id: CAPABILITY_AUTHORITY_ID.to_owned(),
                         authority_epoch: 11,
-                        signed: capability,
+                        signed: Box::new(capability),
                     },
                 ],
             })?;

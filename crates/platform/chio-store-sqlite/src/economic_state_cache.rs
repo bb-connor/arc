@@ -13,9 +13,9 @@ use chio_core::economic_continuity::{
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_credit::clearing::CLEARING_LIFECYCLE_REPLAY_DESCRIPTOR_KIND;
 use chio_kernel::admission_operation::{
-    AdmissionOperationState, AdmissionOperationV1, AdmissionProjectionRecordKind,
-    AdmissionRecoveryLease, PersistedAdmissionOperationV1, SignedAdmissionTerminalProjectionV1,
-    VerifiedAdmissionTerminalProjectionV1,
+    verify_economic_cancellation_terminal_advance, AdmissionOperationState, AdmissionOperationV1,
+    AdmissionProjectionRecordKind, AdmissionRecoveryLease, PersistedAdmissionOperationV1,
+    SignedAdmissionTerminalProjectionV1, VerifiedAdmissionTerminalProjectionV1,
 };
 use chio_kernel::ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND;
 use chio_settle::channel::{
@@ -553,6 +553,10 @@ fn qualify_generic_terminal_projection_effect_slot(
     current_slot
         .validate_successor(&completed_slot)
         .map_err(|_| EconomicStateCacheError::Conflict)?;
+    if completed_slot.state == EconomicEffectStateV1::NoEffect {
+        return verify_economic_cancellation_terminal_advance(base_view, batch, verified)
+            .map_err(|_| EconomicStateCacheError::Conflict);
+    }
     let source = verified.source_operation();
     let binding = source.binding();
     let dispatch_commit = source
@@ -1125,11 +1129,14 @@ impl SqliteEconomicStateCache {
             let verified = envelope
                 .verify()
                 .map_err(|_| EconomicStateCacheError::Conflict)?;
-            let completed = qualify_terminal_projection_advance(advance, &descriptor, &verified)?;
+            let terminal_slot =
+                qualify_terminal_projection_advance(advance, &descriptor, &verified)?;
             if !committed_view_matches_batch(committed.view(), advance.batch()) {
                 return Err(EconomicStateCacheError::Conflict);
             }
-            verify_economic_completed_effect(committed, &completed)?;
+            if terminal_slot.state == EconomicEffectStateV1::Completed {
+                verify_economic_completed_effect(committed, &terminal_slot)?;
+            }
         }
         if self
             .load_stage(&advance.batch().batch_id)?

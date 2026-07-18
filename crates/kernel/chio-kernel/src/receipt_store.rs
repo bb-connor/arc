@@ -941,6 +941,7 @@ pub trait QualifiedAdmissionProjectionStore:
         begin: AdmissionPaymentSettlementBegin<'_>,
     ) -> Result<AdmissionPaymentSettlement, AdmissionPaymentJournalError>;
 
+    #[allow(clippy::too_many_arguments)]
     fn authorize_budget_and_commit_admission(
         &self,
         operation: &crate::admission_operation::AdmissionOperationV1,
@@ -981,6 +982,15 @@ pub trait AnchoredAdmissionProjectionStore: QualifiedAdmissionProjectionStore {
     fn qualify_anchored_terminal_projection(
         &self,
         batch_id: &str,
+        active_fence: &crate::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), ReceiptStoreError>;
+
+    fn record_anchored_terminal_projection(
+        &self,
+        advance: &chio_core::economic_continuity::VerifiedEconomicStateBatchAdvance,
+        committed: &chio_core::economic_continuity::VerifiedEconomicStateView,
+        pins: &chio_core::economic_continuity::EconomicStateAnchorPins,
         active_fence: &crate::admission_operation::StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<(), ReceiptStoreError>;

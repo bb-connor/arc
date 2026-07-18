@@ -12,9 +12,9 @@ use chio_core::economic_continuity::{
     EconomicEffectCancellationProofVerifier, EconomicEffectDispatchCommitV1, EconomicStateAnchor,
     EconomicStateAnchorError, EconomicStateAnchorPins, EconomicStateAnchorViewV1,
     EconomicStateReadQuery, EconomicStateReadiness, EconomicStateReadinessExpectation,
-    EconomicTransitionProofVerifier, VerifiedEconomicEffectCancellationAdvance,
-    VerifiedEconomicEffectDispatch, VerifiedEconomicEffectDispatchAdvance,
-    VerifiedEconomicEffectNotDispatched, VerifiedEconomicStateBatchAdvance,
+    EconomicTransitionProofVerifier, QualifiedGenericEconomicStateBatchAdvance,
+    VerifiedEconomicEffectCancellationAdvance, VerifiedEconomicEffectDispatch,
+    VerifiedEconomicEffectDispatchAdvance, VerifiedEconomicEffectNotDispatched,
     VerifiedEconomicStateView, MAX_ECONOMIC_BATCH_BYTES, MAX_ECONOMIC_INLINE_CONTENT_BYTES,
     MAX_ECONOMIC_TERMINAL_CONTENT_BYTES, MAX_ECONOMIC_TRANSITIONS,
 };
@@ -303,8 +303,9 @@ impl EconomicStateAnchor for RemoteEconomicStateAnchor {
 
     fn compare_and_swap_batch(
         &self,
-        advance: &VerifiedEconomicStateBatchAdvance,
+        advance: QualifiedGenericEconomicStateBatchAdvance<'_>,
     ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
+        let advance = advance.advance();
         reverify_economic_state_batch_advance(
             advance,
             &self.pins,
@@ -417,12 +418,12 @@ mod tests {
 
     use chio_core::crypto::{sha256_hex, Keypair};
     use chio_core::economic_continuity::{
-        EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1, EconomicContentV1,
-        EconomicEffectSlotV1, EconomicEffectStateV1, EconomicEffectTargetV1, EconomicExpectedHead,
-        EconomicRequestBindingV1, EconomicRequestKeyV1, EconomicResourceHeadV1,
-        EconomicResourceKeyV1, EconomicStateAnchor, EconomicStateAnchorPins,
-        EconomicStateAnchorViewV1, EconomicStateBatchV1, EconomicStateReadQuery,
-        EconomicStateReadinessExpectation, EconomicStateTransitionV1,
+        qualify_generic_economic_state_batch_advance, EconomicAdmissionHandoffStateV1,
+        EconomicAdmissionHandoffV1, EconomicContentV1, EconomicEffectSlotV1, EconomicEffectStateV1,
+        EconomicEffectTargetV1, EconomicExpectedHead, EconomicRequestBindingV1,
+        EconomicRequestKeyV1, EconomicResourceHeadV1, EconomicResourceKeyV1, EconomicStateAnchor,
+        EconomicStateAnchorPins, EconomicStateAnchorViewV1, EconomicStateBatchV1,
+        EconomicStateReadQuery, EconomicStateReadinessExpectation, EconomicStateTransitionV1,
         EconomicTransitionAuthorizationV1, EconomicTransitionProofVerifier,
         VerifiedEconomicEffectDispatchAdvance, CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
         CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA, CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
@@ -1045,9 +1046,11 @@ mod tests {
             transport.clone(),
         )?;
 
-        anchor.compare_and_swap_batch(&advance)?;
+        anchor.compare_and_swap_batch(qualify_generic_economic_state_batch_advance(&advance)?)?;
         assert_eq!(verifier.calls.load(Ordering::SeqCst), 2);
-        assert!(anchor.compare_and_swap_batch(&advance).is_err());
+        assert!(anchor
+            .compare_and_swap_batch(qualify_generic_economic_state_batch_advance(&advance)?)
+            .is_err());
         assert_eq!(verifier.calls.load(Ordering::SeqCst), 3);
         let requests = lock_unpoisoned(&transport.requests);
         assert_eq!(requests[0].0, ECONOMIC_STATE_CAS_PATH);
@@ -1069,7 +1072,9 @@ mod tests {
             Arc::new(RejectingCancellationVerifier),
             rejected_transport.clone(),
         )?;
-        assert!(rejecting_anchor.compare_and_swap_batch(&advance).is_err());
+        assert!(rejecting_anchor
+            .compare_and_swap_batch(qualify_generic_economic_state_batch_advance(&advance)?)
+            .is_err());
         assert!(lock_unpoisoned(&rejected_transport.requests).is_empty());
         Ok(())
     }
@@ -1138,7 +1143,7 @@ mod tests {
 
         fn compare_and_swap_batch(
             &self,
-            _advance: &VerifiedEconomicStateBatchAdvance,
+            _advance: QualifiedGenericEconomicStateBatchAdvance<'_>,
         ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
             Err(EconomicStateAnchorError::Missing)
         }

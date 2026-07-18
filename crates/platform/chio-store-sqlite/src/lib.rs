@@ -407,6 +407,25 @@ impl chio_kernel::receipt_store::AnchoredAdmissionProjectionStore
         .map_err(admission_operation_store::receipt_projection_error)
     }
 
+    fn record_anchored_terminal_projection(
+        &self,
+        advance: &chio_core::economic_continuity::VerifiedEconomicStateBatchAdvance,
+        committed: &chio_core::economic_continuity::VerifiedEconomicStateView,
+        pins: &chio_core::economic_continuity::EconomicStateAnchorPins,
+        active_fence: &chio_kernel::admission_operation::StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), chio_kernel::ReceiptStoreError> {
+        admission_operation_store::SqliteAdmissionOperationStore::record_anchored_terminal_projection(
+            self,
+            advance,
+            committed,
+            pins,
+            active_fence,
+            trusted_now_unix_ms,
+        )
+        .map_err(admission_operation_store::receipt_projection_error)
+    }
+
     fn commit_anchored_terminal_projection(
         &self,
         batch_id: &str,

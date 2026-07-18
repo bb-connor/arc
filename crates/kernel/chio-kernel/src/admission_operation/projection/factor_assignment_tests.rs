@@ -503,6 +503,14 @@ fn projection_context(operation: &AdmissionOperationV1) -> TestResult<AdmissionP
     })
 }
 
+fn economic_terminal_capabilities() -> AdmissionProjectionCapabilities {
+    AdmissionProjectionCapabilities {
+        operation_terminal: true,
+        economic_mutation_terminal: true,
+        ..AdmissionProjectionCapabilities::default()
+    }
+}
+
 fn fixture() -> TestResult<ProjectionFixture> {
     let economy = economy_fixture()?;
     let request_digest = economy.request.digest()?;
@@ -536,6 +544,60 @@ fn fixture() -> TestResult<ProjectionFixture> {
         not_applied,
         context,
     })
+}
+
+#[test]
+fn signed_anchored_economic_terminal_preserves_the_anchor_requirement() -> TestResult {
+    let fixture = fixture()?;
+    let signer = Keypair::from_seed(&[92; 32]);
+    let mut not_applied = verified_factor_assignment_not_applied_projection(
+        &fixture.submitted,
+        fixture.context.clone(),
+        &fixture.not_applied,
+    )?;
+    let AdmissionTerminalProjection::EconomicMutationNotApplied { result, .. } = &mut not_applied
+    else {
+        return Err("expected not-applied economic mutation projection".into());
+    };
+    result.0.anchored_effect = true;
+    let not_applied = SignedAdmissionTerminalProjectionV1::from_verified(
+        &fixture.submitted,
+        &not_applied,
+        &economic_terminal_capabilities(),
+        &signer,
+    )?
+    .verify()?;
+    assert!(not_applied.requires_anchored_economic_commit());
+    Ok(())
+}
+
+#[test]
+fn signed_legacy_factor_terminals_remain_unanchored() -> TestResult {
+    let fixture = fixture()?;
+    let signer = Keypair::from_seed(&[93; 32]);
+    let projections = [
+        verified_factor_assignment_applied_projection(
+            &fixture.submitted,
+            fixture.context.clone(),
+            &fixture.acknowledgement,
+        )?,
+        verified_factor_assignment_not_applied_projection(
+            &fixture.submitted,
+            fixture.context.clone(),
+            &fixture.not_applied,
+        )?,
+    ];
+    for projection in projections {
+        let verified = SignedAdmissionTerminalProjectionV1::from_verified(
+            &fixture.submitted,
+            &projection,
+            &economic_terminal_capabilities(),
+            &signer,
+        )?
+        .verify()?;
+        assert!(!verified.requires_anchored_economic_commit());
+    }
+    Ok(())
 }
 
 #[test]

@@ -515,6 +515,7 @@ impl ChioKernel {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn build_deny_response_with_recording(
         &self,
         request: &ToolCallRequest,

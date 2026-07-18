@@ -190,7 +190,14 @@ evaluator-supplied root is not a completeness proof.
   trusted local state, checks that coverage and parties match, and verifies that
   the policy signer was authorized for that payer and facility. The bound
   liability coverage is the sole aggregate economic allocation; the parametric
-  policy cannot declare another independent coverage limit. For contestable
+  policy cannot declare another independent coverage limit. The v1 beneficiary
+  is not caller-selected: it MUST equal the insured subject resolved from the
+  canonical bound-coverage lineage, specifically the bound risk-package
+  `subject_key`, and verification derives and compares that identity rather than
+  trusting the policy copy. A different beneficiary is unsupported in v1. Only
+  a future schema with a typed, signed delegation bound to the coverage, insured
+  subject, beneficiary, destination, facility, validity window, and delegating
+  authority may relax this rule; v1 rejects such an override. For contestable
   mode it also names a contest-authority policy and expected FROST group key,
   epoch, and action domain resolved from trusted local state;
   a key embedded
@@ -248,15 +255,20 @@ window start and end, and canonical evidence-range digest. Each policy defines a
 window anchor and cadence. The evaluator derives the one window index containing
 the cutoff with checked integer arithmetic; a caller cannot select a subwindow,
 overlapping window, or alternate boundary. The evidence-range digest covers the
-sorted source identities, anchor epochs, committed query-index namespaces,
-canonical subject/time/sequence bounds, expected member counts, source-prefix
-cutoffs, and ordered selected-member roots. It excludes outer checkpoint ids and
-roots, evolving whole-index roots, proof serialization, and signatures. A later
-append-only checkpoint that proves the same bounded selection therefore produces
-the same range digest and claim id. A changed count or selected-member root is a
-different evidence range, while a
-different policy, subject, predicate, canonical window, or evidence range cannot
-alias the same trigger instance.
+sorted stable source identities, committed query-index identities, canonical
+subject and window bounds, canonical inclusive sequence bounds, expected member
+counts, and ordered selected-member roots. It excludes outer checkpoint ids and
+roots, proof serialization, signatures, signer keys and key epochs, anchor epochs
+and anchor-rotation metadata, evolving whole-index roots, checkpoint timestamps,
+and source-prefix high-water or cutoff metadata. Those excluded fields remain
+mandatory authenticated provenance and completeness inputs; any missing, stale,
+or invalid value fails closed, but the values do not identify the semantic
+trigger. A later append-only checkpoint, signature or key rotation, anchor
+rotation, or higher prefix high-water that validly proves the same stable
+source/index/subject/window/sequence/count/selected-root tuple therefore produces
+the same range digest and claim id. Changing any retained tuple field produces a
+different evidence range, while a different policy, predicate, or evidence range
+cannot alias the same trigger instance.
 
 ```text
 trigger_instance_id = SHA256(
@@ -269,13 +281,15 @@ claim_id = SHA256(
 
 `PayoutBindingV1` contains `claim_id`, expected claim version and lifecycle
 fence, coverage reservation id and version, payer/source id,
-beneficiary/counterparty id, facility id, rail profile,
+beneficiary/counterparty id equal to the v1 canonical insured subject, facility
+id, rail profile,
 destination-account digest, capital-instruction body digest, and exact
 `MonetaryAmount`. Every field is derived from the verified policy, bound
 coverage, facility, claim, and reservation. Before signing and again before
 dispatch, the verifier requires the capital instruction's source,
 counterparty, facility, rail destination, currency, and amount to equal this
-binding byte for byte. Caller overrides are rejected.
+binding byte for byte. Caller overrides, including a beneficiary override, are
+rejected.
 
 `TriggerMagnitude` is tagged as `Count { value }` or
 `BasisPoints { value }`. Each predicate has exactly one declared magnitude
@@ -307,9 +321,21 @@ state:
 PanelDenied | PayoutReserved | Submitted | Reconciled | ReservationReleased |
 Incident`, plus the exact external continuity-head digest.
 
+WS7 composes these transitions into the shared `EconomicStateBatchV1`; it does
+not define another economic coordinator. The batch uses the existing
+`chio.economy.resource-head.v1` resources for semantic triggers, claims, and
+shared liability coverage and the existing `chio.economy.effect-slot.v1` for
+payout effects.
+`AdmissionOperation` and the shared economic continuity coordinator own durable
+handoff, commit, startup recovery, and reconciliation. `ParametricClaimStore`
+supplies consumer transition proofs and local staging/cache operations under the
+process-fenced shared serving owner. It MUST NOT introduce a second durable
+operation type, WS7-local continuity coordinator, independent rollback authority,
+or parallel dispatch journal.
+
 Creating an automatic claim stages `Ready`; a contestable claim stages
 `ContestOpen` with `contest_opened_at` and checked `contest_deadline` from
-the trusted runtime clock. One external batch creates the semantic
+the trusted runtime clock. One shared `EconomicStateBatchV1` creates the semantic
 trigger-instance head and claim head before local finalization. An evaluation
 with the same semantic trigger key
 returns the existing record when its recomputed verdict and payout agree, even
@@ -340,8 +366,11 @@ One shared `LiabilityCoverageLedger` row per canonical
 coverage limit, reserved units, reconciled-paid units, and version. Legacy filed
 claims and parametric claims reserve through this same row and external coverage
 head API.
-Parametric activation is disabled until the existing legacy claim path also uses
-that ledger; a second ledger or a policy-digest-only allocation is forbidden.
+Production activation of parametric claim processing and payout dispatch remains
+disabled until the existing legacy filed-claim path commits reservations and
+releases through that same ledger and external coverage head API. Artifact and
+schema work may land disabled before that migration; a second ledger or a
+policy-digest-only allocation is forbidden.
 Payout-intent creation accepts only `Ready`, `UncontestedReleased`, or
 `PanelReleased`.
 It first builds the immutable payout request and persists one RFC-0003
@@ -354,21 +383,24 @@ amount for `PanelReleased`, then checked-adds
 `reserved_units + reconciled_paid_units + payout_amount`, rejects above the
 policy limit, inserts exactly one signed payout intent, increments reserved
 coverage, stores the exact `PayoutBindingV1`, increments the lifecycle fence, and
-prepares the claim for `PayoutReserved`. One external batch atomically advances
-the semantic-trigger, claim and shared coverage heads and creates that exact
-prepared operation's effect slot as `Ready`, followed by local finalization.
+prepares the claim for `PayoutReserved`. One shared `EconomicStateBatchV1`
+atomically advances the semantic-trigger, claim, and shared coverage heads and
+creates that exact prepared operation's `chio.economy.effect-slot.v1` as `Ready`,
+followed by local finalization.
 Identical replay is a
 no-op; a different intent for the same claim conflicts. The intent is not
 dispatchable unless this committed claim state and reservation verify.
 
 Dispatch first persists the owning `AdmissionOperation::MutationSubmitted`
 handoff state/version/fence, then one
-external batch compare-and-swaps `PayoutReserved -> Submitted` and the exact
+shared `EconomicStateBatchV1` compare-and-swaps `PayoutReserved -> Submitted`
+and the exact
 effect slot `Ready -> DispatchCommitted` using the claim version, lifecycle
 fence, reservation version, payout binding, operation id and target binding. Only
 that CAS winner calls the settlement target. Reconciliation moves the exact
-reserved amount to paid and the slot to `Completed` in one external
-claim-plus-coverage batch only from canonical execution evidence. A crash after
+reserved amount to paid and the slot to `Completed` in one shared
+`EconomicStateBatchV1` claim-plus-coverage transition only from canonical
+execution evidence. A crash after
 slot commit uses authenticated target status or qualified same-key idempotency;
 otherwise the slot/claim become unknown/incident and remain reserved without
 another call.
@@ -395,20 +427,24 @@ instance.
    `TriggerEvaluation`.
 3. On `Fired`, it assembles a `ClaimEvidence` whose `supporting_receipts` are the
    corpus fingerprints, emits `ParametricAutoClaim`, and inserts or verifies the
-   externally anchored semantic trigger-instance/claim heads. It never calls stateless
-   `BoundPolicy::file_claim` as the replay or aggregate-coverage boundary.
+   externally anchored semantic trigger-instance/claim heads through the shared
+   `EconomicStateBatchV1`. It never calls stateless `BoundPolicy::file_claim` as
+   the replay or aggregate-coverage boundary.
 4. It verifies payout eligibility from the signed policy. `Automatic` creates a
    `Ready` claim. `Contestable` opens the trusted-clock contest through the same external head
    state and remains non-dispatchable until either the no-contest deadline CAS or
    a FROST-authorized panel decision releases it.
 5. Fresh authority for `parametric.trigger_payout` is necessary but not
    sufficient. After its exact `AdmissionOperation::Prepared`, the external
-   claim/coverage batch reserves remaining bound coverage, records the unique
-   `ParametricPayoutIntent` plus exact `PayoutBindingV1`, and creates its `Ready`
-   effect slot; only the later handoff CAS winner may dispatch.
+   `EconomicStateBatchV1` claim/coverage transition reserves remaining bound
+   coverage, records the unique `ParametricPayoutIntent` plus exact
+   `PayoutBindingV1`, and creates its existing `chio.economy.effect-slot.v1` as
+   `Ready`;
+   only the later handoff CAS winner may dispatch.
 6. WS1/WS4 execute the bound capital instruction; observed execution is recorded
    in the digest-bound `ParametricPayoutReceipt` sidecar and the external terminal
-   slot/claim/coverage batch reconciles the reserved coverage.
+   `EconomicStateBatchV1` slot/claim/coverage transition reconciles the reserved
+   coverage.
 
 The automatic path does not enter discretionary adjudication because the policy
 already fixes the deterministic eligibility rule. A contestable path enters the
@@ -512,10 +548,10 @@ rejects the FROST variant.
   persisted, reserved, and dispatched. `PartialSettlement` equal to the filed
   amount rejects, while a smaller positive amount follows that same exact-value
   path.
-- A self-signed policy, unknown facility or source root, payer, beneficiary,
-  destination, rail, reservation, currency, or amount mismatch, untrusted
-  evaluator, absent FROST provider, stale key epoch, or roster/transcript
-  mismatch rejects.
+- A self-signed policy, unknown facility or source root, payer, v1 beneficiary
+  differing from the canonical insured subject, destination, rail, reservation,
+  currency, or amount mismatch, untrusted evaluator, absent FROST provider,
+  stale key epoch, or roster/transcript mismatch rejects.
 
 ## Alternatives considered
 
@@ -580,10 +616,11 @@ derived from absent evidence.
 - Claim idempotency and coverage: alternate evaluation-body encodings and
   concurrent evaluations for one semantic trigger create one claim and one
   payout intent. Changing policy, subject, canonical window, predicate, or
-  evidence range changes the trigger key. Advancing an append-only checkpoint or
-  whole-index root while proving identical source bounds, prefix cutoff, count and
-  ordered selected-member root retains the same key; changing one selected member
-  changes it. A file-backed concurrency test races a
+  evidence range changes the trigger key. Advancing an append-only checkpoint,
+  whole-index root, signer key or epoch, anchor epoch, or prefix high-water while
+  proving the identical stable source/index/subject/window/sequence/count and
+  ordered selected-member-root tuple retains the same key; changing one retained
+  field changes it. A file-backed concurrency test races a
   legacy filed claim with a parametric claim and proves their combined reserved
   plus paid value never exceeds the one canonical bound-coverage allocation. A
   terminal operation-bound `VerifiedNoEffectProof` releases once to
@@ -612,7 +649,9 @@ derived from absent evidence.
   persisted amount; mutating any one independently rejects.
 - Payout binding: mutate payer/source, beneficiary/counterparty, facility, rail,
   destination account, instruction digest, claim or reservation version,
-  currency, or amount independently and assert denial before dispatch.
+  currency, or amount independently and assert denial before dispatch. A
+  beneficiary different from the canonical insured subject rejects even when all
+  other fields match.
 - Panel: official and Chio FROST vectors, wrong-domain/action/resource/fence
   negatives, and supersession of the single adjudicator only through a signed
   panel election plus `VerifiedFrostAuthorization` consumed in the claim CAS.
@@ -638,8 +677,8 @@ derived from absent evidence.
 1. `chio-market::parametric` contract module: `ParametricPolicy`, complete-corpus
    manifest and verification, canonical policy-derived trigger windows,
    `TriggerInstanceKeyV1`, `TriggerEvaluation`, the three non-WS3 predicate
-   classes, exact beneficiary/destination binding, checked `PayoutSchedule`
-   evaluation, deterministic validation,
+   classes, canonical insured-subject beneficiary and exact destination binding,
+   checked `PayoutSchedule` evaluation, deterministic validation,
    schema constants, every signed-schema gate, and conformance. No payout
    execution. Extract a crate only if implementation discovery proves the
    existing home is unworkable. Lands independently of WS1/WS3/WS4.
@@ -647,10 +686,14 @@ derived from absent evidence.
    `ParametricContest`, `ParametricPayoutIntent`,
    `ParametricPayoutReceipt`, the corpus resolver trait, the backend-neutral
    claim/shared-liability-coverage contract, exact `PayoutBindingV1`, SQLite
-   staging/cache implementation, shared external semantic-trigger/claim/coverage
-   batch integration and concurrency/restore tests, and the `parametric.trigger_payout`
-   ladder class. This phase also moves the legacy filed-claim path onto the same
-   coverage ledger; the legacy-plus-parametric race is a phase exit gate.
+   staging/cache implementation, composition into the existing
+   `EconomicStateBatchV1`, resource-head, and effect-slot contracts, and
+   concurrency/restore tests. It adds no second continuity coordinator or
+   authoritative projection. This phase also moves the legacy filed-claim
+   path onto the same coverage ledger; the legacy-plus-parametric race is a phase
+   exit gate, and production activation of parametric claim processing and payout
+   dispatch stays disabled until it passes. The phase also registers the
+   `parametric.trigger_payout` ladder class.
 3. Shared adjudication panel contract: signed
    `chio.adjudication.panel-election.v1`, canonical
    `chio.adjudication.panel-decision.v1`, strict

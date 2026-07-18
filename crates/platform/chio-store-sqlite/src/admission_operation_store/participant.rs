@@ -56,6 +56,24 @@ impl SqliteAdmissionOperationStore {
         transaction.commit().map_err(sqlite_error)
     }
 
+    pub fn record_anchored_terminal_projection(
+        &self,
+        advance: &VerifiedEconomicStateBatchAdvance,
+        committed: &chio_core::economic_continuity::VerifiedEconomicStateView,
+        pins: &chio_core::economic_continuity::EconomicStateAnchorPins,
+        active_fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        let cache = crate::economic_state_cache::SqliteEconomicStateCache::open_alongside(
+            self.connection.clone(),
+            self.serving_owner.clone(),
+        );
+        cache
+            .record_anchor_advanced(advance, committed, pins, active_fence, trusted_now_unix_ms)
+            .map(|_| ())
+            .map_err(map_economic_cache_error)
+    }
+
     pub fn commit_anchored_terminal_projection(
         &self,
         batch_id: &str,
@@ -101,7 +119,7 @@ impl SqliteAdmissionOperationStore {
         let context = verified.context();
         if anchored_binding.is_none() && verified.requires_anchored_economic_commit() {
             return Err(invariant(
-                "channel terminal projection requires an advanced economic anchor",
+                "terminal projection requires an advanced economic anchor",
             ));
         }
         verify_trusted_time(transaction, apply_time_unix_ms)?;

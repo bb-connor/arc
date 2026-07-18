@@ -13,9 +13,21 @@ pub struct VerifiedEconomicEffectCancellationAdvance {
     advance: VerifiedEconomicStateBatchAdvance,
     slot: EconomicEffectSlotV1,
     kind: EconomicNoEffectKindV1,
+    expected_head_version: u64,
+    expected_resource_version: u64,
+    expected_head_digest: String,
+    expected_lifecycle_fence: u64,
+    resulting_head_version: u64,
+    resulting_resource_version: u64,
+    resulting_head_digest: String,
+    resulting_lifecycle_fence: u64,
 }
 
 impl VerifiedEconomicEffectCancellationAdvance {
+    pub fn state_advance(&self) -> &VerifiedEconomicStateBatchAdvance {
+        &self.advance
+    }
+
     pub fn batch(&self) -> &EconomicStateBatchV1 {
         self.advance.batch()
     }
@@ -26,6 +38,46 @@ impl VerifiedEconomicEffectCancellationAdvance {
 
     pub const fn kind(&self) -> EconomicNoEffectKindV1 {
         self.kind
+    }
+
+    pub const fn expected_head_version(&self) -> u64 {
+        self.expected_head_version
+    }
+
+    pub const fn expected_resource_version(&self) -> u64 {
+        self.expected_resource_version
+    }
+
+    pub fn expected_head_digest(&self) -> &str {
+        &self.expected_head_digest
+    }
+
+    pub const fn expected_lifecycle_fence(&self) -> u64 {
+        self.expected_lifecycle_fence
+    }
+
+    pub const fn resulting_head_version(&self) -> u64 {
+        self.resulting_head_version
+    }
+
+    pub const fn resulting_resource_version(&self) -> u64 {
+        self.resulting_resource_version
+    }
+
+    pub fn resulting_head_digest(&self) -> &str {
+        &self.resulting_head_digest
+    }
+
+    pub const fn resulting_lifecycle_fence(&self) -> u64 {
+        self.resulting_lifecycle_fence
+    }
+
+    pub const fn checkpoint_sequence(&self) -> u64 {
+        self.advance.batch.checkpoint_sequence
+    }
+
+    pub fn checkpoint_digest(&self) -> &str {
+        &self.advance.batch.checkpoint_digest
     }
 }
 
@@ -69,6 +121,7 @@ pub fn verify_economic_effect_cancellation_advance(
     if current_slot.state != EconomicEffectStateV1::Ready
         || next_slot.state != EconomicEffectStateV1::NoEffect
         || transition.next_head.lifecycle_state != "no_effect"
+        || transition.next_head.lifecycle_fence <= current_head.lifecycle_fence
         || advance.batch.operation_id.as_deref() != Some(next_slot.operation_id.as_str())
     {
         return Err(EconomicStateAnchorError::EffectCancellationRejected(
@@ -85,10 +138,26 @@ pub fn verify_economic_effect_cancellation_advance(
     } else {
         admission.verify_handoff(&next_slot.operation_id, &next_slot.admission_handoff)?;
     }
+    let expected_head_version = current_head.head_version;
+    let expected_resource_version = current_head.resource_version;
+    let expected_head_digest = current_head.digest()?;
+    let expected_lifecycle_fence = current_head.lifecycle_fence;
+    let resulting_head_version = transition.next_head.head_version;
+    let resulting_resource_version = transition.next_head.resource_version;
+    let resulting_head_digest = transition.next_head.digest()?;
+    let resulting_lifecycle_fence = transition.next_head.lifecycle_fence;
     Ok(VerifiedEconomicEffectCancellationAdvance {
         advance,
         slot: next_slot,
         kind,
+        expected_head_version,
+        expected_resource_version,
+        expected_head_digest,
+        expected_lifecycle_fence,
+        resulting_head_version,
+        resulting_resource_version,
+        resulting_head_digest,
+        resulting_lifecycle_fence,
     })
 }
 
@@ -120,57 +189,65 @@ pub fn reverify_economic_effect_cancellation_advance(
 
 #[derive(Debug)]
 pub struct VerifiedEconomicEffectNotDispatched {
-    slot: EconomicEffectSlotV1,
-    kind: EconomicNoEffectKindV1,
-    expected_head_version: u64,
-    expected_head_digest: String,
-    expected_lifecycle_fence: u64,
-    resulting_head_version: u64,
-    resulting_head_digest: String,
-    resulting_lifecycle_fence: u64,
-    checkpoint_sequence: u64,
-    checkpoint_digest: String,
+    cancellation: VerifiedEconomicEffectCancellationAdvance,
+    committed: VerifiedEconomicStateView,
 }
 
 impl VerifiedEconomicEffectNotDispatched {
+    pub fn cancellation(&self) -> &VerifiedEconomicEffectCancellationAdvance {
+        &self.cancellation
+    }
+
+    pub fn committed(&self) -> &VerifiedEconomicStateView {
+        &self.committed
+    }
+
     pub fn slot(&self) -> &EconomicEffectSlotV1 {
-        &self.slot
+        self.cancellation.slot()
     }
 
     pub const fn kind(&self) -> EconomicNoEffectKindV1 {
-        self.kind
+        self.cancellation.kind()
     }
 
     pub const fn expected_head_version(&self) -> u64 {
-        self.expected_head_version
+        self.cancellation.expected_head_version()
+    }
+
+    pub const fn expected_resource_version(&self) -> u64 {
+        self.cancellation.expected_resource_version()
     }
 
     pub fn expected_head_digest(&self) -> &str {
-        &self.expected_head_digest
+        self.cancellation.expected_head_digest()
     }
 
     pub const fn expected_lifecycle_fence(&self) -> u64 {
-        self.expected_lifecycle_fence
+        self.cancellation.expected_lifecycle_fence()
     }
 
     pub const fn resulting_head_version(&self) -> u64 {
-        self.resulting_head_version
+        self.cancellation.resulting_head_version()
+    }
+
+    pub const fn resulting_resource_version(&self) -> u64 {
+        self.cancellation.resulting_resource_version()
     }
 
     pub fn resulting_head_digest(&self) -> &str {
-        &self.resulting_head_digest
+        self.cancellation.resulting_head_digest()
     }
 
     pub const fn resulting_lifecycle_fence(&self) -> u64 {
-        self.resulting_lifecycle_fence
+        self.cancellation.resulting_lifecycle_fence()
     }
 
     pub const fn checkpoint_sequence(&self) -> u64 {
-        self.checkpoint_sequence
+        self.cancellation.checkpoint_sequence()
     }
 
     pub fn checkpoint_digest(&self) -> &str {
-        &self.checkpoint_digest
+        self.cancellation.checkpoint_digest()
     }
 }
 
@@ -180,25 +257,8 @@ pub fn verify_economic_effect_cancellation_commit(
     pins: &EconomicStateAnchorPins,
 ) -> Result<VerifiedEconomicEffectNotDispatched, EconomicStateAnchorError> {
     verify_economic_state_batch_commit(&advance.advance, committed, pins)?;
-    let transition = &advance.advance.batch.transitions[0];
-    let expected = advance
-        .advance
-        .current
-        .view
-        .head(&transition.resource_key)
-        .ok_or_else(|| {
-            EconomicStateAnchorError::CurrentHeadMissing(transition.resource_key.clone())
-        })?;
     Ok(VerifiedEconomicEffectNotDispatched {
-        slot: advance.slot,
-        kind: advance.kind,
-        expected_head_version: expected.head_version,
-        expected_head_digest: expected.digest()?,
-        expected_lifecycle_fence: expected.lifecycle_fence,
-        resulting_head_version: transition.next_head.head_version,
-        resulting_head_digest: transition.next_head.digest()?,
-        resulting_lifecycle_fence: transition.next_head.lifecycle_fence,
-        checkpoint_sequence: committed.view().checkpoint_sequence,
-        checkpoint_digest: committed.view().checkpoint_digest.clone(),
+        cancellation: advance,
+        committed: committed.clone(),
     })
 }

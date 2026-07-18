@@ -728,6 +728,21 @@ fn cancellation_advance(
     ),
     Box<dyn core::error::Error>,
 > {
+    cancellation_advance_with_fence(kind, admission, 8)
+}
+
+fn cancellation_advance_with_fence(
+    kind: EconomicNoEffectKindV1,
+    admission: &dyn EconomicAdmissionHandoffVerifier,
+    resulting_lifecycle_fence: u64,
+) -> Result<
+    (
+        VerifiedEconomicEffectCancellationAdvance,
+        EconomicEffectSlotV1,
+        EconomicResourceHeadV1,
+    ),
+    Box<dyn core::error::Error>,
+> {
     let ready = ready_effect_slot()?;
     let ready_content = inline_content(serde_json::to_value(&ready)?);
     let ready_head = EconomicResourceHeadV1 {
@@ -736,8 +751,8 @@ fn cancellation_advance(
         namespace: ready.namespace.clone(),
         resource_key: ready.resource_head_key(),
         head_version: 1,
-        resource_version: 1,
-        lifecycle_fence: 1,
+        resource_version: 4,
+        lifecycle_fence: 7,
         lifecycle_state: "ready".to_string(),
         state_digest: ready_content.digest()?,
         state: ready_content,
@@ -776,8 +791,8 @@ fn cancellation_advance(
         namespace: cancelled.namespace.clone(),
         resource_key: cancelled.resource_head_key(),
         head_version: 2,
-        resource_version: 2,
-        lifecycle_fence: 2,
+        resource_version: 9,
+        lifecycle_fence: resulting_lifecycle_fence,
         lifecycle_state: "no_effect".to_string(),
         state_digest: cancelled_content.digest()?,
         state: cancelled_content,
@@ -841,8 +856,10 @@ fn only_verified_cancellation_cas_mints_no_dispatch_authority(
     );
     assert_eq!(authority.expected_head_version(), 1);
     assert_eq!(authority.resulting_head_version(), 2);
-    assert_eq!(authority.expected_lifecycle_fence(), 1);
-    assert_eq!(authority.resulting_lifecycle_fence(), 2);
+    assert_eq!(authority.expected_resource_version(), 4);
+    assert_eq!(authority.resulting_resource_version(), 9);
+    assert_eq!(authority.expected_lifecycle_fence(), 7);
+    assert_eq!(authority.resulting_lifecycle_fence(), 8);
     assert_eq!(
         authority.expected_head_digest(),
         cancelled_head
@@ -862,6 +879,54 @@ fn only_verified_cancellation_cas_mints_no_dispatch_authority(
         &RejectingAdmissionHandoff,
     )
     .is_err());
+    Ok(())
+}
+
+#[test]
+fn generic_batch_qualification_rejects_no_effect_transitions(
+) -> Result<(), Box<dyn core::error::Error>> {
+    let (advance, _, _) = cancellation_advance(
+        EconomicNoEffectKindV1::PermanentlyNotApplied,
+        &MatchingAdmissionHandoff,
+    )?;
+
+    assert!(matches!(
+        qualify_generic_economic_state_batch_advance(advance.state_advance()),
+        Err(EconomicStateAnchorError::EffectCancellationRejected(_))
+    ));
+    Ok(())
+}
+
+#[test]
+fn cancellation_requires_a_strict_lifecycle_fence_advance() {
+    assert!(cancellation_advance_with_fence(
+        EconomicNoEffectKindV1::PermanentlyNotApplied,
+        &MatchingAdmissionHandoff,
+        7,
+    )
+    .is_err());
+}
+
+#[test]
+fn effect_slot_decoder_binds_outer_anchor_namespace_and_lifecycle(
+) -> Result<(), Box<dyn core::error::Error>> {
+    let (_, _, head) = cancellation_advance(
+        EconomicNoEffectKindV1::PermanentlyNotApplied,
+        &MatchingAdmissionHandoff,
+    )?;
+    assert!(economic_effect_slot_from_head(&head).is_ok());
+
+    let mut wrong_anchor = head.clone();
+    wrong_anchor.anchor_id = "anchor-2".to_string();
+    assert!(economic_effect_slot_from_head(&wrong_anchor).is_err());
+
+    let mut wrong_namespace = head.clone();
+    wrong_namespace.namespace = "economy-staging".to_string();
+    assert!(economic_effect_slot_from_head(&wrong_namespace).is_err());
+
+    let mut wrong_lifecycle = head;
+    wrong_lifecycle.lifecycle_state = "completed".to_string();
+    assert!(economic_effect_slot_from_head(&wrong_lifecycle).is_err());
     Ok(())
 }
 

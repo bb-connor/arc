@@ -697,6 +697,7 @@ fn require_committed_credit_admission<S: CreditAdmissionStore>(
         .map_err(|_| IouEnvelopeV2Error::BindingMismatch("committed_credit_admission"))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_body(
     atom: &ObligationAtomV1,
     disposition: &ObligationDispositionRecordV1,

@@ -1,9 +1,10 @@
 use super::*;
 use crate::admission_operation::{
-    verified_pre_dispatch_compensation_projection, AdmissionOperationBindingInputV1,
-    AdmissionOperationBindingV1, AdmissionOperationError, AdmissionOperationKind,
-    AdmissionParticipantRequirements, AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
-    SideEffectClass,
+    verified_pre_dispatch_compensation_projection, verify_economic_cancellation_terminal_advance,
+    AdmissionOperationBindingInputV1, AdmissionOperationBindingV1, AdmissionOperationError,
+    AdmissionOperationKind, AdmissionParticipantRequirements, AdmissionProjectionCapabilities,
+    AdmissionRequestBindingV1, AuthenticatedRequestNamespace, SideEffectClass,
+    SignedAdmissionTerminalProjectionV1,
 };
 use crate::dispatch_status::{
     qualify_dispatch_status_provider_for_test, resolve_dispatch_status,
@@ -19,16 +20,15 @@ use crate::tool_outcome::tests::{
 };
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_core_types::economic_continuity::{
-    verify_economic_effect_cancellation_advance, verify_economic_effect_cancellation_commit,
-    verify_economic_state_batch_advance, verify_economic_state_view,
-    EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1, EconomicAdmissionHandoffVerifier,
-    EconomicContentV1, EconomicEffectCancellationProofVerifier, EconomicEffectSlotV1,
-    EconomicEffectStateV1, EconomicEffectTargetV1, EconomicEffectTerminalV1,
+    verify_economic_effect_cancellation_advance, verify_economic_state_batch_advance,
+    verify_economic_state_view, EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1,
+    EconomicAdmissionHandoffVerifier, EconomicContentV1, EconomicEffectCancellationProofVerifier,
+    EconomicEffectSlotV1, EconomicEffectStateV1, EconomicEffectTargetV1, EconomicEffectTerminalV1,
     EconomicNoEffectKindV1, EconomicRequestBindingV1, EconomicResourceHeadV1,
     EconomicResourceKeyV1, EconomicStateAnchorError, EconomicStateAnchorPins,
     EconomicStateAnchorViewV1, EconomicStateBatchV1, EconomicStateTransitionV1,
     EconomicTransitionAuthorizationV1, EconomicTransitionProofVerifier,
-    VerifiedEconomicEffectNotDispatched, CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
+    VerifiedEconomicEffectCancellationAdvance, CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
     CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA, CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
     CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
 };
@@ -266,7 +266,7 @@ fn qualified_pre_dispatch_snapshot_rejects_an_acquired_participant() {
 fn economic_cancellation(
     operation: &AdmissionOperationV1,
     kind: EconomicNoEffectKindV1,
-) -> Result<VerifiedEconomicEffectNotDispatched, Box<dyn std::error::Error>> {
+) -> Result<VerifiedEconomicEffectCancellationAdvance, Box<dyn std::error::Error>> {
     struct Direct(EconomicNoEffectKindV1);
     impl EconomicTransitionProofVerifier for Direct {
         fn verify_transition(
@@ -418,7 +418,11 @@ fn economic_cancellation(
             qualification_digest: admission_digest("economic-target").as_str().to_owned(),
         },
         action_digest: admission_digest("economic-action").as_str().to_owned(),
-        parameters_digest: admission_digest("economic-parameters").as_str().to_owned(),
+        parameters_digest: operation
+            .binding()
+            .action_parameter_hash()
+            .as_str()
+            .to_owned(),
         resource_head_digest: admission_digest("economic-resource").as_str().to_owned(),
         frost: None,
         idempotency_key: admission_digest("economic-idempotency").as_str().to_owned(),
@@ -476,20 +480,8 @@ fn economic_cancellation(
     batch.seal(&keypair)?;
     let verifier = Direct(kind);
     let advance = verify_economic_state_batch_advance(&current, batch, &pins, &verifier)?;
-    let cancellation = verify_economic_effect_cancellation_advance(advance, &verifier, &verifier)?;
-    let committed = verify_economic_state_view(
-        signed_view(
-            &keypair,
-            2,
-            cancellation.batch().checkpoint_digest.clone(),
-            cancelled_head,
-        )?,
-        &pins,
-    )?;
-    Ok(verify_economic_effect_cancellation_commit(
-        cancellation,
-        &committed,
-        &pins,
+    Ok(verify_economic_effect_cancellation_advance(
+        advance, &verifier, &verifier,
     )?)
 }
 
@@ -516,6 +508,39 @@ fn external_effect_cancellation_constructs_bound_transport_no_acceptance() {
         &cancellation,
     )
     .unwrap();
+    assert!(projection.requires_anchored_economic_commit());
+    let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
+        &operation,
+        &projection,
+        &AdmissionProjectionCapabilities {
+            operation_terminal: true,
+            incident_terminal: true,
+            ..AdmissionProjectionCapabilities::default()
+        },
+        &Keypair::from_seed(&[0x52; 32]),
+    )
+    .unwrap();
+    let verified = envelope.verify().unwrap();
+    assert!(verified.requires_anchored_economic_commit());
+    assert_eq!(
+        verify_economic_cancellation_terminal_advance(
+            cancellation.state_advance().current().view(),
+            cancellation.batch(),
+            &verified,
+        )
+        .unwrap(),
+        cancellation.slot().clone()
+    );
+    let mut substituted_batch = cancellation.batch().clone();
+    substituted_batch.checkpoint_digest = admission_digest("substituted-checkpoint")
+        .as_str()
+        .to_owned();
+    assert!(verify_economic_cancellation_terminal_advance(
+        cancellation.state_advance().current().view(),
+        &substituted_batch,
+        &verified,
+    )
+    .is_err());
     assert!(matches!(
         projection,
         crate::admission_operation::AdmissionTerminalProjection::NotAcceptedAfterDispatchCommit { .. }
@@ -572,6 +597,23 @@ fn external_effect_cancellation_constructs_bound_permanently_not_applied_result(
         &cancellation,
     )
     .unwrap();
+    let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
+        &operation,
+        &projection,
+        &AdmissionProjectionCapabilities {
+            operation_terminal: true,
+            economic_mutation_terminal: true,
+            ..AdmissionProjectionCapabilities::default()
+        },
+        &Keypair::from_seed(&[0x53; 32]),
+    )
+    .unwrap();
+    assert!(verify_economic_cancellation_terminal_advance(
+        cancellation.state_advance().current().view(),
+        cancellation.batch(),
+        &envelope.verify().unwrap(),
+    )
+    .is_ok());
     assert!(matches!(
         projection,
         crate::admission_operation::AdmissionTerminalProjection::EconomicMutationNotApplied { .. }

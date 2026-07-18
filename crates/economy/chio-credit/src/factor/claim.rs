@@ -190,7 +190,7 @@ impl ReceivableClaimTrustV1 {
                 verify_credit_facility_bind(
                     &canonical_bind,
                     &CreditFacilityBindVerificationContextV1 {
-                        trust: *trust,
+                        trust,
                         trusted_at_unix_ms,
                     },
                 )

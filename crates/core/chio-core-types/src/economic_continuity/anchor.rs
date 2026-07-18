@@ -520,6 +520,37 @@ impl VerifiedEconomicStateBatchAdvance {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct QualifiedGenericEconomicStateBatchAdvance<'a> {
+    advance: &'a VerifiedEconomicStateBatchAdvance,
+}
+
+impl<'a> QualifiedGenericEconomicStateBatchAdvance<'a> {
+    pub const fn advance(self) -> &'a VerifiedEconomicStateBatchAdvance {
+        self.advance
+    }
+}
+
+pub fn qualify_generic_economic_state_batch_advance(
+    advance: &VerifiedEconomicStateBatchAdvance,
+) -> Result<QualifiedGenericEconomicStateBatchAdvance<'_>, EconomicStateAnchorError> {
+    for transition in &advance.batch.transitions {
+        if transition.resource_key.resource_family != "effect_slot" {
+            continue;
+        }
+        if let Some(current_head) = advance.current.view.head(&transition.resource_key) {
+            economic_effect_slot_from_head(current_head)?;
+        }
+        let next_slot = economic_effect_slot_from_head(&transition.next_head)?;
+        if next_slot.state == EconomicEffectStateV1::NoEffect {
+            return Err(EconomicStateAnchorError::EffectCancellationRejected(
+                "no-effect transitions require the typed cancellation CAS",
+            ));
+        }
+    }
+    Ok(QualifiedGenericEconomicStateBatchAdvance { advance })
+}
+
 pub fn verify_economic_state_batch_advance(
     current: &VerifiedEconomicStateView,
     batch: EconomicStateBatchV1,
@@ -833,7 +864,17 @@ pub fn economic_effect_slot_from_head(
     let slot = serde_json::from_value::<EconomicEffectSlotV1>(value.clone())
         .map_err(|error| EconomicStateAnchorError::Canonicalization(error.to_string()))?;
     slot.validate()?;
-    if slot.resource_head_key() != head.resource_key
+    let expected_lifecycle_state = match slot.state {
+        EconomicEffectStateV1::Ready => "ready",
+        EconomicEffectStateV1::DispatchCommitted => "dispatch_committed",
+        EconomicEffectStateV1::Completed => "completed",
+        EconomicEffectStateV1::NoEffect => "no_effect",
+        EconomicEffectStateV1::Unknown => "unknown",
+    };
+    if slot.anchor_id != head.anchor_id
+        || slot.namespace != head.namespace
+        || slot.resource_head_key() != head.resource_key
+        || head.lifecycle_state != expected_lifecycle_state
         || head.operation_id.as_deref() != Some(slot.operation_id.as_str())
         || head.effect_idempotency_key.as_deref() != Some(slot.idempotency_key.as_str())
         || head.frost.as_ref() != slot.frost.as_ref()
@@ -1314,7 +1355,7 @@ pub trait EconomicStateAnchor: Send + Sync {
 
     fn compare_and_swap_batch(
         &self,
-        advance: &VerifiedEconomicStateBatchAdvance,
+        advance: QualifiedGenericEconomicStateBatchAdvance<'_>,
     ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError>;
 
     fn compare_and_swap_effect_dispatch(

@@ -361,6 +361,7 @@ impl SqliteAdmissionOperationStore {
             .map_err(map_budget_capture_error)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn authorize_budget_and_commit_admission(
         &self,
         operation: &AdmissionOperationV1,
@@ -575,7 +576,7 @@ impl SqliteAdmissionOperationStore {
     ) -> Result<AdmissionTerminal, AdmissionOperationStoreError> {
         if projection.requires_anchored_economic_commit() {
             return Err(invariant(
-                "channel terminal projection requires an advanced economic anchor",
+                "terminal projection requires an advanced economic anchor",
             ));
         }
         projection.context().validate()?;
@@ -609,7 +610,7 @@ impl SqliteAdmissionOperationStore {
     ) -> Result<(AdmissionTerminal, bool), AdmissionOperationStoreError> {
         if projection.requires_anchored_economic_commit() {
             return Err(invariant(
-                "channel terminal projection requires an advanced economic anchor",
+                "terminal projection requires an advanced economic anchor",
             ));
         }
         let canonical = projection.canonical_projection()?;
@@ -664,7 +665,7 @@ impl SqliteAdmissionOperationStore {
         verify_stored_recovery_claim(
             transaction,
             &self.serving_owner,
-            &stored,
+            stored,
             recovery_claim,
             context.trusted_time_unix_ms,
             &context.store_fence,

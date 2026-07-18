@@ -415,6 +415,7 @@ fn insert_sql_assignment_result(
 }
 
 #[test]
+#[allow(clippy::type_complexity)]
 fn fresh_provision_creates_the_operation_schema_after_serving_lease_schema() {
     let fixture = fixture();
     let connection = fixture.store.connection().expect("connection");
@@ -1135,6 +1136,7 @@ fn persisted_operations_use_rfc_8785_bytes() {
 }
 
 #[test]
+#[allow(clippy::type_complexity)]
 fn not_applied_assignment_result_retains_exact_artifacts_and_head() -> AnchoredTestResult {
     let fixture = fixture();
     let at = now_ms();

@@ -97,26 +97,26 @@ fn payee_binding_digest_commits_exact_beneficiary_and_destination() -> TestResul
 
 #[test]
 fn obligation_atom_rejects_substituted_payee_binding_digest() {
-    let error = ObligationAtomV1::new(ObligationAtomInputV1 {
-        economic_intent_digest: digest("intent-substituted-payee"),
-        source_receipt_id: "receipt-substituted-payee".to_owned(),
-        source_receipt_digest: digest("receipt-substituted-payee"),
-        debtor_id: "did:chio:buyer".to_owned(),
-        original_creditor_id: "did:chio:provider-a".to_owned(),
-        original_settlement_destination_ref: "acct:provider-a".to_owned(),
-        payee_binding_digest: digest("unrelated-payee-binding"),
-        amount: MonetaryAmount {
-            currency: "USD".to_owned(),
-            units: 125,
-        },
-        credit_election: ObligationCreditElectionV1::NotCredit,
-        pre_action_authority_digest: digest("economic-authority"),
-        created_at_unix_ms: 100,
-        due_at_unix_ms: 200,
-    })
-    .expect_err("an arbitrary payee binding digest must fail closed");
-
-    assert_eq!(error, ObligationError::InvalidField("payee_binding_digest"));
+    assert_eq!(
+        ObligationAtomV1::new(ObligationAtomInputV1 {
+            economic_intent_digest: digest("intent-substituted-payee"),
+            source_receipt_id: "receipt-substituted-payee".to_owned(),
+            source_receipt_digest: digest("receipt-substituted-payee"),
+            debtor_id: "did:chio:buyer".to_owned(),
+            original_creditor_id: "did:chio:provider-a".to_owned(),
+            original_settlement_destination_ref: "acct:provider-a".to_owned(),
+            payee_binding_digest: digest("unrelated-payee-binding"),
+            amount: MonetaryAmount {
+                currency: "USD".to_owned(),
+                units: 125,
+            },
+            credit_election: ObligationCreditElectionV1::NotCredit,
+            pre_action_authority_digest: digest("economic-authority"),
+            created_at_unix_ms: 100,
+            due_at_unix_ms: 200,
+        }),
+        Err(ObligationError::InvalidField("payee_binding_digest"))
+    );
 }
 
 #[test]

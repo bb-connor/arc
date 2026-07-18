@@ -1,7 +1,17 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use chio_core_types::economic_continuity::{
+    EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1, EconomicEffectSlotV1,
+    EconomicEffectStateV1, EconomicRequestBindingV1,
+};
+
 use super::*;
+use crate::credit::{
+    CapitalBookSourceKind, CapitalExecutionInstructionAction, CapitalExecutionInstructionArtifact,
+    CapitalExecutionIntendedState, CapitalExecutionReconciledState, CapitalExecutionRole,
+    SignedCapitalExecutionInstruction,
+};
 
 pub const PARAMETRIC_CLAIM_RECORD_SCHEMA: &str = "chio.parametric.claim-record.v1";
 pub const PARAMETRIC_CONTEST_SCHEMA: &str = "chio.parametric.contest.v1";
@@ -9,6 +19,22 @@ pub const PARAMETRIC_PAYOUT_INTENT_SCHEMA: &str = "chio.parametric.payout-intent
 pub const PARAMETRIC_PAYOUT_BINDING_SCHEMA: &str = "chio.parametric.payout-binding.v1";
 pub const PARAMETRIC_CONTEST_ID_DOMAIN: &str = "chio.parametric.contest.id.v1";
 pub const PARAMETRIC_PAYOUT_INTENT_ID_DOMAIN: &str = "chio.parametric.payout-intent.id.v1";
+pub const PARAMETRIC_PAYOUT_DESTINATION_ACCOUNT_DIGEST_DOMAIN: &str =
+    "chio.parametric.payout-destination-account.v1";
+pub const PARAMETRIC_PAYOUT_SOURCE_ACCOUNT_DIGEST_DOMAIN: &str =
+    "chio.parametric.payout-source-account.v1";
+pub const PARAMETRIC_PAYOUT_PREPARATION_BINDING_SCHEMA: &str =
+    "chio.parametric.payout-preparation-binding.v1";
+pub const PARAMETRIC_PAYOUT_CAPITAL_INSTRUCTION_ID_DOMAIN: &str =
+    "chio.parametric.payout-capital-instruction.id.v1";
+pub const PARAMETRIC_PAYOUT_ACTION_DIGEST_DOMAIN: &str = "chio.parametric.payout-action.v1";
+pub const PARAMETRIC_PAYOUT_TARGET_QUALIFICATION_DIGEST_DOMAIN: &str =
+    "chio.parametric.payout-target-qualification.v1";
+pub const PARAMETRIC_PAYOUT_EFFECT_IDEMPOTENCY_KEY_DOMAIN: &str =
+    "chio.parametric.payout-effect-idempotency.v1";
+pub const PARAMETRIC_PAYOUT_ECONOMIC_NAMESPACE: &str = "parametric";
+pub const PARAMETRIC_LIABILITY_COVERAGE_RESOURCE_FAMILY: &str = "liability_coverage";
+pub const PARAMETRIC_PAYOUT_EFFECT_KIND: &str = "parametric_payout";
 pub const MAX_PARAMETRIC_CONTEST_EVIDENCE: usize = 64;
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -27,8 +53,24 @@ pub enum ParametricClaimError {
     InvalidContestSignature,
     #[error("parametric payout is not eligible")]
     PayoutNotEligible,
+    #[error("parametric payout reservation requires the shared economic coordinator")]
+    PayoutReservationRequiresCoordinator,
     #[error("parametric payout intent conflicts with the reserved intent")]
     PayoutIntentConflict,
+    #[error("parametric payout capital instruction is invalid")]
+    InvalidCapitalInstruction,
+    #[error("parametric payout capital instruction signature is invalid")]
+    InvalidCapitalInstructionSignature,
+    #[error("parametric payout capital instruction trust does not match")]
+    UntrustedCapitalInstruction,
+    #[error("parametric payout capital instruction is outside its trusted execution window")]
+    CapitalInstructionWindowClosed,
+    #[error("parametric payout capital instruction does not support automatic dispatch")]
+    AutomaticDispatchUnsupported,
+    #[error("parametric payout intent signer is not trusted")]
+    UntrustedPayoutIntentSigner,
+    #[error("parametric payout intent signature is invalid")]
+    InvalidPayoutIntentSignature,
     #[error("parametric claim arithmetic overflow: {0}")]
     ArithmeticOverflow(&'static str),
 }
@@ -183,12 +225,14 @@ impl ParametricClaimRecordV1 {
                     && self.contest_digest.is_none()
                     && self.payout_binding.is_none()
             }
-            ParametricClaimStateV1::PayoutReserved => {
-                self.contest_digest.is_none() && self.payout_binding.is_some()
-            }
+            ParametricClaimStateV1::PayoutReserved => false,
         };
         if !state_matches {
-            return Err(ParametricContractError::InvalidField("claim.state").into());
+            return if self.state == ParametricClaimStateV1::PayoutReserved {
+                Err(ParametricClaimError::PayoutReservationRequiresCoordinator)
+            } else {
+                Err(ParametricContractError::InvalidField("claim.state").into())
+            };
         }
         if let Some(binding) = self.payout_binding.as_ref() {
             binding.validate()?;
@@ -343,81 +387,6 @@ impl ParametricClaimRecordV1 {
         Ok(next)
     }
 
-    pub fn expected_payout_binding(
-        &self,
-        capital_instruction_body_digest: String,
-    ) -> Result<ParametricPayoutBindingV1, ParametricClaimError> {
-        self.validate()?;
-        if !matches!(
-            self.state,
-            ParametricClaimStateV1::Ready | ParametricClaimStateV1::UncontestedReleased
-        ) {
-            return Err(ParametricClaimError::PayoutNotEligible);
-        }
-        let binding = ParametricPayoutBindingV1 {
-            schema: PARAMETRIC_PAYOUT_BINDING_SCHEMA.to_owned(),
-            claim_id: self.identity.claim_id.clone(),
-            expected_claim_version: self.version,
-            expected_lifecycle_fence: self.lifecycle_fence,
-            bound_coverage_body_digest: self.identity.key.bound_coverage_body_digest.clone(),
-            payer_id: self.payer_id.clone(),
-            beneficiary_id: self.beneficiary_id.clone(),
-            funding_facility_id: self.funding_facility_id.clone(),
-            payout_rail: self.payout_rail.clone(),
-            capital_instruction_body_digest,
-            amount: self.payout_amount.clone(),
-        };
-        binding.validate()?;
-        Ok(binding)
-    }
-
-    pub fn reserve_payout(
-        &self,
-        binding: ParametricPayoutBindingV1,
-    ) -> Result<(Self, ParametricPayoutIntentV1), ParametricClaimError> {
-        self.validate()?;
-        binding.validate()?;
-        if self.state == ParametricClaimStateV1::PayoutReserved {
-            if self.payout_binding.as_ref() == Some(&binding)
-                && self.version
-                    == binding
-                        .expected_claim_version
-                        .checked_add(1)
-                        .ok_or(ParametricClaimError::ArithmeticOverflow("claim.version"))?
-                && self.lifecycle_fence
-                    == binding.expected_lifecycle_fence.checked_add(1).ok_or(
-                        ParametricClaimError::ArithmeticOverflow("claim.lifecycle_fence"),
-                    )?
-            {
-                let intent = ParametricPayoutIntentV1::new(binding)?;
-                intent.validate_against(self)?;
-                return Ok((self.clone(), intent));
-            }
-            return Err(ParametricClaimError::PayoutIntentConflict);
-        }
-        if !matches!(
-            self.state,
-            ParametricClaimStateV1::Ready | ParametricClaimStateV1::UncontestedReleased
-        ) {
-            return Err(ParametricClaimError::PayoutNotEligible);
-        }
-        self.ensure_head(
-            binding.expected_claim_version,
-            binding.expected_lifecycle_fence,
-        )?;
-        self.ensure_binding_matches(&binding)?;
-        let intent = ParametricPayoutIntentV1::new(binding.clone())?;
-        let (version, lifecycle_fence) = self.next_head()?;
-        let mut next = self.clone();
-        next.state = ParametricClaimStateV1::PayoutReserved;
-        next.version = version;
-        next.lifecycle_fence = lifecycle_fence;
-        next.payout_binding = Some(binding);
-        next.validate()?;
-        intent.validate_against(&next)?;
-        Ok((next, intent))
-    }
-
     fn ensure_head(
         &self,
         expected_version: u64,
@@ -450,6 +419,15 @@ impl ParametricClaimRecordV1 {
         require_binding(
             binding.claim_id == self.identity.claim_id,
             "payout_binding.claim_id",
+        )?;
+        require_binding(
+            binding.trigger_instance_id == self.identity.trigger_instance_id,
+            "payout_binding.trigger_instance_id",
+        )?;
+        require_binding(
+            binding.parametric_policy_body_digest
+                == self.identity.key.parametric_policy_body_digest,
+            "payout_binding.parametric_policy_body_digest",
         )?;
         require_binding(
             binding.bound_coverage_body_digest == self.identity.key.bound_coverage_body_digest,
@@ -517,6 +495,16 @@ impl ParametricClaimRecordV1 {
     #[must_use]
     pub const fn payout_amount(&self) -> &MonetaryAmount {
         &self.payout_amount
+    }
+
+    #[must_use]
+    pub const fn trigger_magnitude(&self) -> &TriggerMagnitude {
+        &self.trigger_magnitude
+    }
+
+    #[must_use]
+    pub const fn opened_at(&self) -> u64 {
+        self.opened_at
     }
 
     #[must_use]
@@ -695,17 +683,163 @@ impl VerifiedParametricContestV1 {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ParametricPayoutPreparationBindingV1 {
+    pub schema: String,
+    pub claim_id: String,
+    pub anchor_id: String,
+    pub operation_id: String,
+    pub request: EconomicRequestBindingV1,
+    pub admission_handoff: EconomicAdmissionHandoffV1,
+    pub bound_coverage_body_digest: String,
+    pub coverage_reservation_id: String,
+    pub coverage_reservation_version: u64,
+    pub coverage_reservation_lifecycle_fence: u64,
+    pub coverage_head_digest: String,
+    pub target_id: String,
+    pub target_key_epoch: u64,
+    pub capital_instruction_template_digest: String,
+    pub capital_instruction_id: String,
+    pub capital_instruction_body_digest: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ParametricPayoutCapitalInstructionIdPreimage<'a> {
+    claim_id: &'a str,
+    anchor_id: &'a str,
+    operation_id: &'a str,
+    request: &'a EconomicRequestBindingV1,
+    admission_handoff: &'a EconomicAdmissionHandoffV1,
+    bound_coverage_body_digest: &'a str,
+    coverage_reservation_id: &'a str,
+    coverage_reservation_version: u64,
+    coverage_reservation_lifecycle_fence: u64,
+    coverage_head_digest: &'a str,
+    target_id: &'a str,
+    target_key_epoch: u64,
+    capital_instruction_template_digest: &'a str,
+}
+
+impl ParametricPayoutPreparationBindingV1 {
+    pub fn validate(&self) -> Result<(), ParametricClaimError> {
+        if self.schema != PARAMETRIC_PAYOUT_PREPARATION_BINDING_SCHEMA {
+            return Err(ParametricContractError::UnknownSchema(self.schema.clone()).into());
+        }
+        validate_digest(&self.claim_id, "payout_preparation.claim_id")?;
+        validate_clean(&self.anchor_id, "payout_preparation.anchor_id")?;
+        validate_digest(&self.operation_id, "payout_preparation.operation_id")?;
+        self.request
+            .validate()
+            .map_err(|_| ParametricContractError::InvalidField("payout_preparation.request"))?;
+        self.admission_handoff.validate().map_err(|_| {
+            ParametricContractError::InvalidField("payout_preparation.admission_handoff")
+        })?;
+        validate_digest(
+            &self.bound_coverage_body_digest,
+            "payout_preparation.bound_coverage_body_digest",
+        )?;
+        validate_digest(
+            &self.coverage_reservation_id,
+            "payout_preparation.coverage_reservation_id",
+        )?;
+        if self.coverage_reservation_version == 0
+            || self.coverage_reservation_lifecycle_fence == 0
+            || self.target_key_epoch == 0
+        {
+            return Err(ParametricContractError::InvalidField("payout_preparation.version").into());
+        }
+        validate_digest(
+            &self.coverage_head_digest,
+            "payout_preparation.coverage_head_digest",
+        )?;
+        validate_clean(&self.target_id, "payout_preparation.target_id")?;
+        validate_digest(
+            &self.capital_instruction_template_digest,
+            "payout_preparation.capital_instruction_template_digest",
+        )?;
+        validate_digest(
+            &self.capital_instruction_body_digest,
+            "payout_preparation.capital_instruction_body_digest",
+        )?;
+        require_binding(
+            self.capital_instruction_id == self.derived_capital_instruction_id()?,
+            "payout_preparation.capital_instruction_id",
+        )?;
+        Ok(())
+    }
+
+    pub fn derived_capital_instruction_id(&self) -> Result<String, ParametricClaimError> {
+        Ok(domain_digest(
+            PARAMETRIC_PAYOUT_CAPITAL_INSTRUCTION_ID_DOMAIN,
+            &ParametricPayoutCapitalInstructionIdPreimage {
+                claim_id: &self.claim_id,
+                anchor_id: &self.anchor_id,
+                operation_id: &self.operation_id,
+                request: &self.request,
+                admission_handoff: &self.admission_handoff,
+                bound_coverage_body_digest: &self.bound_coverage_body_digest,
+                coverage_reservation_id: &self.coverage_reservation_id,
+                coverage_reservation_version: self.coverage_reservation_version,
+                coverage_reservation_lifecycle_fence: self.coverage_reservation_lifecycle_fence,
+                coverage_head_digest: &self.coverage_head_digest,
+                target_id: &self.target_id,
+                target_key_epoch: self.target_key_epoch,
+                capital_instruction_template_digest: &self.capital_instruction_template_digest,
+            },
+        )?)
+    }
+
+    pub fn action_digest(&self) -> Result<String, ParametricClaimError> {
+        self.derived_digest(PARAMETRIC_PAYOUT_ACTION_DIGEST_DOMAIN)
+    }
+
+    pub fn target_qualification_digest(&self) -> Result<String, ParametricClaimError> {
+        self.derived_digest(PARAMETRIC_PAYOUT_TARGET_QUALIFICATION_DIGEST_DOMAIN)
+    }
+
+    pub fn effect_idempotency_key(&self) -> Result<String, ParametricClaimError> {
+        self.derived_digest(PARAMETRIC_PAYOUT_EFFECT_IDEMPOTENCY_KEY_DOMAIN)
+    }
+
+    fn derived_digest(&self, domain: &str) -> Result<String, ParametricClaimError> {
+        self.validate()?;
+        Ok(domain_digest(domain, self)?)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ParametricPayoutBindingV1 {
     pub schema: String,
     pub claim_id: String,
+    pub trigger_instance_id: String,
+    pub parametric_policy_body_digest: String,
     pub expected_claim_version: u64,
     pub expected_lifecycle_fence: u64,
     pub bound_coverage_body_digest: String,
+    pub coverage_reservation_id: String,
+    pub coverage_reservation_version: u64,
+    pub coverage_reservation_lifecycle_fence: u64,
+    pub coverage_head_digest: String,
     pub payer_id: String,
     pub beneficiary_id: String,
     pub funding_facility_id: String,
     pub payout_rail: ParametricPayoutRail,
+    pub operation_id: String,
+    pub request: EconomicRequestBindingV1,
+    pub effect_slot_id: String,
+    pub effect_idempotency_key: String,
+    pub effect_slot: EconomicEffectSlotV1,
+    pub capital_instruction_id: String,
+    pub governed_receipt_id: String,
+    pub completion_flow_row_id: String,
+    pub source_account_digest: String,
+    pub instruction_signer_key_epoch: u64,
+    pub facility_authority_key_epoch: u64,
+    pub custodian_authority_key_epoch: u64,
+    pub capital_instruction_template_digest: String,
     pub capital_instruction_body_digest: String,
+    pub capital_instruction_envelope_digest: String,
     pub amount: MonetaryAmount,
 }
 
@@ -715,12 +849,35 @@ impl ParametricPayoutBindingV1 {
             return Err(ParametricContractError::UnknownSchema(self.schema.clone()).into());
         }
         validate_digest(&self.claim_id, "payout_binding.claim_id")?;
+        validate_digest(
+            &self.trigger_instance_id,
+            "payout_binding.trigger_instance_id",
+        )?;
+        validate_digest(
+            &self.parametric_policy_body_digest,
+            "payout_binding.parametric_policy_body_digest",
+        )?;
         if self.expected_claim_version == 0 || self.expected_lifecycle_fence == 0 {
             return Err(ParametricContractError::InvalidField("payout_binding.claim_head").into());
         }
         validate_digest(
             &self.bound_coverage_body_digest,
             "payout_binding.bound_coverage_body_digest",
+        )?;
+        validate_digest(
+            &self.coverage_reservation_id,
+            "payout_binding.coverage_reservation_id",
+        )?;
+        if self.coverage_reservation_version == 0 || self.coverage_reservation_lifecycle_fence == 0
+        {
+            return Err(ParametricContractError::InvalidField(
+                "payout_binding.coverage_reservation_head",
+            )
+            .into());
+        }
+        validate_digest(
+            &self.coverage_head_digest,
+            "payout_binding.coverage_head_digest",
         )?;
         validate_clean(&self.payer_id, "payout_binding.payer_id")?;
         validate_clean(&self.beneficiary_id, "payout_binding.beneficiary_id")?;
@@ -729,34 +886,144 @@ impl ParametricPayoutBindingV1 {
             "payout_binding.funding_facility_id",
         )?;
         self.payout_rail.validate()?;
+        validate_digest(&self.operation_id, "payout_binding.operation_id")?;
+        self.request
+            .validate()
+            .map_err(|_| ParametricContractError::InvalidField("payout_binding.request"))?;
+        self.effect_slot
+            .validate()
+            .map_err(|_| ParametricContractError::InvalidField("payout_binding.effect_slot"))?;
+        require_binding(
+            self.effect_slot.operation_id == self.operation_id,
+            "payout_binding.effect_slot.operation_id",
+        )?;
+        require_binding(
+            self.effect_slot.request == self.request,
+            "payout_binding.effect_slot.request",
+        )?;
+        validate_digest(&self.effect_slot_id, "payout_binding.effect_slot_id")?;
+        validate_digest(
+            &self.effect_idempotency_key,
+            "payout_binding.effect_idempotency_key",
+        )?;
+        require_binding(
+            self.effect_slot.slot_id == self.effect_slot_id
+                && self.effect_slot.idempotency_key == self.effect_idempotency_key,
+            "payout_binding.effect_slot.identity",
+        )?;
+        require_binding(
+            self.effect_slot.namespace == PARAMETRIC_PAYOUT_ECONOMIC_NAMESPACE
+                && self.effect_slot.resource_key.resource_family
+                    == PARAMETRIC_LIABILITY_COVERAGE_RESOURCE_FAMILY
+                && self.effect_slot.effect_kind == PARAMETRIC_PAYOUT_EFFECT_KIND,
+            "payout_binding.effect_slot.effect_kind",
+        )?;
+        require_binding(
+            self.effect_slot.resource_key.scope_id == self.bound_coverage_body_digest
+                && self.effect_slot.resource_key.resource_id == self.coverage_reservation_id
+                && self.effect_slot.resource_head_digest == self.coverage_head_digest,
+            "payout_binding.effect_slot.coverage_head",
+        )?;
+        require_binding(
+            self.effect_slot.admission_handoff.state
+                == EconomicAdmissionHandoffStateV1::MutationSubmitted
+                && self.effect_slot.state == EconomicEffectStateV1::Ready
+                && self.effect_slot.terminal.is_none()
+                && self.effect_slot.frost.is_none(),
+            "payout_binding.effect_slot.state",
+        )?;
+        validate_clean(
+            &self.capital_instruction_id,
+            "payout_binding.capital_instruction_id",
+        )?;
+        validate_clean(
+            &self.governed_receipt_id,
+            "payout_binding.governed_receipt_id",
+        )?;
+        validate_clean(
+            &self.completion_flow_row_id,
+            "payout_binding.completion_flow_row_id",
+        )?;
+        validate_digest(
+            &self.source_account_digest,
+            "payout_binding.source_account_digest",
+        )?;
+        if self.instruction_signer_key_epoch == 0
+            || self.facility_authority_key_epoch == 0
+            || self.custodian_authority_key_epoch == 0
+            || self.effect_slot.target.target_key_epoch != self.custodian_authority_key_epoch
+        {
+            return Err(ParametricContractError::InvalidField(
+                "payout_binding.capital_authority_epoch",
+            )
+            .into());
+        }
+        validate_digest(
+            &self.capital_instruction_template_digest,
+            "payout_binding.capital_instruction_template_digest",
+        )?;
         validate_digest(
             &self.capital_instruction_body_digest,
             "payout_binding.capital_instruction_body_digest",
         )?;
+        validate_digest(
+            &self.capital_instruction_envelope_digest,
+            "payout_binding.capital_instruction_envelope_digest",
+        )?;
         validate_money(&self.amount, "payout_binding.amount", false)?;
+        let preparation = self.preparation_binding()?;
+        require_binding(
+            self.effect_slot.action_digest == preparation.action_digest()?,
+            "payout_binding.effect_slot.action_digest",
+        )?;
+        require_binding(
+            self.effect_slot.target.qualification_digest
+                == preparation.target_qualification_digest()?,
+            "payout_binding.effect_slot.target_qualification_digest",
+        )?;
+        require_binding(
+            self.effect_idempotency_key == preparation.effect_idempotency_key()?,
+            "payout_binding.effect_slot.idempotency_key",
+        )?;
         Ok(())
+    }
+
+    pub fn preparation_binding(
+        &self,
+    ) -> Result<ParametricPayoutPreparationBindingV1, ParametricClaimError> {
+        let preparation = ParametricPayoutPreparationBindingV1 {
+            schema: PARAMETRIC_PAYOUT_PREPARATION_BINDING_SCHEMA.to_owned(),
+            claim_id: self.claim_id.clone(),
+            anchor_id: self.effect_slot.anchor_id.clone(),
+            operation_id: self.operation_id.clone(),
+            request: self.request.clone(),
+            admission_handoff: self.effect_slot.admission_handoff.clone(),
+            bound_coverage_body_digest: self.bound_coverage_body_digest.clone(),
+            coverage_reservation_id: self.coverage_reservation_id.clone(),
+            coverage_reservation_version: self.coverage_reservation_version,
+            coverage_reservation_lifecycle_fence: self.coverage_reservation_lifecycle_fence,
+            coverage_head_digest: self.coverage_head_digest.clone(),
+            target_id: self.effect_slot.target.target_id.clone(),
+            target_key_epoch: self.effect_slot.target.target_key_epoch,
+            capital_instruction_template_digest: self.capital_instruction_template_digest.clone(),
+            capital_instruction_id: self.capital_instruction_id.clone(),
+            capital_instruction_body_digest: self.capital_instruction_body_digest.clone(),
+        };
+        preparation.validate()?;
+        Ok(preparation)
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ParametricPayoutIntentV1 {
     pub schema: String,
     pub payout_intent_id: String,
     pub binding: ParametricPayoutBindingV1,
+    pub capital_instruction: SignedCapitalExecutionInstruction,
 }
 
 impl ParametricPayoutIntentV1 {
-    fn new(binding: ParametricPayoutBindingV1) -> Result<Self, ParametricClaimError> {
-        let intent = Self {
-            schema: PARAMETRIC_PAYOUT_INTENT_SCHEMA.to_owned(),
-            payout_intent_id: parametric_payout_intent_id(&binding.claim_id)?,
-            binding,
-        };
-        intent.validate()?;
-        Ok(intent)
-    }
-
     pub fn validate(&self) -> Result<(), ParametricClaimError> {
         if self.schema != PARAMETRIC_PAYOUT_INTENT_SCHEMA {
             return Err(ParametricContractError::UnknownSchema(self.schema.clone()).into());
@@ -766,22 +1033,386 @@ impl ParametricPayoutIntentV1 {
             self.payout_intent_id == parametric_payout_intent_id(&self.binding.claim_id)?,
             "payout_intent.payout_intent_id",
         )?;
-        Ok(())
+        validate_capital_instruction_against(&self.capital_instruction, &self.binding, None)
     }
 
-    pub fn validate_against(
+    pub fn validate_against_eligible_claim(
         &self,
         claim: &ParametricClaimRecordV1,
     ) -> Result<(), ParametricClaimError> {
         claim.validate()?;
         self.validate()?;
-        if claim.state != ParametricClaimStateV1::PayoutReserved
-            || claim.payout_binding.as_ref() != Some(&self.binding)
+        if !matches!(
+            claim.state,
+            ParametricClaimStateV1::Ready | ParametricClaimStateV1::UncontestedReleased
+        ) || claim.version != self.binding.expected_claim_version
+            || claim.lifecycle_fence != self.binding.expected_lifecycle_fence
         {
             return Err(ParametricClaimError::PayoutIntentConflict);
         }
-        claim.ensure_binding_matches(&self.binding)
+        claim.ensure_binding_matches(&self.binding)?;
+        validate_capital_instruction_against(&self.capital_instruction, &self.binding, Some(claim))
     }
+}
+
+pub type SignedParametricPayoutIntentV1 = SignedExportEnvelope<ParametricPayoutIntentV1>;
+
+#[derive(Debug, Clone)]
+pub struct ParametricPayoutInstructionTrustInputV1 {
+    pub trusted_now: u64,
+    pub instruction_signer_key: PublicKey,
+    pub instruction_signer_key_epoch: u64,
+    pub funding_facility_id: String,
+    pub facility_authority_key: PublicKey,
+    pub facility_authority_key_epoch: u64,
+    pub authorized_source_account_digest: String,
+    pub custody_provider_id: String,
+    pub custodian_authority_key: PublicKey,
+    pub custodian_authority_key_epoch: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct ParametricPayoutInstructionTrustV1 {
+    trusted_now: u64,
+    instruction_signer_key: PublicKey,
+    instruction_signer_key_epoch: u64,
+    funding_facility_id: String,
+    facility_authority_key: PublicKey,
+    facility_authority_key_epoch: u64,
+    authorized_source_account_digest: String,
+    custody_provider_id: String,
+    custodian_authority_key: PublicKey,
+    custodian_authority_key_epoch: u64,
+}
+
+impl ParametricPayoutInstructionTrustV1 {
+    pub fn new(
+        input: ParametricPayoutInstructionTrustInputV1,
+    ) -> Result<Self, ParametricClaimError> {
+        let ParametricPayoutInstructionTrustInputV1 {
+            trusted_now,
+            instruction_signer_key,
+            instruction_signer_key_epoch,
+            funding_facility_id,
+            facility_authority_key,
+            facility_authority_key_epoch,
+            authorized_source_account_digest,
+            custody_provider_id,
+            custodian_authority_key,
+            custodian_authority_key_epoch,
+        } = input;
+        validate_clean(&funding_facility_id, "trusted.funding_facility_id")?;
+        validate_digest(
+            &authorized_source_account_digest,
+            "trusted.authorized_source_account_digest",
+        )?;
+        validate_clean(&custody_provider_id, "trusted.custody_provider_id")?;
+        if trusted_now == 0
+            || instruction_signer_key_epoch == 0
+            || facility_authority_key_epoch == 0
+            || custodian_authority_key_epoch == 0
+        {
+            return Err(
+                ParametricContractError::InvalidField("trusted.capital_instruction").into(),
+            );
+        }
+        Ok(Self {
+            trusted_now,
+            instruction_signer_key,
+            instruction_signer_key_epoch,
+            funding_facility_id,
+            facility_authority_key,
+            facility_authority_key_epoch,
+            authorized_source_account_digest,
+            custody_provider_id,
+            custodian_authority_key,
+            custodian_authority_key_epoch,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ValidatedPreReservationParametricPayoutIntentV1 {
+    signed: SignedParametricPayoutIntentV1,
+    envelope_digest: String,
+}
+
+impl ValidatedPreReservationParametricPayoutIntentV1 {
+    /// Validates preparation inputs only. This does not prove a reservation or dispatch authority.
+    pub fn validate_pre_reservation(
+        signed: SignedParametricPayoutIntentV1,
+        trusted_intent_signer_key: &PublicKey,
+        instruction_trust: &ParametricPayoutInstructionTrustV1,
+        eligible_claim: &ParametricClaimRecordV1,
+        expected_preparation: &ParametricPayoutPreparationBindingV1,
+    ) -> Result<Self, ParametricClaimError> {
+        signed
+            .body
+            .validate_against_eligible_claim(eligible_claim)?;
+        expected_preparation.validate()?;
+        if signed.body.binding.preparation_binding()? != *expected_preparation {
+            return Err(ParametricClaimError::PayoutIntentConflict);
+        }
+        verify_capital_instruction_trust(
+            &signed.body.capital_instruction,
+            &signed.body.binding,
+            instruction_trust,
+        )?;
+        if &signed.signer_key != trusted_intent_signer_key {
+            return Err(ParametricClaimError::UntrustedPayoutIntentSigner);
+        }
+        if !signed
+            .verify_signature()
+            .map_err(|_| ParametricClaimError::InvalidPayoutIntentSignature)?
+        {
+            return Err(ParametricClaimError::InvalidPayoutIntentSignature);
+        }
+        Ok(Self {
+            envelope_digest: canonical_digest(&signed)?,
+            signed,
+        })
+    }
+
+    #[must_use]
+    pub const fn body(&self) -> &ParametricPayoutIntentV1 {
+        &self.signed.body
+    }
+
+    #[must_use]
+    pub const fn signed(&self) -> &SignedParametricPayoutIntentV1 {
+        &self.signed
+    }
+
+    #[must_use]
+    pub fn envelope_digest(&self) -> &str {
+        &self.envelope_digest
+    }
+}
+
+pub fn parametric_payout_destination_account_digest(
+    destination_account_ref: &str,
+) -> Result<String, ParametricClaimError> {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct DestinationAccountDigestPreimage<'a> {
+        destination_account_ref: &'a str,
+    }
+
+    validate_clean(
+        destination_account_ref,
+        "payout_destination.destination_account_ref",
+    )?;
+    Ok(domain_digest(
+        PARAMETRIC_PAYOUT_DESTINATION_ACCOUNT_DIGEST_DOMAIN,
+        &DestinationAccountDigestPreimage {
+            destination_account_ref,
+        },
+    )?)
+}
+
+pub fn parametric_payout_source_account_digest(
+    source_account_ref: &str,
+) -> Result<String, ParametricClaimError> {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SourceAccountDigestPreimage<'a> {
+        source_account_ref: &'a str,
+    }
+
+    validate_clean(source_account_ref, "payout_source.source_account_ref")?;
+    Ok(domain_digest(
+        PARAMETRIC_PAYOUT_SOURCE_ACCOUNT_DIGEST_DOMAIN,
+        &SourceAccountDigestPreimage { source_account_ref },
+    )?)
+}
+
+fn validate_capital_instruction(
+    instruction: &SignedCapitalExecutionInstruction,
+) -> Result<(), ParametricClaimError> {
+    instruction
+        .body
+        .validate()
+        .map_err(|_| ParametricClaimError::InvalidCapitalInstruction)?;
+    if !instruction
+        .verify_signature()
+        .map_err(|_| ParametricClaimError::InvalidCapitalInstructionSignature)?
+    {
+        return Err(ParametricClaimError::InvalidCapitalInstructionSignature);
+    }
+    Ok(())
+}
+
+fn capital_instruction_template_digest(
+    body: &CapitalExecutionInstructionArtifact,
+) -> Result<String, ParametricClaimError> {
+    let mut template = body.clone();
+    template.instruction_id.clear();
+    Ok(canonical_digest(&template)?)
+}
+
+fn validate_capital_instruction_against(
+    instruction: &SignedCapitalExecutionInstruction,
+    binding: &ParametricPayoutBindingV1,
+    claim: Option<&ParametricClaimRecordV1>,
+) -> Result<(), ParametricClaimError> {
+    validate_capital_instruction(instruction)?;
+    let body = &instruction.body;
+    require_binding(
+        body.action == CapitalExecutionInstructionAction::TransferFunds,
+        "payout_intent.capital_instruction.action",
+    )?;
+    require_binding(
+        body.source_kind == CapitalBookSourceKind::FacilityCommitment,
+        "payout_intent.capital_instruction.source_kind",
+    )?;
+    require_binding(
+        body.source_id == binding.funding_facility_id,
+        "payout_intent.capital_instruction.source_id",
+    )?;
+    require_binding(
+        body.owner_role == CapitalExecutionRole::FacilityProvider,
+        "payout_intent.capital_instruction.owner_role",
+    )?;
+    if let Some(claim) = claim {
+        require_binding(
+            body.subject_key == claim.identity.key.subject_key,
+            "payout_intent.capital_instruction.subject_key",
+        )?;
+    }
+    require_binding(
+        body.subject_key == binding.beneficiary_id,
+        "payout_intent.capital_instruction.subject_beneficiary",
+    )?;
+    require_binding(
+        body.counterparty_role == CapitalExecutionRole::AgentCounterparty,
+        "payout_intent.capital_instruction.counterparty_role",
+    )?;
+    require_binding(
+        body.counterparty_id == binding.beneficiary_id,
+        "payout_intent.capital_instruction.counterparty_id",
+    )?;
+    require_binding(
+        body.amount.as_ref() == Some(&binding.amount),
+        "payout_intent.capital_instruction.amount",
+    )?;
+    require_binding(
+        body.rail.kind == binding.payout_rail.kind,
+        "payout_intent.capital_instruction.rail_kind",
+    )?;
+    require_binding(
+        body.rail.rail_id == binding.payout_rail.rail_id,
+        "payout_intent.capital_instruction.rail_id",
+    )?;
+    require_binding(
+        body.rail.custody_provider_id == binding.effect_slot.target.target_id,
+        "payout_intent.capital_instruction.custody_provider_id",
+    )?;
+    require_binding(
+        body.instruction_id == binding.capital_instruction_id,
+        "payout_intent.capital_instruction.instruction_id",
+    )?;
+    require_binding(
+        capital_instruction_template_digest(body)? == binding.capital_instruction_template_digest,
+        "payout_intent.capital_instruction.template_digest",
+    )?;
+    require_binding(
+        body.governed_receipt_id.as_deref() == Some(binding.governed_receipt_id.as_str()),
+        "payout_intent.capital_instruction.governed_receipt_id",
+    )?;
+    require_binding(
+        body.completion_flow_row_id.as_deref() == Some(binding.completion_flow_row_id.as_str()),
+        "payout_intent.capital_instruction.completion_flow_row_id",
+    )?;
+    let source_account_ref = body
+        .rail
+        .source_account_ref
+        .as_deref()
+        .ok_or(ParametricClaimError::InvalidCapitalInstruction)?;
+    require_binding(
+        parametric_payout_source_account_digest(source_account_ref)?
+            == binding.source_account_digest,
+        "payout_intent.capital_instruction.source_account_ref",
+    )?;
+    let destination_account_ref = body
+        .rail
+        .destination_account_ref
+        .as_deref()
+        .ok_or(ParametricClaimError::InvalidCapitalInstruction)?;
+    require_binding(
+        parametric_payout_destination_account_digest(destination_account_ref)?
+            == binding.payout_rail.destination_account_digest,
+        "payout_intent.capital_instruction.destination_account_ref",
+    )?;
+    require_binding(
+        body.intended_state == CapitalExecutionIntendedState::PendingExecution,
+        "payout_intent.capital_instruction.intended_state",
+    )?;
+    require_binding(
+        body.reconciled_state == CapitalExecutionReconciledState::NotObserved
+            && body.observed_execution.is_none(),
+        "payout_intent.capital_instruction.reconciliation",
+    )?;
+    require_binding(
+        canonical_digest(body)? == binding.capital_instruction_body_digest,
+        "payout_intent.capital_instruction.body_digest",
+    )?;
+    require_binding(
+        binding.effect_slot.parameters_digest == binding.capital_instruction_body_digest,
+        "payout_intent.effect_slot.parameters_digest",
+    )?;
+    require_binding(
+        canonical_digest(instruction)? == binding.capital_instruction_envelope_digest,
+        "payout_intent.capital_instruction.envelope_digest",
+    )?;
+    Ok(())
+}
+
+fn verify_capital_instruction_trust(
+    instruction: &SignedCapitalExecutionInstruction,
+    binding: &ParametricPayoutBindingV1,
+    trust: &ParametricPayoutInstructionTrustV1,
+) -> Result<(), ParametricClaimError> {
+    let body = &instruction.body;
+    let trusted_facility_key = trust.facility_authority_key.to_hex();
+    let trusted_custodian_key = trust.custodian_authority_key.to_hex();
+    if instruction.signer_key != trust.instruction_signer_key
+        || binding.instruction_signer_key_epoch != trust.instruction_signer_key_epoch
+        || binding.facility_authority_key_epoch != trust.facility_authority_key_epoch
+        || binding.custodian_authority_key_epoch != trust.custodian_authority_key_epoch
+        || binding.funding_facility_id != trust.funding_facility_id
+        || binding.source_account_digest != trust.authorized_source_account_digest
+        || body.source_id != trust.funding_facility_id
+        || body.rail.custody_provider_id != trust.custody_provider_id
+        || binding.effect_slot.target.target_id != trust.custody_provider_id
+        || binding.effect_slot.target.target_key_epoch != trust.custodian_authority_key_epoch
+    {
+        return Err(ParametricClaimError::UntrustedCapitalInstruction);
+    }
+    if trust.trusted_now < body.execution_window.not_before
+        || trust.trusted_now > body.execution_window.not_after
+        || body.issued_at > trust.trusted_now
+    {
+        return Err(ParametricClaimError::CapitalInstructionWindowClosed);
+    }
+    if !body.support_boundary.automatic_dispatch_supported {
+        return Err(ParametricClaimError::AutomaticDispatchUnsupported);
+    }
+    let exact_current_authority = |role, principal_id: &str| {
+        body.authority_chain.iter().any(|step| {
+            step.role == role
+                && step.principal_id == principal_id
+                && step.approved_at <= trust.trusted_now
+                && trust.trusted_now <= step.expires_at
+        })
+    };
+    if !exact_current_authority(
+        CapitalExecutionRole::FacilityProvider,
+        &trusted_facility_key,
+    ) || !exact_current_authority(CapitalExecutionRole::Custodian, &trusted_custodian_key)
+    {
+        return Err(ParametricClaimError::UntrustedCapitalInstruction);
+    }
+    Ok(())
 }
 
 pub fn parametric_payout_intent_id(claim_id: &str) -> Result<String, ParametricClaimError> {
@@ -796,3 +1427,6 @@ pub fn parametric_payout_intent_id(claim_id: &str) -> Result<String, ParametricC
         &PayoutIntentIdPreimage { claim_id },
     )?)
 }
+
+#[cfg(test)]
+mod payout_tests;

@@ -536,7 +536,7 @@ impl VerifiedEvidenceCorpusV1 {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerifiedTriggerVerdictV1 {
-    Fired(VerifiedFiredTriggerV1),
+    Fired(Box<VerifiedFiredTriggerV1>),
     NotFired,
 }
 

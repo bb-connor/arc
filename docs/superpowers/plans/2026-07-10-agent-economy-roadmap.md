@@ -294,14 +294,17 @@ must pass its consumer batch matrix in Task 5.
   service reservation is externally anchored before tool dispatch;
   family-v2 proposal document for atomic on-chain close (proposal only).
 - WS7: `chio.parametric.*` policy and trigger evaluation; auto-claim assembly;
-  semantic trigger identity, atomic contest lifecycle, shared canonical
-  liability-coverage reservation across legacy and parametric claims, exact
-  beneficiary/destination/facility/amount payout binding, unique payout intent
-  and reconciliation binding, all through one external semantic-trigger/claim/
-  shared-coverage batch; single-adjudicator artifacts may land before
-  FROST, but n-of-m
-  adjudication-panel supersession and settlement dispatch remain disabled until
-  their production quorum prerequisites pass.
+  semantic trigger identity over stable source/index/subject/window/sequence/
+  count/selected-root fields, atomic contest lifecycle, canonical insured-subject
+  beneficiary binding in v1, and shared canonical liability-coverage reservation
+  across legacy and parametric claims. Reuse `EconomicStateBatchV1`, shared
+  resource heads, and the existing effect slot for unique payout intent and
+  reconciliation binding; no WS7-private continuity coordinator or parallel
+  authoritative projection is allowed. Single-adjudicator artifacts may land
+  before FROST, but production claim processing and payout dispatch remain
+  disabled until the legacy claim path uses the same ledger and head API, and
+  n-of-m adjudication-panel supersession and settlement dispatch remain disabled
+  until their production quorum prerequisites pass.
 - WS9: implement the six scenario classes as ordinary tests first. A thin
   deterministic runner may later emit project-signed internal qualification
   matrices; the advisory `ci-gates/` facet cannot launder them into external
@@ -315,8 +318,10 @@ obligation disposition and reconcile through WS1, with WS4 finalization proven
 state machine over the existing qualified escrow, with quorum close enabled
   only through that verifier and channel CAS; the parametric tier is live against
   completeness-proven replayed corpora with semantic claim/contest CAS and
-  legacy-plus-parametric coverage non-equivocation, while panel supersession is
-  optional and remains disabled without FROST P3 and its claim CAS; both named
+  legacy-plus-parametric coverage non-equivocation, with the legacy path live on
+  that same ledger before production parametric claim processing or payout
+  dispatch, while panel supersession is optional and remains disabled without
+  FROST P3 and its claim CAS; both named
   admission controls remain live and their WS9 scenarios run rather than report
   `NotRun`;
   WS9 tests are green with no unresolved Critical or High finding. Scheduled
@@ -378,11 +383,15 @@ optional internal artifacts, not an exit substitute.
   gating remains in each workstream. No workstream silently implements or mocks
   that prerequisite.
 - WS7: rate-trigger corpus completeness needs an anchor-epoch attestation;
-  design lands with the trigger evaluation phase, not after. Parametric claims
-  use semantic policy/subject/window/evidence-range identity, contest CAS, exact
-  payout bindings and the same canonical liability-coverage ledger as legacy
-  claims before any payout intent can dispatch. Panel authority uses the shared
-  FROST schema and payout-instruction v2; v1 stays unchanged.
+  design lands with the trigger evaluation phase, not after. Evidence identity
+  retains stable source/index/subject/window/sequence/count/selected-root fields
+  and excludes verified checkpoint, signature/key, anchor epoch/rotation, and
+  prefix high-water metadata. The v1 beneficiary equals the canonical insured
+  subject; no untyped override is accepted. Parametric claims reuse the shared
+  `EconomicStateBatchV1`, resource heads, effect slot, and canonical
+  liability-coverage ledger, with activation gated until legacy claims use that
+  same ledger. Panel authority uses the shared FROST schema and
+  payout-instruction v2; v1 stays unchanged.
 - WS9: begin with ordinary tests in the owning validator crates. Add a runner
   or crate only when shared campaign code proves a distinct ownership and
   dependency boundary. Project-signed output remains internal qualification.

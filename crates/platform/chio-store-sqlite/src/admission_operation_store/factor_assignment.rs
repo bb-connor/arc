@@ -1589,6 +1589,7 @@ fn insert_factor_assignment_result(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn participant_digest(
     authority_set_generation: u64,
     authority_set_digest: &str,
@@ -1634,6 +1635,7 @@ fn participant_digest(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn participant_digest_from_parts(
     operation_id: &str,
     authority_set_generation: u64,

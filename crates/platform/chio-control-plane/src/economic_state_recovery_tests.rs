@@ -9,9 +9,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chio_core::crypto::{sha256_hex, Keypair};
 use chio_core::economic_continuity::{
     verify_economic_state_batch_advance, verify_economic_state_view,
-    EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1, EconomicContentV1,
-    EconomicEffectDispatchCommitV1, EconomicEffectSlotV1, EconomicEffectStateV1,
-    EconomicEffectTargetV1, EconomicRequestBindingV1, EconomicResourceHeadV1,
+    EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1, EconomicAdmissionHandoffVerifier,
+    EconomicContentV1, EconomicEffectCancellationProofVerifier, EconomicEffectDispatchCommitV1,
+    EconomicEffectSlotV1, EconomicEffectStateV1, EconomicEffectTargetV1, EconomicEffectTerminalV1,
+    EconomicNoEffectKindV1, EconomicRequestBindingV1, EconomicResourceHeadV1,
     EconomicResourceKeyV1, EconomicStateAnchor, EconomicStateAnchorError, EconomicStateAnchorPins,
     EconomicStateAnchorViewV1, EconomicStateBatchV1, EconomicStateReadQuery,
     EconomicStateTransitionV1, EconomicTransitionAuthorizationV1, EconomicTransitionProofVerifier,
@@ -156,6 +157,35 @@ impl EconomicTransitionProofVerifier for DirectVerifier {
         _transition: &EconomicStateTransitionV1,
     ) -> Result<EconomicTransitionAuthorizationV1, EconomicStateAnchorError> {
         Ok(EconomicTransitionAuthorizationV1::Direct)
+    }
+}
+
+impl EconomicEffectCancellationProofVerifier for DirectVerifier {
+    fn verify_cancellation(
+        &self,
+        _current: &EconomicEffectSlotV1,
+        next: &EconomicEffectSlotV1,
+    ) -> Result<EconomicNoEffectKindV1, EconomicStateAnchorError> {
+        match next.terminal.as_ref() {
+            Some(EconomicEffectTerminalV1::NoEffect { kind, .. }) => Ok(*kind),
+            _ => Err(EconomicStateAnchorError::EffectCancellationRejected(
+                "fixture cancellation kind is missing",
+            )),
+        }
+    }
+}
+
+impl EconomicAdmissionHandoffVerifier for DirectVerifier {
+    fn verify_operation_active(&self, _operation_id: &str) -> Result<(), EconomicStateAnchorError> {
+        Ok(())
+    }
+
+    fn verify_handoff(
+        &self,
+        _operation_id: &str,
+        _handoff: &EconomicAdmissionHandoffV1,
+    ) -> Result<(), EconomicStateAnchorError> {
+        Ok(())
     }
 }
 
@@ -530,7 +560,7 @@ impl EconomicStateAnchor for FixtureAnchor {
 
     fn compare_and_swap_batch(
         &self,
-        _advance: &VerifiedEconomicStateBatchAdvance,
+        _advance: chio_core::economic_continuity::QualifiedGenericEconomicStateBatchAdvance<'_>,
     ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
         self.cas_calls.fetch_add(1, Ordering::SeqCst);
         lock(&self.commits).pop_front().ok_or_else(|| {
@@ -554,6 +584,8 @@ fn recovery(fixture: &Fixture, anchor: Arc<FixtureAnchor>) -> EconomicStateRecov
         fixture.cache.clone(),
         anchor,
         fixture.operations.clone(),
+        Arc::new(DirectVerifier),
+        Arc::new(DirectVerifier),
         Arc::new(DirectVerifier),
         pins(),
         fixture.fence.clone(),

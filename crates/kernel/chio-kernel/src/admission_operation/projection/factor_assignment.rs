@@ -194,6 +194,7 @@ fn result_binding(
         )
         .map_err(invalid)?,
         status,
+        anchored_effect: false,
     };
     binding.validate_against(operation, context)?;
     Ok(binding)

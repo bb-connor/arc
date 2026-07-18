@@ -8,7 +8,8 @@ use crate::admission_operation::{
 };
 use chio_core_types::economic_continuity::{
     EconomicAdmissionHandoffStateV1, EconomicEffectSlotV1, EconomicEffectStateV1,
-    EconomicEffectTerminalV1, EconomicNoEffectKindV1, VerifiedEconomicEffectNotDispatched,
+    EconomicEffectTerminalV1, EconomicNoEffectKindV1, EconomicResourceHeadV1, EconomicStateBatchV1,
+    VerifiedEconomicEffectCancellationAdvance,
 };
 use chio_core_types::provider_attempt::{
     ProviderAttemptCheckpointV1, ProviderAttemptPhaseV1, ProviderCancellationBindingV1,
@@ -1013,6 +1014,13 @@ struct UntrustedTransportNotAcceptedWireV1(
 );
 
 impl VerifiedTransportNotAccepted {
+    pub(crate) fn uses_economic_effect_cancellation(&self) -> bool {
+        matches!(
+            self.artifacts.first().map(|artifact| artifact.kind),
+            Some(ReleaseEvidenceArtifactKindV1::EconomicEffectCancellation)
+        )
+    }
+
     pub(crate) fn from_canonical_record_verified(
         bytes: &[u8],
         operation: &AdmissionOperationV1,
@@ -1032,7 +1040,7 @@ impl VerifiedTransportNotAccepted {
     }
 
     pub(crate) fn from_verified_economic_effect(
-        cancellation: &VerifiedEconomicEffectNotDispatched,
+        cancellation: &VerifiedEconomicEffectCancellationAdvance,
         operation: &AdmissionOperationV1,
         context: &AdmissionProjectionContext,
     ) -> Result<Self, ToolOutcomeError> {
@@ -1162,6 +1170,52 @@ impl VerifiedTransportNotAccepted {
         };
         proof.validate_against(operation, context)?;
         Ok(proof)
+    }
+
+    pub(crate) fn verify_economic_cancellation_binding(
+        &self,
+        slot: &EconomicEffectSlotV1,
+        expected_head: &EconomicResourceHeadV1,
+        resulting_head: &EconomicResourceHeadV1,
+        batch: &EconomicStateBatchV1,
+    ) -> Result<(), ToolOutcomeError> {
+        let artifact: EconomicEffectCancellationArtifactV1 = self
+            .artifacts
+            .first()
+            .ok_or(ToolOutcomeError::Binding(
+                "transport_not_accepted.economic_artifact_shape",
+            ))
+            .and_then(parse_artifact_value)?;
+        let expected = EconomicEffectCancellationArtifactV1 {
+            slot: slot.clone(),
+            expected_head_version: expected_head.head_version,
+            expected_head_digest: imported_digest(
+                "economic_cancellation.expected_head_digest",
+                expected_head
+                    .digest()
+                    .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
+            )?,
+            expected_lifecycle_fence: expected_head.lifecycle_fence,
+            resulting_head_version: resulting_head.head_version,
+            resulting_head_digest: imported_digest(
+                "economic_cancellation.resulting_head_digest",
+                resulting_head
+                    .digest()
+                    .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
+            )?,
+            resulting_lifecycle_fence: resulting_head.lifecycle_fence,
+            checkpoint_sequence: batch.checkpoint_sequence,
+            checkpoint_digest: imported_digest(
+                "economic_cancellation.checkpoint_digest",
+                batch.checkpoint_digest.clone(),
+            )?,
+        };
+        if artifact != expected {
+            return Err(ToolOutcomeError::Binding(
+                "transport_not_accepted.economic_cancellation_binding",
+            ));
+        }
+        Ok(())
     }
 
     #[allow(dead_code)]

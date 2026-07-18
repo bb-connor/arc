@@ -352,12 +352,12 @@ fn credit_authorities(
                 ConfiguredCreditAuthorityArtifactV1::Facility {
                     authority_id: CLAIM_CREDIT_AUTHORITY_ID.to_owned(),
                     authority_epoch: CLAIM_CREDIT_AUTHORITY_EPOCH,
-                    signed: facility,
+                    signed: Box::new(facility),
                 },
                 ConfiguredCreditAuthorityArtifactV1::Capability {
                     authority_id: CLAIM_CREDIT_CAPABILITY_AUTHORITY_ID.to_owned(),
                     authority_epoch: CLAIM_CREDIT_CAPABILITY_AUTHORITY_EPOCH,
-                    signed: capability,
+                    signed: Box::new(capability),
                 },
             ],
         })?;

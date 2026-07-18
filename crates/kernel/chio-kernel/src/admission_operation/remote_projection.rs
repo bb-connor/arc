@@ -101,6 +101,8 @@ pub struct VerifiedAdmissionTerminalProjectionV1 {
     manifest_json: Vec<u8>,
     records: Vec<VerifiedAdmissionTerminalProjectionRecordV1>,
     channel_terminal: Option<VerifiedChannelTerminalProjectionV1>,
+    anchored_transport_cancellation: bool,
+    anchored_economic_mutation: bool,
     pre_dispatch_release_proof: Option<VerifiedPreDispatchNoEffect>,
     authorization_consumption: Option<AuthorizationReceiptConsumption>,
     observer: Option<AdmissionTerminalObserverProjectionV1>,
@@ -236,12 +238,19 @@ impl SignedAdmissionTerminalProjectionV1 {
         )?;
         let channel_terminal =
             validate_channel_terminal_record(&records, &source_operation, &self.body.context)?;
-        let pre_dispatch_release_proof = validate_release_proof_record(
+        let anchored_economic_mutation = validate_economic_mutation_result_record(
             &records,
             &source_operation,
-            terminal_operation.state(),
+            &terminal_operation,
             &self.body.context,
         )?;
+        let (pre_dispatch_release_proof, anchored_transport_cancellation) =
+            validate_release_proof_record(
+                &records,
+                &source_operation,
+                terminal_operation.state(),
+                &self.body.context,
+            )?;
         validate_sidecars(
             &records,
             self.body.authorization_consumption.as_ref(),
@@ -256,6 +265,8 @@ impl SignedAdmissionTerminalProjectionV1 {
             manifest_json,
             records,
             channel_terminal,
+            anchored_transport_cancellation,
+            anchored_economic_mutation,
             pre_dispatch_release_proof,
             authorization_consumption: self.body.authorization_consumption.clone(),
             observer: self.body.observer.clone(),
@@ -312,6 +323,8 @@ impl VerifiedAdmissionTerminalProjectionV1 {
     #[must_use]
     pub const fn requires_anchored_economic_commit(&self) -> bool {
         self.channel_terminal.is_some()
+            || self.anchored_transport_cancellation
+            || self.anchored_economic_mutation
     }
 
     #[must_use]
@@ -575,7 +588,7 @@ fn validate_release_proof_record(
     source: &AdmissionOperationV1,
     terminal_state: AdmissionOperationState,
     context: &AdmissionProjectionContext,
-) -> Result<Option<VerifiedPreDispatchNoEffect>, AdmissionOperationError> {
+) -> Result<(Option<VerifiedPreDispatchNoEffect>, bool), AdmissionOperationError> {
     let record = records
         .iter()
         .find(|record| record.kind == AdmissionProjectionRecordKind::ReleaseProof);
@@ -586,7 +599,7 @@ fn validate_release_proof_record(
                 source,
                 context,
             )
-            .map(Some)
+            .map(|proof| (Some(proof), false))
             .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)
         }
         (AdmissionOperationState::NotAcceptedAfterDispatchCommit, Some(record)) => {
@@ -595,7 +608,7 @@ fn validate_release_proof_record(
                 source,
                 context,
             )
-            .map(|_| None)
+            .map(|proof| (None, proof.uses_economic_effect_cancellation()))
             .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)
         }
         (
@@ -604,9 +617,34 @@ fn validate_release_proof_record(
             | AdmissionOperationState::EconomicMutationApplied
             | AdmissionOperationState::EconomicMutationNotApplied,
             None,
-        ) => Ok(None),
+        ) => Ok((None, false)),
         _ => Err(AdmissionOperationError::TerminalProjectionBindingMismatch),
     }
+}
+
+fn validate_economic_mutation_result_record(
+    records: &[VerifiedAdmissionTerminalProjectionRecordV1],
+    source: &AdmissionOperationV1,
+    terminal: &AdmissionOperationV1,
+    context: &AdmissionProjectionContext,
+) -> Result<bool, AdmissionOperationError> {
+    if !matches!(
+        terminal.state(),
+        AdmissionOperationState::EconomicMutationApplied
+            | AdmissionOperationState::EconomicMutationNotApplied
+    ) {
+        return Ok(false);
+    }
+    let record = records
+        .iter()
+        .find(|record| record.kind == AdmissionProjectionRecordKind::EconomicMutationResult)
+        .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+    let result: GovernedEconomicMutationResultBinding =
+        serde_json::from_slice(record.canonical_json())
+            .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)?;
+    result
+        .validate_remote_terminal(source, context, terminal, record.record_id())
+        .map_err(|_| AdmissionOperationError::TerminalProjectionBindingMismatch)
 }
 
 fn channel_terminal_charge(

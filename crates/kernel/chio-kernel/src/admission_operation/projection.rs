@@ -2,7 +2,7 @@ use chio_core::capability::scope::MonetaryAmount;
 use chio_core::crypto::PublicKey;
 use chio_core::economic_continuity::{
     EconomicAdmissionHandoffStateV1, EconomicContentV1, EconomicEffectSlotV1,
-    EconomicResourceKeyV1, EconomicStateAnchorViewV1, EconomicStateBatchV1,
+    EconomicResourceHeadV1, EconomicResourceKeyV1, EconomicStateAnchorViewV1, EconomicStateBatchV1,
     VerifiedEconomicStateBatchAdvance,
 };
 use chio_core::receipt::{body::ChioReceipt, decision::Decision};
@@ -540,6 +540,7 @@ impl AdmissionProjectionContext {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AdmissionExactProjectionBindingV1 {
     operation_id: AdmissionOperationId,
     request_id: AdmissionIdentifier,
@@ -715,14 +716,15 @@ fn receipt_digest(receipt: &ChioReceipt) -> Result<AdmissionDigest, AdmissionOpe
     AdmissionDigest::try_new("consumer_receipt_digest", sha256_hex(&bytes))
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EconomicMutationTerminalStatus {
     Applied,
     PermanentlyNotApplied,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GovernedEconomicMutationResultBinding {
     binding: AdmissionExactProjectionBindingV1,
     record_id: AdmissionIdentifier,
@@ -737,6 +739,8 @@ pub struct GovernedEconomicMutationResultBinding {
     immutable_request_digest: AdmissionDigest,
     signature_digest: AdmissionDigest,
     status: EconomicMutationTerminalStatus,
+    #[serde(default)]
+    anchored_effect: bool,
 }
 
 impl GovernedEconomicMutationResultBinding {
@@ -784,6 +788,7 @@ impl GovernedEconomicMutationResultBinding {
             immutable_request_digest,
             signature_digest,
             status,
+            anchored_effect: false,
         };
         binding.validate_against(operation, context)?;
         Ok(binding)
@@ -819,6 +824,61 @@ impl GovernedEconomicMutationResultBinding {
         self.binding
             .validate_against(operation, context, projected_state)?;
         if self.immutable_request_digest != *operation.binding.request_binding_hash() {
+            return Err(AdmissionOperationError::InvalidEconomicMutationBinding);
+        }
+        Ok(())
+    }
+
+    pub(in crate::admission_operation) fn validate_remote_terminal(
+        &self,
+        operation: &AdmissionOperationV1,
+        context: &AdmissionProjectionContext,
+        terminal: &AdmissionOperationV1,
+        record_id: &AdmissionIdentifier,
+    ) -> Result<bool, AdmissionOperationError> {
+        self.validate_against(operation, context)?;
+        let projected_state = match self.status {
+            EconomicMutationTerminalStatus::Applied => {
+                AdmissionOperationState::EconomicMutationApplied
+            }
+            EconomicMutationTerminalStatus::PermanentlyNotApplied => {
+                AdmissionOperationState::EconomicMutationNotApplied
+            }
+        };
+        let replay_matches = matches!(
+            terminal.terminal_replay(),
+            Some(AdmissionTerminalReplay::EconomicMutation {
+                result_id,
+                result_digest,
+                ..
+            }) if result_id == &self.record_id && result_digest == &self.record_digest
+        );
+        if terminal.state() != projected_state || record_id != &self.record_id || !replay_matches {
+            return Err(AdmissionOperationError::InvalidEconomicMutationBinding);
+        }
+        Ok(self.anchored_effect)
+    }
+
+    pub(in crate::admission_operation) fn verify_anchored_cancellation(
+        &self,
+        slot: &EconomicEffectSlotV1,
+        expected_head: &EconomicResourceHeadV1,
+        resulting_head: &EconomicResourceHeadV1,
+        checkpoint_digest: &str,
+    ) -> Result<(), AdmissionOperationError> {
+        if !self.anchored_effect
+            || self.status != EconomicMutationTerminalStatus::PermanentlyNotApplied
+            || self.participant_id.as_str() != slot.target.target_id.as_str()
+            || self.participant_key_epoch != slot.target.target_key_epoch
+            || self.resource_id.as_str() != slot.slot_id.as_str()
+            || self.expected_resource_version != expected_head.resource_version
+            || self.resulting_resource_version != resulting_head.resource_version
+            || self.expected_resource_fence.as_str()
+                != format!("effect-slot-fence:{}", expected_head.lifecycle_fence)
+            || self.resulting_resource_fence.as_str()
+                != format!("effect-slot-fence:{}", resulting_head.lifecycle_fence)
+            || self.signature_digest.as_str() != checkpoint_digest
+        {
             return Err(AdmissionOperationError::InvalidEconomicMutationBinding);
         }
         Ok(())
@@ -1281,10 +1341,20 @@ impl AdmissionTerminalProjection {
     }
 
     #[must_use]
-    pub const fn requires_anchored_economic_commit(&self) -> bool {
+    pub fn requires_anchored_economic_commit(&self) -> bool {
         matches!(
             self,
             Self::Completed(projection) if projection.channel_terminal.is_some()
+        ) || matches!(
+            self,
+            Self::NotAcceptedAfterDispatchCommit { proof, .. }
+                if proof.uses_economic_effect_cancellation()
+        ) || matches!(
+            self,
+            Self::EconomicMutationApplied { result, .. } if result.0.anchored_effect
+        ) || matches!(
+            self,
+            Self::EconomicMutationNotApplied { result, .. } if result.0.anchored_effect
         )
     }
 

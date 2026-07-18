@@ -81,12 +81,12 @@ pub enum ConfiguredCreditAuthorityArtifactV1 {
     Facility {
         authority_id: String,
         authority_epoch: u64,
-        signed: SignedCreditFacility,
+        signed: Box<SignedCreditFacility>,
     },
     Capability {
         authority_id: String,
         authority_epoch: u64,
-        signed: CapabilityToken,
+        signed: Box<CapabilityToken>,
     },
 }
 
@@ -112,13 +112,13 @@ enum ConfiguredCreditAuthorityArtifact {
         source: CreditAuthoritySourceV1,
         artifact_id: String,
         artifact_digest: String,
-        signed: SignedCreditFacility,
+        signed: Box<SignedCreditFacility>,
     },
     Capability {
         source: CreditAuthoritySourceV1,
         artifact_id: String,
         artifact_digest: String,
-        signed: CapabilityToken,
+        signed: Box<CapabilityToken>,
     },
 }
 

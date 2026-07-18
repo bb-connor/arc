@@ -423,6 +423,7 @@ fn verify_not_applied(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn verify_not_applied_with(
     fixture: &Fixture,
     canonical: &[u8],

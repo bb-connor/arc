@@ -3,18 +3,19 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use chio_core::crypto::{sha256_hex, Keypair};
 use chio_core::economic_continuity::{
-    verify_economic_effect_cancellation_advance, verify_economic_effect_cancellation_commit,
-    verify_economic_effect_dispatch_advance, verify_economic_effect_dispatch_commit,
-    verify_economic_state_batch_advance, verify_economic_state_batch_commit,
-    verify_economic_state_view, EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1,
-    EconomicAdmissionHandoffVerifier, EconomicCheckpointReadQuery, EconomicContentV1,
-    EconomicEffectCancellationProofVerifier, EconomicEffectDispatchCommitV1, EconomicEffectSlotV1,
-    EconomicEffectStateV1, EconomicEffectTargetV1, EconomicEffectTerminalV1,
-    EconomicNoEffectKindV1, EconomicRequestBindingV1, EconomicRequestKeyV1,
-    EconomicRequestReplayV1, EconomicResourceHeadV1, EconomicResourceKeyV1, EconomicStateAnchor,
-    EconomicStateAnchorError, EconomicStateAnchorPins, EconomicStateAnchorViewV1,
-    EconomicStateBatchV1, EconomicStateReadQuery, EconomicStateTransitionV1,
-    EconomicTransitionAuthorizationV1, EconomicTransitionProofVerifier,
+    qualify_generic_economic_state_batch_advance, verify_economic_effect_cancellation_advance,
+    verify_economic_effect_cancellation_commit, verify_economic_effect_dispatch_advance,
+    verify_economic_effect_dispatch_commit, verify_economic_state_batch_advance,
+    verify_economic_state_batch_commit, verify_economic_state_view,
+    EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1, EconomicAdmissionHandoffVerifier,
+    EconomicCheckpointReadQuery, EconomicContentV1, EconomicEffectCancellationProofVerifier,
+    EconomicEffectDispatchCommitV1, EconomicEffectSlotV1, EconomicEffectStateV1,
+    EconomicEffectTargetV1, EconomicEffectTerminalV1, EconomicNoEffectKindV1,
+    EconomicRequestBindingV1, EconomicRequestKeyV1, EconomicRequestReplayV1,
+    EconomicResourceHeadV1, EconomicResourceKeyV1, EconomicStateAnchor, EconomicStateAnchorError,
+    EconomicStateAnchorPins, EconomicStateAnchorViewV1, EconomicStateBatchV1,
+    EconomicStateReadQuery, EconomicStateTransitionV1, EconomicTransitionAuthorizationV1,
+    EconomicTransitionProofVerifier, QualifiedGenericEconomicStateBatchAdvance,
     VerifiedEconomicEffectCancellationAdvance, VerifiedEconomicEffectDispatch,
     VerifiedEconomicEffectDispatchAdvance, VerifiedEconomicEffectNotDispatched,
     VerifiedEconomicStateBatchAdvance, VerifiedEconomicStateView, CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
@@ -360,8 +361,9 @@ impl EconomicStateAnchor for FixtureAnchor {
 
     fn compare_and_swap_batch(
         &self,
-        advance: &VerifiedEconomicStateBatchAdvance,
+        advance: QualifiedGenericEconomicStateBatchAdvance<'_>,
     ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
+        let advance = advance.advance();
         let mut state = self.lock()?;
         if advance.current().view().checkpoint_sequence != state.current.checkpoint_sequence
             || advance.current().view().checkpoint_digest != state.current.checkpoint_digest
@@ -506,8 +508,12 @@ proptest! {
             .map_err(|error| TestCaseError::fail(error.to_string()))?;
         let left_anchor = anchor.clone();
         let right_anchor = anchor.clone();
-        let left_thread = std::thread::spawn(move || left_anchor.compare_and_swap_batch(&left));
-        let right_thread = std::thread::spawn(move || right_anchor.compare_and_swap_batch(&right));
+        let left_thread = std::thread::spawn(move || {
+            left_anchor.compare_and_swap_batch(qualify_generic_economic_state_batch_advance(&left)?)
+        });
+        let right_thread = std::thread::spawn(move || {
+            right_anchor.compare_and_swap_batch(qualify_generic_economic_state_batch_advance(&right)?)
+        });
         let left_result = left_thread.join().map_err(|_| TestCaseError::fail("left CAS panicked"))?;
         let right_result = right_thread.join().map_err(|_| TestCaseError::fail("right CAS panicked"))?;
         prop_assert_eq!(usize::from(left_result.is_ok()) + usize::from(right_result.is_ok()), 1);
