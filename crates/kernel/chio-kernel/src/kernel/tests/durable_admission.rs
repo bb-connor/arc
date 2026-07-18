@@ -1495,6 +1495,40 @@ async fn dropped_durable_guard_evaluation_terminalizes_before_dispatch() {
 }
 
 #[test]
+fn startup_recovery_terminalizes_admission_before_budget_authorization() {
+    let (kernel, request, store, invocations) =
+        durable_admission_fixture("durable-startup-before-budget");
+    let matching = resolve_required_matching_grants(
+        &request.capability,
+        &request.tool_name,
+        &request.server_id,
+        &request.arguments,
+        request.model_metadata.as_ref(),
+    )
+    .expect("matching grants");
+    let admission = kernel
+        .begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
+        .expect("begin durable admission")
+        .expect("covered durable admission");
+    assert_eq!(
+        admission.state(),
+        AdmissionOperationState::BrokerAttemptRegistered
+    );
+
+    assert_eq!(
+        kernel
+            .reconcile_recoverable_admissions()
+            .expect("recover pre-budget admission"),
+        1
+    );
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}
+
+#[test]
 fn durable_pre_dispatch_denial_commits_terminal_compensation() {
     struct DenyAll;
 

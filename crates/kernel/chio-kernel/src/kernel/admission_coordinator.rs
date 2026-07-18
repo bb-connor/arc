@@ -365,6 +365,22 @@ impl ChioKernel {
                             )
                         })?;
                     }
+                    AdmissionOperationState::Prepared
+                    | AdmissionOperationState::BrokerAttemptRegistered => {
+                        self.compensate_durable_admission_before_dispatch(
+                            &operation,
+                            serde_json::json!({
+                                "authority": "startup-recovery",
+                                "cause": "no-authoritative-budget-participant"
+                            }),
+                            trusted_now_unix_ms,
+                        )?;
+                        reconciled = reconciled.checked_add(1).ok_or_else(|| {
+                            KernelError::DurableAdmission(
+                                "admission recovery count overflow".to_owned(),
+                            )
+                        })?;
+                    }
                     AdmissionOperationState::Finalizing => {
                         let mut admission = DurableToolAdmission { operation };
                         let tool_return = self.load_durable_tool_return(&admission)?;
@@ -919,7 +935,10 @@ impl ChioKernel {
             ));
         }
         let lease = self.claim_admission_recovery(&current, trusted_now_unix_ms)?;
-        if current.binding().participant_requirements().payment {
+        if current
+            .attachment(crate::admission_operation::AdmissionAttachmentKind::PaymentParticipant)
+            .is_some()
+        {
             let mut journal = runtime
                 .store
                 .load_payment_journal(current.binding().operation_id().as_str(), &runtime.fence)
