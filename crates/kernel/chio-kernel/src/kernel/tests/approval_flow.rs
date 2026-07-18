@@ -25,9 +25,14 @@ use crate::approval::{
     BatchApprovalStore, HitlVerdict, InMemoryApprovalStore, InMemoryBatchApprovalStore,
 };
 use crate::approval_channels::RecordingChannel;
+use crate::governed_active_response::{
+    GovernedActiveResponseDispatchCommit, GovernedActiveResponseRequest,
+};
 use crate::threshold_approval::ThresholdApprovalRequirementResolver;
 use chio_core::capability::governance::{
-    ThresholdApprovalProposal, ThresholdApprovalProposalBody,
+    GovernedResponseEffect, GovernedResponsePlanIntentBody, GovernedTransactionIntentBody,
+    ThresholdApprovalProposal, ThresholdApprovalProposalBody, ACTIVE_RESPONSE_PLAN_TOOL_NAME,
+    ACTIVE_RESPONSE_SERVER_ID, GOVERNED_RESPONSE_PLAN_SCHEMA,
 };
 use chio_core::capability::threshold_approval::{
     ThresholdApprovalRequirement, ThresholdApproverIdentity,
@@ -47,6 +52,124 @@ impl ThresholdApprovalRequirementResolver for FixedThresholdRequirement {
 }
 
 type CoreKeypair = Keypair;
+
+struct ActiveResponseFixture<'a> {
+    kernel: &'a ChioKernel,
+    requirement: &'a ThresholdApprovalRequirement,
+    policy_authority: &'a CoreKeypair,
+    approvers: [&'a CoreKeypair; 2],
+    executor: &'a CoreKeypair,
+    now: u64,
+}
+
+impl ActiveResponseFixture<'_> {
+    fn request(
+        &self,
+        request_id: &str,
+        effects: Vec<GovernedResponseEffect>,
+        grants: Vec<ToolGrant>,
+    ) -> GovernedActiveResponseRequest {
+        let capability = make_capability(self.kernel, self.executor, make_scope(grants), 600);
+        let canonical_plan_body = serde_json::json!({
+            "actionId": request_id,
+            "effects": effects,
+            "target": {"sessionId": "session-active-1"}
+        });
+        let plan_body_hash =
+            GovernedResponsePlanIntentBody::plan_body_hash(&canonical_plan_body).unwrap();
+        let expires_at = self.now + 240;
+        let intent = GovernedTransactionIntent {
+            id: request_id.to_owned(),
+            server_id: ACTIVE_RESPONSE_SERVER_ID.to_owned(),
+            tool_name: ACTIVE_RESPONSE_PLAN_TOOL_NAME.to_owned(),
+            purpose: "contain compromised session".to_owned(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: None,
+            body: GovernedTransactionIntentBody::ActiveResponsePlan(Box::new(
+                GovernedResponsePlanIntentBody {
+                    plan_schema: GOVERNED_RESPONSE_PLAN_SCHEMA.to_owned(),
+                    plan_id: request_id.to_owned(),
+                    operator_capability_id: capability.id.clone(),
+                    operator_capability_hash: sha256_hex(
+                        &canonical_json_bytes(&capability).unwrap(),
+                    ),
+                    operator_capability_expires_at: capability.expires_at,
+                    executor_subject: capability.subject.clone(),
+                    canonical_plan_body,
+                    plan_body_hash,
+                    target_binding: serde_json::json!({"sessionId": "session-active-1"}),
+                    ordered_effects: effects,
+                    expires_at,
+                    rollback_binding: serde_json::json!({"mode": "remove_contributions"}),
+                },
+            )),
+        };
+        let governed_intent_hash = intent.binding_hash().unwrap();
+        let proposal_created_at = self.now;
+        let proposal_deadline = ThresholdApprovalProposalBody::proposal_deadline(
+            proposal_created_at,
+            self.requirement.timeout_seconds,
+            capability.expires_at,
+            Some(expires_at),
+        )
+        .unwrap();
+        let proposal = ThresholdApprovalProposal::sign(
+            ThresholdApprovalProposalBody {
+                proposal_id: format!("proposal-{request_id}"),
+                request_id: request_id.to_owned(),
+                governed_intent_hash: governed_intent_hash.clone(),
+                subject: capability.subject.clone(),
+                authorizing_capability_digest: sha256_hex(
+                    &canonical_json_bytes(&capability).unwrap(),
+                ),
+                policy_hash: self.requirement.policy_hash.clone(),
+                threshold: self.requirement.threshold,
+                eligible_set_digest: self.requirement.eligible_set_digest.clone(),
+                proposal_created_at,
+                proposal_deadline,
+                policy_authority: self.policy_authority.public_key(),
+            },
+            self.policy_authority,
+        )
+        .unwrap();
+        let proposal_hash = proposal.artifact_digest().unwrap();
+        let approval_tokens = self
+            .approvers
+            .into_iter()
+            .enumerate()
+            .map(|(index, approver)| {
+                GovernedApprovalToken::sign(
+                    GovernedApprovalTokenBody {
+                        id: format!("token-{request_id}-{index}"),
+                        approver: approver.public_key(),
+                        subject: capability.subject.clone(),
+                        governed_intent_hash: governed_intent_hash.clone(),
+                        request_id: request_id.to_owned(),
+                        threshold_proposal_hash: Some(proposal_hash.clone()),
+                        issued_at: self.now,
+                        expires_at: proposal_deadline,
+                        decision: GovernedApprovalDecision::Approved,
+                    },
+                    approver,
+                )
+                .unwrap()
+            })
+            .collect();
+        GovernedActiveResponseRequest {
+            request_id: request_id.to_owned(),
+            operator_capability: capability,
+            governed_intent: intent,
+            approval_tokens,
+            threshold_approval_proposal: proposal,
+            federated_origin_kernel_id: None,
+        }
+    }
+}
 
 fn hitl_make_request() -> ToolCallRequest {
     let subject_kp = CoreKeypair::generate();
@@ -133,6 +256,7 @@ fn threshold_approval_set_is_policy_bound_and_order_independent() {
         call_chain: None,
         autonomy: None,
         context: None,
+        body: Default::default(),
     };
     let intent_hash = intent.binding_hash().unwrap();
     let now = current_unix_timestamp();
@@ -240,6 +364,202 @@ fn threshold_approval_set_is_policy_bound_and_order_independent() {
         .validate_threshold_approval_set(&extended, &cap, &intent_hash, now)
         .unwrap_err();
     assert!(error.to_string().contains("active policy"));
+}
+
+#[test]
+fn active_response_approval_is_durable_and_recovery_does_not_recommit_dispatch() {
+    let policy_hash = sha256_hex(b"active-response-policy");
+    let policy_authority = CoreKeypair::generate();
+    let approver_a = CoreKeypair::generate();
+    let approver_b = CoreKeypair::generate();
+    let requirement = ThresholdApprovalRequirement::new(
+        policy_hash.clone(),
+        2,
+        vec![
+            ThresholdApproverIdentity {
+                identifier: "alice".to_owned(),
+                public_key: approver_a.public_key(),
+            },
+            ThresholdApproverIdentity {
+                identifier: "bob".to_owned(),
+                public_key: approver_b.public_key(),
+            },
+        ],
+        "active-response-directory-v1".to_owned(),
+        300,
+    )
+    .unwrap();
+    let mut config = make_config();
+    config.policy_hash = policy_hash;
+    config.ca_public_keys.push(policy_authority.public_key());
+    let mut kernel = make_kernel(config);
+    kernel.set_threshold_approval_requirement_resolver(StdArc::new(
+        FixedThresholdRequirement(requirement.clone()),
+    ));
+
+    let fence = admission_test_fence();
+    let store = StdArc::new(TestAdmissionOperationStore::new(fence.clone()));
+    kernel
+        .set_durable_admission_store(store.clone(), store.clone(), fence)
+        .unwrap();
+
+    let executor = CoreKeypair::generate();
+    let effects = vec![
+        GovernedResponseEffect::RestrictEgress,
+        GovernedResponseEffect::SuspendSession,
+    ];
+    let grants = effects
+        .iter()
+        .map(|effect| make_grant(ACTIVE_RESPONSE_SERVER_ID, effect.tool_name()))
+        .collect();
+    let now = current_unix_timestamp();
+    let fixture = ActiveResponseFixture {
+        kernel: &kernel,
+        requirement: &requirement,
+        policy_authority: &policy_authority,
+        approvers: [&approver_a, &approver_b],
+        executor: &executor,
+        now,
+    };
+    let request = fixture.request(
+        "active-response-1",
+        effects.clone(),
+        grants,
+    );
+
+    let mut mismatched = request.clone();
+    let GovernedTransactionIntentBody::ActiveResponsePlan(plan) =
+        &mut mismatched.governed_intent.body
+    else {
+        panic!("active-response body");
+    };
+    plan.canonical_plan_body["actionId"] = serde_json::json!("substituted-response");
+    assert!(kernel
+        .admit_governed_active_response_at(&mismatched, now, now * 1_000)
+        .unwrap_err()
+        .to_string()
+        .contains("body hash"));
+
+    let mut raw_plan_hash = request.clone();
+    let GovernedTransactionIntentBody::ActiveResponsePlan(plan) =
+        &raw_plan_hash.governed_intent.body
+    else {
+        panic!("active-response body");
+    };
+    let substituted_hash = plan.plan_body_hash.clone();
+    let mut substituted_proposal = raw_plan_hash.threshold_approval_proposal.body.clone();
+    substituted_proposal.governed_intent_hash = substituted_hash.clone();
+    raw_plan_hash.threshold_approval_proposal =
+        ThresholdApprovalProposal::sign(substituted_proposal, &policy_authority).unwrap();
+    let substituted_proposal_hash = raw_plan_hash
+        .threshold_approval_proposal
+        .artifact_digest()
+        .unwrap();
+    raw_plan_hash.approval_tokens = [&approver_a, &approver_b]
+        .into_iter()
+        .enumerate()
+        .map(|(index, approver)| {
+            GovernedApprovalToken::sign(
+                GovernedApprovalTokenBody {
+                    id: format!("raw-plan-token-{index}"),
+                    approver: approver.public_key(),
+                    subject: raw_plan_hash.operator_capability.subject.clone(),
+                    governed_intent_hash: substituted_hash.clone(),
+                    request_id: raw_plan_hash.request_id.clone(),
+                    threshold_proposal_hash: Some(substituted_proposal_hash.clone()),
+                    issued_at: now,
+                    expires_at: raw_plan_hash
+                        .threshold_approval_proposal
+                        .body
+                        .proposal_deadline,
+                    decision: GovernedApprovalDecision::Approved,
+                },
+                approver,
+            )
+            .unwrap()
+        })
+        .collect();
+    assert!(kernel
+        .admit_governed_active_response_at(&raw_plan_hash, now, now * 1_000)
+        .unwrap_err()
+        .to_string()
+        .contains("proposal does not match"));
+
+    let missing_grant = fixture.request(
+        "active-response-missing-grant",
+        effects,
+        vec![make_grant(
+            ACTIVE_RESPONSE_SERVER_ID,
+            GovernedResponseEffect::RestrictEgress.tool_name(),
+        )],
+    );
+    assert!(kernel
+        .admit_governed_active_response_at(&missing_grant, now, now * 1_000)
+        .unwrap_err()
+        .to_string()
+        .contains("suspend_session"));
+
+    let revoked = fixture.request(
+        "active-response-revoked",
+        vec![GovernedResponseEffect::RestrictEgress],
+        vec![make_grant(
+            ACTIVE_RESPONSE_SERVER_ID,
+            GovernedResponseEffect::RestrictEgress.tool_name(),
+        )],
+    );
+    kernel.set_revocation_store(Box::new(crate::InMemoryRevocationStore::new()));
+    kernel
+        .revoke_capability(&revoked.operator_capability.id)
+        .unwrap();
+    assert!(matches!(
+        kernel.admit_governed_active_response_at(&revoked, now, now * 1_000),
+        Err(KernelError::CapabilityRevoked(id)) if id == revoked.operator_capability.id
+    ));
+
+    let mut admitted = kernel
+        .admit_governed_active_response_at(&request, now, now * 1_000)
+        .unwrap();
+    assert_eq!(admitted.state(), AdmissionOperationState::ApprovalReserved);
+    assert_eq!(admitted.requirement(), &requirement);
+    assert_eq!(
+        admitted.operator_capability().capability_id,
+        request.operator_capability.id
+    );
+    assert_eq!(
+        admitted.operation().binding().kind(),
+        crate::admission_operation::AdmissionOperationKind::GovernedActiveResponse
+    );
+    assert_eq!(
+        admitted.operation().binding().participant_requirements(),
+        crate::admission_operation::AdmissionParticipantRequirements {
+            approval: true,
+            ..crate::admission_operation::AdmissionParticipantRequirements::NONE
+        }
+    );
+    assert_eq!(
+        admitted.approval_set().approval_set_hash().unwrap(),
+        admitted.approval_set_hash()
+    );
+    let operation_id = admitted.operation_id().to_owned();
+    assert_eq!(
+        kernel
+            .commit_governed_active_response_dispatch_at(&mut admitted, now * 1_000)
+            .unwrap(),
+        GovernedActiveResponseDispatchCommit::Committed
+    );
+    assert_eq!(admitted.state(), AdmissionOperationState::DispatchCommitted);
+
+    let mut recovered = kernel
+        .admit_governed_active_response_at(&request, now, now * 1_000)
+        .unwrap();
+    assert_eq!(recovered.operation_id(), operation_id);
+    assert_eq!(recovered.state(), AdmissionOperationState::DispatchCommitted);
+    assert_eq!(
+        kernel
+            .commit_governed_active_response_dispatch_at(&mut recovered, now * 1_000)
+            .unwrap(),
+        GovernedActiveResponseDispatchCommit::AlreadyCommitted
+    );
 }
 
 // ---------------------------------------------------------------------

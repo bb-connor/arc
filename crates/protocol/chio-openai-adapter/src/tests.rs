@@ -492,6 +492,7 @@ fn execute_tool_call_treats_pending_approval_as_denied() {
             call_chain: None,
             autonomy: None,
             context: None,
+            body: Default::default(),
         }),
         approval_token: None,
         approval_tokens: Vec::new(),

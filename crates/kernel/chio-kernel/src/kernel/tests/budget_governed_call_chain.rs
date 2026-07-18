@@ -325,6 +325,7 @@ fn governed_call_chain_receipt_observes_local_parent_receipt_linkage() {
         }),
         autonomy: None,
         context: None,
+        body: Default::default(),
     };
 
     let response = kernel
@@ -430,6 +431,7 @@ fn governed_call_chain_receipt_observes_capability_lineage_subjects() {
                 }),
                 autonomy: None,
                 context: None,
+                body: Default::default(),
             }),
             approval_token: None,
             approval_tokens: Vec::new(),
@@ -515,6 +517,7 @@ fn governed_call_chain_receipt_verifies_signed_upstream_delegator_proof() {
         call_chain: Some(call_chain.clone()),
         autonomy: None,
         context: Some(serde_json::json!({ "workflow": "delegated-proof" })),
+        body: Default::default(),
     };
     let upstream_proof =
         make_governed_upstream_call_chain_proof(&root_kp, &child_kp.public_key(), &call_chain);
@@ -607,6 +610,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
                 )),
                 autonomy: None,
                 context: None,
+                body: Default::default(),
             }),
             approval_token: None,
             approval_tokens: Vec::new(),
@@ -671,6 +675,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
                 }),
                 autonomy: None,
                 context: None,
+                body: Default::default(),
             }),
             approval_token: None,
             approval_tokens: Vec::new(),
@@ -756,6 +761,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
         call_chain: Some(call_chain.clone()),
         autonomy: None,
         context: None,
+        body: Default::default(),
     };
     let upstream_proof =
         make_governed_upstream_call_chain_proof(&root_kp, &child_kp.public_key(), &call_chain);
@@ -864,6 +870,7 @@ fn governed_request_rejects_upstream_call_chain_proof_subject_mismatch() {
         call_chain: Some(call_chain.clone()),
         autonomy: None,
         context: Some(serde_json::json!({ "workflow": "delegated-proof" })),
+        body: Default::default(),
     };
     let upstream_proof =
         make_governed_upstream_call_chain_proof(&root_kp, &wrong_subject.public_key(), &call_chain);
@@ -966,6 +973,7 @@ fn governed_request_rejects_call_chain_delegator_subject_that_conflicts_with_cap
                 }),
                 autonomy: None,
                 context: None,
+                body: Default::default(),
             }),
             approval_token: None,
             approval_tokens: Vec::new(),
@@ -1053,6 +1061,7 @@ fn governed_call_chain_receipt_observes_session_parent_request_lineage() {
                     }),
                     autonomy: None,
                     context: None,
+                    body: Default::default(),
                 }),
                 approval_token: None,
                 approval_tokens: Vec::new(),
@@ -1172,6 +1181,7 @@ fn cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anch
         call_chain: Some(call_chain.clone()),
         autonomy: None,
         context: None,
+        body: Default::default(),
     };
     let continuation_token =
         make_governed_call_chain_continuation_token(GovernedCallChainContinuationTokenFixture {
@@ -1502,6 +1512,7 @@ fn nested_governed_call_chain_evidence_store_error_reverses_pre_execution_budget
                     }),
                     autonomy: None,
                     context: None,
+                    body: Default::default(),
                 }),
                 approval_token: None,
                 approval_tokens: Vec::new(),

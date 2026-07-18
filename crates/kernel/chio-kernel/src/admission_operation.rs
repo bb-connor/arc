@@ -654,6 +654,22 @@ impl AdmissionOperationV1 {
         }
     }
 
+    #[must_use]
+    pub fn threshold_proposal_hash(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::ThresholdProposal) {
+            Some(AdmissionAttachment::ThresholdProposalHash(digest)) => Some(digest),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn approval_set_hash(&self) -> Option<&AdmissionDigest> {
+        match self.attachment(AdmissionAttachmentKind::ApprovalSet) {
+            Some(AdmissionAttachment::ApprovalSetHash(digest)) => Some(digest),
+            _ => None,
+        }
+    }
+
     #[allow(dead_code)]
     pub(crate) fn has_attachment(&self, kind: AdmissionAttachmentKind) -> bool {
         self.attachments.has_slot(kind.slot())

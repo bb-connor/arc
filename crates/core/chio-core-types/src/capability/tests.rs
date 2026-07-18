@@ -947,6 +947,7 @@ fn governed_transaction_intent_binding_hash_changes_with_payload() {
             delegation_bond_id: Some("bond-1".to_string()),
         }),
         context: None,
+        body: GovernedTransactionIntentBody::ToolInvocation,
     };
     let mut changed = base.clone();
     changed
@@ -970,6 +971,62 @@ fn governed_transaction_intent_binding_hash_changes_with_payload() {
         base.binding_hash().unwrap(),
         changed_destination.binding_hash().unwrap()
     );
+}
+
+#[test]
+fn active_response_intent_checks_plan_body_hash_and_effect_order() {
+    let executor = Keypair::generate();
+    let canonical_plan_body = serde_json::json!({
+        "actionId": "response-1",
+        "effects": ["restrict_egress", "suspend_session"]
+    });
+    let plan_body_hash =
+        GovernedResponsePlanIntentBody::plan_body_hash(&canonical_plan_body).unwrap();
+    let intent = GovernedTransactionIntent {
+        id: "response-1".to_string(),
+        server_id: ACTIVE_RESPONSE_SERVER_ID.to_string(),
+        tool_name: "apply_plan".to_string(),
+        purpose: "contain compromised session".to_string(),
+        max_amount: None,
+        commerce: None,
+        metered_billing: None,
+        runtime_attestation: None,
+        call_chain: None,
+        autonomy: None,
+        context: None,
+        body: GovernedTransactionIntentBody::ActiveResponsePlan(Box::new(
+            GovernedResponsePlanIntentBody {
+                plan_schema: GOVERNED_RESPONSE_PLAN_SCHEMA.to_string(),
+                plan_id: "response-1".to_string(),
+                operator_capability_id: "operator-capability-1".to_string(),
+                operator_capability_hash: "a".repeat(64),
+                operator_capability_expires_at: 2_000,
+                executor_subject: executor.public_key(),
+                canonical_plan_body,
+                plan_body_hash,
+                target_binding: serde_json::json!({"sessionId": "session-1"}),
+                ordered_effects: vec![
+                    GovernedResponseEffect::RestrictEgress,
+                    GovernedResponseEffect::SuspendSession,
+                ],
+                expires_at: 1_900,
+                rollback_binding: serde_json::json!({"mode": "remove_contributions"}),
+            },
+        )),
+    };
+
+    let original_hash = intent.binding_hash().unwrap();
+    let mut reordered = intent.clone();
+    if let GovernedTransactionIntentBody::ActiveResponsePlan(plan) = &mut reordered.body {
+        plan.ordered_effects.reverse();
+    }
+    assert_ne!(original_hash, reordered.binding_hash().unwrap());
+
+    let mut mismatched = intent;
+    if let GovernedTransactionIntentBody::ActiveResponsePlan(plan) = &mut mismatched.body {
+        plan.canonical_plan_body["actionId"] = serde_json::json!("response-2");
+    }
+    assert!(mismatched.binding_hash().is_err());
 }
 
 #[test]
@@ -1115,6 +1172,7 @@ fn governed_upstream_call_chain_proof_roundtrip_and_context_extraction() {
             GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY: proof.clone(),
             "note": "preserve-other-context"
         })),
+        body: GovernedTransactionIntentBody::ToolInvocation,
     };
 
     assert!(proof.verify_signature().unwrap());
@@ -1178,6 +1236,7 @@ fn call_chain_continuation_token_roundtrip_and_matching_helpers() {
         context: Some(serde_json::json!({
             GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY: token.clone()
         })),
+        body: GovernedTransactionIntentBody::ToolInvocation,
     };
 
     assert!(token.verify_signature().unwrap());

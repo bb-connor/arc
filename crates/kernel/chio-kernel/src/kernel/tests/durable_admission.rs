@@ -592,6 +592,15 @@ impl PaymentAdapter for QualifiedDurablePaymentAdapter {
 }
 
 impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
+    fn reserve_threshold_approval_and_commit_admission(
+        &self,
+        command: &AdmissionOperationCommand,
+        _reservation: &crate::ThresholdApprovalReplayReservationV1,
+        trusted_now_unix_ms: u64,
+    ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
+        self.compare_and_swap(command, trusted_now_unix_ms)
+    }
+
     fn load_payment_journal(
         &self,
         operation_id: &str,

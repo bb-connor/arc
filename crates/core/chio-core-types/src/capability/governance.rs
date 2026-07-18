@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -21,6 +22,11 @@ use super::scope::MonetaryAmount;
 const GOVERNED_APPROVAL_TOKEN_DIGEST_DOMAIN: &[u8] = b"chio.governed-approval-token.v1\0";
 const THRESHOLD_APPROVAL_PROPOSAL_DIGEST_DOMAIN: &[u8] = b"chio.threshold-approval-proposal.v1\0";
 const VERIFIED_APPROVAL_SET_DIGEST_DOMAIN: &[u8] = b"chio.verified-approval-set.v1\0";
+const GOVERNED_RESPONSE_PLAN_BODY_DIGEST_DOMAIN: &[u8] = b"chio:response-plan:v1\0";
+
+pub const GOVERNED_RESPONSE_PLAN_SCHEMA: &str = "chio.response-plan.v1";
+pub const ACTIVE_RESPONSE_SERVER_ID: &str = "chio.control-plane.active-response";
+pub const ACTIVE_RESPONSE_PLAN_TOOL_NAME: &str = "apply_plan";
 
 /// Explicit governed autonomy tier requested for one economically sensitive action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
@@ -745,6 +751,118 @@ pub struct GovernedAutonomyContext {
     pub delegation_bond_id: Option<String>,
 }
 
+/// Closed response effects that an operator capability may authorize.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GovernedResponseEffect {
+    ThrottleSession,
+    RestrictEgress,
+    SuspendSession,
+    SuspendCapabilitySet,
+    FreezeIssuance,
+}
+
+impl GovernedResponseEffect {
+    #[must_use]
+    pub const fn tool_name(self) -> &'static str {
+        match self {
+            Self::ThrottleSession => "throttle_session",
+            Self::RestrictEgress => "restrict_egress",
+            Self::SuspendSession => "suspend_session",
+            Self::SuspendCapabilitySet => "suspend_capability_set",
+            Self::FreezeIssuance => "freeze_issuance",
+        }
+    }
+}
+
+/// Protocol-owned binding for a governed active-response plan.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GovernedResponsePlanIntentBody {
+    pub plan_schema: String,
+    pub plan_id: String,
+    pub operator_capability_id: String,
+    pub operator_capability_hash: String,
+    pub operator_capability_expires_at: u64,
+    pub executor_subject: PublicKey,
+    pub canonical_plan_body: serde_json::Value,
+    pub plan_body_hash: String,
+    pub target_binding: serde_json::Value,
+    pub ordered_effects: Vec<GovernedResponseEffect>,
+    pub expires_at: u64,
+    pub rollback_binding: serde_json::Value,
+}
+
+impl GovernedResponsePlanIntentBody {
+    pub fn plan_body_hash(canonical_plan_body: &serde_json::Value) -> Result<String> {
+        let canonical = canonical_json_bytes(canonical_plan_body)?;
+        let mut preimage =
+            Vec::with_capacity(GOVERNED_RESPONSE_PLAN_BODY_DIGEST_DOMAIN.len() + canonical.len());
+        preimage.extend_from_slice(GOVERNED_RESPONSE_PLAN_BODY_DIGEST_DOMAIN);
+        preimage.extend_from_slice(&canonical);
+        Ok(sha256_hex(&preimage))
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.plan_schema != GOVERNED_RESPONSE_PLAN_SCHEMA {
+            return Err(Error::CanonicalJson(
+                "governed response plan schema is unsupported".into(),
+            ));
+        }
+        if self.plan_id.is_empty()
+            || self.plan_id.trim() != self.plan_id
+            || self.operator_capability_id.is_empty()
+            || self.operator_capability_id.trim() != self.operator_capability_id
+        {
+            return Err(Error::CanonicalJson(
+                "governed response plan identifiers must be canonical text".into(),
+            ));
+        }
+        if self.ordered_effects.is_empty() || self.ordered_effects.len() > 32 {
+            return Err(Error::CanonicalJson(
+                "governed response plan must contain between 1 and 32 effects".into(),
+            ));
+        }
+        if self.expires_at == 0
+            || self.operator_capability_expires_at == 0
+            || self.expires_at > self.operator_capability_expires_at
+        {
+            return Err(Error::CanonicalJson(
+                "governed response plan expiry exceeds operator capability expiry".into(),
+            ));
+        }
+        if !self.canonical_plan_body.is_object()
+            || !self.target_binding.is_object()
+            || !self.rollback_binding.is_object()
+        {
+            return Err(Error::CanonicalJson(
+                "governed response plan bindings must be canonical objects".into(),
+            ));
+        }
+        if self.plan_body_hash != Self::plan_body_hash(&self.canonical_plan_body)? {
+            return Err(Error::CanonicalJson(
+                "governed response plan body hash does not match its canonical body".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Typed extension carried by a governed transaction intent.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+pub enum GovernedTransactionIntentBody {
+    #[default]
+    ToolInvocation,
+    ActiveResponsePlan(Box<GovernedResponsePlanIntentBody>),
+}
+
+impl GovernedTransactionIntentBody {
+    fn is_tool_invocation(&self) -> bool {
+        matches!(self, Self::ToolInvocation)
+    }
+}
+
 /// Canonical intent attached to a governed transaction request.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GovernedTransactionIntent {
@@ -777,13 +895,30 @@ pub struct GovernedTransactionIntent {
     /// Optional structured context for downstream policy or operator inspection.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<serde_json::Value>,
+    /// Typed governed-action body. Tool invocation remains the wire-compatible default.
+    #[serde(
+        default,
+        skip_serializing_if = "GovernedTransactionIntentBody::is_tool_invocation"
+    )]
+    pub body: GovernedTransactionIntentBody,
 }
 
 impl GovernedTransactionIntent {
     /// Compute a stable canonical hash for approval-token binding and receipts.
     pub fn binding_hash(&self) -> Result<String> {
+        if let GovernedTransactionIntentBody::ActiveResponsePlan(plan) = &self.body {
+            plan.validate()?;
+        }
         let canonical = canonical_json_bytes(self)?;
         Ok(sha256_hex(&canonical))
+    }
+
+    #[must_use]
+    pub const fn governed_operation_expires_at(&self) -> Option<u64> {
+        match &self.body {
+            GovernedTransactionIntentBody::ToolInvocation => None,
+            GovernedTransactionIntentBody::ActiveResponsePlan(plan) => Some(plan.expires_at),
+        }
     }
 
     /// Extract the reserved upstream call-chain proof from the optional context object.

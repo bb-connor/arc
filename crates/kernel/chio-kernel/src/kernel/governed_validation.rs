@@ -15,6 +15,67 @@ mod verified_outcome;
 use verified_outcome::validate_verified_outcome_request;
 
 impl ChioKernel {
+    pub(crate) fn validate_active_response_intent(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        intent: &chio_core::capability::governance::GovernedTransactionIntent,
+        now: u64,
+    ) -> Result<(), KernelError> {
+        use chio_core::capability::governance::{
+            GovernedTransactionIntentBody, ACTIVE_RESPONSE_PLAN_TOOL_NAME,
+            ACTIVE_RESPONSE_SERVER_ID,
+        };
+
+        let GovernedTransactionIntentBody::ActiveResponsePlan(plan) = &intent.body else {
+            return Ok(());
+        };
+        let peer = self
+            .capability_negotiation_for_remote(request.federated_origin_kernel_id.as_deref(), now)
+            .map_err(KernelError::GovernedTransactionDenied)?;
+        if !peer.supports(chio_core::capability::features::GOVERNED_ACTIVE_RESPONSE_PLAN) {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed active-response plans were not negotiated".to_string(),
+            ));
+        }
+        plan.validate()
+            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
+        let capability_hash = sha256_hex(&canonical_json_bytes(cap).map_err(|error| {
+            KernelError::GovernedTransactionDenied(format!(
+                "operator capability is not canonical: {error}"
+            ))
+        })?);
+        if intent.id != plan.plan_id
+            || request.request_id != plan.plan_id
+            || intent.server_id != ACTIVE_RESPONSE_SERVER_ID
+            || intent.tool_name != ACTIVE_RESPONSE_PLAN_TOOL_NAME
+            || plan.operator_capability_id != cap.id
+            || plan.operator_capability_hash != capability_hash
+            || plan.operator_capability_expires_at != cap.expires_at
+            || plan.executor_subject != cap.subject
+            || now >= plan.expires_at
+        {
+            return Err(KernelError::GovernedTransactionDenied(
+                "active-response intent does not match its request or operator capability"
+                    .to_string(),
+            ));
+        }
+        for effect in &plan.ordered_effects {
+            let covered = cap.scope.grants.iter().any(|grant| {
+                grant.server_id == ACTIVE_RESPONSE_SERVER_ID
+                    && grant.tool_name == effect.tool_name()
+                    && grant.operations.contains(&Operation::Invoke)
+            });
+            if !covered {
+                return Err(KernelError::GovernedTransactionDenied(format!(
+                    "operator capability does not grant active-response effect {}",
+                    effect.tool_name()
+                )));
+            }
+        }
+        Ok(())
+    }
+
     fn governed_requirements(
         grant: &ToolGrant,
     ) -> (
@@ -295,7 +356,7 @@ impl ChioKernel {
         Ok(())
     }
 
-    pub(in crate::kernel) fn validate_threshold_approval_set(
+    pub(crate) fn validate_threshold_approval_set(
         &self,
         request: &ToolCallRequest,
         cap: &CapabilityToken,
@@ -393,7 +454,14 @@ impl ChioKernel {
                     "threshold proposal deadline overflowed".to_string(),
                 )
             })?
-            .min(cap.expires_at);
+            .min(cap.expires_at)
+            .min(
+                request
+                    .governed_intent
+                    .as_ref()
+                    .and_then(|intent| intent.governed_operation_expires_at())
+                    .unwrap_or(u64::MAX),
+            );
         if proposal_body.request_id != request.request_id
             || proposal_body.governed_intent_hash != intent_hash
             || proposal_body.subject != cap.subject
@@ -485,6 +553,7 @@ impl ChioKernel {
         )
         .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?;
         Ok(VerifiedThresholdApprovalSet {
+            requirement,
             body: verified,
             replay,
         })
@@ -1192,6 +1261,16 @@ impl ChioKernel {
         if intent.server_id != request.server_id || intent.tool_name != request.tool_name {
             return Err(KernelError::GovernedTransactionDenied(
                 "governed transaction intent target does not match the tool call".to_string(),
+            ));
+        }
+
+        self.validate_active_response_intent(request, cap, intent, now)?;
+        if matches!(
+            &intent.body,
+            chio_core::capability::governance::GovernedTransactionIntentBody::ActiveResponsePlan(_)
+        ) {
+            return Err(KernelError::GovernedTransactionDenied(
+                "active-response plans require the approval-only admission API".to_owned(),
             ));
         }
 

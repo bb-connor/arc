@@ -1047,6 +1047,7 @@ fn chio_runtime_hook_releases_chio_native_reserved_state_after_kernel_abort(
                     "bundleSha256": bundle_hash
                 }
             })),
+            body: Default::default(),
         }),
         approval_token: None,
         approval_tokens: Vec::new(),
@@ -1129,6 +1130,7 @@ fn chio_runtime_hook_denies_swarm_context_without_required_evidence_refs(
                     }
                 }
             })),
+            body: Default::default(),
         }),
         approval_token: None,
         approval_tokens: Vec::new(),
@@ -1200,6 +1202,7 @@ fn chio_runtime_hook_denies_stale_swarm_continuation_before_dispatch(
                 },
                 "chioSwarm": swarm_runtime_context(&swarm_bundle)?
             })),
+            body: Default::default(),
         }),
         approval_token: None,
         approval_tokens: Vec::new(),
@@ -2295,6 +2298,7 @@ fn treaty_runtime_request(
             },
             "chioTreaty": treaty_context
         })),
+        body: Default::default(),
     });
     Ok(request)
 }
@@ -2332,6 +2336,7 @@ fn chio_swarm_runtime_request(
                 },
                 "chioSwarm": swarm_context
             })),
+            body: Default::default(),
         }),
         approval_token: None,
         approval_tokens: Vec::new(),

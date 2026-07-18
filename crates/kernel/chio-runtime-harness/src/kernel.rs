@@ -468,6 +468,7 @@ pub(crate) fn execute_runtime_loopback_step(
                 }
             })
         }),
+        body: Default::default(),
     };
     let request = KernelToolCallRequest {
         request_id: step.request.request_id.clone(),

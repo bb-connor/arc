@@ -1243,6 +1243,7 @@ fn build_governed_intent() -> GovernedTransactionIntent {
             "currency": "USD",
             "seller": "supplier-001"
         })),
+        body: Default::default(),
     }
 }
 

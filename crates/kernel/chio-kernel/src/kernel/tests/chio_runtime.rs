@@ -772,6 +772,7 @@ fn chio_governed_request_without_runtime_hook_fails_closed(
                 "bundleSha256": "a".repeat(64)
             }
         })),
+        body: Default::default(),
     });
 
     let response = kernel.evaluate_tool_call_blocking(&request)?;
@@ -835,6 +836,7 @@ fn chio_treaty_request_without_runtime_hook_fails_closed() -> Result<(), Box<dyn
                 "actionClassId": "workflow.destructive.vendor_call"
             }
         })),
+        body: Default::default(),
     });
 
     let response = kernel.evaluate_tool_call_blocking(&request)?;
@@ -1037,6 +1039,7 @@ fn chio_swarm_request_without_runtime_hook_fails_closed() -> Result<(), Box<dyn 
                 }
             }
         })),
+        body: Default::default(),
     });
 
     let response = kernel.evaluate_tool_call_blocking(&request)?;
@@ -1109,6 +1112,7 @@ fn session_tool_call_preserves_chio_swarm_runtime_context() -> Result<(), Box<dy
                     }
                 }
             })),
+            body: Default::default(),
         }),
         execution_nonce: None,
         model_metadata: None,

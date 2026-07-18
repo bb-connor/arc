@@ -583,6 +583,7 @@ fn make_governed_intent(
             "invoice_id": "inv-1001",
             "operator": "finance-ops",
         })),
+        body: Default::default(),
     }
 }
 
@@ -621,6 +622,7 @@ fn make_governed_acp_intent(fixture: GovernedAcpIntentFixture<'_>) -> GovernedTr
             "invoice_id": "inv-2002",
             "operator": "commerce-ops",
         })),
+        body: Default::default(),
     }
 }
 

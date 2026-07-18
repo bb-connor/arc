@@ -185,6 +185,7 @@ fn stripe_charge_via_governed_intent_also_triggers_pending_approval() {
         call_chain: None,
         autonomy: None,
         context: None,
+        body: Default::default(),
     };
     let v = eval_with(
         &guard,

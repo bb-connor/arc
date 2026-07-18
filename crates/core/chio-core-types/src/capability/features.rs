@@ -82,6 +82,7 @@ impl CapabilityNegotiation {
         features.insert(ACCEPTS_ANCHOR_BATCH_V1.to_string(), true);
         features.insert(DELEGATION_CHAIN_BINDING.to_string(), true);
         features.insert(THRESHOLD_GOVERNED_APPROVALS.to_string(), true);
+        features.insert(GOVERNED_ACTIVE_RESPONSE_PLAN.to_string(), true);
         Self {
             schema: CHIO_CAPABILITIES_SCHEMA.to_string(),
             features,

@@ -1,6 +1,7 @@
 use chio_core_types::capability::governance::{
-    GovernedTransactionIntent, MeteredBillingContext, MeteredBillingQuote, MeteredSettlementMode,
-    VerifiedOutcomeRequestV1, VERIFIED_OUTCOME_REQUEST_SCHEMA,
+    GovernedTransactionIntent, GovernedTransactionIntentBody, MeteredBillingContext,
+    MeteredBillingQuote, MeteredSettlementMode, VerifiedOutcomeRequestV1,
+    VERIFIED_OUTCOME_REQUEST_SCHEMA,
 };
 use chio_core_types::capability::scope::MonetaryAmount;
 
@@ -48,6 +49,7 @@ fn intent(extension: VerifiedOutcomeRequestV1) -> GovernedTransactionIntent {
         call_chain: None,
         autonomy: None,
         context: None,
+        body: GovernedTransactionIntentBody::ToolInvocation,
     }
 }
 

@@ -38,6 +38,7 @@ pub mod dpop;
 pub mod evidence_export;
 pub mod execution_nonce;
 pub mod federation_artifact_store;
+pub mod governed_active_response;
 pub mod memory_provenance;
 pub mod observability;
 pub mod operator_report;

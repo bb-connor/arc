@@ -215,6 +215,13 @@ struct ImmutableToolAdmissionRequest<'a> {
 }
 
 #[derive(Serialize)]
+struct ImmutableActiveResponseAdmissionRequest<'a> {
+    schema: &'static str,
+    request: &'a crate::governed_active_response::GovernedActiveResponseRequest,
+    governed_intent_hash: &'a str,
+}
+
+#[derive(Serialize)]
 struct ImmutableMatchingGrant<'a> {
     index: usize,
     grant: &'a ToolGrant,
@@ -634,6 +641,107 @@ impl ChioKernel {
         Ok(Some(DurableToolAdmission { operation }))
     }
 
+    pub(crate) fn begin_durable_active_response_admission(
+        &self,
+        request: &crate::governed_active_response::GovernedActiveResponseRequest,
+        governed_intent_hash: &str,
+        trusted_now_unix_ms: u64,
+    ) -> Result<DurableToolAdmission, KernelError> {
+        let runtime = self.durable_runtime()?;
+        if !runtime
+            .store
+            .admission_projection_capabilities()
+            .operation_terminal
+        {
+            return Err(KernelError::DurableAdmission(
+                "active-response admission store lacks atomic terminal projection support"
+                    .to_owned(),
+            ));
+        }
+        let immutable_request_hash = admission_digest(
+            "immutable_request_hash",
+            &ImmutableActiveResponseAdmissionRequest {
+                schema: "chio.governed-active-response-admission.v1",
+                request,
+                governed_intent_hash,
+            },
+        )?;
+        let authorization_capability_hash = admission_digest(
+            "authorization_capability_hash",
+            &request.operator_capability,
+        )?;
+        let policy_hash = AdmissionDigest::try_new("policy_hash", self.config.policy_hash.clone())
+            .map_err(|_| {
+                KernelError::DurableAdmission(
+                    "durable admission requires a canonical SHA-256 policy hash".to_owned(),
+                )
+            })?;
+        let requirements = AdmissionParticipantRequirements {
+            approval: true,
+            ..AdmissionParticipantRequirements::NONE
+        };
+        let coordinator_authority_id = AdmissionIdentifier::try_new(
+            "coordinator_authority_id",
+            runtime.fence.store_uuid.clone(),
+        )?;
+        let namespace = match self.receipt_tenant_id_for_request(Some(&request.request_id)) {
+            Some(tenant_id) => AuthenticatedRequestNamespace::from_authentication_context(
+                coordinator_authority_id,
+                tenant_id,
+            )?,
+            None => AuthenticatedRequestNamespace::for_local_system(coordinator_authority_id)?,
+        };
+        let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
+            kind: AdmissionOperationKind::GovernedActiveResponse,
+            namespace,
+            request_id: AdmissionIdentifier::try_new("request_id", request.request_id.clone())?,
+            capability_id: AdmissionIdentifier::try_new(
+                "capability_id",
+                request.operator_capability.id.clone(),
+            )?,
+            authorization_capability_hash,
+            request_binding: AdmissionRequestBindingV1::new(immutable_request_hash, requirements)?,
+            policy_hash,
+            effect_class: SideEffectClass::SideEffecting,
+        })?;
+        let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
+        let _mutation_guard = runtime.lock_mutations()?;
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        let operation = match runtime
+            .store
+            .begin(&prepared, &runtime.fence, trusted_now_unix_ms)
+            .map_err(durable_store_error)?
+        {
+            AdmissionBeginResult::Created(operation) => operation,
+            AdmissionBeginResult::ExactReplay { operation, .. }
+                if matches!(
+                    operation.state(),
+                    AdmissionOperationState::Prepared
+                        | AdmissionOperationState::ApprovalReserved
+                        | AdmissionOperationState::ReadyToDispatch
+                        | AdmissionOperationState::DispatchCommitted
+                ) =>
+            {
+                operation
+            }
+            AdmissionBeginResult::ExactReplay { operation, .. } => {
+                return Err(KernelError::DurableAdmission(format!(
+                    "active-response request replay is retained in state {:?}",
+                    operation.state()
+                )));
+            }
+            AdmissionBeginResult::Conflict {
+                existing_operation_id,
+            } => {
+                return Err(KernelError::DurableAdmission(format!(
+                    "active-response request id conflicts with retained operation {}",
+                    existing_operation_id.as_str()
+                )));
+            }
+        };
+        Ok(DurableToolAdmission { operation })
+    }
+
     fn durable_post_return_plan(&self) -> Result<DurablePostReturnPlan, KernelError> {
         let hook_identities = self
             .post_invocation_pipeline
@@ -807,21 +915,47 @@ impl ChioKernel {
         verified: &VerifiedApprovalReservation,
         trusted_now_unix_ms: u64,
     ) -> Result<(), KernelError> {
-        if admission.operation.state() == AdmissionOperationState::ApprovalReserved {
-            return Ok(());
-        }
-        if admission.operation.state() != AdmissionOperationState::BudgetAuthorized {
-            return Err(KernelError::DurableAdmission(format!(
-                "approval reservation requires budget_authorized, found {:?}",
-                admission.operation.state()
-            )));
-        }
         let proposal_hash = AdmissionDigest::try_new(
             "threshold_proposal_hash",
             verified.threshold_proposal_hash.clone(),
         )?;
         let approval_set_hash =
             AdmissionDigest::try_new("approval_set_hash", verified.approval_set_hash.clone())?;
+        if matches!(
+            admission.operation.state(),
+            AdmissionOperationState::ApprovalReserved
+                | AdmissionOperationState::ReadyToDispatch
+                | AdmissionOperationState::CapturePending
+                | AdmissionOperationState::DispatchCommitted
+                | AdmissionOperationState::Finalizing
+                | AdmissionOperationState::Completed
+        ) {
+            let proposal_matches =
+                admission.operation.threshold_proposal_hash() == Some(&proposal_hash);
+            let set_matches = admission.operation.approval_set_hash() == Some(&approval_set_hash);
+            if proposal_matches && set_matches {
+                return Ok(());
+            }
+            return Err(KernelError::DurableAdmission(
+                "retained approval reservation does not match the verified approval set".to_owned(),
+            ));
+        }
+        let required_source = match admission.operation.binding().kind() {
+            AdmissionOperationKind::ToolDispatch => AdmissionOperationState::BudgetAuthorized,
+            AdmissionOperationKind::GovernedActiveResponse => AdmissionOperationState::Prepared,
+            AdmissionOperationKind::GovernedEconomicMutation => {
+                return Err(KernelError::DurableAdmission(
+                    "economic mutation admission does not accept threshold approval sets"
+                        .to_owned(),
+                ));
+            }
+        };
+        if admission.operation.state() != required_source {
+            return Err(KernelError::DurableAdmission(format!(
+                "approval reservation requires {required_source:?}, found {:?}",
+                admission.operation.state()
+            )));
+        }
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
@@ -975,9 +1109,30 @@ impl ChioKernel {
         if admission.operation.state() == AdmissionOperationState::DispatchCommitted {
             return Ok(());
         }
-        if admission.operation.state() != AdmissionOperationState::CapturePending {
+        if admission.operation.binding().kind() == AdmissionOperationKind::GovernedActiveResponse
+            && admission.operation.state() == AdmissionOperationState::ApprovalReserved
+        {
+            admission.operation = self.apply_admission_command(
+                admission.operation.clone(),
+                Vec::new(),
+                AdmissionOperationState::ReadyToDispatch,
+                trusted_now_unix_ms,
+            )?;
+        }
+        let required_source = match admission.operation.binding().kind() {
+            AdmissionOperationKind::ToolDispatch => AdmissionOperationState::CapturePending,
+            AdmissionOperationKind::GovernedActiveResponse => {
+                AdmissionOperationState::ReadyToDispatch
+            }
+            AdmissionOperationKind::GovernedEconomicMutation => {
+                return Err(KernelError::DurableAdmission(
+                    "economic mutation admission does not use dispatch commitment".to_owned(),
+                ));
+            }
+        };
+        if admission.operation.state() != required_source {
             return Err(KernelError::DurableAdmission(format!(
-                "dispatch cannot commit from state {:?}",
+                "dispatch cannot commit from state {:?}; expected {required_source:?}",
                 admission.operation.state()
             )));
         }

@@ -1069,6 +1069,7 @@ fn governed_intent_with_control_plane(control_plane: Value) -> GovernedTransacti
         call_chain: None,
         autonomy: None,
         context: Some(json!({ "chioControlPlane": control_plane })),
+        body: Default::default(),
     }
 }
 
