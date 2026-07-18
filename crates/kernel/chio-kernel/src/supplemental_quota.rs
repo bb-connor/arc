@@ -6,6 +6,7 @@
 //! every request binding again before exposing a quota owner or maximum.
 
 use serde::Serialize;
+use std::sync::Arc;
 
 use chio_core::capability::features::CapabilityNegotiation;
 use chio_core::crypto::PublicKey;
@@ -54,6 +55,33 @@ pub struct SupplementalQuotaVerificationContext {
 pub struct SupplementalQuotaVerifierBinding {
     pub verifier_identity: String,
     pub configuration_digest: String,
+}
+
+impl SupplementalQuotaVerifierBinding {
+    /// Validate composition-root identity before accepting requests.
+    pub fn validate(&self) -> Result<(), SupplementalQuotaError> {
+        if self.verifier_identity.is_empty() {
+            return Err(SupplementalQuotaError::EmptyContextField(
+                "verifier_identity",
+            ));
+        }
+        if self.configuration_digest.is_empty() {
+            return Err(SupplementalQuotaError::EmptyContextField(
+                "verifier_configuration_digest",
+            ));
+        }
+        ensure_bounded(
+            "verifier_identity",
+            self.verifier_identity.len(),
+            MAX_SUPPLEMENTAL_CONTEXT_FIELD_BYTES,
+        )?;
+        ensure_bounded(
+            "verifier_configuration_digest",
+            self.configuration_digest.len(),
+            MAX_SUPPLEMENTAL_CONTEXT_FIELD_BYTES,
+        )?;
+        ensure_sha256_hex("verifier_configuration_digest", &self.configuration_digest)
+    }
 }
 
 /// A claim returned by an installed trusted supplemental verifier.
@@ -196,6 +224,29 @@ pub trait SupplementalQuotaVerifier: Send + Sync {
         signed_extension: &[u8],
         context: &SupplementalQuotaVerificationContext,
     ) -> Result<VerifiedSupplementalQuotaClaim, SupplementalQuotaVerifierError>;
+}
+
+pub(crate) struct SupplementalQuotaVerifierRuntime {
+    verifier: Arc<dyn SupplementalQuotaVerifier>,
+    binding: SupplementalQuotaVerifierBinding,
+}
+
+impl SupplementalQuotaVerifierRuntime {
+    pub(crate) fn new(
+        verifier: Arc<dyn SupplementalQuotaVerifier>,
+        binding: SupplementalQuotaVerifierBinding,
+    ) -> Result<Self, SupplementalQuotaError> {
+        binding.validate()?;
+        Ok(Self { verifier, binding })
+    }
+
+    pub(crate) fn verifier(&self) -> &dyn SupplementalQuotaVerifier {
+        self.verifier.as_ref()
+    }
+
+    pub(crate) fn binding(&self) -> &SupplementalQuotaVerifierBinding {
+        &self.binding
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

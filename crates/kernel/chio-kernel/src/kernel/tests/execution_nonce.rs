@@ -313,6 +313,10 @@ fn strict_nonce_mode_nested_flow_operation_forwards_presented_nonce(
         tool_name: request.tool_name.clone(),
         arguments: request.arguments.clone(),
         governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
         execution_nonce: Some(serde_json::to_value(&nonce)?),
         model_metadata: None,
         extra_metadata: None,
@@ -472,6 +476,7 @@ fn strict_nonce_mode_payment_denial_does_not_consume_nonce() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -559,6 +564,7 @@ fn strict_nonce_mode_request_id_mismatch_precedes_monetary_side_effects(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };

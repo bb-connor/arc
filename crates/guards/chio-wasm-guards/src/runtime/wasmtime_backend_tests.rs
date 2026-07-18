@@ -780,6 +780,7 @@ fn wasmtime_fuel_consumed_tracked_on_wasm_guard() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };

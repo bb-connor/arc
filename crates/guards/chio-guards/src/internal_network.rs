@@ -443,6 +443,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         };

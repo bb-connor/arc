@@ -270,6 +270,11 @@ fn make_request_json(subject: &Keypair) -> ToolCallRequestJson {
         server_id: "srv-a".to_string(),
         agent_id: subject.public_key().to_hex(),
         arguments: serde_json::json!({"msg": "hello"}),
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: std::vec::Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
     }
 }
 
@@ -308,6 +313,33 @@ fn evaluate_pure_allow_path() {
     assert!(verdict.subject_hex.is_some());
     assert!(verdict.issuer_hex.is_some());
     assert_eq!(verdict.capability_id.as_deref(), Some("cap-1"));
+}
+
+#[test]
+fn evaluate_pure_rejects_unsupported_authorization_extensions() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability(&subject, &issuer);
+    let mut request = make_request_json(&subject);
+    request.supplemental_authorization = Some(serde_json::json!({
+        "signed_extension": "b3BhcXVl"
+    }));
+    let input = EvaluateRequestJson {
+        request,
+        capability,
+        trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],
+        clock_override_unix_secs: Some(ISSUED_AT + 1),
+        session_filesystem_roots: None,
+        peer_capabilities: None,
+        direct_root_capability: None,
+        capability_trust_roots: BTreeMap::new(),
+        parent_budget_snapshots: std::vec![],
+    };
+
+    let error = evaluate_pure(input, &FixedClock::new(ISSUED_AT + 1))
+        .expect_err("unsupported authorization extension must fail closed");
+
+    assert_eq!(error.code, "unsupported_authorization_extension");
 }
 
 #[test]
@@ -622,6 +654,11 @@ fn negotiated_cumulative_family_requires_matching_root_in_verify_and_evaluate() 
                     server_id: "srv-a".to_string(),
                     agent_id: child.subject.to_hex(),
                     arguments: serde_json::json!({"msg": "hello"}),
+                    governed_intent: None,
+                    approval_token: None,
+                    approval_tokens: std::vec::Vec::new(),
+                    threshold_approval_proposal: None,
+                    supplemental_authorization: None,
                 },
                 capability: child.clone(),
                 trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],

@@ -370,6 +370,7 @@ impl RequestEvaluator {
             requested_arguments: None,
             execution_nonce,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             policy: policy_mode(matched_policy),
         })?;
         Ok(result.into())
@@ -381,6 +382,7 @@ impl RequestEvaluator {
         request: ChioHttpRequest,
         presented_capability: Option<&str>,
     ) -> Result<EvaluationResult, crate::error::ProtectError> {
+        let unsupported_authorization_extension = request.unsupported_authorization_extension();
         let ChioHttpRequest {
             request_id,
             method,
@@ -421,6 +423,7 @@ impl RequestEvaluator {
             requested_arguments: Some(&arguments),
             execution_nonce: execution_nonce.as_ref(),
             model_metadata: model_metadata.as_ref(),
+            unsupported_authorization_extension,
             policy: policy_mode(matched_policy),
         })?;
         Ok(result.into())
@@ -879,6 +882,40 @@ mod tests {
             http_status_scope(result.receipt.metadata.as_ref()),
             Some(CHIO_HTTP_STATUS_SCOPE_DECISION)
         );
+    }
+
+    #[test]
+    fn evaluate_chio_request_signed_denies_unsupported_approval_sets() {
+        let keypair = Keypair::generate();
+        let routes = vec![RouteEntry {
+            pattern: "/pets".to_string(),
+            method: HttpMethod::Get,
+            operation_id: Some("listPets".to_string()),
+            policy: PolicyDecision::SessionAllow,
+        }];
+        let evaluator = RequestEvaluator::new_ephemeral(routes, keypair, "test-policy".to_string());
+        let mut request = ChioHttpRequest::new(
+            "req-unsupported-approvals".to_string(),
+            HttpMethod::Get,
+            "/pets".to_string(),
+            "/pets".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.approval_tokens = Some(serde_json::json!([
+            { "id": "approval-a" },
+            { "id": "approval-b" }
+        ]));
+
+        let result = evaluator.evaluate_chio_request(request, None).test_unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.verify_signature().test_unwrap());
+        assert!(result.receipt.evidence[0]
+            .details
+            .as_deref()
+            .is_some_and(|details| details.contains(
+                "HTTP authority projection does not support authorization field approval_tokens"
+            )));
     }
 
     #[test]

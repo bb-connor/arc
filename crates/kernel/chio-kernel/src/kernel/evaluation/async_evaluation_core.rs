@@ -180,6 +180,18 @@ impl ChioKernel {
             );
         }
 
+        if let Err(error) = request.validate_authorization_extensions() {
+            let msg = error.to_string();
+            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "authorization extension rejected");
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+
         let cap = &request.capability;
 
         // Signature is verified first (no budget mutation); the actual

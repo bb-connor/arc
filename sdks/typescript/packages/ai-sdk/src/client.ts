@@ -50,6 +50,16 @@ export interface ChioEvaluateToolCallRequest {
   arguments?: unknown;
   parameters?: unknown;
   capability?: unknown;
+  /** Typed Chio governed intent carried unchanged to the kernel boundary. */
+  governed_intent?: unknown;
+  /** Singular approval compatibility field. Do not combine with `approval_tokens`. */
+  approval_token?: unknown;
+  /** Complete threshold approval set. The client never selects one member. */
+  approval_tokens?: readonly unknown[];
+  /** Signed proposal binding `approval_tokens`. */
+  threshold_approval_proposal?: unknown;
+  /** Opaque authenticated extension. The SDK does not interpret its bytes. */
+  supplemental_authorization?: { signed_extension: string };
   model_metadata?:
     | {
       model_id: string;

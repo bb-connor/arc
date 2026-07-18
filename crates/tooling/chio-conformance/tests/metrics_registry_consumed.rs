@@ -304,6 +304,10 @@ fn mcp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
             agent_id: agent.public_key().to_hex(),
             execution_nonce: None,
             governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
             route_selection_metadata: None,
             peer_supports_chio_tool_streaming: false,
@@ -359,6 +363,10 @@ fn mcp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
             agent_id: error_agent.public_key().to_hex(),
             execution_nonce: None,
             governed_intent: None,
+            approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
             route_selection_metadata: None,
             peer_supports_chio_tool_streaming: false,
@@ -415,6 +423,7 @@ fn acp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
     };
 
@@ -470,6 +479,7 @@ fn acp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         },
     );
@@ -529,6 +539,7 @@ fn a2a_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
     };
 
@@ -583,6 +594,7 @@ fn a2a_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         },
     );
@@ -646,6 +658,7 @@ fn http_core_emits_kernel_decision_latency_and_guard_evaluations() -> Result<(),
         requested_arguments: None,
         execution_nonce: None,
         model_metadata: None,
+        unsupported_authorization_extension: None,
         policy: chio_http_core::HttpAuthorityPolicy::SessionAllow,
     })?;
 
@@ -1411,6 +1424,7 @@ fn existing_infra_driver(name: &str) -> Result<Option<String>, Box<dyn Error>> {
             requested_arguments: None,
             execution_nonce: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             policy: chio_http_core::HttpAuthorityPolicy::SessionAllow,
         })?;
         return Ok(Some(chio_http_core::render_http_core_metrics_prometheus()));
@@ -1466,6 +1480,10 @@ fn existing_infra_driver(name: &str) -> Result<Option<String>, Box<dyn Error>> {
                 agent_id: agent.public_key().to_hex(),
                 execution_nonce: None,
                 governed_intent: None,
+                approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
+                supplemental_authorization: None,
                 model_metadata: None,
                 route_selection_metadata: None,
                 peer_supports_chio_tool_streaming: false,

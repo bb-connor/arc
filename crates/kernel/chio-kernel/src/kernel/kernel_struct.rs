@@ -593,6 +593,8 @@ pub struct ChioKernel {
     pub(super) approval_replay_store: Option<dpop::DpopNonceStore>,
     pub(super) threshold_approval_requirement_resolver:
         Option<Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>>,
+    pub(super) supplemental_quota_verifier:
+        Option<crate::supplemental_quota::SupplementalQuotaVerifierRuntime>,
     /// Emergency kill switch. When `true`, every evaluate entry point returns
     /// `Verdict::Deny` without performing capability validation or guard
     /// evaluation. Flipped by `emergency_stop` / `emergency_resume`.

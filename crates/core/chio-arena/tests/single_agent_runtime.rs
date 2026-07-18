@@ -108,6 +108,7 @@ async fn runs_single_agent_scenario_and_collects_signed_receipt(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };

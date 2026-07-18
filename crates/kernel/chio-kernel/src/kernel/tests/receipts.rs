@@ -635,6 +635,10 @@ fn kernel_persists_child_receipts_to_sqlite_store() {
         tool_name: "sample_via_client".to_string(),
         arguments: serde_json::json!({}),
         governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
         extra_metadata: None,
@@ -742,6 +746,10 @@ fn nested_admission_denied_while_rss_shedding() {
         tool_name: "sample_via_client".to_string(),
         arguments: serde_json::json!({}),
         governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
         extra_metadata: None,
@@ -891,6 +899,10 @@ fn session_tool_call_records_incomplete_terminal_state() {
         tool_name: "drop_stream".to_string(),
         arguments: serde_json::json!({}),
         governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
         extra_metadata: None,
@@ -1228,6 +1240,7 @@ fn checkpoint_triggers_at_100_receipts() {
                 approval_token: None,
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
+                supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             })
@@ -1295,6 +1308,7 @@ fn concurrent_receipt_checkpointing_keeps_contiguous_batches() {
                         approval_token: None,
                         approval_tokens: Vec::new(),
                         threshold_approval_proposal: None,
+                        supplemental_authorization: None,
                         model_metadata: None,
                         federated_origin_kernel_id: None,
                     })
@@ -1367,6 +1381,7 @@ fn checkpoint_counters_restore_when_store_is_reattached() {
                 approval_token: None,
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
+                supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             })
@@ -1410,6 +1425,7 @@ fn checkpoint_counters_restore_when_store_is_reattached() {
                 approval_token: None,
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
+                supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             })
@@ -1480,6 +1496,7 @@ fn checkpoint_counters_refresh_across_kernels_sharing_store() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1501,6 +1518,7 @@ fn checkpoint_counters_refresh_across_kernels_sharing_store() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1581,6 +1599,7 @@ fn inclusion_proof_verifies_against_stored_checkpoint() {
                 approval_token: None,
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
+                supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             })
@@ -1646,6 +1665,7 @@ fn background_checkpoints_are_installed_at_store_attach_and_fire_off_the_request
                 approval_token: None,
                 approval_tokens: Vec::new(),
                 threshold_approval_proposal: None,
+                supplemental_authorization: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             })

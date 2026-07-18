@@ -183,7 +183,6 @@ impl ChioAcpEdge {
     }
 
     fn build_execution_request(
-        &self,
         capability_id: &str,
         arguments: Value,
         execution: &AcpKernelExecutionContext,
@@ -207,6 +206,7 @@ impl ChioAcpEdge {
             approval_token: execution.approval_token.clone(),
             approval_tokens: execution.approval_tokens.clone(),
             threshold_approval_proposal: execution.threshold_approval_proposal.clone(),
+            supplemental_authorization: execution.supplemental_authorization.clone(),
             model_metadata: execution.model_metadata.clone(),
         })
     }
@@ -384,7 +384,7 @@ impl ChioAcpEdge {
         validate_execution_context(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
-        let request = self.build_execution_request(
+        let request = Self::build_execution_request(
             capability_id,
             arguments,
             execution,
@@ -416,7 +416,7 @@ impl ChioAcpEdge {
         validate_execution_context(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
-        let request = self.build_execution_request(
+        let request = Self::build_execution_request(
             capability_id,
             arguments,
             execution,
@@ -451,7 +451,7 @@ impl ChioAcpEdge {
         validate_execution_context(execution)?;
         let binding = self.capability_binding(capability_id)?;
         let request_suffix = current_unix_timestamp();
-        let request = self.build_execution_request(
+        let request = Self::build_execution_request(
             capability_id,
             arguments,
             execution,
@@ -852,7 +852,7 @@ impl ChioAcpEdge {
         self.ensure_deferred_task_capacity()?;
         let task_id = self.next_task_id();
         let expires_at_ms = current_unix_millis().saturating_add(DEFERRED_ACP_TASK_TTL_MILLIS);
-        let request = self.build_execution_request(
+        let request = Self::build_execution_request(
             capability_id,
             arguments,
             execution,

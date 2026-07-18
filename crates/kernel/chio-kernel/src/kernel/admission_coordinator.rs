@@ -25,10 +25,15 @@ use crate::admission_operation::{
 };
 use crate::budget_store::{
     BudgetAdmissionBinding, BudgetCaptureInvocationRequest, BudgetEventAuthority,
-    BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
+    BudgetGuaranteeLevel, BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
 };
 use crate::receipt_store::QualifiedAdmissionProjectionStore;
-use crate::supplemental_quota::CanonicalRevocationSet;
+use crate::supplemental_quota::{
+    canonical_revocation_set_for_verified_claim, supplemental_authorization_artifact_digest,
+    verify_supplemental_quota, CanonicalRevocationSet, KernelVerifiedSupplementalQuotaClaim,
+    SupplementalQuotaError, SupplementalQuotaVerificationContext,
+    BROKER_CAPABILITY_EXECUTION_PROFILE,
+};
 use crate::tool_outcome::{
     EvaluationModeV1, EvaluationPhaseV1, FrozenEvaluationStepV1, InvocationOutputV1,
     InvocationStreamLimitsV1, PostReturnEvaluationRecordV1, PostReturnEvaluationStateV1,
@@ -158,6 +163,7 @@ impl QualifiedDurableOutcomeAuthority for DurableAdmissionRuntime {
 
 pub(crate) struct DurableToolAdmission {
     operation: AdmissionOperationV1,
+    supplemental_quota: Option<KernelVerifiedSupplementalQuotaClaim>,
 }
 
 impl DurableToolAdmission {
@@ -193,6 +199,10 @@ impl DurableToolAdmission {
 
     pub(crate) fn state(&self) -> AdmissionOperationState {
         self.operation.state()
+    }
+
+    pub(crate) fn supplemental_quota(&self) -> Option<&KernelVerifiedSupplementalQuotaClaim> {
+        self.supplemental_quota.as_ref()
     }
 }
 
@@ -392,7 +402,10 @@ impl ChioKernel {
                         })?;
                     }
                     AdmissionOperationState::Finalizing => {
-                        let mut admission = DurableToolAdmission { operation };
+                        let mut admission = DurableToolAdmission {
+                            operation,
+                            supplemental_quota: None,
+                        };
                         let tool_return = self.load_durable_tool_return(&admission)?;
                         let Some(request) =
                             tool_return.recovery_request().map_err(tool_outcome_error)?
@@ -425,6 +438,13 @@ impl ChioKernel {
         matching_grants: &[MatchingGrant<'_>],
         trusted_now_unix_ms: u64,
     ) -> Result<Option<DurableToolAdmission>, KernelError> {
+        if request.supplemental_authorization.is_some()
+            && self.supplemental_quota_verifier.is_none()
+        {
+            return Err(KernelError::DurableAdmission(
+                SupplementalQuotaError::MissingVerifier.to_string(),
+            ));
+        }
         let effect_class = if matching_grants.iter().any(|matching| {
             matching.grant.max_cost_per_invocation.is_some()
                 || matching.grant.max_total_cost.is_some()
@@ -440,11 +460,18 @@ impl ChioKernel {
             SideEffectClass::SideEffecting
         };
         if !self.durable_admission_mode.covers(effect_class) {
+            if request.supplemental_authorization.is_some() {
+                return Err(KernelError::DurableAdmission(
+                    "supplemental authorization requires durable admission coverage".to_string(),
+                ));
+            }
             return Ok(None);
         }
         self.durable_stream_limits()?;
         let Some(runtime) = self.durable_admission_runtime.as_ref() else {
-            if self.config.allow_ephemeral_receipt_log {
+            if self.config.allow_ephemeral_receipt_log
+                && request.supplemental_authorization.is_none()
+            {
                 return Ok(None);
             }
             return Err(KernelError::DurableAdmission(
@@ -486,6 +513,14 @@ impl ChioKernel {
         }
         let post_return_plan = self.durable_post_return_plan()?;
 
+        let supplemental_authorization_artifact_digest = request
+            .supplemental_authorization
+            .as_ref()
+            .map(|authorization| {
+                supplemental_authorization_artifact_digest(
+                    authorization.signed_extension.as_bytes(),
+                )
+            });
         let immutable_request = ImmutableToolAdmissionRequest {
             schema: "chio.tool-admission-request.v1",
             server_id: &request.server_id,
@@ -561,6 +596,11 @@ impl ChioKernel {
             policy_hash,
             effect_class,
         })?;
+        let supplemental_quota = self.verify_supplemental_quota_for_admission(
+            request,
+            &binding,
+            trusted_now_unix_ms / 1000,
+        )?;
         let prepared = AdmissionOperationV1::prepare(binding, runtime.fence.owner_epoch)?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
@@ -616,9 +656,19 @@ impl ChioKernel {
                         "provider attempt binding is invalid: {error}"
                     ))
                 })?;
+                let mut attachments = Vec::with_capacity(2);
+                if let Some(digest) = supplemental_authorization_artifact_digest.as_ref() {
+                    attachments.push(AdmissionAttachment::SupplementalAuthorizationDigest(
+                        AdmissionDigest::try_new(
+                            "supplemental_authorization_digest",
+                            digest.clone(),
+                        )?,
+                    ));
+                }
+                attachments.push(AdmissionAttachment::BrokerAttempt(expected_attempt));
                 self.apply_admission_command(
                     operation,
-                    vec![AdmissionAttachment::BrokerAttempt(expected_attempt)],
+                    attachments,
                     AdmissionOperationState::BrokerAttemptRegistered,
                     trusted_now_unix_ms,
                 )?
@@ -638,7 +688,19 @@ impl ChioKernel {
                 ));
             }
         };
-        Ok(Some(DurableToolAdmission { operation }))
+        if operation
+            .supplemental_authorization_digest()
+            .map(AdmissionDigest::as_str)
+            != supplemental_authorization_artifact_digest.as_deref()
+        {
+            return Err(KernelError::DurableAdmission(
+                "retained supplemental authorization digest does not match request".to_string(),
+            ));
+        }
+        Ok(Some(DurableToolAdmission {
+            operation,
+            supplemental_quota,
+        }))
     }
 
     pub(crate) fn begin_durable_active_response_admission(
@@ -739,7 +801,10 @@ impl ChioKernel {
                 )));
             }
         };
-        Ok(DurableToolAdmission { operation })
+        Ok(DurableToolAdmission {
+            operation,
+            supplemental_quota: None,
+        })
     }
 
     fn durable_post_return_plan(&self) -> Result<DurablePostReturnPlan, KernelError> {
@@ -792,36 +857,144 @@ impl ChioKernel {
         })
     }
 
+    fn verify_supplemental_quota_for_admission(
+        &self,
+        request: &ToolCallRequest,
+        binding: &AdmissionOperationBindingV1,
+        now: u64,
+    ) -> Result<Option<KernelVerifiedSupplementalQuotaClaim>, KernelError> {
+        let Some(authorization) = request.supplemental_authorization.as_ref() else {
+            return Ok(None);
+        };
+        let runtime = self.supplemental_quota_verifier.as_ref().ok_or_else(|| {
+            KernelError::DurableAdmission(SupplementalQuotaError::MissingVerifier.to_string())
+        })?;
+
+        #[derive(Serialize)]
+        struct ToolDestination<'a> {
+            server_id: &'a str,
+            tool_name: &'a str,
+        }
+
+        let normalized_destination = String::from_utf8(
+            canonical_json_bytes(&ToolDestination {
+                server_id: &request.server_id,
+                tool_name: &request.tool_name,
+            })
+            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
+        )
+        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        let capability_digest = sha256_hex(
+            &canonical_json_bytes(&request.capability)
+                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
+        );
+        let arguments_hash = sha256_hex(
+            &canonical_json_bytes(&request.arguments)
+                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
+        );
+        let mut negotiated_features = self
+            .capability_negotiation_for_remote(request.federated_origin_kernel_id.as_deref(), now)
+            .map_err(KernelError::DurableAdmission)?;
+        if request.federated_origin_kernel_id.is_none() {
+            negotiated_features
+                .features
+                .insert(BROKER_CAPABILITY_EXECUTION_PROFILE.to_string(), true);
+        }
+        let context = SupplementalQuotaVerificationContext {
+            capability_id: request.capability.id.clone(),
+            capability_digest,
+            request_namespace_digest: binding.request_namespace_digest().as_str().to_string(),
+            operation_id: binding.operation_id().as_str().to_string(),
+            subject: request.capability.subject.clone(),
+            request_id: request.request_id.clone(),
+            normalized_destination,
+            arguments_hash,
+            negotiated_profile: BROKER_CAPABILITY_EXECUTION_PROFILE.to_string(),
+            negotiated_features,
+            verifier_binding: runtime.binding().clone(),
+        };
+        verify_supplemental_quota(
+            Some(runtime.verifier()),
+            authorization.signed_extension.as_bytes(),
+            &context,
+            now,
+        )
+        .map(Some)
+        .map_err(|error| KernelError::DurableAdmission(error.to_string()))
+    }
+
     pub(crate) fn durable_budget_binding(
         &self,
         admission: &DurableToolAdmission,
         capability: &CapabilityToken,
     ) -> Result<(BudgetAdmissionBinding, BudgetEventAuthority), KernelError> {
         let runtime = self.durable_runtime()?;
-        let mut revocation_ids = Vec::with_capacity(capability.delegation_chain.len() + 1);
-        revocation_ids.push(capability.id.clone());
-        revocation_ids.extend(
-            capability
-                .delegation_chain
-                .iter()
-                .map(|link| link.capability_id.clone()),
-        );
-        let revocation_set =
-            CanonicalRevocationSet::canonicalize(revocation_ids).map_err(|error| {
-                KernelError::DurableAdmission(format!(
-                    "capability revocation set is invalid: {error}"
-                ))
+        let ancestor_capability_ids = capability
+            .delegation_chain
+            .iter()
+            .map(|link| link.capability_id.clone())
+            .collect::<Vec<_>>();
+        let revocation_set = match admission.supplemental_quota() {
+            Some(claim) => canonical_revocation_set_for_verified_claim(
+                &capability.id,
+                &ancestor_capability_ids,
+                claim,
+            ),
+            None => {
+                let mut revocation_ids = Vec::with_capacity(ancestor_capability_ids.len() + 1);
+                revocation_ids.push(capability.id.clone());
+                revocation_ids.extend(ancestor_capability_ids);
+                CanonicalRevocationSet::canonicalize(revocation_ids)
+            }
+        }
+        .map_err(|error| {
+            KernelError::DurableAdmission(format!("capability revocation set is invalid: {error}"))
+        })?;
+        let supplemental = admission.supplemental_quota();
+        let last_observed_revocation = if supplemental.is_some() {
+            let observation = self
+                .revocation_store
+                .observe_revocation(&capability.id)
+                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            if observation.revoked {
+                return Err(KernelError::DurableAdmission(
+                    "supplemental authorization leaf capability is revoked".to_string(),
+                ));
+            }
+            let commit = observation.commit.ok_or_else(|| {
+                KernelError::DurableAdmission(
+                    "supplemental authorization requires atomic revocation observation".to_string(),
+                )
             })?;
+            if !matches!(
+                commit.guarantee_level,
+                BudgetGuaranteeLevel::SingleNodeAtomic | BudgetGuaranteeLevel::HaLinearizable
+            ) {
+                return Err(KernelError::DurableAdmission(
+                    "supplemental authorization revocation observation is not atomic".to_string(),
+                ));
+            }
+            Some(commit)
+        } else {
+            None
+        };
+        let authorization_artifact_digests = supplemental
+            .map(|claim| vec![claim.authorization_artifact_digest().to_string()])
+            .unwrap_or_default();
         Ok((
             BudgetAdmissionBinding {
                 operation_id: admission.operation_id().to_string(),
                 revocation_set,
-                authorization_artifact_digests: Vec::new(),
-                last_observed_revocation: None,
-                supplemental_verifier_id: None,
-                supplemental_verifier_config_digest: None,
-                supplemental_authorization_artifact_digest: None,
-                supplemental_authorization_expires_at: None,
+                authorization_artifact_digests,
+                last_observed_revocation,
+                supplemental_verifier_id: supplemental
+                    .map(|claim| claim.verifier_binding().verifier_identity.clone()),
+                supplemental_verifier_config_digest: supplemental
+                    .map(|claim| claim.verifier_binding().configuration_digest.clone()),
+                supplemental_authorization_artifact_digest: supplemental
+                    .map(|claim| claim.authorization_artifact_digest().to_string()),
+                supplemental_authorization_expires_at: supplemental
+                    .map(KernelVerifiedSupplementalQuotaClaim::expires_at),
             },
             runtime.authority(),
         ))

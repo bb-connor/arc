@@ -12,8 +12,9 @@ use crate::budget_store::{
     BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
     BudgetCancelCapturedBeforeDispatchRequest, BudgetCaptureInvocationRequest,
     BudgetCapturedBeforeDispatchCancellationDecision, BudgetEventAuthority,
-    BudgetHoldMutationDecision, BudgetInvocationCaptureDecision, BudgetReconcileHoldDecision,
-    BudgetReconcileHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest,
+    BudgetHoldMutationDecision, BudgetInvocationCaptureDecision, BudgetInvocationQuota,
+    BudgetQuotaKey, BudgetQuotaProfile, BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
+    BudgetReverseHoldDecision, BudgetReverseHoldRequest,
 };
 
 impl ChioKernel {
@@ -1098,11 +1099,41 @@ impl ChioKernel {
                         )
                     };
 
+                let invocation_quotas = durable_admission
+                    .as_deref()
+                    .and_then(DurableToolAdmission::supplemental_quota)
+                    .map(|supplemental| {
+                        let mut quotas = Vec::with_capacity(2);
+                        if let Some(max_invocations) = grant.max_invocations {
+                            quotas.push(BudgetInvocationQuota {
+                                key: BudgetQuotaKey::grant(
+                                    cap.id.clone(),
+                                    u32::try_from(matching.index).map_err(|_| {
+                                        KernelError::DurableAdmission(
+                                            "matching grant index exceeds u32".to_string(),
+                                        )
+                                    })?,
+                                ),
+                                max_invocations,
+                            });
+                        }
+                        quotas.push(BudgetInvocationQuota {
+                            key: BudgetQuotaKey {
+                                profile: BudgetQuotaProfile::SupplementalBrokerCapabilityExecution,
+                                owner_id: supplemental.owner_id().to_string(),
+                                grant_index: None,
+                            },
+                            max_invocations: supplemental.max_invocations(),
+                        });
+                        Ok::<_, KernelError>(quotas)
+                    })
+                    .transpose()?
+                    .unwrap_or_default();
                 let authorization_request = BudgetAuthorizeHoldRequest {
                     capability_id: cap.id.clone(),
                     grant_index: matching.index,
                     max_invocations: grant.max_invocations,
-                    invocation_quotas: Vec::new(),
+                    invocation_quotas,
                     cumulative_approval: None,
                     admission_binding,
                     requested_exposure_units: cost_units,

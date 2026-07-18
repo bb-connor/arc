@@ -219,6 +219,7 @@ fn make_request(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     }
@@ -500,6 +501,7 @@ async fn full_flow_revocation_cascade() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
     };
     let resp_ok = kernel.evaluate_tool_call(&req_ok).await.unwrap();
     assert_eq!(
@@ -528,6 +530,7 @@ async fn full_flow_revocation_cascade() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
     };
     let resp_revoked = kernel.evaluate_tool_call(&req_revoked).await.unwrap();
 
@@ -850,6 +853,7 @@ async fn full_flow_untrusted_issuer() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
     };
 
     let resp = kernel.evaluate_tool_call(&req).await.unwrap();

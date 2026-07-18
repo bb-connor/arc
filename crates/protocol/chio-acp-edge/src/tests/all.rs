@@ -7,7 +7,15 @@ mod tests {
         Arc, Mutex, MutexGuard,
     };
 
-    use chio_core::capability::{scope::{ChioScope, Operation, ToolGrant}, token::{CapabilityTokenBody}};
+    use chio_core::capability::{
+        governance::{
+            GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+            ThresholdApprovalProposal, ThresholdApprovalProposalBody,
+            THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+        },
+        scope::{ChioScope, Operation, ToolGrant},
+        token::CapabilityTokenBody,
+    };
     use chio_core::crypto::Keypair;
     use chio_kernel::{
         dpop, ChioKernel, KernelConfig, KernelError, NestedFlowBridge, RuntimeAdmissionContext,
@@ -477,6 +485,102 @@ mod tests {
         .test_expect("capability should sign")
     }
 
+    fn threshold_artifacts(
+        subject: &Keypair,
+        request_id: &str,
+    ) -> (Vec<GovernedApprovalToken>, ThresholdApprovalProposal) {
+        let policy_authority = Keypair::generate();
+        let approvers = [Keypair::generate(), Keypair::generate()];
+        let intent_hash = "a".repeat(64);
+        let proposal = ThresholdApprovalProposal::sign(
+            ThresholdApprovalProposalBody {
+                schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
+                proposal_id: format!("proposal-{request_id}"),
+                request_id: request_id.to_string(),
+                governed_intent_hash: intent_hash.clone(),
+                subject: subject.public_key(),
+                authorizing_capability_digest: "b".repeat(64),
+                policy_hash: "c".repeat(64),
+                threshold: 2,
+                eligible_set_digest: "d".repeat(64),
+                proposal_created_at: 100,
+                proposal_deadline: 200,
+                policy_authority: policy_authority.public_key(),
+            },
+            &policy_authority,
+        )
+        .test_expect("threshold proposal should sign");
+        let proposal_hash = proposal
+            .artifact_digest()
+            .test_expect("threshold proposal should hash");
+        let approvals = approvers
+            .iter()
+            .enumerate()
+            .map(|(index, approver)| {
+                GovernedApprovalToken::sign(
+                    GovernedApprovalTokenBody {
+                        id: format!("approval-{request_id}-{index}"),
+                        approver: approver.public_key(),
+                        subject: subject.public_key(),
+                        governed_intent_hash: intent_hash.clone(),
+                        request_id: request_id.to_string(),
+                        threshold_proposal_hash: Some(proposal_hash.clone()),
+                        issued_at: 100,
+                        expires_at: 200,
+                        decision: GovernedApprovalDecision::Approved,
+                    },
+                    approver,
+                )
+                .test_expect("approval should sign")
+            })
+            .collect();
+        (approvals, proposal)
+    }
+
+    #[test]
+    fn acp_projection_preserves_complete_approval_set_and_opaque_extension() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let capability = capability_for_tool(&issuer, &subject, "srv", "run");
+        let (approvals, proposal) = threshold_artifacts(&subject, "acp-auth-set");
+        let supplemental =
+            chio_core::capability::supplemental_authorization::OpaqueSupplementalAuthorization {
+                signed_extension: "opaque-acp-extension".to_string(),
+            };
+        let execution = AcpKernelExecutionContext {
+            capability,
+            agent_id: subject.public_key().to_hex(),
+            dpop_proof: None,
+            execution_nonce: None,
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: approvals.clone(),
+            threshold_approval_proposal: Some(proposal.clone()),
+            supplemental_authorization: Some(supplemental.clone()),
+            model_metadata: None,
+        };
+        let projected = ChioAcpEdge::build_execution_request(
+            "run",
+            serde_json::json!({"value": 7}),
+            &execution,
+            &CapabilityBinding {
+                target_protocol: DiscoveryProtocol::Native,
+                server_id: "srv".to_string(),
+                tool_name: "run".to_string(),
+            },
+            DiscoveryProtocol::Native,
+            AcpRequestIds {
+                origin_request_id: "acp-auth-set".to_string(),
+                kernel_request_id: "acp-kernel-auth-set".to_string(),
+            },
+        )
+        .test_expect("ACP request should project");
+
+        assert_eq!(projected.approval_tokens, approvals);
+        assert_eq!(projected.threshold_approval_proposal, Some(proposal));
+        assert_eq!(projected.supplemental_authorization, Some(supplemental));
+    }
+
     fn dpop_proof_for_request(
         agent: &Keypair,
         capability: &CapabilityToken,
@@ -775,6 +879,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
         let request = PermissionRequest {
@@ -809,6 +914,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
         let request = PermissionRequest {
@@ -853,6 +959,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
         let request = PermissionRequest {
@@ -903,6 +1010,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
         let request = PermissionRequest {
@@ -962,6 +1070,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1000,6 +1109,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
         let request = PermissionRequest {
@@ -1101,6 +1211,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1146,6 +1257,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1177,6 +1289,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1208,6 +1321,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1251,6 +1365,7 @@ mod tests {
                     approval_token: None,
                     approval_tokens: Vec::new(),
                     threshold_approval_proposal: None,
+                    supplemental_authorization: None,
                     model_metadata: None,
                 },
                 "approval required",
@@ -1298,6 +1413,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
         let before_error = receipt_write_total(RECEIPT_WRITE_OUTCOME_ERROR);
@@ -1356,6 +1472,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
         let before_error = receipt_write_total(RECEIPT_WRITE_OUTCOME_ERROR);
@@ -1389,6 +1506,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1447,6 +1565,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1486,6 +1605,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1580,6 +1700,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
@@ -1628,6 +1749,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
@@ -1674,6 +1796,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1714,6 +1837,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1754,6 +1878,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1794,6 +1919,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1835,6 +1961,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
@@ -1874,6 +2001,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1915,6 +2043,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1956,6 +2085,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -1996,6 +2126,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2034,6 +2165,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2071,6 +2203,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2108,6 +2241,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
@@ -2139,6 +2273,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2179,6 +2314,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2319,6 +2455,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2403,6 +2540,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2469,6 +2607,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2510,6 +2649,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2584,6 +2724,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2625,6 +2766,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2666,6 +2808,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2707,6 +2850,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2767,6 +2911,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2809,6 +2954,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 
@@ -2891,6 +3037,7 @@ mod tests {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
         };
 

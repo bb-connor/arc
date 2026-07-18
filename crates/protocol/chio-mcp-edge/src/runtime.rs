@@ -5,8 +5,9 @@ use std::time::Duration;
 
 use crate::{AdapterError, McpTransport};
 use chio_core::capability::{
-    governance::GovernedTransactionIntent,
+    governance::{GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal},
     scope::{ModelMetadata, Operation},
+    supplemental_authorization::OpaqueSupplementalAuthorization,
     token::CapabilityToken,
 };
 use chio_core::receipt::decision::Decision;
@@ -22,8 +23,8 @@ use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_cross_protocol::discovery::DiscoveryProtocol;
 use chio_cross_protocol::error::BridgeError;
 use chio_cross_protocol::execution::{
-    metadata_with_source_receipt_context, CrossProtocolTargetExecution, CrossProtocolTargetRequest,
-    TargetExecutionHop, TargetProtocolExecutor,
+    kernel_tool_call_request, metadata_with_source_receipt_context, CrossProtocolTargetExecution,
+    CrossProtocolTargetRequest, TargetExecutionHop, TargetProtocolExecutor,
 };
 use chio_cross_protocol::routing::route_selection_metadata;
 use chio_kernel::{

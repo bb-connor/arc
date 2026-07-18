@@ -153,6 +153,7 @@ impl ChioKernel {
             approval_token: None,
             approval_tokens: request.approval_tokens.clone(),
             threshold_approval_proposal: Some(request.threshold_approval_proposal.clone()),
+            supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: request.federated_origin_kernel_id.clone(),
         };

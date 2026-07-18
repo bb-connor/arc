@@ -184,6 +184,9 @@ pub struct OpenAiExecutionContext {
     pub approval_tokens: Vec<GovernedApprovalToken>,
     /// Signed threshold proposal binding `approval_tokens`.
     pub threshold_approval_proposal: Option<ThresholdApprovalProposal>,
+    /// Opaque authenticated extension forwarded without interpretation.
+    pub supplemental_authorization:
+        Option<chio_core::capability::supplemental_authorization::OpaqueSupplementalAuthorization>,
     /// Optional originating model metadata for model-constrained grants.
     pub model_metadata: Option<ModelMetadata>,
 }
@@ -292,6 +295,25 @@ impl ChioOpenAiAdapter {
         kernel: &ChioKernel,
         execution: &OpenAiExecutionContext,
     ) -> ToolCallResult {
+        if execution.approval_token.is_some() && !execution.approval_tokens.is_empty() {
+            return denied_tool_call_result(
+                tool_call,
+                "Error: singular and threshold approval tokens must not be mixed".to_string(),
+            );
+        }
+        if execution.approval_tokens.len() > 32 {
+            return denied_tool_call_result(
+                tool_call,
+                "Error: threshold approval set exceeds 32 tokens".to_string(),
+            );
+        }
+        if execution.approval_tokens.is_empty() != execution.threshold_approval_proposal.is_none() {
+            return denied_tool_call_result(
+                tool_call,
+                "Error: threshold approval tokens and proposal must be supplied together"
+                    .to_string(),
+            );
+        }
         let (server_id, tool_name) = {
             let binding = self.function_bindings.get(&tool_call.function.name);
             match binding {
@@ -328,6 +350,7 @@ impl ChioOpenAiAdapter {
             approval_token: execution.approval_token.clone(),
             approval_tokens: execution.approval_tokens.clone(),
             threshold_approval_proposal: execution.threshold_approval_proposal.clone(),
+            supplemental_authorization: execution.supplemental_authorization.clone(),
             model_metadata: execution.model_metadata.clone(),
             federated_origin_kernel_id: None,
         };

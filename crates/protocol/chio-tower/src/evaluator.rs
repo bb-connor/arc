@@ -215,6 +215,7 @@ impl ChioEvaluator {
                 requested_arguments: None,
                 execution_nonce: None,
                 model_metadata: None,
+                unsupported_authorization_extension: None,
                 policy: policy_mode(http_method),
             })
             .map_err(Into::into)

@@ -934,6 +934,7 @@ fn untrusted_issuer_denied() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -945,6 +946,50 @@ fn untrusted_issuer_denied() {
         reason.contains("not found among trusted") || reason.contains("not a trusted CA"),
         "reason was: {reason}"
     );
+}
+
+#[test]
+fn supplemental_authorization_is_rejected_before_dispatch_when_unconfigured() {
+    let mut kernel = make_kernel(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+    let agent = make_keypair();
+    let capability = make_capability(
+        &kernel,
+        &agent,
+        make_scope(vec![make_grant("srv-a", "read_file")]),
+        300,
+    );
+    let request = ToolCallRequest {
+        request_id: "req-supplemental-unconfigured".to_string(),
+        capability,
+        tool_name: "read_file".to_string(),
+        server_id: "srv-a".to_string(),
+        agent_id: agent.public_key().to_hex(),
+        arguments: serde_json::json!({}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: Some(
+            chio_core::capability::supplemental_authorization::OpaqueSupplementalAuthorization {
+                signed_extension: "b3BhcXVl".to_string(),
+            },
+        ),
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+    };
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("unsupported extension must produce a signed denial");
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("supplemental authorization requires an installed verifier")));
 }
 
 #[test]
@@ -1563,6 +1608,7 @@ fn dpop_required_grant_allows_when_valid_proof_provided() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1596,6 +1642,7 @@ fn dpop_required_grant_denies_when_no_proof_provided() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1644,6 +1691,7 @@ fn dpop_required_grant_denies_when_proof_has_wrong_tool_name() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };

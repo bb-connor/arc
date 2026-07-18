@@ -209,6 +209,26 @@ struct EvaluateRequestBody {
     agent_id: String,
     #[serde(default)]
     arguments: serde_json::Value,
+    #[serde(default)]
+    governed_intent: Option<serde_json::Value>,
+    #[serde(default)]
+    approval_token: Option<serde_json::Value>,
+    #[serde(default)]
+    approval_tokens: Vec<serde_json::Value>,
+    #[serde(default)]
+    threshold_approval_proposal: Option<serde_json::Value>,
+    #[serde(default)]
+    supplemental_authorization: Option<serde_json::Value>,
+}
+
+impl EvaluateRequestBody {
+    fn has_unsupported_authorization_extensions(&self) -> bool {
+        self.governed_intent.is_some()
+            || self.approval_token.is_some()
+            || !self.approval_tokens.is_empty()
+            || self.threshold_approval_proposal.is_some()
+            || self.supplemental_authorization.is_some()
+    }
 }
 
 /// Shape of the JSON object returned by [`evaluate`].
@@ -322,6 +342,11 @@ pub fn evaluate(request_json: String) -> Result<String, ChioMobileError> {
         serde_json::from_str(&request_json).map_err(|error| ChioMobileError::InvalidJson {
             message: format!("evaluate request: {error}"),
         })?;
+    if parsed.request.has_unsupported_authorization_extensions() {
+        return Err(ChioMobileError::InvalidCapability {
+            message: "mobile portable evaluation cannot authenticate governed approvals or supplemental authorization".to_string(),
+        });
+    }
 
     let capability: CapabilityToken =
         serde_json::from_value(parsed.capability).map_err(|error| {

@@ -1114,6 +1114,10 @@ fn session_tool_call_preserves_chio_swarm_runtime_context() -> Result<(), Box<dy
             })),
             body: Default::default(),
         }),
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
         extra_metadata: None,
@@ -1270,6 +1274,10 @@ fn chio_runtime_admission_hook_receives_nested_flow_route_metadata_before_dispat
         tool_name: "destructive_update".to_string(),
         arguments: serde_json::json!({"record": "vendor-ledger-7", "value": "closed"}),
         governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
         execution_nonce: None,
         model_metadata: None,
         extra_metadata: Some(serde_json::json!({
@@ -1633,6 +1641,7 @@ fn chio_runtime_admission_releases_reservations_on_pre_dispatch_budget_denial(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })?;
@@ -1667,6 +1676,7 @@ fn chio_runtime_admission_releases_reservations_on_pre_dispatch_budget_denial(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })?;
@@ -1725,6 +1735,7 @@ fn chio_runtime_release_failure_does_not_mask_pre_dispatch_budget_denial(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })?;
@@ -1758,6 +1769,7 @@ fn chio_runtime_release_failure_does_not_mask_pre_dispatch_budget_denial(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })?;

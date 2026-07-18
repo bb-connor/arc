@@ -1459,6 +1459,97 @@ fn durable_admission_fixture_with_grants(
     (kernel, request, store, invocations)
 }
 
+#[test]
+fn durable_admission_passes_opaque_supplemental_bytes_to_installed_verifier() {
+    struct BoundVerifier;
+
+    impl crate::supplemental_quota::SupplementalQuotaVerifier for BoundVerifier {
+        fn verify(
+            &self,
+            signed_extension: &[u8],
+            context: &crate::supplemental_quota::SupplementalQuotaVerificationContext,
+        ) -> Result<
+            crate::supplemental_quota::VerifiedSupplementalQuotaClaim,
+            crate::supplemental_quota::SupplementalQuotaVerifierError,
+        > {
+            let request_binding_hash =
+                crate::supplemental_quota::supplemental_request_binding_hash(context)
+                    .map_err(|error| {
+                        crate::supplemental_quota::SupplementalQuotaVerifierError::new(
+                            error.to_string(),
+                        )
+                    })?;
+            Ok(crate::supplemental_quota::VerifiedSupplementalQuotaClaim {
+                profile: crate::supplemental_quota::BROKER_CAPABILITY_EXECUTION_PROFILE
+                    .to_string(),
+                broker_capability_id: "broker-capability-7".to_string(),
+                issuer: context.subject.clone(),
+                request_constraint_digest: "a".repeat(64),
+                max_invocations: 7,
+                authorization_artifact_digest:
+                    crate::supplemental_quota::supplemental_authorization_artifact_digest(
+                        signed_extension,
+                    ),
+                supplemental_revocation_ids: vec!["broker-capability-7".to_string()],
+                expires_at: current_unix_timestamp() + 300,
+                request_binding_hash,
+                capability_id: context.capability_id.clone(),
+                capability_digest: context.capability_digest.clone(),
+                request_namespace_digest: context.request_namespace_digest.clone(),
+                operation_id: context.operation_id.clone(),
+                subject: context.subject.clone(),
+                request_id: context.request_id.clone(),
+                normalized_destination: context.normalized_destination.clone(),
+                arguments_hash: context.arguments_hash.clone(),
+                negotiated_features: context.negotiated_features.clone(),
+            })
+        }
+    }
+
+    let (mut kernel, mut request, _store, _invocations) =
+        durable_admission_fixture("durable-supplemental-verifier");
+    kernel
+        .set_supplemental_quota_verifier(
+            std::sync::Arc::new(BoundVerifier),
+            crate::supplemental_quota::SupplementalQuotaVerifierBinding {
+                verifier_identity: "test/bound-verifier.v1".to_string(),
+                configuration_digest: "b".repeat(64),
+            },
+        )
+        .expect("valid verifier binding");
+    request.supplemental_authorization = Some(
+        chio_core::capability::supplemental_authorization::OpaqueSupplementalAuthorization {
+            signed_extension: "opaque-signed-extension".to_string(),
+        },
+    );
+    let matching = resolve_required_matching_grants(
+        &request.capability,
+        &request.tool_name,
+        &request.server_id,
+        &request.arguments,
+        request.model_metadata.as_ref(),
+    )
+    .expect("matching grants");
+
+    let admission = kernel
+        .begin_durable_tool_admission(&request, &matching, current_unix_timestamp_ms())
+        .expect("verified durable admission")
+        .expect("covered durable admission");
+
+    let verified = admission
+        .supplemental_quota()
+        .expect("verified supplemental quota");
+    assert_eq!(verified.max_invocations(), 7);
+    assert_eq!(verified.broker_capability_id(), "broker-capability-7");
+    assert_eq!(
+        admission
+            .operation()
+            .supplemental_authorization_digest()
+            .map(crate::admission_operation::AdmissionDigest::as_str),
+        Some(verified.authorization_artifact_digest())
+    );
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn dropped_durable_guard_evaluation_terminalizes_before_dispatch() {
     struct ParkingGuard {

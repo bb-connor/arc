@@ -140,6 +140,7 @@ fn safe_policy_allows_without_capability() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -178,6 +179,7 @@ fn safe_get_input<'a>(query: &'a HashMap<String, String>) -> HttpAuthorityInput<
         requested_tool_name: None,
         requested_arguments: None,
         model_metadata: None,
+        unsupported_authorization_extension: None,
         execution_nonce: None,
         policy: HttpAuthorityPolicy::SessionAllow,
     }
@@ -222,6 +224,7 @@ fn failclosed_authority_surfaces_durability_error_for_denied_projection() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -294,6 +297,7 @@ fn strict_execution_nonce_preflight_round_trips_before_authorizing_http() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -326,6 +330,7 @@ fn strict_execution_nonce_preflight_round_trips_before_authorizing_http() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: Some(&nonce),
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -350,6 +355,7 @@ fn strict_execution_nonce_preflight_round_trips_before_authorizing_http() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: Some(&nonce),
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -380,6 +386,7 @@ fn deny_by_default_requires_capability() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -409,6 +416,7 @@ fn invalid_presented_capability_denies_even_safe_route() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -441,6 +449,7 @@ fn valid_capability_allows_deny_by_default() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -488,6 +497,7 @@ fn approval_store_constructor_fails_closed_without_durable_stores() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -520,6 +530,7 @@ fn approval_store_constructor_fails_closed_without_durable_stores() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -552,6 +563,7 @@ fn direct_v2_capability_denies_without_http_trust_root_resolver() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -587,6 +599,7 @@ fn capability_hint_mismatch_becomes_denial() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -618,6 +631,7 @@ fn untrusted_capability_denies_deny_by_default() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -654,6 +668,7 @@ fn configured_external_issuer_allows_deny_by_default() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -705,6 +720,7 @@ fn revoked_presented_capability_denies_deny_by_default() -> Result<(), Box<dyn s
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -748,6 +764,7 @@ fn finalized_receipt_links_decision_receipt_and_kernel_receipt() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -884,6 +901,7 @@ fn deny_by_default_proxy_path_requires_http_authority_grant() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -938,6 +956,7 @@ fn deny_by_default_proxy_path_ignores_spoofed_tool_identity() {
             requested_tool_name: Some("double"),
             requested_arguments: Some(&serde_json::json!({ "value": 1 })),
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -992,6 +1011,7 @@ fn deny_by_default_tools_path_honors_path_identity() {
             requested_tool_name: Some("files.read"),
             requested_arguments: Some(&serde_json::json!({ "path": "/tmp/a" })),
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1043,6 +1063,7 @@ fn deny_by_default_tools_path_without_sidecar_fields_binds_to_path_identity() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1094,6 +1115,7 @@ fn deny_by_default_tools_path_with_arguments_only_binds_to_path_identity() {
             requested_tool_name: None,
             requested_arguments: Some(&serde_json::json!({ "amount": 100 })),
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1145,6 +1167,7 @@ fn reserved_tools_path_safe_policy_binds_to_path_identity() {
             requested_tool_name: Some("double"),
             requested_arguments: Some(&serde_json::json!({ "amount": 100 })),
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -1178,6 +1201,7 @@ fn reserved_tools_path_safe_policy_requires_capability() {
             requested_tool_name: Some("read"),
             requested_arguments: Some(&Value::Null),
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -1211,6 +1235,7 @@ fn reserved_tools_path_safe_policy_requires_capability_without_sidecar_fields() 
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
@@ -1263,6 +1288,7 @@ fn deny_by_default_unmatched_http_path_does_not_trust_synthetic_pattern() {
             requested_tool_name: Some("admin.delete"),
             requested_arguments: Some(&serde_json::json!({ "path": "/tmp/a" })),
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1317,6 +1343,7 @@ fn deny_by_default_tools_path_binds_to_path_identity() {
             requested_tool_name: Some("double"),
             requested_arguments: Some(&serde_json::json!({ "amount": 100 })),
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1369,6 +1396,7 @@ fn deny_by_default_tools_path_decodes_percent_encoded_identity() {
             requested_tool_name: Some("terminal/create"),
             requested_arguments: Some(&serde_json::json!({ "command": "ls" })),
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1411,6 +1439,7 @@ fn deny_by_default_tools_path_rejects_malformed_percent_encoding() {
             requested_tool_name: Some("terminal/create"),
             requested_arguments: Some(&serde_json::json!({ "command": "ls" })),
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1463,6 +1492,7 @@ fn deny_by_default_tools_path_rejects_malformed_percent_encoding_before_wildcard
             requested_tool_name: Some("terminal/create"),
             requested_arguments: Some(&serde_json::json!({ "command": "ls" })),
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1515,6 +1545,7 @@ fn deny_by_default_requires_matching_tool_grant() {
             requested_tool_name: Some("increment"),
             requested_arguments: Some(&Value::Null),
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })
@@ -1589,6 +1620,7 @@ fn policy_deny_is_not_recorded_as_a_dispatch_failure() {
             requested_tool_name: None,
             requested_arguments: None,
             model_metadata: None,
+            unsupported_authorization_extension: None,
             execution_nonce: None,
             policy: HttpAuthorityPolicy::DenyByDefault,
         })

@@ -136,6 +136,7 @@ fn current_thread_runtime_returns_typed_error_instead_of_deadlocking() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -213,6 +214,7 @@ fn no_runtime_attached_drives_future_to_completion() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };

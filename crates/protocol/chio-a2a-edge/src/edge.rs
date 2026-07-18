@@ -305,6 +305,37 @@ impl ChioA2aEdge {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn build_execution_request(
+        binding: SkillBinding,
+        skill_id: &str,
+        source_request: &SendMessageRequest,
+        arguments: Value,
+        execution: &A2aKernelExecutionContext,
+        origin_request_id: String,
+        kernel_request_id: String,
+    ) -> Result<CrossProtocolExecutionRequest, A2aEdgeError> {
+        Ok(CrossProtocolExecutionRequest {
+            origin_request_id,
+            kernel_request_id,
+            target_protocol: binding.target_protocol,
+            target_server_id: binding.server_id,
+            target_tool_name: binding.tool_name,
+            agent_id: execution.agent_id.clone(),
+            arguments,
+            capability: execution.capability.clone(),
+            source_envelope: build_a2a_source_envelope(skill_id, source_request)?,
+            dpop_proof: execution.dpop_proof.clone(),
+            execution_nonce: execution.execution_nonce.clone(),
+            governed_intent: execution.governed_intent.clone(),
+            approval_token: execution.approval_token.clone(),
+            approval_tokens: execution.approval_tokens.clone(),
+            threshold_approval_proposal: execution.threshold_approval_proposal.clone(),
+            supplemental_authorization: execution.supplemental_authorization.clone(),
+            model_metadata: execution.model_metadata.clone(),
+        })
+    }
+
     /// Handle a SendMessage request by routing it through the Chio kernel.
     ///
     /// The caller is responsible for registering the bound tool server with the
@@ -322,24 +353,15 @@ impl ChioA2aEdge {
 
         let arguments = extract_arguments_from_message(&request.message)?;
         let task_id = self.next_task_id();
-        let request = CrossProtocolExecutionRequest {
-            origin_request_id: task_id.clone(),
-            kernel_request_id: format!("a2a-{task_id}"),
-            target_protocol: binding.target_protocol,
-            target_server_id: binding.server_id,
-            target_tool_name: binding.tool_name,
-            agent_id: execution.agent_id.clone(),
+        let request = Self::build_execution_request(
+            binding,
+            skill_id,
+            request,
             arguments,
-            capability: execution.capability.clone(),
-            source_envelope: build_a2a_source_envelope(skill_id, request)?,
-            dpop_proof: execution.dpop_proof.clone(),
-            execution_nonce: execution.execution_nonce.clone(),
-            governed_intent: execution.governed_intent.clone(),
-            approval_token: execution.approval_token.clone(),
-            approval_tokens: execution.approval_tokens.clone(),
-            threshold_approval_proposal: execution.threshold_approval_proposal.clone(),
-            model_metadata: execution.model_metadata.clone(),
-        };
+            execution,
+            task_id.clone(),
+            format!("a2a-{task_id}"),
+        )?;
         let orchestrated = execute_orchestrated_a2a_request(kernel, request)?;
         Ok(task_response_from_orchestrated(task_id, orchestrated))
     }
@@ -362,24 +384,15 @@ impl ChioA2aEdge {
         let binding = self.resolve_skill_binding(skill_id)?;
         let arguments = extract_arguments_from_message(&request.message)?;
         let task_id = self.next_task_id();
-        let request = CrossProtocolExecutionRequest {
-            origin_request_id: task_id.clone(),
-            kernel_request_id: format!("a2a-{task_id}"),
-            target_protocol: binding.target_protocol,
-            target_server_id: binding.server_id,
-            target_tool_name: binding.tool_name,
-            agent_id: execution.agent_id.clone(),
+        let request = Self::build_execution_request(
+            binding,
+            skill_id,
+            request,
             arguments,
-            capability: execution.capability.clone(),
-            source_envelope: build_a2a_source_envelope(skill_id, request)?,
-            dpop_proof: execution.dpop_proof.clone(),
-            execution_nonce: execution.execution_nonce.clone(),
-            governed_intent: execution.governed_intent.clone(),
-            approval_token: execution.approval_token.clone(),
-            approval_tokens: execution.approval_tokens.clone(),
-            threshold_approval_proposal: execution.threshold_approval_proposal.clone(),
-            model_metadata: execution.model_metadata.clone(),
-        };
+            execution,
+            task_id.clone(),
+            format!("a2a-{task_id}"),
+        )?;
         let mut orchestrated = execute_orchestrated_a2a_request(kernel, request)?;
         let reason = reason.into();
         orchestrated.response.verdict = KernelVerdict::PendingApproval;
@@ -401,24 +414,15 @@ impl ChioA2aEdge {
         self.ensure_deferred_task_capacity()?;
         let task_id = self.next_task_id();
         let expires_at_ms = unix_now_millis().saturating_add(DEFERRED_A2A_TASK_TTL_MILLIS);
-        let orchestrated_request = CrossProtocolExecutionRequest {
-            origin_request_id: task_id.clone(),
-            kernel_request_id: format!("a2a-stream-{task_id}"),
-            target_protocol: binding.target_protocol,
-            target_server_id: binding.server_id,
-            target_tool_name: binding.tool_name,
-            agent_id: execution.agent_id.clone(),
-            arguments: extract_arguments_from_message(&request.message)?,
-            capability: execution.capability.clone(),
-            source_envelope: build_a2a_source_envelope(skill_id, request)?,
-            dpop_proof: execution.dpop_proof.clone(),
-            execution_nonce: execution.execution_nonce.clone(),
-            governed_intent: execution.governed_intent.clone(),
-            approval_token: execution.approval_token.clone(),
-            approval_tokens: execution.approval_tokens.clone(),
-            threshold_approval_proposal: execution.threshold_approval_proposal.clone(),
-            model_metadata: execution.model_metadata.clone(),
-        };
+        let orchestrated_request = Self::build_execution_request(
+            binding,
+            skill_id,
+            request,
+            extract_arguments_from_message(&request.message)?,
+            execution,
+            task_id.clone(),
+            format!("a2a-stream-{task_id}"),
+        )?;
 
         let response = TaskResponse {
             id: task_id.clone(),

@@ -161,6 +161,7 @@ pub fn build_demo_state() -> HelloAcpResult<HelloAcpDemoState> {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
     };
 

@@ -149,6 +149,7 @@ fn governed_request_metadata_preserves_asserted_call_chain_and_diagnostics() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -227,6 +228,7 @@ fn governed_request_metadata_marks_matching_local_call_chain_evidence_as_observe
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -320,6 +322,7 @@ fn governed_request_metadata_marks_validated_upstream_call_chain_proof_as_verifi
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -397,6 +400,7 @@ fn governed_request_metadata_omits_unverified_runtime_assurance() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -442,6 +446,7 @@ fn governed_request_metadata_uses_verified_runtime_assurance_boundary() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -507,6 +512,7 @@ fn governed_request_metadata_prefers_scoped_nitro_verified_record() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -572,6 +578,7 @@ fn governed_request_metadata_rejects_mismatched_scoped_runtime_attestation_recor
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -640,6 +647,7 @@ fn request_receipt_metadata_omits_economic_authorization_without_verified_payee_
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -697,6 +705,7 @@ fn request_receipt_metadata_treats_untyped_financial_extra_metadata_as_pass_thro
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };

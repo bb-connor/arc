@@ -122,6 +122,12 @@ impl ChioKernel {
             "evaluating tool call with nested-flow bridge"
         );
 
+        if let Err(error) = request.validate_authorization_extensions() {
+            let msg = error.to_string();
+            warn!(request_id = %request.request_id, reason = %redacted!(&msg), "authorization extension rejected");
+            return self.build_deny_response(request, &msg, now, None);
+        }
+
         let cap = &request.capability;
 
         // Signature first; the budget admission is deferred until

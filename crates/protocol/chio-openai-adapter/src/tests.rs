@@ -252,6 +252,7 @@ fn test_execution_context(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
     }
 }
@@ -431,6 +432,7 @@ fn execute_tool_call_preserves_model_metadata_for_model_constrained_grant() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: Some(ModelMetadata {
             model_id: "gpt-5".to_string(),
             safety_tier: Some(ModelSafetyTier::High),
@@ -497,6 +499,7 @@ fn execute_tool_call_treats_pending_approval_as_denied() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
     };
 
@@ -703,6 +706,7 @@ fn execute_tool_calls_uses_per_call_execution_nonces() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         };

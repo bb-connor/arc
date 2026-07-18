@@ -1052,6 +1052,7 @@ fn chio_runtime_hook_releases_chio_native_reserved_state_after_kernel_abort(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1135,6 +1136,7 @@ fn chio_runtime_hook_denies_swarm_context_without_required_evidence_refs(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1207,6 +1209,7 @@ fn chio_runtime_hook_denies_stale_swarm_continuation_before_dispatch(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -2277,6 +2280,7 @@ fn treaty_runtime_request(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: Some("kernel.buyer".to_string()),
     };
@@ -2341,6 +2345,7 @@ fn chio_swarm_runtime_request(
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })

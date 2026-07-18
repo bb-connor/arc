@@ -418,6 +418,7 @@ fn matched_grant_index_populated_in_guard_context() {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -489,6 +490,7 @@ fn velocity_guard_denial_produces_signed_deny_receipt_no_panic() {
         approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
+        supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };

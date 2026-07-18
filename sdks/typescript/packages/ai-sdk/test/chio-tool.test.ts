@@ -670,6 +670,33 @@ describe("chioTool: allow path invokes underlying execute", () => {
     expect(result).toEqual({ doubled: 42 });
   });
 
+  it("preserves governed approval sets and opaque authorization extensions", async () => {
+    const { fetch, calls } = fakeFetch([sidecarAllowEvaluateResponse()]);
+    const client = new ChioClient({ fetch });
+    const approvalTokens = [{ id: "approval-a" }, { id: "approval-b" }];
+    const proposal = { proposal_id: "proposal-1" };
+    const governedIntent = { id: "intent-1" };
+    const supplementalAuthorization = { signed_extension: "b3BhcXVl" };
+
+    await client.evaluateToolCall({
+      capability_id: "cap-1",
+      tool_server: "math",
+      tool_name: "double",
+      parameters: { n: 21 },
+      governed_intent: governedIntent,
+      approval_tokens: approvalTokens,
+      threshold_approval_proposal: proposal,
+      supplemental_authorization: supplementalAuthorization,
+    });
+
+    expect(calls[0]?.body).toMatchObject({
+      governed_intent: governedIntent,
+      approval_tokens: approvalTokens,
+      threshold_approval_proposal: proposal,
+      supplemental_authorization: supplementalAuthorization,
+    });
+  });
+
   it("rejects advisory evaluation wrappers as execution authorization", async () => {
     const { fetch } = fakeFetch([advisoryEvaluationResponse()]);
     const client = new ChioClient({ fetch });

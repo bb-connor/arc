@@ -72,6 +72,11 @@ pub struct ToolCallRequest {
     /// Policy-authority-signed proposal binding a threshold approval set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub threshold_approval_proposal: Option<ThresholdApprovalProposal>,
+    /// Opaque authenticated extension for a composition-installed verifier.
+    /// The kernel never accepts quota authority directly from this wrapper.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supplemental_authorization:
+        Option<chio_core::capability::supplemental_authorization::OpaqueSupplementalAuthorization>,
     /// Optional metadata describing the model executing the calling
     /// agent. Consumed by `Constraint::ModelConstraint` enforcement.
     ///
@@ -92,6 +97,11 @@ pub struct ToolCallRequest {
 }
 
 impl ToolCallRequest {
+    pub fn validate_authorization_extensions(&self) -> Result<(), chio_core::Error> {
+        self.approval_artifact_digest()?;
+        Ok(())
+    }
+
     pub fn approval_artifact_digest(&self) -> Result<Option<String>, chio_core::Error> {
         if self.approval_token.is_some() && !self.approval_tokens.is_empty() {
             return Err(chio_core::Error::CanonicalJson(

@@ -63,6 +63,12 @@ pub fn evaluate_pure(
     input: EvaluateRequestJson,
     clock: &dyn chio_kernel_core::Clock,
 ) -> Result<EvaluationVerdictJson, BindingError> {
+    if input.request.has_unsupported_authorization_extensions() {
+        return Err(BindingError::new(
+            "unsupported_authorization_extension",
+            "browser portable evaluation cannot authenticate governed approvals or supplemental authorization",
+        ));
+    }
     let trusted = decode_trusted_issuers(&input.trusted_issuers_hex)?;
     let portable_request: PortableToolCallRequest = input.request.into();
     let peer_profile = input

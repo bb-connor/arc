@@ -110,6 +110,7 @@ pub struct HttpAuthorityInput<'a> {
     pub requested_tool_name: Option<&'a str>,
     pub requested_arguments: Option<&'a Value>,
     pub model_metadata: Option<&'a ModelMetadata>,
+    pub unsupported_authorization_extension: Option<&'a str>,
     pub execution_nonce: Option<&'a SignedExecutionNonce>,
     pub policy: HttpAuthorityPolicy,
 }
@@ -649,27 +650,31 @@ impl HttpAuthority {
             .identity_hash()
             .map_err(|e| HttpAuthorityError::CallerIdentity(e.to_string()))?;
         let binding = capability_binding(&input, &caller_identity_hash);
-        let presented_capability = if let Some(reason) = binding.invalid_reason.clone() {
-            PresentedCapabilityState {
-                capability_id: None,
-                invalid_reason: Some(reason),
-            }
-        } else {
-            validate_presented_capability(
-                input.capability_id_hint,
-                input.presented_capability,
-                self.trusted_capability_issuers(),
-                binding.requested_tool_server.as_deref(),
-                binding.requested_tool_name.as_deref(),
-                binding.requested_arguments.as_ref(),
-                input.model_metadata,
-                &|capability_id| {
-                    self.kernel
-                        .is_capability_revoked(capability_id)
-                        .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))
-                },
-            )
-        };
+        let unsupported_reason = input.unsupported_authorization_extension.map(|field| {
+            format!("HTTP authority projection does not support authorization field {field}")
+        });
+        let presented_capability =
+            if let Some(reason) = unsupported_reason.or_else(|| binding.invalid_reason.clone()) {
+                PresentedCapabilityState {
+                    capability_id: None,
+                    invalid_reason: Some(reason),
+                }
+            } else {
+                validate_presented_capability(
+                    input.capability_id_hint,
+                    input.presented_capability,
+                    self.trusted_capability_issuers(),
+                    binding.requested_tool_server.as_deref(),
+                    binding.requested_tool_name.as_deref(),
+                    binding.requested_arguments.as_ref(),
+                    input.model_metadata,
+                    &|capability_id| {
+                        self.kernel
+                            .is_capability_revoked(capability_id)
+                            .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))
+                    },
+                )
+            };
 
         let chio_request = ChioHttpRequest {
             request_id: input.request_id.clone(),
@@ -687,6 +692,11 @@ impl HttpAuthority {
             tool_name: binding.requested_tool_name.clone(),
             arguments: binding.requested_arguments.clone(),
             model_metadata: input.model_metadata.cloned(),
+            governed_intent: None,
+            approval_token: None,
+            approval_tokens: None,
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
             execution_nonce: input.execution_nonce.cloned(),
             timestamp: chrono::Utc::now().timestamp() as u64,
         };
@@ -947,6 +957,7 @@ impl HttpAuthority {
             approval_token: None,
             approval_tokens: Vec::new(),
             threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         };

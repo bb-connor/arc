@@ -271,6 +271,7 @@ impl ChioKernel {
                 std::time::Duration::from_secs(3600),
             )),
             threshold_approval_requirement_resolver: None,
+            supplemental_quota_verifier: None,
             emergency_stopped: AtomicBool::new(false),
             emergency_stopped_since: AtomicU64::new(0),
             emergency_stop_reason: ArcSwap::from_pointee(Option::<String>::None),
@@ -1795,6 +1796,19 @@ impl ChioKernel {
         resolver: Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>,
     ) {
         self.threshold_approval_requirement_resolver = Some(resolver);
+    }
+
+    /// Install the sole trusted parser and verifier for opaque supplemental
+    /// authorization artifacts.
+    pub fn set_supplemental_quota_verifier(
+        &mut self,
+        verifier: Arc<dyn crate::supplemental_quota::SupplementalQuotaVerifier>,
+        binding: crate::supplemental_quota::SupplementalQuotaVerifierBinding,
+    ) -> Result<(), crate::supplemental_quota::SupplementalQuotaError> {
+        self.supplemental_quota_verifier = Some(
+            crate::supplemental_quota::SupplementalQuotaVerifierRuntime::new(verifier, binding)?,
+        );
+        Ok(())
     }
 
     /// Remove the product-specific runtime admission hook.

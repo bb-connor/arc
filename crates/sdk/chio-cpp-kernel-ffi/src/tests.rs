@@ -179,6 +179,21 @@ fn evaluate_allows_matching_capability() {
 }
 
 #[test]
+fn evaluate_rejects_unsupported_authorization_extensions() {
+    let mut envelope: serde_json::Value = serde_json::from_str(&evaluate_envelope("echo")).unwrap();
+    envelope["request"]["threshold_approval_proposal"] = json!({"opaque": true});
+
+    let error = evaluate_json_str(&envelope.to_string())
+        .expect_err("unsupported authorization extension must fail closed");
+
+    assert!(matches!(
+        error,
+        KernelFfiError::InvalidCapability(message)
+            if message.contains("cannot authenticate governed approvals")
+    ));
+}
+
+#[test]
 fn evaluate_allows_delegated_token_with_parent_budget_snapshot() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();

@@ -231,6 +231,119 @@ pub(in crate::runtime) fn parse_request_governed_intent(
         })
 }
 
+type ParsedApprovalArtifacts = (
+    Option<GovernedApprovalToken>,
+    Vec<GovernedApprovalToken>,
+    Option<ThresholdApprovalProposal>,
+);
+
+pub(in crate::runtime) fn parse_request_approval_artifacts(
+    id: &Value,
+    params: &Value,
+) -> Result<ParsedApprovalArtifacts, Value> {
+    let Some(meta) = params.get("_meta") else {
+        return Ok((None, Vec::new(), None));
+    };
+    let Some(meta) = meta.as_object() else {
+        return Err(jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "_meta must be an object",
+        ));
+    };
+    let approval_token = meta
+        .get("approvalToken")
+        .or_else(|| meta.get("chioApprovalToken"))
+        .map(|value| serde_json::from_value(value.clone()))
+        .transpose()
+        .map_err(|_| {
+            jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "approvalToken must be a Chio governed approval token",
+            )
+        })?;
+    let approval_tokens: Vec<GovernedApprovalToken> = meta
+        .get("approvalTokens")
+        .or_else(|| meta.get("chioApprovalTokens"))
+        .map(|value| serde_json::from_value(value.clone()))
+        .transpose()
+        .map_err(|_| {
+            jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "approvalTokens must be an array of Chio governed approval tokens",
+            )
+        })?
+        .unwrap_or_default();
+    let threshold_approval_proposal = meta
+        .get("thresholdApprovalProposal")
+        .or_else(|| meta.get("chioThresholdApprovalProposal"))
+        .map(|value| serde_json::from_value(value.clone()))
+        .transpose()
+        .map_err(|_| {
+            jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "thresholdApprovalProposal must be a Chio threshold approval proposal",
+            )
+        })?;
+    if approval_token.is_some() && !approval_tokens.is_empty() {
+        return Err(jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "singular and threshold approval tokens must not be mixed",
+        ));
+    }
+    if approval_tokens.len() > 32 {
+        return Err(jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "threshold approval set exceeds 32 tokens",
+        ));
+    }
+    if approval_tokens.is_empty() != threshold_approval_proposal.is_none() {
+        return Err(jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "threshold approval tokens and proposal must be supplied together",
+        ));
+    }
+    Ok((approval_token, approval_tokens, threshold_approval_proposal))
+}
+
+pub(in crate::runtime) fn parse_request_supplemental_authorization(
+    id: &Value,
+    params: &Value,
+) -> Result<Option<OpaqueSupplementalAuthorization>, Value> {
+    let Some(meta) = params.get("_meta") else {
+        return Ok(None);
+    };
+    let Some(meta) = meta.as_object() else {
+        return Err(jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "_meta must be an object",
+        ));
+    };
+    let Some(authorization) = meta
+        .get("supplementalAuthorization")
+        .or_else(|| meta.get("chioSupplementalAuthorization"))
+    else {
+        return Ok(None);
+    };
+
+    serde_json::from_value(authorization.clone())
+        .map(Some)
+        .map_err(|_| {
+            jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "supplementalAuthorization must contain only opaque signed_extension text",
+            )
+        })
+}
+
 pub(in crate::runtime) fn parse_request_extra_metadata(
     id: &Value,
     params: &Value,
