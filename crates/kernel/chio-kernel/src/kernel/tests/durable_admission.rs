@@ -1566,6 +1566,48 @@ fn completed_replay_heals_a_failed_receipt_projection_without_redispatch() {
 }
 
 #[test]
+fn completed_federated_replay_remains_closed_until_cosign_succeeds(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (mut kernel, mut request, store, invocations) =
+        durable_admission_fixture("durable-federation-cosign-retry");
+    kernel.set_receipt_store(Box::new(AdmissionReceiptProjectionStore::default()))?;
+
+    let origin_keypair = Keypair::generate();
+    let origin_kernel_id = "kernel.org-a";
+    let local_kernel_id = "kernel.org-b";
+    kernel.set_federation_local_kernel_id(local_kernel_id);
+    let trust = KernelTrustExchange::new(local_kernel_id, kernel.config.keypair.clone())
+        .with_trusted_peer(origin_kernel_id, origin_keypair.public_key());
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs();
+    let peer = handshake_and_pin(&trust, origin_kernel_id, &origin_keypair, now);
+    let mut kernel = kernel.with_federation_peers(vec![peer]);
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(TreatyDsseAdmissionHook));
+    let cosigner_calls = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.set_federation_cosigner(std::sync::Arc::new(CountingRejectingCosigner {
+        calls: std::sync::Arc::clone(&cosigner_calls),
+    }));
+    request.federated_origin_kernel_id = Some(origin_kernel_id.to_owned());
+
+    assert!(matches!(
+        kernel.evaluate_tool_call_blocking(&request),
+        Err(KernelError::Internal(reason)) if reason.contains("bilateral co-sign failed")
+    ));
+    assert_eq!(store.operation().state(), AdmissionOperationState::Completed);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(cosigner_calls.load(Ordering::SeqCst), 1);
+
+    assert!(matches!(
+        kernel.evaluate_tool_call_blocking(&request),
+        Err(KernelError::Internal(reason)) if reason.contains("bilateral co-sign failed")
+    ));
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(cosigner_calls.load(Ordering::SeqCst), 2);
+    Ok(())
+}
+
+#[test]
 fn admission_receipt_reconciliation_heals_a_crash_gap_before_serving() {
     let (kernel, request, store, invocations) =
         durable_admission_fixture("durable-receipt-startup-recovery");

@@ -613,6 +613,12 @@ impl ChioKernel {
         )?;
         self.materialize_durable_admission_receipt(&receipt)?;
         self.mirror_durable_admission_receipt(&receipt)?;
+        if request.federated_origin_kernel_id.is_some()
+            && (self.dual_signed_receipt(&receipt.id).is_none()
+                || self.federation_dsse_envelope(&receipt.id).is_none())
+        {
+            self.apply_federation_cosign_for_admitted_request(request, &receipt)?;
+        }
         let (verdict, reason, terminal_state) = incomplete_reason.map_or(
             (Verdict::Allow, None, OperationTerminalState::Completed),
             |reason| {
