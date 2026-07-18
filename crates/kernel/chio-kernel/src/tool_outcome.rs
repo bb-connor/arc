@@ -17,8 +17,10 @@ use crate::admission_operation::{
 use crate::dispatch_status::{
     DispatchStatusQuery, QualifiedDispatchStatusProvider, VerifiedProviderNotAccepted,
 };
+use crate::runtime::ToolCallRequest;
 
 pub const RAW_INVOCATION_OUTCOME_SCHEMA: &str = "chio.raw-invocation-outcome.v1";
+pub const RAW_INVOCATION_OUTCOME_V2_SCHEMA: &str = "chio.raw-invocation-outcome.v2";
 pub const TOOL_OUTCOME_SCHEMA: &str = "chio.tool-outcome.v1";
 pub const POST_RETURN_EVALUATION_SCHEMA: &str = "chio.post-return-evaluation.v1";
 pub const POST_RETURN_EXACT_INPUTS_SCHEMA: &str = "chio.post-return-exact-inputs.v1";
@@ -318,6 +320,8 @@ pub struct RawInvocationOutcomeV1 {
     reported_cost: Option<MonetaryAmount>,
     receipt_metadata_snapshot: Option<Value>,
     pre_invocation_guard_evidence: Vec<GuardEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    request_canonical_json: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -339,6 +343,8 @@ pub struct PersistedRawInvocationOutcomeV1 {
     pub reported_cost: Option<MonetaryAmount>,
     pub receipt_metadata_snapshot: Option<Value>,
     pub pre_invocation_guard_evidence: Vec<GuardEvidence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_canonical_json: Option<String>,
 }
 
 impl RawInvocationOutcomeV1 {
@@ -359,10 +365,85 @@ impl RawInvocationOutcomeV1 {
         receipt_metadata_snapshot: Option<Value>,
         pre_invocation_guard_evidence: Vec<GuardEvidence>,
     ) -> Result<Self, ToolOutcomeError> {
+        Self::from_committed_dispatch_parts(
+            RAW_INVOCATION_OUTCOME_SCHEMA,
+            operation,
+            commit,
+            tool_server,
+            tool_name,
+            provider_attempt,
+            transport_terminal_evidence_digest,
+            matched_grant_index,
+            elapsed_millis,
+            stream_limits,
+            output,
+            reported_cost,
+            receipt_metadata_snapshot,
+            pre_invocation_guard_evidence,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn from_committed_dispatch_with_request(
+        operation: &AdmissionOperationV1,
+        commit: &AdmissionDispatchCommitBindingV1,
+        tool_server: AdmissionIdentifier,
+        tool_name: AdmissionIdentifier,
+        provider_attempt: ProviderAttemptBindingV1,
+        transport_terminal_evidence_digest: AdmissionDigest,
+        matched_grant_index: u64,
+        elapsed_millis: u64,
+        stream_limits: InvocationStreamLimitsV1,
+        output: InvocationOutputV1,
+        reported_cost: Option<MonetaryAmount>,
+        receipt_metadata_snapshot: Option<Value>,
+        pre_invocation_guard_evidence: Vec<GuardEvidence>,
+        request: &ToolCallRequest,
+    ) -> Result<Self, ToolOutcomeError> {
+        let request_canonical_json = String::from_utf8(canonical(request)?)
+            .map_err(|_| ToolOutcomeError::Invalid("raw.request_canonical_json"))?;
+        Self::from_committed_dispatch_parts(
+            RAW_INVOCATION_OUTCOME_V2_SCHEMA,
+            operation,
+            commit,
+            tool_server,
+            tool_name,
+            provider_attempt,
+            transport_terminal_evidence_digest,
+            matched_grant_index,
+            elapsed_millis,
+            stream_limits,
+            output,
+            reported_cost,
+            receipt_metadata_snapshot,
+            pre_invocation_guard_evidence,
+            Some(request_canonical_json),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn from_committed_dispatch_parts(
+        schema: &'static str,
+        operation: &AdmissionOperationV1,
+        commit: &AdmissionDispatchCommitBindingV1,
+        tool_server: AdmissionIdentifier,
+        tool_name: AdmissionIdentifier,
+        provider_attempt: ProviderAttemptBindingV1,
+        transport_terminal_evidence_digest: AdmissionDigest,
+        matched_grant_index: u64,
+        elapsed_millis: u64,
+        stream_limits: InvocationStreamLimitsV1,
+        output: InvocationOutputV1,
+        reported_cost: Option<MonetaryAmount>,
+        receipt_metadata_snapshot: Option<Value>,
+        pre_invocation_guard_evidence: Vec<GuardEvidence>,
+        request_canonical_json: Option<String>,
+    ) -> Result<Self, ToolOutcomeError> {
         validate_committed_operation(operation, commit)?;
         validate_registered_provider_attempt(operation, &provider_attempt)?;
         let raw = Self {
-            schema: RAW_INVOCATION_OUTCOME_SCHEMA,
+            schema,
             operation_id: operation.binding().operation_id().clone(),
             request_id: operation.replay_key().request_id,
             dispatch_operation_version: commit.committed_version,
@@ -378,6 +459,7 @@ impl RawInvocationOutcomeV1 {
             reported_cost,
             receipt_metadata_snapshot,
             pre_invocation_guard_evidence,
+            request_canonical_json,
         };
         raw.canonical_blob()?;
         Ok(raw)
@@ -405,17 +487,26 @@ impl RawInvocationOutcomeV1 {
             reported_cost: self.reported_cost.clone(),
             receipt_metadata_snapshot: self.receipt_metadata_snapshot.clone(),
             pre_invocation_guard_evidence: self.pre_invocation_guard_evidence.clone(),
+            request_canonical_json: self.request_canonical_json.clone(),
         }
     }
 
     pub fn from_persisted(
         value: PersistedRawInvocationOutcomeV1,
     ) -> Result<Self, ToolOutcomeError> {
-        if value.schema != RAW_INVOCATION_OUTCOME_SCHEMA {
+        let schema = match (
+            value.schema.as_str(),
+            value.request_canonical_json.is_some(),
+        ) {
+            (RAW_INVOCATION_OUTCOME_SCHEMA, false) => RAW_INVOCATION_OUTCOME_SCHEMA,
+            (RAW_INVOCATION_OUTCOME_V2_SCHEMA, true) => RAW_INVOCATION_OUTCOME_V2_SCHEMA,
+            _ => return Err(ToolOutcomeError::Invalid("raw.schema")),
+        };
+        if value.request_canonical_json.as_deref() == Some("") {
             return Err(ToolOutcomeError::Invalid("raw.schema"));
         }
         let raw = Self {
-            schema: RAW_INVOCATION_OUTCOME_SCHEMA,
+            schema,
             operation_id: value.operation_id,
             request_id: value.request_id,
             dispatch_operation_version: value.dispatch_operation_version,
@@ -431,6 +522,7 @@ impl RawInvocationOutcomeV1 {
             reported_cost: value.reported_cost,
             receipt_metadata_snapshot: value.receipt_metadata_snapshot,
             pre_invocation_guard_evidence: value.pre_invocation_guard_evidence,
+            request_canonical_json: value.request_canonical_json,
         };
         raw.canonical_blob()?;
         Ok(raw)
@@ -480,6 +572,17 @@ impl RawInvocationOutcomeV1 {
                 maximum: MAX_RECEIPT_GUARD_EVIDENCE,
             });
         }
+        if let Some(request_canonical_json) = &self.request_canonical_json {
+            let request: ToolCallRequest = serde_json::from_str(request_canonical_json)
+                .map_err(|_| ToolOutcomeError::Invalid("raw.request_canonical_json"))?;
+            if canonical(&request)? != request_canonical_json.as_bytes()
+                || request.request_id != self.request_id.as_str()
+                || request.server_id != self.tool_server.as_str()
+                || request.tool_name != self.tool_name.as_str()
+            {
+                return Err(ToolOutcomeError::Binding("raw.request"));
+            }
+        }
         CanonicalInvocationBlobV1::new(bounded("raw_invocation_outcome", self, maximum)?)
     }
 
@@ -510,6 +613,16 @@ impl RawInvocationOutcomeV1 {
 
     pub(crate) fn pre_invocation_guard_evidence(&self) -> &[GuardEvidence] {
         &self.pre_invocation_guard_evidence
+    }
+
+    pub(crate) fn recovery_request(&self) -> Result<Option<ToolCallRequest>, ToolOutcomeError> {
+        self.request_canonical_json
+            .as_deref()
+            .map(|request| {
+                serde_json::from_str(request)
+                    .map_err(|_| ToolOutcomeError::Invalid("raw.request_canonical_json"))
+            })
+            .transpose()
     }
 }
 

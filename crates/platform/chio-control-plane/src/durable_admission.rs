@@ -107,8 +107,7 @@ impl DurableAdmissionRuntime {
         )?;
         kernel.set_budget_store_handle(self.budget.clone());
         kernel.set_revocation_store_handle(self.revocations.clone());
-        kernel.reconcile_recoverable_admissions()?;
-        kernel.reconcile_durable_admission_receipt_projections()?;
+        kernel.reconcile_durable_admission_startup()?;
         Ok(())
     }
 }

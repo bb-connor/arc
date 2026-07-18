@@ -582,7 +582,7 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
         invocations: invocations.clone(),
     }));
 
-    assert_eq!(recovered_kernel.reconcile_recoverable_admissions()?, 1);
+    assert_eq!(recovered_kernel.reconcile_durable_admission_startup()?, 1);
     assert_eq!(recovered_kernel.reconcile_recoverable_admissions()?, 0);
     let retained = operations
         .load_by_operation_id(&operation_id)?
@@ -617,7 +617,7 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
 }
 
 #[test]
-fn sqlite_restart_replays_a_committed_capture_intent_before_request_recovery(
+fn sqlite_restart_completes_a_committed_capture_without_request_replay(
 ) -> Result<(), Box<dyn Error>> {
     let temp = tempfile::tempdir()?;
     let database = temp.path().join("authority.db");
@@ -684,27 +684,27 @@ fn sqlite_restart_replays_a_committed_capture_intent_before_request_recovery(
         invocations: invocations.clone(),
     }));
 
-    assert_eq!(recovered_kernel.reconcile_recoverable_admissions()?, 1);
+    assert_eq!(recovered_kernel.reconcile_durable_admission_startup()?, 1);
     let journal = operations
         .load_payment_journal(operation_id.as_str(), &fence)?
         .ok_or_else(|| std::io::Error::other("recovered payment journal is absent"))?;
     assert_eq!(journal.state, PaymentJournalState::Settled);
     assert_eq!(journal.settle_action, Some(PaymentSettleAction::Capture));
     assert_eq!(payment_calls.captures.load(Ordering::SeqCst), 2);
+    let completed = operations
+        .load_by_operation_id(&operation_id)?
+        .ok_or_else(|| std::io::Error::other("completed operation is absent"))?;
+    assert_eq!(completed.state(), AdmissionOperationState::Completed);
 
     let response = recovered_kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(response.verdict, Verdict::Allow);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     assert_eq!(payment_calls.captures.load(Ordering::SeqCst), 2);
-    let completed = operations
-        .load_by_operation_id(&operation_id)?
-        .ok_or_else(|| std::io::Error::other("completed operation is absent"))?;
-    assert_eq!(completed.state(), AdmissionOperationState::Completed);
     Ok(())
 }
 
 #[test]
-fn sqlite_restart_replays_a_committed_release_intent_before_request_recovery(
+fn sqlite_restart_completes_a_committed_release_without_request_replay(
 ) -> Result<(), Box<dyn Error>> {
     let temp = tempfile::tempdir()?;
     let database = temp.path().join("authority.db");
@@ -779,22 +779,22 @@ fn sqlite_restart_replays_a_committed_release_intent_before_request_recovery(
         invocations: invocations.clone(),
     }));
 
-    assert_eq!(recovered_kernel.reconcile_recoverable_admissions()?, 1);
+    assert_eq!(recovered_kernel.reconcile_durable_admission_startup()?, 1);
     let journal = operations
         .load_payment_journal(operation_id.as_str(), &fence)?
         .ok_or_else(|| std::io::Error::other("recovered payment journal is absent"))?;
     assert_eq!(journal.state, PaymentJournalState::Settled);
     assert_eq!(journal.settle_action, Some(PaymentSettleAction::Release));
     assert_eq!(payment_calls.releases.load(Ordering::SeqCst), 2);
+    let completed = operations
+        .load_by_operation_id(&operation_id)?
+        .ok_or_else(|| std::io::Error::other("completed operation is absent"))?;
+    assert_eq!(completed.state(), AdmissionOperationState::Completed);
 
     let response = recovered_kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(response.verdict, Verdict::Allow);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     assert_eq!(payment_calls.releases.load(Ordering::SeqCst), 2);
-    let completed = operations
-        .load_by_operation_id(&operation_id)?
-        .ok_or_else(|| std::io::Error::other("completed operation is absent"))?;
-    assert_eq!(completed.state(), AdmissionOperationState::Completed);
     Ok(())
 }
 

@@ -7,6 +7,12 @@ pub(crate) struct DurableToolReturn {
     outcome: ToolOutcomeRecordV1,
 }
 
+impl DurableToolReturn {
+    pub(super) fn recovery_request(&self) -> Result<Option<ToolCallRequest>, ToolOutcomeError> {
+        self.raw.recovery_request()
+    }
+}
+
 pub(crate) struct DurableToolReturnInput<'a> {
     pub(crate) request: &'a ToolCallRequest,
     pub(crate) output: &'a ToolServerOutput,
@@ -256,7 +262,7 @@ impl ChioKernel {
                     "durable tool return lost its dispatch commit".to_owned(),
                 )
             })?;
-        let raw = RawInvocationOutcomeV1::from_committed_dispatch(
+        let raw = RawInvocationOutcomeV1::from_committed_dispatch_with_request(
             &admission.operation,
             &commit,
             AdmissionIdentifier::try_new("tool_server", request.server_id.clone())?,
@@ -270,6 +276,7 @@ impl ChioKernel {
             monetary_cost,
             receipt_metadata_snapshot,
             pre_invocation_guard_evidence.to_vec(),
+            request,
         )
         .map_err(tool_outcome_error)?;
         let blob = raw.canonical_blob().map_err(tool_outcome_error)?;
@@ -334,7 +341,7 @@ impl ChioKernel {
         }
     }
 
-    fn load_durable_tool_return(
+    pub(super) fn load_durable_tool_return(
         &self,
         admission: &DurableToolAdmission,
     ) -> Result<DurableToolReturn, KernelError> {
@@ -515,7 +522,7 @@ impl ChioKernel {
             .map_or(Decision::Allow, |reason| Decision::Incomplete {
                 reason: reason.clone(),
             });
-        let expected_non_admission_metadata = merge_metadata_objects(
+        let expected_non_financial_metadata = merge_metadata_objects(
             merge_metadata_objects(
                 receipt_content.metadata.clone(),
                 tool_return.raw.receipt_metadata_snapshot().cloned(),
@@ -599,6 +606,15 @@ impl ChioKernel {
             .ok_or_else(|| {
                 KernelError::DurableAdmission("projected receipt disappeared".to_owned())
             })?;
+        let retained_financial_metadata = receipt
+            .metadata
+            .as_ref()
+            .and_then(serde_json::Value::as_object)
+            .and_then(|metadata| metadata.get("financial"))
+            .cloned()
+            .map(|financial| serde_json::json!({ "financial": financial }));
+        let expected_non_admission_metadata =
+            merge_metadata_objects(expected_non_financial_metadata, retained_financial_metadata);
         self.validate_completed_durable_receipt(
             admission,
             request,
@@ -683,6 +699,80 @@ impl ChioKernel {
                 )
             })?;
         let expected_outcome_id = Some(tool_return.outcome.outcome_id());
+        let financial = receipt
+            .metadata
+            .as_ref()
+            .and_then(serde_json::Value::as_object)
+            .and_then(|metadata| metadata.get("financial"))
+            .cloned()
+            .map(serde_json::from_value::<FinancialReceiptMetadata>)
+            .transpose()
+            .map_err(|_| {
+                KernelError::DurableAdmission(
+                    "projected receipt financial metadata is invalid".to_owned(),
+                )
+            })?;
+        if operation.binding().participant_requirements().payment {
+            let journal = runtime
+                .store
+                .load_payment_journal(operation.binding().operation_id().as_str(), &runtime.fence)
+                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
+                .ok_or_else(|| {
+                    KernelError::DurableAdmission(
+                        "completed payment journal disappeared".to_owned(),
+                    )
+                })?;
+            let expected_cost = match (journal.rail_mode, journal.settle_action) {
+                (crate::payment::PaymentRailMode::PrepaidFinal, _) => journal.amount_units,
+                (
+                    crate::payment::PaymentRailMode::ReversibleHold,
+                    Some(crate::payment::PaymentSettleAction::Capture),
+                ) => journal.settle_amount_units.ok_or_else(|| {
+                    KernelError::DurableAdmission(
+                        "completed capture journal omitted its amount".to_owned(),
+                    )
+                })?,
+                (
+                    crate::payment::PaymentRailMode::ReversibleHold,
+                    Some(crate::payment::PaymentSettleAction::Release),
+                ) => 0,
+                _ => {
+                    return Err(KernelError::DurableAdmission(
+                        "completed payment journal omitted its settlement action".to_owned(),
+                    ));
+                }
+            };
+            let financial = financial.as_ref().ok_or_else(|| {
+                KernelError::DurableAdmission(
+                    "completed payment receipt omitted financial metadata".to_owned(),
+                )
+            })?;
+            let payment_reference = journal
+                .transaction_id
+                .as_ref()
+                .or(journal.authorization_id.as_ref());
+            if journal.state != crate::payment::PaymentJournalState::Settled
+                || financial.grant_index != journal.grant_index
+                || financial.cost_charged != expected_cost
+                || financial.currency != journal.currency
+                || financial.payment_reference.as_ref() != payment_reference
+                || financial.settlement_status != SettlementStatus::Settled
+                || financial.delegation_depth
+                    != u32::try_from(request.capability.delegation_chain.len()).unwrap_or(u32::MAX)
+                || financial.root_budget_holder != request.capability.issuer.to_hex()
+                || financial.budget_remaining > financial.budget_total
+                || financial.attempted_cost.is_some()
+            {
+                return Err(KernelError::DurableAdmission(
+                    "projected receipt financial metadata conflicts with the payment journal"
+                        .to_owned(),
+                ));
+            }
+        } else if financial.is_some() {
+            return Err(KernelError::DurableAdmission(
+                "nonpayment admission projected financial metadata".to_owned(),
+            ));
+        }
         let signing_nonce = receipt
             .metadata
             .as_ref()

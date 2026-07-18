@@ -248,6 +248,7 @@ impl ChioKernel {
             );
         }
 
+        self.reconcile_durable_admission_startup()?;
         let mut durable_admission = match self.begin_durable_tool_admission(
             request,
             &matching_grants,

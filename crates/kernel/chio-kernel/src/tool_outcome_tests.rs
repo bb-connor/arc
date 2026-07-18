@@ -428,6 +428,7 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
         reported_cost: None,
         receipt_metadata_snapshot: None,
         pre_invocation_guard_evidence: Vec::new(),
+        request_canonical_json: None,
     };
     let blob = raw.canonical_blob().unwrap();
     let expected = format!(

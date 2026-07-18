@@ -1,5 +1,5 @@
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 
@@ -48,6 +48,7 @@ pub(crate) struct DurableAdmissionRuntime {
     fence: StoreMutationFence,
     claimant_id: AdmissionIdentifier,
     mutation_sequencer: AdmissionMutationSequencer,
+    startup_reconciled: Arc<Mutex<bool>>,
 }
 
 impl fmt::Debug for DurableAdmissionRuntime {
@@ -83,6 +84,7 @@ impl DurableAdmissionRuntime {
             outcome_store,
             channel_terminal_authority: None,
             mutation_sequencer: AdmissionMutationSequencer::for_fence(&fence)?,
+            startup_reconciled: Arc::new(Mutex::new(false)),
             fence,
             claimant_id,
         })
@@ -274,13 +276,31 @@ impl ChioKernel {
         }
     }
 
+    pub fn reconcile_durable_admission_startup(&self) -> Result<usize, KernelError> {
+        let Some(runtime) = self.durable_admission_runtime.as_ref() else {
+            return Ok(0);
+        };
+        let mut reconciled = runtime.startup_reconciled.lock().map_err(|_| {
+            KernelError::DurableAdmission("startup reconciliation lock is poisoned".to_owned())
+        })?;
+        if *reconciled {
+            return Ok(0);
+        }
+        let operation_count = self.reconcile_recoverable_admissions()?;
+        let receipt_count = self.reconcile_durable_admission_receipt_projections()?;
+        let total = operation_count.checked_add(receipt_count).ok_or_else(|| {
+            KernelError::DurableAdmission("startup reconciliation count overflow".to_owned())
+        })?;
+        *reconciled = true;
+        Ok(total)
+    }
+
     pub fn reconcile_recoverable_admissions(&self) -> Result<usize, KernelError> {
         const PAGE_LIMIT: usize = 256;
 
         let Some(runtime) = self.durable_admission_runtime.as_ref() else {
             return Ok(0);
         };
-        let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(current_unix_timestamp_ms());
         let mut reconciled = 0_usize;
         loop {
@@ -299,6 +319,7 @@ impl ChioKernel {
             for operation in recoverable {
                 match operation.state() {
                     AdmissionOperationState::DispatchCommitted => {
+                        let _mutation_guard = runtime.lock_mutations()?;
                         if runtime
                             .outcome_store
                             .lookup_by_operation(operation.binding().operation_id())
@@ -343,40 +364,24 @@ impl ChioKernel {
                             )
                         })?;
                     }
-                    AdmissionOperationState::Finalizing
-                        if operation.binding().participant_requirements().payment =>
-                    {
-                        let journal = runtime
-                            .store
-                            .load_payment_journal(
-                                operation.binding().operation_id().as_str(),
-                                &runtime.fence,
+                    AdmissionOperationState::Finalizing => {
+                        let mut admission = DurableToolAdmission { operation };
+                        let tool_return = self.load_durable_tool_return(&admission)?;
+                        let Some(request) =
+                            tool_return.recovery_request().map_err(tool_outcome_error)?
+                        else {
+                            self.claim_admission_recovery(
+                                &admission.operation,
+                                trusted_now_unix_ms,
+                            )?;
+                            continue;
+                        };
+                        self.finalize_durable_tool_return(&mut admission, &request, &tool_return)?;
+                        reconciled = reconciled.checked_add(1).ok_or_else(|| {
+                            KernelError::DurableAdmission(
+                                "admission recovery count overflow".to_owned(),
                             )
-                            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
-                            .ok_or_else(|| {
-                                KernelError::DurableAdmission(
-                                    "finalizing admission lost its payment journal".to_owned(),
-                                )
-                            })?;
-                        let lease =
-                            self.claim_admission_recovery(&operation, trusted_now_unix_ms)?;
-                        if journal.state == crate::payment::PaymentJournalState::Settling
-                            && self
-                                .continue_durable_payment_settlement(
-                                    &operation,
-                                    runtime,
-                                    &lease,
-                                    journal,
-                                    trusted_now_unix_ms,
-                                )?
-                                .is_some()
-                        {
-                            reconciled = reconciled.checked_add(1).ok_or_else(|| {
-                                KernelError::DurableAdmission(
-                                    "admission recovery count overflow".to_owned(),
-                                )
-                            })?;
-                        }
+                        })?;
                     }
                     _ => {
                         self.claim_admission_recovery(&operation, trusted_now_unix_ms)?;
