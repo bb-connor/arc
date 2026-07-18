@@ -337,6 +337,7 @@ impl ChioKernel {
             if recoverable.is_empty() {
                 break;
             }
+            let reconciled_before_page = reconciled;
             for operation in recoverable {
                 match operation.state() {
                     AdmissionOperationState::DispatchCommitted => {
@@ -427,6 +428,9 @@ impl ChioKernel {
                         self.claim_admission_recovery(&operation, trusted_now_unix_ms)?;
                     }
                 }
+            }
+            if reconciled == reconciled_before_page {
+                break;
             }
         }
         Ok(reconciled)
