@@ -426,6 +426,20 @@ impl ProtectProxy {
         } else {
             Arc::new(InMemoryApprovalStore::new())
         };
+        let threshold_collector_store: Arc<dyn ThresholdApprovalCollectorStore> =
+            if let Some(path) = durable_receipt_db {
+                Arc::new(
+                    SqliteApprovalStore::open_colocated_with_receipt_store(path)
+                        .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
+                )
+            } else {
+                Arc::new(InMemoryThresholdApprovalCollectorStore::new())
+            };
+        let threshold_collector = ThresholdApprovalCollector::new(
+            threshold_collector_store,
+            policy_hash.clone(),
+            vec![keypair.public_key()],
+        );
 
         let mut trusted_capability_issuers = self.config.trusted_capability_issuers.clone();
         let signer_public_key = keypair.public_key();
@@ -500,7 +514,10 @@ impl ProtectProxy {
             upstream: self.config.upstream.clone(),
             http_client,
             egress_contract,
-            approval_admin: ApprovalAdmin::new(approval_store),
+            approval_admin: ApprovalAdmin::with_threshold_collector(
+                approval_store,
+                threshold_collector,
+            ),
             receipt_log: Mutex::new(receipt_log),
             tool_receipt_log: Mutex::new(tool_receipt_log),
             receipt_store,

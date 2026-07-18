@@ -122,6 +122,12 @@ pub use request_matching::{
     capability_matches_resource_request, capability_matches_resource_subscription,
     capability_request_requires_dpop, capability_request_requires_dpop_with_model_metadata,
 };
+pub use threshold_approval::{
+    CollectedThresholdApprovalSet, InMemoryThresholdApprovalCollectorStore,
+    ThresholdApprovalCollector, ThresholdApprovalCollectorProposal,
+    ThresholdApprovalCollectorState, ThresholdApprovalCollectorStore,
+    ThresholdApprovalCollectorStoreError,
+};
 
 pub use approval::{
     compute_parameter_hash, resume_with_decision, ApprovalChannel, ApprovalContext,

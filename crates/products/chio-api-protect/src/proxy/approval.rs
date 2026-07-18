@@ -61,6 +61,66 @@ pub(crate) async fn batch_respond_approvals_handler(
     }
 }
 
+pub(crate) async fn create_threshold_proposal_handler(
+    State(state): State<Arc<ProxyState>>,
+    body: Result<Json<CreateThresholdProposalRequest>, axum::extract::rejection::JsonRejection>,
+) -> Response {
+    let Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => {
+            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
+                "invalid threshold approval proposal payload: {error}"
+            )));
+        }
+    };
+    let now = chrono::Utc::now().timestamp() as u64;
+    match handle_create_threshold_proposal(&state.approval_admin, body, now) {
+        Ok(response) => approval_json(StatusCode::CREATED, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+pub(crate) async fn get_threshold_proposal_handler(
+    State(state): State<Arc<ProxyState>>,
+    Path(proposal_id): Path<String>,
+) -> Response {
+    match handle_get_threshold_proposal(&state.approval_admin, &proposal_id) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+pub(crate) async fn submit_threshold_approval_handler(
+    State(state): State<Arc<ProxyState>>,
+    Path(proposal_id): Path<String>,
+    body: Result<Json<SubmitThresholdApprovalRequest>, axum::extract::rejection::JsonRejection>,
+) -> Response {
+    let Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => {
+            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
+                "invalid threshold approval token payload: {error}"
+            )));
+        }
+    };
+    let now = chrono::Utc::now().timestamp() as u64;
+    match handle_submit_threshold_approval(&state.approval_admin, &proposal_id, body, now) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+pub(crate) async fn deliver_threshold_approval_handler(
+    State(state): State<Arc<ProxyState>>,
+    Path(proposal_id): Path<String>,
+) -> Response {
+    let now = chrono::Utc::now().timestamp() as u64;
+    match handle_deliver_threshold_approval(&state.approval_admin, &proposal_id, now) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
 /// Body for `POST /approvals/submit`. Operator-friendly shape: the
 /// caller hands the sidecar enough context to record a pending request
 /// and the sidecar materializes the full `ApprovalRequest`, signing on
