@@ -135,6 +135,8 @@ fn monetary_denial_exceeds_per_invocation_cap() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -184,6 +186,8 @@ fn monetary_denial_receipt_contains_financial_metadata() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -267,6 +271,8 @@ fn monetary_guard_denial_releases_budget_and_records_attempted_cost(
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -348,6 +354,8 @@ fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocati
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -396,6 +404,8 @@ fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -440,6 +450,8 @@ fn monetary_allow_receipt_contains_financial_metadata() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -508,6 +520,8 @@ fn nested_monetary_allow_uses_reported_cost() {
                 execution_nonce: None,
                 governed_intent: None,
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             },
@@ -555,6 +569,8 @@ fn monetary_allow_records_budget_hold_and_append_only_events() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -615,6 +631,8 @@ fn sibling_sum_denial_reverses_pre_execution_monetary_charge() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -638,6 +656,8 @@ fn sibling_sum_denial_reverses_pre_execution_monetary_charge() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -687,6 +707,8 @@ fn sibling_sum_denial_reverses_pre_execution_invocation_increment() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -710,6 +732,8 @@ fn sibling_sum_denial_reverses_pre_execution_invocation_increment() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -783,6 +807,8 @@ fn nested_hosted_sibling_sum_denial_reverses_pre_execution_monetary_charge() {
                 execution_nonce: None,
                 governed_intent: None,
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             },
@@ -811,6 +837,8 @@ fn nested_hosted_sibling_sum_denial_reverses_pre_execution_monetary_charge() {
                 execution_nonce: None,
                 governed_intent: None,
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             },
@@ -864,6 +892,8 @@ fn payment_authorization_denial_releases_delegated_sibling_budget() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -887,6 +917,8 @@ fn payment_authorization_denial_releases_delegated_sibling_budget() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -948,6 +980,8 @@ fn nested_payment_authorization_denial_releases_delegated_sibling_budget() {
                 execution_nonce: None,
                 governed_intent: None,
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             },
@@ -976,6 +1010,8 @@ fn nested_payment_authorization_denial_releases_delegated_sibling_budget() {
                 execution_nonce: None,
                 governed_intent: None,
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             },
@@ -1010,6 +1046,8 @@ fn hosted_named_remote_without_fresh_peer_fails_before_dispatch() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: Some("stale-or-missing-peer".to_string()),
         })
@@ -1085,6 +1123,8 @@ fn monetary_allow_receipt_marks_failed_settlement_when_reported_cost_exceeds_cha
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1128,6 +1168,8 @@ fn monetary_server_not_reporting_cost_charges_max_cost_per_invocation() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1398,6 +1440,8 @@ fn monetary_tool_server_error_retains_precharged_budget() -> Result<(), Box<dyn 
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })?;
@@ -1438,6 +1482,8 @@ fn monetary_full_pipeline_three_invocations_third_denied() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1493,6 +1539,8 @@ fn multi_grant_budget_remaining_uses_matched_grant_total() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1602,6 +1650,8 @@ async fn async_evaluate_tool_call_supports_shared_kernel_concurrency() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1720,6 +1770,8 @@ fn cross_currency_reported_cost_attaches_oracle_evidence_and_converted_units() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1770,6 +1822,8 @@ fn cross_currency_without_oracle_keeps_provisional_charge_and_marks_failed_settl
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })

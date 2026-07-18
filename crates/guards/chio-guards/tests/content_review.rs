@@ -52,6 +52,8 @@ fn make_request_with_scope(
         execution_nonce: None,
         governed_intent: intent,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };

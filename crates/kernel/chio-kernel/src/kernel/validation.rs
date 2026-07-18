@@ -1806,7 +1806,13 @@ impl ChioKernel {
                         approval_token_id: request
                             .approval_token
                             .as_ref()
-                            .map(|token| token.id.clone()),
+                            .map(|token| token.id.clone())
+                            .or_else(|| {
+                                request
+                                    .threshold_approval_proposal
+                                    .as_ref()
+                                    .map(|proposal| proposal.body.proposal_id.clone())
+                            }),
                     })
                     .map_err(|error| {
                         PaymentError::RailError(format!(
@@ -1828,15 +1834,13 @@ impl ChioKernel {
                 )
             })?;
             let approval_artifact_digest = request
-                .approval_token
-                .as_ref()
+                .approval_artifact_digest()
+                .map_err(|error| PaymentError::RailError(error.to_string()))?
                 .ok_or_else(|| {
                     PaymentError::RailError(
                         "governed commerce payment omitted verified approval".to_owned(),
                     )
-                })?
-                .artifact_digest()
-                .map_err(|error| PaymentError::RailError(error.to_string()))?;
+                })?;
             let intent_hash = governed
                 .as_ref()
                 .map(|context| context.intent_hash.as_str());

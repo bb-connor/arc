@@ -1,6 +1,6 @@
 use alloc::collections::BTreeMap;
 
-use crate::crypto::{Keypair, PublicKey, SigningBackend};
+use crate::crypto::{sha256_hex, Keypair, PublicKey, SigningBackend};
 use crate::error::{Error, Result};
 use crate::runtime_attestation::AttestationVerifierFamily;
 use crate::session::SessionAnchorReference;
@@ -1003,6 +1003,7 @@ fn governed_approval_token_signature_roundtrip() {
         subject: subject.public_key(),
         governed_intent_hash: "intent-hash".to_string(),
         request_id: "req-1".to_string(),
+        threshold_proposal_hash: None,
         issued_at: 1000,
         expires_at: 2000,
         decision: GovernedApprovalDecision::Approved,
@@ -1018,6 +1019,60 @@ fn governed_approval_token_signature_roundtrip() {
     assert!(!token.is_valid_at(2000));
     assert_eq!(token.subject, subject.public_key());
     assert_ne!(artifact_digest, changed_token.artifact_digest().unwrap());
+}
+
+#[test]
+fn threshold_approval_proposal_and_set_bind_complete_artifacts() {
+    let policy_authority = Keypair::generate();
+    let subject = Keypair::generate();
+    let proposal_deadline =
+        ThresholdApprovalProposalBody::proposal_deadline(1_000, 900, 1_500, Some(1_800)).unwrap();
+    let proposal = ThresholdApprovalProposal::sign(
+        ThresholdApprovalProposalBody {
+            proposal_id: "proposal-1".to_string(),
+            request_id: "request-1".to_string(),
+            governed_intent_hash: sha256_hex(b"intent"),
+            subject: subject.public_key(),
+            authorizing_capability_digest: sha256_hex(b"capability"),
+            policy_hash: sha256_hex(b"policy"),
+            threshold: 2,
+            eligible_set_digest: sha256_hex(b"eligible-set"),
+            proposal_created_at: 1_000,
+            proposal_deadline,
+            policy_authority: policy_authority.public_key(),
+        },
+        &policy_authority,
+    )
+    .unwrap();
+
+    assert_eq!(proposal.body.proposal_deadline, 1_500);
+    assert!(proposal.verify_signature().unwrap());
+    proposal.validate_at(1_499).unwrap();
+    assert!(proposal.validate_at(1_500).is_err());
+
+    let first = VerifiedApprovalSetBody::new(
+        vec![sha256_hex(b"token-b"), sha256_hex(b"token-a")],
+        &proposal,
+    )
+    .unwrap();
+    let second = VerifiedApprovalSetBody::new(
+        vec![sha256_hex(b"token-a"), sha256_hex(b"token-b")],
+        &proposal,
+    )
+    .unwrap();
+    assert_eq!(first, second);
+    assert_eq!(
+        first.approval_set_hash().unwrap(),
+        second.approval_set_hash().unwrap()
+    );
+
+    let mut changed = proposal.clone();
+    changed.body.proposal_deadline -= 1;
+    assert!(!changed.verify_signature().unwrap());
+    assert_ne!(
+        proposal.artifact_digest().unwrap(),
+        changed.artifact_digest().unwrap()
+    );
 }
 
 #[test]
@@ -1885,6 +1940,7 @@ fn governed_approval_token_p256_verifies() {
         subject: subject.public_key(),
         governed_intent_hash: "hash-xyz".to_string(),
         request_id: "req-1".to_string(),
+        threshold_proposal_hash: None,
         issued_at: 1000,
         expires_at: 2000,
         decision: GovernedApprovalDecision::Approved,
@@ -2301,6 +2357,7 @@ fn bac573_approval_token(issued_at: u64, expires_at: u64) -> (Keypair, GovernedA
         subject: Keypair::generate().public_key(),
         governed_intent_hash: "intent-hash".to_string(),
         request_id: "req-1".to_string(),
+        threshold_proposal_hash: None,
         issued_at,
         expires_at,
         decision: GovernedApprovalDecision::Approved,

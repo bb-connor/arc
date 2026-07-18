@@ -1226,6 +1226,8 @@ fn checkpoint_triggers_at_100_receipts() {
                 execution_nonce: None,
                 governed_intent: None,
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             })
@@ -1291,6 +1293,8 @@ fn concurrent_receipt_checkpointing_keeps_contiguous_batches() {
                         execution_nonce: None,
                         governed_intent: None,
                         approval_token: None,
+                        approval_tokens: Vec::new(),
+                        threshold_approval_proposal: None,
                         model_metadata: None,
                         federated_origin_kernel_id: None,
                     })
@@ -1361,6 +1365,8 @@ fn checkpoint_counters_restore_when_store_is_reattached() {
                 execution_nonce: None,
                 governed_intent: None,
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             })
@@ -1402,6 +1408,8 @@ fn checkpoint_counters_restore_when_store_is_reattached() {
                 execution_nonce: None,
                 governed_intent: None,
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             })
@@ -1470,6 +1478,8 @@ fn checkpoint_counters_refresh_across_kernels_sharing_store() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1489,6 +1499,8 @@ fn checkpoint_counters_refresh_across_kernels_sharing_store() {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1567,6 +1579,8 @@ fn inclusion_proof_verifies_against_stored_checkpoint() {
                 execution_nonce: None,
                 governed_intent: None,
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             })
@@ -1630,6 +1644,8 @@ fn background_checkpoints_are_installed_at_store_attach_and_fire_off_the_request
                 execution_nonce: None,
                 governed_intent: None,
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             })

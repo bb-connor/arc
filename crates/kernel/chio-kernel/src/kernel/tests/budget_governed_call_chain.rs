@@ -37,6 +37,8 @@ fn governed_monetary_allow_receipt_contains_approval_metadata() {
             execution_nonce: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -112,6 +114,8 @@ fn governed_monetary_allow_receipt_preserves_metered_billing_quote_context() {
             execution_nonce: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -187,6 +191,8 @@ fn governed_request_rejects_empty_metered_billing_provider() {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -251,6 +257,8 @@ fn governed_monetary_allow_receipt_preserves_call_chain_context() {
             execution_nonce: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -331,6 +339,8 @@ fn governed_call_chain_receipt_observes_local_parent_receipt_linkage() {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -422,6 +432,8 @@ fn governed_call_chain_receipt_observes_capability_lineage_subjects() {
                 context: None,
             }),
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -520,6 +532,8 @@ fn governed_call_chain_receipt_verifies_signed_upstream_delegator_proof() {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -595,6 +609,8 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
                 context: None,
             }),
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -657,6 +673,8 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
                 context: None,
             }),
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -755,6 +773,8 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
             execution_nonce: None,
             governed_intent: Some(verified_intent),
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -861,6 +881,8 @@ fn governed_request_rejects_upstream_call_chain_proof_subject_mismatch() {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -946,6 +968,8 @@ fn governed_request_rejects_call_chain_delegator_subject_that_conflicts_with_cap
                 context: None,
             }),
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1031,6 +1055,8 @@ fn governed_call_chain_receipt_observes_session_parent_request_lineage() {
                     context: None,
                 }),
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             },
@@ -1172,6 +1198,8 @@ fn cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anch
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1244,6 +1272,8 @@ fn governed_request_rejects_self_referential_call_chain_parent_request() {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1297,6 +1327,8 @@ fn governed_request_rejects_empty_call_chain_chain_id() {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1364,6 +1396,8 @@ fn governed_call_chain_evidence_store_error_reverses_pre_execution_budget() {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         })
@@ -1470,6 +1504,8 @@ fn nested_governed_call_chain_evidence_store_error_reverses_pre_execution_budget
                     context: None,
                 }),
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             },
@@ -1560,6 +1596,8 @@ fn nested_missing_session_roots_lookup_reverses_pre_execution_budget() {
                 execution_nonce: None,
                 governed_intent: None,
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
                 federated_origin_kernel_id: None,
             },
@@ -1638,6 +1676,8 @@ fn missing_approval_replay_store_denies_before_dispatch_and_reverses_monetary_ad
         execution_nonce: None,
         governed_intent: Some(intent),
         approval_token: Some(approval_token),
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })?;

@@ -626,6 +626,8 @@ impl ChioKernel {
             execution_nonce,
             governed_intent: operation.governed_intent.clone(),
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: operation.model_metadata.clone(),
             federated_origin_kernel_id: None,
         };
@@ -686,6 +688,8 @@ impl ChioKernel {
             execution_nonce,
             governed_intent: operation.governed_intent.clone(),
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: operation.model_metadata.clone(),
             federated_origin_kernel_id: None,
         };
@@ -782,6 +786,8 @@ impl ChioKernel {
                     execution_nonce: parsed_tool_call_execution_nonce,
                     governed_intent: tool_call.governed_intent.clone(),
                     approval_token: None,
+                    approval_tokens: Vec::new(),
+                    threshold_approval_proposal: None,
                     model_metadata: tool_call.model_metadata.clone(),
                     federated_origin_kernel_id: None,
                 };

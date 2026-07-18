@@ -270,6 +270,7 @@ impl ChioKernel {
                 8192,
                 std::time::Duration::from_secs(3600),
             )),
+            threshold_approval_requirement_resolver: None,
             emergency_stopped: AtomicBool::new(false),
             emergency_stopped_since: AtomicU64::new(0),
             emergency_stop_reason: ArcSwap::from_pointee(Option::<String>::None),
@@ -1787,6 +1788,13 @@ impl ChioKernel {
     /// core authorization checks and guards, but before tool dispatch.
     pub fn set_runtime_admission_hook(&mut self, hook: Arc<dyn RuntimeAdmissionHook>) {
         self.runtime_admission_hook = Some(hook);
+    }
+
+    pub fn set_threshold_approval_requirement_resolver(
+        &mut self,
+        resolver: Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>,
+    ) {
+        self.threshold_approval_requirement_resolver = Some(resolver);
     }
 
     /// Remove the product-specific runtime admission hook.

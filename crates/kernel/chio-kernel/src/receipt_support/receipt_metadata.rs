@@ -270,18 +270,16 @@ fn governed_economic_authorization_metadata(
         ))
     })?;
     let approval_artifact_digest = request
-        .approval_token
-        .as_ref()
-        .ok_or_else(|| {
-            KernelError::ReceiptSigningFailed(
-                "verified governed payee binding has no approval token".to_string(),
-            )
-        })?
-        .artifact_digest()
+        .approval_artifact_digest()
         .map_err(|error| {
             KernelError::ReceiptSigningFailed(format!(
-                "failed to hash governed approval token for payee binding: {error}"
+                "failed to hash governed approval for payee binding: {error}"
             ))
+        })?
+        .ok_or_else(|| {
+            KernelError::ReceiptSigningFailed(
+                "verified governed payee binding has no approval artifact".to_string(),
+            )
         })?;
     if payee_binding.economic_intent_digest() != intent_digest.as_str()
         || payee_binding.beneficiary_id() != commerce.seller
@@ -488,25 +486,31 @@ pub(crate) fn governed_request_metadata(
         return Ok(None);
     };
 
-    let approval = request
-        .approval_token
-        .as_ref()
-        .map(|approval_token| {
-            approval_token
-                .artifact_digest()
-                .map(|approval_artifact_digest| GovernedApprovalReceiptMetadata {
-                    token_id: approval_token.id.clone(),
-                    approver_key: approval_token.approver.to_hex(),
-                    approval_artifact_digest: Some(approval_artifact_digest),
-                    approved: approval_token.decision == GovernedApprovalDecision::Approved,
-                })
-                .map_err(|error| {
-                    KernelError::ReceiptSigningFailed(format!(
-                        "failed to hash governed approval token for receipt metadata: {error}"
-                    ))
-                })
+    let approval = if let Some(approval_token) = request.approval_token.as_ref() {
+        Some(GovernedApprovalReceiptMetadata {
+            token_id: approval_token.id.clone(),
+            approver_key: approval_token.approver.to_hex(),
+            approval_artifact_digest: request.approval_artifact_digest().map_err(|error| {
+                KernelError::ReceiptSigningFailed(format!(
+                    "failed to hash governed approval for receipt metadata: {error}"
+                ))
+            })?,
+            approved: approval_token.decision == GovernedApprovalDecision::Approved,
         })
-        .transpose()?;
+    } else if let Some(proposal) = request.threshold_approval_proposal.as_ref() {
+        Some(GovernedApprovalReceiptMetadata {
+            token_id: proposal.body.proposal_id.clone(),
+            approver_key: proposal.body.policy_authority.to_hex(),
+            approval_artifact_digest: request.approval_artifact_digest().map_err(|error| {
+                KernelError::ReceiptSigningFailed(format!(
+                    "failed to hash threshold approval set for receipt metadata: {error}"
+                ))
+            })?,
+            approved: true,
+        })
+    } else {
+        None
+    };
     let commerce = intent
         .commerce
         .as_ref()

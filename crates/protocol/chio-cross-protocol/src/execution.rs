@@ -1,5 +1,5 @@
 use chio_core::capability::{
-    governance::{GovernedApprovalToken, GovernedTransactionIntent},
+    governance::{GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal},
     scope::ModelMetadata,
     token::CapabilityToken,
 };
@@ -28,6 +28,8 @@ pub struct CrossProtocolExecutionRequest {
     pub execution_nonce: Option<SignedExecutionNonce>,
     pub governed_intent: Option<GovernedTransactionIntent>,
     pub approval_token: Option<GovernedApprovalToken>,
+    pub approval_tokens: Vec<GovernedApprovalToken>,
+    pub threshold_approval_proposal: Option<ThresholdApprovalProposal>,
     pub model_metadata: Option<ModelMetadata>,
 }
 
@@ -101,6 +103,11 @@ impl TargetProtocolExecutor for OpenAiTargetExecutor {
                     execution_nonce: request.execution.execution_nonce.clone(),
                     governed_intent: request.execution.governed_intent.clone(),
                     approval_token: request.execution.approval_token.clone(),
+                    approval_tokens: request.execution.approval_tokens.clone(),
+                    threshold_approval_proposal: request
+                        .execution
+                        .threshold_approval_proposal
+                        .clone(),
                     model_metadata: request.execution.model_metadata.clone(),
                     federated_origin_kernel_id: None,
                 },

@@ -156,6 +156,10 @@ pub struct AcpKernelExecutionContext {
     pub governed_intent: Option<GovernedTransactionIntent>,
     /// Optional approval token for governed transaction execution.
     pub approval_token: Option<GovernedApprovalToken>,
+    /// Optional threshold approval tokens.
+    pub approval_tokens: Vec<GovernedApprovalToken>,
+    /// Signed proposal binding a threshold approval set.
+    pub threshold_approval_proposal: Option<ThresholdApprovalProposal>,
     /// Optional metadata about the model that originated this invocation.
     pub model_metadata: Option<ModelMetadata>,
 }

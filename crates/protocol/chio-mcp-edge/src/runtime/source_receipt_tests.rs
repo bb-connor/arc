@@ -85,6 +85,8 @@ fn mcp_target_executor_carries_source_receipt_context_into_kernel_receipt_metada
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
     };
     let capability_ref = CrossProtocolCapabilityRef {

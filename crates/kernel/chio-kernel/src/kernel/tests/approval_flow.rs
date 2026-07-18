@@ -25,6 +25,26 @@ use crate::approval::{
     BatchApprovalStore, HitlVerdict, InMemoryApprovalStore, InMemoryBatchApprovalStore,
 };
 use crate::approval_channels::RecordingChannel;
+use crate::threshold_approval::ThresholdApprovalRequirementResolver;
+use chio_core::capability::governance::{
+    ThresholdApprovalProposal, ThresholdApprovalProposalBody,
+};
+use chio_core::capability::threshold_approval::{
+    ThresholdApprovalRequirement, ThresholdApproverIdentity,
+};
+
+struct FixedThresholdRequirement(ThresholdApprovalRequirement);
+
+impl ThresholdApprovalRequirementResolver for FixedThresholdRequirement {
+    fn resolve_requirement(
+        &self,
+        policy_hash: &str,
+        _server_id: &str,
+        _tool_name: &str,
+    ) -> Result<Option<ThresholdApprovalRequirement>, String> {
+        Ok((policy_hash == self.0.policy_hash).then(|| self.0.clone()))
+    }
+}
 
 type CoreKeypair = Keypair;
 
@@ -50,11 +70,176 @@ fn hitl_sign_token(
         subject: subject.public_key(),
         governed_intent_hash: parameter_hash.to_string(),
         request_id: approval_id.to_string(),
+        threshold_proposal_hash: None,
         issued_at: now.saturating_sub(10),
         expires_at: now + 600,
         decision,
     };
     GovernedApprovalToken::sign(body, approver).unwrap()
+}
+
+#[test]
+fn threshold_approval_set_is_policy_bound_and_order_independent() {
+    let policy_hash = sha256_hex(b"threshold-policy");
+    let policy_authority = CoreKeypair::generate();
+    let approver_a = CoreKeypair::generate();
+    let approver_b = CoreKeypair::generate();
+    let approver_c = CoreKeypair::generate();
+    let mut config = make_config();
+    config.policy_hash = policy_hash.clone();
+    config.ca_public_keys.push(policy_authority.public_key());
+    let mut kernel = make_kernel(config);
+    let requirement = ThresholdApprovalRequirement::new(
+        policy_hash.clone(),
+        2,
+        vec![
+            ThresholdApproverIdentity {
+                identifier: "alice".to_string(),
+                public_key: approver_a.public_key(),
+            },
+            ThresholdApproverIdentity {
+                identifier: "bob".to_string(),
+                public_key: approver_b.public_key(),
+            },
+            ThresholdApproverIdentity {
+                identifier: "carol".to_string(),
+                public_key: approver_c.public_key(),
+            },
+        ],
+        "directory-v1".to_string(),
+        300,
+    )
+    .unwrap();
+    kernel.set_threshold_approval_requirement_resolver(StdArc::new(
+        FixedThresholdRequirement(requirement.clone()),
+    ));
+
+    let subject = CoreKeypair::generate();
+    let cap = make_capability(
+        &kernel,
+        &subject,
+        make_scope(vec![make_grant("srv-threshold", "transfer")]),
+        600,
+    );
+    let intent = GovernedTransactionIntent {
+        id: "intent-threshold-1".to_string(),
+        server_id: "srv-threshold".to_string(),
+        tool_name: "transfer".to_string(),
+        purpose: "approve transfer".to_string(),
+        max_amount: None,
+        commerce: None,
+        metered_billing: None,
+        runtime_attestation: None,
+        call_chain: None,
+        autonomy: None,
+        context: None,
+    };
+    let intent_hash = intent.binding_hash().unwrap();
+    let now = current_unix_timestamp();
+    let capability_digest = sha256_hex(&canonical_json_bytes(&cap).unwrap());
+    let proposal_created_at = now.saturating_sub(5);
+    let proposal_deadline = ThresholdApprovalProposalBody::proposal_deadline(
+        proposal_created_at,
+        requirement.timeout_seconds,
+        cap.expires_at,
+        None,
+    )
+    .unwrap();
+    let proposal = ThresholdApprovalProposal::sign(
+        ThresholdApprovalProposalBody {
+            proposal_id: "proposal-threshold-1".to_string(),
+            request_id: "request-threshold-1".to_string(),
+            governed_intent_hash: intent_hash.clone(),
+            subject: cap.subject.clone(),
+            authorizing_capability_digest: capability_digest,
+            policy_hash,
+            threshold: requirement.threshold,
+            eligible_set_digest: requirement.eligible_set_digest.clone(),
+            proposal_created_at,
+            proposal_deadline,
+            policy_authority: policy_authority.public_key(),
+        },
+        &policy_authority,
+    )
+    .unwrap();
+    let proposal_hash = proposal.artifact_digest().unwrap();
+    let make_token = |id: &str, approver: &CoreKeypair| {
+        GovernedApprovalToken::sign(
+            GovernedApprovalTokenBody {
+                id: id.to_string(),
+                approver: approver.public_key(),
+                subject: cap.subject.clone(),
+                governed_intent_hash: intent_hash.clone(),
+                request_id: "request-threshold-1".to_string(),
+                threshold_proposal_hash: Some(proposal_hash.clone()),
+                issued_at: now,
+                expires_at: proposal.body.proposal_deadline,
+                decision: GovernedApprovalDecision::Approved,
+            },
+            approver,
+        )
+        .unwrap()
+    };
+    let token_a = make_token("token-a", &approver_a);
+    let token_b = make_token("token-b", &approver_b);
+    let mut request = make_request(
+        "request-threshold-1",
+        &cap,
+        "transfer",
+        "srv-threshold",
+    );
+    request.governed_intent = Some(intent);
+    request.approval_tokens = vec![token_b.clone(), token_a.clone()];
+    request.threshold_approval_proposal = Some(proposal.clone());
+    let first_digest = request.approval_artifact_digest().unwrap();
+    request.approval_tokens = vec![token_a, token_b];
+    assert_eq!(first_digest, request.approval_artifact_digest().unwrap());
+
+    let verified = kernel
+        .validate_threshold_approval_set(&request, &cap, &intent_hash, now)
+        .unwrap();
+    assert_eq!(verified.threshold, 2);
+    assert_eq!(verified.token_digests.len(), 2);
+
+    let mut insufficient = request.clone();
+    insufficient.approval_tokens.pop();
+    let error = kernel
+        .validate_threshold_approval_set(&insufficient, &cap, &intent_hash, now)
+        .unwrap_err();
+    assert!(error.to_string().contains("quorum"));
+
+    let mut extended_proposal = proposal.body.clone();
+    extended_proposal.proposal_deadline = extended_proposal.proposal_deadline.saturating_add(1);
+    let extended_proposal =
+        ThresholdApprovalProposal::sign(extended_proposal, &policy_authority).unwrap();
+    let extended_hash = extended_proposal.artifact_digest().unwrap();
+    let mut extended = request;
+    extended.approval_tokens = [&approver_a, &approver_b]
+        .into_iter()
+        .enumerate()
+        .map(|(index, approver)| {
+            GovernedApprovalToken::sign(
+                GovernedApprovalTokenBody {
+                    id: format!("extended-token-{index}"),
+                    approver: approver.public_key(),
+                    subject: cap.subject.clone(),
+                    governed_intent_hash: intent_hash.clone(),
+                    request_id: "request-threshold-1".to_string(),
+                    threshold_proposal_hash: Some(extended_hash.clone()),
+                    issued_at: now,
+                    expires_at: extended_proposal.body.proposal_deadline,
+                    decision: GovernedApprovalDecision::Approved,
+                },
+                approver,
+            )
+            .unwrap()
+        })
+        .collect();
+    extended.threshold_approval_proposal = Some(extended_proposal);
+    let error = kernel
+        .validate_threshold_approval_set(&extended, &cap, &intent_hash, now)
+        .unwrap_err();
+    assert!(error.to_string().contains("active policy"));
 }
 
 // ---------------------------------------------------------------------
@@ -507,6 +692,7 @@ fn hitl_token_verification_rejects_expired_tokens() {
         subject: subject.public_key(),
         governed_intent_hash: "h".into(),
         request_id: "a".into(),
+        threshold_proposal_hash: None,
         issued_at: 10,
         expires_at: 20, // in the past relative to now=100
         decision: GovernedApprovalDecision::Approved,
@@ -562,6 +748,7 @@ fn governed_approval_token_binds_every_authorization_field_and_time_window(
             subject: subject.public_key(),
             governed_intent_hash: "intent-hash".to_string(),
             request_id: "request-1".to_string(),
+            threshold_proposal_hash: None,
             issued_at: 1_000,
             expires_at: 2_000,
             decision: GovernedApprovalDecision::Approved,

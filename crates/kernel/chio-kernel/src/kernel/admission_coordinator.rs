@@ -205,6 +205,9 @@ struct ImmutableToolAdmissionRequest<'a> {
     arguments: &'a serde_json::Value,
     governed_intent: &'a Option<chio_core::capability::governance::GovernedTransactionIntent>,
     approval_token: &'a Option<chio_core::capability::governance::GovernedApprovalToken>,
+    approval_tokens: &'a [chio_core::capability::governance::GovernedApprovalToken],
+    threshold_approval_proposal:
+        &'a Option<chio_core::capability::governance::ThresholdApprovalProposal>,
     model_metadata: &'a Option<chio_core::capability::scope::ModelMetadata>,
     federated_origin_kernel_id: &'a Option<String>,
     matching_grants: Vec<ImmutableMatchingGrant<'a>>,
@@ -484,6 +487,8 @@ impl ChioKernel {
             arguments: &request.arguments,
             governed_intent: &request.governed_intent,
             approval_token: &request.approval_token,
+            approval_tokens: &request.approval_tokens,
+            threshold_approval_proposal: &request.threshold_approval_proposal,
             model_metadata: &request.model_metadata,
             federated_origin_kernel_id: &request.federated_origin_kernel_id,
             matching_grants: matching_grants
@@ -516,6 +521,7 @@ impl ChioKernel {
         let requirements = AdmissionParticipantRequirements {
             broker_attempt: true,
             budget_capture: true,
+            approval: request.approval_token.is_some() || !request.approval_tokens.is_empty(),
             payment: payment_required,
             observation_attempt_zero: observer_required,
             ..AdmissionParticipantRequirements::NONE
@@ -563,6 +569,7 @@ impl ChioKernel {
                     AdmissionOperationState::Prepared
                         | AdmissionOperationState::BrokerAttemptRegistered
                         | AdmissionOperationState::BudgetAuthorized
+                        | AdmissionOperationState::ApprovalReserved
                         | AdmissionOperationState::ReadyToDispatch
                         | AdmissionOperationState::CapturePending
                         | AdmissionOperationState::Finalizing
@@ -758,6 +765,7 @@ impl ChioKernel {
                 if !matches!(
                     authorization.operation.state(),
                     AdmissionOperationState::BudgetAuthorized
+                        | AdmissionOperationState::ApprovalReserved
                         | AdmissionOperationState::ReadyToDispatch
                         | AdmissionOperationState::CapturePending
                         | AdmissionOperationState::DispatchCommitted
@@ -791,6 +799,42 @@ impl ChioKernel {
         }
         admission.operation = authorization.operation;
         Ok(authorization.decision)
+    }
+
+    pub(crate) fn reserve_durable_approval_set(
+        &self,
+        admission: &mut DurableToolAdmission,
+        verified: &VerifiedApprovalReservation,
+        trusted_now_unix_ms: u64,
+    ) -> Result<(), KernelError> {
+        if admission.operation.state() == AdmissionOperationState::ApprovalReserved {
+            return Ok(());
+        }
+        if admission.operation.state() != AdmissionOperationState::BudgetAuthorized {
+            return Err(KernelError::DurableAdmission(format!(
+                "approval reservation requires budget_authorized, found {:?}",
+                admission.operation.state()
+            )));
+        }
+        let proposal_hash = AdmissionDigest::try_new(
+            "threshold_proposal_hash",
+            verified.threshold_proposal_hash.clone(),
+        )?;
+        let approval_set_hash =
+            AdmissionDigest::try_new("approval_set_hash", verified.approval_set_hash.clone())?;
+        let runtime = self.durable_runtime()?;
+        let _mutation_guard = runtime.lock_mutations()?;
+        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms);
+        admission.operation = self.apply_admission_command(
+            admission.operation.clone(),
+            vec![
+                AdmissionAttachment::ThresholdProposalHash(proposal_hash),
+                AdmissionAttachment::ApprovalSetHash(approval_set_hash),
+            ],
+            AdmissionOperationState::ApprovalReserved,
+            trusted_now_unix_ms,
+        )?;
+        Ok(())
     }
 
     pub(crate) fn load_durable_payment_journal(

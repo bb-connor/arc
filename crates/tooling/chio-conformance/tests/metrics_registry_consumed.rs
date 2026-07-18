@@ -413,6 +413,8 @@ fn acp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
     };
 
@@ -466,6 +468,8 @@ fn acp_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         },
     );
@@ -523,6 +527,8 @@ fn a2a_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
     };
 
@@ -575,6 +581,8 @@ fn a2a_edge_emits_chio_receipt_write_total() -> Result<(), Box<dyn Error>> {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         },
     );

@@ -32,7 +32,23 @@ pub struct ChioAcpEdgeCompatibility<'a> {
 }
 
 fn validate_execution_context(execution: &AcpKernelExecutionContext) -> Result<(), AcpEdgeError> {
-    validate_execution_agent_id(&execution.agent_id)
+    validate_execution_agent_id(&execution.agent_id)?;
+    if execution.approval_token.is_some() && !execution.approval_tokens.is_empty() {
+        return Err(AcpEdgeError::InvalidRequest(
+            "ACP execution must not mix singular and threshold approval tokens".to_string(),
+        ));
+    }
+    if execution.approval_tokens.len() > 32 {
+        return Err(AcpEdgeError::InvalidRequest(
+            "ACP threshold approval set exceeds 32 tokens".to_string(),
+        ));
+    }
+    if execution.approval_tokens.is_empty() != execution.threshold_approval_proposal.is_none() {
+        return Err(AcpEdgeError::InvalidRequest(
+            "ACP threshold approval tokens and proposal must be supplied together".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_execution_agent_id(agent_id: &str) -> Result<(), AcpEdgeError> {
@@ -189,6 +205,8 @@ impl ChioAcpEdge {
             execution_nonce: execution.execution_nonce.clone(),
             governed_intent: execution.governed_intent.clone(),
             approval_token: execution.approval_token.clone(),
+            approval_tokens: execution.approval_tokens.clone(),
+            threshold_approval_proposal: execution.threshold_approval_proposal.clone(),
             model_metadata: execution.model_metadata.clone(),
         })
     }

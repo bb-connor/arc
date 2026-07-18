@@ -1,5 +1,5 @@
 use chio_core::capability::{
-    governance::{GovernedApprovalToken, GovernedTransactionIntent},
+    governance::{GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal},
     scope::ModelMetadata,
     token::CapabilityToken,
 };
@@ -66,6 +66,12 @@ pub struct ToolCallRequest {
     /// Optional approval token authorizing this governed invocation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub approval_token: Option<GovernedApprovalToken>,
+    /// Bounded threshold approval set. Requests must not also set `approval_token`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub approval_tokens: Vec<GovernedApprovalToken>,
+    /// Policy-authority-signed proposal binding a threshold approval set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub threshold_approval_proposal: Option<ThresholdApprovalProposal>,
     /// Optional metadata describing the model executing the calling
     /// agent. Consumed by `Constraint::ModelConstraint` enforcement.
     ///
@@ -83,6 +89,46 @@ pub struct ToolCallRequest {
     /// wire format stays byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub federated_origin_kernel_id: Option<String>,
+}
+
+impl ToolCallRequest {
+    pub fn approval_artifact_digest(&self) -> Result<Option<String>, chio_core::Error> {
+        if self.approval_token.is_some() && !self.approval_tokens.is_empty() {
+            return Err(chio_core::Error::CanonicalJson(
+                "request supplies both singular and threshold approval tokens".to_string(),
+            ));
+        }
+        if let Some(token) = self.approval_token.as_ref() {
+            return token.artifact_digest().map(Some);
+        }
+        if self.approval_tokens.is_empty() {
+            return if self.threshold_approval_proposal.is_none() {
+                Ok(None)
+            } else {
+                Err(chio_core::Error::CanonicalJson(
+                    "threshold approval proposal has no approval tokens".to_string(),
+                ))
+            };
+        }
+        if self.approval_tokens.len() > 32 {
+            return Err(chio_core::Error::CanonicalJson(
+                "threshold approval set exceeds 32 tokens".to_string(),
+            ));
+        }
+        let proposal = self.threshold_approval_proposal.as_ref().ok_or_else(|| {
+            chio_core::Error::CanonicalJson(
+                "threshold approval tokens have no signed proposal".to_string(),
+            )
+        })?;
+        let token_digests = self
+            .approval_tokens
+            .iter()
+            .map(GovernedApprovalToken::artifact_digest)
+            .collect::<Result<Vec<_>, chio_core::Error>>()?;
+        chio_core::capability::governance::VerifiedApprovalSetBody::new(token_digests, proposal)?
+            .approval_set_hash()
+            .map(Some)
+    }
 }
 
 /// The kernel's response to a tool call request.

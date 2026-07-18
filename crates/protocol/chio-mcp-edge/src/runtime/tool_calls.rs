@@ -77,6 +77,8 @@ impl TargetProtocolExecutor for McpTargetExecutor {
                     execution_nonce: request.execution.execution_nonce.clone(),
                     governed_intent: request.execution.governed_intent.clone(),
                     approval_token: request.execution.approval_token.clone(),
+                    approval_tokens: Vec::new(),
+                    threshold_approval_proposal: None,
                     model_metadata: request.execution.model_metadata.clone(),
                     federated_origin_kernel_id: None,
                 },
@@ -140,6 +142,8 @@ pub async fn execute_bridge_mcp_tool_call_async(
         execution_nonce,
         governed_intent,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata,
         federated_origin_kernel_id: None,
     };
@@ -183,6 +187,8 @@ pub fn execute_bridge_mcp_tool_call(
                 execution_nonce: request.execution_nonce.clone(),
                 governed_intent: request.governed_intent.clone(),
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: request.model_metadata.clone(),
                 federated_origin_kernel_id: None,
             };

@@ -338,9 +338,13 @@ impl ChioKernel {
             request,
             cap,
             matched_grant,
-            budget_mutation.charge_result(),
-            Some(parent_context),
-            now,
+            GovernedValidationContext {
+                charge_result: budget_mutation.charge_result(),
+                parent_context: Some(parent_context),
+                now,
+                durable_admission: durable_admission.as_mut(),
+                trusted_now_unix_ms: now_unix_ms,
+            },
         ) {
             Ok(validated_governed_admission) => validated_governed_admission,
             Err(error) => {

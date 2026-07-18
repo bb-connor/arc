@@ -932,6 +932,8 @@ fn untrusted_issuer_denied() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1559,6 +1561,8 @@ fn dpop_required_grant_allows_when_valid_proof_provided() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1590,6 +1594,8 @@ fn dpop_required_grant_denies_when_no_proof_provided() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -1636,6 +1642,8 @@ fn dpop_required_grant_denies_when_proof_has_wrong_tool_name() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };

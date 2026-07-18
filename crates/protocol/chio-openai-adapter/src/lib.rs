@@ -15,7 +15,7 @@
 use std::collections::BTreeMap;
 
 use chio_core::capability::{
-    governance::{GovernedApprovalToken, GovernedTransactionIntent},
+    governance::{GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal},
     scope::ModelMetadata,
     token::CapabilityToken,
 };
@@ -180,6 +180,10 @@ pub struct OpenAiExecutionContext {
     pub governed_intent: Option<GovernedTransactionIntent>,
     /// Optional governed approval token.
     pub approval_token: Option<GovernedApprovalToken>,
+    /// Optional threshold approval tokens.
+    pub approval_tokens: Vec<GovernedApprovalToken>,
+    /// Signed threshold proposal binding `approval_tokens`.
+    pub threshold_approval_proposal: Option<ThresholdApprovalProposal>,
     /// Optional originating model metadata for model-constrained grants.
     pub model_metadata: Option<ModelMetadata>,
 }
@@ -322,6 +326,8 @@ impl ChioOpenAiAdapter {
             execution_nonce: execution.execution_nonces.get(&tool_call.id).cloned(),
             governed_intent: execution.governed_intent.clone(),
             approval_token: execution.approval_token.clone(),
+            approval_tokens: execution.approval_tokens.clone(),
+            threshold_approval_proposal: execution.threshold_approval_proposal.clone(),
             model_metadata: execution.model_metadata.clone(),
             federated_origin_kernel_id: None,
         };

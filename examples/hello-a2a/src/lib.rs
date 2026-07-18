@@ -163,6 +163,8 @@ pub fn build_demo_state() -> HelloA2aResult<HelloA2aDemoState> {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
     };
 

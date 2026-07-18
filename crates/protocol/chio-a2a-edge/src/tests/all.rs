@@ -862,6 +862,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -920,6 +922,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -943,6 +947,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -971,6 +977,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -1013,6 +1021,8 @@ mod tests {
                     execution_nonce: None,
                     governed_intent: None,
                     approval_token: None,
+                    approval_tokens: Vec::new(),
+                    threshold_approval_proposal: None,
                     model_metadata: None,
                 },
                 "approval required",
@@ -1062,6 +1072,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
         let before_error = receipt_write_total(RECEIPT_WRITE_OUTCOME_ERROR);
@@ -1096,6 +1108,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
         let capability_ref = CrossProtocolCapabilityRef {
@@ -1159,6 +1173,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -1548,6 +1564,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
@@ -1595,6 +1613,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -1636,6 +1656,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
@@ -1678,6 +1700,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
@@ -1713,6 +1737,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
@@ -1743,6 +1769,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -1775,6 +1803,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -1807,6 +1837,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -1846,6 +1878,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -1957,6 +1991,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -2003,6 +2039,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -2079,6 +2117,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -2147,6 +2187,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -2184,6 +2226,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -2249,6 +2293,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -2320,6 +2366,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -2379,6 +2427,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -2422,6 +2472,8 @@ mod tests {
                 execution_nonce: None,
                 governed_intent: None,
                 approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
                 model_metadata: None,
             };
 
@@ -2489,6 +2541,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -2565,6 +2619,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -2640,6 +2696,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 
@@ -2696,6 +2754,8 @@ mod tests {
             execution_nonce: None,
             governed_intent: None,
             approval_token: None,
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
             model_metadata: None,
         };
 

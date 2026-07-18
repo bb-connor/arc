@@ -1026,6 +1026,7 @@ fn make_governed_approval_token(
             subject: subject.clone(),
             governed_intent_hash: intent.binding_hash().unwrap(),
             request_id: request_id.to_string(),
+            threshold_proposal_hash: None,
             issued_at: now.saturating_sub(1),
             expires_at: now + 300,
             decision: GovernedApprovalDecision::Approved,

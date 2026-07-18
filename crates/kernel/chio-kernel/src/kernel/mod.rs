@@ -148,6 +148,20 @@ pub(crate) struct ValidatedGovernedAdmission {
     verified_payee_binding: Option<VerifiedGovernedPayeeBinding>,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct VerifiedApprovalReservation {
+    threshold_proposal_hash: String,
+    approval_set_hash: String,
+}
+
+pub(crate) struct GovernedValidationContext<'a> {
+    charge_result: Option<&'a BudgetChargeResult>,
+    parent_context: Option<&'a OperationContext>,
+    now: u64,
+    durable_admission: Option<&'a mut DurableToolAdmission>,
+    trusted_now_unix_ms: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct VerifiedGovernedPayeeBinding {
     beneficiary_id: String,

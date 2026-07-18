@@ -1627,6 +1627,8 @@ fn chio_runtime_admission_releases_reservations_on_pre_dispatch_budget_denial(
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })?;
@@ -1659,6 +1661,8 @@ fn chio_runtime_admission_releases_reservations_on_pre_dispatch_budget_denial(
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })?;
@@ -1715,6 +1719,8 @@ fn chio_runtime_release_failure_does_not_mask_pre_dispatch_budget_denial(
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })?;
@@ -1746,6 +1752,8 @@ fn chio_runtime_release_failure_does_not_mask_pre_dispatch_budget_denial(
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     })?;

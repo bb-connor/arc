@@ -18,7 +18,9 @@ use crate::signer_binding::{
 use super::runtime_attestation::{RuntimeAssuranceTier, RuntimeAttestationEvidence};
 use super::scope::MonetaryAmount;
 
-const GOVERNED_APPROVAL_TOKEN_DIGEST_DOMAIN: &[u8] = b"chio.governed-approval-token.digest.v1\0";
+const GOVERNED_APPROVAL_TOKEN_DIGEST_DOMAIN: &[u8] = b"chio.governed-approval-token.v1\0";
+const THRESHOLD_APPROVAL_PROPOSAL_DIGEST_DOMAIN: &[u8] = b"chio.threshold-approval-proposal.v1\0";
+const VERIFIED_APPROVAL_SET_DIGEST_DOMAIN: &[u8] = b"chio.verified-approval-set.v1\0";
 
 /// Explicit governed autonomy tier requested for one economically sensitive action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
@@ -854,6 +856,8 @@ pub struct GovernedApprovalTokenBody {
     pub subject: PublicKey,
     pub governed_intent_hash: String,
     pub request_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub threshold_proposal_hash: Option<String>,
     pub issued_at: u64,
     pub expires_at: u64,
     pub decision: GovernedApprovalDecision,
@@ -867,6 +871,8 @@ pub struct GovernedApprovalToken {
     pub subject: PublicKey,
     pub governed_intent_hash: String,
     pub request_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub threshold_proposal_hash: Option<String>,
     pub issued_at: u64,
     pub expires_at: u64,
     pub decision: GovernedApprovalDecision,
@@ -888,6 +894,7 @@ impl GovernedApprovalToken {
             subject: self.subject.clone(),
             governed_intent_hash: self.governed_intent_hash.clone(),
             request_id: self.request_id.clone(),
+            threshold_proposal_hash: self.threshold_proposal_hash.clone(),
             issued_at: self.issued_at,
             expires_at: self.expires_at,
             decision: self.decision,
@@ -909,6 +916,7 @@ impl GovernedApprovalToken {
             subject: body.subject,
             governed_intent_hash: body.governed_intent_hash,
             request_id: body.request_id,
+            threshold_proposal_hash: body.threshold_proposal_hash,
             issued_at: body.issued_at,
             expires_at: body.expires_at,
             decision: body.decision,
@@ -937,6 +945,7 @@ impl GovernedApprovalToken {
             subject: body.subject,
             governed_intent_hash: body.governed_intent_hash,
             request_id: body.request_id,
+            threshold_proposal_hash: body.threshold_proposal_hash,
             issued_at: body.issued_at,
             expires_at: body.expires_at,
             decision: body.decision,
@@ -998,4 +1007,218 @@ impl GovernedApprovalToken {
         }
         Ok(())
     }
+}
+
+/// Canonical policy-authority statement that opens one threshold approval window.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ThresholdApprovalProposalBody {
+    pub proposal_id: String,
+    pub request_id: String,
+    pub governed_intent_hash: String,
+    pub subject: PublicKey,
+    pub authorizing_capability_digest: String,
+    pub policy_hash: String,
+    pub threshold: u32,
+    pub eligible_set_digest: String,
+    pub proposal_created_at: u64,
+    pub proposal_deadline: u64,
+    pub policy_authority: PublicKey,
+}
+
+impl ThresholdApprovalProposalBody {
+    pub fn proposal_deadline(
+        proposal_created_at: u64,
+        timeout_seconds: u64,
+        authorizing_capability_expiry: u64,
+        governed_operation_expiry: Option<u64>,
+    ) -> Result<u64> {
+        let timeout_deadline = proposal_created_at
+            .checked_add(timeout_seconds)
+            .ok_or_else(|| Error::CanonicalJson("threshold proposal deadline overflow".into()))?;
+        Ok(timeout_deadline
+            .min(authorizing_capability_expiry)
+            .min(governed_operation_expiry.unwrap_or(u64::MAX)))
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.proposal_id.is_empty()
+            || self.proposal_id.trim() != self.proposal_id
+            || self.request_id.is_empty()
+            || self.request_id.trim() != self.request_id
+        {
+            return Err(Error::CanonicalJson(
+                "threshold proposal identifiers must be canonical text".into(),
+            ));
+        }
+        for (field, value) in [
+            ("governed intent hash", self.governed_intent_hash.as_str()),
+            (
+                "authorizing capability digest",
+                self.authorizing_capability_digest.as_str(),
+            ),
+            ("policy hash", self.policy_hash.as_str()),
+            ("eligible set digest", self.eligible_set_digest.as_str()),
+        ] {
+            if !is_sha256_hex(value) {
+                return Err(Error::CanonicalJson(alloc::format!(
+                    "threshold proposal {field} must be lowercase SHA-256 hex"
+                )));
+            }
+        }
+        if self.threshold == 0 {
+            return Err(Error::CanonicalJson(
+                "threshold proposal quorum must be non-zero".into(),
+            ));
+        }
+        if self.proposal_created_at >= self.proposal_deadline {
+            return Err(Error::CanonicalJson(
+                "threshold proposal deadline must follow creation time".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Signed threshold proposal issued by the active policy authority.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ThresholdApprovalProposal {
+    #[serde(flatten)]
+    pub body: ThresholdApprovalProposalBody,
+    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
+    pub algorithm: Option<SigningAlgorithm>,
+    pub signature: Signature,
+}
+
+impl ThresholdApprovalProposal {
+    pub fn sign(body: ThresholdApprovalProposalBody, keypair: &Keypair) -> Result<Self> {
+        body.validate()?;
+        ensure_keypair_matches_embedded_key(
+            &body.policy_authority,
+            keypair,
+            "threshold approval proposal",
+            "policy_authority",
+        )?;
+        let (signature, _) = keypair.sign_canonical(&body)?;
+        Ok(Self {
+            body,
+            algorithm: None,
+            signature,
+        })
+    }
+
+    pub fn sign_with_backend(
+        body: ThresholdApprovalProposalBody,
+        backend: &dyn SigningBackend,
+    ) -> Result<Self> {
+        body.validate()?;
+        ensure_backend_matches_embedded_key(
+            &body.policy_authority,
+            backend,
+            "threshold approval proposal",
+            "policy_authority",
+        )?;
+        let (signature, _) = sign_canonical_with_backend(backend, &body)?;
+        Ok(Self {
+            body,
+            algorithm: Some(backend.algorithm()),
+            signature,
+        })
+    }
+
+    pub fn verify_signature(&self) -> Result<bool> {
+        self.body.validate()?;
+        self.body
+            .policy_authority
+            .verify_canonical(&self.body, &self.signature)
+    }
+
+    pub fn validate_at(&self, now: u64) -> Result<()> {
+        self.body.validate()?;
+        if now < self.body.proposal_created_at {
+            return Err(Error::CapabilityNotYetValid {
+                not_before: self.body.proposal_created_at,
+            });
+        }
+        if now >= self.body.proposal_deadline {
+            return Err(Error::CapabilityExpired {
+                expires_at: self.body.proposal_deadline,
+            });
+        }
+        Ok(())
+    }
+
+    pub fn artifact_digest(&self) -> Result<String> {
+        domain_separated_digest(THRESHOLD_APPROVAL_PROPOSAL_DIGEST_DOMAIN, self)
+    }
+}
+
+/// Canonical evidence emitted after a complete threshold set verifies.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VerifiedApprovalSetBody {
+    pub token_digests: Vec<String>,
+    pub policy_hash: String,
+    pub threshold: u32,
+    pub eligible_set_digest: String,
+    pub request_id: String,
+    pub governed_intent_hash: String,
+    pub subject: PublicKey,
+    pub authorizing_capability_digest: String,
+    pub threshold_proposal_hash: String,
+    pub proposal_id: String,
+    pub proposal_created_at: u64,
+    pub proposal_deadline: u64,
+}
+
+impl VerifiedApprovalSetBody {
+    pub fn new(
+        mut token_digests: Vec<String>,
+        proposal: &ThresholdApprovalProposal,
+    ) -> Result<Self> {
+        token_digests.sort();
+        if token_digests.is_empty()
+            || token_digests.iter().any(|digest| !is_sha256_hex(digest))
+            || token_digests.windows(2).any(|pair| pair[0] == pair[1])
+        {
+            return Err(Error::CanonicalJson(
+                "verified approval token digests must be distinct SHA-256 values".into(),
+            ));
+        }
+        let body = &proposal.body;
+        Ok(Self {
+            token_digests,
+            policy_hash: body.policy_hash.clone(),
+            threshold: body.threshold,
+            eligible_set_digest: body.eligible_set_digest.clone(),
+            request_id: body.request_id.clone(),
+            governed_intent_hash: body.governed_intent_hash.clone(),
+            subject: body.subject.clone(),
+            authorizing_capability_digest: body.authorizing_capability_digest.clone(),
+            threshold_proposal_hash: proposal.artifact_digest()?,
+            proposal_id: body.proposal_id.clone(),
+            proposal_created_at: body.proposal_created_at,
+            proposal_deadline: body.proposal_deadline,
+        })
+    }
+
+    pub fn approval_set_hash(&self) -> Result<String> {
+        domain_separated_digest(VERIFIED_APPROVAL_SET_DIGEST_DOMAIN, self)
+    }
+}
+
+fn domain_separated_digest(domain: &[u8], value: &impl Serialize) -> Result<String> {
+    let canonical = canonical_json_bytes(value)?;
+    let mut preimage = Vec::with_capacity(domain.len() + canonical.len());
+    preimage.extend_from_slice(domain);
+    preimage.extend_from_slice(&canonical);
+    Ok(sha256_hex(&preimage))
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }

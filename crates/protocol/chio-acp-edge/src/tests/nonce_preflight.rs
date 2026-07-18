@@ -142,6 +142,8 @@ fn invoke_strict_nonce_preflight_is_not_success_and_returns_retry_metadata() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
     };
 

@@ -155,6 +155,8 @@ fn send_message_strict_nonce_preflight_returns_working_retry_metadata() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
     };
 

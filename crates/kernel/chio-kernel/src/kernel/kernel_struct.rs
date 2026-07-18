@@ -591,6 +591,8 @@ pub struct ChioKernel {
     /// from being consumed more than once. Uses the same LRU + TTL pattern as
     /// DPoP nonce verification. Key: (request_id, governed_intent_hash).
     pub(super) approval_replay_store: Option<dpop::DpopNonceStore>,
+    pub(super) threshold_approval_requirement_resolver:
+        Option<Arc<dyn crate::threshold_approval::ThresholdApprovalRequirementResolver>>,
     /// Emergency kill switch. When `true`, every evaluate entry point returns
     /// `Verdict::Deny` without performing capability validation or guard
     /// evaluation. Flipped by `emergency_stop` / `emergency_resume`.

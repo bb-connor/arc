@@ -134,6 +134,8 @@ fn current_thread_runtime_returns_typed_error_instead_of_deadlocking() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
@@ -209,6 +211,8 @@ fn no_runtime_attached_drives_future_to_completion() {
         execution_nonce: None,
         governed_intent: None,
         approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
     };
