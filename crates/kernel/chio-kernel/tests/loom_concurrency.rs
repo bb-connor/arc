@@ -471,7 +471,7 @@ fn loom_emergency_stop_arcswap() {
 
 #[cfg(any(loom, chio_kernel_loom))]
 #[test]
-fn loom_budget_atomic_decrement() {
+fn protocol_primitives_last_unit_contention() {
     loom::model(|| {
         #[derive(Debug)]
         struct TenantBudget {
@@ -541,12 +541,12 @@ fn loom_budget_atomic_decrement() {
 #[cfg(any(loom, chio_kernel_loom))]
 #[derive(Debug, Default)]
 struct CompositeQuotaModel {
-    reserved: [u8; 3],
+    reserved: [u8; 4],
 }
 
 #[cfg(any(loom, chio_kernel_loom))]
 impl CompositeQuotaModel {
-    fn authorize(&mut self, keys: [usize; 2]) -> bool {
+    fn authorize(&mut self, keys: [usize; 3]) -> bool {
         if keys.iter().any(|key| self.reserved[*key] >= 1) {
             return false;
         }
@@ -559,7 +559,7 @@ impl CompositeQuotaModel {
 
 #[cfg(any(loom, chio_kernel_loom))]
 #[test]
-fn loom_composite_quota_authorization_is_all_or_none() {
+fn protocol_primitives_three_key_all_or_nothing_admission() {
     loom::model(|| {
         let quotas = Arc::new(Mutex::new(CompositeQuotaModel::default()));
         let allowed_a = Arc::new(AtomicBool::new(false));
@@ -568,13 +568,19 @@ fn loom_composite_quota_authorization_is_all_or_none() {
         let quotas_a = Arc::clone(&quotas);
         let result_a = Arc::clone(&allowed_a);
         let a = thread::spawn(move || {
-            result_a.store(lock_mutex(&quotas_a).authorize([0, 1]), Ordering::Release);
+            result_a.store(
+                lock_mutex(&quotas_a).authorize([0, 1, 2]),
+                Ordering::Release,
+            );
         });
 
         let quotas_b = Arc::clone(&quotas);
         let result_b = Arc::clone(&allowed_b);
         let b = thread::spawn(move || {
-            result_b.store(lock_mutex(&quotas_b).authorize([1, 2]), Ordering::Release);
+            result_b.store(
+                lock_mutex(&quotas_b).authorize([1, 2, 3]),
+                Ordering::Release,
+            );
         });
 
         join_ok(a);
@@ -587,11 +593,62 @@ fn loom_composite_quota_authorization_is_all_or_none() {
         );
         let quotas = lock_mutex(&quotas);
         assert_eq!(quotas.reserved[1], 1, "shared quota must be reserved once");
+        assert_eq!(quotas.reserved[2], 1, "shared quota must be reserved once");
         assert_eq!(
-            quotas.reserved[0] + quotas.reserved[2],
+            quotas.reserved[0] + quotas.reserved[3],
             1,
             "the denied hold must not reserve its private quota"
         );
+    });
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+#[derive(Debug, Default)]
+struct ImmutableMaximumModel {
+    maximum: Option<u8>,
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+impl ImmutableMaximumModel {
+    fn define(&mut self, maximum: u8) -> bool {
+        match self.maximum {
+            Some(existing) => existing == maximum,
+            None => {
+                self.maximum = Some(maximum);
+                true
+            }
+        }
+    }
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+#[test]
+fn protocol_primitives_immutable_maximum_race() {
+    loom::model(|| {
+        let quota = Arc::new(Mutex::new(ImmutableMaximumModel::default()));
+        let accepted = Arc::new(AtomicUsize::new(0));
+
+        let quota_a = Arc::clone(&quota);
+        let accepted_a = Arc::clone(&accepted);
+        let a = thread::spawn(move || {
+            if lock_mutex(&quota_a).define(1) {
+                accepted_a.fetch_add(1, Ordering::AcqRel);
+            }
+        });
+
+        let quota_b = Arc::clone(&quota);
+        let accepted_b = Arc::clone(&accepted);
+        let b = thread::spawn(move || {
+            if lock_mutex(&quota_b).define(2) {
+                accepted_b.fetch_add(1, Ordering::AcqRel);
+            }
+        });
+
+        join_ok(a);
+        join_ok(b);
+
+        assert_eq!(accepted.load(Ordering::Acquire), 1);
+        assert!(matches!(lock_mutex(&quota).maximum, Some(1 | 2)));
     });
 }
 
@@ -691,7 +748,7 @@ impl ReservationTransitionModel {
 
 #[cfg(any(loom, chio_kernel_loom))]
 #[test]
-fn loom_capture_and_reverse_have_one_terminal_winner() {
+fn protocol_primitives_capture_versus_reverse() {
     loom::model(|| {
         let reservation = Arc::new(Mutex::new(ReservationTransitionModel {
             state: ReservationState::Authorized,
@@ -732,6 +789,44 @@ fn loom_capture_and_reverse_have_one_terminal_winner() {
             reservation.captured,
             u8::from(reservation.state == ReservationState::Captured)
         );
+    });
+}
+
+#[cfg(any(loom, chio_kernel_loom))]
+#[test]
+fn protocol_primitives_idempotent_compensation() {
+    loom::model(|| {
+        let reservation = Arc::new(Mutex::new(ReservationTransitionModel {
+            state: ReservationState::Authorized,
+            reserved: 1,
+            captured: 0,
+        }));
+        let applied = Arc::new(AtomicUsize::new(0));
+
+        let reservation_a = Arc::clone(&reservation);
+        let applied_a = Arc::clone(&applied);
+        let a = thread::spawn(move || {
+            if lock_mutex(&reservation_a).reverse() {
+                applied_a.fetch_add(1, Ordering::AcqRel);
+            }
+        });
+
+        let reservation_b = Arc::clone(&reservation);
+        let applied_b = Arc::clone(&applied);
+        let b = thread::spawn(move || {
+            if lock_mutex(&reservation_b).reverse() {
+                applied_b.fetch_add(1, Ordering::AcqRel);
+            }
+        });
+
+        join_ok(a);
+        join_ok(b);
+
+        let reservation = lock_mutex(&reservation);
+        assert_eq!(applied.load(Ordering::Acquire), 1);
+        assert_eq!(reservation.state, ReservationState::Reversed);
+        assert_eq!(reservation.reserved, 0);
+        assert_eq!(reservation.captured, 0);
     });
 }
 
