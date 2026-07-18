@@ -307,16 +307,13 @@ impl ChioKernel {
         .map_err(|error| {
             chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason()
         })?;
-        if cap.aggregate_invocation_budget.is_some() {
-            return Err("aggregate invocation enforcement is unavailable".to_string());
-        }
         if cap.scope.has_cumulative_approval() {
             return Err("cumulative approval enforcement is unavailable".to_string());
         }
         Ok(())
     }
 
-    fn negotiated_capability_root(
+    pub(crate) fn negotiated_capability_root(
         &self,
         cap: &CapabilityToken,
         peer: &chio_core::capability::features::CapabilityNegotiation,
@@ -1099,13 +1096,13 @@ impl ChioKernel {
                         )
                     };
 
-                let invocation_quotas = durable_admission
-                    .as_deref()
-                    .and_then(DurableToolAdmission::supplemental_quota)
-                    .map(|supplemental| {
-                        let mut quotas = Vec::with_capacity(2);
+                let mut invocation_quotas = Vec::with_capacity(3);
+                if let Some(admission) = durable_admission.as_deref() {
+                    if admission.aggregate_quota().is_some()
+                        || admission.supplemental_quota().is_some()
+                    {
                         if let Some(max_invocations) = grant.max_invocations {
-                            quotas.push(BudgetInvocationQuota {
+                            invocation_quotas.push(BudgetInvocationQuota {
                                 key: BudgetQuotaKey::grant(
                                     cap.id.clone(),
                                     u32::try_from(matching.index).map_err(|_| {
@@ -1117,7 +1114,12 @@ impl ChioKernel {
                                 max_invocations,
                             });
                         }
-                        quotas.push(BudgetInvocationQuota {
+                    }
+                    if let Some(aggregate) = admission.aggregate_quota() {
+                        invocation_quotas.push(aggregate.clone());
+                    }
+                    if let Some(supplemental) = admission.supplemental_quota() {
+                        invocation_quotas.push(BudgetInvocationQuota {
                             key: BudgetQuotaKey {
                                 profile: BudgetQuotaProfile::SupplementalBrokerCapabilityExecution,
                                 owner_id: supplemental.owner_id().to_string(),
@@ -1125,10 +1127,8 @@ impl ChioKernel {
                             },
                             max_invocations: supplemental.max_invocations(),
                         });
-                        Ok::<_, KernelError>(quotas)
-                    })
-                    .transpose()?
-                    .unwrap_or_default();
+                    }
+                }
                 let authorization_request = BudgetAuthorizeHoldRequest {
                     capability_id: cap.id.clone(),
                     grant_index: matching.index,

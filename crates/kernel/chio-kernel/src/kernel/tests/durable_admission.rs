@@ -1431,6 +1431,10 @@ fn durable_admission_fixture_with_grants(
     std::sync::Arc<TestAdmissionOperationStore>,
     std::sync::Arc<AtomicU64>,
 ) {
+    let tools = grants
+        .iter()
+        .map(|grant| grant.tool_name.clone())
+        .collect::<Vec<_>>();
     let mut config = make_config();
     config.policy_hash = sha256_hex(b"durable-admission-test-policy");
     let mut kernel = make_kernel(config);
@@ -1443,7 +1447,7 @@ fn durable_admission_fixture_with_grants(
     let invocations = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(DurableAdmissionCheckingServer {
         id: "durable-server".to_string(),
-        tools: vec!["mutate".to_string()],
+        tools,
         invocations: invocations.clone(),
         store: store.clone(),
     }));
@@ -1457,6 +1461,58 @@ fn durable_admission_fixture_with_grants(
         serde_json::json!({"record": "ledger-7", "value": "settled"}),
     );
     (kernel, request, store, invocations)
+}
+
+#[test]
+fn aggregate_invocation_budget_exhausts_across_grants_atomically() {
+    use chio_core::capability::aggregate_invocation::{
+        AggregateInvocationBudget, AggregateInvocationScope,
+    };
+
+    let mut first_grant = make_grant("durable-server", "mutate");
+    first_grant.max_invocations = Some(1);
+    let mut second_grant = make_grant("durable-server", "mutate-alt");
+    second_grant.max_invocations = Some(1);
+    let (kernel, mut first, store, invocations) = durable_admission_fixture_with_grants(
+        "aggregate-first",
+        vec![first_grant, second_grant],
+    );
+    let mut body = first.capability.body();
+    body.aggregate_invocation_budget = Some(AggregateInvocationBudget {
+        scope: AggregateInvocationScope::Capability,
+        max_invocations: 1,
+        root_binding: None,
+    });
+    first.capability = CapabilityToken::sign(body, &kernel.config.keypair)
+        .expect("aggregate capability must sign");
+
+    let first_response = kernel
+        .evaluate_tool_call_blocking(&first)
+        .expect("first aggregate invocation");
+    assert_eq!(
+        first_response.verdict,
+        Verdict::Allow,
+        "{:?}",
+        first_response.reason
+    );
+
+    let mut second = first.clone();
+    second.request_id = "aggregate-second".to_string();
+    second.tool_name = "mutate-alt".to_string();
+    let second_response = kernel
+        .evaluate_tool_call_blocking(&second)
+        .expect("aggregate exhaustion must produce a signed denial");
+    assert_eq!(second_response.verdict, Verdict::Deny);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    let second_grant_usage = store
+        .budget_store()
+        .get_invocation_quota_usage(&crate::budget_store::BudgetQuotaKey::grant(
+            first.capability.id.clone(),
+            1,
+        ))
+        .expect("second grant quota lookup");
+    assert!(second_grant_usage.is_none());
 }
 
 #[test]

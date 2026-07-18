@@ -25,7 +25,8 @@ use crate::admission_operation::{
 };
 use crate::budget_store::{
     BudgetAdmissionBinding, BudgetCaptureInvocationRequest, BudgetEventAuthority,
-    BudgetGuaranteeLevel, BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
+    BudgetGuaranteeLevel, BudgetInvocationQuota, BudgetQuotaKey, BudgetQuotaProfile,
+    BudgetReconcileHoldDecision, BudgetReconcileHoldRequest,
 };
 use crate::receipt_store::QualifiedAdmissionProjectionStore;
 use crate::supplemental_quota::{
@@ -163,6 +164,7 @@ impl QualifiedDurableOutcomeAuthority for DurableAdmissionRuntime {
 
 pub(crate) struct DurableToolAdmission {
     operation: AdmissionOperationV1,
+    aggregate_quota: Option<BudgetInvocationQuota>,
     supplemental_quota: Option<KernelVerifiedSupplementalQuotaClaim>,
 }
 
@@ -203,6 +205,10 @@ impl DurableToolAdmission {
 
     pub(crate) fn supplemental_quota(&self) -> Option<&KernelVerifiedSupplementalQuotaClaim> {
         self.supplemental_quota.as_ref()
+    }
+
+    pub(crate) fn aggregate_quota(&self) -> Option<&BudgetInvocationQuota> {
+        self.aggregate_quota.as_ref()
     }
 }
 
@@ -405,6 +411,7 @@ impl ChioKernel {
                     AdmissionOperationState::Finalizing => {
                         let mut admission = DurableToolAdmission {
                             operation,
+                            aggregate_quota: None,
                             supplemental_quota: None,
                         };
                         let tool_return = self.load_durable_tool_return(&admission)?;
@@ -442,6 +449,11 @@ impl ChioKernel {
         matching_grants: &[MatchingGrant<'_>],
         trusted_now_unix_ms: u64,
     ) -> Result<Option<DurableToolAdmission>, KernelError> {
+        let aggregate_quota =
+            self.verify_aggregate_quota_for_admission(request, trusted_now_unix_ms / 1_000)?;
+        let requires_structured_admission = aggregate_quota.is_some()
+            || request.supplemental_authorization.is_some()
+            || request.capability.scope.has_cumulative_approval();
         if request.supplemental_authorization.is_some()
             && self.supplemental_quota_verifier.is_none()
         {
@@ -464,18 +476,17 @@ impl ChioKernel {
             SideEffectClass::SideEffecting
         };
         if !self.durable_admission_mode.covers(effect_class) {
-            if request.supplemental_authorization.is_some() {
+            if requires_structured_admission {
                 return Err(KernelError::DurableAdmission(
-                    "supplemental authorization requires durable admission coverage".to_string(),
+                    "aggregate, cumulative, and supplemental authorization requires durable admission coverage"
+                        .to_string(),
                 ));
             }
             return Ok(None);
         }
         self.durable_stream_limits()?;
         let Some(runtime) = self.durable_admission_runtime.as_ref() else {
-            if self.config.allow_ephemeral_receipt_log
-                && request.supplemental_authorization.is_none()
-            {
+            if self.config.allow_ephemeral_receipt_log && !requires_structured_admission {
                 return Ok(None);
             }
             return Err(KernelError::DurableAdmission(
@@ -703,6 +714,7 @@ impl ChioKernel {
         }
         Ok(Some(DurableToolAdmission {
             operation,
+            aggregate_quota,
             supplemental_quota,
         }))
     }
@@ -807,6 +819,7 @@ impl ChioKernel {
         };
         Ok(DurableToolAdmission {
             operation,
+            aggregate_quota: None,
             supplemental_quota: None,
         })
     }
@@ -925,6 +938,53 @@ impl ChioKernel {
         )
         .map(Some)
         .map_err(|error| KernelError::DurableAdmission(error.to_string()))
+    }
+
+    fn verify_aggregate_quota_for_admission(
+        &self,
+        request: &ToolCallRequest,
+        now: u64,
+    ) -> Result<Option<BudgetInvocationQuota>, KernelError> {
+        use chio_core::capability::aggregate_invocation::{
+            verify_aggregate_invocation_budget, AggregateInvocationScope,
+        };
+
+        if request.capability.aggregate_invocation_budget.is_none() {
+            return Ok(None);
+        }
+        let peer = self
+            .capability_negotiation_for_remote(request.federated_origin_kernel_id.as_deref(), now)
+            .map_err(KernelError::DurableAdmission)?;
+        let direct_root = self
+            .negotiated_capability_root(&request.capability, &peer)
+            .map_err(KernelError::DurableAdmission)?;
+        let verified = verify_aggregate_invocation_budget(
+            &request.capability,
+            &self.trusted_issuer_keys(),
+            direct_root.as_ref(),
+        )
+        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
+        .ok_or_else(|| {
+            KernelError::DurableAdmission(
+                "aggregate invocation budget did not produce a verified quota".to_string(),
+            )
+        })?;
+        let profile = match verified.scope {
+            AggregateInvocationScope::Capability => {
+                BudgetQuotaProfile::AggregateCapabilityInvocation
+            }
+            AggregateInvocationScope::DelegationFamily => {
+                BudgetQuotaProfile::AggregateFamilyInvocation
+            }
+        };
+        Ok(Some(BudgetInvocationQuota {
+            key: BudgetQuotaKey {
+                profile,
+                owner_id: verified.owner_id,
+                grant_index: None,
+            },
+            max_invocations: verified.max_invocations,
+        }))
     }
 
     pub(crate) fn durable_budget_binding(

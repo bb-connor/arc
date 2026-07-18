@@ -112,17 +112,9 @@ fn hosted_aggregate_family_uses_signed_root_lineage_before_enforcement(
     drop(valid_store);
     let mut valid_kernel = make_hosted_kernel();
     valid_kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&valid_path)?))?;
-    let valid_error =
-        match valid_kernel.verify_capability_full_pre_admit(&child, Some(remote_kernel_id), now) {
-            Err(error) => error,
-            Ok(()) => {
-                return Err(std::io::Error::other(
-                    "hosted aggregate evaluation escaped the enforcement fence",
-                )
-                .into());
-            }
-        };
-    assert!(valid_error.contains("aggregate invocation enforcement is unavailable"));
+    valid_kernel
+        .verify_capability_full_pre_admit(&child, Some(remote_kernel_id), now)
+        .map_err(std::io::Error::other)?;
 
     let missing_path = unique_receipt_db_path("chio-hosted-aggregate-missing-root");
     let mut missing_kernel = make_hosted_kernel();

@@ -1076,7 +1076,12 @@ impl ChioKernel {
                 "no fresh federation peer negotiation profile pinned for remote kernel {remote}"
             ));
         }
-        Ok(chio_core::capability::features::CapabilityNegotiation::t1_default())
+        let mut local = chio_core::capability::features::CapabilityNegotiation::t1_default();
+        local.features.insert(
+            chio_core::capability::features::AGGREGATE_INVOCATION_BUDGET.to_string(),
+            true,
+        );
+        Ok(local)
     }
 
     /// Install the bilateral cosigner responsible for
