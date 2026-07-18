@@ -604,6 +604,49 @@ admit check, and the Rust shell is exercised by
 `crates/tooling/chio-conformance/tests/budget_split_rejects_oversubscribed_siblings.rs`
 and `crates/tooling/chio-conformance/tests/budget_split_cross_hop_rejects_amplification.rs`.
 
+#### Aggregate Invocation Budgets And Threshold Approval
+
+An `aggregate_invocation_budget` bounds invocations across every grant in one
+capability or across every descendant in one delegation family. Capability
+scope uses the capability ID as the quota owner. Delegation-family scope uses
+the owner derived from a verified, CA-signed `chio.aggregate-budget-root.v1`
+binding. A family descendant MUST carry the identical root binding and signed
+maximum from its direct root. It MUST NOT lower, raise, omit, replace, or create
+that family budget. A maximum of zero is valid and denies every capture.
+
+The verifier MUST authenticate the direct root token and bind the root
+capability ID, root commitment hash, issuer, subject, scope hash, expiry,
+maximum, root-binding signature, and descendant binding digest. Presented
+delegation metadata is not authority for a family owner. An untrusted root,
+forged field, changed digest, or missing direct-root token is a denial.
+
+When a request is covered by grant, aggregate, or supplemental invocation
+quotas, the durable authority authorizes and captures the complete sorted quota
+set atomically. Exhaustion or an immutable-maximum mismatch on any member
+leaves every member unchanged. Supplemental authorization is opaque caller
+input until an installed verifier returns a bound claim. The verifier binds the
+claim to the subject, request, destination, validity window, and authority
+state; callers cannot construct a quota claim directly.
+
+A governed operation that requires threshold approval uses a signed
+`chio.threshold-approval-proposal.v1` from the active policy authority. The
+proposal fixes the request, governed intent, subject, authorizing capability,
+policy hash, distinct eligible-key set digest, exact threshold, creation time,
+and deadline. Approval tokens count only once per distinct eligible public key
+and MUST fall inside the proposal window. The complete verified set sorts
+distinct token digests before applying the `chio.verified-approval-set.v1`
+domain-separated hash. Token order therefore cannot change the set hash or the
+decision.
+
+Unsupported negotiation denies these features instead of downgrading them.
+Portable binding vectors are maintained in
+`crates/core/chio-adversarial-suite/cases/authority_binding_mutation/` and are
+executed by
+`crates/tooling/chio-conformance/tests/protocol_primitives_authority_bindings.rs`.
+Durable quota, saga, broker, restart, HA, and receipt/store parity cases remain
+in the kernel integration suites so they exercise the production authority and
+not a parallel conformance model.
+
 ### 5.2 Governed Transaction Extensions
 
 Tool-call requests may attach two optional governed artifacts:
