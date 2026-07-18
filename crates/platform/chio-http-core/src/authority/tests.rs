@@ -8,6 +8,7 @@ use chio_core_types::capability::{
     scope::{ChioScope, Operation, ToolGrant},
     token::{CapabilityTokenAttenuationBody, CapabilityTokenBody},
 };
+use chio_core_types::crypto::sha256_hex;
 
 use chio_test_support::prelude::*;
 
@@ -243,10 +244,25 @@ fn builder_with_durable_stores_evaluates_without_persistence_deny(
     let revocation_store: Arc<dyn chio_kernel::RevocationStore> = Arc::new(
         chio_store_sqlite::SqliteRevocationStore::open(dir.path().join("revocations.db"))?,
     );
+    let authority_database = dir.path().join("authority.db");
+    let authority_locks = dir.path().join("authority-locks");
+    std::fs::create_dir(&authority_locks)?;
+    chio_store_sqlite::SqliteAuthorityStore::provision(&authority_database, &authority_locks)?;
+    let authority_store = chio_store_sqlite::SqliteAuthorityStore::open_serving(
+        &authority_database,
+        &authority_locks,
+    )?;
+    let admission_store = Arc::new(authority_store.admission_operation_store());
+    let outcome_store = Arc::new(authority_store.tool_outcome_store());
     let authority = HttpAuthority::builder()
         .receipt_store(receipt_store)
         .revocation_store(revocation_store)
-        .build(Keypair::generate(), "policy-hash".to_string())?;
+        .durable_admission_stores(
+            admission_store,
+            outcome_store,
+            authority_store.mutation_fence(),
+        )
+        .build(Keypair::generate(), sha256_hex(b"policy"))?;
 
     let query = HashMap::new();
     let result = authority.evaluate(safe_get_input(&query)).test_unwrap();

@@ -260,11 +260,18 @@ impl Guard for HttpProjectionGuard {
 /// revocation stores before the kernel is Arc-wrapped, and it is fallible
 /// because attaching a receipt store hydrates checkpoint counters and can fail.
 /// Both ephemeral opt-ins default to `false` (fail-closed).
+struct DurableAdmissionStores {
+    store: Arc<dyn chio_kernel::QualifiedAdmissionProjectionStore>,
+    outcome_store: Arc<dyn chio_kernel::tool_outcome::QualifiedToolOutcomeStore>,
+    fence: chio_kernel::admission_operation::StoreMutationFence,
+}
+
 #[derive(Default)]
 pub struct HttpAuthorityBuilder {
     approval_store: Option<Arc<dyn ApprovalStore>>,
     receipt_store: Option<Arc<dyn ReceiptStore>>,
     revocation_store: Option<Arc<dyn RevocationStore>>,
+    durable_admission: Option<DurableAdmissionStores>,
     trusted_capability_issuers: Vec<PublicKey>,
     allow_ephemeral_receipt_log: bool,
     allow_ephemeral_revocation_store: bool,
@@ -280,6 +287,21 @@ impl HttpAuthorityBuilder {
     #[must_use]
     pub fn revocation_store(mut self, store: Arc<dyn RevocationStore>) -> Self {
         self.revocation_store = Some(store);
+        self
+    }
+
+    #[must_use]
+    pub fn durable_admission_stores(
+        mut self,
+        store: Arc<dyn chio_kernel::QualifiedAdmissionProjectionStore>,
+        outcome_store: Arc<dyn chio_kernel::tool_outcome::QualifiedToolOutcomeStore>,
+        fence: chio_kernel::admission_operation::StoreMutationFence,
+    ) -> Self {
+        self.durable_admission = Some(DurableAdmissionStores {
+            store,
+            outcome_store,
+            fence,
+        });
         self
     }
 
@@ -338,6 +360,11 @@ impl HttpAuthorityBuilder {
         }
         if let Some(store) = self.revocation_store {
             kernel.set_revocation_store_handle(store);
+        }
+        if let Some(durable) = self.durable_admission {
+            kernel
+                .set_durable_admission_store(durable.store, durable.outcome_store, durable.fence)
+                .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))?;
         }
         kernel.register_tool_server(Box::new(HttpAuthorizationServer));
         kernel.add_guard(Box::new(HttpProjectionGuard));
