@@ -63,6 +63,7 @@ fn structured_metadata(event_id: &str, commit_index: u64) -> BudgetCommitMetadat
             chio_kernel::budget_store::BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
         budget_commit_index: Some(commit_index),
         event_id: Some(event_id.to_string()),
+        recorded_at_unix_seconds: Some(commit_index),
     }
 }
 

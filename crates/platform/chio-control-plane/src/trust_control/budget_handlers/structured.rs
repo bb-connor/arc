@@ -257,6 +257,7 @@ pub(crate) async fn handle_structured_budget_cumulative_operation(
                     metering_profile: store.budget_metering_profile(),
                     budget_commit_index: Some(event.event_seq),
                     event_id: Some(event.event_id),
+                    recorded_at_unix_seconds: u64::try_from(event.recorded_at).ok(),
                 }
                 .into(),
             ),

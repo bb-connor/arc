@@ -1100,6 +1100,7 @@ impl RemoteBudgetStore {
             metering_profile: self.budget_metering_profile(),
             budget_commit_index: response_budget_commit_index(authority, commit),
             event_id,
+            recorded_at_unix_seconds: None,
         }
     }
 }

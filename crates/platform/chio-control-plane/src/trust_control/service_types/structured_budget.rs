@@ -462,6 +462,8 @@ pub(crate) struct StructuredBudgetCommitMetadataView {
     pub(crate) budget_commit_index: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) event_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) recorded_at_unix_seconds: Option<u64>,
 }
 
 impl From<BudgetCommitMetadata> for StructuredBudgetCommitMetadataView {
@@ -473,6 +475,7 @@ impl From<BudgetCommitMetadata> for StructuredBudgetCommitMetadataView {
             metering_profile: value.metering_profile.as_str().to_string(),
             budget_commit_index: value.budget_commit_index,
             event_id: value.event_id,
+            recorded_at_unix_seconds: value.recorded_at_unix_seconds,
         }
     }
 }
@@ -496,6 +499,7 @@ impl TryFrom<StructuredBudgetCommitMetadataView> for BudgetCommitMetadata {
                 chio_kernel::budget_store::BudgetMeteringProfile::MaxCostPreauthorizeThenReconcileActual,
             budget_commit_index: value.budget_commit_index,
             event_id: value.event_id,
+            recorded_at_unix_seconds: value.recorded_at_unix_seconds,
         })
     }
 }
