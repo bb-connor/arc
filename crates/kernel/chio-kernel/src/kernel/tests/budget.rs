@@ -471,6 +471,67 @@ fn monetary_allow_receipt_contains_financial_metadata() {
 }
 
 #[test]
+fn nested_monetary_allow_uses_reported_cost() {
+    let mut kernel = make_kernel(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+    let session_id = kernel
+        .open_session("nested-parent-agent".to_string(), Vec::new())
+        .unwrap();
+    kernel.activate_session(&session_id).unwrap();
+    let parent_context = make_operation_context(
+        &session_id,
+        "req-nested-reported-cost-parent",
+        "nested-parent-agent",
+    );
+    kernel
+        .begin_session_request(&parent_context, OperationKind::ToolCall, true)
+        .unwrap();
+    let mut client = NoopNestedFlowClient;
+
+    let response = kernel
+        .evaluate_tool_call_with_nested_flow_client(
+            &parent_context,
+            &ToolCallRequest {
+                request_id: "req-nested-reported-cost".to_string(),
+                capability: cap.clone(),
+                tool_name: "compute".to_string(),
+                server_id: "cost-srv".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({}),
+                dpop_proof: None,
+                execution_nonce: None,
+                governed_intent: None,
+                approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
+            },
+            &mut client,
+            None,
+        )
+        .unwrap();
+
+    assert_eq!(response.verdict, Verdict::Allow);
+    let financial = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("financial"))
+        .expect("allow receipt should carry financial metadata");
+    assert_eq!(financial["cost_charged"].as_u64(), Some(75));
+    assert_eq!(financial["budget_remaining"].as_u64(), Some(925));
+
+    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    assert_eq!(usage.invocation_count, 1);
+    assert_eq!(usage.committed_cost_units().unwrap(), 75);
+}
+
+#[test]
 fn monetary_allow_records_budget_hold_and_append_only_events() {
     let mut kernel = make_kernel(make_monetary_config());
     let agent_kp = Keypair::generate();

@@ -224,20 +224,20 @@ pub(crate) fn dispatch_runtime_available() -> bool {
 /// On a current-thread runtime there is no spare worker to promote, and with no
 /// timer driver the timeout wrapper would panic, so the call runs inline: under
 /// the timeout when a timer is present, and directly otherwise.
-pub(crate) async fn dispatch_nested_call_within_budget<F>(
+pub(crate) async fn dispatch_nested_call_within_budget<F, T>(
     call: F,
     budget: std::time::Duration,
-) -> Result<ToolServerOutput, KernelError>
+) -> Result<T, KernelError>
 where
-    F: std::future::Future<Output = Result<ToolServerOutput, KernelError>>,
+    F: std::future::Future<Output = Result<T, KernelError>>,
 {
-    async fn bounded<F>(
+    async fn bounded<F, T>(
         call: F,
         budget: std::time::Duration,
         timer_available: bool,
-    ) -> Result<ToolServerOutput, KernelError>
+    ) -> Result<T, KernelError>
     where
-        F: std::future::Future<Output = Result<ToolServerOutput, KernelError>>,
+        F: std::future::Future<Output = Result<T, KernelError>>,
     {
         if timer_available {
             match tokio::time::timeout(budget, call).await {

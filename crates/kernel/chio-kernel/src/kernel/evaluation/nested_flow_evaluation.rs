@@ -860,6 +860,7 @@ impl ChioKernel {
         // the `&mut self` call must happen first. There is no await between here
         // and the invoke below, so the future cannot be dropped in this window.
         post_admission_drop_guard.mark_dispatch_started();
+        let has_monetary_charge = budget_mutation.charge_result().is_some();
         let dispatch_call = async {
             let mut bridge = SessionNestedFlowBridge {
                 sessions: &self.sessions,
@@ -881,7 +882,15 @@ impl ChioKernel {
                 )
                 .await
             {
-                Ok(Some(stream)) => Ok(ToolServerOutput::Stream(stream)),
+                Ok(Some(stream)) => Ok((ToolServerOutput::Stream(stream), None)),
+                Ok(None) if has_monetary_charge => server
+                    .invoke_with_cost(
+                        &request.tool_name,
+                        request.arguments.clone(),
+                        Some(&mut bridge),
+                    )
+                    .await
+                    .map(|(value, cost)| (ToolServerOutput::Value(value), cost)),
                 Ok(None) => server
                     .invoke(
                         &request.tool_name,
@@ -889,7 +898,7 @@ impl ChioKernel {
                         Some(&mut bridge),
                     )
                     .await
-                    .map(ToolServerOutput::Value),
+                    .map(|value| (ToolServerOutput::Value(value), None)),
                 Err(error) => Err(error),
             }
         };
@@ -928,7 +937,7 @@ impl ChioKernel {
         post_admission_drop_guard.record_buffered_child_receipts()?;
         post_admission_drop_guard.disarm();
         drop(post_admission_drop_guard);
-        let tool_output = match tool_output_result {
+        let (tool_output, reported_cost) = match tool_output_result {
             Ok(output) => output,
             Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
                 let metadata = self.ambiguous_dispatch_receipt_metadata(
@@ -1078,7 +1087,7 @@ impl ChioKernel {
                 DurableToolReturnInput {
                     request,
                     output: &tool_output,
-                    reported_cost: None,
+                    reported_cost: reported_cost.clone(),
                     matched_grant_index,
                     elapsed: tool_elapsed,
                     extra_receipt_metadata: runtime_admission_metadata.clone(),
@@ -1114,7 +1123,7 @@ impl ChioKernel {
                 matched_grant_index,
                 FinalizeToolOutputCostContext {
                     charge_result: budget_mutation.into_charge_result(),
-                    reported_cost: None,
+                    reported_cost,
                     payment_authorization,
                     cap,
                 },
