@@ -474,15 +474,36 @@ impl ChioKernel {
             }
         };
 
-        let pre_invocation_guard_evidence = match self
+        let mut pre_dispatch_drop_guard = PostAdmissionDropGuard::new(
+            self,
+            request,
+            cap,
+            Some(matched_grant_index),
+            &budget_mutation,
+            None,
+            PostAdmissionReceiptContext {
+                extra_metadata: None,
+                pre_invocation_guard_evidence: Vec::new(),
+                verified_payee_binding: verified_governed_payee_binding.clone(),
+            },
+            false,
+        )
+        .with_durable_operation(
+            durable_admission
+                .as_ref()
+                .map(DurableToolAdmission::operation),
+        );
+        let guard_result = self
             .run_guards_within_budget(
                 request,
                 &cap.scope,
                 Some(session_roots.as_slice()),
                 Some(matched_grant_index),
             )
-            .await
-        {
+            .await;
+        pre_dispatch_drop_guard.disarm();
+        drop(pre_dispatch_drop_guard);
+        let pre_invocation_guard_evidence = match guard_result {
             Ok(evidence) => evidence,
             Err(e) => {
                 let msg = e.error.to_string();

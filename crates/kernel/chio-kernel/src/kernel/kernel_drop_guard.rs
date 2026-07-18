@@ -2,6 +2,7 @@ use chio_core::receipt::metadata::GuardEvidence;
 use chio_log_redact::redacted;
 use tracing::warn;
 
+use crate::admission_operation::AdmissionOperationV1;
 use crate::{CapabilityToken, ChildRequestReceipt, PaymentAuthorization, ToolCallRequest};
 
 use super::{
@@ -78,6 +79,7 @@ pub(crate) struct PostAdmissionDropGuard<'a> {
     /// overlapping evaluation that still holds it keeps its share protected.
     /// Gates the step-4 child-budget release in `handle_pre_dispatch_drop`.
     budget_lease_acquired: bool,
+    durable_operation: Option<&'a AdmissionOperationV1>,
     armed: bool,
     dispatch_started: bool,
 }
@@ -104,9 +106,18 @@ impl<'a> PostAdmissionDropGuard<'a> {
             receipt_context,
             child_receipts: Vec::new(),
             budget_lease_acquired,
+            durable_operation: None,
             armed: true,
             dispatch_started: false,
         }
+    }
+
+    pub(crate) fn with_durable_operation(
+        mut self,
+        operation: Option<&'a AdmissionOperationV1>,
+    ) -> Self {
+        self.durable_operation = operation;
+        self
     }
 
     /// Borrow the buffered child-receipt sink so the nested-flow bridge can push
@@ -155,36 +166,37 @@ impl<'a> PostAdmissionDropGuard<'a> {
     /// each step is attempted independently and failures are collected.
     fn handle_pre_dispatch_drop(&self) {
         let mut faults: Vec<PreDispatchCleanupFault> = Vec::new();
+        let mut budget_reverse = None;
 
         // 1. Monetary hold reversal (budget charge + payment release/refund).
         if self.budget_mutation.charge_result().is_some() {
-            if let Err(error) = self.kernel.unwind_pre_dispatch_monetary_invocation(
+            match self.kernel.unwind_pre_dispatch_monetary_invocation(
                 self.request,
                 self.cap,
                 self.budget_mutation.charge_result(),
                 self.payment_authorization,
             ) {
-                let reason = redacted!(&error).to_string();
-                warn!(
-                    request_id = %self.request.request_id,
-                    reason = %redacted!(&error),
-                    "failed to unwind dropped pre-dispatch monetary invocation"
-                );
-                // Name the budget hold (and payment authorization, if any) the
-                // failed reversal was unwinding so an operator can locate the
-                // possibly-stuck monetary hold from the fault entry alone.
-                let mut hold_ids = Vec::new();
-                if let Some(charge) = self.budget_mutation.charge_result() {
-                    hold_ids.push(charge.budget_hold_id.clone());
+                Ok(reverse) => budget_reverse = reverse,
+                Err(error) => {
+                    let reason = redacted!(&error).to_string();
+                    warn!(
+                        request_id = %self.request.request_id,
+                        reason = %redacted!(&error),
+                        "failed to unwind dropped pre-dispatch monetary invocation"
+                    );
+                    let mut hold_ids = Vec::new();
+                    if let Some(charge) = self.budget_mutation.charge_result() {
+                        hold_ids.push(charge.budget_hold_id.clone());
+                    }
+                    if let Some(authorization) = self.payment_authorization {
+                        hold_ids.push(authorization.authorization_id.clone());
+                    }
+                    faults.push(PreDispatchCleanupFault {
+                        step: "monetary_unwind",
+                        reason,
+                        hold_ids,
+                    });
                 }
-                if let Some(authorization) = self.payment_authorization {
-                    hold_ids.push(authorization.authorization_id.clone());
-                }
-                faults.push(PreDispatchCleanupFault {
-                    step: "monetary_unwind",
-                    reason,
-                    hold_ids,
-                });
             }
         }
 
@@ -199,26 +211,27 @@ impl<'a> PostAdmissionDropGuard<'a> {
             PreExecutionBudgetMutation::Invocation { .. }
                 | PreExecutionBudgetMutation::InvocationHold(_)
         ) {
-            if let Err(error) = self
+            match self
                 .kernel
                 .reverse_pre_execution_budget_mutation(self.cap, self.budget_mutation)
             {
-                let reason = redacted!(&error).to_string();
-                warn!(
-                    request_id = %self.request.request_id,
-                    reason = %redacted!(&error),
-                    "failed to reverse dropped pre-dispatch invocation budget"
-                );
-                faults.push(PreDispatchCleanupFault {
-                    step: "invocation_reversal",
-                    reason,
-                    // The invocation slot is keyed by the capability id; name it
-                    // so the stuck slot is locatable from the fault entry.
-                    hold_ids: self.budget_mutation.durable_hold_result().map_or_else(
-                        || vec![self.cap.id.clone()],
-                        |hold| vec![hold.budget_hold_id.clone()],
-                    ),
-                });
+                Ok(reverse) => budget_reverse = reverse,
+                Err(error) => {
+                    let reason = redacted!(&error).to_string();
+                    warn!(
+                        request_id = %self.request.request_id,
+                        reason = %redacted!(&error),
+                        "failed to reverse dropped pre-dispatch invocation budget"
+                    );
+                    faults.push(PreDispatchCleanupFault {
+                        step: "invocation_reversal",
+                        reason,
+                        hold_ids: self.budget_mutation.durable_hold_result().map_or_else(
+                            || vec![self.cap.id.clone()],
+                            |hold| vec![hold.budget_hold_id.clone()],
+                        ),
+                    });
+                }
             }
         }
 
@@ -277,6 +290,31 @@ impl<'a> PostAdmissionDropGuard<'a> {
                     reason,
                     hold_ids,
                 });
+            }
+        }
+
+        if faults.is_empty() {
+            if let Some(operation) = self.durable_operation {
+                if let Err(error) = self
+                    .kernel
+                    .compensate_durable_admission_after_pre_dispatch_cleanup(
+                        Some(operation),
+                        budget_reverse.as_ref(),
+                        self.payment_authorization,
+                    )
+                {
+                    let reason = redacted!(&error).to_string();
+                    warn!(
+                        request_id = %self.request.request_id,
+                        reason = %redacted!(&error),
+                        "failed to terminalize dropped pre-dispatch admission"
+                    );
+                    faults.push(PreDispatchCleanupFault {
+                        step: "durable_admission_compensation",
+                        reason,
+                        hold_ids: vec![operation.binding().operation_id().as_str().to_owned()],
+                    });
+                }
             }
         }
 

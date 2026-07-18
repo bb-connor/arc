@@ -1450,6 +1450,50 @@ fn durable_admission_fixture_with_grants(
     (kernel, request, store, invocations)
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn dropped_durable_guard_evaluation_terminalizes_before_dispatch() {
+    struct ParkingGuard {
+        started: std::sync::Arc<tokio::sync::Notify>,
+    }
+
+    impl Guard for ParkingGuard {
+        fn name(&self) -> &str {
+            "durable-parking-guard"
+        }
+
+        fn evaluate(&self, _context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
+            self.started.notify_one();
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            Ok(GuardDecision::allow())
+        }
+    }
+
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("durable-dropped-guard-evaluation");
+    kernel.config.deadlines.always_offload_guards = true;
+    let started = std::sync::Arc::new(tokio::sync::Notify::new());
+    kernel.add_guard(Box::new(ParkingGuard {
+        started: started.clone(),
+    }));
+    let kernel = std::sync::Arc::new(kernel);
+    let evaluation = {
+        let kernel = kernel.clone();
+        tokio::spawn(async move { kernel.evaluate_tool_call(&request).await })
+    };
+
+    tokio::time::timeout(std::time::Duration::from_secs(5), started.notified())
+        .await
+        .expect("guard evaluation started");
+    evaluation.abort();
+    assert!(evaluation.await.is_err());
+
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::CompensatedBeforeDispatch
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+}
+
 #[test]
 fn durable_pre_dispatch_denial_commits_terminal_compensation() {
     struct DenyAll;

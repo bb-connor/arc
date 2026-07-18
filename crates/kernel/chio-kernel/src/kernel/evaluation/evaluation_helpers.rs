@@ -27,7 +27,7 @@ struct CleanupReleaseOutcome {
 }
 
 impl ChioKernel {
-    pub(super) fn compensate_durable_admission_after_pre_dispatch_cleanup(
+    pub(crate) fn compensate_durable_admission_after_pre_dispatch_cleanup(
         &self,
         operation: Option<&AdmissionOperationV1>,
         reverse: Option<&BudgetReverseHoldDecision>,
