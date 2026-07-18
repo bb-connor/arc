@@ -95,6 +95,8 @@ pub struct LoadedPolicy {
     pub post_invocation_pipeline: PostInvocationPipeline,
     pub issuance_policy: Option<ReputationIssuancePolicy>,
     pub runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
+    pub threshold_approval:
+        Option<chio_core::capability::threshold_approval::ThresholdApprovalRequirement>,
 }
 
 impl LoadedPolicy {

@@ -133,6 +133,19 @@ pub fn compile_policy_with_approver_directory(
     )
 }
 
+pub fn compile_policy_with_source_and_approver_directory(
+    policy: &HushSpec,
+    source_path: Option<&Path>,
+    directory: &dyn ApproverDirectory,
+) -> Result<CompiledPolicy, CompileError> {
+    compile_policy_with_options(
+        policy,
+        source_path,
+        &MemoryBudgetConfig::defaults(),
+        Some(directory),
+    )
+}
+
 fn compile_policy_with_options(
     policy: &HushSpec,
     source_path: Option<&Path>,

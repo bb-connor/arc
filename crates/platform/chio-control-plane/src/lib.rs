@@ -1,6 +1,7 @@
 #![allow(clippy::result_large_err, clippy::too_many_arguments)]
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 
 pub use chio_agent_web_interop as agent_web;
 use chio_core::crypto::Keypair;
@@ -42,6 +43,26 @@ pub use chio_transaction_passport as transaction_passport;
 pub mod transaction_passport_risk;
 pub mod trust_control;
 pub use chio_trust_market_context as trust_market;
+
+struct LoadedThresholdApprovalResolver(
+    chio_core::capability::threshold_approval::ThresholdApprovalRequirement,
+);
+
+impl chio_kernel::threshold_approval::ThresholdApprovalRequirementResolver
+    for LoadedThresholdApprovalResolver
+{
+    fn resolve_requirement(
+        &self,
+        policy_hash: &str,
+        _server_id: &str,
+        _tool_name: &str,
+    ) -> Result<
+        Option<chio_core::capability::threshold_approval::ThresholdApprovalRequirement>,
+        String,
+    > {
+        Ok((self.0.policy_hash == policy_hash).then(|| self.0.clone()))
+    }
+}
 
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize,
@@ -350,6 +371,7 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
         guard_pipeline,
         post_invocation_pipeline,
         runtime_assurance_policy,
+        threshold_approval,
         ..
     } = loaded_policy;
 
@@ -417,6 +439,12 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
         runtime_assurance_policy.and_then(|policy| policy.attestation_trust_policy)
     {
         kernel.set_attestation_trust_policy(attestation_trust_policy);
+    }
+
+    if let Some(requirement) = threshold_approval {
+        kernel.set_threshold_approval_requirement_resolver(Arc::new(
+            LoadedThresholdApprovalResolver(requirement),
+        ));
     }
 
     kernel
@@ -969,6 +997,7 @@ mod tests {
             },
             issuance_policy: None,
             runtime_assurance_policy: None,
+            threshold_approval: None,
         };
 
         let kernel = build_kernel(loaded_policy, &keypair);
@@ -990,6 +1019,7 @@ mod tests {
             post_invocation_pipeline: PostInvocationPipeline::new(),
             issuance_policy: None,
             runtime_assurance_policy: None,
+            threshold_approval: None,
         };
 
         let kernel = build_kernel(loaded_policy, &keypair);

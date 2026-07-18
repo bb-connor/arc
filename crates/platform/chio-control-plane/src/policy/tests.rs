@@ -1291,6 +1291,59 @@ fn load_hushspec_policy_materializes_runtime_state() {
 }
 
 #[test]
+fn load_hushspec_materializes_threshold_approval_against_runtime_policy_hash() {
+    let approver_a = chio_core::Keypair::generate().public_key().to_hex();
+    let approver_b = chio_core::Keypair::generate().public_key().to_hex();
+    let policy_dir = std::env::temp_dir().join(format!(
+        "chio-threshold-policy-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .test_unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&policy_dir).test_unwrap();
+    let policy_path = policy_dir.join("policy.yaml");
+    std::fs::write(
+        &policy_path,
+        format!(
+            r#"
+hushspec: "0.1.0"
+name: threshold-runtime
+rules:
+  tool_access:
+    enabled: true
+    allow: ["payments.charge"]
+extensions:
+  chio:
+    human_in_loop:
+      approvers:
+        n: 2
+        of: ["{approver_a}", "{approver_b}"]
+        timeout_seconds: 600
+"#
+        ),
+    )
+    .test_unwrap();
+
+    let loaded = load_policy(&policy_path).test_unwrap();
+    let requirement = loaded
+        .threshold_approval
+        .as_ref()
+        .test_expect("threshold requirement");
+    assert_eq!(requirement.policy_hash, loaded.identity.runtime_hash);
+    assert_eq!(requirement.threshold, 2);
+    assert_eq!(requirement.timeout_seconds, 600);
+    assert_eq!(
+        requirement.directory_version,
+        "self-authenticating-public-key-v1"
+    );
+    requirement.validate().test_unwrap();
+
+    std::fs::remove_dir_all(policy_dir).test_unwrap();
+}
+
+#[test]
 fn load_hushspec_policy_identity_tracks_threat_intel_pattern_db_bytes() {
     let policy_dir = std::env::temp_dir().join(format!(
         "chio-hushspec-asset-{}-{}",

@@ -21,6 +21,7 @@
                 .unwrap(),
             issuance_policy: None,
             runtime_assurance_policy: None,
+            threshold_approval: None,
         }
     }
 
