@@ -20,6 +20,8 @@ use super::runtime_attestation::{RuntimeAssuranceTier, RuntimeAttestationEvidenc
 use super::scope::MonetaryAmount;
 
 const GOVERNED_APPROVAL_TOKEN_DIGEST_DOMAIN: &[u8] = b"chio.governed-approval-token.v1\0";
+pub const THRESHOLD_APPROVAL_PROPOSAL_SCHEMA: &str = "chio.threshold-approval-proposal.v1";
+
 const THRESHOLD_APPROVAL_PROPOSAL_DIGEST_DOMAIN: &[u8] = b"chio.threshold-approval-proposal.v1\0";
 const VERIFIED_APPROVAL_SET_DIGEST_DOMAIN: &[u8] = b"chio.verified-approval-set.v1\0";
 const GOVERNED_RESPONSE_PLAN_BODY_DIGEST_DOMAIN: &[u8] = b"chio:response-plan:v1\0";
@@ -1148,6 +1150,7 @@ impl GovernedApprovalToken {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ThresholdApprovalProposalBody {
+    pub schema: String,
     pub proposal_id: String,
     pub request_id: String,
     pub governed_intent_hash: String,
@@ -1177,6 +1180,11 @@ impl ThresholdApprovalProposalBody {
     }
 
     pub fn validate(&self) -> Result<()> {
+        if self.schema != THRESHOLD_APPROVAL_PROPOSAL_SCHEMA {
+            return Err(Error::CanonicalJson(
+                "threshold approval proposal schema is unsupported".into(),
+            ));
+        }
         if self.proposal_id.is_empty()
             || self.proposal_id.trim() != self.proposal_id
             || self.request_id.is_empty()

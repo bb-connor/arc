@@ -34,6 +34,7 @@ const DIRECT_KEY_DOMAIN: &[u8] = b"chio.cumulative-approval-direct-key.v1\0";
 #[serde(deny_unknown_fields)]
 pub struct CumulativeApprovalRootBindingBody {
     pub schema: String,
+    pub signer_key_epoch: u64,
     pub root_capability_id: String,
     pub root_capability_hash: String,
     pub root_issuer: PublicKey,
@@ -87,6 +88,7 @@ pub struct VerifiedCumulativeApprovalConstraint {
 #[derive(Serialize)]
 #[serde(deny_unknown_fields)]
 struct CumulativeApprovalRootCommitment {
+    signer_key_epoch: u64,
     root_capability_id: String,
     root_issuer: PublicKey,
     root_subject: PublicKey,
@@ -262,25 +264,31 @@ pub(crate) fn cumulative_approval_delegation_marker(
     Ok(Some(marker))
 }
 
-pub(crate) fn bind_family_roots(body: &mut CapabilityTokenBody, keypair: &Keypair) -> Result<()> {
+pub(crate) fn bind_family_roots(
+    body: &mut CapabilityTokenBody,
+    signer_key_epoch: u64,
+    keypair: &Keypair,
+) -> Result<()> {
     ensure_keypair_matches_embedded_key(&body.issuer, keypair, "capability token", "issuer")?;
-    bind_family_roots_with(body, |binding_body| {
+    bind_family_roots_with(body, signer_key_epoch, |binding_body| {
         CumulativeApprovalRootBinding::sign(binding_body, keypair)
     })
 }
 
 pub(crate) fn bind_family_roots_with_backend(
     body: &mut CapabilityTokenBody,
+    signer_key_epoch: u64,
     backend: &dyn SigningBackend,
 ) -> Result<()> {
     ensure_backend_matches_embedded_key(&body.issuer, backend, "capability token", "issuer")?;
-    bind_family_roots_with(body, |binding_body| {
+    bind_family_roots_with(body, signer_key_epoch, |binding_body| {
         CumulativeApprovalRootBinding::sign_with_backend(binding_body, backend)
     })
 }
 
 fn bind_family_roots_with(
     body: &mut CapabilityTokenBody,
+    signer_key_epoch: u64,
     mut sign: impl FnMut(CumulativeApprovalRootBindingBody) -> Result<CumulativeApprovalRootBinding>,
 ) -> Result<()> {
     if !body.delegation_chain.is_empty() {
@@ -336,6 +344,7 @@ fn bind_family_roots_with(
             &threshold,
             &approval_budget_id,
             approval_budget_epoch,
+            signer_key_epoch,
         )?;
         let binding = sign(binding_body)?;
         body.scope.grants[grant_index].constraints[constraint_index]
@@ -649,6 +658,7 @@ fn verify_binding_matches_root(
         threshold,
         approval_budget_id,
         approval_budget_epoch,
+        binding.body.signer_key_epoch,
     )?;
     let body = &binding.body;
     if body.root_capability_id != root.id
@@ -675,9 +685,11 @@ fn root_binding_body(
     threshold: &MonetaryAmount,
     approval_budget_id: &str,
     approval_budget_epoch: u64,
+    signer_key_epoch: u64,
 ) -> Result<CumulativeApprovalRootBindingBody> {
     Ok(CumulativeApprovalRootBindingBody {
         schema: CUMULATIVE_APPROVAL_ROOT_SCHEMA.to_string(),
+        signer_key_epoch,
         root_capability_id: body.id.clone(),
         root_capability_hash: root_commitment_hash_from_body(
             body,
@@ -685,6 +697,7 @@ fn root_binding_body(
             threshold,
             approval_budget_id,
             approval_budget_epoch,
+            signer_key_epoch,
         )?,
         root_issuer: body.issuer.clone(),
         root_subject: body.subject.clone(),
@@ -703,6 +716,7 @@ fn root_commitment_hash(
     threshold: &MonetaryAmount,
     approval_budget_id: &str,
     approval_budget_epoch: u64,
+    signer_key_epoch: u64,
 ) -> Result<String> {
     root_commitment_hash_parts(
         &token.id,
@@ -715,6 +729,7 @@ fn root_commitment_hash(
         threshold,
         approval_budget_id,
         approval_budget_epoch,
+        signer_key_epoch,
     )
 }
 
@@ -724,6 +739,7 @@ fn root_commitment_hash_from_body(
     threshold: &MonetaryAmount,
     approval_budget_id: &str,
     approval_budget_epoch: u64,
+    signer_key_epoch: u64,
 ) -> Result<String> {
     root_commitment_hash_parts(
         &body.id,
@@ -736,6 +752,7 @@ fn root_commitment_hash_from_body(
         threshold,
         approval_budget_id,
         approval_budget_epoch,
+        signer_key_epoch,
     )
 }
 
@@ -751,10 +768,12 @@ fn root_commitment_hash_parts(
     threshold: &MonetaryAmount,
     approval_budget_id: &str,
     approval_budget_epoch: u64,
+    signer_key_epoch: u64,
 ) -> Result<String> {
     domain_hash(
         ROOT_COMMITMENT_DOMAIN,
         &CumulativeApprovalRootCommitment {
+            signer_key_epoch,
             root_capability_id: id.to_string(),
             root_issuer: issuer.clone(),
             root_subject: subject.clone(),

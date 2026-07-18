@@ -1086,6 +1086,7 @@ fn threshold_approval_proposal_and_set_bind_complete_artifacts() {
         ThresholdApprovalProposalBody::proposal_deadline(1_000, 900, 1_500, Some(1_800)).unwrap();
     let proposal = ThresholdApprovalProposal::sign(
         ThresholdApprovalProposalBody {
+            schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
             proposal_id: "proposal-1".to_string(),
             request_id: "request-1".to_string(),
             governed_intent_hash: sha256_hex(b"intent"),

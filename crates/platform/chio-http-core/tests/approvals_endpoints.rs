@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use chio_core_types::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-    ThresholdApprovalProposal, ThresholdApprovalProposalBody,
+    ThresholdApprovalProposal, ThresholdApprovalProposalBody, THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
 };
 use chio_core_types::capability::threshold_approval::{
     ThresholdApprovalRequirement, ThresholdApproverIdentity,
@@ -370,6 +370,7 @@ fn threshold_handlers_collect_and_deliver_original_tokens() {
     .unwrap();
     let proposal = ThresholdApprovalProposal::sign(
         ThresholdApprovalProposalBody {
+            schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
             proposal_id: "http-proposal".to_string(),
             request_id: "http-request".to_string(),
             governed_intent_hash: sha256_hex(b"http-intent"),

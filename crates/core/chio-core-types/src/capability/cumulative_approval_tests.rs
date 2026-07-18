@@ -574,6 +574,26 @@ fn cumulative_approval_backend_root_round_trip() -> TestResult {
 }
 
 #[test]
+fn cumulative_approval_root_binds_signer_key_epoch() -> TestResult {
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let root = CapabilityToken::sign_cumulative_approval_family_root_at_epoch(
+        token_body(
+            "cap-key-epoch",
+            &issuer.public_key(),
+            &subject.public_key(),
+            tool_scope(true, Some(100)),
+        ),
+        7,
+        &issuer,
+    )?;
+
+    assert_eq!(binding(&root)?.body.signer_key_epoch, 7);
+    assert!(root.verify_signature()?);
+    Ok(())
+}
+
+#[test]
 fn cumulative_approval_rejects_every_root_binding_field_mutation() -> TestResult {
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
@@ -582,6 +602,9 @@ fn cumulative_approval_rejects_every_root_binding_field_mutation() -> TestResult
 
     assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
         body.schema = "chio.cumulative-approval-root.invalid".to_string();
+    })?);
+    assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
+        body.signer_key_epoch += 1;
     })?);
     assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
         body.root_capability_id.push_str("-changed");

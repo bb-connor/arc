@@ -33,6 +33,7 @@ use chio_core::capability::governance::{
     GovernedResponseEffect, GovernedResponsePlanIntentBody, GovernedTransactionIntentBody,
     ThresholdApprovalProposal, ThresholdApprovalProposalBody, ACTIVE_RESPONSE_PLAN_TOOL_NAME,
     ACTIVE_RESPONSE_SERVER_ID, GOVERNED_RESPONSE_PLAN_SCHEMA,
+    THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
 };
 use chio_core::capability::threshold_approval::{
     ThresholdApprovalRequirement, ThresholdApproverIdentity,
@@ -120,6 +121,7 @@ impl ActiveResponseFixture<'_> {
         .unwrap();
         let proposal = ThresholdApprovalProposal::sign(
             ThresholdApprovalProposalBody {
+                schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
                 proposal_id: format!("proposal-{request_id}"),
                 request_id: request_id.to_owned(),
                 governed_intent_hash: governed_intent_hash.clone(),
@@ -271,6 +273,7 @@ fn threshold_approval_set_is_policy_bound_and_order_independent() {
     .unwrap();
     let proposal = ThresholdApprovalProposal::sign(
         ThresholdApprovalProposalBody {
+            schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
             proposal_id: "proposal-threshold-1".to_string(),
             request_id: "request-threshold-1".to_string(),
             governed_intent_hash: intent_hash.clone(),

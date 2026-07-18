@@ -4,7 +4,11 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use crate::capability::{features::CHIO_CAPABILITIES_SCHEMA, token::CHIO_CAPABILITY_SCHEMA};
+use crate::capability::{
+    aggregate_invocation::AGGREGATE_BUDGET_ROOT_SCHEMA,
+    cumulative_approval::CUMULATIVE_APPROVAL_ROOT_SCHEMA, features::CHIO_CAPABILITIES_SCHEMA,
+    governance::THRESHOLD_APPROVAL_PROPOSAL_SCHEMA, token::CHIO_CAPABILITY_SCHEMA,
+};
 use crate::economic_continuity::{
     CHIO_ECONOMIC_EFFECT_DISPATCH_COMMIT_SCHEMA, CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
     CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA, CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
@@ -239,6 +243,10 @@ type SignedArtifactSchemaSpec = (&'static str, Option<(&'static str, &'static st
 
 const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
+        AGGREGATE_BUDGET_ROOT_SCHEMA,
+        Some(("aggregate_budget_root_binding", "protocol-primitives-v1")),
+    ),
+    (
         CHIO_CAPABILITIES_SCHEMA,
         Some((
             "capability_negotiation",
@@ -248,6 +256,14 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     (
         CHIO_CAPABILITY_SCHEMA,
         Some(("capability_token", "schema-registry/v1/capability-token-v1")),
+    ),
+    (
+        CUMULATIVE_APPROVAL_ROOT_SCHEMA,
+        Some(("cumulative_approval_root_binding", "protocol-primitives-v1")),
+    ),
+    (
+        THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+        Some(("threshold_approval_proposal", "protocol-primitives-v1")),
     ),
     (
         CHIO_RECEIPT_SCHEMA,

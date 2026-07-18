@@ -534,6 +534,8 @@ mod tests {
     fn proposal(fixture: &Fixture, proposal_id: &str) -> ThresholdApprovalProposal {
         ThresholdApprovalProposal::sign(
             ThresholdApprovalProposalBody {
+                schema: chio_core::capability::governance::THRESHOLD_APPROVAL_PROPOSAL_SCHEMA
+                    .to_string(),
                 proposal_id: proposal_id.to_string(),
                 request_id: "request-1".to_string(),
                 governed_intent_hash: sha256_hex(b"intent"),

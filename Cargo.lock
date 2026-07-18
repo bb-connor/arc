@@ -3157,6 +3157,7 @@ dependencies = [
  "percent-encoding",
  "proptest",
  "rand_core 0.6.4",
+ "regress",
  "ryu",
  "serde",
  "serde_json",

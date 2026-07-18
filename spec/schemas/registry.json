@@ -23,6 +23,12 @@
       "schemaFile": "spec/schemas/chio-web3/v1/anchor-proof-bundle.schema.json"
     },
     {
+      "schema": "chio.aggregate-budget-root.v1",
+      "artifactKind": "aggregate_budget_root_binding",
+      "introducedBy": "protocol-primitives-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/capability/aggregate-budget-root.schema.json"
+    },
+    {
       "schema": "chio.attest.buyer-attestation-explanation.v1",
       "artifactKind": "chio_attest_buyer_attestation_explanation",
       "introducedBy": "chio-final-architecture/v1",
@@ -106,6 +112,12 @@
       "artifactKind": "capability_token",
       "introducedBy": "schema-registry/v1/capability-token-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/capability/token.schema.json"
+    },
+    {
+      "schema": "chio.cumulative-approval-root.v1",
+      "artifactKind": "cumulative_approval_root_binding",
+      "introducedBy": "protocol-primitives-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/capability/cumulative-approval-root.schema.json"
     },
     {
       "schema": "chio.federation.authority-profile.v1",
@@ -1276,6 +1288,12 @@
       "artifactKind": "swarm_task_graph",
       "introducedBy": "swarm-authority-v1",
       "schemaFile": "spec/schemas/chio-swarm/v1/task-graph.schema.json"
+    },
+    {
+      "schema": "chio.threshold-approval-proposal.v1",
+      "artifactKind": "threshold_approval_proposal",
+      "introducedBy": "protocol-primitives-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/capability/threshold-approval-proposal.schema.json"
     },
     {
       "schema": "chio.swarm.continuation-token.v1",

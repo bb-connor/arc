@@ -2,6 +2,7 @@ use super::*;
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
     ThresholdApprovalProposal, ThresholdApprovalProposalBody, VerifiedApprovalSetBody,
+    THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
 };
 use chio_kernel::ThresholdApprovalReplayReservationV1;
 
@@ -17,6 +18,7 @@ fn replay_reservation(
     let deadline = created_at + 300;
     let proposal = ThresholdApprovalProposal::sign(
         ThresholdApprovalProposalBody {
+            schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
             proposal_id: proposal_id.to_owned(),
             request_id: request_id.to_owned(),
             governed_intent_hash: sha256_hex(b"threshold-intent"),

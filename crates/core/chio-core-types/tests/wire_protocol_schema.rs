@@ -75,7 +75,108 @@ fn assert_schema_rejects(relative_path: &str, instance: &Value) {
     );
 }
 
+#[test]
+fn protocol_primitives_shared_fixtures_match_authoritative_schemas() {
+    let corpus_path = repo_root().join("tests/bindings/fixtures/protocol-primitives-v1.json");
+    let corpus: Value = serde_json::from_str(
+        &fs::read_to_string(corpus_path).expect("protocol-primitives fixture corpus exists"),
+    )
+    .expect("protocol-primitives fixture corpus parses");
+    let cases = corpus["cases"]
+        .as_array()
+        .expect("fixture cases are an array");
+
+    for case in cases {
+        let schema_file = case["schema_file"]
+            .as_str()
+            .expect("fixture schema_file is a string");
+        let instance = &case["instance"];
+        if case["valid"].as_bool().expect("fixture valid is a boolean") {
+            assert_schema_accepts(schema_file, instance);
+        } else {
+            assert_schema_rejects(schema_file, instance);
+        }
+    }
+}
+
+#[test]
+fn protocol_primitives_schema_conditions_fail_closed() {
+    let corpus_path = repo_root().join("tests/bindings/fixtures/protocol-primitives-v1.json");
+    let corpus: Value = serde_json::from_str(
+        &fs::read_to_string(corpus_path).expect("protocol-primitives fixture corpus exists"),
+    )
+    .expect("protocol-primitives fixture corpus parses");
+    let cases = corpus["cases"]
+        .as_array()
+        .expect("fixture cases are an array");
+    let fixture = |name: &str| {
+        cases
+            .iter()
+            .find(|case| case["name"] == name)
+            .unwrap_or_else(|| panic!("fixture `{name}` exists"))["instance"]
+            .clone()
+    };
+
+    assert_schema_rejects(
+        "capability/aggregate-invocation-budget.schema.json",
+        &json!({
+            "scope": "delegation_family",
+            "max_invocations": 3
+        }),
+    );
+    assert_schema_rejects(
+        "capability/aggregate-invocation-budget.schema.json",
+        &json!({
+            "scope": "capability",
+            "max_invocations": 3,
+            "root_binding": {}
+        }),
+    );
+
+    let mut direct = fixture("capability-with-direct-cumulative-approval");
+    direct["scope"]["grants"][0]["constraints"][0]["value"]["cumulative_approval_root_binding"] =
+        json!({});
+    assert_schema_rejects("capability/token.schema.json", &direct);
+
+    let mut delegable = fixture("capability-with-direct-cumulative-approval");
+    delegable["scope"]["grants"][0]["operations"] = json!(["invoke", "delegate"]);
+    assert_schema_rejects("capability/token.schema.json", &delegable);
+
+    let approval = fixture("governed-approval-token");
+    let request = json!({
+        "type": "tool_call_request",
+        "id": "request-1",
+        "capability_token": fixture("capability-with-aggregate-budget"),
+        "server_id": "server-1",
+        "tool": "tool-1",
+        "params": {},
+        "threshold_approval_proposal": fixture("threshold-proposal"),
+        "approval_tokens": vec![approval; 33]
+    });
+    assert_schema_rejects("agent/tool_call_request.schema.json", &request);
+}
+
 fn validator_for_schema(schema_path: &std::path::Path, schema: &Value) -> jsonschema::Validator {
+    fn add_schema_resources(directory: &std::path::Path, resources: &mut Vec<(String, Value)>) {
+        for entry in fs::read_dir(directory).expect("schema directory is readable") {
+            let path = entry.expect("schema directory entry is readable").path();
+            if path.is_dir() {
+                add_schema_resources(&path, resources);
+            } else if path
+                .extension()
+                .is_some_and(|extension| extension == "json")
+            {
+                let value: Value = serde_json::from_str(
+                    &fs::read_to_string(&path).expect("schema resource is readable"),
+                )
+                .expect("schema resource parses");
+                if let Some(id) = value["$id"].as_str() {
+                    resources.push((id.to_string(), value));
+                }
+            }
+        }
+    }
+
     let base_uri = schema_path
         .parent()
         .and_then(|parent| parent.canonicalize().ok())
@@ -90,7 +191,17 @@ fn validator_for_schema(schema_path: &std::path::Path, schema: &Value) -> jsonsc
             format!("file://{path}")
         })
         .expect("schema parent canonicalizes");
+    let mut resources = Vec::new();
+    add_schema_resources(&schema_root(), &mut resources);
+    let mut registry = jsonschema::Registry::new();
+    for (uri, resource) in &resources {
+        registry = registry
+            .add(uri.as_str(), resource)
+            .expect("schema resource registers");
+    }
+    let registry = registry.prepare().expect("schema registry prepares");
     jsonschema::options()
+        .with_registry(&registry)
         .with_base_uri(base_uri)
         .build(schema)
         .expect("schema compiles")

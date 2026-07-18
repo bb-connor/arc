@@ -540,10 +540,19 @@ impl CapabilityToken {
 
     /// Issue a direct cumulative-approval family root with CA-authenticated bindings.
     pub fn sign_cumulative_approval_family_root(
-        mut body: CapabilityTokenBody,
+        body: CapabilityTokenBody,
         keypair: &Keypair,
     ) -> Result<Self> {
-        bind_family_roots(&mut body, keypair)?;
+        Self::sign_cumulative_approval_family_root_at_epoch(body, 0, keypair)
+    }
+
+    /// Issue a direct cumulative-approval family root at a named signer key epoch.
+    pub fn sign_cumulative_approval_family_root_at_epoch(
+        mut body: CapabilityTokenBody,
+        signer_key_epoch: u64,
+        keypair: &Keypair,
+    ) -> Result<Self> {
+        bind_family_roots(&mut body, signer_key_epoch, keypair)?;
         Self::sign(body, keypair)
     }
 
@@ -727,10 +736,19 @@ impl CapabilityToken {
 
     /// Backend-agnostic cumulative-approval family-root issuance.
     pub fn sign_cumulative_approval_family_root_with_backend(
-        mut body: CapabilityTokenBody,
+        body: CapabilityTokenBody,
         backend: &dyn SigningBackend,
     ) -> Result<Self> {
-        bind_family_roots_with_backend(&mut body, backend)?;
+        Self::sign_cumulative_approval_family_root_with_backend_at_epoch(body, 0, backend)
+    }
+
+    /// Backend-agnostic cumulative-approval family-root issuance at a key epoch.
+    pub fn sign_cumulative_approval_family_root_with_backend_at_epoch(
+        mut body: CapabilityTokenBody,
+        signer_key_epoch: u64,
+        backend: &dyn SigningBackend,
+    ) -> Result<Self> {
+        bind_family_roots_with_backend(&mut body, signer_key_epoch, backend)?;
         Self::sign_with_backend(body, backend)
     }
 

@@ -833,6 +833,7 @@ mod tests {
     use chio_core::capability::governance::{
         GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
         ThresholdApprovalProposal, ThresholdApprovalProposalBody,
+        THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
     };
     use chio_core::capability::threshold_approval::{
         ThresholdApprovalRequirement, ThresholdApproverIdentity,
@@ -1025,6 +1026,7 @@ mod tests {
         .unwrap();
         let proposal = ThresholdApprovalProposal::sign(
             ThresholdApprovalProposalBody {
+                schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
                 proposal_id: "durable-proposal".to_string(),
                 request_id: "durable-request".to_string(),
                 governed_intent_hash: sha256_hex(b"durable-intent"),
