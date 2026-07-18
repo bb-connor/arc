@@ -57,6 +57,7 @@ pub mod runtime;
 pub mod session;
 mod settlement_routing;
 pub mod supplemental_quota;
+pub mod threshold_approval;
 pub mod tool_outcome;
 pub mod transport;
 pub mod weights_binding;
