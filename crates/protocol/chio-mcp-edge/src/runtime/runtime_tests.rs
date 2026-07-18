@@ -927,6 +927,9 @@ fn normalize_dynamic_transport_fields(value: &mut Value) {
             if let Some(owner_session_id) = map.get_mut("ownerSessionId") {
                 *owner_session_id = json!("$session");
             }
+            if let Some(owner_request_id) = map.get_mut("ownerRequestId") {
+                *owner_request_id = json!("$request");
+            }
             // The two transports capture wall-clock timestamps independently;
             // a tick across a second boundary between the stdio and channel
             // runs causes assert_eq! to flake. The shape comparison is what
