@@ -10,8 +10,6 @@ use std::time::{Duration, Instant};
 
 pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
     config.validate()?;
-    let listener = tokio::net::TcpListener::bind(config.listen).await?;
-    let local_addr = listener.local_addr()?;
     let enterprise_provider_registry = load_enterprise_provider_registry(
         config.enterprise_providers_file.as_deref(),
         "trust_control",
@@ -29,6 +27,12 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
         }
         None => None,
     };
+    let fiscal_runtime = compose_trust_fiscal_runtime(
+        joint_authority_store.as_ref(),
+        config.fiscal_runtime.as_ref(),
+    )?;
+    let listener = tokio::net::TcpListener::bind(config.listen).await?;
+    let local_addr = listener.local_addr()?;
     let budget_store = config
         .budget_db_path
         .as_deref()
@@ -62,6 +66,7 @@ pub(crate) async fn serve_async(config: TrustServiceConfig) -> Result<(), CliErr
     let state = TrustServiceState {
         config,
         joint_authority_store,
+        fiscal_runtime,
         budget_store,
         revocation_store,
         enterprise_provider_registry,

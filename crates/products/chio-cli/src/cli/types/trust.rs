@@ -78,6 +78,27 @@ pub(crate) enum TrustCommands {
         #[arg(long)]
         certification_discovery_file: Option<PathBuf>,
 
+        /// Pinned fiscal genesis policy JSON loaded before the service binds.
+        #[arg(long, requires_all = ["fiscal_anchor_url", "fiscal_anchor_token"])]
+        fiscal_genesis_policy: Option<PathBuf>,
+
+        /// Independent HTTPS fiscal continuity anchor base URL.
+        #[arg(long, requires_all = ["fiscal_genesis_policy", "fiscal_anchor_token"])]
+        fiscal_anchor_url: Option<String>,
+
+        /// Bearer token for the independent fiscal continuity anchor.
+        #[arg(
+            long,
+            env = "CHIO_FISCAL_ANCHOR_TOKEN",
+            hide_env_values = true,
+            requires_all = ["fiscal_genesis_policy", "fiscal_anchor_url"]
+        )]
+        fiscal_anchor_token: Option<String>,
+
+        /// Fiscal continuity anchor request timeout in seconds.
+        #[arg(long, default_value_t = 5)]
+        fiscal_anchor_timeout_seconds: u64,
+
         /// Public certification metadata TTL in seconds.
         #[arg(long, default_value_t = 3600)]
         certification_public_metadata_ttl_seconds: u64,

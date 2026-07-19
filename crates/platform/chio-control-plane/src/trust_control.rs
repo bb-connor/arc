@@ -1,5 +1,9 @@
 #![allow(clippy::result_large_err)]
 
+#[path = "trust_control/fiscal_handlers.rs"]
+mod fiscal_handlers;
+#[path = "trust_control/fiscal_runtime.rs"]
+mod fiscal_runtime;
 #[path = "trust_control/frost.rs"]
 pub mod frost;
 #[path = "trust_control/health.rs"]
@@ -326,6 +330,8 @@ pub(crate) use self::budget_handlers::*;
 pub use self::capital_and_liability::*;
 pub(crate) use self::certification_handlers::*;
 pub(crate) use self::credit_and_loss::*;
+pub(crate) use self::fiscal_handlers::*;
+pub(crate) use self::fiscal_runtime::*;
 pub(crate) use self::passport_handlers::*;
 pub(crate) use self::receipt_handlers::*;
 pub(crate) use self::risk_finance_handlers::*;

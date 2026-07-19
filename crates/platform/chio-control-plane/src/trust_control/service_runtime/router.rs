@@ -166,6 +166,10 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             post(handle_evaluate_open_market_penalty),
         )
         .route(
+            FISCAL_RUNTIME_STATUS_PATH,
+            get(handle_fiscal_runtime_status),
+        )
+        .route(
             PASSPORT_ISSUER_METADATA_PATH,
             get(handle_passport_issuer_metadata),
         )

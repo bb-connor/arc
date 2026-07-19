@@ -1262,6 +1262,10 @@ pub(crate) fn cmd_trust_serve(
     passport_issuance_offers_file: Option<&Path>,
     certification_registry_file: Option<&Path>,
     certification_discovery_file: Option<&Path>,
+    fiscal_genesis_policy: Option<&Path>,
+    fiscal_anchor_url: Option<&str>,
+    fiscal_anchor_token: Option<&str>,
+    fiscal_anchor_timeout_seconds: u64,
     receipt_db_path: Option<&Path>,
     revocation_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
@@ -1293,6 +1297,27 @@ pub(crate) fn cmd_trust_serve(
         .transpose()?
         .map(|loaded| (loaded.issuance_policy, loaded.runtime_assurance_policy))
         .unwrap_or((None, None));
+    let fiscal_runtime = match (
+        fiscal_genesis_policy,
+        fiscal_anchor_url,
+        fiscal_anchor_token,
+    ) {
+        (Some(policy), Some(anchor_url), Some(anchor_token)) => Some(
+            trust_control::TrustFiscalRuntimeConfig::from_policy_file(
+                policy,
+                anchor_url.to_owned(),
+                anchor_token.to_owned(),
+                std::time::Duration::from_secs(fiscal_anchor_timeout_seconds),
+            )?,
+        ),
+        (None, None, None) => None,
+        _ => {
+            return Err(CliError::cli_other_error(
+                "fiscal runtime requires --fiscal-genesis-policy, --fiscal-anchor-url, and --fiscal-anchor-token together"
+                    .to_owned(),
+            ));
+        }
+    };
     trust_control::serve(trust_control::TrustServiceConfig {
         listen,
         service_token: service_token.to_string(),
@@ -1303,6 +1328,7 @@ pub(crate) fn cmd_trust_serve(
         authority_db_path: authority_db_path.map(Path::to_path_buf),
         budget_db_path: budget_db_path.map(Path::to_path_buf),
         joint_authority_db_path: session_db_path.map(Path::to_path_buf),
+        fiscal_runtime,
         enterprise_providers_file: enterprise_providers_file.map(Path::to_path_buf),
         federation_policies_file: federation_policies_file.map(Path::to_path_buf),
         scim_lifecycle_file: scim_lifecycle_file.map(Path::to_path_buf),

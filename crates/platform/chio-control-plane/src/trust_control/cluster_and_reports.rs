@@ -32,6 +32,7 @@ mod cluster_and_reports_tests {
             authority_db_path: None,
             budget_db_path: None,
             joint_authority_db_path: None,
+            fiscal_runtime: None,
             enterprise_providers_file: None,
             federation_policies_file: None,
             scim_lifecycle_file: None,
@@ -84,6 +85,7 @@ mod cluster_and_reports_tests {
         let state = TrustServiceState {
             config,
             joint_authority_store: None,
+            fiscal_runtime: None,
             budget_store,
             revocation_store,
             enterprise_provider_registry: None,

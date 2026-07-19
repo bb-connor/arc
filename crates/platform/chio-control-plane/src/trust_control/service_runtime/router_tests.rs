@@ -17,6 +17,7 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         authority_db_path: None,
         budget_db_path: None,
         joint_authority_db_path: None,
+        fiscal_runtime: None,
         enterprise_providers_file: None,
         federation_policies_file: None,
         scim_lifecycle_file: None,
@@ -38,6 +39,7 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
     TrustServiceState {
         config,
         joint_authority_store: None,
+        fiscal_runtime: None,
         budget_store: None,
         revocation_store: None,
         enterprise_provider_registry: None,
@@ -58,6 +60,21 @@ async fn trust_control_metrics_rejects_unauthenticated_request() {
     let state = metrics_state("service-secret");
     let response = handle_trust_control_metrics(State(state), HeaderMap::new()).await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn fiscal_runtime_status_is_authenticated_and_disabled_by_default() {
+    let state = metrics_state("service-secret");
+    let unauthorized = handle_fiscal_runtime_status(State(state.clone()), HeaderMap::new()).await;
+    assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_static("Bearer service-secret"),
+    );
+    let disabled = handle_fiscal_runtime_status(State(state), headers).await;
+    assert_eq!(disabled.status(), StatusCode::CONFLICT);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

@@ -1,6 +1,54 @@
 use super::*;
 
 #[derive(Clone)]
+pub struct TrustFiscalRuntimeConfig {
+    pub genesis_policy: chio_fiscal::FiscalGenesisPolicy,
+    pub anchor_url: String,
+    pub anchor_bearer_token: String,
+    pub anchor_timeout: Duration,
+}
+
+impl std::fmt::Debug for TrustFiscalRuntimeConfig {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("TrustFiscalRuntimeConfig")
+            .field("policy_id", &self.genesis_policy.policy_id)
+            .field("anchor_url", &self.anchor_url)
+            .field("anchor_bearer_token", &"[REDACTED]")
+            .field("anchor_timeout", &self.anchor_timeout)
+            .finish()
+    }
+}
+
+impl TrustFiscalRuntimeConfig {
+    pub fn from_policy_file(
+        policy_path: &Path,
+        anchor_url: String,
+        anchor_bearer_token: String,
+        anchor_timeout: Duration,
+    ) -> Result<Self, CliError> {
+        let bytes = std::fs::read(policy_path).map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to read fiscal genesis policy {}: {error}",
+                policy_path.display()
+            ))
+        })?;
+        let genesis_policy = serde_json::from_slice(&bytes).map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to parse fiscal genesis policy {}: {error}",
+                policy_path.display()
+            ))
+        })?;
+        Ok(Self {
+            genesis_policy,
+            anchor_url,
+            anchor_bearer_token,
+            anchor_timeout,
+        })
+    }
+}
+
+#[derive(Clone)]
 pub struct TrustServiceConfig {
     pub listen: SocketAddr,
     pub service_token: String,
@@ -11,6 +59,7 @@ pub struct TrustServiceConfig {
     pub authority_db_path: Option<PathBuf>,
     pub budget_db_path: Option<PathBuf>,
     pub joint_authority_db_path: Option<PathBuf>,
+    pub fiscal_runtime: Option<TrustFiscalRuntimeConfig>,
     pub enterprise_providers_file: Option<PathBuf>,
     pub federation_policies_file: Option<PathBuf>,
     pub scim_lifecycle_file: Option<PathBuf>,
@@ -85,6 +134,19 @@ impl TrustServiceConfig {
                     .to_string(),
             ));
         }
+        if let Some(fiscal) = &self.fiscal_runtime {
+            if self.joint_authority_db_path.is_none() {
+                return Err(CliError::cli_other_error(
+                    "fiscal runtime requires the joint authority database".to_string(),
+                ));
+            }
+            if fiscal.anchor_timeout.is_zero() {
+                return Err(CliError::cli_other_error(
+                    "fiscal anchor timeout must be non-zero".to_string(),
+                ));
+            }
+            validate_control_secret(&fiscal.anchor_bearer_token, "fiscal anchor bearer token")?;
+        }
         let mut database_paths = Vec::new();
         for (label, path) in [
             (
@@ -151,6 +213,7 @@ mod service_config_tests {
             authority_db_path: None,
             budget_db_path: None,
             joint_authority_db_path: None,
+            fiscal_runtime: None,
             enterprise_providers_file: None,
             federation_policies_file: None,
             scim_lifecycle_file: None,
@@ -169,6 +232,33 @@ mod service_config_tests {
             cluster_sync_interval: Duration::from_millis(25),
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         }
+    }
+
+    fn fiscal_runtime_config() -> TrustFiscalRuntimeConfig {
+        let policy_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../spec/schemas/chio-fiscal/v1/fixtures/genesis-policy.positive.json");
+        TrustFiscalRuntimeConfig::from_policy_file(
+            &policy_path,
+            "https://fiscal-anchor.example".to_owned(),
+            "fiscal-anchor-token".to_owned(),
+            Duration::from_secs(5),
+        )
+        .test_expect("fiscal fixture config")
+    }
+
+    #[test]
+    fn fiscal_runtime_config_is_redacted_and_requires_joint_authority() {
+        let fiscal = fiscal_runtime_config();
+        assert!(!format!("{fiscal:?}").contains("fiscal-anchor-token"));
+        let mut config = base_config();
+        config.fiscal_runtime = Some(fiscal);
+
+        let error = config
+            .validate()
+            .test_expect_err("fiscal runtime without joint authority must fail");
+        assert!(error
+            .to_string()
+            .contains("fiscal runtime requires the joint authority database"));
     }
 
     #[test]
