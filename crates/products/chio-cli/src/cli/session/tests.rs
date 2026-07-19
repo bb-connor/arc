@@ -1,6 +1,10 @@
     use super::*;
     use chio_core::capability::scope::{Operation, ToolGrant};
-    use std::{fs, path::{Path, PathBuf}};
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+        sync::OnceLock,
+    };
     use std::time::{SystemTime, UNIX_EPOCH};
     use wiremock::matchers::{header, method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -31,12 +35,24 @@
             .join(name)
     }
 
+    fn session_store_dir() -> &'static Path {
+        static STORE_DIR: OnceLock<tempfile::TempDir> = OnceLock::new();
+        STORE_DIR
+            .get_or_init(|| {
+                tempfile::Builder::new()
+                    .prefix("chio-cli-session-stores-")
+                    .tempdir()
+                    .expect("create private session store directory")
+            })
+            .path()
+    }
+
     fn unique_db_path(prefix: &str) -> PathBuf {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system time before unix epoch")
             .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+        session_store_dir().join(format!("{prefix}-{nonce}.sqlite3"))
     }
 
     fn unique_seed_path(prefix: &str) -> PathBuf {
@@ -44,7 +60,7 @@
             .duration_since(UNIX_EPOCH)
             .expect("system time before unix epoch")
             .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.seed"))
+        session_store_dir().join(format!("{prefix}-{nonce}.seed"))
     }
 
     fn loopback_bind_available() -> bool {
