@@ -397,6 +397,24 @@ pub fn price_fiscal_premium(
     }
 }
 
+pub fn self_test_fiscal_insurance_premium_adapter() -> Result<(), String> {
+    let inputs = PremiumInputs::new(Some(850), Some(1.5), 10_000, "USD");
+    let window = LookbackWindow::new(1_000, 2_000)?;
+    let legacy = price_premium("fiscal-readiness", "market", window, &inputs);
+    let installed = price_premium_with_schedule(
+        "fiscal-readiness",
+        "market",
+        window,
+        &inputs,
+        &FiscalInsurancePremiumSchedule::legacy(&inputs),
+        true,
+    );
+    if installed != legacy {
+        return Err("insurance-premium bootstrap parity failed".to_owned());
+    }
+    Ok(())
+}
+
 fn price_premium_with_schedule(
     agent_id: &str,
     scope: &str,

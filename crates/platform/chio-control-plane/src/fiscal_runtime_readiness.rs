@@ -56,6 +56,34 @@ pub struct FiscalRuntimeAssembler {
     integrations: Vec<FiscalRuntimeIntegration>,
 }
 
+pub fn production_fiscal_runtime_assembler(
+) -> Result<FiscalRuntimeAssembler, FiscalRuntimeReadinessError> {
+    let version = env!("CARGO_PKG_VERSION");
+    FiscalRuntimeAssembler::new(vec![
+        FiscalRuntimeIntegration::new(FISCAL_TIER_LIMITS_ADAPTER_ID, version, || {
+            chio_underwriting::self_test_fiscal_tier_limits_adapter()
+        })?,
+        FiscalRuntimeIntegration::new(FISCAL_MARKETPLACE_DISCOUNT_ADAPTER_ID, version, || {
+            chio_appraisal::self_test_fiscal_marketplace_discount_adapter()
+        })?,
+        FiscalRuntimeIntegration::new(FISCAL_DECISION_PREMIUM_ADAPTER_ID, version, || {
+            chio_underwriting::self_test_fiscal_decision_premium_adapter()
+        })?,
+        FiscalRuntimeIntegration::new(FISCAL_INSURANCE_PREMIUM_ADAPTER_ID, version, || {
+            chio_underwriting::self_test_fiscal_insurance_premium_adapter()
+        })?,
+        FiscalRuntimeIntegration::new(FISCAL_OPEN_MARKET_SCHEDULE_ADAPTER_ID, version, || {
+            chio_open_market::fiscal_adapter::self_test_fiscal_open_market_schedule_adapter()
+        })?,
+        FiscalRuntimeIntegration::new(FISCAL_OPEN_MARKET_FEE_GATE_ID, version, || {
+            chio_open_market::fiscal_adapter::self_test_fiscal_open_market_fee_gate()
+        })?,
+        FiscalRuntimeIntegration::new(FISCAL_OPEN_MARKET_PENALTY_GATE_ID, version, || {
+            chio_open_market::fiscal_adapter::self_test_fiscal_open_market_penalty_gate()
+        })?,
+    ])
+}
+
 impl FiscalRuntimeAssembler {
     pub fn new(
         mut integrations: Vec<FiscalRuntimeIntegration>,
@@ -203,6 +231,21 @@ mod tests {
             ),
             Err(FiscalRuntimeReadinessError::SelfTest { id, .. }) if id == failed_id
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn production_assembler_self_tests_every_installed_integration() -> TestResult {
+        let registry = production_fiscal_runtime_assembler()?
+            .self_test_and_build_registry("build-production", "chio.fiscal.runtime.v1")?;
+        assert_eq!(
+            registry
+                .adapters()
+                .iter()
+                .map(|adapter| adapter.id.as_str())
+                .collect::<Vec<_>>(),
+            REQUIRED_FISCAL_RUNTIME_INTEGRATIONS
+        );
         Ok(())
     }
 }

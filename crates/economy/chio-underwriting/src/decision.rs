@@ -832,6 +832,33 @@ fn premium_quote_for_outcome(
     }
 }
 
+pub fn self_test_fiscal_decision_premium_adapter() -> Result<(), String> {
+    let schedule = FiscalDecisionPremiumSchedule::default();
+    for (risk_class, index) in [
+        (UnderwritingRiskClass::Baseline, 0),
+        (UnderwritingRiskClass::Guarded, 1),
+        (UnderwritingRiskClass::Elevated, 2),
+        (UnderwritingRiskClass::Critical, 3),
+    ] {
+        for (outcome, expected) in [
+            (
+                UnderwritingDecisionOutcome::Approve,
+                APPROVE_PREMIUM_BASIS_POINTS[index],
+            ),
+            (
+                UnderwritingDecisionOutcome::ReduceCeiling,
+                REDUCE_CEILING_PREMIUM_BASIS_POINTS[index],
+            ),
+        ] {
+            let quote = premium_quote_for_outcome(outcome, risk_class, None, &schedule)?;
+            if quote.basis_points != Some(expected) {
+                return Err("decision-premium bootstrap parity failed".to_owned());
+            }
+        }
+    }
+    Ok(())
+}
+
 fn quote_premium_amount(
     exposure: &MonetaryAmount,
     basis_points: u32,

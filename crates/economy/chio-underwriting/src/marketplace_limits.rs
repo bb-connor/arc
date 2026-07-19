@@ -210,6 +210,33 @@ fn denied_credit_limit(
     }
 }
 
+pub fn self_test_fiscal_tier_limits_adapter() -> Result<(), String> {
+    for tier in [
+        MarketplaceLimitTier::Tier0,
+        MarketplaceLimitTier::Tier1,
+        MarketplaceLimitTier::Tier2,
+        MarketplaceLimitTier::Tier3,
+    ] {
+        for publisher_revoked in [false, true] {
+            let request = MarketplaceCreditLimitRequest {
+                tenant_id: "fiscal-readiness".to_owned(),
+                reputation_tier: tier,
+                currency: MARKETPLACE_TIER_LIMIT_CURRENCY.to_owned(),
+                publisher_revoked,
+            };
+            let legacy = compute_marketplace_credit_limit(&request);
+            let installed = compute_marketplace_credit_limit_with_units(
+                &request,
+                &MARKETPLACE_TIER_LIMIT_UNITS,
+            );
+            if installed != legacy {
+                return Err("tier-limit bootstrap parity failed".to_owned());
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -4,15 +4,18 @@ use chio_fiscal::{
 };
 
 use crate::authority::verify_signed_fee_schedule;
-use crate::crypto::PublicKey;
+use crate::capability::scope::MonetaryAmount;
+use crate::crypto::{Keypair, PublicKey};
 use crate::evaluation::{
     evaluate_open_market_penalty_with_trusted_signers, OpenMarketPenaltyEvaluation,
     OpenMarketPenaltyEvaluationRequest,
 };
 use crate::fee_schedule::{
-    build_open_market_fee_schedule_artifact, OpenMarketFeeScheduleArtifact,
+    build_open_market_fee_schedule_artifact, OpenMarketBondClass, OpenMarketBondRequirement,
+    OpenMarketCollateralReferenceKind, OpenMarketEconomicsScope, OpenMarketFeeScheduleArtifact,
     OpenMarketFeeScheduleIssueRequest, SignedOpenMarketFeeSchedule,
 };
+use crate::listing::{GenericListingActorKind, GenericTrustAdmissionClass};
 use crate::penalty::{
     build_open_market_penalty_artifact_with_trusted_signers, OpenMarketPenaltyArtifact,
     OpenMarketPenaltyIssueRequest,
@@ -202,4 +205,101 @@ fn verify_legacy_schedule(
         ));
     }
     Ok(())
+}
+
+pub fn self_test_fiscal_open_market_schedule_adapter() -> Result<(), String> {
+    let (schedule, _) = readiness_fee_schedule()?;
+    let params = FiscalParams::OpenMarketFeeAndBondSchedule {
+        legacy_body: Box::new(schedule.body.clone()),
+    };
+    let installed = FiscalOpenMarketSchedule::from_fiscal_params(&params)
+        .ok_or_else(|| "open-market fiscal parameter conversion failed".to_owned())?;
+    if installed.legacy_body != schedule.body {
+        return Err("open-market schedule adapter parity failed".to_owned());
+    }
+    Ok(())
+}
+
+pub fn self_test_fiscal_open_market_fee_gate() -> Result<(), String> {
+    let (schedule, keypair) = readiness_fee_schedule()?;
+    let binding = FiscalLegacyFeeScheduleBinding {
+        fiscal_schedule_id: "fiscal-readiness-schedule".to_owned(),
+        legacy_envelope_digest: signed_fee_schedule_digest(&schedule)
+            .map_err(|error| error.to_string())?,
+    };
+    verify_fiscal_legacy_binding(
+        &schedule,
+        &binding,
+        "fiscal-readiness-schedule",
+        &schedule.body,
+        &[keypair.public_key()],
+    )
+    .map_err(|error| error.to_string())
+}
+
+pub fn self_test_fiscal_open_market_penalty_gate() -> Result<(), String> {
+    let (schedule, keypair) = readiness_fee_schedule()?;
+    let binding = FiscalLegacyFeeScheduleBinding {
+        fiscal_schedule_id: "fiscal-readiness-schedule".to_owned(),
+        legacy_envelope_digest: signed_fee_schedule_digest(&schedule)
+            .map_err(|error| error.to_string())?,
+    };
+    let mut mismatched = schedule.body.clone();
+    mismatched.publication_fee.units = mismatched.publication_fee.units.saturating_add(1);
+    if !matches!(
+        verify_fiscal_legacy_binding(
+            &schedule,
+            &binding,
+            "fiscal-readiness-schedule",
+            &mismatched,
+            &[keypair.public_key()],
+        ),
+        Err(FiscalOpenMarketError::BindingMismatch)
+    ) {
+        return Err("open-market penalty gate accepted mismatched economics".to_owned());
+    }
+    Ok(())
+}
+
+fn readiness_fee_schedule() -> Result<(SignedOpenMarketFeeSchedule, Keypair), String> {
+    let operator_id = "https://fiscal-readiness.chio.example";
+    let request = OpenMarketFeeScheduleIssueRequest {
+        scope: OpenMarketEconomicsScope {
+            namespace: operator_id.to_owned(),
+            allowed_listing_operator_ids: vec![operator_id.to_owned()],
+            allowed_actor_kinds: vec![GenericListingActorKind::ToolServer],
+            allowed_admission_classes: vec![GenericTrustAdmissionClass::BondBacked],
+            policy_reference: Some("policy/fiscal-readiness".to_owned()),
+        },
+        publication_fee: MonetaryAmount {
+            units: 100,
+            currency: "USD".to_owned(),
+        },
+        dispute_fee: MonetaryAmount {
+            units: 250,
+            currency: "USD".to_owned(),
+        },
+        market_participation_fee: MonetaryAmount {
+            units: 500,
+            currency: "USD".to_owned(),
+        },
+        bond_requirements: vec![OpenMarketBondRequirement {
+            bond_class: OpenMarketBondClass::Listing,
+            required_amount: MonetaryAmount {
+                units: 5_000,
+                currency: "USD".to_owned(),
+            },
+            collateral_reference_kind: OpenMarketCollateralReferenceKind::CreditBond,
+            slashable: true,
+        }],
+        issued_by: "fiscal-readiness@chio.example".to_owned(),
+        issued_at: Some(100),
+        expires_at: Some(200),
+        note: None,
+    };
+    let artifact = build_open_market_fee_schedule_artifact(operator_id, None, &request, 100)?;
+    let keypair = Keypair::from_seed(&[41; 32]);
+    let signed =
+        SignedOpenMarketFeeSchedule::sign(artifact, &keypair).map_err(|error| error.to_string())?;
+    Ok((signed, keypair))
 }
