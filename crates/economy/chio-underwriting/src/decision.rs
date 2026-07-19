@@ -1,5 +1,9 @@
 use std::collections::BTreeMap;
 
+use chio_fiscal::{
+    FiscalDenialReason, FiscalDomain, FiscalDomainParams, FiscalParams, FiscalResolution,
+    FiscalResolver,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::canonical::canonical_json_bytes;
@@ -22,6 +26,47 @@ pub enum UnderwritingDecisionOutcome {
     ReduceCeiling,
     StepUp,
     Deny,
+}
+
+pub const APPROVE_PREMIUM_BASIS_POINTS: [u32; 4] = [100, 150, 200, 300];
+pub const REDUCE_CEILING_PREMIUM_BASIS_POINTS: [u32; 4] = [150, 250, 400, 600];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FiscalDecisionPremiumSchedule {
+    pub approve: [u32; 4],
+    pub reduce_ceiling: [u32; 4],
+}
+
+impl FiscalDomainParams for FiscalDecisionPremiumSchedule {
+    fn from_fiscal_params(params: &FiscalParams) -> Option<Self> {
+        match params {
+            FiscalParams::DecisionPremiumBasisPoints {
+                approve,
+                reduce_ceiling,
+            } => Some(Self {
+                approve: *approve,
+                reduce_ceiling: *reduce_ceiling,
+            }),
+            _ => None,
+        }
+    }
+}
+
+impl Default for FiscalDecisionPremiumSchedule {
+    fn default() -> Self {
+        Self {
+            approve: APPROVE_PREMIUM_BASIS_POINTS,
+            reduce_ceiling: REDUCE_CEILING_PREMIUM_BASIS_POINTS,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum FiscalUnderwritingDecisionError {
+    #[error("fiscal decision premium denied: {0:?}")]
+    Denied(FiscalDenialReason),
+    #[error("underwriting decision could not be built: {0}")]
+    Build(String),
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -627,6 +672,48 @@ pub fn build_underwriting_decision_artifact(
     supersedes_decision_id: Option<String>,
     quoted_exposure: Option<MonetaryAmount>,
 ) -> Result<UnderwritingDecisionArtifact, String> {
+    build_underwriting_decision_artifact_with_schedule(
+        evaluation,
+        issued_at,
+        supersedes_decision_id,
+        quoted_exposure,
+        &FiscalDecisionPremiumSchedule::default(),
+    )
+}
+
+pub fn build_fiscal_underwriting_decision_artifact(
+    evaluation: UnderwritingDecisionReport,
+    issued_at: u64,
+    supersedes_decision_id: Option<String>,
+    quoted_exposure: Option<MonetaryAmount>,
+    resolver: &FiscalResolver<'_>,
+) -> Result<UnderwritingDecisionArtifact, FiscalUnderwritingDecisionError> {
+    let schedule = match resolver
+        .resolve::<FiscalDecisionPremiumSchedule>(FiscalDomain::DecisionPremiumBasisPoints, None)
+    {
+        FiscalResolution::Governed { params, .. } => params,
+        FiscalResolution::Fallback(_) => FiscalDecisionPremiumSchedule::default(),
+        FiscalResolution::Denied(reason) => {
+            return Err(FiscalUnderwritingDecisionError::Denied(reason));
+        }
+    };
+    build_underwriting_decision_artifact_with_schedule(
+        evaluation,
+        issued_at,
+        supersedes_decision_id,
+        quoted_exposure,
+        &schedule,
+    )
+    .map_err(FiscalUnderwritingDecisionError::Build)
+}
+
+fn build_underwriting_decision_artifact_with_schedule(
+    evaluation: UnderwritingDecisionReport,
+    issued_at: u64,
+    supersedes_decision_id: Option<String>,
+    quoted_exposure: Option<MonetaryAmount>,
+    premium_schedule: &FiscalDecisionPremiumSchedule,
+) -> Result<UnderwritingDecisionArtifact, String> {
     let review_state = match evaluation.outcome {
         UnderwritingDecisionOutcome::Approve | UnderwritingDecisionOutcome::ReduceCeiling => {
             UnderwritingReviewState::Approved
@@ -636,8 +723,12 @@ pub fn build_underwriting_decision_artifact(
     };
     let budget =
         budget_recommendation_for_outcome(evaluation.outcome, evaluation.suggested_ceiling_factor);
-    let premium =
-        premium_quote_for_outcome(evaluation.outcome, evaluation.risk_class, quoted_exposure)?;
+    let premium = premium_quote_for_outcome(
+        evaluation.outcome,
+        evaluation.risk_class,
+        quoted_exposure,
+        premium_schedule,
+    )?;
     let decision_id_input = canonical_json_bytes(&(
         UNDERWRITING_DECISION_ARTIFACT_SCHEMA,
         issued_at,
@@ -695,20 +786,19 @@ fn premium_quote_for_outcome(
     outcome: UnderwritingDecisionOutcome,
     risk_class: UnderwritingRiskClass,
     quoted_exposure: Option<MonetaryAmount>,
+    schedule: &FiscalDecisionPremiumSchedule,
 ) -> Result<UnderwritingPremiumQuote, String> {
+    let risk_index = match risk_class {
+        UnderwritingRiskClass::Baseline => 0,
+        UnderwritingRiskClass::Guarded => 1,
+        UnderwritingRiskClass::Elevated => 2,
+        UnderwritingRiskClass::Critical => 3,
+    };
     let basis_points = match outcome {
-        UnderwritingDecisionOutcome::Approve => Some(match risk_class {
-            UnderwritingRiskClass::Baseline => 100,
-            UnderwritingRiskClass::Guarded => 150,
-            UnderwritingRiskClass::Elevated => 200,
-            UnderwritingRiskClass::Critical => 300,
-        }),
-        UnderwritingDecisionOutcome::ReduceCeiling => Some(match risk_class {
-            UnderwritingRiskClass::Baseline => 150,
-            UnderwritingRiskClass::Guarded => 250,
-            UnderwritingRiskClass::Elevated => 400,
-            UnderwritingRiskClass::Critical => 600,
-        }),
+        UnderwritingDecisionOutcome::Approve => schedule.approve.get(risk_index).copied(),
+        UnderwritingDecisionOutcome::ReduceCeiling => {
+            schedule.reduce_ceiling.get(risk_index).copied()
+        }
         UnderwritingDecisionOutcome::StepUp | UnderwritingDecisionOutcome::Deny => None,
     };
 
@@ -857,6 +947,36 @@ mod tests {
         let quoted = quote_premium_amount(&exposure, 1)
             .unwrap_or_else(|error| panic!("premium quote should fit: {error}"));
         assert_eq!(quoted.units, 1);
+    }
+
+    #[test]
+    fn fiscal_decision_schedule_preserves_defaults_and_changes_the_quote() {
+        let exposure = Some(MonetaryAmount {
+            units: 10_000,
+            currency: "USD".to_owned(),
+        });
+        let default = premium_quote_for_outcome(
+            UnderwritingDecisionOutcome::Approve,
+            UnderwritingRiskClass::Baseline,
+            exposure.clone(),
+            &FiscalDecisionPremiumSchedule::default(),
+        )
+        .unwrap();
+        assert_eq!(default.basis_points, Some(100));
+        assert_eq!(default.quoted_amount.map(|amount| amount.units), Some(100));
+
+        let governed = premium_quote_for_outcome(
+            UnderwritingDecisionOutcome::Approve,
+            UnderwritingRiskClass::Baseline,
+            exposure,
+            &FiscalDecisionPremiumSchedule {
+                approve: [200, 250, 300, 400],
+                reduce_ceiling: [300, 400, 500, 700],
+            },
+        )
+        .unwrap();
+        assert_eq!(governed.basis_points, Some(200));
+        assert_eq!(governed.quoted_amount.map(|amount| amount.units), Some(200));
     }
 
     #[test]

@@ -4676,6 +4676,7 @@ dependencies = [
  "chio-core-types",
  "chio-fiscal",
  "serde",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

@@ -28,6 +28,10 @@
 //! The formula is deterministic: given the same `PremiumInputs`, every call
 //! produces the same [`PremiumQuote`]. No wall-clock or randomness is used.
 
+use chio_fiscal::{
+    FiscalDenialReason, FiscalDomain, FiscalDomainParams, FiscalParams, FiscalResolution,
+    FiscalResolver,
+};
 use serde::{Deserialize, Serialize};
 
 /// Minimum score required to quote any premium. Below this threshold the
@@ -48,6 +52,60 @@ pub const DEFAULT_BEHAVIORAL_PENALTY_PER_SIGMA: u32 = 50;
 /// Hard cap on the behavioral deduction so a single runaway z-score cannot
 /// synthesise an arbitrary decline on top of an otherwise clean history.
 pub const DEFAULT_BEHAVIORAL_PENALTY_CAP: u32 = 250;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FiscalInsurancePremiumSchedule {
+    pub decline_floor: u32,
+    pub high_risk_floor: u32,
+    pub medium_risk_floor: u32,
+    pub low_risk_floor: u32,
+    pub score_adjustments_bps: [u32; 3],
+    pub behavioral_threshold: f64,
+    pub behavioral_penalty_per_sigma: u32,
+    pub behavioral_penalty_cap: u32,
+}
+
+impl FiscalDomainParams for FiscalInsurancePremiumSchedule {
+    fn from_fiscal_params(params: &FiscalParams) -> Option<Self> {
+        match params {
+            FiscalParams::InsurancePremiumSchedule {
+                decline_floor,
+                high_risk_floor,
+                medium_risk_floor,
+                low_risk_floor,
+                score_adjustments_bps,
+                behavioral_threshold,
+                behavioral_penalty_per_sigma,
+                behavioral_penalty_cap,
+            } => Some(Self {
+                decline_floor: *decline_floor,
+                high_risk_floor: *high_risk_floor,
+                medium_risk_floor: *medium_risk_floor,
+                low_risk_floor: *low_risk_floor,
+                score_adjustments_bps: *score_adjustments_bps,
+                behavioral_threshold: *behavioral_threshold,
+                behavioral_penalty_per_sigma: *behavioral_penalty_per_sigma,
+                behavioral_penalty_cap: *behavioral_penalty_cap,
+            }),
+            _ => None,
+        }
+    }
+}
+
+impl FiscalInsurancePremiumSchedule {
+    fn legacy(inputs: &PremiumInputs) -> Self {
+        Self {
+            decline_floor: PREMIUM_DECLINE_FLOOR,
+            high_risk_floor: PREMIUM_HIGH_RISK_FLOOR,
+            medium_risk_floor: PREMIUM_MEDIUM_RISK_FLOOR,
+            low_risk_floor: PREMIUM_LOW_RISK_FLOOR,
+            score_adjustments_bps: [10_000, 20_000, 50_000],
+            behavioral_threshold: inputs.behavioral_threshold,
+            behavioral_penalty_per_sigma: inputs.behavioral_penalty_per_sigma,
+            behavioral_penalty_cap: inputs.behavioral_penalty_cap,
+        }
+    }
+}
 
 /// Lookback window for the compliance / behavioral inputs used by the
 /// premium. Recorded in the justification so operators can audit the
@@ -304,6 +362,53 @@ pub fn price_premium(
     lookback_window: LookbackWindow,
     inputs: &PremiumInputs,
 ) -> PremiumQuote {
+    price_premium_with_schedule(
+        agent_id,
+        scope,
+        lookback_window,
+        inputs,
+        &FiscalInsurancePremiumSchedule::legacy(inputs),
+        true,
+    )
+}
+
+pub fn price_fiscal_premium(
+    agent_id: &str,
+    scope: &str,
+    lookback_window: LookbackWindow,
+    inputs: &PremiumInputs,
+    resolver: &FiscalResolver<'_>,
+) -> Result<PremiumQuote, FiscalDenialReason> {
+    match resolver
+        .resolve::<FiscalInsurancePremiumSchedule>(FiscalDomain::InsurancePremiumSchedule, None)
+    {
+        FiscalResolution::Governed { params, .. } => Ok(price_premium_with_schedule(
+            agent_id,
+            scope,
+            lookback_window,
+            inputs,
+            &params,
+            false,
+        )),
+        FiscalResolution::Fallback(_) => {
+            Ok(price_premium(agent_id, scope, lookback_window, inputs))
+        }
+        FiscalResolution::Denied(reason) => Err(reason),
+    }
+}
+
+fn price_premium_with_schedule(
+    agent_id: &str,
+    scope: &str,
+    lookback_window: LookbackWindow,
+    inputs: &PremiumInputs,
+    schedule: &FiscalInsurancePremiumSchedule,
+    enforce_legacy_precision: bool,
+) -> PremiumQuote {
+    let mut inputs = inputs.clone();
+    inputs.behavioral_threshold = schedule.behavioral_threshold;
+    inputs.behavioral_penalty_per_sigma = schedule.behavioral_penalty_per_sigma;
+    inputs.behavioral_penalty_cap = schedule.behavioral_penalty_cap;
     if let Err(error) = inputs.validate() {
         return PremiumQuote::Declined {
             agent_id: agent_id.to_string(),
@@ -328,10 +433,10 @@ pub fn price_premium(
     };
 
     let (behavioral_penalty, behavioral_note) =
-        behavioral_penalty(inputs.behavioral_z_score, inputs);
+        behavioral_penalty(inputs.behavioral_z_score, &inputs);
     let combined_score = compliance_score.saturating_sub(behavioral_penalty);
 
-    if combined_score < PREMIUM_DECLINE_FLOOR {
+    if combined_score < schedule.decline_floor {
         return PremiumQuote::Declined {
             agent_id: agent_id.to_string(),
             scope: scope.to_string(),
@@ -339,13 +444,14 @@ pub fn price_premium(
             combined_score: Some(combined_score),
             reason: PremiumDeclineReason::ScoreBelowFloor,
             justification: format!(
-                "combined score {combined_score} is below the decline floor {PREMIUM_DECLINE_FLOOR} \
+                "combined score {combined_score} is below the decline floor {} \
                  (compliance_score={compliance_score}, behavioral_penalty={behavioral_penalty}{behavioral_note})",
+                schedule.decline_floor,
             ),
         };
     }
 
-    if inputs.base_rate_cents > (1_u64 << 53) {
+    if enforce_legacy_precision && inputs.base_rate_cents > (1_u64 << 53) {
         return PremiumQuote::Declined {
             agent_id: agent_id.to_string(),
             scope: scope.to_string(),
@@ -359,7 +465,7 @@ pub fn price_premium(
         };
     }
 
-    let adjustment_bps = match risk_adjustment_basis_points(combined_score) {
+    let adjustment_bps = match risk_adjustment_basis_points(combined_score, schedule) {
         Ok(adjustment_bps) => adjustment_bps,
         Err(reason) => {
             return PremiumQuote::Declined {
@@ -455,13 +561,16 @@ fn behavioral_penalty(z: Option<f64>, inputs: &PremiumInputs) -> (u32, String) {
     }
 }
 
-fn risk_adjustment_basis_points(score: u32) -> Result<u32, PremiumDeclineReason> {
-    if score > PREMIUM_LOW_RISK_FLOOR {
-        Ok(10_000)
-    } else if score >= PREMIUM_MEDIUM_RISK_FLOOR {
-        Ok(20_000)
-    } else if score >= PREMIUM_HIGH_RISK_FLOOR {
-        Ok(50_000)
+fn risk_adjustment_basis_points(
+    score: u32,
+    schedule: &FiscalInsurancePremiumSchedule,
+) -> Result<u32, PremiumDeclineReason> {
+    if score > schedule.low_risk_floor {
+        Ok(schedule.score_adjustments_bps[0])
+    } else if score >= schedule.medium_risk_floor {
+        Ok(schedule.score_adjustments_bps[1])
+    } else if score >= schedule.high_risk_floor {
+        Ok(schedule.score_adjustments_bps[2])
     } else {
         Err(PremiumDeclineReason::ScoreBelowFloor)
     }
@@ -693,6 +802,35 @@ mod tests {
             clean_cents < denied_cents,
             "expected clean ({clean_cents}) < denials ({denied_cents})"
         );
+    }
+
+    #[test]
+    fn governed_schedule_ignores_caller_tuning_and_uses_checked_integer_money() {
+        let mut request = inputs(Some(950), Some(4.0));
+        request.behavioral_threshold = 100.0;
+        let legacy = price_premium("agent", "scope", window(), &request);
+        assert_eq!(legacy.quoted_cents(), Some(2_000));
+
+        let governed = FiscalInsurancePremiumSchedule {
+            decline_floor: 500,
+            high_risk_floor: 500,
+            medium_risk_floor: 700,
+            low_risk_floor: 900,
+            score_adjustments_bps: [10_000, 20_000, 50_000],
+            behavioral_threshold: 3.0,
+            behavioral_penalty_per_sigma: 100,
+            behavioral_penalty_cap: 100,
+        };
+        let governed_quote =
+            price_premium_with_schedule("agent", "scope", window(), &request, &governed, false);
+        assert_eq!(governed_quote.combined_score(), Some(850));
+        assert_eq!(governed_quote.quoted_cents(), Some(3_000));
+
+        request.behavioral_z_score = None;
+        request.base_rate_cents = (1_u64 << 53) + 1;
+        let large =
+            price_premium_with_schedule("agent", "scope", window(), &request, &governed, false);
+        assert_eq!(large.quoted_cents(), Some((1_u64 << 54) + 2));
     }
 
     #[test]
