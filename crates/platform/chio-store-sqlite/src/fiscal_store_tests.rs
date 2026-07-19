@@ -1,13 +1,19 @@
 use std::collections::BTreeMap;
 use std::fs;
 
+use chio_core::capability::scope::MonetaryAmount;
 use chio_core::crypto::{sha256_hex, Keypair};
 use chio_fiscal::{
-    FiscalAuthorityState, FiscalBootstrapState, FiscalCharterBuilder, FiscalCharterRegistry,
-    FiscalContinuityChange, FiscalContinuityCheckpointBuilder, FiscalDomain, FiscalDomainState,
-    FiscalGenesisPolicy, FiscalRuntimeAdapter, FiscalRuntimeAdapterRegistry,
-    FiscalRuntimeReadinessBuilder, VerifiedFiscalCharter, VerifiedFiscalContinuityAdvance,
-    VerifiedFiscalContinuityCheckpoint, VerifiedFiscalRuntimeReadiness,
+    FiscalActivationBuilder, FiscalActivationTarget, FiscalAdmissionAuthority,
+    FiscalAdmissionTrustRegistry, FiscalApprovalBuilder, FiscalAuthorityState,
+    FiscalBootstrapState, FiscalCharterBuilder, FiscalCharterRegistry, FiscalContinuityChange,
+    FiscalContinuityCheckpointBuilder, FiscalDomain, FiscalDomainState, FiscalGenesisPolicy,
+    FiscalParams, FiscalProposalAdmissionBuilder, FiscalProposalAdmissionState,
+    FiscalProposalBuilder, FiscalProposalTarget, FiscalRuntimeAdapter,
+    FiscalRuntimeAdapterRegistry, FiscalRuntimeReadinessBuilder, FiscalScheduleBuilder,
+    FiscalScheduleHead, FiscalStagedTransition, VerifiedFiscalActivation, VerifiedFiscalCharter,
+    VerifiedFiscalContinuityAdvance, VerifiedFiscalContinuityCheckpoint, VerifiedFiscalProposal,
+    VerifiedFiscalProposalAdmission, VerifiedFiscalRuntimeReadiness, VerifiedFiscalSchedule,
     FISCAL_RUNTIME_ADAPTER_COUNT,
 };
 use tempfile::TempDir;
@@ -181,6 +187,161 @@ fn fiscal_fixture() -> TestResult<FiscalFixture> {
     })
 }
 
+struct FiscalActivationFixture {
+    schedule: VerifiedFiscalSchedule,
+    proposal: VerifiedFiscalProposal,
+    admitted: FiscalProposalAdmissionState,
+    activated: FiscalProposalAdmissionState,
+    activation: VerifiedFiscalActivation,
+    next_checkpoint: VerifiedFiscalContinuityCheckpoint,
+    next_authority: FiscalAuthorityState,
+    advance: VerifiedFiscalContinuityAdvance,
+}
+
+fn fiscal_activation_fixture(fixture: &FiscalFixture) -> TestResult<FiscalActivationFixture> {
+    let schedule = VerifiedFiscalSchedule::verify(
+        FiscalScheduleBuilder {
+            domain: FiscalDomain::TierLimits,
+            params: FiscalParams::TierLimits {
+                ceilings: [100_u64, 200, 300, 400].map(|units| MonetaryAmount {
+                    units,
+                    currency: "USD".to_owned(),
+                }),
+            },
+            valid_from: 70,
+            valid_until: 900,
+            issued_at: 70,
+            issued_by: "operator.example".to_owned(),
+        }
+        .sign(&fixture.charter, None, &key(9))?,
+        &fixture.charter,
+        None,
+    )?;
+    let proposal = VerifiedFiscalProposal::verify(
+        FiscalProposalBuilder {
+            target: FiscalProposalTarget::Schedule {
+                candidate: Box::new(schedule.signed().clone()),
+            },
+            rationale_digest: sha256_hex(b"tier amendment"),
+            proposed_at: 50,
+        }
+        .sign(&key(1))?,
+        &fixture.charter,
+        None,
+    )?;
+    let admission_key = key(7);
+    let trust = FiscalAdmissionTrustRegistry::new(vec![FiscalAdmissionAuthority::new(
+        "operator.example".to_owned(),
+        "local-admission".to_owned(),
+        1,
+        admission_key.public_key(),
+    )?])?;
+    let admission = VerifiedFiscalProposalAdmission::verify(
+        FiscalProposalAdmissionBuilder {
+            admission_sequence: 1,
+            admitted_at: 55,
+            admission_authority_id: "local-admission".to_owned(),
+            signer_key_epoch: 1,
+        }
+        .sign(&proposal, &fixture.charter, &admission_key)?,
+        &proposal,
+        &fixture.charter,
+        &trust,
+        55,
+    )?;
+    let admitted = FiscalProposalAdmissionState::admitted(&admission);
+    let approvals = [key(1), key(2)]
+        .into_iter()
+        .map(|signer| {
+            FiscalApprovalBuilder { approved_at: 56 }.sign(
+                &proposal,
+                &admission,
+                &fixture.charter,
+                &signer,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let signed_activation = FiscalActivationBuilder {
+        target: FiscalActivationTarget::Schedule {
+            schedule_id: schedule.body().schedule_id.clone(),
+            supersedes_schedule_id: None,
+        },
+        approvals,
+        activated_at: 70,
+    }
+    .sign(&proposal, &admission, &fixture.charter, &key(1))?;
+    let staged_activation = VerifiedFiscalActivation::verify(
+        signed_activation.clone(),
+        &proposal,
+        &admission,
+        &admitted,
+        &fixture.charter,
+        &trust,
+        None,
+        &[],
+        70,
+    )?;
+    let activated = admitted.activate(staged_activation.digest().to_owned(), 1)?;
+    let activation = VerifiedFiscalActivation::verify(
+        signed_activation,
+        &proposal,
+        &admission,
+        &activated,
+        &fixture.charter,
+        &trust,
+        None,
+        &[],
+        70,
+    )?;
+    let head = FiscalScheduleHead::from_signed(schedule.signed())?;
+    let mut next_domains = domains();
+    next_domains[0] = FiscalDomainState::activated(FiscalDomain::TierLimits, head.clone(), head)?;
+    let next_signed = FiscalContinuityCheckpointBuilder {
+        continuity_sequence: 1,
+        previous_checkpoint_digest: Some(fixture.genesis.digest().to_owned()),
+        pinned_charter_id: fixture.charter.body().charter_id.clone(),
+        pinned_charter_digest: fixture.charter.digest().to_owned(),
+        pinned_charter_sequence: fixture.charter.body().sequence,
+        runtime_readiness_digest: fixture.readiness.digest().to_owned(),
+        domains: next_domains,
+        trusted_clock_high_water: 70,
+        staged_transition: Some(FiscalStagedTransition::new(
+            activation.body().activation_id.clone(),
+            activation.digest().to_owned(),
+        )?),
+    }
+    .sign(&fixture.policy, &key(8))?;
+    let charters = FiscalCharterRegistry::new(vec![fixture.charter.signed().clone()])?;
+    let advance = VerifiedFiscalContinuityAdvance::verify(
+        &fixture.genesis,
+        next_signed,
+        &fixture.policy,
+        &charters,
+        &FiscalContinuityChange::Activation {
+            activation: Box::new(activation.clone()),
+            readiness: Box::new(fixture.readiness.clone()),
+            domain: FiscalDomain::TierLimits,
+            schedule: Box::new(schedule.clone()),
+        },
+    )?;
+    let next_checkpoint = advance.next().clone();
+    let next_authority = FiscalAuthorityState::from_checkpoint(
+        &fixture.policy,
+        &next_checkpoint,
+        FiscalBootstrapState::CharterPinned,
+    )?;
+    Ok(FiscalActivationFixture {
+        schedule,
+        proposal,
+        admitted,
+        activated,
+        activation,
+        next_checkpoint,
+        next_authority,
+        advance,
+    })
+}
+
 struct StoreFixture {
     _temp: TempDir,
     database: std::path::PathBuf,
@@ -343,6 +504,116 @@ fn staged_fiscal_advance_is_invisible_until_anchor_ack_and_finalize() -> TestRes
         fixture.next_readiness.digest()
     );
     Ok(())
+}
+
+#[test]
+fn activation_finalize_atomically_consumes_admission_and_flips_schedule() -> TestResult {
+    let files = store_fixture()?;
+    let fixture = fiscal_fixture()?;
+    let activation = fiscal_activation_fixture(&fixture)?;
+    let authority = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let fence = authority.mutation_fence();
+    let store = authority.fiscal_store();
+    store.initialize_genesis(
+        &fixture.policy,
+        &fixture.authority,
+        &fixture.charter,
+        &fixture.readiness,
+        &fixture.genesis,
+        &fence,
+    )?;
+    store.persist_schedule(&activation.schedule, &fence)?;
+    store.persist_proposal(&activation.proposal, &fence)?;
+    store.persist_admission_state(&activation.admitted, None, &fence)?;
+    store.persist_activation(&activation.activation, &fence)?;
+
+    let staged = store
+        .stage_activation_advance(
+            &activation.advance,
+            &activation.next_authority,
+            &activation.activation,
+            &activation.activated,
+            &activation.schedule,
+            None,
+            &fence,
+        )
+        .map_err(|error| std::io::Error::other(format!("stage activation: {error}")))?;
+    assert_eq!(staged.status, FiscalStageStatus::DbStaged);
+    assert_eq!(
+        fiscal_activation_projection(&files.database, &activation)?,
+        ("admitted".to_owned(), 1, "staged".to_owned())
+    );
+    store.mark_anchor_advanced(&staged.transition_id, &activation.next_checkpoint, &fence)?;
+    store.finalize_advance(
+        &staged.transition_id,
+        &activation.next_checkpoint,
+        &activation.next_authority,
+        &fence,
+    )?;
+    assert_eq!(
+        fiscal_activation_projection(&files.database, &activation)?,
+        ("activated".to_owned(), 2, "active".to_owned())
+    );
+    assert_eq!(store.load_authority_state()?, activation.next_authority);
+    Ok(())
+}
+
+#[test]
+fn discarded_activation_stage_preserves_admission_and_candidate_state() -> TestResult {
+    let files = store_fixture()?;
+    let fixture = fiscal_fixture()?;
+    let activation = fiscal_activation_fixture(&fixture)?;
+    let authority = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let fence = authority.mutation_fence();
+    let store = authority.fiscal_store();
+    store.initialize_genesis(
+        &fixture.policy,
+        &fixture.authority,
+        &fixture.charter,
+        &fixture.readiness,
+        &fixture.genesis,
+        &fence,
+    )?;
+    store.persist_schedule(&activation.schedule, &fence)?;
+    store.persist_proposal(&activation.proposal, &fence)?;
+    store.persist_admission_state(&activation.admitted, None, &fence)?;
+    store.persist_activation(&activation.activation, &fence)?;
+    let staged = store.stage_activation_advance(
+        &activation.advance,
+        &activation.next_authority,
+        &activation.activation,
+        &activation.activated,
+        &activation.schedule,
+        None,
+        &fence,
+    )?;
+
+    store.discard_unanchored_stage(&staged.transition_id, &fence)?;
+
+    assert_eq!(
+        fiscal_activation_projection(&files.database, &activation)?,
+        ("admitted".to_owned(), 1, "staged".to_owned())
+    );
+    assert_eq!(store.load_authority_state()?, fixture.authority);
+    Ok(())
+}
+
+fn fiscal_activation_projection(
+    database: &std::path::Path,
+    activation: &FiscalActivationFixture,
+) -> TestResult<(String, i64, String)> {
+    let connection = rusqlite::Connection::open(database)?;
+    let admission = connection.query_row(
+        "SELECT status, state_version FROM fiscal_proposal_admissions WHERE admission_id = ?1",
+        [&activation.admitted.signed_admission.body.admission_id],
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+    )?;
+    let schedule_state = connection.query_row(
+        "SELECT lifecycle_state FROM fiscal_schedules WHERE schedule_id = ?1",
+        [&activation.schedule.body().schedule_id],
+        |row| row.get::<_, String>(0),
+    )?;
+    Ok((admission.0, admission.1, schedule_state))
 }
 
 #[test]

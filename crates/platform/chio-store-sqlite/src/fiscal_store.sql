@@ -138,6 +138,43 @@ CREATE TABLE IF NOT EXISTS fiscal_staged_transitions (
         REFERENCES fiscal_continuity_checkpoints(checkpoint_digest)
 );
 
+CREATE TABLE IF NOT EXISTS fiscal_staged_activation_mutations (
+    transition_id TEXT PRIMARY KEY,
+    activation_id TEXT NOT NULL UNIQUE,
+    activation_digest TEXT NOT NULL UNIQUE CHECK (
+        length(activation_digest) = 64 AND activation_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    admission_id TEXT NOT NULL UNIQUE,
+    admission_digest TEXT NOT NULL CHECK (
+        length(admission_digest) = 64 AND admission_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    expected_admission_version INTEGER NOT NULL CHECK (expected_admission_version > 0),
+    activated_admission_version INTEGER NOT NULL CHECK (
+        activated_admission_version = expected_admission_version + 1
+    ),
+    activated_admission_json BLOB NOT NULL CHECK (
+        length(activated_admission_json) BETWEEN 1 AND 4194304
+    ),
+    candidate_schedule_id TEXT NOT NULL UNIQUE,
+    candidate_schedule_digest TEXT NOT NULL CHECK (
+        length(candidate_schedule_digest) = 64
+        AND candidate_schedule_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    predecessor_schedule_id TEXT,
+    predecessor_schedule_digest TEXT CHECK (
+        predecessor_schedule_digest IS NULL OR (
+            length(predecessor_schedule_digest) = 64
+            AND predecessor_schedule_digest NOT GLOB '*[^0-9a-f]*'
+        )
+    ),
+    CHECK ((predecessor_schedule_id IS NULL) = (predecessor_schedule_digest IS NULL)),
+    FOREIGN KEY (transition_id) REFERENCES fiscal_staged_transitions(transition_id),
+    FOREIGN KEY (activation_id) REFERENCES fiscal_activations(activation_id),
+    FOREIGN KEY (admission_id) REFERENCES fiscal_proposal_admissions(admission_id),
+    FOREIGN KEY (candidate_schedule_id) REFERENCES fiscal_schedules(schedule_id),
+    FOREIGN KEY (predecessor_schedule_id) REFERENCES fiscal_schedules(schedule_id)
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS fiscal_one_open_transition
 ON fiscal_staged_transitions((1))
 WHERE status IN ('db_staged', 'fiscal_anchor_advanced');
@@ -187,6 +224,12 @@ BEGIN SELECT RAISE(ABORT, 'fiscal legacy fee schedule binding is immutable'); EN
 CREATE TRIGGER IF NOT EXISTS fiscal_legacy_fee_schedule_bindings_no_delete
 BEFORE DELETE ON fiscal_legacy_fee_schedule_bindings
 BEGIN SELECT RAISE(ABORT, 'fiscal legacy fee schedule binding is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS fiscal_staged_activation_mutations_immutable
+BEFORE UPDATE ON fiscal_staged_activation_mutations
+BEGIN SELECT RAISE(ABORT, 'fiscal staged activation mutation is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS fiscal_staged_activation_mutations_no_delete
+BEFORE DELETE ON fiscal_staged_activation_mutations
+BEGIN SELECT RAISE(ABORT, 'fiscal staged activation mutation is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS fiscal_checkpoints_immutable
 BEFORE UPDATE OF checkpoint_digest, continuity_sequence, signed_json
 ON fiscal_continuity_checkpoints

@@ -3,8 +3,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_fiscal::{
-    fee_schedule::SignedOpenMarketFeeSchedule, FiscalAuthorityState, FiscalCharterRegistry,
-    FiscalGenesisPolicy, FiscalParams, FiscalProposalAdmissionState, FiscalProposalAdmissionStatus,
+    fee_schedule::SignedOpenMarketFeeSchedule, FiscalActivationTarget, FiscalAuthorityState,
+    FiscalCharterRegistry, FiscalGenesisPolicy, FiscalParams, FiscalProposalAdmissionState,
+    FiscalProposalAdmissionStatus, FiscalScheduleHead, FiscalStagedTransition,
     VerifiedFiscalActivation, VerifiedFiscalApproval, VerifiedFiscalCharter,
     VerifiedFiscalContinuityAdvance, VerifiedFiscalContinuityCheckpoint, VerifiedFiscalProposal,
     VerifiedFiscalRuntimeReadiness, VerifiedFiscalSchedule,
@@ -15,7 +16,7 @@ use serde::Serialize;
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 
 const FISCAL_STORE_SCHEMA_KEY: &str = "fiscal";
-pub(crate) const FISCAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 3;
+pub(crate) const FISCAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 4;
 const FISCAL_STORE_SCHEMA: &str = include_str!("fiscal_store.sql");
 const FISCAL_GENESIS_PROJECTION_KEY: &str = "authority";
 const ZERO_DIGEST: &str = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -107,6 +108,22 @@ struct FiscalGenesisSnapshot<'a> {
     charter_digest: &'a str,
     readiness_digest: &'a str,
     checkpoint_digest: &'a str,
+}
+
+struct PreparedFiscalActivationMutation {
+    transition_id: String,
+    activation_id: String,
+    activation_digest: String,
+    admission_id: String,
+    admission_digest: String,
+    expected_admission_version: u64,
+    expected_admission_json: Vec<u8>,
+    activated_admission_version: u64,
+    activated_admission_json: Vec<u8>,
+    candidate_schedule_id: String,
+    candidate_schedule_digest: String,
+    predecessor_schedule_id: Option<String>,
+    predecessor_schedule_digest: Option<String>,
 }
 
 #[derive(Clone)]
@@ -732,6 +749,37 @@ impl SqliteFiscalStore {
         next_authority: &FiscalAuthorityState,
         fence: &StoreMutationFence,
     ) -> Result<FiscalStagedTransitionRecord, FiscalStoreError> {
+        self.stage_advance_inner(advance, next_authority, None, fence)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn stage_activation_advance(
+        &self,
+        advance: &VerifiedFiscalContinuityAdvance,
+        next_authority: &FiscalAuthorityState,
+        activation: &VerifiedFiscalActivation,
+        activated_admission: &FiscalProposalAdmissionState,
+        candidate: &VerifiedFiscalSchedule,
+        predecessor: Option<&VerifiedFiscalSchedule>,
+        fence: &StoreMutationFence,
+    ) -> Result<FiscalStagedTransitionRecord, FiscalStoreError> {
+        let mutation = prepare_activation_mutation(
+            advance,
+            activation,
+            activated_admission,
+            candidate,
+            predecessor,
+        )?;
+        self.stage_advance_inner(advance, next_authority, Some(&mutation), fence)
+    }
+
+    fn stage_advance_inner(
+        &self,
+        advance: &VerifiedFiscalContinuityAdvance,
+        next_authority: &FiscalAuthorityState,
+        activation_mutation: Option<&PreparedFiscalActivationMutation>,
+        fence: &StoreMutationFence,
+    ) -> Result<FiscalStagedTransitionRecord, FiscalStoreError> {
         next_authority.validate()?;
         if next_authority.finalized_checkpoint_digest != advance.next().digest() {
             return Err(invariant("staged authority does not match next checkpoint"));
@@ -771,6 +819,11 @@ impl SqliteFiscalStore {
                 {
                     return Err(FiscalStoreError::Conflict);
                 }
+                verify_exact_activation_mutation(
+                    &transaction,
+                    &record.transition_id,
+                    activation_mutation,
+                )?;
                 transaction.commit().map_err(sqlite_error)?;
                 return Ok(existing);
             }
@@ -858,6 +911,9 @@ impl SqliteFiscalStore {
                 ],
             )
             .map_err(sqlite_error)?;
+        if let Some(mutation) = activation_mutation {
+            insert_activation_mutation(&transaction, mutation)?;
+        }
         let projection_key = format!("transition:{}", record.transition_id);
         append_projection_commit(
             &transaction,
@@ -970,6 +1026,7 @@ impl SqliteFiscalStore {
         if updated != 1 || checkpoint_updated != 1 || authority_updated != 1 {
             return Err(FiscalStoreError::Conflict);
         }
+        finalize_activation_mutation(&transaction, &self.serving_owner, transition_id)?;
         record.status = FiscalStageStatus::DbFinalized;
         record.stage_version = next_version;
         let projection_key = format!("transition:{transition_id}");
@@ -1126,6 +1183,289 @@ impl SqliteFiscalStore {
     }
 }
 
+fn prepare_activation_mutation(
+    advance: &VerifiedFiscalContinuityAdvance,
+    activation: &VerifiedFiscalActivation,
+    activated_admission: &FiscalProposalAdmissionState,
+    candidate: &VerifiedFiscalSchedule,
+    predecessor: Option<&VerifiedFiscalSchedule>,
+) -> Result<PreparedFiscalActivationMutation, FiscalStoreError> {
+    let FiscalActivationTarget::Schedule {
+        schedule_id,
+        supersedes_schedule_id,
+    } = &activation.body().target
+    else {
+        return Err(FiscalStoreError::Conflict);
+    };
+    let transition = FiscalStagedTransition::new(
+        activation.body().activation_id.clone(),
+        activation.digest().to_owned(),
+    )?;
+    let candidate_head = FiscalScheduleHead::from_signed(candidate.signed())?;
+    let predecessor_head = predecessor
+        .map(|schedule| FiscalScheduleHead::from_signed(schedule.signed()))
+        .transpose()?;
+    let next_domain = advance
+        .next()
+        .body()
+        .domains
+        .iter()
+        .find(|state| state.domain == candidate.body().domain)
+        .ok_or(FiscalStoreError::Conflict)?;
+    let expected_admission_version = activated_admission
+        .version
+        .checked_sub(1)
+        .ok_or(FiscalStoreError::Conflict)?;
+    if advance.next().body().staged_transition.as_ref() != Some(&transition)
+        || schedule_id != &candidate.body().schedule_id
+        || next_domain.active.as_ref() != Some(&candidate_head)
+        || next_domain.last_known_good.as_ref() != Some(&candidate_head)
+        || activated_admission.status != FiscalProposalAdmissionStatus::Activated
+        || activated_admission.signed_admission.body.admission_id != activation.body().admission_id
+        || activated_admission.admission_digest != activation.body().admission_digest
+        || activated_admission.activation_digest.as_deref() != Some(activation.digest())
+        || activated_admission.activated_sequence != Some(candidate.body().sequence)
+        || expected_admission_version == 0
+        || supersedes_schedule_id.as_deref()
+            != predecessor.map(|schedule| schedule.body().schedule_id.as_str())
+        || candidate.body().supersedes_schedule_id.as_deref()
+            != predecessor.map(|schedule| schedule.body().schedule_id.as_str())
+    {
+        return Err(FiscalStoreError::Conflict);
+    }
+    let expected_admission = FiscalProposalAdmissionState {
+        signed_admission: activated_admission.signed_admission.clone(),
+        admission_digest: activated_admission.admission_digest.clone(),
+        version: expected_admission_version,
+        status: FiscalProposalAdmissionStatus::Admitted,
+        activation_digest: None,
+        activated_sequence: None,
+    };
+    Ok(PreparedFiscalActivationMutation {
+        transition_id: transition.transition_id,
+        activation_id: activation.body().activation_id.clone(),
+        activation_digest: activation.digest().to_owned(),
+        admission_id: activated_admission
+            .signed_admission
+            .body
+            .admission_id
+            .clone(),
+        admission_digest: activated_admission.admission_digest.clone(),
+        expected_admission_version,
+        expected_admission_json: canonical_json_bytes(&expected_admission)
+            .map_err(canonical_error)?,
+        activated_admission_version: activated_admission.version,
+        activated_admission_json: canonical_json_bytes(activated_admission)
+            .map_err(canonical_error)?,
+        candidate_schedule_id: candidate.body().schedule_id.clone(),
+        candidate_schedule_digest: candidate_head.schedule_digest,
+        predecessor_schedule_id: predecessor.map(|schedule| schedule.body().schedule_id.clone()),
+        predecessor_schedule_digest: predecessor_head.map(|head| head.schedule_digest),
+    })
+}
+
+fn insert_activation_mutation(
+    transaction: &Transaction<'_>,
+    mutation: &PreparedFiscalActivationMutation,
+) -> Result<(), FiscalStoreError> {
+    let activation_exact = transaction
+        .query_row(
+            "SELECT activation_digest = ?1 FROM fiscal_activations WHERE activation_id = ?2",
+            params![&mutation.activation_digest, &mutation.activation_id],
+            |row| row.get::<_, bool>(0),
+        )
+        .optional()
+        .map_err(sqlite_error)?
+        .unwrap_or(false);
+    let admission_exact = transaction
+        .query_row(
+            "SELECT admission_digest = ?1 AND state_version = ?2 AND status = 'admitted' AND state_json = ?3 FROM fiscal_proposal_admissions WHERE admission_id = ?4",
+            params![
+                &mutation.admission_digest,
+                sqlite_i64(mutation.expected_admission_version, "expected admission version")?,
+                &mutation.expected_admission_json,
+                &mutation.admission_id,
+            ],
+            |row| row.get::<_, bool>(0),
+        )
+        .optional()
+        .map_err(sqlite_error)?
+        .unwrap_or(false);
+    let candidate_exact = schedule_has_state(
+        transaction,
+        &mutation.candidate_schedule_id,
+        &mutation.candidate_schedule_digest,
+        "staged",
+    )?;
+    let predecessor_exact = match (
+        &mutation.predecessor_schedule_id,
+        &mutation.predecessor_schedule_digest,
+    ) {
+        (Some(id), Some(digest)) => schedule_has_state(transaction, id, digest, "active")?,
+        (None, None) => true,
+        _ => false,
+    };
+    if !activation_exact || !admission_exact || !candidate_exact || !predecessor_exact {
+        return Err(FiscalStoreError::Conflict);
+    }
+    transaction
+        .execute(
+            "INSERT INTO fiscal_staged_activation_mutations (transition_id, activation_id, activation_digest, admission_id, admission_digest, expected_admission_version, activated_admission_version, activated_admission_json, candidate_schedule_id, candidate_schedule_digest, predecessor_schedule_id, predecessor_schedule_digest) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            params![
+                &mutation.transition_id,
+                &mutation.activation_id,
+                &mutation.activation_digest,
+                &mutation.admission_id,
+                &mutation.admission_digest,
+                sqlite_i64(mutation.expected_admission_version, "expected admission version")?,
+                sqlite_i64(mutation.activated_admission_version, "activated admission version")?,
+                &mutation.activated_admission_json,
+                &mutation.candidate_schedule_id,
+                &mutation.candidate_schedule_digest,
+                &mutation.predecessor_schedule_id,
+                &mutation.predecessor_schedule_digest,
+            ],
+        )
+        .map_err(|error| invariant(format!("staged activation mutation insert failed: {error}")))?;
+    Ok(())
+}
+
+fn verify_exact_activation_mutation(
+    transaction: &Transaction<'_>,
+    transition_id: &str,
+    expected: Option<&PreparedFiscalActivationMutation>,
+) -> Result<(), FiscalStoreError> {
+    let retained = transaction
+        .query_row(
+            "SELECT activation_id, activation_digest, admission_id, admission_digest, expected_admission_version, activated_admission_version, activated_admission_json, candidate_schedule_id, candidate_schedule_digest, predecessor_schedule_id, predecessor_schedule_digest FROM fiscal_staged_activation_mutations WHERE transition_id = ?1",
+            [transition_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, i64>(5)?,
+                    row.get::<_, Vec<u8>>(6)?,
+                    row.get::<_, String>(7)?,
+                    row.get::<_, String>(8)?,
+                    row.get::<_, Option<String>>(9)?,
+                    row.get::<_, Option<String>>(10)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    match (retained, expected) {
+        (None, None) => Ok(()),
+        (Some(row), Some(expected))
+            if row.0 == expected.activation_id
+                && row.1 == expected.activation_digest
+                && row.2 == expected.admission_id
+                && row.3 == expected.admission_digest
+                && read_u64(row.4, "expected admission version")?
+                    == expected.expected_admission_version
+                && read_u64(row.5, "activated admission version")?
+                    == expected.activated_admission_version
+                && row.6 == expected.activated_admission_json
+                && row.7 == expected.candidate_schedule_id
+                && row.8 == expected.candidate_schedule_digest
+                && row.9 == expected.predecessor_schedule_id
+                && row.10 == expected.predecessor_schedule_digest =>
+        {
+            Ok(())
+        }
+        _ => Err(FiscalStoreError::Conflict),
+    }
+}
+
+fn schedule_has_state(
+    transaction: &Transaction<'_>,
+    schedule_id: &str,
+    schedule_digest: &str,
+    state: &str,
+) -> Result<bool, FiscalStoreError> {
+    transaction
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM fiscal_schedules WHERE schedule_id = ?1 AND schedule_digest = ?2 AND lifecycle_state = ?3)",
+            params![schedule_id, schedule_digest, state],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)
+}
+
+fn finalize_activation_mutation(
+    transaction: &Transaction<'_>,
+    owner: &SqliteServingOwner,
+    transition_id: &str,
+) -> Result<(), FiscalStoreError> {
+    let mutation = transaction
+        .query_row(
+            "SELECT admission_id, admission_digest, expected_admission_version, activated_admission_version, activated_admission_json, candidate_schedule_id, candidate_schedule_digest, predecessor_schedule_id, predecessor_schedule_digest FROM fiscal_staged_activation_mutations WHERE transition_id = ?1",
+            [transition_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, Vec<u8>>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, Option<String>>(8)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(sqlite_error)?;
+    let Some(mutation) = mutation else {
+        return Ok(());
+    };
+    let expected_version = read_u64(mutation.2, "expected admission version")?;
+    let activated_version = read_u64(mutation.3, "activated admission version")?;
+    let admission_updated = transaction
+        .execute(
+            "UPDATE fiscal_proposal_admissions SET status = 'activated', state_version = ?1, state_json = ?2 WHERE admission_id = ?3 AND admission_digest = ?4 AND state_version = ?5 AND status = 'admitted'",
+            params![
+                sqlite_i64(activated_version, "activated admission version")?,
+                &mutation.4,
+                &mutation.0,
+                &mutation.1,
+                sqlite_i64(expected_version, "expected admission version")?,
+            ],
+        )
+        .map_err(sqlite_error)?;
+    let candidate_updated = transaction
+        .execute(
+            "UPDATE fiscal_schedules SET lifecycle_state = 'active' WHERE schedule_id = ?1 AND schedule_digest = ?2 AND lifecycle_state = 'staged'",
+            params![&mutation.5, &mutation.6],
+        )
+        .map_err(sqlite_error)?;
+    let predecessor_updated = match (&mutation.7, &mutation.8) {
+        (Some(id), Some(digest)) => transaction
+            .execute(
+                "UPDATE fiscal_schedules SET lifecycle_state = 'superseded' WHERE schedule_id = ?1 AND schedule_digest = ?2 AND lifecycle_state = 'active'",
+                params![id, digest],
+            )
+            .map_err(sqlite_error)?,
+        (None, None) => 1,
+        _ => 0,
+    };
+    if admission_updated != 1 || candidate_updated != 1 || predecessor_updated != 1 {
+        return Err(FiscalStoreError::Conflict);
+    }
+    append_projection_commit(
+        transaction,
+        owner,
+        &format!("admission:{}", mutation.0),
+        activated_version,
+        "activate_fiscal_admission",
+        &sha256_hex(&mutation.4),
+    )
+}
+
 pub(crate) fn initialize_fiscal_schema(
     connection: &mut Connection,
 ) -> Result<(), FiscalStoreError> {
@@ -1214,6 +1554,77 @@ pub(crate) fn verify_fiscal_sql_invariants(
                            SELECT 1 FROM fiscal_schedules AS schedule
                            WHERE schedule.schedule_id = binding.fiscal_schedule_id
                              AND schedule.schedule_digest = binding.fiscal_schedule_digest
+                       )
+                )
+                OR EXISTS(
+                    SELECT 1
+                    FROM fiscal_staged_activation_mutations AS mutation
+                    JOIN fiscal_staged_transitions AS stage
+                      ON stage.transition_id = mutation.transition_id
+                    WHERE NOT EXISTS(
+                              SELECT 1 FROM fiscal_activations AS activation
+                              WHERE activation.activation_id = mutation.activation_id
+                                AND activation.activation_digest = mutation.activation_digest
+                          )
+                       OR (
+                           stage.status = 'db_finalized'
+                           AND (
+                               NOT EXISTS(
+                                   SELECT 1 FROM fiscal_proposal_admissions AS admission
+                                   WHERE admission.admission_id = mutation.admission_id
+                                     AND admission.admission_digest = mutation.admission_digest
+                                     AND admission.status = 'activated'
+                                     AND admission.state_version = mutation.activated_admission_version
+                                     AND admission.state_json = mutation.activated_admission_json
+                               )
+                               OR NOT EXISTS(
+                                   SELECT 1 FROM fiscal_schedules AS candidate
+                                   WHERE candidate.schedule_id = mutation.candidate_schedule_id
+                                     AND candidate.schedule_digest = mutation.candidate_schedule_digest
+                                     AND candidate.lifecycle_state = 'active'
+                               )
+                               OR (
+                                   mutation.predecessor_schedule_id IS NOT NULL
+                                   AND NOT EXISTS(
+                                       SELECT 1 FROM fiscal_schedules AS predecessor
+                                       WHERE predecessor.schedule_id = mutation.predecessor_schedule_id
+                                         AND predecessor.schedule_digest = mutation.predecessor_schedule_digest
+                                         AND predecessor.lifecycle_state = 'superseded'
+                                   )
+                               )
+                               OR NOT EXISTS(
+                                   SELECT 1 FROM fiscal_projection_commits AS commit_record
+                                   WHERE commit_record.projection_key = 'admission:' || mutation.admission_id
+                                     AND commit_record.projection_sequence = mutation.activated_admission_version
+                               )
+                           )
+                       )
+                       OR (
+                           stage.status <> 'db_finalized'
+                           AND (
+                               NOT EXISTS(
+                                   SELECT 1 FROM fiscal_proposal_admissions AS admission
+                                   WHERE admission.admission_id = mutation.admission_id
+                                     AND admission.admission_digest = mutation.admission_digest
+                                     AND admission.status = 'admitted'
+                                     AND admission.state_version = mutation.expected_admission_version
+                               )
+                               OR NOT EXISTS(
+                                   SELECT 1 FROM fiscal_schedules AS candidate
+                                   WHERE candidate.schedule_id = mutation.candidate_schedule_id
+                                     AND candidate.schedule_digest = mutation.candidate_schedule_digest
+                                     AND candidate.lifecycle_state = 'staged'
+                               )
+                               OR (
+                                   mutation.predecessor_schedule_id IS NOT NULL
+                                   AND NOT EXISTS(
+                                       SELECT 1 FROM fiscal_schedules AS predecessor
+                                       WHERE predecessor.schedule_id = mutation.predecessor_schedule_id
+                                         AND predecessor.schedule_digest = mutation.predecessor_schedule_digest
+                                         AND predecessor.lifecycle_state = 'active'
+                                   )
+                               )
+                           )
                        )
                 )
                 OR EXISTS(

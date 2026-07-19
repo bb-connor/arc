@@ -1,10 +1,13 @@
 use chio_fiscal::{
     commit_fiscal_continuity_advance, FiscalAuthorityState, FiscalCharterRegistry,
-    FiscalGenesisPolicy, FiscalStateAnchor, FiscalStateAnchorError,
-    VerifiedFiscalContinuityAdvance, VerifiedFiscalContinuityCheckpoint,
+    FiscalGenesisPolicy, FiscalProposalAdmissionState, FiscalStateAnchor, FiscalStateAnchorError,
+    VerifiedFiscalActivation, VerifiedFiscalContinuityAdvance, VerifiedFiscalContinuityCheckpoint,
+    VerifiedFiscalSchedule,
 };
 use chio_kernel::admission_operation::StoreMutationFence;
-use chio_store_sqlite::fiscal_store::{FiscalStoreError, SqliteFiscalStore};
+use chio_store_sqlite::fiscal_store::{
+    FiscalStagedTransitionRecord, FiscalStoreError, SqliteFiscalStore,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum FiscalStateCommitError {
@@ -24,6 +27,64 @@ pub fn commit_fiscal_state_advance(
     fence: &StoreMutationFence,
 ) -> Result<VerifiedFiscalContinuityCheckpoint, FiscalStateCommitError> {
     let staged = store.stage_advance(&advance, next_authority, fence)?;
+    finish_fiscal_state_advance(
+        store,
+        anchor,
+        staged,
+        advance,
+        next_authority,
+        policy,
+        charters,
+        fence,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn commit_fiscal_activation(
+    store: &SqliteFiscalStore,
+    anchor: &dyn FiscalStateAnchor,
+    advance: VerifiedFiscalContinuityAdvance,
+    next_authority: &FiscalAuthorityState,
+    activation: &VerifiedFiscalActivation,
+    activated_admission: &FiscalProposalAdmissionState,
+    candidate: &VerifiedFiscalSchedule,
+    predecessor: Option<&VerifiedFiscalSchedule>,
+    policy: &FiscalGenesisPolicy,
+    charters: &FiscalCharterRegistry,
+    fence: &StoreMutationFence,
+) -> Result<VerifiedFiscalContinuityCheckpoint, FiscalStateCommitError> {
+    let staged = store.stage_activation_advance(
+        &advance,
+        next_authority,
+        activation,
+        activated_admission,
+        candidate,
+        predecessor,
+        fence,
+    )?;
+    finish_fiscal_state_advance(
+        store,
+        anchor,
+        staged,
+        advance,
+        next_authority,
+        policy,
+        charters,
+        fence,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn finish_fiscal_state_advance(
+    store: &SqliteFiscalStore,
+    anchor: &dyn FiscalStateAnchor,
+    staged: FiscalStagedTransitionRecord,
+    advance: VerifiedFiscalContinuityAdvance,
+    next_authority: &FiscalAuthorityState,
+    policy: &FiscalGenesisPolicy,
+    charters: &FiscalCharterRegistry,
+    fence: &StoreMutationFence,
+) -> Result<VerifiedFiscalContinuityCheckpoint, FiscalStateCommitError> {
     let committed = commit_fiscal_continuity_advance(anchor, advance, policy, charters)?;
     let checkpoint = committed.checkpoint().clone();
     store.mark_anchor_advanced(&staged.transition_id, &checkpoint, fence)?;
