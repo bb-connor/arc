@@ -44,7 +44,7 @@ use uuid::Uuid;
 use crate::KernelError;
 
 /// Schema identifier for Chio execution nonces.
-pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v2";
+pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v1";
 
 /// Default TTL for a freshly minted execution nonce.
 pub const DEFAULT_EXECUTION_NONCE_TTL_SECS: u64 = 30;
@@ -71,6 +71,7 @@ pub struct NonceBinding {
     /// Hex-encoded subject (agent) public key, taken from `capability.subject`.
     pub subject_id: String,
     /// Stable idempotency identity of the tool request.
+    #[serde(default)]
     pub request_id: String,
     /// ID of the capability that authorized this invocation.
     pub capability_id: String,
@@ -557,7 +558,7 @@ pub(crate) fn validate_execution_nonce(
             field: "subject_id",
         });
     }
-    if bound.request_id != expected.request_id {
+    if bound.request_id.is_empty() || bound.request_id != expected.request_id {
         return Err(ExecutionNonceError::BindingMismatch {
             field: "request_id",
         });
@@ -708,20 +709,29 @@ mod tests {
     }
 
     #[test]
-    fn v1_nonce_is_rejected_after_request_binding_revision() {
+    fn nonce_without_request_binding_is_rejected() {
         let kp = Keypair::generate();
-        let store = InMemoryExecutionNonceStore::default();
         let cfg = ExecutionNonceConfig::default();
         let binding = sample_binding();
         let now = 1_000_000;
-        let mut signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
-        signed.nonce.schema = "chio.execution_nonce.v1".to_string();
-        signed.signature = kp.sign_canonical(&signed.nonce).unwrap().0;
+        let signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
+        let mut encoded = serde_json::to_value(signed).unwrap();
+        encoded["nonce"]["bound_to"]
+            .as_object_mut()
+            .unwrap()
+            .remove("request_id");
+        let decoded: SignedExecutionNonce = serde_json::from_value(encoded).unwrap();
 
-        let error = verify_execution_nonce(&signed, &kp.public_key(), &binding, now + 1, &store)
-            .unwrap_err();
+        assert!(decoded.nonce.bound_to.request_id.is_empty());
+        let error =
+            validate_execution_nonce(&decoded, &kp.public_key(), &binding, now + 1).unwrap_err();
 
-        assert!(matches!(error, ExecutionNonceError::BadSchema { .. }));
+        assert!(matches!(
+            error,
+            ExecutionNonceError::BindingMismatch {
+                field: "request_id"
+            }
+        ));
     }
 
     #[test]

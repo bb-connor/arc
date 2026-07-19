@@ -17,16 +17,16 @@ ADR declares the enforcement contract normative so downstream consumers can pin
 to a stable shape.
 
 Two code-only realities are hereby reconciled with the docs: the
-`chio.execution_nonce.v2` schema (`execution_nonce.rs`) and the
+`chio.execution_nonce.v1` schema (`execution_nonce.rs`) and the
 `BudgetGuaranteeLevel` taxonomy (`budget_store.rs`) were previously absent from
 `spec/` and every ADR.
 
 ## Decision
 
-1. `chio.execution_nonce.v2` is a signed body of
+1. `chio.execution_nonce.v1` is a signed body of
    `{schema, nonce_id, issued_at, expires_at, bound_to{subject_id, request_id,
    capability_id, tool_server, tool_name, parameter_hash}}` plus an Ed25519
-   `signature`. Version 1 did not bind `request_id` and is rejected fail-closed.
+   `signature`. A missing or empty `request_id` is rejected fail-closed.
 2. The atomic hold lifecycle (authorize worst-case exposure, reconcile down to
    realized spend, reverse on deny) is normative. `BudgetGuaranteeLevel`
    (`single_node_atomic`, `ha_linearizable`, `partition_escrowed`,

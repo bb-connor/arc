@@ -1030,7 +1030,7 @@ it satisfies the structural conjunction of the `chio.mediated_spend.v1` profile:
 - Its `budget_authority` metadata names a `hold_id` that was atomically committed
   against the agent's cost-bearing capability and reconciled down to realized
   spend (`authorize` then `terminal.disposition = reconciled`).
-- A `chio.execution_nonce.v2` nonce, signed by the same admitted kernel key, is
+- A `chio.execution_nonce.v1` nonce, signed by the same admitted kernel key, is
   bound to the same `capability_id`, `tool_server`, `tool_name`, and
   `parameter_hash`, and the receipt records that nonce id
   (`budget_authority.execution_nonce_id`).
