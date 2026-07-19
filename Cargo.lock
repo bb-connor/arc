@@ -3072,6 +3072,7 @@ dependencies = [
  "chio-errors",
  "chio-external-guards",
  "chio-federation",
+ "chio-fiscal",
  "chio-guards",
  "chio-http-serve",
  "chio-kernel",
