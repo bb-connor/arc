@@ -94,6 +94,11 @@ fn verify_structured_lifecycle_history(connection: &Connection) -> Result<(), Bu
                     AND invocation_state_after = 'reversed'
                     AND monetary_state_after = CASE
                         WHEN exposure_units = 0 THEN 'none' ELSE 'reversed' END)
+                OR (kind = 'cancel_captured_before_dispatch'
+                    AND invocation_state_before = 'captured'
+                    AND invocation_state_after = 'reversed'
+                    AND monetary_state_after = CASE
+                        WHEN exposure_units = 0 THEN 'none' ELSE 'reversed' END)
                 OR (kind = 'release_exposure'
                     AND invocation_state_before = 'authorized'
                     AND invocation_state_after = 'authorized'
@@ -413,9 +418,14 @@ fn verify_quota_history(connection: &Connection) -> Result<(), BudgetStoreError>
                      AND reserved_after = reserved_before - 1
                      AND captured_after = captured_before)
                     OR
+                    (kind = 'cancel_captured_before_dispatch' AND captured_before > 0
+                     AND reserved_after = reserved_before
+                     AND captured_after = captured_before - 1)
+                    OR
                     (kind NOT IN (
                         'reserve_invocation', 'authorize_exposure',
-                        'capture_invocation', 'reverse_invocation'
+                        'capture_invocation', 'reverse_invocation',
+                        'cancel_captured_before_dispatch'
                      ) AND reserved_after = reserved_before
                        AND captured_after = captured_before)
                   )
@@ -702,6 +712,20 @@ fn verify_cumulative_state_machine(connection: &Connection) -> Result<(), Budget
                                 .checked_sub(event.requested_authorized)
                                 == Some(event.after.reserved)
                             && event.before.captured == event.after.captured
+                            && version_incremented
+                    }
+                    "cancel_captured_before_dispatch" => {
+                        prior.state == BudgetCumulativeApprovalState::Captured
+                            && state_after == BudgetCumulativeApprovalState::ReversedBeforeDispatch
+                            && event.authorization_outcome.is_none()
+                            && digest_unchanged
+                            && approved_digest_present
+                            && event.before.reserved == event.after.reserved
+                            && event
+                                .before
+                                .captured
+                                .checked_sub(event.requested_authorized)
+                                == Some(event.after.captured)
                             && version_incremented
                     }
                     "release_exposure" => {
@@ -1010,7 +1034,7 @@ fn verify_supplemental_capture_time(connection: &Connection) -> Result<(), Budge
             FROM budget_authorization_holds AS hold
             WHERE hold.projection_kind = 'composite_v1'
               AND (
-                (hold.invocation_state <> 'captured'
+                (hold.invocation_state NOT IN ('captured', 'reversed')
                  AND hold.trusted_capture_time IS NOT NULL)
                 OR
                 (hold.invocation_state = 'captured' AND (
@@ -1025,6 +1049,23 @@ fn verify_supplemental_capture_time(connection: &Connection) -> Result<(), Budge
                     OR (hold.supplemental_expires_at IS NOT NULL
                         AND hold.trusted_capture_time >= hold.supplemental_expires_at)
                 ))
+                OR
+                (hold.invocation_state = 'reversed'
+                 AND hold.trusted_capture_time IS NOT NULL
+                 AND (
+                    hold.trusted_capture_time IS NOT (
+                        SELECT event.trusted_time
+                        FROM budget_mutation_events AS event
+                        WHERE event.hold_id = hold.hold_id
+                          AND event.kind = 'capture_invocation'
+                        ORDER BY event.event_seq DESC LIMIT 1
+                    )
+                    OR NOT EXISTS (
+                        SELECT 1 FROM budget_mutation_events AS event
+                        WHERE event.hold_id = hold.hold_id
+                          AND event.kind = 'cancel_captured_before_dispatch'
+                    )
+                 ))
               )
             LIMIT 1
             "#,

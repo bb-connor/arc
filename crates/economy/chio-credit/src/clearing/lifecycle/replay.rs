@@ -437,6 +437,7 @@ pub fn verify_clearing_lifecycle_replay_with_outcome(
         batch,
         &replay.proof,
         verified.expected_reconciliation_slot(),
+        verified.verified_zero_intent(),
     )?;
     Ok(verified.authorization().clone())
 }
@@ -586,9 +587,14 @@ fn verify_replay_authority(
             EconomicTransitionAuthorizationV1::Direct
         }
     };
-    Ok(match reconciliation_slot {
-        Some(slot) => ClearingLifecycleAuthorityVerificationV1::reconciled(authorization, slot),
-        None => ClearingLifecycleAuthorityVerificationV1::direct(authorization),
+    Ok(match (&replay.evidence, reconciliation_slot) {
+        (ClearingLifecycleReplayEvidenceV1::ZeroIntentReconciliation { .. }, None) => {
+            ClearingLifecycleAuthorityVerificationV1::zero_intent(authorization)
+        }
+        (_, Some(slot)) => {
+            ClearingLifecycleAuthorityVerificationV1::reconciled(authorization, slot)
+        }
+        (_, None) => ClearingLifecycleAuthorityVerificationV1::direct(authorization),
     })
 }
 

@@ -583,6 +583,94 @@ impl BudgetStore for RemoteBudgetStore {
         Ok(())
     }
 
+    fn try_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&BudgetEventAuthority>,
+    ) -> Result<bool, BudgetStoreError> {
+        if authority.is_some() {
+            return Err(structured_budget_error(
+                "remote budget store does not support authority-fenced charging",
+            ));
+        }
+        self.try_charge_cost_with_ids(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+            hold_id,
+            event_id,
+        )
+    }
+
+    fn reverse_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&BudgetEventAuthority>,
+    ) -> Result<(), BudgetStoreError> {
+        if authority.is_some() {
+            return Err(structured_budget_error(
+                "remote budget store does not support authority-fenced reversal",
+            ));
+        }
+        self.reverse_charge_cost_with_ids(capability_id, grant_index, cost_units, hold_id, event_id)
+    }
+
+    fn reduce_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&BudgetEventAuthority>,
+    ) -> Result<(), BudgetStoreError> {
+        if authority.is_some() {
+            return Err(structured_budget_error(
+                "remote budget store does not support authority-fenced release",
+            ));
+        }
+        self.reduce_charge_cost_with_ids(capability_id, grant_index, cost_units, hold_id, event_id)
+    }
+
+    fn settle_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        exposed_cost_units: u64,
+        realized_cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&BudgetEventAuthority>,
+    ) -> Result<(), BudgetStoreError> {
+        if authority.is_some() {
+            return Err(structured_budget_error(
+                "remote budget store does not support authority-fenced settlement",
+            ));
+        }
+        self.settle_charge_cost_with_ids(
+            capability_id,
+            grant_index,
+            exposed_cost_units,
+            realized_cost_units,
+            hold_id,
+            event_id,
+        )
+    }
+
     fn authorize_budget_hold(
         &self,
         request: BudgetAuthorizeHoldRequest,

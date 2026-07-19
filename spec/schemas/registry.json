@@ -5,6 +5,12 @@
   "description": "Verifier-facing registry of signed artifact schema IDs. Load-time and verify-time code must reject signed artifacts whose schema is not listed here.",
   "artifacts": [
     {
+      "schema": "chio.admission-receipt.v1",
+      "artifactKind": "admission_receipt_metadata",
+      "introducedBy": "durable-admission-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/receipt/admission-metadata.schema.json"
+    },
+    {
       "schema": "chio.anchor_batch.v1",
       "artifactKind": "anchor_batch",
       "introducedBy": "schema-registry/v1/anchor-batch-v1",

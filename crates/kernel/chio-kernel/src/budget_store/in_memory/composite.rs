@@ -497,9 +497,9 @@ impl InMemoryBudgetStoreInner {
                         invocation_state: BudgetInvocationState::Authorized,
                         invocation_quotas: quotas.clone(),
                         legacy_captured_invocation_quota: None,
-                        captured_cancellation_allowed: request.invocation_quotas.is_empty()
-                            && request.cumulative_approval.is_none()
-                            && request.admission_binding.is_none(),
+                        captured_cancellation_allowed: request.cumulative_approval.is_some()
+                            || (request.invocation_quotas.is_empty()
+                                && request.admission_binding.is_none()),
                         cumulative_approval,
                         monetary_state: if request.requested_exposure_units == 0 {
                             BudgetMonetaryState::None
@@ -631,11 +631,11 @@ impl InMemoryBudgetStoreInner {
             authority: request.authority.clone(),
         };
         self.append_mutation(request.event_id.as_deref(), mutation.clone(), record);
-        if let Some(hold_id) = request.hold_id.as_deref() {
-            self.hold_authorizations
-                .insert(hold_id.to_string(), mutation.clone());
-        }
         if allowed {
+            if let Some(hold_id) = request.hold_id.as_deref() {
+                self.hold_authorizations
+                    .insert(hold_id.to_string(), mutation.clone());
+            }
             if let Some(operation_id) = request
                 .admission_binding
                 .as_ref()

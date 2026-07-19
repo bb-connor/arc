@@ -193,6 +193,80 @@ fn batch_advance_rechecks_current_heads_sequence_signature_and_consumer_proofs(
     Ok(())
 }
 
+#[test]
+fn batch_commit_requires_exact_request_replays() -> Result<(), Box<dyn core::error::Error>> {
+    let (mut batch, slot) = unsigned_prepared_effect_batch()?;
+    let absent_resource_keys = batch
+        .transitions
+        .iter()
+        .map(|transition| transition.resource_key.clone())
+        .collect::<Vec<_>>();
+    let current = verify_economic_state_view(
+        signed_view(
+            1,
+            digest("request-replay-checkpoint-1"),
+            Vec::new(),
+            absent_resource_keys,
+            Vec::new(),
+            vec![slot.request.key()],
+        )?,
+        &pins(),
+    )?;
+    batch.checkpoint_sequence = 2;
+    batch.previous_checkpoint_digest = Some(current.view().checkpoint_digest.clone());
+    batch.issued_at = 501;
+    batch.seal(&anchor_keypair())?;
+    let advance =
+        verify_economic_state_batch_advance(&current, batch, &pins(), &DirectTransitionVerifier)?;
+    let committed_heads = advance
+        .batch()
+        .transitions
+        .iter()
+        .map(|transition| transition.next_head.clone())
+        .collect::<Vec<_>>();
+    let committed = verify_economic_state_view(
+        signed_view(
+            advance.batch().checkpoint_sequence,
+            advance.batch().checkpoint_digest.clone(),
+            committed_heads.clone(),
+            Vec::new(),
+            advance.batch().request_replays.clone(),
+            Vec::new(),
+        )?,
+        &pins(),
+    )?;
+    verify_economic_state_batch_commit(&advance, &committed, &pins())?;
+
+    let omitted = verify_economic_state_view(
+        signed_view(
+            advance.batch().checkpoint_sequence,
+            advance.batch().checkpoint_digest.clone(),
+            committed_heads.clone(),
+            Vec::new(),
+            Vec::new(),
+            vec![slot.request.key()],
+        )?,
+        &pins(),
+    )?;
+    assert!(verify_economic_state_batch_commit(&advance, &omitted, &pins()).is_err());
+
+    let mut conflicting = advance.batch().request_replays.clone();
+    conflicting[0].request.request_binding_digest = digest("conflicting-request-binding");
+    let altered = verify_economic_state_view(
+        signed_view(
+            advance.batch().checkpoint_sequence,
+            advance.batch().checkpoint_digest.clone(),
+            committed_heads,
+            Vec::new(),
+            conflicting,
+            Vec::new(),
+        )?,
+        &pins(),
+    )?;
+    assert!(verify_economic_state_batch_commit(&advance, &altered, &pins()).is_err());
+    Ok(())
+}
+
 #[derive(Debug)]
 struct CompleteBatchVerifier {
     required_keys: Vec<EconomicResourceKeyV1>,

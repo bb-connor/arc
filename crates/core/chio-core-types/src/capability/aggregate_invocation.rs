@@ -72,6 +72,22 @@ pub struct AggregateBudgetDelegationMarker {
     pub max_invocations: u32,
 }
 
+impl AggregateBudgetDelegationMarker {
+    pub(crate) fn validate(&self) -> Result<()> {
+        if self.root_binding_digest.len() != 64
+            || !self
+                .root_binding_digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err(violation(
+                "aggregate budget root binding digest must be lowercase SHA-256 hex",
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedAggregateInvocationBudget {
     pub scope: AggregateInvocationScope,

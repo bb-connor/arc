@@ -662,6 +662,13 @@ pub fn verify_economic_state_batch_commit(
             ));
         }
     }
+    for replay in &advance.batch.request_replays {
+        if committed.view.request_replay(&replay.request.key()) != Some(replay) {
+            return Err(EconomicStateAnchorError::InvalidView(
+                "committed request replay does not match the batch",
+            ));
+        }
+    }
     Ok(())
 }
 

@@ -992,10 +992,7 @@ impl ChioKernel {
                 || matching.grant.max_total_cost.is_some()
         });
         if has_monetary_grant || request_has_monetary_grant {
-            return Err(KernelError::Internal(
-                "direct monetary dispatch requires captured admission from the full evaluator"
-                    .to_string(),
-            ));
+            return Err(KernelError::DirectDispatchUnavailable);
         }
         self.reserve_presented_execution_nonce(request)?;
         self.dispatch_within_budget(request, has_monetary_grant)

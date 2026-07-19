@@ -16,6 +16,8 @@ use crate::tool_outcome::{
 
 #[path = "durable_admission/monetary.rs"]
 mod monetary;
+#[path = "durable_admission/review_regressions.rs"]
+mod review_regressions;
 
 #[test]
 fn durable_admission_runtime_defaults_closed_and_off_requires_explicit_unsafe_ephemeral_mode() {
@@ -1541,9 +1543,9 @@ fn cumulative_approval_resumes_the_same_hold_and_dispatches_once() {
         300,
     )
     .expect("threshold requirement");
-    kernel.set_threshold_approval_requirement_resolver(StdArc::new(
-        FixedThresholdRequirement(requirement),
-    ));
+    kernel.set_threshold_approval_requirement_resolver(StdArc::new(FixedThresholdRequirement(
+        requirement,
+    )));
     let mut body = request.capability.body();
     body.scope.grants[0]
         .constraints
@@ -1786,9 +1788,9 @@ fn nested_cumulative_approval_resumes_and_dispatches_once() {
         300,
     )
     .expect("threshold requirement");
-    kernel.set_threshold_approval_requirement_resolver(StdArc::new(
-        FixedThresholdRequirement(requirement),
-    ));
+    kernel.set_threshold_approval_requirement_resolver(StdArc::new(FixedThresholdRequirement(
+        requirement,
+    )));
     let mut body = request.capability.body();
     body.scope.grants[0]
         .constraints
@@ -1839,12 +1841,7 @@ fn nested_cumulative_approval_resumes_and_dispatches_once() {
     let mut client = NoopNestedFlowClient;
 
     let pending = kernel
-        .evaluate_tool_call_with_nested_flow_client(
-            &parent_context,
-            &request,
-            &mut client,
-            None,
-        )
+        .evaluate_tool_call_with_nested_flow_client(&parent_context, &request, &mut client, None)
         .expect("nested pending response");
     assert_eq!(
         pending.verdict,
@@ -1879,12 +1876,7 @@ fn nested_cumulative_approval_resumes_and_dispatches_once() {
     request.approval_tokens = vec![token];
 
     let response = kernel
-        .evaluate_tool_call_with_nested_flow_client(
-            &parent_context,
-            &request,
-            &mut client,
-            None,
-        )
+        .evaluate_tool_call_with_nested_flow_client(&parent_context, &request, &mut client, None)
         .expect("nested approved response");
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
@@ -1900,10 +1892,8 @@ fn aggregate_invocation_budget_exhausts_across_grants_atomically() {
     first_grant.max_invocations = Some(1);
     let mut second_grant = make_grant("durable-server", "mutate-alt");
     second_grant.max_invocations = Some(1);
-    let (kernel, mut first, store, invocations) = durable_admission_fixture_with_grants(
-        "aggregate-first",
-        vec![first_grant, second_grant],
-    );
+    let (kernel, mut first, store, invocations) =
+        durable_admission_fixture_with_grants("aggregate-first", vec![first_grant, second_grant]);
     let mut body = first.capability.body();
     body.aggregate_invocation_budget = Some(AggregateInvocationBudget {
         scope: AggregateInvocationScope::Capability,
@@ -1956,15 +1946,15 @@ fn durable_admission_passes_opaque_supplemental_bytes_to_installed_verifier() {
             crate::supplemental_quota::SupplementalQuotaVerifierError,
         > {
             let request_binding_hash =
-                crate::supplemental_quota::supplemental_request_binding_hash(context)
-                    .map_err(|error| {
+                crate::supplemental_quota::supplemental_request_binding_hash(context).map_err(
+                    |error| {
                         crate::supplemental_quota::SupplementalQuotaVerifierError::new(
                             error.to_string(),
                         )
-                    })?;
+                    },
+                )?;
             Ok(crate::supplemental_quota::VerifiedSupplementalQuotaClaim {
-                profile: crate::supplemental_quota::BROKER_CAPABILITY_EXECUTION_PROFILE
-                    .to_string(),
+                profile: crate::supplemental_quota::BROKER_CAPABILITY_EXECUTION_PROFILE.to_string(),
                 broker_capability_id: "broker-capability-7".to_string(),
                 issuer: context.subject.clone(),
                 request_constraint_digest: "a".repeat(64),
@@ -2353,7 +2343,10 @@ fn completed_federated_replay_remains_closed_until_cosign_succeeds(
         kernel.evaluate_tool_call_blocking(&request),
         Err(KernelError::Internal(reason)) if reason.contains("bilateral co-sign failed")
     ));
-    assert_eq!(store.operation().state(), AdmissionOperationState::Completed);
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::Completed
+    );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     assert_eq!(cosigner_calls.load(Ordering::SeqCst), 1);
 
@@ -2418,6 +2411,11 @@ fn failed_tool_return_persistence_retains_dispatch_and_blocks_redispatch() {
         AdmissionOperationState::DispatchCommitted
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    let receipt_log = kernel.receipt_log();
+    assert_eq!(receipt_log.len(), 1);
+    let failure_receipt = receipt_log.get(0).expect("tool return failure receipt");
+    assert!(failure_receipt.is_denied());
+    assert!(failure_receipt.verify_signature().expect("signed receipt"));
 
     let replay = kernel
         .evaluate_tool_call_blocking(&request)

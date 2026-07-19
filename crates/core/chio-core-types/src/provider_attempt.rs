@@ -514,7 +514,7 @@ impl ProviderAttemptCheckpointV1 {
                     &execution_lease.digest()?,
                 )?;
                 if completion.completed_at < execution_lease.acquired_at
-                    || completion.completed_at > execution_lease.expires_at
+                    || completion.completed_at >= execution_lease.expires_at
                 {
                     return Err(invalid(
                         "completed_at",

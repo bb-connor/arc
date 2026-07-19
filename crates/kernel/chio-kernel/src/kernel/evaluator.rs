@@ -80,9 +80,7 @@ pub trait ToolEvaluator: Send + Sync {
         has_monetary_grant: bool,
     ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
         let _ = (kernel, request, has_monetary_grant);
-        Err(KernelError::DurableAdmission(
-            "direct phase dispatch requires the full evaluation pipeline".to_owned(),
-        ))
+        Err(KernelError::DirectDispatchUnavailable)
     }
 
     /// Sign the receipt for the (allow or deny) outcome of a tool call.

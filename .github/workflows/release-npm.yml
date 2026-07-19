@@ -71,7 +71,6 @@ jobs:
             "sdks/typescript/packages/node-http"
             "sdks/typescript/packages/wasm-core"
             "sdks/typescript/packages/browser"
-            "sdks/typescript/packages/wasm-core"
             "sdks/typescript/packages/workers"
             "sdks/typescript/packages/edge"
             "sdks/typescript/packages/deno"
@@ -320,15 +319,14 @@ jobs:
           set -euo pipefail
           same_release_marker="$(mktemp)"
           trap 'rm -f "$same_release_marker"' EXIT
-          SAME_RELEASE_MARKER="$same_release_marker" node <<'NODE'
+          mapfile -t local_dep_dirs < <(
+            SAME_RELEASE_MARKER="$same_release_marker" node <<'NODE'
             const fs = require("fs");
             const path = require("path");
 
             const repoRoot = process.env.GITHUB_WORKSPACE ?? path.resolve("../../..");
             const workspaceRoot = path.join(repoRoot, "sdks/typescript");
             const packageDir = process.cwd();
-            const pkgPath = path.join(packageDir, "package.json");
-            const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
             const localByName = new Map();
 
             for (const dir of [path.join(workspaceRoot, "chio-ts")]) {
@@ -344,53 +342,52 @@ jobs:
               localByName.set(manifest.name, dir);
             }
 
-            let mutated = false;
-            for (const block of ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]) {
-              const deps = pkg[block] ?? {};
-              for (const [name, spec] of Object.entries(deps)) {
-                if (typeof spec !== "string" || spec.startsWith("file:")) continue;
-                if (!name.startsWith("@chio-protocol/")) continue;
-                const localDir = localByName.get(name);
-                if (!localDir || path.resolve(localDir) === path.resolve(packageDir)) continue;
-                const rel = path.relative(packageDir, localDir).replaceAll(path.sep, "/");
-                deps[name] = `file:${rel}`;
-                mutated = true;
-                console.log(`using local same-release ${block}.${name}: ${spec} -> file:${rel}`);
+            const visited = new Set();
+            let anyMutated = false;
+
+            function visit(dir) {
+              const resolved = path.resolve(dir);
+              if (visited.has(resolved)) return;
+              visited.add(resolved);
+
+              const pkgPath = path.join(resolved, "package.json");
+              const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+              let mutated = false;
+              for (const block of ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]) {
+                const deps = pkg[block] ?? {};
+                for (const [name, spec] of Object.entries(deps)) {
+                  if (typeof spec !== "string" || !name.startsWith("@chio-protocol/")) continue;
+                  const localDir = localByName.get(name);
+                  if (!localDir || path.resolve(localDir) === resolved) continue;
+                  const rel = path.relative(resolved, localDir).replaceAll(path.sep, "/");
+                  const localSpec = `file:${rel}`;
+                  if (spec !== localSpec) {
+                    deps[name] = localSpec;
+                    mutated = true;
+                    anyMutated = true;
+                    console.error(`using local same-release ${block}.${name}: ${spec} -> ${localSpec}`);
+                  }
+                  visit(localDir);
+                }
               }
+
+              if (mutated) {
+                fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+              }
+              if (resolved !== path.resolve(packageDir)) console.log(resolved);
             }
 
-            if (mutated) {
-              fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+            visit(packageDir);
+            if (anyMutated) {
               fs.writeFileSync(process.env.SAME_RELEASE_MARKER, "1");
             }
           NODE
-          mapfile -t local_file_deps < <(
-            node -e '
-              const fs = require("fs");
-              const path = require("path");
-              const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-              const seen = new Set();
-              for (const block of ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]) {
-                const deps = pkg[block] ?? {};
-                for (const spec of Object.values(deps)) {
-                  if (typeof spec !== "string" || !spec.startsWith("file:")) continue;
-                  const dir = path.resolve(spec.slice("file:".length));
-                  if (seen.has(dir)) continue;
-                  seen.add(dir);
-                  console.log(dir);
-                }
-              }
-            '
           )
-          for dep_dir in "${local_file_deps[@]}"; do
+          for dep_dir in "${local_dep_dirs[@]}"; do
             [[ -n "$dep_dir" ]] || continue
             echo "Bootstrapping local file dependency $dep_dir"
             pushd "$dep_dir" >/dev/null
-            if [[ -f package-lock.json ]]; then
-              npm ci --workspaces=false
-            else
-              npm install --workspaces=false
-            fi
+            npm install --workspaces=false
             if node -e 'const pkg = require("./package.json"); process.exit(pkg.scripts?.build ? 0 : 1)'; then
               npm run build
             fi

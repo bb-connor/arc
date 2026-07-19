@@ -52,7 +52,7 @@ mod contract_freeze {
         ))
         .expect("ADR-0016 must exist");
         assert!(adr.contains("chio.mediated_spend.v1"));
-        assert!(adr.contains("chio.execution_nonce.v1"));
+        assert!(adr.contains("chio.execution_nonce.v2"));
         assert!(adr.contains("quote.quoted_cost"));
         assert!(adr.contains("execution_nonce_ref"));
         assert!(adr.contains("hold_ref"));

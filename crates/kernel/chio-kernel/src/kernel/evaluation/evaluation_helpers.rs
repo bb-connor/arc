@@ -75,6 +75,64 @@ impl ChioKernel {
         build()
     }
 
+    pub(super) fn post_dispatch_failure_receipt_metadata(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        budget_mutation: &PreExecutionBudgetMutation,
+        payment_authorization: Option<&PaymentAuthorization>,
+        durable_admission: bool,
+        metadata: Option<serde_json::Value>,
+    ) -> Option<serde_json::Value> {
+        if durable_admission {
+            return self.ambiguous_dispatch_receipt_metadata(
+                budget_mutation,
+                payment_authorization,
+                metadata,
+            );
+        }
+        match self.unwind_pre_dispatch_monetary_invocation(
+            request,
+            cap,
+            budget_mutation.charge_result(),
+            payment_authorization,
+        ) {
+            Ok(reverse) => {
+                let metadata = match (budget_mutation.charge_result(), reverse.as_ref()) {
+                    (Some(charge), Some(reverse)) => self.merge_budget_receipt_metadata(
+                        metadata,
+                        self.budget_execution_receipt_metadata(
+                            charge,
+                            Some(("reversed", reverse)),
+                            None,
+                        ),
+                    ),
+                    _ => metadata,
+                };
+                self.mark_runtime_admission_reservations_retained_fail_closed(metadata)
+            }
+            Err(error) => {
+                warn!(
+                    request_id = %request.request_id,
+                    reason = %redacted!(&error),
+                    "non-durable monetary unwind could not be confirmed"
+                );
+                merge_metadata_objects(
+                    self.ambiguous_dispatch_receipt_metadata(
+                        budget_mutation,
+                        payment_authorization,
+                        metadata,
+                    ),
+                    Some(serde_json::json!({
+                        "financial": {
+                            "non_durable_unwind_unconfirmed": true
+                        }
+                    })),
+                )
+            }
+        }
+    }
+
     fn release_budget_lease_with_evidence(
         &self,
         cap: &CapabilityToken,

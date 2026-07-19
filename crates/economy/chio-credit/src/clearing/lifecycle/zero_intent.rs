@@ -272,7 +272,7 @@ pub fn compose_clearing_zero_intent_reconciliation_transition(
     {
         return Err(ClearingError::AuthorityVerification);
     }
-    compose_lifecycle_transition(
+    compose_zero_intent_lifecycle_transition(
         current_round_head,
         reservations,
         ClearingRoundTransitionV1::Satisfy {

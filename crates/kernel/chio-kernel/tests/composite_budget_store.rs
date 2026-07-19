@@ -1130,14 +1130,16 @@ fn exhausted_member_denies_without_reserving_other_quotas_or_exposure() {
         "family:private",
         2,
     );
+    let mut retry = authorize_request(
+        "denied-composite",
+        vec![private_with_new_maximum.clone()],
+        0,
+    );
+    retry.event_id = Some("event:denied-composite:retry".to_string());
     expect_authorized(
         store
-            .authorize_budget_hold(authorize_request(
-                "private-after-denial",
-                vec![private_with_new_maximum.clone()],
-                0,
-            ))
-            .expect("denied request must not define a new quota maximum"),
+            .authorize_budget_hold(retry)
+            .expect("denied hold and operation identifiers remain reusable"),
     );
     assert_usage(&quota_usage(&store, &private_with_new_maximum.key), 1, 0);
 }
@@ -1746,6 +1748,33 @@ fn cumulative_threshold_boundary_requires_approval_before_capture() {
         .find(|event| event.event_id == "event:cumulative-boundary:authorize")
         .expect("cumulative authorization event");
     assert_eq!(authorize_event.kind, BudgetMutationKind::ReserveInvocation);
+
+    let cancellation = store
+        .cancel_captured_before_dispatch(BudgetCancelCapturedBeforeDispatchRequest {
+            capability_id: CAPABILITY_ID.to_string(),
+            grant_index: GRANT_INDEX,
+            hold_id: "hold:cumulative-boundary".to_string(),
+            event_id: "event:cumulative-boundary:cancel".to_string(),
+            authority: None,
+        })
+        .expect("cancel captured cumulative participant");
+    let cancelled = match cancellation {
+        BudgetCapturedBeforeDispatchCancellationDecision::Cancelled(cancelled) => cancelled,
+        other => panic!("expected cumulative cancellation, got {other:?}"),
+    };
+    assert_eq!(
+        cancelled
+            .cumulative_approval
+            .as_ref()
+            .map(|usage| usage.state),
+        Some(BudgetCumulativeApprovalState::ReversedBeforeDispatch)
+    );
+    let account_after_cancel = store
+        .get_cumulative_approval_account_usage(&account)
+        .expect("query cumulative account after cancellation")
+        .expect("cumulative account exists");
+    assert_eq!(account_after_cancel.reserved_authorized.units, 60);
+    assert_eq!(account_after_cancel.captured_authorized.units, 0);
 }
 
 #[test]

@@ -255,7 +255,7 @@ fn cancellation_and_execution_fences_are_enforced() {
 
     let mut late = lifecycle()[3].clone();
     if let ProviderAttemptPhaseV1::Completed { completion, .. } = &mut late.phase {
-        completion.completed_at = lease().expires_at + 1;
+        completion.completed_at = lease().expires_at;
     }
     assert!(late.validate().is_err());
 

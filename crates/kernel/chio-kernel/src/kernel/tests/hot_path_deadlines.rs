@@ -307,8 +307,7 @@ async fn per_guard_budget_bounds_single_guard_not_pipeline(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn pipeline_budget_bounds_the_per_guard_loop(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn pipeline_budget_bounds_the_per_guard_loop() -> Result<(), Box<dyn std::error::Error>> {
     // With per-guard budgets configured, the whole guard loop must still honor
     // the pipeline budget. A single guard whose own budget is generous but whose
     // work exceeds the pipeline budget must trip the pipeline deadline rather
@@ -390,8 +389,8 @@ async fn dispatch_budget_expiry_runs_full_unwind_and_emits_cancelled_receipt(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn wedged_writer_watchdog_denies_before_side_effect(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn wedged_writer_watchdog_denies_before_side_effect() -> Result<(), Box<dyn std::error::Error>>
+{
     let invocations = Arc::new(AtomicU64::new(0));
     let mut kernel = make_kernel(make_config());
     kernel.set_receipt_store(Box::new(WedgedLivenessStore))?;
@@ -649,13 +648,10 @@ async fn phase_dispatch_requires_the_full_evaluation_pipeline(
         .dispatch(&kernel, &request, false)
         .await;
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    match result {
-        Err(KernelError::DurableAdmission(reason)) => assert_eq!(
-            reason,
-            "direct phase dispatch requires the full evaluation pipeline"
-        ),
-        other => panic!("expected durable admission denial, got {other:?}"),
-    }
+    assert!(matches!(
+        result,
+        Err(KernelError::DirectDispatchUnavailable)
+    ));
     Ok(())
 }
 
@@ -761,7 +757,10 @@ fn always_offload_moves_guards_off_the_async_worker_without_a_timer(
             .run_guards_within_budget(&request, &scope, None, None)
             .await;
         assert!(outcome.is_ok(), "the recording guard allows");
-        let guard = guard_thread.lock().expect("read guard thread").expect("guard ran");
+        let guard = guard_thread
+            .lock()
+            .expect("read guard thread")
+            .expect("guard ran");
         assert_ne!(
             guard, worker,
             "always_offload must move the guard off the async worker even without a timer"
@@ -846,12 +845,8 @@ fn always_offload_runs_guards_inline_without_a_tokio_runtime(
     let scope = make_scope(vec![make_grant("srv-offload", "noop")]);
 
     // Drive the future with the futures executor: no Tokio runtime is entered.
-    let outcome = futures::executor::block_on(kernel.run_guards_within_budget(
-        &request,
-        &scope,
-        None,
-        None,
-    ));
+    let outcome =
+        futures::executor::block_on(kernel.run_guards_within_budget(&request, &scope, None, None));
 
     assert!(
         outcome.is_ok(),
@@ -920,7 +915,8 @@ fn nested_dispatch_isolates_a_synchronously_blocking_call_from_the_async_pool(
             std::thread::sleep(block);
             Ok::<_, KernelError>(ToolServerOutput::Value(serde_json::json!({ "ok": true })))
         };
-        let output = crate::kernel::dispatch::dispatch_nested_call_within_budget(call, budget).await;
+        let output =
+            crate::kernel::dispatch::dispatch_nested_call_within_budget(call, budget).await;
         assert!(
             matches!(output, Ok(ToolServerOutput::Value(_))),
             "the blocking nested call completes through the helper"

@@ -1380,7 +1380,7 @@ fn chio_runtime_admission_does_not_release_destructive_lease_after_dispatch_fail
 }
 
 #[test]
-fn chio_runtime_admission_retains_reservations_on_url_elicitation_after_dispatch_entry(
+fn chio_runtime_admission_releases_reservations_on_non_durable_url_elicitation(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
@@ -1425,14 +1425,16 @@ fn chio_runtime_admission_retains_reservations_on_url_elicitation_after_dispatch
     assert_eq!(stream_attempts.load(Ordering::SeqCst), 1);
     assert_eq!(
         releases.load(Ordering::SeqCst),
-        0,
-        "URL elicitation after dispatch entry must retain runtime reservations"
+        1,
+        "non-durable URL elicitation must release runtime reservations for retry"
     );
-    assert_url_elicitation_retained_receipt(
-        &kernel,
-        "lease-url-elicitation",
-        Some("continuation-url-elicitation"),
-    )?;
+    let receipt_log = kernel.receipt_log();
+    assert_eq!(receipt_log.len(), 1);
+    let receipt = receipt_log
+        .get(0)
+        .ok_or_else(|| std::io::Error::other("URL elicitation cleanup receipt missing"))?;
+    assert!(receipt.is_denied());
+    assert!(receipt.verify_signature()?);
     Ok(())
 }
 
@@ -1797,13 +1799,61 @@ fn chio_runtime_release_failure_does_not_mask_pre_dispatch_budget_denial(
         "lease-release-failure-budget-deny"
     );
     assert_eq!(metadata["chio_runtime"]["reservation_release_failed"], true);
-    assert_eq!(
-        metadata["chio_runtime"]["reservation_retained"],
-        true
-    );
+    assert_eq!(metadata["chio_runtime"]["reservation_retained"], true);
     assert!(metadata["chio_runtime"]
         .get("reservation_release_failure_reason")
         .is_none());
+    Ok(())
+}
+
+#[test]
+fn exhausted_grant_receipt_retains_failed_runtime_release_evidence(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut kernel = make_kernel(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new(
+        "runtime-release-srv",
+        vec!["read"],
+    )));
+
+    let admission_calls = std::sync::Arc::new(AtomicU64::new(0));
+    let releases = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(FailingReleaseRuntimeAdmissionHook {
+        calls: std::sync::Arc::clone(&admission_calls),
+        releases: std::sync::Arc::clone(&releases),
+        expected_request_id: "req-exhausted-runtime-release-failure",
+        admission_id: "adm-exhausted-runtime-release-failure",
+        lease_id: "lease-exhausted-runtime-release-failure",
+    }));
+
+    let mut grant = make_grant("runtime-release-srv", "read");
+    grant.max_invocations = Some(0);
+    let agent = make_keypair();
+    let capability = make_capability(&kernel, &agent, make_scope(vec![grant]), 300);
+    let response = kernel.evaluate_tool_call_blocking(&make_request_with_arguments(
+        "req-exhausted-runtime-release-failure",
+        &capability,
+        "read",
+        "runtime-release-srv",
+        serde_json::json!({}),
+    ))?;
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("budget exhausted")));
+    assert_eq!(admission_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(releases.load(Ordering::SeqCst), 1);
+    let metadata = response
+        .receipt
+        .metadata
+        .ok_or_else(|| std::io::Error::other("deny metadata missing"))?;
+    assert_eq!(
+        metadata["chio_runtime"]["reserved_destructive_lease_id"],
+        "lease-exhausted-runtime-release-failure"
+    );
+    assert_eq!(metadata["chio_runtime"]["reservation_release_failed"], true);
+    assert_eq!(metadata["chio_runtime"]["reservation_retained"], true);
     Ok(())
 }
 
@@ -1903,16 +1953,22 @@ fn drop_guard_reverse_failure_records_cleanup_fault() {
     ));
 
     let receipt_log = kernel.receipt_log();
-    assert_eq!(receipt_log.len(), 1, "drop guard must emit exactly one cancellation receipt");
+    assert_eq!(
+        receipt_log.len(),
+        1,
+        "drop guard must emit exactly one cancellation receipt"
+    );
     let receipt = receipt_log.get(0).unwrap();
-    assert!(receipt.is_cancelled(), "drop guard receipt must be a cancellation");
+    assert!(
+        receipt.is_cancelled(),
+        "drop guard receipt must be a cancellation"
+    );
     let metadata = receipt
         .metadata
         .as_ref()
         .expect("cancellation receipt must carry metadata");
     assert_eq!(
-        metadata["chio_runtime"]["pre_dispatch_cleanup_failed"],
-        true,
+        metadata["chio_runtime"]["pre_dispatch_cleanup_failed"], true,
         "reverse failure must be visible as a pre-dispatch cleanup fault"
     );
     assert!(
@@ -3562,8 +3618,7 @@ fn post_invocation_block_marks_reservations_retained() -> Result<(), Box<dyn std
 
 #[test]
 fn connector_tool_not_registered_after_side_effect_retains_admission(
-) -> Result<(), Box<dyn std::error::Error>>
-{
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
     let side_effects = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(ToolNotRegisteredDispatchServer::new(
@@ -3618,7 +3673,10 @@ fn connector_tool_not_registered_after_side_effect_retains_admission(
         .as_object()
         .ok_or_else(|| std::io::Error::other("chio_runtime block missing"))?;
     assert_eq!(runtime["reservations_retained_fail_closed"], true);
-    assert_eq!(runtime["retained_destructive_lease_id"], "lease-tool-not-registered");
+    assert_eq!(
+        runtime["retained_destructive_lease_id"],
+        "lease-tool-not-registered"
+    );
     Ok(())
 }
 
@@ -3724,8 +3782,8 @@ fn dispatch_not_registered_retains_full_budget_state_nested_flow(
 }
 
 #[test]
-fn url_elicitation_after_dispatch_retains_full_budget_state(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn non_durable_url_elicitation_releases_full_budget_state() -> Result<(), Box<dyn std::error::Error>>
+{
     let mut kernel = make_kernel(make_config());
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
     kernel.register_tool_server(Box::new(UrlElicitationBeforeSideEffectServer::new(
@@ -3777,21 +3835,16 @@ fn url_elicitation_after_dispatch_retains_full_budget_state(
     let slot_reusable =
         kernel.with_budget_store(|store| Ok(store.try_increment(&cap.id, 0, Some(1))?))?;
     assert!(
-        !slot_reusable,
-        "URL elicitation after dispatch entry must retain the invocation slot"
+        slot_reusable,
+        "non-durable URL elicitation must release the invocation slot"
     );
     assert_eq!(admission_calls.load(Ordering::SeqCst), 1);
-    assert_eq!(releases.load(Ordering::SeqCst), 0);
-    assert_url_elicitation_retained_receipt(
-        &kernel,
-        "lease-url-elicitation-full-budget-async",
-        Some("continuation-url-elicitation-full-budget-async"),
-    )?;
+    assert_eq!(releases.load(Ordering::SeqCst), 1);
     Ok(())
 }
 
 #[test]
-fn url_elicitation_after_dispatch_retains_full_budget_state_nested_flow(
+fn non_durable_url_elicitation_releases_full_budget_state_nested_flow(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut kernel = make_kernel(make_config());
     let stream_attempts = std::sync::Arc::new(AtomicU64::new(0));
@@ -3860,49 +3913,11 @@ fn url_elicitation_after_dispatch_retains_full_budget_state_nested_flow(
     let slot_reusable =
         kernel.with_budget_store(|store| Ok(store.try_increment(&cap.id, 0, Some(1))?))?;
     assert!(
-        !slot_reusable,
-        "nested URL elicitation after dispatch entry must retain the invocation slot"
+        slot_reusable,
+        "nested non-durable URL elicitation must release the invocation slot"
     );
     assert_eq!(admission_calls.load(Ordering::SeqCst), 1);
-    assert_eq!(releases.load(Ordering::SeqCst), 0);
-    assert_url_elicitation_retained_receipt(
-        &kernel,
-        "lease-url-elicitation-full-budget-nested",
-        Some("continuation-url-elicitation-full-budget-nested"),
-    )?;
-    Ok(())
-}
-
-fn assert_url_elicitation_retained_receipt(
-    kernel: &ChioKernel,
-    lease_id: &str,
-    continuation_id: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let receipt_log = kernel.receipt_log();
-    assert_eq!(receipt_log.len(), 1);
-    let receipt = receipt_log
-        .get(0)
-        .ok_or_else(|| std::io::Error::other("URL elicitation receipt missing"))?;
-    assert!(receipt.is_cancelled());
-    assert!(receipt.verify_signature()?);
-    let metadata = receipt
-        .metadata
-        .as_ref()
-        .ok_or_else(|| std::io::Error::other("URL elicitation receipt metadata missing"))?;
-    assert_eq!(
-        metadata["chio_runtime"]["reservations_retained_fail_closed"],
-        true
-    );
-    assert_eq!(
-        metadata["chio_runtime"]["retained_destructive_lease_id"],
-        lease_id
-    );
-    if let Some(continuation_id) = continuation_id {
-        assert_eq!(
-            metadata["chio_runtime"]["retained_treaty_continuation_id"],
-            continuation_id
-        );
-    }
+    assert_eq!(releases.load(Ordering::SeqCst), 1);
     Ok(())
 }
 
@@ -3980,8 +3995,7 @@ fn make_sibling_sum_url_fixture(prefix: &str) -> SiblingSumInvocationFixture {
 }
 
 #[test]
-fn url_elicitation_after_dispatch_retains_sibling_budget() -> Result<(), Box<dyn std::error::Error>>
-{
+fn non_durable_url_elicitation_releases_sibling_budget() -> Result<(), Box<dyn std::error::Error>> {
     // Refcount: admit_capability_budget takes a holder lease per evaluation. An
     // earlier evaluation holds child_a's edge (lease 1). A second overlapping
     // evaluation that reaches dispatch takes a second lease and retains it when
@@ -4019,20 +4033,12 @@ fn url_elicitation_after_dispatch_retains_sibling_budget() -> Result<(), Box<dyn
     kernel
         .release_admitted_capability_budget(&child_a)
         .map_err(std::io::Error::other)?;
-    let readmit_b = kernel.admit_capability_budget(&child_b);
-    assert!(
-        readmit_b.is_err(),
-        "the URL-elicitation dispatch lease must keep the sibling oversubscribed after the earlier lease is released: {readmit_b:?}"
-    );
-    kernel
-        .release_admitted_capability_budget(&child_a)
-        .map_err(std::io::Error::other)?;
     assert!(kernel.admit_capability_budget(&child_b).is_ok());
     Ok(())
 }
 
 #[test]
-fn url_elicitation_after_dispatch_retains_sibling_budget_nested_flow(
+fn non_durable_url_elicitation_releases_sibling_budget_nested_flow(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // The nested-flow arm must retain its holder lease after dispatch entry.
     let SiblingSumInvocationFixture {
@@ -4080,14 +4086,6 @@ fn url_elicitation_after_dispatch_retains_sibling_budget_nested_flow(
         "the nested delegated child must surface UrlElicitationsRequired: {result:?}"
     );
 
-    kernel
-        .release_admitted_capability_budget(&child_a)
-        .map_err(std::io::Error::other)?;
-    let readmit_b = kernel.admit_capability_budget(&child_b);
-    assert!(
-        readmit_b.is_err(),
-        "the nested URL-elicitation dispatch lease must keep the sibling oversubscribed: {readmit_b:?}"
-    );
     kernel
         .release_admitted_capability_budget(&child_a)
         .map_err(std::io::Error::other)?;

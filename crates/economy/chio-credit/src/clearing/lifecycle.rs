@@ -429,9 +429,35 @@ impl ClearingRoundLifecycleRecordV1 {
         transition: &ClearingRoundTransitionV1,
         proof_digest: String,
     ) -> Result<Self, ClearingError> {
+        self.advance_inner(transition, proof_digest, false)
+    }
+
+    fn advance_zero_intent(
+        &self,
+        transition: &ClearingRoundTransitionV1,
+        proof_digest: String,
+    ) -> Result<Self, ClearingError> {
+        self.advance_inner(transition, proof_digest, true)
+    }
+
+    fn advance_inner(
+        &self,
+        transition: &ClearingRoundTransitionV1,
+        proof_digest: String,
+        verified_zero_intent: bool,
+    ) -> Result<Self, ClearingError> {
         self.validate()?;
         transition.validate()?;
-        let state = transition.target_state(self.state)?;
+        let state = if verified_zero_intent
+            && self.state == ClearingRoundLifecycleStateV1::Finalized
+            && self.intent_progress.is_empty()
+            && self.first_dispatch_operation_id.is_none()
+            && matches!(transition, ClearingRoundTransitionV1::Satisfy { .. })
+        {
+            ClearingRoundLifecycleStateV1::Satisfied
+        } else {
+            transition.target_state(self.state)?
+        };
         let row_version = self
             .row_version
             .checked_add(1)
@@ -783,8 +809,7 @@ impl ClearingRoundTransitionV1 {
                 Ok(ClearingRoundLifecycleStateV1::Incident)
             }
             (
-                ClearingRoundLifecycleStateV1::Finalized
-                | ClearingRoundLifecycleStateV1::Dispatching
+                ClearingRoundLifecycleStateV1::Dispatching
                 | ClearingRoundLifecycleStateV1::Reconciling,
                 Self::Satisfy { .. },
             ) => Ok(ClearingRoundLifecycleStateV1::Satisfied),
@@ -909,7 +934,16 @@ impl ClearingRoundTransitionProofV1 {
         validate_positive("reservation_count", self.reservation_count)?;
         validate_digest("reservation_head_root", &self.reservation_head_root)?;
         self.transition.validate()?;
-        if self.transition.target_state(self.source_state)? != self.target_state
+        let target_matches = match self.transition.target_state(self.source_state) {
+            Ok(target) => target == self.target_state,
+            Err(ClearingError::IllegalLifecycleTransition) => {
+                self.source_state == ClearingRoundLifecycleStateV1::Finalized
+                    && self.target_state == ClearingRoundLifecycleStateV1::Satisfied
+                    && matches!(self.transition, ClearingRoundTransitionV1::Satisfy { .. })
+            }
+            Err(error) => return Err(error),
+        };
+        if !target_matches
             || self.next_round_version
                 != self
                     .source_round_version
@@ -1030,6 +1064,37 @@ fn compose_lifecycle_transition(
     transition: ClearingRoundTransitionV1,
     trusted_clock_high_water: u64,
 ) -> Result<ClearingLifecycleProjectionV1, ClearingError> {
+    compose_lifecycle_transition_inner(
+        current_round_head,
+        reservations,
+        transition,
+        trusted_clock_high_water,
+        false,
+    )
+}
+
+fn compose_zero_intent_lifecycle_transition(
+    current_round_head: &EconomicResourceHeadV1,
+    reservations: &[AnchoredClearingObligationV1],
+    transition: ClearingRoundTransitionV1,
+    trusted_clock_high_water: u64,
+) -> Result<ClearingLifecycleProjectionV1, ClearingError> {
+    compose_lifecycle_transition_inner(
+        current_round_head,
+        reservations,
+        transition,
+        trusted_clock_high_water,
+        true,
+    )
+}
+
+fn compose_lifecycle_transition_inner(
+    current_round_head: &EconomicResourceHeadV1,
+    reservations: &[AnchoredClearingObligationV1],
+    transition: ClearingRoundTransitionV1,
+    trusted_clock_high_water: u64,
+    verified_zero_intent: bool,
+) -> Result<ClearingLifecycleProjectionV1, ClearingError> {
     current_round_head
         .validate()
         .map_err(|_| ClearingError::InvalidField("current_round_head"))?;
@@ -1048,7 +1113,14 @@ fn compose_lifecycle_transition(
     let source_digest = current_round_head
         .digest()
         .map_err(|_| ClearingError::InvalidField("current_round_head"))?;
-    let target_state = transition.target_state(current_record.state)?;
+    let target_state = if verified_zero_intent
+        && current_record.state == ClearingRoundLifecycleStateV1::Finalized
+        && matches!(transition, ClearingRoundTransitionV1::Satisfy { .. })
+    {
+        ClearingRoundLifecycleStateV1::Satisfied
+    } else {
+        transition.target_state(current_record.state)?
+    };
     let next_round_version = current_record
         .row_version
         .checked_add(1)
@@ -1075,7 +1147,11 @@ fn compose_lifecycle_transition(
     };
     proof.validate()?;
     let proof_digest = proof.digest()?;
-    let next_record = current_record.advance(&proof.transition, proof_digest.clone())?;
+    let next_record = if verified_zero_intent {
+        current_record.advance_zero_intent(&proof.transition, proof_digest.clone())?
+    } else {
+        current_record.advance(&proof.transition, proof_digest.clone())?
+    };
     let frost = proof.transition.frost().cloned();
     let mut transitions = Vec::with_capacity(proof.reservations.len() + 1);
     transitions.push(EconomicStateTransitionV1 {
@@ -1138,6 +1214,7 @@ pub trait ClearingLifecycleProofResolver: Send + Sync {
 pub struct ClearingLifecycleAuthorityVerificationV1 {
     authorization: EconomicTransitionAuthorizationV1,
     expected_reconciliation_slot: Option<EconomicEffectSlotV1>,
+    verified_zero_intent: bool,
 }
 
 impl ClearingLifecycleAuthorityVerificationV1 {
@@ -1146,6 +1223,16 @@ impl ClearingLifecycleAuthorityVerificationV1 {
         Self {
             authorization,
             expected_reconciliation_slot: None,
+            verified_zero_intent: false,
+        }
+    }
+
+    #[must_use]
+    pub const fn zero_intent(authorization: EconomicTransitionAuthorizationV1) -> Self {
+        Self {
+            authorization,
+            expected_reconciliation_slot: None,
+            verified_zero_intent: true,
         }
     }
 
@@ -1157,6 +1244,7 @@ impl ClearingLifecycleAuthorityVerificationV1 {
         Self {
             authorization,
             expected_reconciliation_slot: Some(expected_reconciliation_slot),
+            verified_zero_intent: false,
         }
     }
 
@@ -1168,6 +1256,11 @@ impl ClearingLifecycleAuthorityVerificationV1 {
     #[must_use]
     pub const fn expected_reconciliation_slot(&self) -> Option<&EconomicEffectSlotV1> {
         self.expected_reconciliation_slot.as_ref()
+    }
+
+    #[must_use]
+    pub const fn verified_zero_intent(&self) -> bool {
+        self.verified_zero_intent
     }
 }
 
@@ -1240,6 +1333,7 @@ impl EconomicTransitionProofVerifier for ClearingLifecycleBatchVerifier {
             batch,
             &proof,
             verified.expected_reconciliation_slot(),
+            verified.verified_zero_intent(),
         )
         .map_err(|_| rejected_batch(batch))?;
         Ok(vec![
@@ -1505,6 +1599,7 @@ fn verify_projection(
     batch: &EconomicStateBatchV1,
     proof: &ClearingRoundTransitionProofV1,
     expected_reconciliation_slot: Option<&EconomicEffectSlotV1>,
+    verified_zero_intent: bool,
 ) -> Result<(), ClearingError> {
     proof.validate()?;
     let proof_digest = proof.digest()?;
@@ -1565,7 +1660,11 @@ fn verify_projection(
     {
         return Err(ClearingError::IncompleteLifecycleProjection);
     }
-    let expected_next = source_record.advance(&proof.transition, proof_digest.clone())?;
+    let expected_next = if verified_zero_intent {
+        source_record.advance_zero_intent(&proof.transition, proof_digest.clone())?
+    } else {
+        source_record.advance(&proof.transition, proof_digest.clone())?
+    };
     let actual_next: ClearingRoundLifecycleRecordV1 = decode_inline(&round_transition.next_head)?;
     if actual_next != expected_next
         || round_transition.expected_head_digest.as_deref()
@@ -1700,4 +1799,22 @@ fn rejected_batch(batch: &EconomicStateBatchV1) -> EconomicStateAnchorError {
                 resource_id: "invalid".to_owned(),
             }),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finalized_round_cannot_satisfy_without_zero_intent_reconciliation() {
+        let transition = ClearingRoundTransitionV1::Satisfy {
+            satisfaction_digest: "0".repeat(64),
+            authority_digest: "1".repeat(64),
+        };
+
+        assert!(matches!(
+            transition.target_state(ClearingRoundLifecycleStateV1::Finalized),
+            Err(ClearingError::IllegalLifecycleTransition)
+        ));
+    }
 }

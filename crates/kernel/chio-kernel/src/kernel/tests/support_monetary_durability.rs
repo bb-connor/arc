@@ -109,6 +109,8 @@ impl crate::budget_store::BudgetStore for CommittingCaptureErrorBudgetStore {
         )
     }
 
+    delegate_authority_fenced_budget_methods!(inner);
+
     fn list_usages(
         &self,
         limit: usize,
@@ -767,25 +769,25 @@ impl MonetaryFailureFixture {
         })
     }
 
-    fn assert_retained(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn assert_released(&self, expected_attempts: usize) -> Result<(), Box<dyn std::error::Error>> {
         let usage = self
             .kernel
             .budget_store
             .get_usage(&self.capability.id, 0)?
             .ok_or_else(|| std::io::Error::other("monetary usage missing after dispatch"))?;
-        assert_eq!(usage.invocation_count, 1);
-        assert_eq!(usage.committed_cost_units()?, 100);
+        assert_eq!(usage.invocation_count, 0);
+        assert_eq!(usage.committed_cost_units()?, 0);
         assert_eq!(
             self.payment
                 .authorized
                 .load(std::sync::atomic::Ordering::SeqCst),
-            1
+            expected_attempts
         );
         assert_eq!(
             self.payment
                 .released
                 .load(std::sync::atomic::Ordering::SeqCst),
-            0
+            expected_attempts
         );
         assert_eq!(
             self.payment
@@ -793,13 +795,16 @@ impl MonetaryFailureFixture {
                 .load(std::sync::atomic::Ordering::SeqCst),
             0
         );
-        assert_eq!(self.executions.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(
+            self.executions.load(std::sync::atomic::Ordering::SeqCst),
+            u64::try_from(expected_attempts)?
+        );
         Ok(())
     }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn monetary_terminal_failures_retain_admission_and_block_top_level_replay(
+async fn non_durable_monetary_terminal_failures_release_top_level_funds(
 ) -> Result<(), Box<dyn std::error::Error>> {
     for case in MONETARY_FAILURE_CASES {
         let fixture = MonetaryFailureFixture::new(case, "top-level")?;
@@ -810,18 +815,19 @@ async fn monetary_terminal_failures_retain_admission_and_block_top_level_replay(
             &fixture.capability.id,
             &fixture.request.request_id,
         )?;
-        assert_payment_authorization_retained(&first.receipt)?;
-        fixture.assert_retained()?;
+        fixture.assert_released(1)?;
 
-        let replay = fixture.kernel.evaluate_tool_call(&fixture.request).await?;
-        assert_eq!(replay.verdict, Verdict::Deny);
-        fixture.assert_retained()?;
+        let mut fresh = fixture.request.clone();
+        fresh.request_id = format!("{}-fresh", fresh.request_id);
+        let retry = fixture.kernel.evaluate_tool_call(&fresh).await?;
+        assert_eq!(retry.verdict, Verdict::Deny);
+        fixture.assert_released(2)?;
     }
     Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn monetary_terminal_failures_retain_admission_and_block_nested_replay(
+async fn non_durable_monetary_terminal_failures_release_nested_funds(
 ) -> Result<(), Box<dyn std::error::Error>> {
     for case in MONETARY_FAILURE_CASES {
         let fixture = MonetaryFailureFixture::new(case, "nested")?;
@@ -855,33 +861,30 @@ async fn monetary_terminal_failures_retain_admission_and_block_nested_replay(
             &fixture.capability.id,
             &fixture.request.request_id,
         )?;
-        assert_payment_authorization_retained(&first.receipt)?;
-        fixture.assert_retained()?;
+        fixture.assert_released(1)?;
 
-        let replay_session_id = fixture.kernel.open_session(
-            fixture.request.agent_id.clone(),
-            vec![fixture.capability.clone()],
-        )?;
+        let mut fresh = fixture.request.clone();
+        fresh.request_id = format!("{}-fresh", fresh.request_id);
+        let replay_session_id = fixture
+            .kernel
+            .open_session(fresh.agent_id.clone(), vec![fixture.capability.clone()])?;
         fixture.kernel.activate_session(&replay_session_id)?;
-        let replay_context = make_operation_context(
-            &replay_session_id,
-            &fixture.request.request_id,
-            &fixture.request.agent_id,
-        );
+        let replay_context =
+            make_operation_context(&replay_session_id, &fresh.request_id, &fresh.agent_id);
         fixture
             .kernel
             .begin_session_request(&replay_context, OperationKind::ToolCall, true)?;
-        let replay = fixture
+        let retry = fixture
             .kernel
             .evaluate_tool_call_with_nested_flow_client_async(
                 &replay_context,
-                &fixture.request,
+                &fresh,
                 &mut client,
                 None,
             )
             .await?;
-        assert_eq!(replay.verdict, Verdict::Deny);
-        fixture.assert_retained()?;
+        assert_eq!(retry.verdict, Verdict::Deny);
+        fixture.assert_released(2)?;
     }
     Ok(())
 }
@@ -1218,9 +1221,8 @@ fn predispatch_unwind_requires_confirmed_payment_release_status(
         &request.arguments,
         request.model_metadata.as_ref(),
     )?;
-    let (_, mutation) =
-        kernel
-            .check_and_increment_budget(
+    let (_, mutation) = kernel
+        .check_and_increment_budget(
             &request,
             &capability,
             &matching,
@@ -1228,7 +1230,7 @@ fn predispatch_unwind_requires_confirmed_payment_release_status(
             None,
             current_unix_timestamp_ms(),
         )?
-            .into_authorized()?;
+        .into_authorized()?;
     let authorization = PaymentAuthorization {
         authorization_id: "auth-predispatch-unwind-pending".to_string(),
         state: PaymentAuthorizationState::Held,
@@ -1699,7 +1701,7 @@ async fn lost_cancellation_acknowledgement_records_ambiguity_and_blocks_dispatch
 }
 
 #[test]
-fn monetary_url_elicitation_after_tool_entry_retains_admission_and_records_receipt(
+fn non_durable_monetary_url_elicitation_releases_admission_for_fresh_retry(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let payment = TrackingPaymentAdapter::new();
     let side_effects = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
@@ -1738,26 +1740,25 @@ fn monetary_url_elicitation_after_tool_entry_retains_admission_and_records_recei
     let usage = kernel
         .budget_store
         .get_usage(&capability.id, 0)?
-        .ok_or_else(|| std::io::Error::other("URL retained usage missing"))?;
-    assert_eq!(usage.invocation_count, 1);
-    assert_eq!(usage.committed_cost_units()?, 100);
+        .ok_or_else(|| std::io::Error::other("URL cleanup usage missing"))?;
+    assert_eq!(usage.invocation_count, 0);
+    assert_eq!(usage.committed_cost_units()?, 0);
     assert_eq!(
         payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
         1
     );
     assert_eq!(
         payment.released.load(std::sync::atomic::Ordering::SeqCst),
-        0
+        1
     );
     assert_eq!(side_effects.load(std::sync::atomic::Ordering::SeqCst), 1);
     let receipt_log = kernel.receipt_log();
     assert_eq!(receipt_log.len(), 1);
     let receipt = receipt_log
         .get(0)
-        .ok_or_else(|| std::io::Error::other("ambiguous URL receipt missing"))?;
-    assert!(receipt.is_cancelled());
+        .ok_or_else(|| std::io::Error::other("URL cleanup receipt missing"))?;
+    assert!(receipt.is_denied());
     assert_monetary_capture_receipt_metadata(receipt, &capability.id, &request.request_id)?;
-    assert_payment_authorization_retained(receipt)?;
 
     let exact_replay = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(exact_replay.verdict, Verdict::Deny);
@@ -1769,17 +1770,19 @@ fn monetary_url_elicitation_after_tool_entry_retains_admission_and_records_recei
 
     let mut fresh = request;
     fresh.request_id = "req-monetary-url-ambiguous-fresh".to_string();
-    let fresh_result = kernel.evaluate_tool_call_blocking(&fresh)?;
-    assert_eq!(fresh_result.verdict, Verdict::Deny);
+    assert!(matches!(
+        kernel.evaluate_tool_call_blocking(&fresh),
+        Err(KernelError::UrlElicitationsRequired { .. })
+    ));
     assert_eq!(
         payment.authorized.load(std::sync::atomic::Ordering::SeqCst),
-        1
+        2
     );
     assert_eq!(
         payment.released.load(std::sync::atomic::Ordering::SeqCst),
-        0
+        2
     );
-    assert_eq!(side_effects.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert_eq!(side_effects.load(std::sync::atomic::Ordering::SeqCst), 2);
     Ok(())
 }
 
@@ -1854,7 +1857,10 @@ async fn direct_monetary_dispatch_without_capture_proof_fails_closed(
         let result = kernel
             .dispatch_tool_call_with_cost(&request, caller_claim)
             .await;
-        assert!(result.is_err());
+        assert!(matches!(
+            result,
+            Err(KernelError::DirectDispatchUnavailable)
+        ));
     }
     assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
     Ok(())

@@ -139,6 +139,9 @@ pub enum KernelError {
     #[error("captured budget replay denied for capability {0}")]
     CapturedBudgetReplay(CapabilityId),
 
+    #[error("direct tool dispatch is unavailable; use the full evaluation pipeline")]
+    DirectDispatchUnavailable,
+
     #[error("request agent {actual} does not match capability subject {expected}")]
     SubjectMismatch { expected: String, actual: String },
 
@@ -399,6 +402,11 @@ impl KernelError {
                 "CHIO-KERNEL-CAPTURED-BUDGET-REPLAY",
                 serde_json::json!({ "capability_id": capability_id }),
                 "Use a new request ID. A captured budget authorization cannot be reused by another dispatch.",
+            ),
+            Self::DirectDispatchUnavailable => self.report_with_context(
+                "CHIO-KERNEL-DIRECT-DISPATCH-UNAVAILABLE",
+                serde_json::json!({}),
+                "Use the full evaluation pipeline so admission, dispatch, compensation, and receipt persistence remain one lifecycle.",
             ),
             Self::SubjectMismatch { expected, actual } => self.report_with_context(
                 "CHIO-KERNEL-SUBJECT-MISMATCH",

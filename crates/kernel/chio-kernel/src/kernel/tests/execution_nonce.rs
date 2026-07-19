@@ -1,69 +1,3 @@
-// Execution-nonce integration tests.
-//
-// Included by `src/kernel/tests.rs`, which already imported `super::*`
-// and all helper items from `tests/all.rs` (`make_config`, `make_scope`,
-// `make_grant`, `make_keypair`, `make_capability`, `make_request`,
-// `EchoServer`).
-//
-// The tests cover six behaviours:
-//   (a) a fresh nonce on Allow verifies
-//   (b) a stale nonce (>TTL) is rejected
-//   (c) a replayed nonce is rejected
-//   (d) mismatched binding is rejected
-//   (e) tampered signature is rejected
-//   (f) disabled mode lets tool calls through without a nonce (back-compat)
-
-use crate::execution_nonce::{
-    mint_execution_nonce, verify_execution_nonce, ExecutionNonceConfig, ExecutionNonceError,
-    InMemoryExecutionNonceStore, NonceBinding,
-};
-
-fn kernel_with_nonce() -> (ChioKernel, Keypair, ChioScope, ExecutionNonceConfig) {
-    let mut kernel = make_kernel(make_config());
-    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
-    let cfg = ExecutionNonceConfig {
-        nonce_ttl_secs: 30,
-        nonce_store_capacity: 1024,
-        require_nonce: false,
-    };
-    let store = Box::new(InMemoryExecutionNonceStore::from_config(&cfg));
-    kernel.set_execution_nonce_store(cfg.clone(), store);
-    let agent_kp = make_keypair();
-    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
-    (kernel, agent_kp, scope, cfg)
-}
-
-fn binding_for_request(cap: &CapabilityToken, request: &ToolCallRequest) -> NonceBinding {
-    let parameter_hash =
-        chio_core::receipt::decision::ToolCallAction::from_parameters(request.arguments.clone())
-            .unwrap()
-            .parameter_hash;
-    NonceBinding {
-        subject_id: cap.subject.to_hex(),
-        request_id: request.request_id.clone(),
-        capability_id: cap.id.clone(),
-        tool_server: request.server_id.clone(),
-        tool_name: request.tool_name.clone(),
-        parameter_hash,
-    }
-}
-
-fn mint_nonce_for_request(
-    kernel: &ChioKernel,
-    cap: &CapabilityToken,
-    request: &ToolCallRequest,
-    cfg: &ExecutionNonceConfig,
-) -> crate::execution_nonce::SignedExecutionNonce {
-    let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
-    mint_execution_nonce(
-        &kernel.config.keypair,
-        binding_for_request(cap, request),
-        cfg,
-        now,
-    )
-    .unwrap()
-}
-
 #[test]
 fn allow_verdict_carries_signed_execution_nonce_and_verifies() {
     let (kernel, agent_kp, scope, _cfg) = kernel_with_nonce();
@@ -740,11 +674,20 @@ fn mediated_allow_receipt_records_bound_execution_nonce_id() {
     let mut kernel = make_kernel(make_monetary_config());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
-    let cfg = ExecutionNonceConfig { nonce_ttl_secs: 30, nonce_store_capacity: 1024, require_nonce: false };
-    kernel.set_execution_nonce_store(cfg.clone(), Box::new(InMemoryExecutionNonceStore::from_config(&cfg)));
+    let cfg = ExecutionNonceConfig {
+        nonce_ttl_secs: 30,
+        nonce_store_capacity: 1024,
+        require_nonce: false,
+    };
+    kernel.set_execution_nonce_store(
+        cfg.clone(),
+        Box::new(InMemoryExecutionNonceStore::from_config(&cfg)),
+    );
 
     let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
-    let cap = kernel.issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600).unwrap();
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
     let request = ToolCallRequest {
         request_id: "req-nonce-link".to_string(),
         capability: cap,
@@ -764,9 +707,17 @@ fn mediated_allow_receipt_records_bound_execution_nonce_id() {
     };
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Allow);
-    let nonce = response.execution_nonce.as_ref().expect("mediated allow mints a nonce");
-    let metadata = response.receipt.metadata.as_ref().expect("receipt metadata present");
-    let recorded = metadata["budget_authority"]["execution_nonce_id"].as_str()
+    let nonce = response
+        .execution_nonce
+        .as_ref()
+        .expect("mediated allow mints a nonce");
+    let metadata = response
+        .receipt
+        .metadata
+        .as_ref()
+        .expect("receipt metadata present");
+    let recorded = metadata["budget_authority"]["execution_nonce_id"]
+        .as_str()
         .expect("execution_nonce_id recorded on budget_authority metadata");
     assert_eq!(recorded, nonce.nonce_id());
     assert_eq!(
@@ -1052,7 +1003,10 @@ fn reconcile_by_nonce_settles_reserved_hold_and_frees_difference() {
         meta["budget_authority"]["terminal"]["disposition"], "reconciled",
         "the reserved hold must be reconciled, not released"
     );
-    assert_eq!(meta["budget_authority"]["terminal"]["realized_spend_units"], 30);
+    assert_eq!(
+        meta["budget_authority"]["terminal"]["realized_spend_units"],
+        30
+    );
     assert_eq!(meta["budget_authority"]["authorize"]["exposure_units"], 100);
     assert_eq!(
         meta["budget_authority"]["execution_nonce_id"]
@@ -1779,8 +1733,7 @@ fn delegated_reserving_child_holds_sibling_share_until_reconciled() {
         .unwrap();
     assert_eq!(reconciled.verdict, Verdict::Allow);
 
-    let third =
-        delegated_reserve_request("req-b-reserve-2", &fixture.child_b, &fixture.child_b_kp);
+    let third = delegated_reserve_request("req-b-reserve-2", &fixture.child_b, &fixture.child_b_kp);
     let admitted_b = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(&third, None)
         .unwrap();
@@ -1830,8 +1783,7 @@ fn delegated_reserving_child_sibling_share_freed_after_ttl_reap() {
         "the reaper settles child A's expired reserved hold"
     );
 
-    let third =
-        delegated_reserve_request("req-b-reserve-2", &fixture.child_b, &fixture.child_b_kp);
+    let third = delegated_reserve_request("req-b-reserve-2", &fixture.child_b, &fixture.child_b_kp);
     let admitted_b = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(&third, None)
         .unwrap();
@@ -1886,7 +1838,9 @@ fn restart_gate_blocks_sibling_over_subscription_against_open_delegated_reserve(
     let parent = make_capability(&kernel_before, &parent_kp, parent_scope.clone(), 300);
     {
         let seed_store = SqliteReceiptStore::open(&receipt_path).unwrap();
-        seed_store.record_capability_snapshot(&parent, None).unwrap();
+        seed_store
+            .record_capability_snapshot(&parent, None)
+            .unwrap();
     }
     kernel_before
         .set_receipt_store(Box::new(SqliteReceiptStore::open(&receipt_path).unwrap()))
@@ -1894,10 +1848,8 @@ fn restart_gate_blocks_sibling_over_subscription_against_open_delegated_reserve(
     kernel_before
         .register_budget_parent(parent.id.clone(), 5_000)
         .unwrap();
-    kernel_before.set_capability_trust_root(
-        signer.public_key(),
-        scope_hash(&parent_scope).unwrap(),
-    );
+    kernel_before
+        .set_capability_trust_root(signer.public_key(), scope_hash(&parent_scope).unwrap());
     install_strict_nonce_store(&mut kernel_before);
 
     let child_a = make_v2_delegated_child(V2DelegatedChildInput {
@@ -1946,10 +1898,7 @@ fn restart_gate_blocks_sibling_over_subscription_against_open_delegated_reserve(
     kernel_after
         .register_budget_parent(parent.id.clone(), 5_000)
         .unwrap();
-    kernel_after.set_capability_trust_root(
-        signer.public_key(),
-        scope_hash(&parent_scope).unwrap(),
-    );
+    kernel_after.set_capability_trust_root(signer.public_key(), scope_hash(&parent_scope).unwrap());
     install_strict_nonce_store(&mut kernel_after);
     kernel_after.arm_restart_reserved_hold_gate().unwrap();
 
@@ -1978,7 +1927,9 @@ fn restart_gate_blocks_sibling_over_subscription_against_open_delegated_reserve(
     // Settle child A's abandoned reservation in the shared store. Closing it drops
     // the last unaccounted delegated reserve hold, so the gate clears.
     assert_eq!(
-        kernel_after.reap_expired_reserved_budget_holds(i64::MAX).unwrap(),
+        kernel_after
+            .reap_expired_reserved_budget_holds(i64::MAX)
+            .unwrap(),
         1,
         "the reaper settles child A's expired restart-carried hold"
     );
@@ -2249,6 +2200,8 @@ impl BudgetStore for StampFailingBudgetStore {
         )
     }
 
+    delegate_authority_fenced_budget_methods!(inner);
+
     fn list_usages(
         &self,
         limit: usize,
@@ -2472,7 +2425,10 @@ impl ReceiptStore for TogglingAppendReceiptStore {
         Ok(())
     }
 
-    fn append_child_receipt(&self, _receipt: &ChildRequestReceipt) -> Result<(), ReceiptStoreError> {
+    fn append_child_receipt(
+        &self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
         Ok(())
     }
 }
@@ -2653,8 +2609,7 @@ fn reserving_receipt_persist_failure_keeps_delegated_reservation_and_share() {
         .expect("child A's durable reservation must reconcile by its nonce");
     assert_eq!(reconciled.verdict, Verdict::Allow);
 
-    let third =
-        delegated_reserve_request("req-b-reserve-2", &fixture.child_b, &fixture.child_b_kp);
+    let third = delegated_reserve_request("req-b-reserve-2", &fixture.child_b, &fixture.child_b_kp);
     let admitted_b = kernel
         .authorize_tool_call_reserving_blocking_with_metadata(&third, None)
         .unwrap();
@@ -3071,6 +3026,10 @@ impl BudgetStore for PartialReapBudgetStore {
         Ok(())
     }
 
+    reject_authority_fenced_budget_methods!(
+        "partial reaper store does not support authority-fenced budget mutations"
+    );
+
     fn list_usages(
         &self,
         _limit: usize,
@@ -3243,6 +3202,8 @@ impl BudgetStore for TransientReconcileFailBudgetStore {
             realized_cost_units,
         )
     }
+
+    delegate_authority_fenced_budget_methods!(inner);
 
     fn list_usages(
         &self,

@@ -272,10 +272,7 @@ impl BudgetStore for SqliteBudgetStore {
         validate_budget_grant_index(request.grant_index)?;
         request.validate()?;
         if self.is_structured_hold(&request.hold_id)? {
-            return Err(BudgetStoreError::Invariant(
-                "composite invocation capture is terminal without a durable admission-operation cancellation fence"
-                    .to_string(),
-            ));
+            return self.cancel_captured_composite_hold(request);
         }
         self.require_standalone_mutation("captured invocation cancellation")?;
         if let Some(authority) = request.authority.as_ref() {

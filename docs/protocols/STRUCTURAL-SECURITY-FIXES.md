@@ -53,7 +53,7 @@ replay-protected via an LRU store (reusing the `DpopNonceStore` pattern from
 
 ```rust
 /// Schema identifier for execution nonces.
-pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v1";
+pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v2";
 
 /// A short-lived, single-use token binding a kernel verdict to a tool
 /// execution. Issued by the kernel on Allow, consumed by the tool server

@@ -293,6 +293,7 @@ The v1 signed body is:
 | `issued_at` | Unix timestamp seconds |
 | `expires_at` | Unix timestamp seconds |
 | `delegation_chain` | Ordered chain of delegation links |
+| `aggregate_invocation_budget` | Optional capability-wide or delegation-family invocation ceiling |
 | `algorithm` | Optional envelope hint: `ed25519`, `p256`, `p384`, or `hybrid` |
 
 Capability public-key fields and signatures use the same self-describing
@@ -1029,7 +1030,7 @@ it satisfies the structural conjunction of the `chio.mediated_spend.v1` profile:
 - Its `budget_authority` metadata names a `hold_id` that was atomically committed
   against the agent's cost-bearing capability and reconciled down to realized
   spend (`authorize` then `terminal.disposition = reconciled`).
-- A `chio.execution_nonce.v1` nonce, signed by the same admitted kernel key, is
+- A `chio.execution_nonce.v2` nonce, signed by the same admitted kernel key, is
   bound to the same `capability_id`, `tool_server`, `tool_name`, and
   `parameter_hash`, and the receipt records that nonce id
   (`budget_authority.execution_nonce_id`).
@@ -1065,6 +1066,14 @@ include:
 - subject and issuer attribution
 - streamed-output chunk metadata
 - portable-trust and federation provenance
+
+Durable tool calls carry an `admission_operation` block whose schema is
+`chio.admission-receipt.v1`. It binds the signed receipt to the admission
+operation and request namespace, terminal projection and dispatch state,
+trusted time, coordinator lease and store fence, retained dispatch commit, and
+optional tool outcome. The machine-readable contract is registered at
+`spec/schemas/chio-wire/v1/receipt/admission-metadata.schema.json`; unknown
+fields and unsupported schema versions fail closed.
 
 Governed receipt metadata now also admits a versioned
 `economic_authorization` envelope with `version`, `economic_mode`, `payer`,

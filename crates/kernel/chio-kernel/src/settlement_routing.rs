@@ -796,7 +796,7 @@ mod tests {
     }
 
     #[test]
-    fn installer_rejects_a_missing_receipt_store() {
+    fn installer_allows_receipt_store_to_be_attached_after_the_runtime() {
         let mut kernel = kernel();
         let store = atomic_store(AtomicReceiptProjection::SettlementObservationV1);
 
@@ -806,13 +806,11 @@ mod tests {
             RetryPolicy::default(),
         );
 
-        assert!(matches!(
-            result,
-            Err(KernelError::SettlementConfiguration(
-                SettlementRuntimeConfigError::MissingReceiptStore
-            ))
-        ));
-        assert!(kernel.settlement_observer().is_none());
+        assert!(result.is_ok());
+        assert!(kernel.settlement_observer().is_some());
+        assert!(kernel
+            .set_receipt_store_handle(receipt_store(&store))
+            .is_ok());
     }
 
     #[test]
@@ -974,7 +972,7 @@ mod tests {
     }
 
     #[test]
-    fn installed_runtime_rejects_non_atomic_store_replacement() {
+    fn installed_runtime_rejects_a_non_atomic_receipt_store() {
         let mut kernel = kernel();
         let store = atomic_store(AtomicReceiptProjection::SettlementObservationV1);
         assert!(kernel
@@ -990,14 +988,14 @@ mod tests {
         assert!(matches!(
             result,
             Err(KernelError::SettlementConfiguration(
-                SettlementRuntimeConfigError::ReceiptStoreReplacement
+                SettlementRuntimeConfigError::UnsupportedAtomicProjection
             ))
         ));
         assert!(kernel.settlement_observer().is_some());
     }
 
     #[test]
-    fn installed_runtime_rejects_atomic_store_replacement() {
+    fn installed_runtime_accepts_a_compatible_atomic_store_replacement() {
         let mut kernel = kernel();
         let store = atomic_store(AtomicReceiptProjection::SettlementObservationV1);
         assert!(kernel
@@ -1010,12 +1008,7 @@ mod tests {
 
         let result = kernel.set_receipt_store_handle(receipt_store(&replacement));
 
-        assert!(matches!(
-            result,
-            Err(KernelError::SettlementConfiguration(
-                SettlementRuntimeConfigError::ReceiptStoreReplacement
-            ))
-        ));
+        assert!(result.is_ok());
         assert!(kernel.settlement_observer().is_some());
     }
 }

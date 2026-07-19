@@ -169,7 +169,7 @@ impl InMemoryBudgetStoreInner {
                 max_cost_per_invocation: None,
                 max_total_cost_units: None,
                 invocation_count_after: if allowed {
-                    current.invocation_count + 1
+                    next_invocation_count
                 } else {
                     current.invocation_count
                 },

@@ -451,6 +451,7 @@ impl ChioKernel {
     fn durable_evaluation_contract(
         &self,
         admission: &DurableToolAdmission,
+        request: &ToolCallRequest,
         raw: &RawInvocationOutcomeV1,
     ) -> Result<
         (
@@ -464,6 +465,22 @@ impl ChioKernel {
         if !admission.permits_grant(matched_grant_index) {
             return Err(KernelError::DurableAdmission(
                 "recorded tool return does not match the captured grant".to_owned(),
+            ));
+        }
+        let plan = self.durable_post_return_plan()?;
+        let matching_grants = resolve_required_matching_grants(
+            &request.capability,
+            &request.tool_name,
+            &request.server_id,
+            &request.arguments,
+            request.model_metadata.as_ref(),
+        )
+        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        let recovered_request_hash =
+            immutable_tool_admission_request_hash(request, &matching_grants, &plan)?;
+        if &recovered_request_hash != admission.operation.binding().immutable_request_hash() {
+            return Err(KernelError::DurableAdmission(
+                "recovered post-return plan does not match durable admission".to_owned(),
             ));
         }
         let stream_limits = raw.stream_limits();
@@ -484,11 +501,7 @@ impl ChioKernel {
             .map_err(|error| KernelError::DurableAdmission(error.to_string()))?,
         )
         .map_err(tool_outcome_error)?;
-        Ok((
-            matched_grant_index,
-            self.durable_post_return_plan()?,
-            normalized_context,
-        ))
+        Ok((matched_grant_index, plan, normalized_context))
     }
 
     fn completed_durable_tool_response(
@@ -499,7 +512,7 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let tool_return = self.load_durable_tool_return(admission)?;
         let (matched_grant_index, plan, normalized_context) =
-            self.durable_evaluation_contract(admission, &tool_return.raw)?;
+            self.durable_evaluation_contract(admission, request, &tool_return.raw)?;
         let DurableEvaluatedOutput {
             output,
             incomplete_reason,
@@ -634,6 +647,18 @@ impl ChioKernel {
                 || self.federation_dsse_envelope(&receipt.id).is_none())
         {
             self.apply_federation_cosign_for_admitted_request(request, &receipt)?;
+        }
+        if let Some(crate::memory_provenance::MemoryActionKind::Write { store, key }) =
+            crate::memory_provenance::classify_memory_action(&request.tool_name, &request.arguments)
+                .as_ref()
+        {
+            self.append_memory_provenance_for_write(
+                store,
+                key,
+                &request.capability.id,
+                &receipt.id,
+                receipt.timestamp,
+            )?;
         }
         let (verdict, reason, terminal_state) = incomplete_reason.map_or(
             (Verdict::Allow, None, OperationTerminalState::Completed),
@@ -1231,7 +1256,7 @@ impl ChioKernel {
             tool_return.raw.pre_invocation_guard_evidence().to_vec(),
         );
         let (matched_grant_index, plan, normalized_context) =
-            self.durable_evaluation_contract(admission, &tool_return.raw)?;
+            self.durable_evaluation_contract(admission, request, &tool_return.raw)?;
         let DurableEvaluatedOutput {
             output,
             incomplete_reason,
@@ -1598,6 +1623,10 @@ impl ChioKernel {
             ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
                 KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {error}"))
             })?;
+        let persisted_binding = admission.operation.binding().to_persisted();
+        let authenticated_tenant_id = persisted_binding.authenticated_tenant_id.as_str();
+        let receipt_tenant_id = (authenticated_tenant_id != LOCAL_SYSTEM_TENANT_ID)
+            .then(|| authenticated_tenant_id.to_owned());
         let receipt = self.build_and_sign_receipt(ReceiptParams {
             request_id: Some(&request.request_id),
             capability_id: &request.capability.id,
@@ -1610,7 +1639,7 @@ impl ChioKernel {
             metadata,
             timestamp,
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
-            tenant_id: None,
+            tenant_id: receipt_tenant_id,
         })?;
         let receipt = VerifiedAdmissionReceipt::from_kernel_verified_terminal(
             receipt,

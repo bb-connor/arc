@@ -307,6 +307,8 @@ impl ChioKernel {
         };
 
         let mut budget_error = None;
+        let mut budget_error_metadata = None;
+        let mut governed_error = None;
         let mut selected = None;
         for matching in &matching_grants {
             if durable_admission
@@ -335,23 +337,8 @@ impl ChioKernel {
             ) {
                 Ok(validated) => validated,
                 Err(error) => {
-                    let msg = error.to_string();
-                    warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed transaction denied (nested flow)");
-                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                        durable_admission
-                            .as_ref()
-                            .map(DurableToolAdmission::operation),
-                        None,
-                        None,
-                    )?;
-                    return self.build_monetary_deny_response_with_metadata(
-                        request,
-                        &msg,
-                        now,
-                        &matching_grants,
-                        cap,
-                        Some(self.budget_backend_receipt_metadata()?),
-                    );
+                    governed_error.get_or_insert(error);
+                    continue;
                 }
             };
             let governed_call_chain_receipt_evidence = match self
@@ -365,23 +352,8 @@ impl ChioKernel {
                 ) {
                 Ok(evidence) => evidence,
                 Err(error) => {
-                    let msg = error.to_string();
-                    warn!(request_id = %request.request_id, reason = %redacted!(&msg), "governed call-chain evidence lookup failed (nested flow)");
-                    self.compensate_durable_admission_after_pre_dispatch_cleanup(
-                        durable_admission
-                            .as_ref()
-                            .map(DurableToolAdmission::operation),
-                        None,
-                        None,
-                    )?;
-                    return self.build_monetary_deny_response_with_metadata(
-                        request,
-                        &msg,
-                        now,
-                        &matching_grants,
-                        cap,
-                        Some(self.budget_backend_receipt_metadata()?),
-                    );
+                    governed_error.get_or_insert(error);
+                    continue;
                 }
             };
             let no_budget_mutation = PreExecutionBudgetMutation::None;
@@ -556,10 +528,15 @@ impl ChioKernel {
                     );
                 }
                 Err(error @ KernelError::BudgetExhausted(_)) => {
-                    let _ = self.release_runtime_admission_reservations_for_pre_dispatch_denial(
-                        runtime_admission_metadata,
-                    );
+                    let (runtime_admission_metadata, runtime_release_confirmed) = self
+                        .release_runtime_admission_reservations_for_pre_dispatch_denial(
+                            runtime_admission_metadata,
+                        );
                     budget_error = Some(error);
+                    if !runtime_release_confirmed {
+                        budget_error_metadata = runtime_admission_metadata;
+                        break;
+                    }
                 }
                 Err(error) => {
                     let msg = error.to_string();
@@ -596,7 +573,7 @@ impl ChioKernel {
             runtime_admission_metadata,
         )) = selected
         else {
-            let error = budget_error.unwrap_or_else(|| {
+            let error = budget_error.or(governed_error).unwrap_or_else(|| {
                 KernelError::DurableAdmission(
                     "retained budget hold does not identify a matching grant".to_string(),
                 )
@@ -620,7 +597,10 @@ impl ChioKernel {
                 now,
                 &matching_grants,
                 cap,
-                Some(self.budget_backend_receipt_metadata()?),
+                self.merge_budget_receipt_metadata(
+                    merge_metadata_objects(extra_metadata.clone(), budget_error_metadata),
+                    self.budget_backend_receipt_metadata()?,
+                ),
             );
         };
 
@@ -793,8 +773,6 @@ impl ChioKernel {
             let capture = self.capture_invocation(cap, &mut budget_mutation);
             match capture {
                 Ok(BudgetInvocationCaptureDecision::Captured(_)) => {}
-                Ok(BudgetInvocationCaptureDecision::AlreadyCaptured(_))
-                    if durable_admission.is_some() => {}
                 Ok(BudgetInvocationCaptureDecision::AlreadyCaptured(_)) => {
                     let reason = "monetary invocation was already dispatched";
                     return self.with_pre_invocation_guard_evidence(
@@ -1076,6 +1054,40 @@ impl ChioKernel {
         let (tool_output, reported_cost) = match tool_output_result {
             Ok(output) => output,
             Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
+                if durable_admission.is_none() {
+                    let cleanup = self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
+                                request,
+                                reason: "tool server requested URL elicitation before execution",
+                                timestamp: now,
+                                matched_grant_index,
+                                cap,
+                                budget_mutation: &budget_mutation,
+                                payment_authorization: payment_authorization.as_ref(),
+                                durable_operation: None,
+                                runtime_admission_metadata: runtime_admission_metadata.clone(),
+                                verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                                budget_lease_acquired,
+                            })
+                        },
+                    );
+                    if let Err(cleanup_error) = cleanup {
+                        warn!(
+                            request_id = %request.request_id,
+                            reason = %redacted!(&cleanup_error),
+                            audit_fault = "url_elicitation_cleanup_unrecorded",
+                            "nested URL-elicitation cleanup could not be confirmed"
+                        );
+                    }
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %redacted!(&error),
+                        "tool call requires URL elicitation"
+                    );
+                    return Err(error);
+                }
                 let metadata = self.ambiguous_dispatch_receipt_metadata(
                     &budget_mutation,
                     payment_authorization.as_ref(),
@@ -1108,6 +1120,14 @@ impl ChioKernel {
                 return Err(error);
             }
             Err(KernelError::RequestCancelled { request_id, reason }) => {
+                let metadata = self.post_dispatch_failure_receipt_metadata(
+                    request,
+                    cap,
+                    &budget_mutation,
+                    payment_authorization.as_ref(),
+                    durable_admission.is_some(),
+                    runtime_admission_metadata.clone(),
+                );
                 if request_id == parent_context.request_id {
                     self.with_session_mut(&parent_context.session_id, |session| {
                         session.request_cancellation(&parent_context.request_id)?;
@@ -1127,11 +1147,7 @@ impl ChioKernel {
                             &reason,
                             now,
                             Some(matched_grant_index),
-                            self.ambiguous_dispatch_receipt_metadata(
-                                &budget_mutation,
-                                payment_authorization.as_ref(),
-                                runtime_admission_metadata.clone(),
-                            ),
+                            metadata,
                             verified_governed_payee_binding.as_ref(),
                         )
                     },
@@ -1139,14 +1155,22 @@ impl ChioKernel {
             }
             Err(KernelError::HotPathDeadlineExceeded { stage, budget_ms }) => {
                 let reason = format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms");
+                let metadata = self.post_dispatch_failure_receipt_metadata(
+                    request,
+                    cap,
+                    &budget_mutation,
+                    payment_authorization.as_ref(),
+                    durable_admission.is_some(),
+                    runtime_admission_metadata.clone(),
+                );
                 warn!(
                     request_id = %request.request_id,
                     reason = %redacted!(&reason),
                     "tool call deadline expired"
                 );
-                // A timed-out dispatch may already have applied its side effect,
-                // so the runtime-admission reservation is retained and marked
-                // auditable rather than released.
+                // Runtime reservations remain retained because the side effect
+                // is ambiguous. Durable admission retains the financial state
+                // for recovery; an explicitly non-durable path releases it.
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
@@ -1155,17 +1179,21 @@ impl ChioKernel {
                             &reason,
                             now,
                             Some(matched_grant_index),
-                            self.ambiguous_dispatch_receipt_metadata(
-                                &budget_mutation,
-                                payment_authorization.as_ref(),
-                                runtime_admission_metadata.clone(),
-                            ),
+                            metadata,
                             verified_governed_payee_binding.as_ref(),
                         )
                     },
                 );
             }
             Err(KernelError::RequestIncomplete(reason)) => {
+                let metadata = self.post_dispatch_failure_receipt_metadata(
+                    request,
+                    cap,
+                    &budget_mutation,
+                    payment_authorization.as_ref(),
+                    durable_admission.is_some(),
+                    runtime_admission_metadata.clone(),
+                );
                 warn!(
                     request_id = %request.request_id,
                     reason = %redacted!(&reason),
@@ -1180,11 +1208,7 @@ impl ChioKernel {
                             &reason,
                             now,
                             Some(matched_grant_index),
-                            self.ambiguous_dispatch_receipt_metadata(
-                                &budget_mutation,
-                                payment_authorization.as_ref(),
-                                runtime_admission_metadata.clone(),
-                            ),
+                            metadata,
                             verified_governed_payee_binding.as_ref(),
                         )
                     },
@@ -1192,17 +1216,18 @@ impl ChioKernel {
             }
             Err(error) => {
                 let msg = error.to_string();
+                let deny_metadata = self.post_dispatch_failure_receipt_metadata(
+                    request,
+                    cap,
+                    &budget_mutation,
+                    payment_authorization.as_ref(),
+                    durable_admission.is_some(),
+                    runtime_admission_metadata.clone(),
+                );
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool server error");
-                // A tool side effect may have executed: retain runtime admission,
-                // invocation consumption, and monetary exposure.
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
-                        let deny_metadata = self.ambiguous_dispatch_receipt_metadata(
-                            &budget_mutation,
-                            payment_authorization.as_ref(),
-                            runtime_admission_metadata.clone(),
-                        );
                         self.build_deny_response_with_metadata_and_payee_binding(
                             request,
                             &msg,
@@ -1238,6 +1263,24 @@ impl ChioKernel {
                         request_id = %request.request_id,
                         reason = %redacted!(&error),
                         "nested tool return could not be durably recorded"
+                    );
+                    let deny_metadata = self.ambiguous_dispatch_receipt_metadata(
+                        &budget_mutation,
+                        payment_authorization.as_ref(),
+                        runtime_admission_metadata.clone(),
+                    );
+                    let _ = self.with_pre_invocation_guard_evidence(
+                        &pre_invocation_guard_evidence,
+                        || {
+                            self.build_deny_response_with_metadata_and_payee_binding(
+                                request,
+                                &error.to_string(),
+                                now,
+                                Some(matched_grant_index),
+                                deny_metadata,
+                                verified_governed_payee_binding.as_ref(),
+                            )
+                        },
                     );
                     return Err(error);
                 }

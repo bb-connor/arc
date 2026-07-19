@@ -10,6 +10,7 @@ use crate::budget_store::{
 
 include!("tests/support.rs");
 include!("tests/support_delegation_plain.rs");
+include!("tests/support_budget_store_impls.rs");
 include!("tests/support_monetary.rs");
 include!("tests/settlement_routing.rs");
 include!("tests/capability_validation.rs");
@@ -18,12 +19,14 @@ include!("tests/hot_path_deadlines.rs");
 include!("tests/receipts.rs");
 include!("tests/session.rs");
 include!("tests/budget.rs");
+include!("tests/budget_governed_fallback.rs");
 include!("tests/budget_governed_call_chain.rs");
 include!("tests/budget_governed_assurance.rs");
 include!("tests/emergency.rs");
 include!("tests/constraint_variants.rs");
 include!("tests/plan_evaluation.rs");
 include!("tests/approval_flow.rs");
+include!("tests/execution_nonce_support.rs");
 include!("tests/execution_nonce.rs");
 include!("tests/compliance_score.rs");
 include!("tests/multi_tenant_receipt.rs");

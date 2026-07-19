@@ -106,6 +106,16 @@ fn capture_request(id: &str) -> BudgetCaptureInvocationRequest {
     }
 }
 
+fn cancel_captured_request(id: &str) -> BudgetCancelCapturedBeforeDispatchRequest {
+    BudgetCancelCapturedBeforeDispatchRequest {
+        capability_id: "cap-composite".to_string(),
+        grant_index: 0,
+        hold_id: format!("hold-{id}"),
+        event_id: format!("event-{id}-cancel-captured"),
+        authority: None,
+    }
+}
+
 fn reverse_request(id: &str, exposure: u64) -> BudgetReverseHoldRequest {
     BudgetReverseHoldRequest {
         capability_id: "cap-composite".to_string(),
@@ -142,6 +152,7 @@ authority_bound_request!(
     BudgetReconcileHoldRequest,
     BudgetCaptureHoldRequest,
     BudgetAuthorizeCumulativeApprovalRequest,
+    BudgetCancelCapturedBeforeDispatchRequest,
 );
 
 fn current_authority(store: &SqliteBudgetStore) -> BudgetEventAuthority {
@@ -628,6 +639,7 @@ fn cumulative_approval_attach_is_exact_idempotent_and_survives_capture() {
         .get_cumulative_approval_account_usage(
             &request
                 .cumulative_approval
+                .as_ref()
                 .expect("cumulative request")
                 .account_key,
         )
@@ -635,6 +647,40 @@ fn cumulative_approval_attach_is_exact_idempotent_and_survives_capture() {
         .expect("account row");
     assert_eq!(account.reserved_authorized.units, 0);
     assert_eq!(account.captured_authorized.units, 10);
+    let cancellation_request = cancel_captured_request("cumulative");
+    let cancelled = store
+        .cancel_captured_before_dispatch(owned(&store, cancellation_request.clone()))
+        .expect("cancel captured cumulative invocation");
+    let cancelled_usage = match cancelled {
+        BudgetCapturedBeforeDispatchCancellationDecision::Cancelled(decision) => decision
+            .cumulative_approval
+            .expect("cancelled cumulative projection"),
+        other => panic!("unexpected cancellation decision: {other:?}"),
+    };
+    assert_eq!(
+        cancelled_usage.state,
+        BudgetCumulativeApprovalState::ReversedBeforeDispatch
+    );
+    assert!(matches!(
+        store
+            .cancel_captured_before_dispatch(owned(&store, cancellation_request))
+            .expect("replay captured cumulative cancellation"),
+        BudgetCapturedBeforeDispatchCancellationDecision::AlreadyCancelled(_)
+    ));
+    drop(store);
+    let store = reopen(&path);
+    let account = store
+        .get_cumulative_approval_account_usage(
+            &request
+                .cumulative_approval
+                .as_ref()
+                .expect("cumulative request")
+                .account_key,
+        )
+        .expect("cancelled account usage")
+        .expect("cancelled account row");
+    assert_eq!(account.reserved_authorized.units, 0);
+    assert_eq!(account.captured_authorized.units, 0);
     let _ = fs::remove_file(path);
 }
 

@@ -190,11 +190,13 @@ impl InMemoryBudgetStoreInner {
                         "budget hold `{hold_id}` cumulative approval state changed"
                     )));
                 }
-                if !matches!(
+                if !(matches!(
                     participant.state,
                     BudgetCumulativeApprovalState::PendingApproval
                         | BudgetCumulativeApprovalState::Authorized
-                ) {
+                ) || cancels_captured_before_dispatch
+                    && participant.state == BudgetCumulativeApprovalState::Captured)
+                {
                     return Err(BudgetStoreError::Invariant(
                         "cumulative approval participant is terminal".to_string(),
                     ));
@@ -207,9 +209,14 @@ impl InMemoryBudgetStoreInner {
                             "missing cumulative approval account".to_string(),
                         )
                     })?;
-                if account.reserved_authorized_units
-                    < participant.request.requested_authorized.units
+                let reversible_authorized_units = if participant.state
+                    == BudgetCumulativeApprovalState::Captured
                 {
+                    account.captured_authorized_units
+                } else {
+                    account.reserved_authorized_units
+                };
+                if reversible_authorized_units < participant.request.requested_authorized.units {
                     return Err(BudgetStoreError::Invariant(
                         "cumulative approval reservation is incomplete".to_string(),
                     ));
@@ -383,7 +390,13 @@ impl InMemoryBudgetStoreInner {
                             "validated cumulative approval account disappeared".to_string(),
                         )
                     })?;
-                account.reserved_authorized_units -= participant.request.requested_authorized.units;
+                if participant.state == BudgetCumulativeApprovalState::Captured {
+                    account.captured_authorized_units -=
+                        participant.request.requested_authorized.units;
+                } else {
+                    account.reserved_authorized_units -=
+                        participant.request.requested_authorized.units;
+                }
                 account.version += 1;
             }
             invocation_quota_usages = self.invocation_quota_usages(&affected_quotas)?;

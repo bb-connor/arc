@@ -245,6 +245,32 @@ struct DurablePostReturnPlan {
     frozen_steps: Vec<FrozenEvaluationStepV1>,
 }
 
+fn immutable_tool_admission_request_hash(
+    request: &ToolCallRequest,
+    matching_grants: &[MatchingGrant<'_>],
+    post_return_plan: &DurablePostReturnPlan,
+) -> Result<AdmissionDigest, KernelError> {
+    let immutable_request = ImmutableToolAdmissionRequest {
+        schema: "chio.tool-admission-request.v1",
+        server_id: &request.server_id,
+        tool_name: &request.tool_name,
+        agent_id: &request.agent_id,
+        arguments: &request.arguments,
+        governed_intent: &request.governed_intent,
+        model_metadata: &request.model_metadata,
+        federated_origin_kernel_id: &request.federated_origin_kernel_id,
+        matching_grants: matching_grants
+            .iter()
+            .map(|matching| ImmutableMatchingGrant {
+                index: matching.index,
+                grant: matching.grant,
+            })
+            .collect(),
+        post_return_steps: &post_return_plan.frozen_steps,
+    };
+    admission_digest("immutable_request_hash", &immutable_request)
+}
+
 impl ChioKernel {
     pub(crate) fn load_durable_admission_receipt(
         &self,
@@ -534,26 +560,8 @@ impl ChioKernel {
                     authorization.signed_extension.as_bytes(),
                 )
             });
-        let immutable_request = ImmutableToolAdmissionRequest {
-            schema: "chio.tool-admission-request.v1",
-            server_id: &request.server_id,
-            tool_name: &request.tool_name,
-            agent_id: &request.agent_id,
-            arguments: &request.arguments,
-            governed_intent: &request.governed_intent,
-            model_metadata: &request.model_metadata,
-            federated_origin_kernel_id: &request.federated_origin_kernel_id,
-            matching_grants: matching_grants
-                .iter()
-                .map(|matching| ImmutableMatchingGrant {
-                    index: matching.index,
-                    grant: matching.grant,
-                })
-                .collect(),
-            post_return_steps: &post_return_plan.frozen_steps,
-        };
         let immutable_request_hash =
-            admission_digest("immutable_request_hash", &immutable_request)?;
+            immutable_tool_admission_request_hash(request, matching_grants, &post_return_plan)?;
         let action =
             ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
                 KernelError::DurableAdmission(format!(

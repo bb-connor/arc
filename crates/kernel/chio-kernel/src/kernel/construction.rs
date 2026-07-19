@@ -704,8 +704,8 @@ impl ChioKernel {
         &mut self,
         receipt_store: Arc<dyn ReceiptStore>,
     ) -> Result<(), KernelError> {
-        if self.settlement_observer.is_some() {
-            return Err(crate::SettlementRuntimeConfigError::ReceiptStoreReplacement.into());
+        if let Some(runtime) = self.settlement_observer.as_ref() {
+            Self::validate_settlement_receipt_store(receipt_store.as_ref(), runtime)?;
         }
         match receipt_store.load_latest_checkpoint() {
             Ok(Some(checkpoint)) => {
@@ -877,10 +877,10 @@ impl ChioKernel {
 
     /// Install a settlement hook with its durable outcome store and retry policy.
     ///
-    /// Installation requires a receipt store that can atomically seed pending
-    /// settlement work within the configured receipt-append deadline. Invalid
-    /// retry policies and unsupported stores fail without changing the active
-    /// runtime.
+    /// Before dispatch, the kernel requires a receipt store that can atomically
+    /// seed pending settlement work within the configured receipt-append
+    /// deadline. The store and runtime may be configured in either order;
+    /// attaching an incompatible store fails without replacing the active one.
     pub fn set_settlement_observer_runtime(
         &mut self,
         hook: Arc<dyn chio_settle::SettlementHook>,
@@ -893,9 +893,17 @@ impl ChioKernel {
             retry_policy,
         )
         .map_err(crate::SettlementRuntimeConfigError::from)?;
-        let Some(receipt_store) = self.receipt_store.as_ref() else {
-            return Err(crate::SettlementRuntimeConfigError::MissingReceiptStore.into());
-        };
+        if let Some(receipt_store) = self.receipt_store.as_ref() {
+            Self::validate_settlement_receipt_store(receipt_store.as_ref(), &runtime)?;
+        }
+        self.settlement_observer = Some(runtime);
+        Ok(())
+    }
+
+    fn validate_settlement_receipt_store(
+        receipt_store: &dyn ReceiptStore,
+        runtime: &crate::settlement_routing::SettlementObserverRuntime,
+    ) -> Result<(), KernelError> {
         if receipt_store.atomic_receipt_projection()
             != crate::receipt_store::AtomicReceiptProjection::SettlementObservationV1
             || !receipt_store.supports_atomic_receipt_projection_with_timeout()
@@ -908,7 +916,6 @@ impl ChioKernel {
         if receipt_binding != runtime.store_binding() {
             return Err(crate::SettlementRuntimeConfigError::StoreBindingMismatch.into());
         }
-        self.settlement_observer = Some(runtime);
         Ok(())
     }
 
@@ -1751,7 +1758,8 @@ impl ChioKernel {
         let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
             KernelError::Internal("execution nonce store is not installed".to_string())
         })?;
-        crate::execution_nonce::reserve_execution_nonce(presented, store)
+        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
+        crate::execution_nonce::reserve_execution_nonce(presented, store, now)
             .map_err(|e| KernelError::Internal(format!("{e}")))
     }
 

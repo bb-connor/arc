@@ -988,7 +988,7 @@ adopter persist and restore counters instead of silently losing them.
   the participant idempotency key. The existing `settle_dead_letters`, `iou_envelope`, and
   `settlement_reconciliations` tables are now populated by production code
   (F68/F69), not only tests.
-- `PaymentJournalRecord`, `DeadLetterRecord` (existing, schema `chio.settle.dead-letter.v1`),
+- `PaymentJournalRecord`, `DeadLetterRecord` (schema `chio.settle.dead-letter.v2`),
   and any reconciliation report serialize as RFC 8785 canonical JSON, consistent with
   the canonical-JSON `parameter_hash` and dead-letter row bytes already in use.
 - `BudgetDenyReason` gains a `CurrencyMismatch` variant. It is config-as-data JSON
@@ -1006,7 +1006,7 @@ adopter persist and restore counters instead of silently losing them.
   trustworthy `operation_id` and terminal recovery proof, so they are never
   auto-expired merely because they predate the migration. They appear in the
   review command and require an explicit reconciled resolution.
-- The bounded `chio.settle.dead-letter.v1` shape is the sole pre-release
+- The bounded `chio.settle.dead-letter.v2` shape is the sole pre-release
   dead-letter contract. Rows that do not match it fail closed.
 - Staged rollout. The payment participant is the money-path specialization of RFC-0003's
   `DurableAdmissionMode`; enable it with the `Monetary` class first (highest

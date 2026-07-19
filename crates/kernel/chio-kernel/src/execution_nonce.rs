@@ -44,7 +44,7 @@ use uuid::Uuid;
 use crate::KernelError;
 
 /// Schema identifier for Chio execution nonces.
-pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v1";
+pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v2";
 
 /// Default TTL for a freshly minted execution nonce.
 pub const DEFAULT_EXECUTION_NONCE_TTL_SECS: u64 = 30;
@@ -338,6 +338,20 @@ impl InMemoryExecutionNonceStore {
             }
             cache.pop(&key);
         }
+        let expired: Vec<String> = cache
+            .iter()
+            .filter(|(_, retain_until)| **retain_until <= now)
+            .map(|(nonce_id, _)| nonce_id.clone())
+            .collect();
+        for nonce_id in expired {
+            cache.pop(&nonce_id);
+        }
+        if cache.len() >= cache.cap().get() {
+            error!("execution nonce store capacity exhausted; denying fail-closed");
+            return Err(KernelError::Internal(
+                "execution nonce store capacity exhausted; fail-closed".to_string(),
+            ));
+        }
         let Some(retain_until) = now.checked_add(retention) else {
             error!("execution nonce retention overflow; denying fail-closed");
             return Err(KernelError::Internal(
@@ -475,7 +489,7 @@ pub fn verify_execution_nonce(
     nonce_store: &dyn ExecutionNonceStore,
 ) -> Result<(), ExecutionNonceError> {
     validate_execution_nonce(presented, kernel_pubkey, expected, now)?;
-    reserve_execution_nonce(presented, nonce_store)
+    reserve_execution_nonce(presented, nonce_store, now)
 }
 
 pub fn verify_execution_nonce_without_consume(
@@ -584,7 +598,14 @@ pub(crate) fn validate_execution_nonce(
 pub(crate) fn reserve_execution_nonce(
     presented: &SignedExecutionNonce,
     nonce_store: &dyn ExecutionNonceStore,
+    now: i64,
 ) -> Result<(), ExecutionNonceError> {
+    if now >= presented.nonce.expires_at {
+        return Err(ExecutionNonceError::Expired {
+            now,
+            expires_at: presented.nonce.expires_at,
+        });
+    }
     // Pass the nonce's signed expiry so durable stores retain the
     // consumed marker for the full validity window - otherwise the row
     // can be pruned while the nonce is still cryptographically valid,
@@ -656,6 +677,22 @@ mod tests {
     }
 
     #[test]
+    fn nonce_expiry_is_rechecked_when_reserved() {
+        let kp = Keypair::generate();
+        let store = InMemoryExecutionNonceStore::default();
+        let cfg = ExecutionNonceConfig::default();
+        let binding = sample_binding();
+        let now = 1_000_000;
+        let signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
+        validate_execution_nonce(&signed, &kp.public_key(), &binding, now + 1).unwrap();
+
+        let error = reserve_execution_nonce(&signed, &store, signed.nonce.expires_at).unwrap_err();
+
+        assert!(matches!(error, ExecutionNonceError::Expired { .. }));
+        assert!(!store.is_consumed(signed.nonce_id()).unwrap());
+    }
+
+    #[test]
     fn replayed_nonce_is_rejected() {
         let kp = Keypair::generate();
         let store = InMemoryExecutionNonceStore::default();
@@ -668,6 +705,23 @@ mod tests {
         let err = verify_execution_nonce(&signed, &kp.public_key(), &binding, now + 2, &store)
             .unwrap_err();
         assert!(matches!(err, ExecutionNonceError::Replayed));
+    }
+
+    #[test]
+    fn v1_nonce_is_rejected_after_request_binding_revision() {
+        let kp = Keypair::generate();
+        let store = InMemoryExecutionNonceStore::default();
+        let cfg = ExecutionNonceConfig::default();
+        let binding = sample_binding();
+        let now = 1_000_000;
+        let mut signed = mint_execution_nonce(&kp, binding.clone(), &cfg, now).unwrap();
+        signed.nonce.schema = "chio.execution_nonce.v1".to_string();
+        signed.signature = kp.sign_canonical(&signed.nonce).unwrap().0;
+
+        let error = verify_execution_nonce(&signed, &kp.public_key(), &binding, now + 1, &store)
+            .unwrap_err();
+
+        assert!(matches!(error, ExecutionNonceError::BadSchema { .. }));
     }
 
     #[test]
@@ -731,6 +785,20 @@ mod tests {
         assert!(store.reserve_until("long-lived", expires_at).unwrap());
         thread::sleep(Duration::from_millis(5));
         assert!(!store.reserve_until("long-lived", expires_at).unwrap());
+    }
+
+    #[test]
+    fn capacity_exhaustion_preserves_live_replay_markers() {
+        let store = InMemoryExecutionNonceStore::new(1, Duration::from_secs(30));
+
+        assert!(store.reserve("first").unwrap());
+        let error = store.reserve("second").unwrap_err();
+        assert!(matches!(
+            error,
+            KernelError::Internal(reason)
+                if reason.contains("execution nonce store capacity exhausted")
+        ));
+        assert!(!store.reserve("first").unwrap());
     }
 
     #[test]

@@ -676,6 +676,10 @@ pub trait BudgetStore: Send + Sync {
         )
     }
 
+    /// Apply a charge under the caller's durable hold/event identity and
+    /// authority fence. Implementations must preserve all three values or
+    /// return an explicit unsupported error. This method is required so a
+    /// backend upgrade cannot compile successfully and fail only on live calls.
     #[allow(clippy::too_many_arguments)]
     fn try_charge_cost_with_ids_and_authority(
         &self,
@@ -688,23 +692,7 @@ pub trait BudgetStore: Send + Sync {
         hold_id: Option<&str>,
         event_id: Option<&str>,
         authority: Option<&BudgetEventAuthority>,
-    ) -> Result<bool, BudgetStoreError> {
-        if authority.is_some() {
-            return Err(BudgetStoreError::Invariant(
-                "budget store does not support authority-fenced charging".to_string(),
-            ));
-        }
-        self.try_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            max_invocations,
-            cost_units,
-            max_cost_per_invocation,
-            max_total_cost_units,
-            hold_id,
-            event_id,
-        )
-    }
+    ) -> Result<bool, BudgetStoreError>;
 
     /// Reverse a previously applied provisional exposure for a pre-execution denial path.
     fn reverse_charge_cost(
@@ -730,6 +718,7 @@ pub trait BudgetStore: Send + Sync {
         self.reverse_charge_cost(capability_id, grant_index, cost_units)
     }
 
+    /// Reverse a charge under the exact durable identity and authority fence.
     fn reverse_charge_cost_with_ids_and_authority(
         &self,
         capability_id: &str,
@@ -738,14 +727,7 @@ pub trait BudgetStore: Send + Sync {
         hold_id: Option<&str>,
         event_id: Option<&str>,
         authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        if authority.is_some() {
-            return Err(BudgetStoreError::Invariant(
-                "budget store does not support authority-fenced reversal".to_string(),
-            ));
-        }
-        self.reverse_charge_cost_with_ids(capability_id, grant_index, cost_units, hold_id, event_id)
-    }
+    ) -> Result<(), BudgetStoreError>;
 
     /// Release a previously exposed monetary amount without changing invocation count.
     ///
@@ -774,6 +756,7 @@ pub trait BudgetStore: Send + Sync {
         self.reduce_charge_cost(capability_id, grant_index, cost_units)
     }
 
+    /// Release exposure under the exact durable identity and authority fence.
     fn reduce_charge_cost_with_ids_and_authority(
         &self,
         capability_id: &str,
@@ -782,14 +765,7 @@ pub trait BudgetStore: Send + Sync {
         hold_id: Option<&str>,
         event_id: Option<&str>,
         authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        if authority.is_some() {
-            return Err(BudgetStoreError::Invariant(
-                "budget store does not support authority-fenced release".to_string(),
-            ));
-        }
-        self.reduce_charge_cost_with_ids(capability_id, grant_index, cost_units, hold_id, event_id)
-    }
+    ) -> Result<(), BudgetStoreError>;
 
     /// Atomically release provisional exposure and record realized spend.
     ///
@@ -827,6 +803,8 @@ pub trait BudgetStore: Send + Sync {
         )
     }
 
+    /// Reconcile exposure and spend under the exact durable identity and
+    /// authority fence.
     #[allow(clippy::too_many_arguments)]
     fn settle_charge_cost_with_ids_and_authority(
         &self,
@@ -837,21 +815,7 @@ pub trait BudgetStore: Send + Sync {
         hold_id: Option<&str>,
         event_id: Option<&str>,
         authority: Option<&BudgetEventAuthority>,
-    ) -> Result<(), BudgetStoreError> {
-        if authority.is_some() {
-            return Err(BudgetStoreError::Invariant(
-                "budget store does not support authority-fenced settlement".to_string(),
-            ));
-        }
-        self.settle_charge_cost_with_ids(
-            capability_id,
-            grant_index,
-            exposed_cost_units,
-            realized_cost_units,
-            hold_id,
-            event_id,
-        )
-    }
+    ) -> Result<(), BudgetStoreError>;
 
     fn list_usages(
         &self,

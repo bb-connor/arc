@@ -96,6 +96,21 @@ fn signed_link(
     )
 }
 
+#[test]
+fn delegation_marker_rejects_noncanonical_root_digest() -> TestResult {
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let delegatee = Keypair::generate();
+    let root = signed_family_root("cap-invalid-marker", &issuer, &subject, 2)?;
+    let marker = super::aggregate_invocation::AggregateBudgetDelegationMarker {
+        root_binding_digest: "root-binding-digest".to_string(),
+        max_invocations: 2,
+    };
+
+    assert!(signed_link(&root, &subject, &delegatee.public_key(), Some(marker)).is_err());
+    Ok(())
+}
+
 fn descendant(
     id: &str,
     issuer: &Keypair,

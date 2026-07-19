@@ -317,7 +317,9 @@ fn make_sibling_sum_monetary_fixture(prefix: &str) -> SiblingSumMonetaryFixture 
         .record_capability_snapshot(&parent, None)
         .unwrap();
     drop(seed_store);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     kernel
         .register_budget_parent(parent.id.clone(), 5_000)
         .unwrap();
@@ -396,7 +398,9 @@ fn make_sibling_sum_invocation_fixture(prefix: &str) -> SiblingSumInvocationFixt
         .record_capability_snapshot(&parent, None)
         .unwrap();
     drop(seed_store);
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap())).unwrap();
+    kernel
+        .set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()))
+        .unwrap();
     kernel
         .register_budget_parent(parent.id.clone(), 5_000)
         .unwrap();
@@ -670,8 +674,10 @@ fn make_runtime_attestation(
         evidence_sha256: format!("digest-{tier:?}"),
         runtime_identity: Some("spiffe://chio/runtime/test".to_string()),
         workload_identity: Some(
-            chio_core::capability::workload_identity::WorkloadIdentity::parse_spiffe_uri("spiffe://chio/runtime/test")
-                .expect("parse runtime workload identity"),
+            chio_core::capability::workload_identity::WorkloadIdentity::parse_spiffe_uri(
+                "spiffe://chio/runtime/test",
+            )
+            .expect("parse runtime workload identity"),
         ),
         claims: Some(serde_json::json!({
             "enterpriseVerifier": {
@@ -1311,6 +1317,85 @@ impl BudgetStore for ReverseFailingBudgetStore {
             grant_index,
             exposed_cost_units,
             realized_cost_units,
+        )
+    }
+
+    fn try_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&crate::budget_store::BudgetEventAuthority>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.inner.try_charge_cost_with_ids_and_authority(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+            hold_id,
+            event_id,
+            authority,
+        )
+    }
+
+    fn reverse_charge_cost_with_ids_and_authority(
+        &self,
+        _capability_id: &str,
+        _grant_index: usize,
+        _cost_units: u64,
+        _hold_id: Option<&str>,
+        _event_id: Option<&str>,
+        _authority: Option<&crate::budget_store::BudgetEventAuthority>,
+    ) -> Result<(), BudgetStoreError> {
+        Err(BudgetStoreError::Invariant(
+            "reverse store unreachable".to_string(),
+        ))
+    }
+
+    fn reduce_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&crate::budget_store::BudgetEventAuthority>,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.reduce_charge_cost_with_ids_and_authority(
+            capability_id,
+            grant_index,
+            cost_units,
+            hold_id,
+            event_id,
+            authority,
+        )
+    }
+
+    fn settle_charge_cost_with_ids_and_authority(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        exposed_cost_units: u64,
+        realized_cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+        authority: Option<&crate::budget_store::BudgetEventAuthority>,
+    ) -> Result<(), BudgetStoreError> {
+        self.inner.settle_charge_cost_with_ids_and_authority(
+            capability_id,
+            grant_index,
+            exposed_cost_units,
+            realized_cost_units,
+            hold_id,
+            event_id,
+            authority,
         )
     }
 

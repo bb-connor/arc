@@ -118,6 +118,9 @@ impl DelegationLink {
             "delegation link",
             "delegator",
         )?;
+        if let Some(marker) = body.aggregate_budget.as_ref() {
+            marker.validate()?;
+        }
         if let Some(marker) = body.cumulative_approval.as_ref() {
             marker.validate()?;
         }
@@ -152,6 +155,9 @@ impl DelegationLink {
 
     /// Verify this link's signature against the delegator's key.
     pub fn verify_signature(&self) -> Result<bool> {
+        if let Some(marker) = self.aggregate_budget.as_ref() {
+            marker.validate()?;
+        }
         if let Some(marker) = self.cumulative_approval.as_ref() {
             marker.validate()?;
         }

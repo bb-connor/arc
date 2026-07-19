@@ -54,6 +54,13 @@ awk '
   }
 ' "$WORKFLOW" >"$actual"
 
+duplicates="$(sort "$actual" | uniq -d)"
+if [[ -n "$duplicates" ]]; then
+  echo "release-npm.yml all_packages contains duplicate entries:" >&2
+  echo "$duplicates" >&2
+  exit 1
+fi
+
 sort -u "$expected" -o "$expected"
 sort -u "$actual" -o "$actual"
 
@@ -72,6 +79,7 @@ grep -F 'if (visit(localDir)) return true;' "$WORKFLOW" >/dev/null
 grep -F 'cargo install wasm-pack --version "$(cat .tooling/wasm-pack.version)" --locked' "$WORKFLOW" >/dev/null
 grep -F 'CHIO_REQUIRE_WASM_TOOLCHAIN: "1"' "$WORKFLOW" >/dev/null
 grep -F 'using local same-release ${block}.${name}' "$WORKFLOW" >/dev/null
+grep -F 'visit(localDir);' "$WORKFLOW" >/dev/null
 grep -F 'SAME_RELEASE_MARKER' "$WORKFLOW" >/dev/null
 grep -F 'npm install -g npm@^11.5.1' "$WORKFLOW" >/dev/null
 grep -F 'node trusted publishing runtime must be >= 22.14.0' "$WORKFLOW" >/dev/null
