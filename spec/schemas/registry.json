@@ -1122,6 +1122,12 @@
       "schemaFile": "spec/schemas/chio-commerce/v1/federation-trust-bundle.schema.json"
     },
     {
+      "schema": "chio.comptroller.surface-report.v1",
+      "artifactKind": "chio_comptroller_surface_report",
+      "introducedBy": "chio-comptroller-surface/v1",
+      "schemaFile": "spec/schemas/chio-comptroller/v1/surface-report.schema.json"
+    },
+    {
       "schema": "chio.risk.comptroller-report.v1",
       "artifactKind": "risk_comptroller_report",
       "introducedBy": "enterprise-export-v1",

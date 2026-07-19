@@ -204,16 +204,13 @@ mod tests {
             retention_config: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-            dispatch_intent_journal: chio_kernel::DispatchIntentJournalMode::Off,
         });
 
         kernel.register_tool_server(Box::new(FlatCostServer { cost_units: 75 }));
 
         let adapter_config = PaymentAdapterConfig::default_safe();
         adapter_config.validate().test_unwrap();
-        kernel
-            .set_payment_adapter(adapter_config.build_adapter())
-            .test_unwrap();
+        kernel.set_payment_adapter(adapter_config.build_adapter());
 
         let agent_kp = Keypair::generate();
         let grant = ToolGrant {
@@ -270,11 +267,13 @@ mod tests {
                     expires_at: Some(now + 300),
                 },
                 max_billed_units: Some(2),
+                verified_outcome: None,
             }),
             runtime_attestation: None,
             call_chain: None,
             autonomy: None,
             context: None,
+            body: Default::default(),
         };
 
         let intent_hash = intent.binding_hash().test_unwrap();
@@ -285,6 +284,7 @@ mod tests {
                 subject: agent_kp.public_key(),
                 governed_intent_hash: intent_hash,
                 request_id: "req-cli-sim-1".to_string(),
+                threshold_proposal_hash: None,
                 issued_at: now.saturating_sub(1),
                 expires_at: now + 300,
                 decision: GovernedApprovalDecision::Approved,
@@ -304,6 +304,9 @@ mod tests {
             execution_nonce: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            approval_tokens: Vec::new(),
+            threshold_approval_proposal: None,
+            supplemental_authorization: None,
             model_metadata: None,
             federated_origin_kernel_id: None,
         };
