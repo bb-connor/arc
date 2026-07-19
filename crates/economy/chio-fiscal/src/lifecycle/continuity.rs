@@ -205,7 +205,7 @@ pub struct FiscalCharterRegistry {
 }
 
 impl FiscalCharterRegistry {
-    pub fn new(charters: Vec<SignedFiscalCharter>) -> Result<Self, FiscalError> {
+    pub fn new(mut charters: Vec<SignedFiscalCharter>) -> Result<Self, FiscalError> {
         let mut ids = BTreeSet::new();
         for charter in &charters {
             let verified = VerifiedFiscalCharter::verify(charter.clone())?;
@@ -213,6 +213,12 @@ impl FiscalCharterRegistry {
                 return Err(FiscalError::InvalidField("charter_registry.duplicate"));
             }
         }
+        charters.sort_by(|left, right| {
+            left.body
+                .sequence
+                .cmp(&right.body.sequence)
+                .then_with(|| left.body.charter_id.cmp(&right.body.charter_id))
+        });
         Ok(Self { charters })
     }
 
