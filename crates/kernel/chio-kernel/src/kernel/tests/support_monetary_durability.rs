@@ -769,25 +769,25 @@ impl MonetaryFailureFixture {
         })
     }
 
-    fn assert_released(&self, expected_attempts: usize) -> Result<(), Box<dyn std::error::Error>> {
+    fn assert_retained(&self) -> Result<(), Box<dyn std::error::Error>> {
         let usage = self
             .kernel
             .budget_store
             .get_usage(&self.capability.id, 0)?
             .ok_or_else(|| std::io::Error::other("monetary usage missing after dispatch"))?;
-        assert_eq!(usage.invocation_count, 0);
-        assert_eq!(usage.committed_cost_units()?, 0);
+        assert_eq!(usage.invocation_count, 1);
+        assert_eq!(usage.committed_cost_units()?, 100);
         assert_eq!(
             self.payment
                 .authorized
                 .load(std::sync::atomic::Ordering::SeqCst),
-            expected_attempts
+            1
         );
         assert_eq!(
             self.payment
                 .released
                 .load(std::sync::atomic::Ordering::SeqCst),
-            expected_attempts
+            0
         );
         assert_eq!(
             self.payment
@@ -797,14 +797,14 @@ impl MonetaryFailureFixture {
         );
         assert_eq!(
             self.executions.load(std::sync::atomic::Ordering::SeqCst),
-            u64::try_from(expected_attempts)?
+            1
         );
         Ok(())
     }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn non_durable_monetary_terminal_failures_release_top_level_funds(
+async fn non_durable_monetary_terminal_failures_retain_top_level_funds(
 ) -> Result<(), Box<dyn std::error::Error>> {
     for case in MONETARY_FAILURE_CASES {
         let fixture = MonetaryFailureFixture::new(case, "top-level")?;
@@ -815,19 +815,19 @@ async fn non_durable_monetary_terminal_failures_release_top_level_funds(
             &fixture.capability.id,
             &fixture.request.request_id,
         )?;
-        fixture.assert_released(1)?;
+        fixture.assert_retained()?;
 
         let mut fresh = fixture.request.clone();
         fresh.request_id = format!("{}-fresh", fresh.request_id);
         let retry = fixture.kernel.evaluate_tool_call(&fresh).await?;
         assert_eq!(retry.verdict, Verdict::Deny);
-        fixture.assert_released(2)?;
+        fixture.assert_retained()?;
     }
     Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn non_durable_monetary_terminal_failures_release_nested_funds(
+async fn non_durable_monetary_terminal_failures_retain_nested_funds(
 ) -> Result<(), Box<dyn std::error::Error>> {
     for case in MONETARY_FAILURE_CASES {
         let fixture = MonetaryFailureFixture::new(case, "nested")?;
@@ -861,7 +861,7 @@ async fn non_durable_monetary_terminal_failures_release_nested_funds(
             &fixture.capability.id,
             &fixture.request.request_id,
         )?;
-        fixture.assert_released(1)?;
+        fixture.assert_retained()?;
 
         let mut fresh = fixture.request.clone();
         fresh.request_id = format!("{}-fresh", fresh.request_id);
@@ -884,7 +884,7 @@ async fn non_durable_monetary_terminal_failures_release_nested_funds(
             )
             .await?;
         assert_eq!(retry.verdict, Verdict::Deny);
-        fixture.assert_released(2)?;
+        fixture.assert_retained()?;
     }
     Ok(())
 }

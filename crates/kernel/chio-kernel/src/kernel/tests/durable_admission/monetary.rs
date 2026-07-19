@@ -113,6 +113,38 @@ fn unsupported_durable_participants_fail_before_dispatch() {
 }
 
 #[test]
+fn free_matching_grant_does_not_inherit_paid_grant_requirements() {
+    let mut paid = make_grant("durable-server", "mutate");
+    paid.max_cost_per_invocation = Some(MonetaryAmount {
+        units: 10,
+        currency: "USD".to_owned(),
+    });
+    paid.max_total_cost = Some(MonetaryAmount {
+        units: 100,
+        currency: "USD".to_owned(),
+    });
+    let free = make_grant("durable-server", "mutate");
+    let (kernel, request, store, invocations) = durable_admission_fixture_with_grants(
+        "durable-free-grant-fallback",
+        vec![paid, free],
+    );
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("free fallback dispatch");
+
+    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    assert!(!store.operation().binding().participant_requirements().payment);
+    assert!(store
+        .operation()
+        .budget_hold_id()
+        .expect("bound budget hold")
+        .as_str()
+        .ends_with(":1"));
+}
+
+#[test]
 fn durable_monetary_lifecycle_uses_the_qualified_projection_store() {
     let mut config = make_config();
     config.policy_hash = sha256_hex(b"durable-monetary-authorization-policy");

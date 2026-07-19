@@ -1452,18 +1452,8 @@ impl ChioKernel {
         for matching in matching_grants {
             if durable_admission
                 .as_deref()
-                .is_some_and(|admission| !admission.permits_grant(matching.index))
+                .is_some_and(|admission| !admission.permits_matching_grant(matching))
             {
-                continue;
-            }
-            if durable_admission.as_deref().is_some_and(|admission| {
-                admission.requires_payment()
-                    && matching
-                        .grant
-                        .max_cost_per_invocation
-                        .as_ref()
-                        .is_none_or(|amount| amount.units == 0)
-            }) {
                 continue;
             }
             eligible_grant_seen = true;

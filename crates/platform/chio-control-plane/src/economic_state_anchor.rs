@@ -12,9 +12,10 @@ use chio_core::economic_continuity::{
     EconomicEffectCancellationProofVerifier, EconomicEffectDispatchCommitV1, EconomicStateAnchor,
     EconomicStateAnchorError, EconomicStateAnchorPins, EconomicStateAnchorViewV1,
     EconomicStateReadQuery, EconomicStateReadiness, EconomicStateReadinessExpectation,
-    EconomicTransitionProofVerifier, QualifiedGenericEconomicStateBatchAdvance,
-    VerifiedEconomicEffectCancellationAdvance, VerifiedEconomicEffectDispatch,
-    VerifiedEconomicEffectDispatchAdvance, VerifiedEconomicEffectNotDispatched,
+    EconomicTransitionProofVerifier, QualifiedEconomicEffectUnknownAdvance,
+    QualifiedGenericEconomicStateBatchAdvance, VerifiedEconomicEffectCancellationAdvance,
+    VerifiedEconomicEffectDispatch, VerifiedEconomicEffectDispatchAdvance,
+    VerifiedEconomicEffectNotDispatched, VerifiedEconomicStateBatchAdvance,
     VerifiedEconomicStateView, MAX_ECONOMIC_BATCH_BYTES, MAX_ECONOMIC_INLINE_CONTENT_BYTES,
     MAX_ECONOMIC_TERMINAL_CONTENT_BYTES, MAX_ECONOMIC_TRANSITIONS,
 };
@@ -278,6 +279,24 @@ impl RemoteEconomicStateAnchor {
             .map_err(|error| EconomicStateAnchorError::Canonicalization(error.to_string()))
     }
 
+    fn compare_and_swap_verified_batch(
+        &self,
+        advance: &VerifiedEconomicStateBatchAdvance,
+    ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
+        reverify_economic_state_batch_advance(
+            advance,
+            &self.pins,
+            self.transition_verifier.as_ref(),
+        )?;
+        verify_economic_admission_batch(advance, self.admission_verifier.as_ref())?;
+        let committed = verify_economic_state_view(
+            self.post(ECONOMIC_STATE_CAS_PATH, advance.batch())?,
+            &self.pins,
+        )?;
+        verify_economic_state_batch_commit(advance, &committed, &self.pins)?;
+        Ok(committed)
+    }
+
     pub fn readiness(
         &self,
         query: &EconomicStateReadQuery,
@@ -334,19 +353,7 @@ impl EconomicStateAnchor for RemoteEconomicStateAnchor {
         &self,
         advance: QualifiedGenericEconomicStateBatchAdvance<'_>,
     ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
-        let advance = advance.advance();
-        reverify_economic_state_batch_advance(
-            advance,
-            &self.pins,
-            self.transition_verifier.as_ref(),
-        )?;
-        verify_economic_admission_batch(advance, self.admission_verifier.as_ref())?;
-        let committed = verify_economic_state_view(
-            self.post(ECONOMIC_STATE_CAS_PATH, advance.batch())?,
-            &self.pins,
-        )?;
-        verify_economic_state_batch_commit(advance, &committed, &self.pins)?;
-        Ok(committed)
+        self.compare_and_swap_verified_batch(advance.advance())
     }
 
     fn compare_and_swap_effect_dispatch(
@@ -363,6 +370,13 @@ impl EconomicStateAnchor for RemoteEconomicStateAnchor {
             self.post(ECONOMIC_EFFECT_DISPATCH_PATH, advance.batch())?;
         let committed = verify_economic_state_view(response.view, &self.pins)?;
         verify_economic_effect_dispatch_commit(advance, &committed, response.commit, &self.pins)
+    }
+
+    fn compare_and_swap_effect_unknown(
+        &self,
+        advance: QualifiedEconomicEffectUnknownAdvance<'_>,
+    ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
+        self.compare_and_swap_verified_batch(advance.advance())
     }
 
     fn compare_and_swap_effect_cancellation(

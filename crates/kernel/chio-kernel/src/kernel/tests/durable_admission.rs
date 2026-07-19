@@ -2739,17 +2739,15 @@ fn durable_post_invocation_identity_change_cannot_replace_recovered_finalization
         store: store.clone(),
     }));
 
-    let response = recovered_kernel
+    let error = recovered_kernel
         .evaluate_tool_call_blocking(&request)
-        .expect("identity substitution denial");
-    assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("request id conflicts")));
+        .expect_err("identity substitution must fail closed");
+    assert!(error
+        .to_string()
+        .contains("recovered post-return plan does not match durable admission"));
     assert_eq!(
         store.operation().state(),
-        AdmissionOperationState::Completed
+        AdmissionOperationState::Finalizing
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }

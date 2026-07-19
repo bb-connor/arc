@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use chio_core::economic_continuity::{
-    economic_effect_slot_from_head, qualify_generic_economic_state_batch_advance,
-    EconomicEffectStateV1, EconomicStateAnchor, EconomicStateAnchorError,
-    VerifiedEconomicEffectDispatch, VerifiedEconomicEffectDispatchAdvance,
-    VerifiedEconomicStateBatchAdvance, VerifiedEconomicStateView,
+    economic_effect_slot_from_head, qualify_economic_effect_unknown_advance, EconomicEffectStateV1,
+    EconomicStateAnchor, EconomicStateAnchorError, VerifiedEconomicEffectDispatch,
+    VerifiedEconomicEffectDispatchAdvance, VerifiedEconomicStateBatchAdvance,
+    VerifiedEconomicStateView,
 };
 use chio_kernel::admission_operation::{
     AdmissionMutationSequencer, AdmissionOperationError, StoreMutationFence,
@@ -74,7 +74,7 @@ impl SequencedEconomicEffectCoordinator {
             ));
         }
         self.anchor
-            .compare_and_swap_batch(qualify_generic_economic_state_batch_advance(advance)?)
+            .compare_and_swap_effect_unknown(qualify_economic_effect_unknown_advance(advance)?)
     }
 
     fn lock(
@@ -99,16 +99,17 @@ mod tests {
     };
     use chio_core::crypto::{sha256_hex, Keypair};
     use chio_core::economic_continuity::{
-        verify_economic_state_batch_advance, verify_economic_state_batch_commit,
-        verify_economic_state_view, EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1,
-        EconomicCheckpointReadQuery, EconomicContentV1, EconomicEffectSlotV1,
-        EconomicEffectTargetV1, EconomicRequestBindingV1, EconomicResourceHeadV1,
-        EconomicResourceKeyV1, EconomicStateAnchorPins, EconomicStateAnchorViewV1,
-        EconomicStateBatchV1, EconomicStateReadQuery, EconomicStateTransitionV1,
-        EconomicTransitionAuthorizationV1, EconomicTransitionProofVerifier,
-        VerifiedEconomicEffectDispatch, VerifiedEconomicEffectDispatchAdvance,
-        CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
-        CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA, CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
+        qualify_generic_economic_state_batch_advance, verify_economic_state_batch_advance,
+        verify_economic_state_batch_commit, verify_economic_state_view,
+        EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1, EconomicCheckpointReadQuery,
+        EconomicContentV1, EconomicEffectSlotV1, EconomicEffectTargetV1, EconomicRequestBindingV1,
+        EconomicResourceHeadV1, EconomicResourceKeyV1, EconomicStateAnchorPins,
+        EconomicStateAnchorViewV1, EconomicStateBatchV1, EconomicStateReadQuery,
+        EconomicStateTransitionV1, EconomicTransitionAuthorizationV1,
+        EconomicTransitionProofVerifier, VerifiedEconomicEffectDispatch,
+        VerifiedEconomicEffectDispatchAdvance, CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
+        CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA, CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
+        CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
     };
 
     use super::*;
@@ -341,11 +342,23 @@ mod tests {
                 "dispatch is not used by this fixture".to_owned(),
             ))
         }
+
+        fn compare_and_swap_effect_unknown(
+            &self,
+            advance: chio_core::economic_continuity::QualifiedEconomicEffectUnknownAdvance<'_>,
+        ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
+            let advance = advance.advance();
+            self.batch_calls.fetch_add(1, Ordering::SeqCst);
+            let committed = verify_economic_state_view(self.committed.clone(), &pins())?;
+            verify_economic_state_batch_commit(advance, &committed, &pins())?;
+            Ok(committed)
+        }
     }
 
     #[test]
     fn unqualified_recovery_commits_unknown_before_returning() -> TestResult {
         let (advance, committed, committed_view) = unknown_advance()?;
+        assert!(qualify_generic_economic_state_batch_advance(&advance).is_err());
         let EconomicEffectRecoveryDecision::LockedUnknown(recovery) =
             qualify_committed_effect_recovery(&committed, None, None)?
         else {

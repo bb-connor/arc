@@ -972,6 +972,18 @@ fn generic_batch_qualification_rejects_no_effect_transitions(
 }
 
 #[test]
+fn generic_batch_qualification_rejects_effect_dispatch_transitions(
+) -> Result<(), Box<dyn core::error::Error>> {
+    let (advance, _, _, _) = dispatch_advance()?;
+
+    assert!(matches!(
+        qualify_generic_economic_state_batch_advance(advance.state_advance()),
+        Err(EconomicStateAnchorError::EffectDispatchRejected(_))
+    ));
+    Ok(())
+}
+
+#[test]
 fn cancellation_requires_a_strict_lifecycle_fence_advance() {
     assert!(cancellation_advance_with_fence(
         EconomicNoEffectKindV1::PermanentlyNotApplied,

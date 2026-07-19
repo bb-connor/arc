@@ -538,17 +538,76 @@ pub fn qualify_generic_economic_state_batch_advance(
         if transition.resource_key.resource_family != "effect_slot" {
             continue;
         }
-        if let Some(current_head) = advance.current.view.head(&transition.resource_key) {
-            economic_effect_slot_from_head(current_head)?;
-        }
+        let current_slot = advance
+            .current
+            .view
+            .head(&transition.resource_key)
+            .map(economic_effect_slot_from_head)
+            .transpose()?;
         let next_slot = economic_effect_slot_from_head(&transition.next_head)?;
         if next_slot.state == EconomicEffectStateV1::NoEffect {
             return Err(EconomicStateAnchorError::EffectCancellationRejected(
                 "no-effect transitions require the typed cancellation CAS",
             ));
         }
+        if current_slot.is_some() || next_slot.state != EconomicEffectStateV1::Ready {
+            return Err(EconomicStateAnchorError::EffectDispatchRejected(
+                "retained effect-slot transitions require a typed CAS",
+            ));
+        }
     }
     Ok(QualifiedGenericEconomicStateBatchAdvance { advance })
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct QualifiedEconomicEffectUnknownAdvance<'a> {
+    advance: &'a VerifiedEconomicStateBatchAdvance,
+}
+
+impl<'a> QualifiedEconomicEffectUnknownAdvance<'a> {
+    pub const fn advance(self) -> &'a VerifiedEconomicStateBatchAdvance {
+        self.advance
+    }
+}
+
+pub fn qualify_economic_effect_unknown_advance(
+    advance: &VerifiedEconomicStateBatchAdvance,
+) -> Result<QualifiedEconomicEffectUnknownAdvance<'_>, EconomicStateAnchorError> {
+    if advance.batch.transitions.len() != 1
+        || !advance.batch.effect_slots.is_empty()
+        || !advance.batch.request_replays.is_empty()
+        || advance.batch.transitions[0].prepared_effect.is_some()
+    {
+        return Err(EconomicStateAnchorError::EffectDispatchRejected(
+            "unknown recovery must advance exactly one retained effect slot",
+        ));
+    }
+    let transition = &advance.batch.transitions[0];
+    if transition.resource_key.resource_family != "effect_slot" {
+        return Err(EconomicStateAnchorError::EffectDispatchRejected(
+            "unknown recovery transition is not an effect slot",
+        ));
+    }
+    let current_head = advance
+        .current
+        .view
+        .head(&transition.resource_key)
+        .ok_or_else(|| {
+            EconomicStateAnchorError::CurrentHeadMissing(transition.resource_key.clone())
+        })?;
+    let current_slot = economic_effect_slot_from_head(current_head)?;
+    let next_slot = economic_effect_slot_from_head(&transition.next_head)?;
+    current_slot.validate_successor(&next_slot)?;
+    if current_slot.state != EconomicEffectStateV1::DispatchCommitted
+        || next_slot.state != EconomicEffectStateV1::Unknown
+        || transition.next_head.lifecycle_state != "unknown"
+        || advance.batch.operation_id.as_deref() != Some(next_slot.operation_id.as_str())
+    {
+        return Err(EconomicStateAnchorError::EffectDispatchRejected(
+            "effect slot did not enter unknown from dispatch_committed",
+        ));
+    }
+    Ok(QualifiedEconomicEffectUnknownAdvance { advance })
 }
 
 pub fn verify_economic_state_batch_advance(
@@ -773,6 +832,10 @@ pub struct VerifiedEconomicEffectDispatchAdvance {
 }
 
 impl VerifiedEconomicEffectDispatchAdvance {
+    pub fn state_advance(&self) -> &VerifiedEconomicStateBatchAdvance {
+        &self.advance
+    }
+
     pub fn batch(&self) -> &EconomicStateBatchV1 {
         self.advance.batch()
     }
@@ -1369,6 +1432,15 @@ pub trait EconomicStateAnchor: Send + Sync {
         &self,
         advance: VerifiedEconomicEffectDispatchAdvance,
     ) -> Result<VerifiedEconomicEffectDispatch, EconomicStateAnchorError>;
+
+    fn compare_and_swap_effect_unknown(
+        &self,
+        _advance: QualifiedEconomicEffectUnknownAdvance<'_>,
+    ) -> Result<VerifiedEconomicStateView, EconomicStateAnchorError> {
+        Err(EconomicStateAnchorError::Unavailable(
+            "economic effect unknown recovery is not configured".to_string(),
+        ))
+    }
 
     fn compare_and_swap_effect_cancellation(
         &self,

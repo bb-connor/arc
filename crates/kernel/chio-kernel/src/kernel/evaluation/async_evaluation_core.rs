@@ -378,15 +378,7 @@ impl ChioKernel {
         for matching in &matching_grants {
             if durable_admission
                 .as_ref()
-                .is_some_and(|admission| !admission.permits_grant(matching.index))
-                || durable_admission.as_ref().is_some_and(|admission| {
-                    admission.requires_payment()
-                        && matching
-                            .grant
-                            .max_cost_per_invocation
-                            .as_ref()
-                            .is_none_or(|amount| amount.units == 0)
-                })
+                .is_some_and(|admission| !admission.permits_matching_grant(matching))
             {
                 continue;
             }
@@ -1165,12 +1157,9 @@ impl ChioKernel {
                 return Err(error);
             }
             Err(KernelError::RequestCancelled { reason, .. }) => {
-                let metadata = self.post_dispatch_failure_receipt_metadata(
-                    request,
-                    cap,
+                let metadata = self.ambiguous_dispatch_receipt_metadata(
                     &budget_mutation,
                     payment_authorization.as_ref(),
-                    durable_admission.is_some(),
                     extra_metadata.clone(),
                 );
                 warn!(
@@ -1194,12 +1183,9 @@ impl ChioKernel {
             }
             Err(KernelError::HotPathDeadlineExceeded { stage, budget_ms }) => {
                 let reason = format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms");
-                let metadata = self.post_dispatch_failure_receipt_metadata(
-                    request,
-                    cap,
+                let metadata = self.ambiguous_dispatch_receipt_metadata(
                     &budget_mutation,
                     payment_authorization.as_ref(),
-                    durable_admission.is_some(),
                     extra_metadata.clone(),
                 );
                 warn!(
@@ -1207,9 +1193,8 @@ impl ChioKernel {
                     reason = %redacted!(&reason),
                     "tool call deadline expired"
                 );
-                // Runtime reservations remain retained because the side effect
-                // is ambiguous. Durable admission retains the financial state
-                // for recovery; an explicitly non-durable path releases it.
+                // Runtime and financial reservations remain retained because
+                // the side effect is ambiguous.
                 return self.with_pre_invocation_guard_evidence(
                     &pre_invocation_guard_evidence,
                     || {
@@ -1225,12 +1210,9 @@ impl ChioKernel {
                 );
             }
             Err(KernelError::RequestIncomplete(reason)) => {
-                let metadata = self.post_dispatch_failure_receipt_metadata(
-                    request,
-                    cap,
+                let metadata = self.ambiguous_dispatch_receipt_metadata(
                     &budget_mutation,
                     payment_authorization.as_ref(),
-                    durable_admission.is_some(),
                     extra_metadata.clone(),
                 );
                 warn!(
@@ -1255,12 +1237,9 @@ impl ChioKernel {
             }
             Err(e) => {
                 let msg = e.to_string();
-                let deny_metadata = self.post_dispatch_failure_receipt_metadata(
-                    request,
-                    cap,
+                let deny_metadata = self.ambiguous_dispatch_receipt_metadata(
                     &budget_mutation,
                     payment_authorization.as_ref(),
-                    durable_admission.is_some(),
                     extra_metadata.clone(),
                 );
                 warn!(request_id = %request.request_id, reason = %redacted!(&msg), "tool server error");

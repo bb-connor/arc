@@ -191,6 +191,20 @@ impl DurableToolAdmission {
             .is_none_or(|hold_id| hold_id.as_str() == self.budget_hold_id(grant_index))
     }
 
+    pub(crate) fn permits_matching_grant(&self, matching: &MatchingGrant<'_>) -> bool {
+        self.permits_grant(matching.index)
+            && if self.requires_payment() {
+                matching
+                    .grant
+                    .max_cost_per_invocation
+                    .as_ref()
+                    .is_some_and(|amount| amount.units != 0)
+            } else {
+                matching.grant.max_cost_per_invocation.is_none()
+                    && matching.grant.max_total_cost.is_none()
+            }
+    }
+
     pub(crate) fn can_resume_captured_hold(&self) -> bool {
         self.operation.state() == AdmissionOperationState::CapturePending
     }
@@ -485,7 +499,7 @@ impl ChioKernel {
                 SupplementalQuotaError::MissingVerifier.to_string(),
             ));
         }
-        let effect_class = if matching_grants.iter().any(|matching| {
+        let effect_class = if matching_grants.iter().all(|matching| {
             matching.grant.max_cost_per_invocation.is_some()
                 || matching.grant.max_total_cost.is_some()
         }) {

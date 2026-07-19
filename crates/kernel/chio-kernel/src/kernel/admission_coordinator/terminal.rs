@@ -462,12 +462,6 @@ impl ChioKernel {
         KernelError,
     > {
         let matched_grant_index = raw.matched_grant_index().map_err(tool_outcome_error)?;
-        if !admission.permits_grant(matched_grant_index) {
-            return Err(KernelError::DurableAdmission(
-                "recorded tool return does not match the captured grant".to_owned(),
-            ));
-        }
-        let plan = self.durable_post_return_plan()?;
         let matching_grants = resolve_required_matching_grants(
             &request.capability,
             &request.tool_name,
@@ -476,6 +470,14 @@ impl ChioKernel {
             request.model_metadata.as_ref(),
         )
         .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        if !matching_grants.iter().any(|matching| {
+            matching.index == matched_grant_index && admission.permits_matching_grant(matching)
+        }) {
+            return Err(KernelError::DurableAdmission(
+                "recorded tool return does not match the captured grant".to_owned(),
+            ));
+        }
+        let plan = self.durable_post_return_plan()?;
         let recovered_request_hash =
             immutable_tool_admission_request_hash(request, &matching_grants, &plan)?;
         if &recovered_request_hash != admission.operation.binding().immutable_request_hash() {

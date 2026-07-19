@@ -211,7 +211,11 @@ impl TrustFiscalRuntime {
         let charter = current_charter(&startup)
             .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?;
         let verify_at = trusted_now(&startup)?;
-        let trust = self.admission_trust(&charter)?;
+        let retained = self
+            .store
+            .load_admission_state(&signed_admission.body.admission_id)
+            .map_err(TrustFiscalOperationError::Store)?;
+        let trust = self.admission_trust(&charter, Some(&retained))?;
         let admission = VerifiedFiscalProposalAdmission::verify(
             signed_admission,
             &proposal,
@@ -220,10 +224,6 @@ impl TrustFiscalRuntime {
             verify_at,
         )
         .map_err(TrustFiscalOperationError::InvalidArtifact)?;
-        let retained = self
-            .store
-            .load_admission_state(&admission.body().admission_id)
-            .map_err(TrustFiscalOperationError::Store)?;
         if retained.signed_admission != *admission.signed()
             || retained.admission_digest != admission.digest()
             || retained.status != chio_fiscal::FiscalProposalAdmissionStatus::Admitted
@@ -259,13 +259,17 @@ impl TrustFiscalRuntime {
         let proposal = self.verify_proposal_at(signed_proposal, &startup)?;
         let charter = current_charter(&startup)
             .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?;
-        let trust = self.admission_trust(&charter)?;
         let activated_at = signed_activation.body.activated_at;
         if activated_at > trusted_now(&startup)? {
             return Err(TrustFiscalOperationError::InvalidArtifact(
                 chio_fiscal::FiscalError::InvalidField("activation.activated_at"),
             ));
         }
+        let admitted = self
+            .store
+            .load_admission_state(&signed_admission.body.admission_id)
+            .map_err(TrustFiscalOperationError::Store)?;
+        let trust = self.admission_trust(&charter, Some(&admitted))?;
         let admission = VerifiedFiscalProposalAdmission::verify(
             signed_admission,
             &proposal,
@@ -274,10 +278,6 @@ impl TrustFiscalRuntime {
             activated_at,
         )
         .map_err(TrustFiscalOperationError::InvalidArtifact)?;
-        let admitted = self
-            .store
-            .load_admission_state(&admission.body().admission_id)
-            .map_err(TrustFiscalOperationError::Store)?;
         if admitted.signed_admission != *admission.signed()
             || admitted.admission_digest != admission.digest()
             || admitted.status != chio_fiscal::FiscalProposalAdmissionStatus::Admitted
@@ -585,11 +585,11 @@ impl TrustFiscalRuntime {
                 predecessor.as_ref(),
             )
             .map_err(TrustFiscalOperationError::InvalidArtifact)?;
-            let trust = self.admission_trust(&charter)?;
             let state = self
                 .store
                 .load_admission_state(&signed_activation.body.admission_id)
                 .map_err(TrustFiscalOperationError::Store)?;
+            let trust = self.admission_trust(&charter, Some(&state))?;
             let admission = VerifiedFiscalProposalAdmission::verify(
                 state.signed_admission.clone(),
                 &proposal,
@@ -645,15 +645,31 @@ impl TrustFiscalRuntime {
     fn admission_trust(
         &self,
         charter: &VerifiedFiscalCharter,
+        retained: Option<&chio_fiscal::FiscalProposalAdmissionState>,
     ) -> Result<FiscalAdmissionTrustRegistry, TrustFiscalOperationError> {
-        FiscalAdmissionTrustRegistry::new(vec![FiscalAdmissionAuthority::new(
+        let current = FiscalAdmissionAuthority::new(
             charter.body().governing_operator_id.clone(),
             self.admission_authority_id.clone(),
             self.admission_signer_key_epoch,
             self.admission_signer.public_key(),
         )
-        .map_err(TrustFiscalOperationError::InvalidArtifact)?])
-        .map_err(TrustFiscalOperationError::InvalidArtifact)
+        .map_err(TrustFiscalOperationError::InvalidArtifact)?;
+        let mut authorities = vec![current.clone()];
+        if let Some(retained) = retained {
+            let signed = &retained.signed_admission;
+            let historical = FiscalAdmissionAuthority::new(
+                signed.body.governing_operator_id.clone(),
+                signed.body.admission_authority_id.clone(),
+                signed.body.signer_key_epoch,
+                signed.signer_key.clone(),
+            )
+            .map_err(TrustFiscalOperationError::InvalidArtifact)?;
+            if historical != current {
+                authorities.push(historical);
+            }
+        }
+        FiscalAdmissionTrustRegistry::new(authorities)
+            .map_err(TrustFiscalOperationError::InvalidArtifact)
     }
 }
 
@@ -1056,6 +1072,39 @@ mod tests {
                 .signed(),
             &candidate
         );
+
+        let historical_signer = Keypair::from_seed(&[6; 32]);
+        let historical_signed = chio_fiscal::FiscalProposalAdmissionBuilder {
+            admission_sequence: 1,
+            admitted_at: 55,
+            admission_authority_id: "fiscal-admission".to_owned(),
+            signer_key_epoch: 7,
+        }
+        .sign(&persisted, &charter, &historical_signer)?;
+        let historical_trust =
+            FiscalAdmissionTrustRegistry::new(vec![FiscalAdmissionAuthority::new(
+                charter.body().governing_operator_id.clone(),
+                "fiscal-admission".to_owned(),
+                7,
+                historical_signer.public_key(),
+            )?])?;
+        let historical = VerifiedFiscalProposalAdmission::verify(
+            historical_signed,
+            &persisted,
+            &charter,
+            &historical_trust,
+            55,
+        )?;
+        let retained = chio_fiscal::FiscalProposalAdmissionState::admitted(&historical);
+        let rotated_trust = runtime.admission_trust(&charter, Some(&retained))?;
+        assert!(VerifiedFiscalProposalAdmission::verify(
+            retained.signed_admission.clone(),
+            &persisted,
+            &charter,
+            &rotated_trust,
+            55,
+        )
+        .is_ok());
         Ok(())
     }
 }
