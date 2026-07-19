@@ -134,6 +134,10 @@ CREATE TABLE IF NOT EXISTS fiscal_staged_transitions (
         REFERENCES fiscal_continuity_checkpoints(checkpoint_digest)
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS fiscal_one_open_transition
+ON fiscal_staged_transitions((1))
+WHERE status IN ('db_staged', 'fiscal_anchor_advanced');
+
 CREATE TABLE IF NOT EXISTS fiscal_projection_commits (
     projection_key TEXT NOT NULL CHECK (projection_key <> ''),
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence > 0),

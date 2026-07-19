@@ -33,6 +33,7 @@ pub mod enterprise_federation;
 pub mod evidence_export;
 pub mod federation_policy;
 pub mod fiscal_state_anchor;
+pub mod fiscal_state_recovery;
 pub mod issuance;
 pub mod passport_verifier;
 pub mod policy;

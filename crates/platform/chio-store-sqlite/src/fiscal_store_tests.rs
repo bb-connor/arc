@@ -201,6 +201,33 @@ fn store_fixture() -> TestResult<StoreFixture> {
 }
 
 #[test]
+fn fiscal_schema_migrates_the_single_open_transition_guard() -> TestResult {
+    let mut connection = rusqlite::Connection::open_in_memory()?;
+    initialize_fiscal_schema(&mut connection)?;
+    connection.execute(
+        "UPDATE chio_store_schema_versions SET version = 1 WHERE store_key = 'fiscal'",
+        [],
+    )?;
+    connection.execute("DROP INDEX fiscal_one_open_transition", [])?;
+
+    initialize_fiscal_schema(&mut connection)?;
+
+    let version: i32 = connection.query_row(
+        "SELECT version FROM chio_store_schema_versions WHERE store_key = 'fiscal'",
+        [],
+        |row| row.get(0),
+    )?;
+    let index_present: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'index' AND name = 'fiscal_one_open_transition')",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(version, FISCAL_STORE_SUPPORTED_SCHEMA_VERSION);
+    assert!(index_present);
+    Ok(())
+}
+
+#[test]
 fn fiscal_genesis_is_exact_idempotent_and_survives_restart() -> TestResult {
     let files = store_fixture()?;
     let fixture = fiscal_fixture()?;

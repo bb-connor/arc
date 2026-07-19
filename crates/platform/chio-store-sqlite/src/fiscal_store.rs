@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::{sha256_hex, StoreMutationFence};
 use chio_fiscal::{
-    FiscalAuthorityState, FiscalGenesisPolicy, FiscalProposalAdmissionState,
+    FiscalAuthorityState, FiscalCharterRegistry, FiscalGenesisPolicy, FiscalProposalAdmissionState,
     FiscalProposalAdmissionStatus, VerifiedFiscalActivation, VerifiedFiscalApproval,
     VerifiedFiscalCharter, VerifiedFiscalContinuityAdvance, VerifiedFiscalContinuityCheckpoint,
     VerifiedFiscalProposal, VerifiedFiscalRuntimeReadiness, VerifiedFiscalSchedule,
@@ -14,7 +14,7 @@ use serde::Serialize;
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 
 const FISCAL_STORE_SCHEMA_KEY: &str = "fiscal";
-pub(crate) const FISCAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
+pub(crate) const FISCAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 2;
 const FISCAL_STORE_SCHEMA: &str = include_str!("fiscal_store.sql");
 const FISCAL_GENESIS_PROJECTION_KEY: &str = "authority";
 const ZERO_DIGEST: &str = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -950,6 +950,53 @@ impl SqliteFiscalStore {
         let record = load_transition(&transaction, transition_id)?;
         transaction.commit().map_err(sqlite_error)?;
         Ok(record)
+    }
+
+    pub fn load_open_transition(
+        &self,
+    ) -> Result<Option<FiscalStagedTransitionRecord>, FiscalStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let transition_id = transaction
+            .query_row(
+                "SELECT transition_id FROM fiscal_staged_transitions WHERE status IN ('db_staged', 'fiscal_anchor_advanced')",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(sqlite_error)?;
+        let record = transition_id
+            .as_deref()
+            .map(|id| load_transition(&transaction, id))
+            .transpose()?;
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(record)
+    }
+
+    pub fn load_checkpoint(
+        &self,
+        checkpoint_digest: &str,
+        policy: &FiscalGenesisPolicy,
+        charters: &FiscalCharterRegistry,
+    ) -> Result<VerifiedFiscalContinuityCheckpoint, FiscalStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let json = transaction
+            .query_row(
+                "SELECT signed_json FROM fiscal_continuity_checkpoints WHERE checkpoint_digest = ?1",
+                [checkpoint_digest],
+                |row| row.get::<_, Vec<u8>>(0),
+            )
+            .optional()
+            .map_err(sqlite_error)?
+            .ok_or(FiscalStoreError::NotFound)?;
+        let checkpoint =
+            VerifiedFiscalContinuityCheckpoint::from_canonical_bytes(&json, policy, charters)?;
+        if checkpoint.digest() != checkpoint_digest {
+            return Err(invariant("stored fiscal checkpoint digest is inconsistent"));
+        }
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(checkpoint)
     }
 
     fn transition_status_update(
