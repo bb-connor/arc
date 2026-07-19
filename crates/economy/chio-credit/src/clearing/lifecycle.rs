@@ -24,7 +24,7 @@ pub use dispatch::compose_clearing_dispatch_transition;
 pub use reconciliation::*;
 pub use replay::*;
 pub use satisfaction::*;
-use validation::{reservation_head_root, reservation_root};
+use validation::{checked_transition_count, reservation_head_root, reservation_root};
 pub(super) use validation::{validate_round_core, validate_round_head};
 pub use zero_intent::*;
 
@@ -307,10 +307,8 @@ impl ClearingRoundLifecycleRecordV1 {
         validate_digest("input_manifest_digest", &self.input_manifest_digest)?;
         validate_digest("reservation_root", &self.reservation_root)?;
         validate_positive("reservation_count", self.reservation_count)?;
-        if usize::try_from(self.reservation_count).map_err(|_| ClearingError::ArithmeticOverflow)?
-            + 2
-            > MAX_ECONOMIC_TRANSITIONS
-        {
+        let transition_count = checked_transition_count(self.reservation_count)?;
+        if transition_count > MAX_ECONOMIC_TRANSITIONS {
             return Err(ClearingError::IncompleteLifecycleProjection);
         }
         validate_positive("round_row_version", self.row_version)?;
@@ -1804,6 +1802,14 @@ fn rejected_batch(batch: &EconomicStateBatchV1) -> EconomicStateAnchorError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn round_transition_count_rejects_input_padding_overflow() {
+        assert!(matches!(
+            checked_transition_count(u64::MAX),
+            Err(ClearingError::ArithmeticOverflow)
+        ));
+    }
 
     #[test]
     fn finalized_round_cannot_satisfy_without_zero_intent_reconciliation() {

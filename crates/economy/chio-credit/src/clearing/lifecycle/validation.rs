@@ -31,6 +31,13 @@ pub(super) fn reservation_head_root(
     domain_digest(RESERVATION_HEAD_ROOT_DOMAIN, &leaves)
 }
 
+pub(super) fn checked_transition_count(input_count: u64) -> Result<usize, ClearingError> {
+    usize::try_from(input_count)
+        .map_err(|_| ClearingError::ArithmeticOverflow)?
+        .checked_add(2)
+        .ok_or(ClearingError::ArithmeticOverflow)
+}
+
 pub(in crate::clearing) fn validate_round_core(
     core: &NettingRoundCoreV1,
 ) -> Result<(), ClearingError> {
@@ -55,9 +62,8 @@ pub(in crate::clearing) fn validate_round_core(
     )?;
     validate_digest("input_manifest_digest", &core.input_manifest_digest)?;
     validate_positive("input_count", core.input_count)?;
-    if usize::try_from(core.input_count).map_err(|_| ClearingError::ArithmeticOverflow)? + 2
-        > MAX_ECONOMIC_TRANSITIONS
-    {
+    let transition_count = checked_transition_count(core.input_count)?;
+    if transition_count > MAX_ECONOMIC_TRANSITIONS {
         return Err(ClearingError::IncompleteLifecycleProjection);
     }
     validate_digest("reservation_root", &core.reservation_root)?;

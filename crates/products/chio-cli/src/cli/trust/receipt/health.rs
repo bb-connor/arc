@@ -24,10 +24,10 @@ pub(crate) fn receipt_health_report_error(
     )
 }
 
-pub(crate) fn local_receipt_store(
-    backend: &QueryBackend<'_>,
+pub(crate) fn local_receipt_db_path<'a>(
+    backend: &QueryBackend<'a>,
     command_name: &str,
-) -> Result<chio_store_sqlite::SqliteReceiptStore, CliError> {
+) -> Result<&'a Path, CliError> {
     if backend.control_url.is_some() {
         return Err(CliError::cli_other_error(format!(
             "{command_name} requires local --receipt-db; remote receipt operator operations are not supported in this release"
@@ -42,6 +42,14 @@ pub(crate) fn local_receipt_store(
             path.display()
         )));
     }
+    Ok(path)
+}
+
+pub(crate) fn local_receipt_store(
+    backend: &QueryBackend<'_>,
+    command_name: &str,
+) -> Result<chio_store_sqlite::SqliteReceiptStore, CliError> {
+    let path = local_receipt_db_path(backend, command_name)?;
     chio_store_sqlite::SqliteReceiptStore::open_existing(path).map_err(CliError::from)
 }
 
@@ -62,8 +70,8 @@ pub(crate) fn load_existing_kernel_checkpoint_keypair(
 }
 
 pub(crate) fn cmd_receipt_health(backend: QueryBackend<'_>) -> Result<(), CliError> {
-    let store = local_receipt_store(&backend, "receipt health")?;
-    let report = store.receipt_store_health()?;
+    let path = local_receipt_db_path(&backend, "receipt health")?;
+    let report = chio_store_sqlite::SqliteReceiptStore::receipt_store_health_read_only(path)?;
     if backend.json_output {
         print_receipt_operator_json(CHIO_CLI_RECEIPT_HEALTH_SCHEMA, &report)?;
     } else {
@@ -680,6 +688,21 @@ mod receipt_operator_tests {
 
         let _ = std::fs::remove_file(db_path);
         let _ = std::fs::remove_file(seed_path);
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_health_samples_a_live_store_without_opening_another_writer(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let db_path = unique_temp_path("receipt-health-live-writer", "sqlite3");
+        let store = chio_store_sqlite::SqliteReceiptStore::open(&db_path)?;
+        store.append_chio_receipt(&operator_sample_receipt()?)?;
+        store.flush_receipt_writes()?;
+
+        cmd_receipt_health(backend(Some(&db_path), None))?;
+
+        drop(store);
+        let _ = std::fs::remove_file(db_path);
         Ok(())
     }
 
