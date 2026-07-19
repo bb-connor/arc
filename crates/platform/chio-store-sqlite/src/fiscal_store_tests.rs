@@ -700,6 +700,7 @@ fn fiscal_genesis_is_exact_idempotent_and_survives_restart() -> TestResult {
         readiness.runtime_registry(),
         fixture.readiness.runtime_registry()
     );
+    assert!(reopened_store.load_signed_schedules()?.is_empty());
     Ok(())
 }
 

@@ -778,7 +778,7 @@ impl SqliteFiscalStore {
 
     pub fn load_signed_schedules(&self) -> Result<Vec<SignedFiscalSchedule>, FiscalStoreError> {
         self.load_signed_artifacts(
-            "SELECT signed_json FROM fiscal_schedules ORDER BY domain, schedule_sequence",
+            "SELECT signed_json FROM fiscal_schedules ORDER BY domain_json, schedule_sequence",
             "stored fiscal schedule",
         )
     }
