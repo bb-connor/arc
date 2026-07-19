@@ -143,7 +143,7 @@ pub fn validate_governance_ladder_manifest(
             );
         }
         let action_rank = ladder_mode_rank(&action.mode)?;
-        validate_consistency_model(&action.consistency_model)?;
+        let consistency_model = bilateral_dsse_consistency_model(&action.consistency_model)?;
         validate_co_sign_mode(&action.co_sign)?;
         if action.destructive && action_rank < destructive_floor_rank {
             return rejected(
@@ -151,10 +151,10 @@ pub fn validate_governance_ladder_manifest(
                 "destructive action class resolves below the destructive floor",
             );
         }
-        if action.destructive && action.consistency_model == "crdt_commutative" {
+        if action.destructive && consistency_model == "crdt-commutative" {
             return rejected(
                 "chio_ladder_destructive_crdt_not_allowed",
-                "destructive action class cannot use crdt_commutative consistency",
+                "destructive action class cannot use crdt-commutative consistency",
             );
         }
         if action.destructive && action.evidence_required.is_empty() {
@@ -338,6 +338,8 @@ pub fn compute_ladder_intersection(
                     "governance ladder manifest does not allow action class",
                 );
             };
+            let action_consistency_model =
+                bilateral_dsse_consistency_model(&action.consistency_model)?;
             let rank = ladder_mode_rank(&action.mode)?;
             if rank > mode_rank {
                 mode_rank = rank;
@@ -345,14 +347,14 @@ pub fn compute_ladder_intersection(
             }
             destructive |= action.destructive;
             if let Some(existing) = consistency_model.as_ref() {
-                if existing != &action.consistency_model {
+                if existing != action_consistency_model {
                     return rejected(
                         "chio_ladder_consistency_mismatch",
                         "governance ladder consistency models do not intersect",
                     );
                 }
             } else {
-                consistency_model = Some(action.consistency_model.clone());
+                consistency_model = Some(action_consistency_model.to_owned());
             }
             if co_sign_requirement_rank(&action.co_sign)? > co_sign_requirement_rank(&co_sign)? {
                 co_sign = action.co_sign.clone();
@@ -368,7 +370,7 @@ pub fn compute_ladder_intersection(
                 "intersected destructive action resolves below receipt backed mode",
             );
         }
-        if destructive && consistency_model.as_deref() == Some("crdt_commutative") {
+        if destructive && consistency_model.as_deref() == Some("crdt-commutative") {
             return rejected(
                 "chio_ladder_destructive_crdt_not_allowed",
                 "intersected destructive action cannot use crdt_commutative consistency",
@@ -378,7 +380,7 @@ pub fn compute_ladder_intersection(
             action_class_id: action_class_id.clone(),
             mode,
             destructive,
-            consistency_model: consistency_model.unwrap_or_else(|| "totally_ordered".to_string()),
+            consistency_model: consistency_model.unwrap_or_else(|| "totally-ordered".to_string()),
             co_sign,
             evidence_required: evidence_required.into_iter().collect(),
             participant_modes,
@@ -442,7 +444,7 @@ pub fn validate_ladder_intersection(
             "ladder_intersection_empty_action_class",
         )?;
         ladder_mode_rank(&action.mode)?;
-        validate_consistency_model(&action.consistency_model)?;
+        let consistency_model = bilateral_dsse_consistency_model(&action.consistency_model)?;
         validate_co_sign_mode(&action.co_sign)?;
         if action.destructive
             && ladder_mode_rank(&action.mode)? < ladder_mode_rank("receipt_backed")?
@@ -452,10 +454,10 @@ pub fn validate_ladder_intersection(
                 "ladder intersection destructive action resolves below receipt backed mode",
             );
         }
-        if action.destructive && action.consistency_model == "crdt_commutative" {
+        if action.destructive && consistency_model == "crdt-commutative" {
             return rejected(
                 "chio_ladder_destructive_crdt_not_allowed",
-                "ladder intersection destructive action cannot use crdt_commutative consistency",
+                "ladder intersection destructive action cannot use crdt-commutative consistency",
             );
         }
     }
@@ -797,7 +799,7 @@ fn cross_boundary_rejection_report(
         accepted: false,
         failure_code: Some(failure_code.to_string()),
         mode: "observation".to_string(),
-        consistency_model: "totally_ordered".to_string(),
+        consistency_model: "totally-ordered".to_string(),
         co_sign: "none".to_string(),
         required_evidence: Vec::new(),
         present_evidence: input.present_evidence,

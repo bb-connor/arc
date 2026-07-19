@@ -85,7 +85,7 @@ pub(crate) fn build_runtime_loopback_buyer_closure(
         continuation_sha256: treaty_context.continuation_sha256.clone(),
         lineage_statement_sha256: String::new(),
         action_class_id: action_class_id.clone(),
-        consistency_model: "totally_ordered".to_string(),
+        consistency_model: "totally-ordered".to_string(),
         capability_id: step.request.capability_id.clone(),
         request_sha256: receipt.action.parameter_hash.clone(),
         outcome_sha256: outcome_sha256.clone(),

@@ -164,7 +164,7 @@ fn treaty_cross_boundary_admission_requires_intersection_and_evidence(
     })?;
     assert!(accepted.accepted);
     assert_eq!(accepted.mode, "receipt_backed");
-    assert_eq!(accepted.consistency_model, "totally_ordered");
+    assert_eq!(accepted.consistency_model, "totally-ordered");
     Ok(())
 }
 
