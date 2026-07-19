@@ -11,6 +11,9 @@ use crate::{
     generate_markdown_report, load_results_from_dir, load_scenarios_from_dir, CompatibilityReport,
 };
 
+const SERVER_STARTUP_ATTEMPTS: usize = 900;
+const SERVER_STARTUP_POLL_INTERVAL: Duration = Duration::from_millis(100);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PeerTarget {
     Js,
@@ -606,9 +609,9 @@ fn wait_for_server(
     server: &mut Child,
     log_path: &Path,
 ) -> Result<(), RunnerError> {
-    for _ in 0..100 {
+    for _ in 0..SERVER_STARTUP_ATTEMPTS {
         if TcpStream::connect(listen).is_ok() {
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(SERVER_STARTUP_POLL_INTERVAL);
             return Ok(());
         }
         if let Some(status) = server.try_wait()? {
@@ -618,7 +621,7 @@ fn wait_for_server(
                 log_path: log_path.display().to_string(),
             });
         }
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(SERVER_STARTUP_POLL_INTERVAL);
     }
     Err(RunnerError::ServerStartupTimeout { listen })
 }
