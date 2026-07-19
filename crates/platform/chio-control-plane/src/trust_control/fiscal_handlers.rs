@@ -1,5 +1,6 @@
 use super::*;
 use chio_fiscal::{
+    FiscalDenialReason, FiscalDomain, FiscalFallbackReason, FiscalResolution, GovernedSource,
     SignedFiscalActivation, SignedFiscalApproval, SignedFiscalContinuityCheckpoint,
     SignedFiscalProposal, SignedFiscalProposalAdmission,
 };
@@ -165,6 +166,56 @@ pub(crate) async fn handle_fiscal_activation_commit(
     }
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct FiscalResolveRequest {
+    domain: FiscalDomain,
+    #[serde(default)]
+    request_currency: Option<String>,
+}
+
+pub(crate) async fn handle_fiscal_resolve(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<FiscalResolveRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    let Some(runtime) = state.fiscal_runtime.as_ref() else {
+        return fiscal_runtime_not_configured();
+    };
+    match runtime.resolve(request.domain, request.request_currency.as_deref()) {
+        Ok(FiscalResolution::Governed {
+            schedule_id,
+            sequence,
+            source,
+            params,
+        }) => Json(json!({
+            "schema": "chio.fiscal.resolution.v1",
+            "outcome": "governed",
+            "scheduleId": schedule_id,
+            "sequence": sequence,
+            "source": governed_source_name(source),
+            "params": params,
+        }))
+        .into_response(),
+        Ok(FiscalResolution::Fallback(reason)) => Json(json!({
+            "schema": "chio.fiscal.resolution.v1",
+            "outcome": "fallback",
+            "reason": fallback_reason_name(reason),
+        }))
+        .into_response(),
+        Ok(FiscalResolution::Denied(reason)) => Json(json!({
+            "schema": "chio.fiscal.resolution.v1",
+            "outcome": "denied",
+            "reason": denial_reason_name(reason),
+        }))
+        .into_response(),
+        Err(error) => fiscal_operation_error(error),
+    }
+}
+
 fn fiscal_runtime_not_configured() -> Response {
     plain_http_error(
         StatusCode::CONFLICT,
@@ -188,5 +239,30 @@ const fn recovery_action_name(action: FiscalStartupRecoveryAction) -> &'static s
         FiscalStartupRecoveryAction::Ready => "ready",
         FiscalStartupRecoveryAction::DiscardedUnanchoredStage => "discarded_unanchored_stage",
         FiscalStartupRecoveryAction::FinalizedAnchoredStage => "finalized_anchored_stage",
+    }
+}
+
+const fn governed_source_name(source: GovernedSource) -> &'static str {
+    match source {
+        GovernedSource::Active => "active",
+        GovernedSource::LastKnownGood => "last_known_good",
+    }
+}
+
+const fn fallback_reason_name(reason: FiscalFallbackReason) -> &'static str {
+    match reason {
+        FiscalFallbackReason::AuthoritativeBootstrap => "authoritative_bootstrap",
+        FiscalFallbackReason::NeverActivated => "never_activated",
+    }
+}
+
+const fn denial_reason_name(reason: FiscalDenialReason) -> &'static str {
+    match reason {
+        FiscalDenialReason::AnchorUnavailable => "anchor_unavailable",
+        FiscalDenialReason::AnchorRollbackOrDivergence => "anchor_rollback_or_divergence",
+        FiscalDenialReason::ActivatedStateUnavailable => "activated_state_unavailable",
+        FiscalDenialReason::NoValidLastKnownGood => "no_valid_last_known_good",
+        FiscalDenialReason::ClockRollback => "clock_rollback",
+        FiscalDenialReason::VerificationFailed => "verification_failed",
     }
 }

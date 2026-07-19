@@ -179,6 +179,7 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             FISCAL_ACTIVATIONS_PATH,
             post(handle_fiscal_activation_commit),
         )
+        .route(FISCAL_RESOLVE_PATH, post(handle_fiscal_resolve))
         .route(
             FISCAL_PROPOSAL_PREVIEW_PATH,
             post(handle_fiscal_proposal_preview),

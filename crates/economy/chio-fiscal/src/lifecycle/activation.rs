@@ -9,7 +9,7 @@ use crate::{
     VerifiedFiscalSchedule,
 };
 
-use super::continuity::VerifiedFiscalActivationAuthority;
+use super::continuity::{FiscalStagedTransition, VerifiedFiscalActivationAuthority};
 use super::proposal::{
     FiscalAdmissionTrustRegistry, FiscalProposalAdmissionState, FiscalProposalAdmissionStatus,
     FiscalProposalTarget, VerifiedFiscalProposal, VerifiedFiscalProposalAdmission,
@@ -583,6 +583,62 @@ impl FiscalActivationHistory {
             }
         }
         Ok(Self { activations })
+    }
+
+    pub fn from_checkpoint_history(
+        activations: Vec<VerifiedFiscalActivation>,
+        checkpoints: &[super::continuity::VerifiedFiscalContinuityCheckpoint],
+        current: &super::continuity::VerifiedFiscalContinuityCheckpoint,
+    ) -> Result<Self, FiscalError> {
+        let mut by_digest = checkpoints
+            .iter()
+            .map(|checkpoint| (checkpoint.digest(), checkpoint))
+            .collect::<std::collections::BTreeMap<_, _>>();
+        if by_digest.len() != checkpoints.len() {
+            return Err(FiscalError::InvalidLineage);
+        }
+        by_digest
+            .remove(current.digest())
+            .ok_or(FiscalError::InvalidLineage)?;
+        let mut chain = BTreeSet::new();
+        let mut cursor = current;
+        loop {
+            if !chain.insert(cursor.digest().to_owned()) {
+                return Err(FiscalError::InvalidLineage);
+            }
+            let Some(previous) = cursor.body().previous_checkpoint_digest.as_deref() else {
+                break;
+            };
+            cursor = by_digest
+                .remove(previous)
+                .ok_or(FiscalError::InvalidLineage)?;
+        }
+        if !by_digest.is_empty() {
+            return Err(FiscalError::InvalidLineage);
+        }
+        let authorities = activations
+            .into_iter()
+            .map(|activation| {
+                let transition = FiscalStagedTransition::new(
+                    activation.body().activation_id.clone(),
+                    activation.digest().to_owned(),
+                )?;
+                let checkpoint = checkpoints
+                    .iter()
+                    .find(|checkpoint| {
+                        chain.contains(checkpoint.digest())
+                            && checkpoint.body().staged_transition.as_ref() == Some(&transition)
+                            && checkpoint.body().trusted_clock_high_water
+                                >= activation.body().activated_at
+                    })
+                    .ok_or(FiscalError::InvalidLineage)?;
+                Ok(VerifiedFiscalActivationAuthority {
+                    activation,
+                    checkpoint_digest: checkpoint.digest().to_owned(),
+                })
+            })
+            .collect::<Result<Vec<_>, FiscalError>>()?;
+        Self::new(authorities)
     }
 
     pub(crate) fn verify_head(

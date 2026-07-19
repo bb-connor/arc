@@ -762,6 +762,27 @@ fn external_checkpoint_prevents_database_restore_from_reopening_fallback() -> Te
 }
 
 #[test]
+fn activation_history_rebuilds_only_from_the_complete_checkpoint_chain() -> TestResult {
+    let fixture = continuity_fixture()?;
+    let head = FiscalScheduleHead::from_signed(fixture.amendment.schedule.signed())?;
+    let history = FiscalActivationHistory::from_checkpoint_history(
+        vec![fixture.amendment.activation.clone()],
+        &[fixture.genesis.clone(), fixture.activated.clone()],
+        &fixture.activated,
+    )?;
+    assert!(history
+        .verify_head(&head, FiscalDomain::TierLimits, 70)
+        .is_ok());
+    assert!(FiscalActivationHistory::from_checkpoint_history(
+        vec![fixture.amendment.activation],
+        std::slice::from_ref(&fixture.activated),
+        &fixture.activated,
+    )
+    .is_err());
+    Ok(())
+}
+
+#[test]
 fn clock_rollback_anchor_outage_and_divergence_deny() -> TestResult {
     let fixture = continuity_fixture()?;
     for (snapshot, expected) in [

@@ -978,8 +978,8 @@ fn verify_activation_readiness(
 
 #[derive(Debug)]
 pub struct VerifiedFiscalActivationAuthority {
-    activation: VerifiedFiscalActivation,
-    checkpoint_digest: String,
+    pub(super) activation: VerifiedFiscalActivation,
+    pub(super) checkpoint_digest: String,
 }
 
 impl VerifiedFiscalActivationAuthority {

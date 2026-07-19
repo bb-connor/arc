@@ -846,6 +846,7 @@ fn activation_finalize_atomically_consumes_admission_and_flips_schedule() -> Tes
     store.persist_proposal(&activation.proposal, &fence)?;
     store.persist_admission_state(&activation.admitted, None, &fence)?;
     store.persist_activation(&activation.activation, &fence)?;
+    assert!(store.load_signed_activations()?.is_empty());
 
     let staged = store
         .stage_activation_advance(
@@ -859,6 +860,7 @@ fn activation_finalize_atomically_consumes_admission_and_flips_schedule() -> Tes
         )
         .map_err(|error| std::io::Error::other(format!("stage activation: {error}")))?;
     assert_eq!(staged.status, FiscalStageStatus::DbStaged);
+    assert!(store.load_signed_activations()?.is_empty());
     assert_eq!(
         fiscal_activation_projection(&files.database, &activation)?,
         ("admitted".to_owned(), 1, "staged".to_owned())
@@ -875,6 +877,7 @@ fn activation_finalize_atomically_consumes_admission_and_flips_schedule() -> Tes
         ("activated".to_owned(), 2, "active".to_owned())
     );
     assert_eq!(store.load_authority_state()?, activation.next_authority);
+    assert_eq!(store.load_signed_activations()?.len(), 1);
     assert_eq!(
         store
             .load_verified_schedule(

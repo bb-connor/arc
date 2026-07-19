@@ -57,6 +57,7 @@ pub(crate) const FISCAL_PROPOSAL_PREVIEW_PATH: &str = "/v1/fiscal/proposals/prev
 pub(crate) const FISCAL_PROPOSAL_ADMIT_PATH: &str = "/v1/fiscal/proposals/admit";
 pub(crate) const FISCAL_APPROVALS_PATH: &str = "/v1/fiscal/approvals";
 pub(crate) const FISCAL_ACTIVATIONS_PATH: &str = "/v1/fiscal/activations";
+pub(crate) const FISCAL_RESOLVE_PATH: &str = "/v1/fiscal/resolve";
 pub(crate) const PASSPORT_ISSUER_METADATA_PATH: &str = OID4VCI_ISSUER_METADATA_PATH;
 pub(crate) const PASSPORT_ISSUER_JWKS_PATH: &str = OID4VCI_JWKS_PATH;
 pub(crate) const PASSPORT_SD_JWT_TYPE_METADATA_PATH: &str =

@@ -8,10 +8,10 @@ use chio_fiscal::{
     FiscalAdmissionTrustRegistry, FiscalAuthorityState, FiscalCharterRegistry, FiscalDomain,
     FiscalGenesisPolicy, FiscalParams, FiscalProposalAdmissionBuilder,
     FiscalProposalAdmissionState, FiscalProposalAdmissionStatus, FiscalRuntimeAdapterRegistry,
-    FiscalScheduleHead, FiscalStagedTransition, VerifiedFiscalActivation, VerifiedFiscalApproval,
-    VerifiedFiscalCharter, VerifiedFiscalContinuityAdvance, VerifiedFiscalContinuityCheckpoint,
-    VerifiedFiscalProposal, VerifiedFiscalProposalAdmission, VerifiedFiscalRuntimeReadiness,
-    VerifiedFiscalSchedule,
+    FiscalScheduleHead, FiscalStagedTransition, SignedFiscalActivation, SignedFiscalProposal,
+    SignedFiscalSchedule, VerifiedFiscalActivation, VerifiedFiscalApproval, VerifiedFiscalCharter,
+    VerifiedFiscalContinuityAdvance, VerifiedFiscalContinuityCheckpoint, VerifiedFiscalProposal,
+    VerifiedFiscalProposalAdmission, VerifiedFiscalRuntimeReadiness, VerifiedFiscalSchedule,
 };
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use serde::Serialize;
@@ -774,6 +774,53 @@ impl SqliteFiscalStore {
         let verified = verified.ok_or(FiscalStoreError::NotFound)?;
         transaction.commit().map_err(sqlite_error)?;
         Ok(verified)
+    }
+
+    pub fn load_signed_schedules(&self) -> Result<Vec<SignedFiscalSchedule>, FiscalStoreError> {
+        self.load_signed_artifacts(
+            "SELECT signed_json FROM fiscal_schedules ORDER BY domain, schedule_sequence",
+            "stored fiscal schedule",
+        )
+    }
+
+    pub fn load_signed_proposals(&self) -> Result<Vec<SignedFiscalProposal>, FiscalStoreError> {
+        self.load_signed_artifacts(
+            "SELECT signed_json FROM fiscal_proposals ORDER BY proposal_id",
+            "stored fiscal proposal",
+        )
+    }
+
+    pub fn load_signed_activations(&self) -> Result<Vec<SignedFiscalActivation>, FiscalStoreError> {
+        self.load_signed_artifacts(
+            "SELECT activation.signed_json FROM fiscal_activations AS activation WHERE EXISTS(SELECT 1 FROM fiscal_staged_activation_mutations AS mutation JOIN fiscal_staged_transitions AS stage ON stage.transition_id = mutation.transition_id WHERE mutation.activation_id = activation.activation_id AND mutation.activation_digest = activation.activation_digest AND stage.status = 'db_finalized') OR EXISTS(SELECT 1 FROM fiscal_staged_rotation_mutations AS mutation JOIN fiscal_staged_transitions AS stage ON stage.transition_id = mutation.transition_id WHERE mutation.activation_id = activation.activation_id AND mutation.activation_digest = activation.activation_digest AND stage.status = 'db_finalized') ORDER BY activation.activation_id",
+            "stored fiscal activation",
+        )
+    }
+
+    fn load_signed_artifacts<T: serde::de::DeserializeOwned + Serialize>(
+        &self,
+        sql: &str,
+        label: &str,
+    ) -> Result<Vec<T>, FiscalStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let mut statement = transaction.prepare(sql).map_err(sqlite_error)?;
+        let artifacts = statement
+            .query_map([], |row| row.get::<_, Vec<u8>>(0))
+            .map_err(sqlite_error)?
+            .map(|row| {
+                let bytes = row.map_err(sqlite_error)?;
+                let artifact: T = serde_json::from_slice(&bytes)
+                    .map_err(|error| invariant(format!("{label} is invalid: {error}")))?;
+                if canonical_json_bytes(&artifact).map_err(canonical_error)? != bytes {
+                    return Err(invariant(format!("{label} is not canonical")));
+                }
+                Ok(artifact)
+            })
+            .collect::<Result<Vec<_>, FiscalStoreError>>()?;
+        drop(statement);
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(artifacts)
     }
 
     pub fn persist_approval(
@@ -1542,6 +1589,32 @@ impl SqliteFiscalStore {
         }
         transaction.commit().map_err(sqlite_error)?;
         Ok(checkpoint)
+    }
+
+    pub fn load_finalized_checkpoints(
+        &self,
+        policy: &FiscalGenesisPolicy,
+        charters: &FiscalCharterRegistry,
+    ) -> Result<Vec<VerifiedFiscalContinuityCheckpoint>, FiscalStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        let mut statement = transaction
+            .prepare(
+                "SELECT signed_json FROM fiscal_continuity_checkpoints WHERE status = 'finalized' ORDER BY continuity_sequence",
+            )
+            .map_err(sqlite_error)?;
+        let checkpoints = statement
+            .query_map([], |row| row.get::<_, Vec<u8>>(0))
+            .map_err(sqlite_error)?
+            .map(|row| {
+                let bytes = row.map_err(sqlite_error)?;
+                VerifiedFiscalContinuityCheckpoint::from_canonical_bytes(&bytes, policy, charters)
+                    .map_err(FiscalStoreError::from)
+            })
+            .collect::<Result<Vec<_>, FiscalStoreError>>()?;
+        drop(statement);
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(checkpoints)
     }
 
     fn transition_status_update(

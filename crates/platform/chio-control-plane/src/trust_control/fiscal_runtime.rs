@@ -1,8 +1,9 @@
 use super::*;
 use chio_core::crypto::Keypair;
 use chio_fiscal::{
-    FiscalActivationTarget, FiscalAdmissionAuthority, FiscalAdmissionTrustRegistry,
-    FiscalAuthorityState, FiscalContinuityChange, FiscalGenesisPolicy, FiscalProposalTarget,
+    FiscalActivationHistory, FiscalActivationTarget, FiscalAdmissionAuthority,
+    FiscalAdmissionTrustRegistry, FiscalAuthorityState, FiscalContinuityChange, FiscalDomain,
+    FiscalGenesisPolicy, FiscalParams, FiscalProposalTarget, FiscalResolution, FiscalResolver,
     FiscalRuntimeAdapterRegistry, FiscalScheduleHead, FiscalStateAnchor, SignedFiscalActivation,
     SignedFiscalApproval, SignedFiscalContinuityCheckpoint, SignedFiscalProposal,
     SignedFiscalProposalAdmission, VerifiedFiscalActivation, VerifiedFiscalApproval,
@@ -465,6 +466,139 @@ impl TrustFiscalRuntime {
                 chio_fiscal::FiscalError::InvalidField("activation.target"),
             )),
         }
+    }
+
+    pub(crate) fn resolve(
+        &self,
+        domain: FiscalDomain,
+        request_currency: Option<&str>,
+    ) -> Result<FiscalResolution<FiscalParams>, TrustFiscalOperationError> {
+        let startup = self
+            .reconcile()
+            .map_err(|error| TrustFiscalOperationError::Startup(error.to_string()))?;
+        let authority = self
+            .store
+            .load_authority_state()
+            .map_err(TrustFiscalOperationError::Store)?;
+        let schedules = self
+            .store
+            .load_signed_schedules()
+            .map_err(TrustFiscalOperationError::Store)?;
+        let history = self.activation_history(&startup)?;
+        Ok(FiscalResolver {
+            continuity: chio_fiscal::FiscalContinuitySnapshot::Verified(&startup.checkpoint),
+            policy: &self.policy,
+            readiness: &startup.readiness,
+            activation_history: &history,
+            authority: &authority,
+            charters: &startup.charters,
+            schedules: &schedules,
+            verify_at: startup.checkpoint.body().trusted_clock_high_water,
+        }
+        .resolve(domain, request_currency))
+    }
+
+    fn activation_history(
+        &self,
+        startup: &FiscalRuntimeStartup,
+    ) -> Result<FiscalActivationHistory, TrustFiscalOperationError> {
+        let proposals = self
+            .store
+            .load_signed_proposals()
+            .map_err(TrustFiscalOperationError::Store)?;
+        let activations = self
+            .store
+            .load_signed_activations()
+            .map_err(TrustFiscalOperationError::Store)?;
+        let mut verified = Vec::with_capacity(activations.len());
+        for signed_activation in activations {
+            let activated_at = signed_activation.body.activated_at;
+            let charter = startup
+                .charters
+                .resolve(
+                    &signed_activation.body.charter_id,
+                    &signed_activation.body.charter_digest,
+                )
+                .map_err(TrustFiscalOperationError::InvalidArtifact)?;
+            let signed_proposal = proposals
+                .iter()
+                .find(|proposal| proposal.body.proposal_id == signed_activation.body.proposal_id)
+                .ok_or_else(|| {
+                    TrustFiscalOperationError::Startup(
+                        "activated fiscal proposal is missing".to_owned(),
+                    )
+                })?;
+            let predecessor = match &signed_proposal.body.target {
+                FiscalProposalTarget::Schedule { candidate } => candidate
+                    .body
+                    .supersedes_schedule_id
+                    .as_deref()
+                    .map(|id| self.store.load_verified_schedule(id, &startup.charters))
+                    .transpose()
+                    .map_err(TrustFiscalOperationError::Store)?,
+                FiscalProposalTarget::CharterRotation { .. } => None,
+            };
+            let proposal = VerifiedFiscalProposal::verify(
+                signed_proposal.clone(),
+                &charter,
+                predecessor.as_ref(),
+            )
+            .map_err(TrustFiscalOperationError::InvalidArtifact)?;
+            let trust = self.admission_trust(&charter)?;
+            let state = self
+                .store
+                .load_admission_state(&signed_activation.body.admission_id)
+                .map_err(TrustFiscalOperationError::Store)?;
+            let admission = VerifiedFiscalProposalAdmission::verify(
+                state.signed_admission.clone(),
+                &proposal,
+                &charter,
+                &trust,
+                signed_activation.body.activated_at,
+            )
+            .map_err(TrustFiscalOperationError::InvalidArtifact)?;
+            let rotation_predecessors = match &signed_activation.body.target {
+                FiscalActivationTarget::Schedule { .. } => Vec::new(),
+                FiscalActivationTarget::CharterRotation {
+                    successor_schedules,
+                    ..
+                } => successor_schedules
+                    .iter()
+                    .map(|schedule| {
+                        schedule
+                            .body
+                            .supersedes_schedule_id
+                            .as_deref()
+                            .ok_or(chio_store_sqlite::fiscal_store::FiscalStoreError::Conflict)
+                            .and_then(|id| self.store.load_verified_schedule(id, &startup.charters))
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(TrustFiscalOperationError::Store)?,
+            };
+            let activation = VerifiedFiscalActivation::verify(
+                signed_activation,
+                &proposal,
+                &admission,
+                &state,
+                &charter,
+                &trust,
+                predecessor.as_ref(),
+                &rotation_predecessors,
+                activated_at,
+            )
+            .map_err(TrustFiscalOperationError::InvalidArtifact)?;
+            verified.push(activation);
+        }
+        let checkpoints = self
+            .store
+            .load_finalized_checkpoints(&self.policy, &startup.charters)
+            .map_err(TrustFiscalOperationError::Store)?;
+        FiscalActivationHistory::from_checkpoint_history(
+            verified,
+            &checkpoints,
+            &startup.checkpoint,
+        )
+        .map_err(TrustFiscalOperationError::InvalidArtifact)
     }
 
     fn admission_trust(
