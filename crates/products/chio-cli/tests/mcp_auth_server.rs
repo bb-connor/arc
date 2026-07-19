@@ -122,7 +122,6 @@ fn spawn_http_server_with_local_auth(
     let policy_path = write_policy(dir);
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
-    let revocation_db_path = dir.join("remote-revocations.sqlite3");
     let session_db_path = dir.join(format!("remote-session-{}.sqlite3", listen.port()));
     let authority_seed_path = dir.join("remote-authority.seed");
     let auth_server_seed_path = dir.join("auth-server.seed");
@@ -133,8 +132,6 @@ fn spawn_http_server_with_local_auth(
         .args([
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
-            "--revocation-db",
-            revocation_db_path.to_str().expect("revocation db path"),
             "--session-db",
             session_db_path.to_str().expect("session db path"),
             "--authority-seed-file",

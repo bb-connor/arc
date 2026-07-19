@@ -7,7 +7,7 @@ use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel::admission_operation::{DurableAdmissionMode, StoreMutationFence};
 use chio_kernel::tool_outcome::QualifiedToolOutcomeStore;
 use chio_kernel::{BudgetStore, ChioKernel, QualifiedAdmissionProjectionStore, RevocationStore};
-use chio_store_sqlite::SqliteAuthorityStore;
+use chio_store_sqlite::{SqliteAuthorityStore, SqliteBudgetStore, SqliteRevocationStore};
 
 use crate::{load_or_create_authority_keypair, CliError};
 
@@ -17,6 +17,8 @@ pub struct DurableAdmissionRuntime {
     outcomes: Arc<dyn QualifiedToolOutcomeStore>,
     budget: Arc<dyn BudgetStore>,
     revocations: Arc<dyn RevocationStore>,
+    local_budget: Option<SqliteBudgetStore>,
+    local_revocations: Option<SqliteRevocationStore>,
     fence: StoreMutationFence,
     kernel_keypair: Keypair,
 }
@@ -36,6 +38,8 @@ impl DurableAdmissionRuntime {
         fs::create_dir_all(&lock_root)?;
         SqliteAuthorityStore::provision(path, &lock_root)?;
         let authority = SqliteAuthorityStore::open_serving(path, &lock_root)?;
+        let budget = authority.budget_store();
+        let revocations = authority.revocation_store();
         let kernel_keypair =
             load_or_create_authority_keypair(&durable_admission_kernel_seed_path(path)?)?;
         bind_durable_admission_kernel_identity(path, &kernel_keypair.public_key())?;
@@ -43,8 +47,10 @@ impl DurableAdmissionRuntime {
         Ok(Self {
             operations: Arc::new(authority.admission_operation_store()),
             outcomes: Arc::new(authority.tool_outcome_store()),
-            budget: Arc::new(authority.budget_store()),
-            revocations: Arc::new(authority.revocation_store()),
+            budget: Arc::new(budget.clone()),
+            revocations: Arc::new(revocations.clone()),
+            local_budget: Some(budget),
+            local_revocations: Some(revocations),
             fence: authority.mutation_fence(),
             kernel_keypair,
         })
@@ -84,6 +90,8 @@ impl DurableAdmissionRuntime {
             outcomes: stores.outcomes,
             budget: stores.budget,
             revocations,
+            local_budget: None,
+            local_revocations: None,
             fence: stores.fence,
             kernel_keypair,
         })
@@ -92,6 +100,16 @@ impl DurableAdmissionRuntime {
     #[must_use]
     pub fn kernel_keypair(&self) -> Keypair {
         self.kernel_keypair.clone()
+    }
+
+    #[must_use]
+    pub fn local_budget_store(&self) -> Option<SqliteBudgetStore> {
+        self.local_budget.clone()
+    }
+
+    #[must_use]
+    pub fn local_revocation_store(&self) -> Option<SqliteRevocationStore> {
+        self.local_revocations.clone()
     }
 
     pub fn attach(&self, kernel: &mut ChioKernel) -> Result<(), CliError> {
