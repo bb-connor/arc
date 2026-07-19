@@ -175,6 +175,59 @@ CREATE TABLE IF NOT EXISTS fiscal_staged_activation_mutations (
     FOREIGN KEY (predecessor_schedule_id) REFERENCES fiscal_schedules(schedule_id)
 );
 
+CREATE TABLE IF NOT EXISTS fiscal_staged_rotation_mutations (
+    transition_id TEXT PRIMARY KEY,
+    activation_id TEXT NOT NULL UNIQUE,
+    activation_digest TEXT NOT NULL UNIQUE CHECK (
+        length(activation_digest) = 64 AND activation_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    admission_id TEXT NOT NULL UNIQUE,
+    admission_digest TEXT NOT NULL CHECK (
+        length(admission_digest) = 64 AND admission_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    expected_admission_version INTEGER NOT NULL CHECK (expected_admission_version > 0),
+    activated_admission_version INTEGER NOT NULL CHECK (
+        activated_admission_version = expected_admission_version + 1
+    ),
+    activated_admission_json BLOB NOT NULL CHECK (
+        length(activated_admission_json) BETWEEN 1 AND 4194304
+    ),
+    successor_charter_id TEXT NOT NULL UNIQUE,
+    successor_charter_digest TEXT NOT NULL UNIQUE CHECK (
+        length(successor_charter_digest) = 64
+        AND successor_charter_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    predecessor_charter_id TEXT NOT NULL UNIQUE,
+    predecessor_charter_digest TEXT NOT NULL UNIQUE CHECK (
+        length(predecessor_charter_digest) = 64
+        AND predecessor_charter_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    FOREIGN KEY (transition_id) REFERENCES fiscal_staged_transitions(transition_id),
+    FOREIGN KEY (activation_id) REFERENCES fiscal_activations(activation_id),
+    FOREIGN KEY (admission_id) REFERENCES fiscal_proposal_admissions(admission_id),
+    FOREIGN KEY (successor_charter_id) REFERENCES fiscal_charters(charter_id),
+    FOREIGN KEY (predecessor_charter_id) REFERENCES fiscal_charters(charter_id)
+);
+
+CREATE TABLE IF NOT EXISTS fiscal_staged_rotation_schedules (
+    transition_id TEXT NOT NULL,
+    domain_json TEXT NOT NULL CHECK (domain_json <> ''),
+    candidate_schedule_id TEXT NOT NULL UNIQUE,
+    candidate_schedule_digest TEXT NOT NULL UNIQUE CHECK (
+        length(candidate_schedule_digest) = 64
+        AND candidate_schedule_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    predecessor_schedule_id TEXT NOT NULL UNIQUE,
+    predecessor_schedule_digest TEXT NOT NULL UNIQUE CHECK (
+        length(predecessor_schedule_digest) = 64
+        AND predecessor_schedule_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    PRIMARY KEY (transition_id, domain_json),
+    FOREIGN KEY (transition_id) REFERENCES fiscal_staged_rotation_mutations(transition_id),
+    FOREIGN KEY (candidate_schedule_id) REFERENCES fiscal_schedules(schedule_id),
+    FOREIGN KEY (predecessor_schedule_id) REFERENCES fiscal_schedules(schedule_id)
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS fiscal_one_open_transition
 ON fiscal_staged_transitions((1))
 WHERE status IN ('db_staged', 'fiscal_anchor_advanced');
@@ -230,6 +283,18 @@ BEGIN SELECT RAISE(ABORT, 'fiscal staged activation mutation is immutable'); END
 CREATE TRIGGER IF NOT EXISTS fiscal_staged_activation_mutations_no_delete
 BEFORE DELETE ON fiscal_staged_activation_mutations
 BEGIN SELECT RAISE(ABORT, 'fiscal staged activation mutation is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS fiscal_staged_rotation_mutations_immutable
+BEFORE UPDATE ON fiscal_staged_rotation_mutations
+BEGIN SELECT RAISE(ABORT, 'fiscal staged rotation mutation is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS fiscal_staged_rotation_mutations_no_delete
+BEFORE DELETE ON fiscal_staged_rotation_mutations
+BEGIN SELECT RAISE(ABORT, 'fiscal staged rotation mutation is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS fiscal_staged_rotation_schedules_immutable
+BEFORE UPDATE ON fiscal_staged_rotation_schedules
+BEGIN SELECT RAISE(ABORT, 'fiscal staged rotation schedules are immutable'); END;
+CREATE TRIGGER IF NOT EXISTS fiscal_staged_rotation_schedules_no_delete
+BEFORE DELETE ON fiscal_staged_rotation_schedules
+BEGIN SELECT RAISE(ABORT, 'fiscal staged rotation schedules are immutable'); END;
 CREATE TRIGGER IF NOT EXISTS fiscal_checkpoints_immutable
 BEFORE UPDATE OF checkpoint_digest, continuity_sequence, signed_json
 ON fiscal_continuity_checkpoints

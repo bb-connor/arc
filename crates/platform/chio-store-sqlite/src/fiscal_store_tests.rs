@@ -198,6 +198,19 @@ struct FiscalActivationFixture {
     advance: VerifiedFiscalContinuityAdvance,
 }
 
+struct FiscalRotationFixture {
+    successor_charter: VerifiedFiscalCharter,
+    successor_schedule: VerifiedFiscalSchedule,
+    proposal: VerifiedFiscalProposal,
+    admitted: FiscalProposalAdmissionState,
+    activated: FiscalProposalAdmissionState,
+    activation: VerifiedFiscalActivation,
+    next_checkpoint: VerifiedFiscalContinuityCheckpoint,
+    next_authority: FiscalAuthorityState,
+    advance: VerifiedFiscalContinuityAdvance,
+    charters: FiscalCharterRegistry,
+}
+
 fn fiscal_activation_fixture(fixture: &FiscalFixture) -> TestResult<FiscalActivationFixture> {
     let schedule = VerifiedFiscalSchedule::verify(
         FiscalScheduleBuilder {
@@ -342,6 +355,180 @@ fn fiscal_activation_fixture(fixture: &FiscalFixture) -> TestResult<FiscalActiva
     })
 }
 
+fn fiscal_rotation_fixture(
+    fixture: &FiscalFixture,
+    current: &FiscalActivationFixture,
+) -> TestResult<FiscalRotationFixture> {
+    let successor_charter = VerifiedFiscalCharter::verify(
+        FiscalCharterBuilder {
+            governing_operator_id: "operator.example".to_owned(),
+            governed_domains: fixture.charter.body().governed_domains.clone(),
+            signer_keys: vec![key(3).public_key(), key(4).public_key()],
+            approval_threshold: 2,
+            timelock_seconds: 10,
+            proposal_ttl_seconds: 100,
+            approval_ttl_seconds: 50,
+            issued_at: 60,
+            expires_at: 950,
+            issued_by: "operator.example".to_owned(),
+            sequence: 2,
+            predecessor_charter_digest: Some(fixture.charter.digest().to_owned()),
+        }
+        .sign(&key(9))?,
+    )?;
+    let successor_schedule = VerifiedFiscalSchedule::verify_rotation_replacement(
+        FiscalScheduleBuilder {
+            domain: FiscalDomain::TierLimits,
+            params: current.schedule.body().params.clone(),
+            valid_from: current.schedule.body().valid_from,
+            valid_until: current.schedule.body().valid_until,
+            issued_at: current.schedule.body().issued_at,
+            issued_by: "operator.example".to_owned(),
+        }
+        .sign_rotation_replacement(&successor_charter, &current.schedule, &key(9))?,
+        &successor_charter,
+        &current.schedule,
+    )
+    .map_err(|error| std::io::Error::other(format!("verify replacement schedule: {error}")))?;
+    let proposal = VerifiedFiscalProposal::verify(
+        FiscalProposalBuilder {
+            target: FiscalProposalTarget::CharterRotation {
+                successor: Box::new(successor_charter.signed().clone()),
+            },
+            rationale_digest: sha256_hex(b"charter rotation"),
+            proposed_at: 72,
+        }
+        .sign(&key(1))?,
+        &fixture.charter,
+        None,
+    )
+    .map_err(|error| std::io::Error::other(format!("verify rotation proposal: {error}")))?;
+    let admission_key = key(7);
+    let trust = FiscalAdmissionTrustRegistry::new(vec![FiscalAdmissionAuthority::new(
+        "operator.example".to_owned(),
+        "local-admission".to_owned(),
+        1,
+        admission_key.public_key(),
+    )?])?;
+    let admission = VerifiedFiscalProposalAdmission::verify(
+        FiscalProposalAdmissionBuilder {
+            admission_sequence: 2,
+            admitted_at: 73,
+            admission_authority_id: "local-admission".to_owned(),
+            signer_key_epoch: 1,
+        }
+        .sign(&proposal, &fixture.charter, &admission_key)?,
+        &proposal,
+        &fixture.charter,
+        &trust,
+        73,
+    )?;
+    let admitted = FiscalProposalAdmissionState::admitted(&admission);
+    let approvals = [key(1), key(2)]
+        .into_iter()
+        .map(|signer| {
+            FiscalApprovalBuilder { approved_at: 74 }.sign(
+                &proposal,
+                &admission,
+                &fixture.charter,
+                &signer,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let signed_activation = FiscalActivationBuilder {
+        target: FiscalActivationTarget::CharterRotation {
+            successor_charter_digest: successor_charter.digest().to_owned(),
+            predecessor_charter_digest: fixture.charter.digest().to_owned(),
+            successor_schedules: vec![successor_schedule.signed().clone()],
+        },
+        approvals,
+        activated_at: 83,
+    }
+    .sign(&proposal, &admission, &fixture.charter, &key(1))?;
+    let staged_activation = VerifiedFiscalActivation::verify(
+        signed_activation.clone(),
+        &proposal,
+        &admission,
+        &admitted,
+        &fixture.charter,
+        &trust,
+        None,
+        std::slice::from_ref(&current.schedule),
+        83,
+    )
+    .map_err(|error| std::io::Error::other(format!("verify staged rotation: {error}")))?;
+    let activated = admitted.activate(staged_activation.digest().to_owned(), 2)?;
+    let activation = VerifiedFiscalActivation::verify(
+        signed_activation,
+        &proposal,
+        &admission,
+        &activated,
+        &fixture.charter,
+        &trust,
+        None,
+        std::slice::from_ref(&current.schedule),
+        83,
+    )
+    .map_err(|error| std::io::Error::other(format!("verify consumed rotation: {error}")))?;
+    let successor_head = FiscalScheduleHead::from_signed(successor_schedule.signed())?;
+    let mut replacement_domains = current.next_checkpoint.body().domains.clone();
+    replacement_domains[0] = FiscalDomainState::activated(
+        FiscalDomain::TierLimits,
+        successor_head.clone(),
+        successor_head,
+    )?;
+    let next_signed = FiscalContinuityCheckpointBuilder {
+        continuity_sequence: 2,
+        previous_checkpoint_digest: Some(current.next_checkpoint.digest().to_owned()),
+        pinned_charter_id: successor_charter.body().charter_id.clone(),
+        pinned_charter_digest: successor_charter.digest().to_owned(),
+        pinned_charter_sequence: successor_charter.body().sequence,
+        runtime_readiness_digest: fixture.readiness.digest().to_owned(),
+        domains: replacement_domains.clone(),
+        trusted_clock_high_water: 83,
+        staged_transition: Some(FiscalStagedTransition::new(
+            activation.body().activation_id.clone(),
+            activation.digest().to_owned(),
+        )?),
+    }
+    .sign(&fixture.policy, &key(8))?;
+    let charters = FiscalCharterRegistry::new(vec![
+        fixture.charter.signed().clone(),
+        successor_charter.signed().clone(),
+    ])?;
+    let advance = VerifiedFiscalContinuityAdvance::verify(
+        &current.next_checkpoint,
+        next_signed,
+        &fixture.policy,
+        &charters,
+        &FiscalContinuityChange::CharterRotation {
+            activation: Box::new(activation.clone()),
+            readiness: Box::new(fixture.readiness.clone()),
+            predecessor_schedules: vec![current.schedule.clone()],
+            replacement_domains,
+        },
+    )
+    .map_err(|error| std::io::Error::other(format!("verify charter rotation advance: {error}")))?;
+    let next_checkpoint = advance.next().clone();
+    let next_authority = FiscalAuthorityState::from_checkpoint(
+        &fixture.policy,
+        &next_checkpoint,
+        FiscalBootstrapState::CharterPinned,
+    )?;
+    Ok(FiscalRotationFixture {
+        successor_charter,
+        successor_schedule,
+        proposal,
+        admitted,
+        activated,
+        activation,
+        next_checkpoint,
+        next_authority,
+        advance,
+        charters,
+    })
+}
+
 struct StoreFixture {
     _temp: TempDir,
     database: std::path::PathBuf,
@@ -411,6 +598,34 @@ fn fiscal_schema_migrates_the_legacy_envelope_digest_binding() -> TestResult {
         .iter()
         .any(|column| column == "legacy_envelope_digest");
     assert!(digest_column_present);
+    Ok(())
+}
+
+#[test]
+fn fiscal_schema_migrates_atomic_charter_rotation_tables() -> TestResult {
+    let mut connection = rusqlite::Connection::open_in_memory()?;
+    initialize_fiscal_schema(&mut connection)?;
+    connection.execute(
+        "UPDATE chio_store_schema_versions SET version = 4 WHERE store_key = 'fiscal'",
+        [],
+    )?;
+    connection.execute_batch(
+        "DROP TRIGGER fiscal_staged_rotation_schedules_no_delete;
+         DROP TRIGGER fiscal_staged_rotation_schedules_immutable;
+         DROP TRIGGER fiscal_staged_rotation_mutations_no_delete;
+         DROP TRIGGER fiscal_staged_rotation_mutations_immutable;
+         DROP TABLE fiscal_staged_rotation_schedules;
+         DROP TABLE fiscal_staged_rotation_mutations;",
+    )?;
+
+    initialize_fiscal_schema(&mut connection)?;
+
+    let tables: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM sqlite_schema WHERE type = 'table' AND name IN ('fiscal_staged_rotation_mutations', 'fiscal_staged_rotation_schedules')",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(tables, 2);
     Ok(())
 }
 
@@ -559,6 +774,142 @@ fn activation_finalize_atomically_consumes_admission_and_flips_schedule() -> Tes
 }
 
 #[test]
+fn charter_rotation_finalize_atomically_flips_charter_and_all_schedules() -> TestResult {
+    let files = store_fixture()?;
+    let fixture = fiscal_fixture()?;
+    let current = fiscal_activation_fixture(&fixture)?;
+    let rotation = fiscal_rotation_fixture(&fixture, &current)?;
+    let authority = SqliteAuthorityStore::open_serving(&files.database, &files.lock_root)?;
+    let fence = authority.mutation_fence();
+    let store = authority.fiscal_store();
+    store
+        .initialize_genesis(
+            &fixture.policy,
+            &fixture.authority,
+            &fixture.charter,
+            &fixture.readiness,
+            &fixture.genesis,
+            &fence,
+        )
+        .map_err(|error| std::io::Error::other(format!("initialize rotation store: {error}")))?;
+    store
+        .persist_schedule(&current.schedule, &fence)
+        .map_err(|error| std::io::Error::other(format!("persist current schedule: {error}")))?;
+    store
+        .persist_proposal(&current.proposal, &fence)
+        .map_err(|error| std::io::Error::other(format!("persist current proposal: {error}")))?;
+    store
+        .persist_admission_state(&current.admitted, None, &fence)
+        .map_err(|error| std::io::Error::other(format!("persist current admission: {error}")))?;
+    store
+        .persist_activation(&current.activation, &fence)
+        .map_err(|error| std::io::Error::other(format!("persist current activation: {error}")))?;
+    let current_stage = store
+        .stage_activation_advance(
+            &current.advance,
+            &current.next_authority,
+            &current.activation,
+            &current.activated,
+            &current.schedule,
+            None,
+            &fence,
+        )
+        .map_err(|error| std::io::Error::other(format!("stage current activation: {error}")))?;
+    store
+        .mark_anchor_advanced(
+            &current_stage.transition_id,
+            &current.next_checkpoint,
+            &fence,
+        )
+        .map_err(|error| std::io::Error::other(format!("mark current anchored: {error}")))?;
+    store
+        .finalize_advance(
+            &current_stage.transition_id,
+            &current.next_checkpoint,
+            &current.next_authority,
+            &fence,
+        )
+        .map_err(|error| std::io::Error::other(format!("finalize current activation: {error}")))?;
+
+    store
+        .persist_charter(&rotation.successor_charter, &fence)
+        .map_err(|error| std::io::Error::other(format!("persist successor charter: {error}")))?;
+    store
+        .persist_schedule(&rotation.successor_schedule, &fence)
+        .map_err(|error| std::io::Error::other(format!("persist successor schedule: {error}")))?;
+    store
+        .persist_proposal(&rotation.proposal, &fence)
+        .map_err(|error| std::io::Error::other(format!("persist rotation proposal: {error}")))?;
+    store
+        .persist_admission_state(&rotation.admitted, None, &fence)
+        .map_err(|error| std::io::Error::other(format!("persist rotation admission: {error}")))?;
+    store
+        .persist_activation(&rotation.activation, &fence)
+        .map_err(|error| std::io::Error::other(format!("persist rotation activation: {error}")))?;
+    let staged = store
+        .stage_charter_rotation_advance(
+            &rotation.advance,
+            &rotation.next_authority,
+            &rotation.activation,
+            &rotation.activated,
+            &rotation.successor_charter,
+            std::slice::from_ref(&rotation.successor_schedule),
+            &fixture.charter,
+            std::slice::from_ref(&current.schedule),
+            &fence,
+        )
+        .map_err(|error| std::io::Error::other(format!("stage charter rotation: {error}")))?;
+    assert_eq!(
+        fiscal_rotation_projection(&files.database, &fixture, &current, &rotation)?,
+        (
+            "admitted".to_owned(),
+            "pinned".to_owned(),
+            "proposed".to_owned(),
+            "active".to_owned(),
+            "staged".to_owned(),
+        )
+    );
+    store
+        .mark_anchor_advanced(&staged.transition_id, &rotation.next_checkpoint, &fence)
+        .map_err(|error| std::io::Error::other(format!("mark rotation anchored: {error}")))?;
+    store
+        .finalize_advance(
+            &staged.transition_id,
+            &rotation.next_checkpoint,
+            &rotation.next_authority,
+            &fence,
+        )
+        .map_err(|error| std::io::Error::other(format!("finalize charter rotation: {error}")))?;
+    assert_eq!(
+        fiscal_rotation_projection(&files.database, &fixture, &current, &rotation)?,
+        (
+            "activated".to_owned(),
+            "superseded".to_owned(),
+            "active".to_owned(),
+            "superseded".to_owned(),
+            "active".to_owned(),
+        )
+    );
+    assert_eq!(
+        store.load_authority_state().map_err(|error| {
+            std::io::Error::other(format!("load authority after rotation: {error}"))
+        })?,
+        rotation.next_authority
+    );
+    assert_eq!(
+        rotation
+            .charters
+            .resolve(
+                &rotation.next_checkpoint.body().pinned_charter_id,
+                &rotation.next_checkpoint.body().pinned_charter_digest,
+            )?
+            .digest(),
+        rotation.successor_charter.digest()
+    );
+    Ok(())
+}
+
+#[test]
 fn discarded_activation_stage_preserves_admission_and_candidate_state() -> TestResult {
     let files = store_fixture()?;
     let fixture = fiscal_fixture()?;
@@ -614,6 +965,47 @@ fn fiscal_activation_projection(
         |row| row.get::<_, String>(0),
     )?;
     Ok((admission.0, admission.1, schedule_state))
+}
+
+fn fiscal_rotation_projection(
+    database: &std::path::Path,
+    fixture: &FiscalFixture,
+    current: &FiscalActivationFixture,
+    rotation: &FiscalRotationFixture,
+) -> TestResult<(String, String, String, String, String)> {
+    let connection = rusqlite::Connection::open(database)?;
+    let admission = connection.query_row(
+        "SELECT status FROM fiscal_proposal_admissions WHERE admission_id = ?1",
+        [&rotation.admitted.signed_admission.body.admission_id],
+        |row| row.get::<_, String>(0),
+    )?;
+    let predecessor_charter = connection.query_row(
+        "SELECT lifecycle_state FROM fiscal_charters WHERE charter_id = ?1",
+        [&fixture.charter.body().charter_id],
+        |row| row.get::<_, String>(0),
+    )?;
+    let successor_charter = connection.query_row(
+        "SELECT lifecycle_state FROM fiscal_charters WHERE charter_id = ?1",
+        [&rotation.successor_charter.body().charter_id],
+        |row| row.get::<_, String>(0),
+    )?;
+    let predecessor_schedule = connection.query_row(
+        "SELECT lifecycle_state FROM fiscal_schedules WHERE schedule_id = ?1",
+        [&current.schedule.body().schedule_id],
+        |row| row.get::<_, String>(0),
+    )?;
+    let successor_schedule = connection.query_row(
+        "SELECT lifecycle_state FROM fiscal_schedules WHERE schedule_id = ?1",
+        [&rotation.successor_schedule.body().schedule_id],
+        |row| row.get::<_, String>(0),
+    )?;
+    Ok((
+        admission,
+        predecessor_charter,
+        successor_charter,
+        predecessor_schedule,
+        successor_schedule,
+    ))
 }
 
 #[test]

@@ -545,6 +545,23 @@ impl FiscalScheduleBuilder {
         charter: &VerifiedFiscalCharter,
         predecessor: Option<&VerifiedFiscalSchedule>,
     ) -> Result<FiscalSchedule, FiscalError> {
+        self.build_successor_body(charter, predecessor, false)
+    }
+
+    pub fn build_rotation_replacement(
+        self,
+        successor_charter: &VerifiedFiscalCharter,
+        predecessor: &VerifiedFiscalSchedule,
+    ) -> Result<FiscalSchedule, FiscalError> {
+        self.build_successor_body(successor_charter, Some(predecessor), true)
+    }
+
+    fn build_successor_body(
+        self,
+        charter: &VerifiedFiscalCharter,
+        predecessor: Option<&VerifiedFiscalSchedule>,
+        charter_rotation: bool,
+    ) -> Result<FiscalSchedule, FiscalError> {
         self.params.validate()?;
         if self.domain != self.params.domain() {
             return Err(FiscalError::InvalidField("domain"));
@@ -553,8 +570,7 @@ impl FiscalScheduleBuilder {
             None => (1, None),
             Some(previous) => {
                 if previous.body().domain != self.domain
-                    || previous.body().charter_id != charter.body().charter_id
-                    || previous.body().charter_digest != charter.digest()
+                    || !schedule_charter_accepts_predecessor(charter, previous, charter_rotation)
                 {
                     return Err(FiscalError::InvalidLineage);
                 }
@@ -596,6 +612,19 @@ impl FiscalScheduleBuilder {
         SignedFiscalSchedule::sign(self.build_body(charter, predecessor)?, keypair)
             .map_err(|error| FiscalError::Canonicalization(error.to_string()))
     }
+
+    pub fn sign_rotation_replacement(
+        self,
+        successor_charter: &VerifiedFiscalCharter,
+        predecessor: &VerifiedFiscalSchedule,
+        keypair: &Keypair,
+    ) -> Result<SignedFiscalSchedule, FiscalError> {
+        SignedFiscalSchedule::sign(
+            self.build_rotation_replacement(successor_charter, predecessor)?,
+            keypair,
+        )
+        .map_err(|error| FiscalError::Canonicalization(error.to_string()))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -610,7 +639,21 @@ impl VerifiedFiscalSchedule {
         predecessor: Option<&VerifiedFiscalSchedule>,
     ) -> Result<Self, FiscalError> {
         signed.body.validate_against(charter)?;
-        verify_schedule_lineage(&signed.body, predecessor)?;
+        verify_schedule_lineage(&signed.body, charter, predecessor, false)?;
+        Self::finish_verification(signed)
+    }
+
+    pub fn verify_rotation_replacement(
+        signed: SignedFiscalSchedule,
+        successor_charter: &VerifiedFiscalCharter,
+        predecessor: &VerifiedFiscalSchedule,
+    ) -> Result<Self, FiscalError> {
+        signed.body.validate_against(successor_charter)?;
+        verify_schedule_lineage(&signed.body, successor_charter, Some(predecessor), true)?;
+        Self::finish_verification(signed)
+    }
+
+    fn finish_verification(signed: SignedFiscalSchedule) -> Result<Self, FiscalError> {
         if !signed
             .verify_signature()
             .map_err(|error| FiscalError::Canonicalization(error.to_string()))?
@@ -662,7 +705,9 @@ impl VerifiedFiscalSchedule {
 
 fn verify_schedule_lineage(
     schedule: &FiscalSchedule,
+    charter: &VerifiedFiscalCharter,
     predecessor: Option<&VerifiedFiscalSchedule>,
+    charter_rotation: bool,
 ) -> Result<(), FiscalError> {
     match predecessor {
         None => {
@@ -677,8 +722,7 @@ fn verify_schedule_lineage(
                 .checked_add(1)
                 .ok_or(FiscalError::InvalidLineage)?;
             if schedule.domain != previous.body().domain
-                || schedule.charter_id != previous.body().charter_id
-                || schedule.charter_digest != previous.body().charter_digest
+                || !schedule_charter_accepts_predecessor(charter, previous, charter_rotation)
                 || schedule.sequence != expected_sequence
                 || schedule.supersedes_schedule_id.as_deref()
                     != Some(previous.body().schedule_id.as_str())
@@ -688,6 +732,18 @@ fn verify_schedule_lineage(
         }
     }
     Ok(())
+}
+
+fn schedule_charter_accepts_predecessor(
+    charter: &VerifiedFiscalCharter,
+    predecessor: &VerifiedFiscalSchedule,
+    charter_rotation: bool,
+) -> bool {
+    (predecessor.body().charter_id == charter.body().charter_id
+        && predecessor.body().charter_digest == charter.digest())
+        || (charter_rotation
+            && charter.body().predecessor_charter_digest.as_deref()
+                == Some(predecessor.body().charter_digest.as_str()))
 }
 
 fn validate_tier_limits(ceilings: &[MonetaryAmount; 4]) -> Result<(), FiscalError> {

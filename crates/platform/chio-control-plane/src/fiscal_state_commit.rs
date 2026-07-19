@@ -75,6 +75,45 @@ pub fn commit_fiscal_activation(
 }
 
 #[allow(clippy::too_many_arguments)]
+pub fn commit_fiscal_charter_rotation(
+    store: &SqliteFiscalStore,
+    anchor: &dyn FiscalStateAnchor,
+    advance: VerifiedFiscalContinuityAdvance,
+    next_authority: &FiscalAuthorityState,
+    activation: &VerifiedFiscalActivation,
+    activated_admission: &FiscalProposalAdmissionState,
+    successor_charter: &chio_fiscal::VerifiedFiscalCharter,
+    successor_schedules: &[VerifiedFiscalSchedule],
+    predecessor_charter: &chio_fiscal::VerifiedFiscalCharter,
+    predecessor_schedules: &[VerifiedFiscalSchedule],
+    policy: &FiscalGenesisPolicy,
+    charters: &FiscalCharterRegistry,
+    fence: &StoreMutationFence,
+) -> Result<VerifiedFiscalContinuityCheckpoint, FiscalStateCommitError> {
+    let staged = store.stage_charter_rotation_advance(
+        &advance,
+        next_authority,
+        activation,
+        activated_admission,
+        successor_charter,
+        successor_schedules,
+        predecessor_charter,
+        predecessor_schedules,
+        fence,
+    )?;
+    finish_fiscal_state_advance(
+        store,
+        anchor,
+        staged,
+        advance,
+        next_authority,
+        policy,
+        charters,
+        fence,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
 fn finish_fiscal_state_advance(
     store: &SqliteFiscalStore,
     anchor: &dyn FiscalStateAnchor,

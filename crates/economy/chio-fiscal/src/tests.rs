@@ -369,6 +369,35 @@ fn schedule_rejects_lineage_gaps_and_cross_domain_predecessors() {
     )
     .build_body(&charter, Some(&predecessor))
     .is_err());
+
+    let mut successor_builder = charter_builder();
+    successor_builder.sequence = 2;
+    successor_builder.predecessor_charter_digest = Some(charter.digest().to_string());
+    let successor_charter =
+        VerifiedFiscalCharter::verify(successor_builder.sign(&key(9)).test_unwrap()).test_unwrap();
+    let replacement = schedule_builder(FiscalDomain::TierLimits, tier_params())
+        .sign_rotation_replacement(&successor_charter, &predecessor, &key(9))
+        .test_unwrap();
+    assert_eq!(
+        VerifiedFiscalSchedule::verify_rotation_replacement(
+            replacement,
+            &successor_charter,
+            &predecessor,
+        )
+        .test_unwrap()
+        .body()
+        .sequence,
+        2
+    );
+
+    let mut unrelated_builder = charter_builder();
+    unrelated_builder.sequence = 2;
+    unrelated_builder.predecessor_charter_digest = Some("1".repeat(64));
+    let unrelated =
+        VerifiedFiscalCharter::verify(unrelated_builder.sign(&key(9)).test_unwrap()).test_unwrap();
+    assert!(schedule_builder(FiscalDomain::TierLimits, tier_params())
+        .build_rotation_replacement(&unrelated, &predecessor)
+        .is_err());
 }
 
 #[test]
