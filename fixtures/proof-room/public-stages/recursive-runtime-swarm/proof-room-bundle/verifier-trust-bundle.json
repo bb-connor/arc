@@ -92,7 +92,7 @@
   "workflowIntersections": [
     {
       "intersectionId": "workflow-intersection:buyer-refund:001",
-      "sha256": "eed26f6f877ffba1240d75d95f717fd1b71ca42210e336d5d0bf15a7677f821c"
+      "sha256": "b6d7c675906d97261c134d6e4be4402a54eb352db9dcb8a84424b3c9cb9320c5"
     }
   ],
   "runtimePolicyIssuerPublicKeys": [

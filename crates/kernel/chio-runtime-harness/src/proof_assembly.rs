@@ -759,12 +759,31 @@ pub(crate) fn assemble_runtime_loopback_outputs(
     if workflow_report.accepted {
         Ok(())
     } else {
+        let parity_detail = parity_report
+            .as_ref()
+            .filter(|report| !report.accepted)
+            .map(|report| {
+                let fields = report
+                    .mismatches
+                    .iter()
+                    .map(|mismatch| mismatch.field.as_str())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                format!(
+                    "; mismatched fields: [{}]; proof package hash match: {}; verifier report hash match: {}",
+                    fields,
+                    report.static_proof_package_sha256 == report.runtime_proof_package_sha256,
+                    report.static_verifier_report_sha256 == report.runtime_verifier_report_sha256,
+                )
+            })
+            .unwrap_or_default();
         Err(RuntimeLoopbackError::message(format!(
-            "Chio runtime loopback rejected request: {}",
+            "Chio runtime loopback rejected request: {}{}",
             workflow_report
                 .failure_code
                 .as_deref()
-                .unwrap_or("unknown_runtime_loopback_failure")
+                .unwrap_or("unknown_runtime_loopback_failure"),
+            parity_detail,
         )))
     }
 }
