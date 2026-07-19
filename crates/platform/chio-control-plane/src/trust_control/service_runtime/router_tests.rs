@@ -77,6 +77,39 @@ async fn fiscal_runtime_status_is_authenticated_and_disabled_by_default() {
     assert_eq!(disabled.status(), StatusCode::CONFLICT);
 }
 
+#[tokio::test]
+async fn fiscal_marketplace_consumers_require_auth_and_a_runtime() {
+    let state = metrics_state("service-secret");
+    let price = FiscalMarketplacePriceRequest {
+        base: chio_appraisal::MarketplaceBasePrice::new(1_000, "USD"),
+        context: chio_appraisal::MarketplacePricingContext::new(
+            "tenant-a",
+            chio_appraisal::MarketplaceReputationTier::Tier1,
+        ),
+    };
+    let unauthorized =
+        handle_fiscal_marketplace_price(State(state.clone()), HeaderMap::new(), Json(price)).await;
+    assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_static("Bearer service-secret"),
+    );
+    let disabled = handle_fiscal_marketplace_credit_limit(
+        State(state),
+        headers,
+        Json(chio_underwriting::MarketplaceCreditLimitRequest {
+            tenant_id: "tenant-a".to_owned(),
+            reputation_tier: chio_underwriting::MarketplaceLimitTier::Tier1,
+            currency: "USD".to_owned(),
+            publisher_revoked: false,
+        }),
+    )
+    .await;
+    assert_eq!(disabled.status(), StatusCode::CONFLICT);
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

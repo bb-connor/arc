@@ -988,6 +988,36 @@ mod tests {
         assert_eq!(runtime.fence, authority.mutation_fence());
         assert_eq!(runtime.anchor.read()?, *checkpoint.signed());
 
+        let price = runtime.with_resolver(|resolver| {
+            chio_appraisal::compute_fiscal_marketplace_invocation_price(
+                &chio_appraisal::MarketplaceBasePrice::new(1_000, "USD"),
+                &chio_appraisal::MarketplacePricingContext::new(
+                    "tenant-a",
+                    chio_appraisal::MarketplaceReputationTier::Tier1,
+                ),
+                resolver,
+            )
+        })??;
+        assert_eq!(price.units, 950);
+        let limit = runtime
+            .with_resolver(|resolver| {
+                chio_underwriting::compute_fiscal_marketplace_credit_limit(
+                    &chio_underwriting::MarketplaceCreditLimitRequest {
+                        tenant_id: "tenant-a".to_owned(),
+                        reputation_tier: chio_underwriting::MarketplaceLimitTier::Tier1,
+                        currency: "USD".to_owned(),
+                        publisher_revoked: false,
+                    },
+                    resolver,
+                )
+            })?
+            .map_err(|reason| {
+                std::io::Error::other(format!(
+                    "fiscal marketplace credit-limit resolution denied: {reason:?}"
+                ))
+            })?;
+        assert_eq!(limit.limit_units, 200);
+
         let candidate = FiscalScheduleBuilder {
             domain: FiscalDomain::TierLimits,
             params: FiscalParams::TierLimits {

@@ -216,6 +216,60 @@ pub(crate) async fn handle_fiscal_resolve(
     }
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct FiscalMarketplacePriceRequest {
+    pub(crate) base: chio_appraisal::MarketplaceBasePrice,
+    pub(crate) context: chio_appraisal::MarketplacePricingContext,
+}
+
+pub(crate) async fn handle_fiscal_marketplace_price(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<FiscalMarketplacePriceRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    let Some(runtime) = state.fiscal_runtime.as_ref() else {
+        return fiscal_runtime_not_configured();
+    };
+    match runtime.with_resolver(|resolver| {
+        chio_appraisal::compute_fiscal_marketplace_invocation_price(
+            &request.base,
+            &request.context,
+            resolver,
+        )
+    }) {
+        Ok(Ok(price)) => Json(price).into_response(),
+        Ok(Err(error)) => plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
+        Err(error) => fiscal_operation_error(error),
+    }
+}
+
+pub(crate) async fn handle_fiscal_marketplace_credit_limit(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<chio_underwriting::MarketplaceCreditLimitRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    let Some(runtime) = state.fiscal_runtime.as_ref() else {
+        return fiscal_runtime_not_configured();
+    };
+    match runtime.with_resolver(|resolver| {
+        chio_underwriting::compute_fiscal_marketplace_credit_limit(&request, resolver)
+    }) {
+        Ok(Ok(decision)) => Json(decision).into_response(),
+        Ok(Err(reason)) => plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            &format!("fiscal marketplace credit-limit resolution denied: {reason:?}"),
+        ),
+        Err(error) => fiscal_operation_error(error),
+    }
+}
+
 fn fiscal_runtime_not_configured() -> Response {
     plain_http_error(
         StatusCode::CONFLICT,

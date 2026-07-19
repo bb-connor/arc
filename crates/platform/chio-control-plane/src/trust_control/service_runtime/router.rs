@@ -181,6 +181,14 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         )
         .route(FISCAL_RESOLVE_PATH, post(handle_fiscal_resolve))
         .route(
+            FISCAL_MARKETPLACE_PRICE_PATH,
+            post(handle_fiscal_marketplace_price),
+        )
+        .route(
+            FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH,
+            post(handle_fiscal_marketplace_credit_limit),
+        )
+        .route(
             FISCAL_PROPOSAL_PREVIEW_PATH,
             post(handle_fiscal_proposal_preview),
         )

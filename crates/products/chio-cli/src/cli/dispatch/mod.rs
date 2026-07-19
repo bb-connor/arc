@@ -228,7 +228,9 @@ pub(crate) fn run() {
         Commands::Workflow { command } => dispatch_workflow(command, json_output),
         Commands::Cert { command } => dispatch_cert(command, json_output, authority_seed_file),
         Commands::Reputation { command } => dispatch_reputation(command, json_output, receipt_db, budget_db, authority_seed_file, control_url, control_token),
-        Commands::Guard { command } => dispatch_guard(command, json_output),
+        Commands::Guard { command } => {
+            dispatch_guard(command, json_output, control_url, control_token)
+        }
         Commands::Conformance { command } => dispatch_conformance(command),
         Commands::Federation { command } => dispatch_chio_federation_command(command),
         Commands::Attest { command } => dispatch_chio_attest_command(command),
