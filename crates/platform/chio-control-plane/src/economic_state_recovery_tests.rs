@@ -1320,21 +1320,20 @@ fn prepared_effect_verifier_binds_operation_request_handoff_and_fences() -> Test
     let operations = fixture._authority.admission_operation_store();
     let mut mutation = prepared_economic_operation(&fixture.fence, "prepared-mutation");
     let dispatch = prepared_dispatch_operation(&fixture.fence, "prepared-dispatch");
-    let channel = prepared_dispatch_operation_with_requirements(
+    let approval = prepared_dispatch_operation_with_requirements(
         &fixture.fence,
-        "prepared-channel-dispatch",
+        "prepared-approval-dispatch",
         AdmissionParticipantRequirements {
             broker_attempt: true,
             budget_capture: true,
-            obligation: true,
-            channel: true,
+            approval: true,
             ..AdmissionParticipantRequirements::NONE
         },
     );
     let now = now_ms();
     operations.begin(&mutation, &fixture.fence, now)?;
     operations.begin(&dispatch, &fixture.fence, now + 1)?;
-    operations.begin(&channel, &fixture.fence, now + 2)?;
+    operations.begin(&approval, &fixture.fence, now + 2)?;
     let verifier = QualifiedEconomicAdmissionHandoffVerifier::new(
         fixture.operations.clone(),
         fixture.fence.clone(),
@@ -1353,41 +1352,17 @@ fn prepared_effect_verifier_binds_operation_request_handoff_and_fences() -> Test
         6,
     )?;
     verifier.verify_prepared_effect(&dispatch_slot)?;
-    let channel_lease = operations.claim_recovery(
-        channel.binding().operation_id(),
-        channel.version(),
-        &identifier("claimant_id", "prepared-channel-owner"),
-        now + 3,
-        now + 1_003,
-        &fixture.fence,
-    )?;
-    let channel_command = AdmissionOperationCommand::new(
-        channel.binding().operation_id().clone(),
-        channel.version(),
-        channel_lease,
-        vec![AdmissionAttachment::ChannelReservationProposalDigest(
-            admission_digest("channel_reservation_proposal_digest", 'd'),
-        )],
-        None,
-        None,
-        None,
-    )?;
-    let channel = operations
-        .compare_and_swap(&channel_command, now + 4)?
-        .into_operation();
-    assert_eq!(channel.state(), AdmissionOperationState::Prepared);
-    assert_eq!(channel.version(), 2);
-    let channel_slot = prepared_effect_slot(
-        &channel,
+    let approval_slot = prepared_effect_slot(
+        &approval,
         &fixture.fence,
         EconomicAdmissionHandoffStateV1::DispatchCommitted,
         7,
     )?;
-    verifier.verify_prepared_effect(&channel_slot)?;
-    let mut stale_channel_slot = channel_slot;
-    stale_channel_slot.admission_handoff.operation_version = 6;
+    verifier.verify_prepared_effect(&approval_slot)?;
+    let mut stale_approval_slot = approval_slot;
+    stale_approval_slot.admission_handoff.operation_version = 6;
     assert!(verifier
-        .verify_prepared_effect(&stale_channel_slot)
+        .verify_prepared_effect(&stale_approval_slot)
         .is_err());
 
     let mut wrong_request = mutation_slot.clone();

@@ -476,7 +476,7 @@ fn probationary_subject_denied_broad_issue_request() {
 }
 
 #[test]
-fn control_plane_rejects_cumulative_approval_until_atomic_enforcement_exists() {
+fn control_plane_issues_cumulative_approval_for_atomic_enforcement() {
     let authority = wrap_capability_authority(
         Box::new(chio_kernel::LocalCapabilityAuthority::new(
             Keypair::generate(),
@@ -508,9 +508,20 @@ fn control_plane_rejects_cumulative_approval_until_atomic_enforcement_exists() {
         ..ChioScope::default()
     };
 
+    let capability = authority
+        .issue_capability(&Keypair::generate().public_key(), scope, 300)
+        .test_expect("cumulative approval capability should issue");
     assert!(matches!(
-        authority.issue_capability(&Keypair::generate().public_key(), scope, 300),
-        Err(KernelError::CapabilityIssuanceDenied(_))
+        capability.scope.grants[0].constraints.as_slice(),
+        [Constraint::RequireCumulativeApprovalAbove {
+            threshold: MonetaryAmount {
+                units: 100,
+                currency,
+            },
+            approval_budget_id,
+            approval_budget_epoch: 1,
+            cumulative_approval_root_binding: None,
+        }] if currency == "USD" && approval_budget_id == "budget-1"
     ));
 }
 
